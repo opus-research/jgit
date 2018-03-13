@@ -160,9 +160,6 @@ class Clone extends AbstractFetchCommand {
 		}
 		if (idHEAD != null && head == null)
 			head = idHEAD;
-		else
-			head = result
-					.getAdvertisedRef(Constants.R_HEADS + Constants.MASTER);
 		return head;
 	}
 
