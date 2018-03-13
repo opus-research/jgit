@@ -61,7 +61,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.URIish;
@@ -83,9 +82,8 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 		super.tearDown();
 	}
 
-	protected TestRepository<FileRepository> createTestRepository()
-			throws IOException {
-		return new TestRepository<FileRepository>(createBareRepository());
+	protected TestRepository createTestRepository() throws Exception {
+		return new TestRepository(createBareRepository());
 	}
 
 	protected URIish toURIish(String path) throws URISyntaxException {
