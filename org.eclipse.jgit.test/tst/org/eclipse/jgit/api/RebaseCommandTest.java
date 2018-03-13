@@ -1740,8 +1740,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals("edited commit message", actualCommitMag);
 	}
 
-	// dummy
-
 	private File getTodoFile() {
 		File todoFile = new File(db.getDirectory(),
 				"rebase-merge/git-rebase-todo");
