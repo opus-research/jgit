@@ -415,7 +415,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		walk.release();
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
-		refUpdate.setRefLogMessage("checkout: moving to " + branchName, false);
 		refUpdate.link(branchName);
 	}
 

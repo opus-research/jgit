@@ -57,7 +57,7 @@ import org.eclipse.jgit.util.NB;
  * with this instance can alter at any time, if this instance is modified to
  * represent a different object name.
  */
-public abstract class AnyObjectId implements Comparable<AnyObjectId> {
+public abstract class AnyObjectId implements Comparable<Object> {
 
 	/**
 	 * Compare to object identifier byte sequences for equality.
@@ -182,6 +182,10 @@ public abstract class AnyObjectId implements Comparable<AnyObjectId> {
 			return cmp;
 
 		return NB.compareUInt32(w5, other.w5);
+	}
+
+	public final int compareTo(final Object other) {
+		return compareTo(((AnyObjectId) other));
 	}
 
 	/**
