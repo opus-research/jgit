@@ -149,6 +149,9 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 		FileUtil.createSymLink(path, target);
 	}
 
+	/**
+	 * @since 3.3
+	 */
 	@Override
 	public Attributes getAttributes(File path) {
 		return FileUtil.getFileAttributesPosix(this, path);
