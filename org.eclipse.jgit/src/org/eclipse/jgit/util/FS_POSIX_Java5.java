@@ -41,30 +41,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.internal;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 
-import org.eclipse.jgit.util.FS;
-
-/**
- * FS implementaton for Java5
- */
-public class FS_POSIX_Java5 extends FS_POSIX {
-	/**
-	 * Constructor
-	 */
-	public FS_POSIX_Java5() {
+class FS_POSIX_Java5 extends FS_POSIX {
+	FS_POSIX_Java5() {
 		super();
 	}
 
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            instance whose attributes to copy
-	 */
-	public FS_POSIX_Java5(FS src) {
+	FS_POSIX_Java5(FS src) {
 		super(src);
 	}
 

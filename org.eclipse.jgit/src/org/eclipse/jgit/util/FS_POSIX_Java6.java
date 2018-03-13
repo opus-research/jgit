@@ -43,18 +43,13 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.internal;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-import org.eclipse.jgit.util.FS;
-
-/**
- * FS implementation for POSIX systems using Java6
- */
-public class FS_POSIX_Java6 extends FS_POSIX {
+class FS_POSIX_Java6 extends FS_POSIX {
 	private static final Method canExecute;
 
 	private static final Method setExecute;
@@ -64,11 +59,7 @@ public class FS_POSIX_Java6 extends FS_POSIX {
 		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE); //$NON-NLS-1$
 	}
 
-	/**
-	 * @return true if Java has the ability to set and get the executable flag
-	 *         on files
-	 */
-	public static boolean hasExecute() {
+	static boolean hasExecute() {
 		return canExecute != null && setExecute != null;
 	}
 
@@ -83,20 +74,11 @@ public class FS_POSIX_Java6 extends FS_POSIX {
 		}
 	}
 
-	/**
-	 * Constructor
-	 */
-	public FS_POSIX_Java6() {
+	FS_POSIX_Java6() {
 		super();
 	}
 
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            instance whose attributes to copy
-	 */
-	public FS_POSIX_Java6(FS src) {
+	FS_POSIX_Java6(FS src) {
 		super(src);
 	}
 
