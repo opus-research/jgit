@@ -608,12 +608,12 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * Returns the object ids in the pack file that was created by this writer.
-	 * <p>
+	 *
 	 * This method can only be invoked after
 	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
 	 * been invoked and completed successfully.
 	 *
-	 * @return set of objects in pack.
+	 * @return number of objects in pack.
 	 * @throws IOException
 	 *             a cached pack cannot supply its object ids.
 	 */
@@ -623,20 +623,17 @@ public class PackWriter implements AutoCloseable {
 			throw new IOException(
 					JGitText.get().cachedPacksPreventsListingObjects);
 
-		if (writeBitmaps != null) {
-			return writeBitmaps.getObjectSet();
-		}
-
-		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> r = new ObjectIdOwnerMap<>();
+		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> objs = new ObjectIdOwnerMap<
+				ObjectIdOwnerMap.Entry>();
 		for (BlockList<ObjectToPack> objList : objectsLists) {
 			if (objList != null) {
 				for (ObjectToPack otp : objList)
-					r.add(new ObjectIdOwnerMap.Entry(otp) {
+					objs.add(new ObjectIdOwnerMap.Entry(otp) {
 						// A new entry that copies the ObjectId
 					});
 			}
 		}
-		return r;
+		return objs;
 	}
 
 	/**
