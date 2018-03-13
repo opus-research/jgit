@@ -56,10 +56,8 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIteratorWithTimeControl;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
 
-public class RacyGitTest extends RepositoryTestCase {
-	@Test
+public class RacyGitTests extends RepositoryTestCase {
 	public void testIterator() throws IllegalStateException, IOException,
 			InterruptedException {
 		TreeSet<Long> modTimes = new TreeSet<>();
@@ -123,7 +121,6 @@ public class RacyGitTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testRacyGitDetection() throws IOException,
 			IllegalStateException, InterruptedException {
 		TreeSet<Long> modTimes = new TreeSet<>();
