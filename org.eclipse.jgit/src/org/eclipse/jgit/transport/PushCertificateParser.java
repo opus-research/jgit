@@ -54,10 +54,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.BaseReceivePack.ReceiveConfig;
 import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -115,16 +115,11 @@ public class PushCertificateParser {
 	private final List<ReceiveCommand> commands;
 	private final StringBuilder rawCommands;
 
-	PushCertificateParser(Repository into, SignedPushConfig cfg) {
-		if (cfg != null) {
-			nonceSlopLimit = cfg.getCertNonceSlopLimit();
-			nonceGenerator = cfg.getCertNonceSeed() != null
-					? new HMACSHA1NonceGenerator(cfg.certNonceSeed)
-					: null;
-		} else {
-			nonceSlopLimit = 0;
-			nonceGenerator = null;
-		}
+	PushCertificateParser(Repository into, ReceiveConfig cfg) {
+		nonceSlopLimit = cfg.certNonceSlopLimit;
+		nonceGenerator = cfg.certNonceSeed != null
+				? new HMACSHA1NonceGenerator(cfg.certNonceSeed)
+				: null;
 		db = into;
 		commands = new ArrayList<>();
 		rawCommands = new StringBuilder();
@@ -184,7 +179,7 @@ public class PushCertificateParser {
 		if (s.length() <= header.length()
 				|| !s.startsWith(header)
 				|| s.charAt(header.length()) != ' ') {
-			throw new PackProtocolException(MessageFormat.format(
+			throw new IOException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidHeader, header));
 		}
 		return s.substring(header.length() + 1);
@@ -215,13 +210,13 @@ public class PushCertificateParser {
 		try {
 			version = parseHeader(pckIn, VERSION);
 			if (!version.equals(VERSION_0_1)) {
-				throw new PackProtocolException(MessageFormat.format(
+				throw new IOException(MessageFormat.format(
 						JGitText.get().pushCertificateInvalidFieldValue, VERSION, version));
 			}
 			String pusherStr = parseHeader(pckIn, PUSHER);
 			pusher = RawParseUtils.parsePersonIdent(pusherStr);
 			if (pusher == null) {
-				throw new PackProtocolException(MessageFormat.format(
+				throw new IOException(MessageFormat.format(
 						JGitText.get().pushCertificateInvalidFieldValue,
 						PUSHER, pusherStr));
 			}
@@ -229,11 +224,11 @@ public class PushCertificateParser {
 			receivedNonce = parseHeader(pckIn, NONCE);
 			// An empty line.
 			if (!pckIn.readString().isEmpty()) {
-				throw new PackProtocolException(
+				throw new IOException(
 						JGitText.get().pushCertificateInvalidHeader);
 			}
 		} catch (EOFException eof) {
-			throw new PackProtocolException(
+			throw new IOException(
 					JGitText.get().pushCertificateInvalidHeader, eof);
 		}
 		nonceStatus = nonceGenerator != null
@@ -258,18 +253,17 @@ public class PushCertificateParser {
 	 */
 	public void receiveSignature(PacketLineIn pckIn) throws IOException {
 		try {
-			StringBuilder sig = new StringBuilder(BEGIN_SIGNATURE);
+			StringBuilder sig = new StringBuilder();
 			String line;
 			while (!(line = pckIn.readStringRaw()).equals(END_SIGNATURE)) {
 				sig.append(line);
 			}
-			signature = sig.append(END_SIGNATURE).toString();
+			signature = sig.toString();
 			if (!pckIn.readStringRaw().equals(END_CERT)) {
-				throw new PackProtocolException(
-						JGitText.get().pushCertificateInvalidSignature);
+				throw new IOException(JGitText.get().pushCertificateInvalidSignature);
 			}
 		} catch (EOFException eof) {
-			throw new PackProtocolException(
+			throw new IOException(
 					JGitText.get().pushCertificateInvalidSignature, eof);
 		}
 	}
