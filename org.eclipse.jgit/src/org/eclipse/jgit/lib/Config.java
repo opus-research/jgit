@@ -58,7 +58,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -896,7 +895,7 @@ public class Config {
 		if (value instanceof ConfigEnum)
 			n = ((ConfigEnum) value).toConfigValue();
 		else
-			n = value.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+			n = value.name().toLowerCase().replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
