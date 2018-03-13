@@ -62,10 +62,14 @@ class FS_Win32_Cygwin extends FS_Win32 {
 				});
 		if (path == null)
 			return false;
-		File found = FS.searchPath(path, "cygpath.exe");
-		if (found != null)
-			cygpath = found.getPath();
-		return cygpath != null;
+		for (final String p : path.split(";")) {
+			final File e = new File(p, "cygpath.exe");
+			if (e.isFile()) {
+				cygpath = e.getAbsolutePath();
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public File resolve(final File dir, final String pn) {
