@@ -48,25 +48,14 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Task;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.InitCommand;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 
-/**
- * Create an empty git repository.
- * 
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
- *      >git-init(1)</a>
- */
 public class GitInitTask extends Task {
-
 	private File dest;
 	private boolean bare;
 
 	/**
-	 * Set the destination git repository.
-	 * 
 	 * @param dest
-	 *            the destination directory that should be initialized with the
-	 *            git repository.
+	 *            the dest to set
 	 */
 	public void setDest(File dest) {
 		this.dest = dest;
@@ -74,8 +63,7 @@ public class GitInitTask extends Task {
 
 	/**
 	 * @param bare
-	 *            whether the repository should be initialized to a bare
-	 *            repository or not.
+	 *            the bare to set
 	 */
 	public void setBare(boolean bare) {
 		this.bare = bare;
@@ -88,12 +76,8 @@ public class GitInitTask extends Task {
 		} else {
 			log("Initializing repository at " + dest);
 		}
-		try {
-			InitCommand init = Git.init();
-			init.setBare(bare).setDirectory(dest);
-			init.call();
-		} catch (JGitInternalException e) {
-			throw new BuildException("Could not initialize repository", e);
-		}
+		InitCommand init = Git.init();
+		init.setBare(bare).setDirectory(dest);
+		init.call();
 	}
 }
