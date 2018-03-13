@@ -48,7 +48,6 @@ import static org.eclipse.jgit.transport.SideBandOutputStream.HDR_SIZE;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Writer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -84,18 +83,16 @@ class SideBandInputStream extends InputStream {
 	static final int CH_ERROR = 3;
 
 	private static Pattern P_UNBOUNDED = Pattern
-			.compile("^([\\w ]+): +(\\d+)(?:, done\\.)? *[\r\n]$");
+			.compile("^([\\w ]+): +(\\d+)(?:, done\\.)? *$");
 
 	private static Pattern P_BOUNDED = Pattern
-			.compile("^([\\w ]+): +\\d+% +\\( *(\\d+)/ *(\\d+)\\)(?:, done\\.)? *[\r\n]$");
+			.compile("^([\\w ]+): +\\d+% +\\( *(\\d+)/ *(\\d+)\\)(?:, done\\.)? *$");
 
 	private final InputStream rawIn;
 
 	private final PacketLineIn pckIn;
 
 	private final ProgressMonitor monitor;
-
-	private final Writer messages;
 
 	private String progressBuffer = "";
 
@@ -109,12 +106,10 @@ class SideBandInputStream extends InputStream {
 
 	private int available;
 
-	SideBandInputStream(final InputStream in, final ProgressMonitor progress,
-			final Writer messageStream) {
+	SideBandInputStream(final InputStream in, final ProgressMonitor progress) {
 		rawIn = in;
 		pckIn = new PacketLineIn(rawIn);
 		monitor = progress;
-		messages = messageStream;
 		currentTask = "";
 	}
 
@@ -175,7 +170,7 @@ class SideBandInputStream extends InputStream {
 		}
 	}
 
-	private void progress(String pkt) throws IOException {
+	private void progress(String pkt) {
 		pkt = progressBuffer + pkt;
 		for (;;) {
 			final int lf = pkt.indexOf('\n');
@@ -190,13 +185,16 @@ class SideBandInputStream extends InputStream {
 			else
 				break;
 
-			doProgressLine(pkt.substring(0, s + 1));
-			pkt = pkt.substring(s + 1);
+			final String msg = pkt.substring(0, s);
+			if (doProgressLine(msg))
+				pkt = pkt.substring(s + 1);
+			else
+				break;
 		}
 		progressBuffer = pkt;
 	}
 
-	private void doProgressLine(final String msg) throws IOException {
+	private boolean doProgressLine(final String msg) {
 		Matcher matcher;
 
 		matcher = P_BOUNDED.matcher(msg);
@@ -210,7 +208,7 @@ class SideBandInputStream extends InputStream {
 			final int cnt = Integer.parseInt(matcher.group(2));
 			monitor.update(cnt - lastCnt);
 			lastCnt = cnt;
-			return;
+			return true;
 		}
 
 		matcher = P_UNBOUNDED.matcher(msg);
@@ -224,10 +222,10 @@ class SideBandInputStream extends InputStream {
 			final int cnt = Integer.parseInt(matcher.group(2));
 			monitor.update(cnt - lastCnt);
 			lastCnt = cnt;
-			return;
+			return true;
 		}
 
-		messages.write(msg);
+		return false;
 	}
 
 	private void beginTask(final int totalWorkUnits) {
