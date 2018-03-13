@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,56 +40,59 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.merge;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertFalse;
 
-import java.io.IOException;
+import java.io.File;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.util.FileUtils;
+import org.junit.Test;
 
-/**
- * Persistent configuration that can be stored and loaded from a location.
- */
-public abstract class StoredConfig extends Config {
-	/** Create a configuration with no default fallback. */
-	public StoredConfig() {
-		super();
+public class ResolveMergerTest extends RepositoryTestCase {
+
+	@Test
+	public void failingPathsShouldNotResultInOKReturnValue() throws Exception {
+		File folder1 = new File(db.getWorkTree(), "folder1");
+		FileUtils.mkdir(folder1);
+		File file = new File(folder1, "file1.txt");
+		write(file, "folder1--file1.txt");
+		file = new File(folder1, "file2.txt");
+		write(file, "folder1--file2.txt");
+
+		Git git = new Git(db);
+		git.add().addFilepattern(folder1.getName()).call();
+		RevCommit base = git.commit().setMessage("adding folder").call();
+
+		recursiveDelete(folder1);
+		git.rm().addFilepattern("folder1/file1.txt")
+				.addFilepattern("folder1/file2.txt").call();
+		RevCommit other = git.commit()
+				.setMessage("removing folders on 'other'").call();
+
+		git.checkout().setName(base.name()).call();
+
+		file = new File(db.getWorkTree(), "unrelated.txt");
+		write(file, "unrelated");
+
+		git.add().addFilepattern("unrelated").call();
+		RevCommit head = git.commit().setMessage("Adding another file").call();
+
+		// Untracked file to cause failing path for delete() of folder1
+		file = new File(folder1, "file3.txt");
+		write(file, "folder1--file3.txt");
+
+		ResolveMerger merger = new ResolveMerger(db, false);
+		merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
+		merger.setWorkingTreeIterator(new FileTreeIterator(db));
+		boolean ok = merger.merge(head.getId(), other.getId());
+
+		assertFalse(merger.getFailingPaths().isEmpty());
+		assertFalse(ok);
 	}
 
-	/**
-	 * Create an empty configuration with a fallback for missing keys.
-	 *
-	 * @param defaultConfig
-	 *            the base configuration to be consulted when a key is missing
-	 *            from this configuration instance.
-	 */
-	public StoredConfig(Config defaultConfig) {
-		super(defaultConfig);
-	}
-
-	/**
-	 * Load the configuration from the persistent store.
-	 * <p>
-	 * If the configuration does not exist, this configuration is cleared, and
-	 * thus behaves the same as though the backing store exists, but is empty.
-	 *
-	 * @throws IOException
-	 *             the configuration could not be read (but does exist).
-	 * @throws ConfigInvalidException
-	 *             the configuration is not properly formatted.
-	 */
-	public abstract void load() throws IOException, ConfigInvalidException;
-
-	/**
-	 * Save the configuration to the persistent store.
-	 *
-	 * @throws IOException
-	 *             the configuration could not be written.
-	 */
-	public abstract void save() throws IOException;
-
-	@Override
-	public void clear() {
-		super.clear();
-	}
 }
