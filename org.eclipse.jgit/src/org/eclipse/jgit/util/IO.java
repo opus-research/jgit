@@ -54,8 +54,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 
@@ -144,7 +142,13 @@ public class IO {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
 			final byte[] buf = new byte[(int) sz];
-			IO.readFully(in, buf, 0, buf.length);
+			int actSz = IO.readFully(in, buf, 0);
+
+			if (actSz == sz) {
+				byte[] ret = new byte[actSz];
+				System.arraycopy(buf, 0, ret, 0, actSz);
+				return ret;
+			}
 			return buf;
 		} finally {
 			try {
@@ -256,6 +260,31 @@ public class IO {
 	}
 
 	/**
+	 * Read the entire byte array into memory, unless input is shorter
+	 *
+	 * @param fd
+	 *            input stream to read the data from.
+	 * @param dst
+	 *            buffer that must be fully populated, [off, off+len).
+	 * @param off
+	 *            position within the buffer to start writing to.
+	 * @return number of bytes in buffer or stream, whichever is shortest
+	 * @throws IOException
+	 *             there was an error reading from the stream.
+	 */
+	public static int readFully(InputStream fd, byte[] dst, int off)
+			throws IOException {
+		int r;
+		int len = 0;
+		while ((r = fd.read(dst, off, dst.length - off)) >= 0
+				&& len < dst.length) {
+			off += r;
+			len += r;
+		}
+		return len;
+	}
+
+	/**
 	 * Skip an entire region of an input stream.
 	 * <p>
 	 * The input stream's position is moved forward by the number of requested
@@ -280,43 +309,6 @@ public class IO {
 				throw new EOFException(JGitText.get().shortSkipOfBlock);
 			toSkip -= r;
 		}
-	}
-
-	/**
-	 * Divides the given string into lines.
-	 *
-	 * @param s
-	 *            the string to read
-	 * @return the string divided into lines
-	 */
-	public static List<String> readLines(final String s) {
-		List<String> l = new ArrayList<String>();
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < s.length(); i++) {
-			char c = s.charAt(i);
-			if (c == '\n') {
-				l.add(sb.toString());
-				sb.setLength(0);
-				continue;
-			}
-			if (c == '\r') {
-				if (i + 1 < s.length()) {
-					c = s.charAt(++i);
-					l.add(sb.toString());
-					sb.setLength(0);
-					if (c != '\n') {
-						sb.append(c);
-					}
-					continue;
-				} else { // EOF
-					l.add(sb.toString());
-					break;
-				}
-			}
-			sb.append(c);
-		}
-		l.add(sb.toString());
-		return l;
 	}
 
 	private IO() {

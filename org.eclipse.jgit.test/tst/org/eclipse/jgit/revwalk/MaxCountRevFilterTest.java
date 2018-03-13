@@ -40,63 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.junit.Before;
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
 import org.junit.Test;
 
-public class ReadLinesTest {
-	List<String> l = new ArrayList<String>();
+public class MaxCountRevFilterTest extends RevWalkTestCase {
+	@Test
+	public void testMaxCountRevFilter() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c1 = commit(b);
+		final RevCommit c2 = commit(b);
+		final RevCommit d = commit(c1, c2);
+		final RevCommit e = commit(d);
 
-	@Before
-	public void clearList() {
-		l.clear();
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(3));
+		markStart(e);
+		assertCommit(e, rw.next());
+		assertCommit(d, rw.next());
+		assertCommit(c2, rw.next());
+		assertNull(rw.next());
+
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(e);
+		assertNull(rw.next());
 	}
 
 	@Test
-	public void testReadLines_singleLine() {
-		l.add("[0]");
-		assertEquals(l, IO.readLines("[0]"));
-	}
+	public void testMaxCountRevFilter0() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-	@Test
-	public void testReadLines_LF() {
-		l.add("[0]");
-		l.add("[1]");
-		assertEquals(l, IO.readLines("[0]\n[1]"));
-	}
-
-	@Test
-	public void testReadLines_CRLF() {
-		l.add("[0]");
-		l.add("[1]");
-		assertEquals(l, IO.readLines("[0]\r\n[1]"));
-	}
-
-	@Test
-	public void testReadLines_endLF() {
-		l.add("[0]");
-		l.add("");
-		assertEquals(l, IO.readLines("[0]\n"));
-	}
-
-	@Test
-	public void testReadLines_endCRLF() {
-		l.add("[0]");
-		l.add("");
-		assertEquals(l, IO.readLines("[0]\r\n"));
-	}
-
-	@Test
-	public void testReadLines_mixed() {
-		l.add("[0]");
-		l.add("[1]");
-		l.add("[2]");
-		assertEquals(l, IO.readLines("[0]\r\n[1]\n[2]"));
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(b);
+		assertNull(rw.next());
 	}
 }

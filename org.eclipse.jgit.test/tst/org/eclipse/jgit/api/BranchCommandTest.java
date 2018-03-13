@@ -465,12 +465,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		git.branchCreate().setName("topic").call();
 	}
 
-	@Test
-	public void testList_CLI() throws Exception {
-		assertEquals("* master 9c58deb Initial commit",
-				execute("git branch -v")[0]);
-	}
-
 	public Ref createBranch(Git actGit, String name, boolean force,
 			String startPoint, SetupUpstreamMode mode)
 			throws JGitInternalException, RefAlreadyExistsException,

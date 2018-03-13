@@ -55,8 +55,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
@@ -64,8 +62,8 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.pgm.CLIGitCommand;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepository;
@@ -101,14 +99,11 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 
 	protected File writeTrashFile(final String name, final String data)
 			throws IOException {
-		File path = new File(db.getWorkTree(), name);
-		write(path, data);
-		return path;
+		return JGitTestUtil.writeTrashFile(db, name, data);
 	}
 
 	protected void deleteTrashFile(final String name) throws IOException {
-		File path = new File(db.getWorkTree(), name);
-		FileUtils.delete(path);
+		JGitTestUtil.deleteTrashFile(db, name);
 	}
 
 	protected static void checkFile(File f, final String checkData)
@@ -401,13 +396,5 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
 		refUpdate.link(branchName);
-	}
-
-	protected String[] execute(String... cmds) throws Exception {
-		List<String> result = new ArrayList<String>(cmds.length);
-		for (String cmd : cmds) {
-			result.addAll(CLIGitCommand.execute(cmd, db));
-		}
-		return result.toArray(new String[0]);
 	}
 }

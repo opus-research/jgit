@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -68,6 +67,7 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.junit.Test;
@@ -268,6 +268,36 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testModeChange() throws IOException, NoFilepatternException,
+			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
+		Git git = new Git(db);
+
+		// create file
+		File file = new File(db.getWorkTree(), "a.txt");
+		FileUtils.createNewFile(file);
+		PrintWriter writer = new PrintWriter(file);
+		writer.print("content1");
+		writer.close();
+
+		// First commit - a.txt file
+		git.add().addFilepattern("a.txt").call();
+		git.commit().setMessage("commit1").setCommitter(committer).call();
+
+		// pure mode change should be committable
+		FS fs = db.getFS();
+		fs.setExecute(file, true);
+		git.add().addFilepattern("a.txt").call();
+		git.commit().setMessage("mode change").setCommitter(committer).call();
+
+		// pure mode change should be committable with -o option
+		fs.setExecute(file, false);
+		git.add().addFilepattern("a.txt").call();
+		git.commit().setMessage("mode change").setCommitter(committer)
+				.setOnly("a.txt").call();
+	}
+
+	@Test
 	public void testCommitRange() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
@@ -324,21 +354,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		reader = db.getReflogReader(db.getBranch());
 		assertTrue(reader.getLastEntry().getComment()
 				.startsWith("commit (amend):"));
-	}
-
-	@Test
-	public void testCommitAmend_CLI() throws Exception {
-		assertArrayEquals(
-				new String[] {
-						"[master 101cffba0364877df1942891eba7f465f628a3d2] first comit",
-						"",
-						"[master d2169869dadf16549be20dcf8c207349d2ed6c62] first commit",
-						"", "commit d2169869dadf16549be20dcf8c207349d2ed6c62",
-						"Author: GIT_COMMITTER_NAME <GIT_COMMITTER_EMAIL>",
-						"Date:   Sat Aug 15 20:12:58 2009 -0330", "",
-						"    first commit", "", "" },
-				execute("git commit -m 'first comit'",
-						"git commit --amend -m 'first commit'", "git log"));
 	}
 
 	@Test
