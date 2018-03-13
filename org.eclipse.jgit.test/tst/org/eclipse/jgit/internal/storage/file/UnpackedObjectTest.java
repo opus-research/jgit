@@ -93,7 +93,6 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		return rng;
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -106,7 +105,6 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
