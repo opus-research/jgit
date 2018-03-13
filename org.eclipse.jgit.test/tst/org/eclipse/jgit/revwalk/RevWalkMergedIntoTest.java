@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2014 IBM Corporation and others.
+ * Copyright (C) 2014, Sven Selberg <sven.selberg@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.junit.Before;
 import org.junit.Test;
 
-public class BranchTest extends CLIRepositoryTestCase {
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
-	}
+public class RevWalkMergedIntoTest extends RevWalkTestCase {
 
 	@Test
-	public void testList() throws Exception {
-		assertEquals("* master 6fd41be initial commit",
-				execute("git branch -v")[0]);
-	}
-
-	@Test
-	public void testListDetached() throws Exception {
-		RefUpdate updateRef = db.updateRef(Constants.HEAD, true);
-		updateRef.setNewObjectId(db.resolve("6fd41be"));
-		updateRef.update();
-		assertEquals("* (no branch) 6fd41be initial commit",
-				execute("git branch -v")[0]);
-	}
-
-	@Test
-	public void testListContains() throws Exception {
-		new Git(db).branchCreate().setName("initial").call();
-		RevCommit second = new Git(db).commit().setMessage("second commit")
-				.call();
-		assertArrayOfLinesEquals(new String[] { "  initial", "* master", "" },
-				execute("git branch --contains 6fd41be"));
-		assertArrayOfLinesEquals(new String[] { "* master", "" },
-				execute("git branch --contains " + second.name()));
-	}
-
-	@Test
-	public void testExistingBranch() throws Exception {
-		assertEquals("fatal: A branch named 'master' already exists.",
-				execute("git branch master")[0]);
+	public void testOldCommitWalk() throws Exception {
+		/*
+		 * Sometimes a merge is performed on a machine with faulty time.
+		 * This makes the traversal of the graph, when trying to find out if B
+		 * is merged into T, complex since the algorithm uses the time stamps
+		 * of commits to find the best route.
+		 * When for example O(ld) has a very old time stamp compared to one of the
+		 * commits (N(ew)) on the upper route between T and F(alse base), the route
+		 * to False is deemed the better option even though the alternate route leeds
+		 * to B(ase) which was the commit we were after.
+		 *
+		 *             o---o---o---o---N
+		 *            /                 \
+		 *           /   o---o---o---O---T
+		 *          /   /
+		 *      ---F---B
+		 *
+		 * This test is asserting that isMergedInto(B, T) returns true even
+		 * under those circumstances.
+		 */
+		final int threeDaysInSecs = 3 * 24 * 60 * 60;
+		final RevCommit f = commit();
+		final RevCommit b = commit(f);
+		final RevCommit o = commit(-threeDaysInSecs, commit(commit(commit(b))));
+		final RevCommit n = commit(commit(commit(commit(commit(f)))));
+		final RevCommit t = commit(n, o);
+		assertTrue(rw.isMergedInto(b, t));
 	}
 }
