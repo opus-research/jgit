@@ -592,14 +592,13 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return the EOL stream type of the current entry using the config and
 	 *         {@link #getAttributes()} Note that this method may return null if
 	 *         the {@link TreeWalk} is not based on a working tree
-	 * @since 4.9
 	 */
+	// TODO(msohn) make this method public in 4.4
 	@Nullable
-	public EolStreamType getEolStreamType(OperationType opType) {
+	EolStreamType getEolStreamType(OperationType opType) {
 		if (attributesNodeProvider == null || config == null)
 			return null;
-		return EolStreamTypeUtil.detectStreamType(
-				opType != null ? opType : operationType,
+		return EolStreamTypeUtil.detectStreamType(opType,
 					config.get(WorkingTreeOptions.KEY), getAttributes());
 	}
 
@@ -608,9 +607,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *         {@link #getAttributes()} Note that this method may return null if
 	 *         the {@link TreeWalk} is not based on a working tree
 	 * @since 4.3
-	 * @deprecated use {@link #getEolStreamType(OperationType)} instead.
 	 */
-	@Deprecated
+	// TODO(msohn) deprecate this method in 4.4
 	public @Nullable EolStreamType getEolStreamType() {
 		return (getEolStreamType(operationType));
 	}

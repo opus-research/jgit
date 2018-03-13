@@ -1394,7 +1394,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (eolStreamTypeHolder == null) {
 			EolStreamType type=null;
 			if (state.walk != null) {
-				type = state.walk.getEolStreamType(opType);
+				if (opType != null) {
+					type = state.walk.getEolStreamType(opType);
+				} else {
+					type=state.walk.getEolStreamType();
+				}
 			} else {
 				switch (getOptions().getAutoCRLF()) {
 				case FALSE:
