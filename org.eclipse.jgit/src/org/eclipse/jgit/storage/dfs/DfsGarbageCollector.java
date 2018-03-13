@@ -318,14 +318,14 @@ public class DfsGarbageCollector {
 		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
-		out = objdb.writeFile(pack, DfsObjDatabase.PACK_EXT);
+		out = objdb.writePackFile(pack);
 		try {
 			pw.writePack(pm, pm, out);
 		} finally {
 			out.close();
 		}
 
-		out = objdb.writeFile(pack, DfsObjDatabase.PACK_INDEX_EXT);
+		out = objdb.writePackIndex(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);

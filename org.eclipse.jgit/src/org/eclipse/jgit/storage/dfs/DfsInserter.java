@@ -220,8 +220,7 @@ public class DfsInserter extends ObjectInserter {
 
 		rollback = true;
 		packDsc = db.newPack(DfsObjDatabase.PackSource.INSERT);
-		packOut = new PackStream(
-				db.writeFile(packDsc, DfsObjDatabase.PACK_EXT));
+		packOut = new PackStream(db.writePackFile(packDsc));
 		packKey = new DfsPackKey();
 
 		// Write the header as though it were a single object pack.
@@ -251,7 +250,7 @@ public class DfsInserter extends ObjectInserter {
 			packIndex = PackIndex.read(buf.openInputStream());
 		}
 
-		DfsOutputStream os = db.writeFile(pack, DfsObjDatabase.PACK_INDEX_EXT);
+		DfsOutputStream os = db.writePackIndex(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
