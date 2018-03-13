@@ -134,31 +134,18 @@ public abstract class Reftable implements AutoCloseable {
 	public abstract LogCursor allLogs() throws IOException;
 
 	/**
-	 * Read a single reference's log.
+	 * Seek to a timestamp in a reference's log.
 	 *
 	 * @param refName
 	 *            exact name of the reference whose log to read.
+	 * @param timeUsec
+	 *            time in microseconds since the epoch to scan backwards from.
+	 *            Records at this time and older will be returned.
 	 * @return cursor to iterate.
 	 * @throws IOException
 	 *             logs cannot be read.
 	 */
-	public LogCursor seekLog(String refName) throws IOException {
-		return seekLog(refName, Long.MAX_VALUE);
-	}
-
-	/**
-	 * Seek to an update index in a reference's log.
-	 *
-	 * @param refName
-	 *            exact name of the reference whose log to read.
-	 * @param updateIndex
-	 *            most recent index to return first in the log cursor. Log
-	 *            records at or before {@code updateIndex} will be returned.
-	 * @return cursor to iterate.
-	 * @throws IOException
-	 *             logs cannot be read.
-	 */
-	public abstract LogCursor seekLog(String refName, long updateIndex)
+	public abstract LogCursor seekLog(String refName, long timeUsec)
 			throws IOException;
 
 	/**

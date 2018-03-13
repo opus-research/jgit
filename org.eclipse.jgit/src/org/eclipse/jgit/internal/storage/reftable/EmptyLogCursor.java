@@ -59,7 +59,7 @@ class EmptyLogCursor extends LogCursor {
 	}
 
 	@Override
-	public long getUpdateIndex() {
+	public long getReflogTimeUsec() {
 		return 0;
 	}
 
