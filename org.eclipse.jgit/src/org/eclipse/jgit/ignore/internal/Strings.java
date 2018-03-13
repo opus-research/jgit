@@ -141,7 +141,7 @@ public class Strings {
 	private static boolean isComplexWildcard(String pattern) {
 		int idx1 = pattern.indexOf('[');
 		if (idx1 != -1) {
-			int idx2 = pattern.indexOf(']');
+			int idx2 = pattern.indexOf(']', idx1);
 			if (idx2 > idx1)
 				return true;
 		}
@@ -157,7 +157,9 @@ public class Strings {
 					return false;
 				}
 				char nextChar = pattern.charAt(nextIdx);
-				if (escapedByBackslash(nextChar)) {
+				if (nextChar == '?' || nextChar == '*' || nextChar == '['
+				// required to match escaped backslashes '\\\\'
+						|| nextChar == '\\') {
 					return true;
 				} else {
 					return false;
@@ -165,12 +167,6 @@ public class Strings {
 			}
 		}
 		return false;
-	}
-
-	private static boolean escapedByBackslash(char nextChar) {
-		return nextChar == '?' || nextChar == '*' || nextChar == '['
-		// required to match escaped backslashes '\\\\'
-				|| nextChar == '\\';
 	}
 
 	static PatternState checkWildCards(String pattern) {
@@ -312,14 +308,6 @@ public class Strings {
 					char lookAhead = lookAhead(pattern, i);
 					if (lookAhead == ']' || lookAhead == '[')
 						ignoreLastBracket = true;
-				} else {
-					//
-					char lookAhead = lookAhead(pattern, i);
-					if (lookAhead != '\\' && lookAhead != '['
-							&& lookAhead != '?' && lookAhead != '*'
-							&& lookAhead != ' ' && lookBehind(sb) != '\\') {
-						break;
-					}
 				}
 				sb.append(c);
 				break;
@@ -455,31 +443,6 @@ public class Strings {
 				return JAVA_CHAR_CLASSES.get(i);
 		}
 		return null;
-	}
-
-	static String deleteBackslash(String s) {
-		if (s.indexOf('\\') < 0) {
-			return s;
-		}
-		StringBuilder sb = new StringBuilder(s.length());
-		char prev = 0;
-		for (int i = 0; i < s.length(); i++) {
-			char ch = s.charAt(i);
-			if ('\\' == ch) {
-				if (i + 1 == s.length()) {
-					continue;
-				}
-				char next = s.charAt(i + 1);
-				if (prev != '\\' && !escapedByBackslash(next)) {
-					continue;
-				}
-				prev = ch;
-			} else {
-				prev = 0;
-			}
-			sb.append(ch);
-		}
-		return sb.toString();
 	}
 
 }
