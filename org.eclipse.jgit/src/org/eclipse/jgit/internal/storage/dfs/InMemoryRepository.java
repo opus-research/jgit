@@ -25,7 +25,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
-import org.eclipse.jgit.lib.RepositoryShallow;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -471,10 +470,4 @@ public class InMemoryRepository extends DfsRepository {
 				return Objects.equals(a.getObjectId(), b.getObjectId());
 		}
 	}
-
-	@Override
-	public RepositoryShallow getRepositoryShallowHandler() {
-		return new RepositoryShallow();
-	}
-
 }
