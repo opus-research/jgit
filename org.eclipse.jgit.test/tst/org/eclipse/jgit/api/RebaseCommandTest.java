@@ -420,7 +420,8 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals(Status.STOPPED, res.getStatus());
 		assertEquals(conflicting, res.getCurrentCommit());
 		checkFile(FILE1,
-				"<<<<<<< OURS\n1master\n=======\n1topic\n>>>>>>> THEIRS\n2\n3\ntopic4");
+				"<<<<<<< Upstream, based on master\n1master\n=======\n1topic",
+				">>>>>>> e0d1dea change file1 in topic\n2\n3\ntopic4");
 
 		assertEquals(RepositoryState.REBASING_INTERACTIVE, db
 				.getRepositoryState());
@@ -778,8 +779,10 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 		res = git.rebase().setOperation(Operation.SKIP).call();
 		// TODO is this correct? It is what the command line returns
-		checkFile(FILE1,
-				"1master\n2\n<<<<<<< OURS\n3master\n=======\n3topic\n>>>>>>> THEIRS\n4\n5topic");
+		checkFile(
+				FILE1,
+				"1master\n2\n<<<<<<< Upstream, based on master\n3master\n=======\n3topic",
+				">>>>>>> 5afc8df change file1 in topic again\n4\n5topic");
 		assertEquals(Status.STOPPED, res.getStatus());
 	}
 
@@ -1362,38 +1365,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals("unstaged modified file0", read(file0));
 		// index shall be unchanged
 		assertEquals(indexState, indexState(CONTENT));
-		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
-	}
-
-	@Test
-	public void testRebaseWithUncommittedDelete() throws Exception {
-		// create file0 + file1, add and commit
-		File file0 = writeTrashFile("file0", "file0");
-		writeTrashFile(FILE1, "file1");
-		git.add().addFilepattern("file0").addFilepattern(FILE1).call();
-		RevCommit commit = git.commit().setMessage("commit1").call();
-
-		// create topic branch
-		createBranch(commit, "refs/heads/topic");
-
-		// still on master / modify file1, add and commit
-		writeTrashFile(FILE1, "modified file1");
-		git.add().addFilepattern(FILE1).call();
-		git.commit().setMessage("commit2").call();
-
-		// checkout topic branch / delete file0 and add to index
-		checkoutBranch("refs/heads/topic");
-		git.rm().addFilepattern("file0").call();
-		// do not commit
-
-		// rebase
-		RebaseResult result = git.rebase().setUpstream("refs/heads/master")
-				.call();
-		assertEquals(Status.FAST_FORWARD, result.getStatus());
-		assertFalse("File should still be deleted", file0.exists());
-		// index should only have updated file1
-		assertEquals("[file1, mode:100644, content:modified file1]",
-				indexState(CONTENT));
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 	}
 
