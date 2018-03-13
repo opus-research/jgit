@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -161,7 +162,7 @@ public class MutableObjectId extends AnyObjectId {
 	 *            the string to read from. Must be 40 characters long.
 	 */
 	public void fromString(final String str) {
-		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
+		if (str.length() != STR_LEN)
 			throw new IllegalArgumentException("Invalid id: " + str);
 		fromHexString(Constants.encodeASCII(str), 0);
 	}
@@ -174,8 +175,7 @@ public class MutableObjectId extends AnyObjectId {
 			w4 = RawParseUtils.parseHexInt32(bs, p + 24);
 			w5 = RawParseUtils.parseHexInt32(bs, p + 32);
 		} catch (ArrayIndexOutOfBoundsException e1) {
-			throw new InvalidObjectIdException(bs, p,
-					Constants.OBJECT_ID_STRING_LENGTH);
+			throw new InvalidObjectIdException(bs, p, STR_LEN);
 		}
 	}
 
