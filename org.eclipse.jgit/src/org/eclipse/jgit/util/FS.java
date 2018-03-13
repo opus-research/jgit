@@ -217,6 +217,10 @@ public abstract class FS {
 	 * <p>
 	 * Not all platforms and JREs support executable flags on files. If the
 	 * feature is unsupported this method will always return false.
+	 * <p>
+	 * <em>If the platform supports symbolic links and <code>f</code> is a symbolic link
+	 * this method returns false, rather than the state of the executable flags
+	 * on the target file.</em>
 	 *
 	 * @param f
 	 *            abstract path to test.

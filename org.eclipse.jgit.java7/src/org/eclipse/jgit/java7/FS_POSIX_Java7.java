@@ -134,7 +134,7 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtil.setHidden(path, hidden);
+		super.setHidden(path, hidden);
 	}
 
 	@Override

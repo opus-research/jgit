@@ -50,7 +50,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
@@ -104,7 +104,7 @@ public class FSTest {
 		assertTrue(fs.lastModified(targetFile) > fs.lastModified(link));
 		assertFalse(fs.canExecute(link));
 		fs.setExecute(targetFile, true);
-		assertTrue(fs.canExecute(link));
+		assertFalse(fs.canExecute(link));
 	}
 
 }
