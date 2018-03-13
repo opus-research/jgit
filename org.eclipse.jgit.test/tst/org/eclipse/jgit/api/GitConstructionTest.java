@@ -51,6 +51,7 @@ import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -71,6 +72,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 				.setURI(db.getDirectory().toURI().toString())
 				.setDirectory(createUniqueTestGitDir(true)).call()
 				.getRepository();
+		addRepoToClose(bareRepo);
 	}
 
 	@Test
@@ -79,7 +81,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 		assertEquals(1, git.branchList().call().size());
 
 		git = Git.wrap(bareRepo);
-		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
+		assertEquals(1, git.branchList().setListMode(ListMode.ALL).call()
 				.size());
 
 		try {
@@ -96,7 +98,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 		assertEquals(1, git.branchList().call().size());
 
 		git = Git.open(bareRepo.getDirectory());
-		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
+		assertEquals(1, git.branchList().setListMode(ListMode.ALL).call()
 				.size());
 
 		git = Git.open(db.getWorkTree());
