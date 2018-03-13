@@ -159,23 +159,16 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			RevCommit headCommit = headId == null ? null : revWalk
 					.parseCommit(headId);
 			RevCommit newCommit = revWalk.parseCommit(branch);
-			boolean isSameRev = (headCommit != null && headCommit
-					.equals(newCommit));
-
 			RevTree headTree = headCommit == null ? null : headCommit.getTree();
-			DirCacheCheckout dco = null;
-			if (!isSameRev) {
-				dco = new DirCacheCheckout(repo, headTree,
-						repo.lockDirCache(), newCommit.getTree());
-				dco.setFailOnConflict(true);
-
-				try {
-					dco.checkout();
-				} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
-					status = new CheckoutResult(Status.CONFLICTS,
-							dco.getConflicts());
-					throw new CheckoutConflictException(dco.getConflicts(), e);
-				}
+			DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
+					repo.lockDirCache(), newCommit.getTree());
+			dco.setFailOnConflict(true);
+			try {
+				dco.checkout();
+			} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
+				status = new CheckoutResult(Status.CONFLICTS, dco
+						.getConflicts());
+				throw new CheckoutConflictException(dco.getConflicts(), e);
 			}
 			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
@@ -212,7 +205,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
-			if (dco != null && !dco.getToBeDeleted().isEmpty()) {
+			if (!dco.getToBeDeleted().isEmpty()) {
 				status = new CheckoutResult(Status.NONDELETED, dco
 						.getToBeDeleted());
 			}
