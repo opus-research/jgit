@@ -42,6 +42,8 @@
 
 package org.eclipse.jgit.dircache;
 
+import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKOUT_OP;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -528,9 +530,7 @@ public class DirCacheCheckout {
 					String path = e.getKey();
 					CheckoutMetadata meta = e.getValue();
 					DirCacheEntry entry = dc.getEntry(path);
-					if (FileMode.GITLINK.equals(entry.getRawMode())) {
-						checkoutGitlink(path, entry);
-					} else {
+					if (!FileMode.GITLINK.equals(entry.getRawMode())) {
 						checkoutEntry(repo, entry, objectReader, false, meta);
 					}
 					e = null;
@@ -552,13 +552,6 @@ public class DirCacheCheckout {
 				throw new IndexWriteException();
 		}
 		return toBeDeleted.size() == 0;
-	}
-
-	private void checkoutGitlink(String path, DirCacheEntry entry) throws IOException {
-		File gitlinkDir = new File(repo.getWorkTree(), path);
-		FileUtils.mkdirs(gitlinkDir, true);
-		FS fs = repo.getFS();
-		entry.setLastModified(fs.lastModified(gitlinkDir));
 	}
 
 	private static ArrayList<String> filterOut(ArrayList<String> strings,
@@ -940,19 +933,14 @@ public class DirCacheCheckout {
 							// to be removed. Since the file is not dirty remove
 							// file and index entry
 							remove(name);
-					} else {
+					} else
 						// Something in Merge or current path is not part of
 						// File/Folder conflict
 						// Merge contains nothing or the same as Index
 						// Nothing in Head
 						// Something in Index
 						// -> Merge contains nothing new. Keep the index.
-						if (mMode == FileMode.GITLINK) {
-							update(name, mId, mMode);
-						} else {
-							keep(dce);
-						}
-					}
+						keep(dce);
 				} else
 					// Merge contains something and it is not the same as Index
 					// Nothing in Head
@@ -1162,7 +1150,8 @@ public class DirCacheCheckout {
 	private void update(String path, ObjectId mId, FileMode mode)
 			throws IOException {
 		if (!FileMode.TREE.equals(mode)) {
-			updated.put(path, new CheckoutMetadata(walk.getEolStreamType(),
+			updated.put(path, new CheckoutMetadata(
+					walk.getEolStreamType(CHECKOUT_OP),
 					walk.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE)));
 
 			DirCacheEntry entry = new DirCacheEntry(path, DirCacheEntry.STAGE_0);

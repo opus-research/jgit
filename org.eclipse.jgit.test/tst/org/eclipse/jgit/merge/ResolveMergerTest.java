@@ -46,16 +46,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
@@ -64,27 +62,21 @@ import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.errors.NoMergeBaseException.MergeBaseFailureReason;
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -702,6 +694,143 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		}
 	}
 
+
+	/**
+	 * Merging a change involving large binary files should short-circuit reads.
+	 *
+	 * @param strategy
+	 * @throws Exception
+	 */
+	@Theory
+	public void checkContentMergeLargeBinaries(MergeStrategy strategy) throws Exception {
+		Git git = Git.wrap(db);
+		final int LINELEN = 72;
+
+		// setup a merge that would work correctly if we disconsider the stray '\0'
+		// that the file contains near the start.
+		byte[] binary = new byte[LINELEN * 2000];
+		for (int i = 0; i < binary.length; i++) {
+			binary[i] = (byte)((i % LINELEN) == 0 ? '\n' : 'x');
+		}
+		binary[50] = '\0';
+
+		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
+		git.add().addFilepattern("file").call();
+		RevCommit first = git.commit().setMessage("added file").call();
+
+		// Generate an edit in a single line.
+		int idx = LINELEN * 1200 + 1;
+		byte save = binary[idx];
+		binary[idx] = '@';
+		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
+
+		binary[idx] = save;
+		git.add().addFilepattern("file").call();
+		RevCommit masterCommit = git.commit().setAll(true)
+			.setMessage("modified file l 1200").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first).setName("side").call();
+		binary[LINELEN * 1500 + 1] = '!';
+		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
+		git.add().addFilepattern("file").call();
+		RevCommit sideCommit = git.commit().setAll(true)
+			.setMessage("modified file l 1500").call();
+
+		try (ObjectInserter ins = db.newObjectInserter()) {
+			// Check that we don't read the large blobs.
+			ObjectInserter forbidInserter = new ObjectInserter.Filter() {
+				@Override
+				protected ObjectInserter delegate() {
+					return ins;
+				}
+
+				@Override
+				public ObjectReader newReader() {
+					return new BigReadForbiddenReader(super.newReader(), 8000);
+				}
+			};
+
+			ResolveMerger merger =
+				(ResolveMerger) strategy.newMerger(forbidInserter, db.getConfig());
+			boolean noProblems = merger.merge(masterCommit, sideCommit);
+			assertFalse(noProblems);
+		}
+	}
+
+	/**
+	 * Throws an exception if reading beyond limit.
+	 */
+	class BigReadForbiddenStream extends ObjectStream.Filter {
+		int limit;
+
+		BigReadForbiddenStream(ObjectStream orig, int limit) {
+			super(orig.getType(), orig.getSize(), orig);
+			this.limit = limit;
+		}
+
+		@Override
+		public long skip(long n) throws IOException {
+			limit -= n;
+			if (limit < 0) {
+				throw new IllegalStateException();
+			}
+
+			return super.skip(n);
+		}
+
+		@Override
+		public int read() throws IOException {
+			int r = super.read();
+			limit--;
+			if (limit < 0) {
+				throw new IllegalStateException();
+			}
+			return r;
+		}
+
+		@Override
+		public int read(byte[] b, int off, int len) throws IOException {
+			int n = super.read(b, off, len);
+			limit -= n;
+			if (limit < 0) {
+				throw new IllegalStateException();
+			}
+			return n;
+		}
+	}
+
+	class BigReadForbiddenReader extends ObjectReader.Filter {
+		ObjectReader delegate;
+		int limit;
+
+		@Override
+		protected ObjectReader delegate() {
+			return delegate;
+		}
+
+		BigReadForbiddenReader(ObjectReader delegate, int limit) {
+			this.delegate = delegate;
+			this.limit = limit;
+		}
+
+		@Override
+		public ObjectLoader open(AnyObjectId objectId, int typeHint) throws IOException {
+			ObjectLoader orig = super.open(objectId, typeHint);
+			return new ObjectLoader.Filter() {
+				@Override
+				protected ObjectLoader delegate() {
+					return orig;
+				}
+
+				@Override
+				public ObjectStream openStream() throws IOException {
+					ObjectStream os = orig.openStream();
+					return new BigReadForbiddenStream(os, limit);
+				}
+			};
+		}
+	}
+
 	@Theory
 	public void checkContentMergeConflict(MergeStrategy strategy)
 			throws Exception {
@@ -968,142 +1097,6 @@ public class ResolveMergerTest extends RepositoryTestCase {
 						+ "[3, mode:100644, stage:1, content:orig][3, mode:100644, stage:2, content:side][3, mode:100644, stage:3, content:master]" //
 						+ "[4, mode:100644, content:orig]", //
 				indexState(CONTENT));
-	}
-
-	/**
-	 * Merging two conflicting submodules when the index does not contain any entry
-	 * for that submodule.
-	 *
-	 * @param strategy
-	 * @throws Exception
-	 */
-	@Theory
-	public void checkMergeConflictingSubmodulesWithoutIndex(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-		writeTrashFile("initial", "initial");
-		git.add().addFilepattern("initial").call();
-		RevCommit initial = git.commit().setMessage("initial").call();
-
-		Repository submodule = createWorkRepository();
-		Git subgit = Git.wrap(submodule);
-		JGitTestUtil.writeTrashFile(submodule, "sub", "sub");
-		RevCommit firstSubCommit = subgit.commit().setMessage("first submodule commit").call();
-
-		writeSubmodule("one", firstSubCommit);
-		git.add().addFilepattern(Constants.DOT_GIT_MODULES).call();
-		RevCommit right = git.commit().setMessage("added one").call();
-
-		// a second commit in the submodule
-		JGitTestUtil.writeTrashFile(submodule, "sub", "sub2");
-		RevCommit secondSubCommit = subgit.commit().setMessage("second submodule commit").call();
-
-		git.checkout().setStartPoint(initial).setName("left").setCreateBranch(true).call();
-		writeSubmodule("one", secondSubCommit);
-
-		git.add().addFilepattern(Constants.DOT_GIT_MODULES).call();
-		git.commit().setMessage("a different one").call();
-
-		MergeResult result = git.merge().setStrategy(strategy)
-				.include(right).call();
-
-		assertEquals(MergeStatus.CONFLICTING, result.getMergeStatus());
-		Map<String, int[][]> conflicts = result.getConflicts();
-		assertEquals(1, conflicts.size());
-		assertNotNull(conflicts.get("one"));
-	}
-
-	/**
-	 * Merging two non-conflicting submodules when the index does not contain any entry
-	 * for either submodule.
-	 *
-	 * @param strategy
-	 * @throws Exception
-	 */
-	@Theory
-	public void checkMergeNonConflictingSubmodulesWithoutIndex(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-		writeTrashFile("initial", "initial");
-		git.add().addFilepattern("initial").call();
-
-		Repository submodule = createWorkRepository();
-		Git subgit = Git.wrap(submodule);
-		JGitTestUtil.writeTrashFile(submodule, "sub", "sub");
-		RevCommit firstSubCommit = subgit.commit().setMessage("first submodule commit").call();
-
-		writeSubmodule("one", firstSubCommit);
-
-		// Our initial commit should include a .gitmodules with a bunch of comment lines, so that
-		// we don't have a content merge issue when we add a new submodule at the top and a different
-		// one at the bottom.  This is sort of a hack, but it should allow add/add submodule merges
-		String existing = read(Constants.DOT_GIT_MODULES);
-		String context = "\n# context\n# more context\n# yet more context\n";
-		write(new File(db.getWorkTree(), Constants.DOT_GIT_MODULES), existing + context + context + context);
-
-		git.add().addFilepattern(Constants.DOT_GIT_MODULES).call();
-		RevCommit initial = git.commit().setMessage("initial").call();
-
-		writeSubmodule("two", firstSubCommit);
-		git.add().addFilepattern(Constants.DOT_GIT_MODULES).call();
-
-		RevCommit right = git.commit().setMessage("added one").call();
-
-		git.checkout().setStartPoint(initial).setName("left").setCreateBranch(true).call();
-
-		// we need to manually create the submodule for three for the .gitmodules hackery
-		addSubmoduleToIndex("three", firstSubCommit);
-		new File(db.getWorkTree(), "three").mkdir();
-
-		existing = read(Constants.DOT_GIT_MODULES);
-		String three = "[submodule \"three\"]\n\tpath = three\n\turl = " +
-				db.getDirectory().toURI() + "\n";
-		write(new File(db.getWorkTree(), Constants.DOT_GIT_MODULES), three + existing);
-
-		git.add().addFilepattern(Constants.DOT_GIT_MODULES).call();
-		git.commit().setMessage("a different one").call();
-
-		MergeResult result = git.merge().setStrategy(strategy)
-				.include(right).call();
-
-		assertNull(result.getCheckoutConflicts());
-		assertNull(result.getFailingPaths());
-		for (String dir : Arrays.asList("one", "two", "three")) {
-			assertTrue(new File(db.getWorkTree(), dir).isDirectory());
-		}
-	}
-
-	private void writeSubmodule(String path, ObjectId commit) throws IOException, ConfigInvalidException {
-		addSubmoduleToIndex(path, commit);
-		new File(db.getWorkTree(), path).mkdir();
-
-		StoredConfig config = db.getConfig();
-		config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, db.getDirectory().toURI()
-						.toString());
-		config.save();
-
-		FileBasedConfig modulesConfig = new FileBasedConfig(new File(
-				db.getWorkTree(), Constants.DOT_GIT_MODULES), db.getFS());
-		modulesConfig.load();
-		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_PATH, path);
-		modulesConfig.save();
-
-	}
-
-	private void addSubmoduleToIndex(String path, ObjectId commit) throws IOException {
-		DirCache cache = db.lockDirCache();
-		DirCacheEditor editor = cache.editor();
-		editor.add(new DirCacheEditor.PathEdit(path) {
-
-			@Override
-			public void apply(DirCacheEntry ent) {
-				ent.setFileMode(FileMode.GITLINK);
-				ent.setObjectId(commit);
-			}
-		});
-		editor.commit();
 	}
 
 	// Assert that every specified index entry has the same last modification

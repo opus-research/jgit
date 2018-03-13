@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.fnmatch.FileNameMatcher;
@@ -350,6 +351,17 @@ public class OpenSshConfig implements ConfigRepository {
 		if (StringUtils.equalsIgnoreCase("yes", value)) //$NON-NLS-1$
 			return Boolean.TRUE;
 		return Boolean.FALSE;
+	}
+
+	private static File toFile(String path, File home) {
+		if (path.startsWith("~/")) { //$NON-NLS-1$
+			return new File(home, path.substring(2));
+		}
+		File ret = new File(path);
+		if (ret.isAbsolute()) {
+			return ret;
+		}
+		return new File(home, path);
 	}
 
 	private static int positive(final String value) {
@@ -730,18 +742,40 @@ public class OpenSshConfig implements ConfigRepository {
 			return result;
 		}
 
+		private List<String> replaceTilde(List<String> values, File home) {
+			List<String> result = new ArrayList<>(values.size());
+			for (String value : values) {
+				result.add(toFile(value, home).getPath());
+			}
+			return result;
+		}
+
 		protected void substitute(String originalHostName, File home) {
 			Replacer r = new Replacer(originalHostName, home);
 			if (multiOptions != null) {
 				List<String> values = multiOptions.get("IDENTITYFILE"); //$NON-NLS-1$
 				if (values != null) {
 					values = substitute(values, "dhlru", r); //$NON-NLS-1$
+					values = replaceTilde(values, home);
 					multiOptions.put("IDENTITYFILE", values); //$NON-NLS-1$
 				}
 				values = multiOptions.get("CERTIFICATEFILE"); //$NON-NLS-1$
 				if (values != null) {
 					values = substitute(values, "dhlru", r); //$NON-NLS-1$
+					values = replaceTilde(values, home);
 					multiOptions.put("CERTIFICATEFILE", values); //$NON-NLS-1$
+				}
+			}
+			if (listOptions != null) {
+				List<String> values = listOptions.get("GLOBALKNOWNHOSTSFILE"); //$NON-NLS-1$
+				if (values != null) {
+					values = replaceTilde(values, home);
+					listOptions.put("GLOBALKNOWNHOSTSFILE", values); //$NON-NLS-1$
+				}
+				values = listOptions.get("USERKNOWNHOSTSFILE"); //$NON-NLS-1$
+				if (values != null) {
+					values = replaceTilde(values, home);
+					listOptions.put("USERKNOWNHOSTSFILE", values); //$NON-NLS-1$
 				}
 			}
 			if (options != null) {
@@ -749,6 +783,7 @@ public class OpenSshConfig implements ConfigRepository {
 				String value = options.get("IDENTITYAGENT"); //$NON-NLS-1$
 				if (value != null) {
 					value = r.substitute(value, "dhlru"); //$NON-NLS-1$
+					value = toFile(value, home).getPath();
 					options.put("IDENTITYAGENT", value); //$NON-NLS-1$
 				}
 			}
@@ -909,17 +944,6 @@ public class OpenSshConfig implements ConfigRepository {
 			}
 		}
 
-		private File toFile(String path, File home) {
-			if (path.startsWith("~/")) { //$NON-NLS-1$
-				return new File(home, path.substring(2));
-			}
-			File ret = new File(path);
-			if (ret.isAbsolute()) {
-				return ret;
-			}
-			return new File(home, path);
-		}
-
 		Config getConfig() {
 			return config;
 		}
@@ -938,7 +962,7 @@ public class OpenSshConfig implements ConfigRepository {
 
 	/**
 	 * Retrieves the full {@link com.jcraft.jsch.ConfigRepository.Config Config}
-	 * for the given host name.
+	 * for the given host name. Should be called only by Jsch and tests.
 	 *
 	 * @param hostName
 	 *            to get the config for
@@ -948,7 +972,7 @@ public class OpenSshConfig implements ConfigRepository {
 	@Override
 	public Config getConfig(String hostName) {
 		Host host = lookup(hostName);
-		return host.getConfig();
+		return new JschBugFixingConfig(host.getConfig());
 	}
 
 	@Override
@@ -956,5 +980,62 @@ public class OpenSshConfig implements ConfigRepository {
 	public String toString() {
 		return "OpenSshConfig [home=" + home + ", configFile=" + configFile
 				+ ", lastModified=" + lastModified + ", state=" + state + "]";
+	}
+
+	/**
+	 * A {@link com.jcraft.jsch.ConfigRepository.Config} that transforms some
+	 * values from the config file into the format Jsch 0.1.54 expects. This is
+	 * a work-around for bugs in Jsch.
+	 */
+	private static class JschBugFixingConfig implements Config {
+
+		private final Config real;
+
+		public JschBugFixingConfig(Config delegate) {
+			real = delegate;
+		}
+
+		@Override
+		public String getHostname() {
+			return real.getHostname();
+		}
+
+		@Override
+		public String getUser() {
+			return real.getUser();
+		}
+
+		@Override
+		public int getPort() {
+			return real.getPort();
+		}
+
+		@Override
+		public String getValue(String key) {
+			String result = real.getValue(key);
+			if (result != null) {
+				String k = key.toUpperCase(Locale.ROOT);
+				if ("SERVERALIVEINTERVAL".equals(k) //$NON-NLS-1$
+						|| "CONNECTTIMEOUT".equals(k)) { //$NON-NLS-1$
+					// These values are in seconds. Jsch 0.1.54 passes them on
+					// as is to java.net.Socket.setSoTimeout(), which expects
+					// milliseconds. So convert here to milliseconds...
+					try {
+						int timeout = Integer.parseInt(result);
+						result = Long
+								.toString(TimeUnit.SECONDS.toMillis(timeout));
+					} catch (NumberFormatException e) {
+						// Ignore
+					}
+				}
+			}
+			return result;
+		}
+
+		@Override
+		public String[] getValues(String key) {
+			return real.getValues(key);
+		}
+
 	}
 }
