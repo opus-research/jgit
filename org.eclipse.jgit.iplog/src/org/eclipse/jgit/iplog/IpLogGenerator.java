@@ -86,7 +86,7 @@ import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -144,7 +144,7 @@ public class IpLogGenerator {
 
 	private NameConflictTreeWalk tw;
 
-	private ObjectReader curs;
+	private final WindowCursor curs = new WindowCursor();
 
 	private final MutableObjectId idbuf = new MutableObjectId();
 
@@ -184,7 +184,6 @@ public class IpLogGenerator {
 			throws IOException, ConfigInvalidException {
 		try {
 			db = repo;
-			curs = db.newObjectReader();
 			rw = new RevWalk(db);
 			tw = new NameConflictTreeWalk(db);
 
@@ -195,7 +194,7 @@ public class IpLogGenerator {
 			scanProjectCommits(meta.getProjects().get(0), c);
 			commits.add(c);
 		} finally {
-			curs.release();
+			WindowCursor.release(curs);
 			db = null;
 			rw = null;
 			tw = null;

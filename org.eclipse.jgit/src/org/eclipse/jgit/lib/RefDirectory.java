@@ -109,7 +109,7 @@ public class RefDirectory extends RefDatabase {
 	/** If in the header, denotes the file has peeled data. */
 	public static final String PACKED_REFS_PEELED = " peeled"; //$NON-NLS-1$
 
-	private final FileRepository parent;
+	private final Repository parent;
 
 	private final File gitDir;
 
@@ -150,7 +150,7 @@ public class RefDirectory extends RefDatabase {
 	 */
 	private final AtomicInteger lastNotifiedModCnt = new AtomicInteger();
 
-	RefDirectory(final FileRepository db) {
+	RefDirectory(final Repository db) {
 		final FS fs = db.getFS();
 		parent = db;
 		gitDir = db.getDirectory();

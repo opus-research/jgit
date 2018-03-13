@@ -51,9 +51,9 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -73,7 +73,7 @@ public abstract class Merger {
 	/** A RevWalk for computing merge bases, or listing incoming commits. */
 	protected final RevWalk walk;
 
-	private ObjectInserter inserter;
+	private ObjectWriter writer;
 
 	/** The original objects supplied in the merge; this can be any tree-ish. */
 	protected RevObject[] sourceObjects;
@@ -105,10 +105,10 @@ public abstract class Merger {
 	/**
 	 * @return an object writer to create objects in {@link #getRepository()}.
 	 */
-	public ObjectInserter getObjectInserter() {
-		if (inserter == null)
-			inserter = getRepository().newObjectInserter();
-		return inserter;
+	public ObjectWriter getObjectWriter() {
+		if (writer == null)
+			writer = new ObjectWriter(getRepository());
+		return writer;
 	}
 
 	/**
@@ -202,7 +202,7 @@ public abstract class Merger {
 	 */
 	protected AbstractTreeIterator openTree(final AnyObjectId treeId)
 			throws IncorrectObjectTypeException, IOException {
-		final ObjectReader curs = db.newObjectReader();
+		final WindowCursor curs = new WindowCursor();
 		try {
 			return new CanonicalTreeParser(null, db, treeId, curs);
 		} finally {

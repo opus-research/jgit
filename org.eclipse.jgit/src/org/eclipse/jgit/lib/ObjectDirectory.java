@@ -72,21 +72,9 @@ import org.eclipse.jgit.util.FS;
  * where objects are stored loose by hashing them into directories by their
  * {@link ObjectId}, or are stored in compressed containers known as
  * {@link PackFile}s.
- * <p>
- * Optionally an object database can reference one or more alternates; other
- * ObjectDatabase instances that are searched in addition to the current
- * database.
- * <p>
- * Databases are divided into two halves: a half that is considered to be fast
- * to search (the {@code PackFile}s), and a half that is considered to be slow
- * to search (loose objects). When alternates are present the fast half is fully
- * searched (recursively through all alternates) before the slow half is
- * considered.
  */
-public class ObjectDirectory extends FileObjectDatabase {
+public class ObjectDirectory extends ObjectDatabase {
 	private static final PackList NO_PACKS = new PackList(-1, -1, new PackFile[0]);
-
-	private final Config config;
 
 	private final File objects;
 
@@ -98,44 +86,29 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final AtomicReference<PackList> packList;
 
-	private final FS fs;
+	private final File[] alternateObjectDir;
 
-	private final AtomicReference<AlternateHandle[]> alternates;
+	private final FS fs;
 
 	/**
 	 * Initialize a reference to an on-disk object directory.
 	 *
-	 * @param cfg
-	 *            configuration this directory consults for write settings.
 	 * @param dir
 	 *            the location of the <code>objects</code> directory.
-	 * @param alternatePaths
+	 * @param alternateObjectDir
 	 *            a list of alternate object directories
 	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 * @throws IOException
-	 *             an alternate object cannot be opened.
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 */
-	public ObjectDirectory(final Config cfg, final File dir,
-			File[] alternatePaths, FS fs) throws IOException {
-		config = cfg;
+	public ObjectDirectory(final File dir, File[] alternateObjectDir, FS fs) {
 		objects = dir;
+		this.alternateObjectDir = alternateObjectDir;
 		infoDirectory = new File(objects, "info");
 		packDirectory = new File(objects, "pack");
 		alternatesFile = new File(infoDirectory, "alternates");
 		packList = new AtomicReference<PackList>(NO_PACKS);
 		this.fs = fs;
-
-		alternates = new AtomicReference<AlternateHandle[]>();
-		if (alternatePaths != null) {
-			AlternateHandle[] alt;
-
-			alt = new AlternateHandle[alternatePaths.length];
-			for (int i = 0; i < alternatePaths.length; i++)
-				alt[i] = openAlternate(alternatePaths[i]);
-			alternates.set(alt);
-		}
 	}
 
 	/**
@@ -158,24 +131,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	public ObjectInserter newInserter() {
-		return new ObjectDirectoryInserter(this, config);
-	}
-
-	@Override
-	public void close() {
+	public void closeSelf() {
 		final PackList packs = packList.get();
 		packList.set(NO_PACKS);
 		for (final PackFile p : packs.packs)
 			p.close();
-
-		// Fully close all loaded alternates and clear the alternate list.
-		AlternateHandle[] alt = alternates.get();
-		if (alt != null) {
-			alternates.set(null);
-			for(final AlternateHandle od : alt)
-				od.close();
-		}
 	}
 
 	/**
@@ -239,7 +199,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return "ObjectDirectory[" + getDirectory() + "]";
 	}
 
-	boolean hasObject1(final AnyObjectId objectId) {
+	@Override
+	protected boolean hasObject1(final AnyObjectId objectId) {
 		for (final PackFile p : packList.get().packs) {
 			try {
 				if (p.hasObject(objectId)) {
@@ -257,7 +218,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return false;
 	}
 
-	ObjectLoader openObject1(final WindowCursor curs,
+	@Override
+	protected ObjectLoader openObject1(final WindowCursor curs,
 			final AnyObjectId objectId) throws IOException {
 		PackList pList = packList.get();
 		SEARCH: for (;;) {
@@ -283,7 +245,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	void openObjectInAllPacks(final Collection<PackedObjectLoader> out,
+	@Override
+	void openObjectInAllPacks1(final Collection<PackedObjectLoader> out,
 			final WindowCursor curs, final AnyObjectId objectId)
 			throws IOException {
 		PackList pList = packList.get();
@@ -307,16 +270,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 			break SEARCH;
 		}
-
-		for (AlternateHandle h : myAlternates())
-			h.db.openObjectInAllPacks(out, curs, objectId);
 	}
 
-	boolean hasObject2(final String objectName) {
+	@Override
+	protected boolean hasObject2(final String objectName) {
 		return fileFor(objectName).exists();
 	}
 
-	ObjectLoader openObject2(final WindowCursor curs,
+	@Override
+	protected ObjectLoader openObject2(final WindowCursor curs,
 			final String objectName, final AnyObjectId objectId)
 			throws IOException {
 		try {
@@ -326,7 +288,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	boolean tryAgain1() {
+	@Override
+	protected boolean tryAgain1() {
 		final PackList old = packList.get();
 		if (old.tryAgain(packDirectory.lastModified()))
 			return old != scanPacks(old);
@@ -496,36 +459,29 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return nameSet;
 	}
 
-	AlternateHandle[] myAlternates() {
-		AlternateHandle[] alt = alternates.get();
-		if (alt == null) {
-			synchronized (alternates) {
-				alt = alternates.get();
-				if (alt == null) {
-					try {
-						alt = loadAlternates();
-					} catch (IOException e) {
-						alt = new AlternateHandle[0];
-					}
-					alternates.set(alt);
+	@Override
+	protected ObjectDatabase[] loadAlternates() throws IOException {
+		final List<ObjectDatabase> l = new ArrayList<ObjectDatabase>(4);
+		if (alternateObjectDir != null) {
+			for (File d : alternateObjectDir) {
+				l.add(openAlternate(d));
+			}
+		} else {
+			final BufferedReader br = open(alternatesFile);
+			try {
+				String line;
+				while ((line = br.readLine()) != null) {
+					l.add(openAlternate(line));
 				}
+			} finally {
+				br.close();
 			}
 		}
-		return alt;
-	}
 
-	private AlternateHandle[] loadAlternates() throws IOException {
-		final List<AlternateHandle> l = new ArrayList<AlternateHandle>(4);
-		final BufferedReader br = open(alternatesFile);
-		try {
-			String line;
-			while ((line = br.readLine()) != null) {
-				l.add(openAlternate(line));
-			}
-		} finally {
-			br.close();
+		if (l.isEmpty()) {
+			return NO_ALTERNATES;
 		}
-		return l.toArray(new AlternateHandle[l.size()]);
+		return l.toArray(new ObjectDatabase[l.size()]);
 	}
 
 	private static BufferedReader open(final File f)
@@ -533,22 +489,19 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return new BufferedReader(new FileReader(f));
 	}
 
-	private AlternateHandle openAlternate(final String location)
+	private ObjectDatabase openAlternate(final String location)
 			throws IOException {
 		final File objdir = fs.resolve(objects, location);
 		return openAlternate(objdir);
 	}
 
-	private AlternateHandle openAlternate(File objdir) throws IOException {
+	private ObjectDatabase openAlternate(File objdir) throws IOException {
 		final File parent = objdir.getParentFile();
 		if (FileKey.isGitRepository(parent, fs)) {
-			FileKey key = FileKey.exact(parent, fs);
-			FileRepository db = (FileRepository) RepositoryCache.open(key);
-			return new AlternateRepository(db);
+			final Repository db = RepositoryCache.open(FileKey.exact(parent, fs));
+			return new AlternateRepositoryDatabase(db);
 		}
-
-		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs);
-		return new AlternateHandle(db);
+		return new ObjectDirectory(objdir, null, fs);
 	}
 
 	private static final class PackList {
@@ -613,10 +566,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public ObjectDatabase newCachedDatabase() {
-		return newCachedFileObjectDatabase();
-	}
-
-	FileObjectDatabase newCachedFileObjectDatabase() {
 		return new CachedObjectDirectory(this);
 	}
 }
