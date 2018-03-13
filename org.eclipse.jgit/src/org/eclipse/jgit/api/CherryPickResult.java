@@ -68,14 +68,12 @@ public class CherryPickResult {
 		},
 		/** */
 		FAILED {
-			@Override
 			public String toString() {
 				return "Failed";
 			}
 		},
 		/** */
 		CONFLICTING {
-			@Override
 			public String toString() {
 				return "Conflicting";
 			}

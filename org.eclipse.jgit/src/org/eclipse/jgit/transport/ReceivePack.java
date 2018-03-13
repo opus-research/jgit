@@ -115,9 +115,8 @@ public class ReceivePack {
 			if (nul >= 0) {
 				for (String c : line.substring(nul + 1).split(" "))
 					caps.add(c);
-				this.line = line.substring(0, nul);
-			} else
-				this.line = line;
+			}
+			this.line = line.substring(0, nul);
 			this.capabilities = Collections.unmodifiableSet(caps);
 		}
 
