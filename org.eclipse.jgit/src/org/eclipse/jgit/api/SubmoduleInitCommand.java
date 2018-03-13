@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -82,6 +83,7 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 	 * Add repository-relative submodule path to initialize
 	 *
 	 * @param path
+	 *            (with <code>/</code> as separator)
 	 * @return this command
 	 */
 	public SubmoduleInitCommand addPath(final String path) {
@@ -89,7 +91,7 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 		return this;
 	}
 
-	public Collection<String> call() throws JGitInternalException {
+	public Collection<String> call() throws GitAPIException {
 		checkCallable();
 
 		try {

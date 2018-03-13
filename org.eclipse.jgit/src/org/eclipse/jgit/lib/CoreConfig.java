@@ -55,28 +55,6 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  * This class keeps git repository core parameters.
  */
 public class CoreConfig {
-	private static int defaultStreamFileThreshold = 50 * 1024 * 1024;
-
-	/**
-	 * Returns the default threshold beyond which objects should not be read into
-	 * memory completely but should be streamed. Streaming will keep the memory
-	 * usage low in case of large objects, but may slow down operations
-	 * significantly. Certain functionality may not be able to use streaming but
-	 * will throw an Exception instead.
-	 *
-	 * @return the default stream file threshold
-	 */
-	public static int getDefaultStreamFileThreshold() {
-		return defaultStreamFileThreshold;
-	}
-
-	/**
-	 * @param threshold
-	 */
-	public static void setDefaultStreamFileThreshold(int threshold) {
-		defaultStreamFileThreshold = threshold;
-	}
-
 	/** Key for {@link Config#get(SectionParser)}. */
 	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
 		public CoreConfig parse(final Config cfg) {
@@ -96,6 +74,25 @@ public class CoreConfig {
 		INPUT;
 	}
 
+	/**
+	 * Permissible values for {@code core.checkstat}
+	 *
+	 * @since 3.0
+	 */
+	public static enum CheckStat {
+		/**
+		 * Only check the size and whole second part of time stamp when
+		 * comparing the stat info in the dircache with actual file stat info.
+		 */
+		MINIMAL,
+
+		/**
+		 * Check as much of the dircache stat info as possible. Implementation
+		 * limits may apply.
+		 */
+		DEFAULT
+	}
+
 	private final int compression;
 
 	private final int packIndexVersion;
@@ -104,7 +101,17 @@ public class CoreConfig {
 
 	private final String excludesfile;
 
-	private final long streamFileThreshold;
+	/**
+	 * Options for symlink handling
+	 *
+	 * @since 3.3
+	 */
+	public static enum SymLinks {
+		/** Checkout symbolic links as plain files */
+		FALSE,
+		/** Checkout symbolic links as links */
+		TRUE
+	}
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
@@ -112,12 +119,9 @@ public class CoreConfig {
 		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
 				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
 		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-		                                 ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
 		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
-		                            ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
-		streamFileThreshold = rc.getLong(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_STREAM_FILE_TRESHOLD,
-				defaultStreamFileThreshold);
+				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
 	}
 
 	/**
@@ -146,14 +150,5 @@ public class CoreConfig {
 	 */
 	public String getExcludesFile() {
 		return excludesfile;
-	}
-
-	/**
-	 * @see #defaultStreamFileThreshold
-	 *
-	 * @return the size threshold beyond which objects must be streamed
-	 */
-	public long getStreamFileThreshold() {
-		return streamFileThreshold;
 	}
 }

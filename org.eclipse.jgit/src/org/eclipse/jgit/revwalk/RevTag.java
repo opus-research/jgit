@@ -58,6 +58,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.StringUtils;
 
 /** An annotated tag. */
 public class RevTag extends RevObject {
@@ -204,7 +205,7 @@ public class RevTag extends RevObject {
 		final byte[] raw = buffer;
 		final int msgB = RawParseUtils.tagMessage(raw, 0);
 		if (msgB < 0)
-			return "";
+			return ""; //$NON-NLS-1$
 		final Charset enc = RawParseUtils.parseEncoding(raw);
 		return RawParseUtils.decode(enc, raw, msgB, raw.length);
 	}
@@ -228,20 +229,28 @@ public class RevTag extends RevObject {
 		final byte[] raw = buffer;
 		final int msgB = RawParseUtils.tagMessage(raw, 0);
 		if (msgB < 0)
-			return "";
+			return ""; //$NON-NLS-1$
 
 		final Charset enc = RawParseUtils.parseEncoding(raw);
 		final int msgE = RawParseUtils.endOfParagraph(raw, msgB);
 		String str = RawParseUtils.decode(enc, raw, msgB, msgE);
 		if (RevCommit.hasLF(raw, msgB, msgE))
-			str = str.replace('\n', ' ');
+			str = StringUtils.replaceLineBreaksWithSpace(str);
 		return str;
 	}
 
 	/**
 	 * Get a reference to the object this tag was placed on.
+	 * <p>
+	 * Note that the returned object has only been looked up (see
+	 * {@link RevWalk#lookupAny(AnyObjectId, int)}. To access the contents it
+	 * needs to be parsed, see {@link RevWalk#parseHeaders(RevObject)} and
+	 * {@link RevWalk#parseBody(RevObject)}.
+	 * <p>
+	 * As an alternative, use {@link RevWalk#peel(RevObject)} and pass this
+	 * {@link RevTag} to peel it until the first non-tag object.
 	 *
-	 * @return object this tag refers to.
+	 * @return object this tag refers to (only looked up, not parsed)
 	 */
 	public final RevObject getObject() {
 		return object;

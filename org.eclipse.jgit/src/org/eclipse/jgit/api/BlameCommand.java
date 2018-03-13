@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.blame.BlameGenerator;
 import org.eclipse.jgit.blame.BlameResult;
@@ -85,9 +86,10 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	}
 
 	/**
-	 * Set file path
+	 * Set file path.
 	 *
 	 * @param filePath
+	 *            file path (with <code>/</code> as separator)
 	 * @return this command
 	 */
 	public BlameCommand setFilePath(String filePath) {
@@ -189,7 +191,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 *
 	 * @return list of lines
 	 */
-	public BlameResult call() throws JGitInternalException {
+	public BlameResult call() throws GitAPIException {
 		checkCallable();
 		BlameGenerator gen = new BlameGenerator(repo, path);
 		try {
@@ -213,7 +215,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 						gen.push(null, dc.getEntry(entry).getObjectId());
 
 					File inTree = new File(repo.getWorkTree(), path);
-					if (inTree.isFile())
+					if (repo.getFS().isFile(inTree))
 						gen.push(null, new RawText(inTree));
 				}
 			}

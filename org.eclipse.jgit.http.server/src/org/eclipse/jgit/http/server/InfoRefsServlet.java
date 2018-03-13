@@ -44,6 +44,7 @@
 package org.eclipse.jgit.http.server;
 
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -72,7 +73,8 @@ class InfoRefsServlet extends HttpServlet {
 
 		final Repository db = getRepository(req);
 		final OutputStreamWriter out = new OutputStreamWriter(
-				new SmartOutputStream(req, rsp), Constants.CHARSET);
+				new SmartOutputStream(req, rsp, true),
+				Constants.CHARSET);
 		final RefAdvertiser adv = new RefAdvertiser() {
 			@Override
 			protected void writeOne(final CharSequence line) throws IOException {
@@ -90,7 +92,7 @@ class InfoRefsServlet extends HttpServlet {
 		adv.init(db);
 		adv.setDerefTags(true);
 
-		Map<String, Ref> refs = db.getAllRefs();
+		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
 		refs.remove(Constants.HEAD);
 		adv.send(refs);
 		out.close();

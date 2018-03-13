@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,16 +48,18 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_WWW_AUTHENTICATE;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
+import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.Base64;
 
 /**
@@ -69,6 +71,8 @@ import org.eclipse.jgit.util.Base64;
 abstract class HttpAuthMethod {
 	/** No authentication is configured. */
 	static final HttpAuthMethod NONE = new None();
+	static final String EMPTY_STRING = ""; //$NON-NLS-1$
+	static final String SCHEMA_NAME_SEPARATOR = " "; //$NON-NLS-1$
 
 	/**
 	 * Handle an authentication failure and possibly return a new response.
@@ -77,22 +81,39 @@ abstract class HttpAuthMethod {
 	 *            the connection that failed.
 	 * @return new authentication method to try.
 	 */
-	static HttpAuthMethod scanResponse(HttpURLConnection conn) {
-		String hdr = conn.getHeaderField(HDR_WWW_AUTHENTICATE);
-		if (hdr == null || hdr.length() == 0)
-			return NONE;
+	static HttpAuthMethod scanResponse(final HttpConnection conn) {
+		final Map<String, List<String>> headers = conn.getHeaderFields();
+		HttpAuthMethod authentication = NONE;
 
-		int sp = hdr.indexOf(' ');
-		if (sp < 0)
-			return NONE;
+		for (final Entry<String, List<String>> entry : headers.entrySet()) {
+			if (HDR_WWW_AUTHENTICATE.equalsIgnoreCase(entry.getKey())) {
+				if (entry.getValue() != null) {
+					for (final String value : entry.getValue()) {
+						if (value != null && value.length() != 0) {
+							final String[] valuePart = value.split(
+									SCHEMA_NAME_SEPARATOR, 2);
 
-		String type = hdr.substring(0, sp);
-		if (Basic.NAME.equalsIgnoreCase(type))
-			return new Basic();
-		else if (Digest.NAME.equalsIgnoreCase(type))
-			return new Digest(hdr.substring(sp + 1));
-		else
-			return NONE;
+							if (Digest.NAME.equalsIgnoreCase(valuePart[0])) {
+								final String param;
+								if (valuePart.length == 1)
+									param = EMPTY_STRING;
+								else
+									param = valuePart[1];
+
+								authentication = new Digest(param);
+								break;
+							}
+
+							if (Basic.NAME.equalsIgnoreCase(valuePart[0]))
+								authentication = new Basic();
+						}
+					}
+				}
+				break;
+			}
+		}
+
+		return authentication;
 	}
 
 	/**
@@ -147,7 +168,7 @@ abstract class HttpAuthMethod {
 	 * @param conn
 	 * @throws IOException
 	 */
-	abstract void configureRequest(HttpURLConnection conn) throws IOException;
+	abstract void configureRequest(HttpConnection conn) throws IOException;
 
 	/** Performs no user authentication. */
 	private static class None extends HttpAuthMethod {
@@ -157,14 +178,14 @@ abstract class HttpAuthMethod {
 		}
 
 		@Override
-		void configureRequest(HttpURLConnection conn) throws IOException {
+		void configureRequest(HttpConnection conn) throws IOException {
 			// Do nothing when no authentication is enabled.
 		}
 	}
 
 	/** Performs HTTP basic authentication (plaintext username/password). */
 	private static class Basic extends HttpAuthMethod {
-		static final String NAME = "Basic";
+		static final String NAME = "Basic"; //$NON-NLS-1$
 
 		private String user;
 
@@ -177,16 +198,16 @@ abstract class HttpAuthMethod {
 		}
 
 		@Override
-		void configureRequest(final HttpURLConnection conn) throws IOException {
-			String ident = user + ":" + pass;
-			String enc = Base64.encodeBytes(ident.getBytes("UTF-8"));
-			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc);
+		void configureRequest(final HttpConnection conn) throws IOException {
+			String ident = user + ":" + pass; //$NON-NLS-1$
+			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
+			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc); //$NON-NLS-1$
 		}
 	}
 
 	/** Performs HTTP digest authentication. */
 	private static class Digest extends HttpAuthMethod {
-		static final String NAME = "Digest";
+		static final String NAME = "Digest"; //$NON-NLS-1$
 
 		private static final Random PRNG = new Random();
 
@@ -201,11 +222,11 @@ abstract class HttpAuthMethod {
 		Digest(String hdr) {
 			params = parse(hdr);
 
-			final String qop = params.get("qop");
-			if ("auth".equals(qop)) {
+			final String qop = params.get("qop"); //$NON-NLS-1$
+			if ("auth".equals(qop)) { //$NON-NLS-1$
 				final byte[] bin = new byte[8];
 				PRNG.nextBytes(bin);
-				params.put("cnonce", Base64.encodeBytes(bin));
+				params.put("cnonce", Base64.encodeBytes(bin)); //$NON-NLS-1$
 			}
 		}
 
@@ -217,72 +238,73 @@ abstract class HttpAuthMethod {
 
 		@SuppressWarnings("boxing")
 		@Override
-		void configureRequest(final HttpURLConnection conn) throws IOException {
+		void configureRequest(final HttpConnection conn) throws IOException {
 			final Map<String, String> r = new LinkedHashMap<String, String>();
 
-			final String realm = params.get("realm");
-			final String nonce = params.get("nonce");
-			final String cnonce = params.get("cnonce");
+			final String realm = params.get("realm"); //$NON-NLS-1$
+			final String nonce = params.get("nonce"); //$NON-NLS-1$
+			final String cnonce = params.get("cnonce"); //$NON-NLS-1$
 			final String uri = uri(conn.getURL());
-			final String qop = params.get("qop");
+			final String qop = params.get("qop"); //$NON-NLS-1$
 			final String method = conn.getRequestMethod();
 
-			final String A1 = user + ":" + realm + ":" + pass;
-			final String A2 = method + ":" + uri;
+			final String A1 = user + ":" + realm + ":" + pass; //$NON-NLS-1$ //$NON-NLS-2$
+			final String A2 = method + ":" + uri; //$NON-NLS-1$
 
-			r.put("username", user);
-			r.put("realm", realm);
-			r.put("nonce", nonce);
-			r.put("uri", uri);
+			r.put("username", user); //$NON-NLS-1$
+			r.put("realm", realm); //$NON-NLS-1$
+			r.put("nonce", nonce); //$NON-NLS-1$
+			r.put("uri", uri); //$NON-NLS-1$
 
 			final String response, nc;
-			if ("auth".equals(qop)) {
-				nc = String.format("%08x", ++requestCount);
-				response = KD(H(A1), nonce + ":" + nc + ":" + cnonce + ":"
-						+ qop
-						+ ":"
+			if ("auth".equals(qop)) { //$NON-NLS-1$
+				nc = String.format("%08x", ++requestCount); //$NON-NLS-1$
+				response = KD(H(A1), nonce + ":" + nc + ":" + cnonce + ":" //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+						+ qop + ":" //$NON-NLS-1$
 						+ H(A2));
 			} else {
 				nc = null;
-				response = KD(H(A1), nonce + ":" + H(A2));
+				response = KD(H(A1), nonce + ":" + H(A2)); //$NON-NLS-1$
 			}
-			r.put("response", response);
-			if (params.containsKey("algorithm"))
-				r.put("algorithm", "MD5");
+			r.put("response", response); //$NON-NLS-1$
+			if (params.containsKey("algorithm")) //$NON-NLS-1$
+				r.put("algorithm", "MD5"); //$NON-NLS-1$ //$NON-NLS-2$
 			if (cnonce != null && qop != null)
-				r.put("cnonce", cnonce);
-			if (params.containsKey("opaque"))
-				r.put("opaque", params.get("opaque"));
+				r.put("cnonce", cnonce); //$NON-NLS-1$
+			if (params.containsKey("opaque")) //$NON-NLS-1$
+				r.put("opaque", params.get("opaque")); //$NON-NLS-1$ //$NON-NLS-2$
 			if (qop != null)
-				r.put("qop", qop);
+				r.put("qop", qop); //$NON-NLS-1$
 			if (nc != null)
-				r.put("nc", nc);
+				r.put("nc", nc); //$NON-NLS-1$
 
 			StringBuilder v = new StringBuilder();
 			for (Map.Entry<String, String> e : r.entrySet()) {
 				if (v.length() > 0)
-					v.append(", ");
+					v.append(", "); //$NON-NLS-1$
 				v.append(e.getKey());
 				v.append('=');
 				v.append('"');
 				v.append(e.getValue());
 				v.append('"');
 			}
-			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + v);
+			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + v); //$NON-NLS-1$
 		}
 
 		private static String uri(URL u) {
 			StringBuilder r = new StringBuilder();
 			r.append(u.getProtocol());
-			r.append("://");
+			r.append("://"); //$NON-NLS-1$
 			r.append(u.getHost());
 			if (0 < u.getPort()) {
-				if (u.getPort() == 80 && "http".equals(u.getProtocol()))
-					/* nothing */;
-				else if (u.getPort() == 443 && "https".equals(u.getProtocol()))
-					/* nothing */;
-				else
+				if (u.getPort() == 80 && "http".equals(u.getProtocol())) { //$NON-NLS-1$
+					/* nothing */
+				} else if (u.getPort() == 443
+						&& "https".equals(u.getProtocol())) { //$NON-NLS-1$
+					/* nothing */
+				} else {
 					r.append(':').append(u.getPort());
+				}
 			}
 			r.append(u.getPath());
 			if (u.getQuery() != null)
@@ -293,30 +315,30 @@ abstract class HttpAuthMethod {
 		private static String H(String data) {
 			try {
 				MessageDigest md = newMD5();
-				md.update(data.getBytes("UTF-8"));
+				md.update(data.getBytes("UTF-8")); //$NON-NLS-1$
 				return LHEX(md.digest());
 			} catch (UnsupportedEncodingException e) {
-				throw new RuntimeException("UTF-8 encoding not available", e);
+				throw new RuntimeException("UTF-8 encoding not available", e); //$NON-NLS-1$
 			}
 		}
 
 		private static String KD(String secret, String data) {
 			try {
 				MessageDigest md = newMD5();
-				md.update(secret.getBytes("UTF-8"));
+				md.update(secret.getBytes("UTF-8")); //$NON-NLS-1$
 				md.update((byte) ':');
-				md.update(data.getBytes("UTF-8"));
+				md.update(data.getBytes("UTF-8")); //$NON-NLS-1$
 				return LHEX(md.digest());
 			} catch (UnsupportedEncodingException e) {
-				throw new RuntimeException("UTF-8 encoding not available", e);
+				throw new RuntimeException("UTF-8 encoding not available", e); //$NON-NLS-1$
 			}
 		}
 
 		private static MessageDigest newMD5() {
 			try {
-				return MessageDigest.getInstance("MD5");
+				return MessageDigest.getInstance("MD5"); //$NON-NLS-1$
 			} catch (NoSuchAlgorithmException e) {
-				throw new RuntimeException("No MD5 available", e);
+				throw new RuntimeException("No MD5 available", e); //$NON-NLS-1$
 			}
 		}
 

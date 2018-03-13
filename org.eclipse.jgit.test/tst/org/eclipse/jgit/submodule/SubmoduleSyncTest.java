@@ -53,16 +53,17 @@ import java.util.Map.Entry;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.SubmoduleSyncCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.junit.Test;
@@ -73,7 +74,7 @@ import org.junit.Test;
 public class SubmoduleSyncTest extends RepositoryTestCase {
 
 	@Test
-	public void repositoryWithNoSubmodules() {
+	public void repositoryWithNoSubmodules() throws GitAPIException {
 		SubmoduleSyncCommand command = new SubmoduleSyncCommand(db);
 		Map<String, String> modules = command.call();
 		assertNotNull(modules);
@@ -114,6 +115,7 @@ public class SubmoduleSyncTest extends RepositoryTestCase {
 				.setURI(db.getDirectory().toURI().toString())
 				.setDirectory(new File(db.getWorkTree(), path)).call()
 				.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
@@ -132,7 +134,9 @@ public class SubmoduleSyncTest extends RepositoryTestCase {
 		generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
 		assertEquals(url, generator.getConfigUrl());
-		StoredConfig submoduleConfig = generator.getRepository().getConfig();
+		Repository subModRepository = generator.getRepository();
+		addRepoToClose(subModRepository);
+		StoredConfig submoduleConfig = subModRepository.getConfig();
 		assertEquals(url, submoduleConfig.getString(
 				ConfigConstants.CONFIG_REMOTE_SECTION,
 				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL));
@@ -180,6 +184,7 @@ public class SubmoduleSyncTest extends RepositoryTestCase {
 				.setDirectory(new File(db.getWorkTree(), path)).call()
 				.getRepository();
 		assertNotNull(subRepo);
+		addRepoToClose(subRepo);
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
@@ -201,7 +206,9 @@ public class SubmoduleSyncTest extends RepositoryTestCase {
 		generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
 		assertEquals("git://server/sub.git", generator.getConfigUrl());
-		StoredConfig submoduleConfig = generator.getRepository().getConfig();
+		Repository subModRepository1 = generator.getRepository();
+		addRepoToClose(subModRepository1);
+		StoredConfig submoduleConfig = subModRepository1.getConfig();
 		assertEquals("git://server/sub.git", submoduleConfig.getString(
 				ConfigConstants.CONFIG_REMOTE_SECTION,
 				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL));

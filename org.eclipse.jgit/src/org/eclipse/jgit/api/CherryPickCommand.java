@@ -47,10 +47,14 @@ import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -78,7 +82,11 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about cherry-pick</a>
  */
 public class CherryPickCommand extends GitCommand<CherryPickResult> {
+	private String reflogPrefix = "cherry-pick:"; //$NON-NLS-1$
+
 	private List<Ref> commits = new LinkedList<Ref>();
+
+	private String ourCommitName = null;
 
 	/**
 	 * @param repo
@@ -94,8 +102,16 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 * invocation of the command. Don't call this method twice on an instance.
 	 *
 	 * @return the result of the cherry-pick
+	 * @throws GitAPIException
+	 * @throws WrongRepositoryStateException
+	 * @throws ConcurrentRefUpdateException
+	 * @throws UnmergedPathsException
+	 * @throws NoMessageException
+	 * @throws NoHeadException
 	 */
-	public CherryPickResult call() throws GitAPIException {
+	public CherryPickResult call() throws GitAPIException, NoMessageException,
+			UnmergedPathsException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException, NoHeadException {
 		RevCommit newHead = null;
 		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();
@@ -108,9 +124,8 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 			if (headRef == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
-			RevCommit headCommit = revWalk.parseCommit(headRef.getObjectId());
 
-			newHead = headCommit;
+			newHead = revWalk.parseCommit(headRef.getObjectId());
 
 			// loop through all refs to be cherry-picked
 			for (Ref src : commits) {
@@ -132,24 +147,29 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
 
-				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
+				String ourName = calculateOurName(headRef);
+				String cherryPickName = srcCommit.getId().abbreviate(7).name()
+						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
+
+				ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
-				if (merger.merge(headCommit, srcCommit)) {
-					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
+				merger.setCommitNames(new String[] { "BASE", ourName,
+						cherryPickName });
+				if (merger.merge(newHead, srcCommit)) {
+					if (AnyObjectId.equals(newHead.getTree().getId(), merger
 							.getResultTreeId()))
 						continue;
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
-							headCommit.getTree(), repo.lockDirCache(),
+							newHead.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
-							.setReflogComment(
-									"cherry-pick: "
-											+ srcCommit.getShortMessage())
+							.setReflogComment(reflogPrefix + " " //$NON-NLS-1$
+									+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
@@ -210,5 +230,41 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	public CherryPickCommand include(String name, AnyObjectId commit) {
 		return include(new ObjectIdRef.Unpeeled(Storage.LOOSE, name,
 				commit.copy()));
+	}
+
+	/**
+	 * @param ourCommitName
+	 *            the name that should be used in the "OURS" place for conflict
+	 *            markers
+	 * @return {@code this}
+	 */
+	public CherryPickCommand setOurCommitName(String ourCommitName) {
+		this.ourCommitName = ourCommitName;
+		return this;
+	}
+
+	/**
+	 * Set the prefix to use in the reflog.
+	 * <p>
+	 * This is primarily needed for implementing rebase in terms of
+	 * cherry-picking
+	 *
+	 * @param prefix
+	 *            including ":"
+	 * @return {@code this}
+	 * @since 3.1
+	 */
+	public CherryPickCommand setReflogPrefix(final String prefix) {
+		this.reflogPrefix = prefix;
+		return this;
+	}
+
+	private String calculateOurName(Ref headRef) {
+		if (ourCommitName != null)
+			return ourCommitName;
+
+		String targetRefName = headRef.getTarget().getName();
+		String headName = Repository.shortenRefName(targetRefName);
+		return headName;
 	}
 }

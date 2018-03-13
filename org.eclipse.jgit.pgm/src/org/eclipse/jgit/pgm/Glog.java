@@ -59,11 +59,13 @@ import javax.swing.JScrollPane;
 
 import org.eclipse.jgit.awtui.CommitGraphPane;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revplot.PlotWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 
+@Command(usage = "usage_Glog")
 class Glog extends RevWalkTextBuiltin {
 	final JFrame frame;
 
@@ -104,7 +106,7 @@ class Glog extends RevWalkTextBuiltin {
 		graphPane.getCommitList().source(walk);
 		graphPane.getCommitList().fillTo(Integer.MAX_VALUE);
 
-		frame.setTitle("[" + repoName() + "]");
+		frame.setTitle("[" + repoName() + "]"); //$NON-NLS-1$ //$NON-NLS-2$
 		frame.pack();
 		frame.setVisible(true);
 		return graphPane.getCommitList().size();

@@ -72,9 +72,8 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
@@ -85,7 +84,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class HttpClientTests extends HttpTestCase {
-	private TestRepository<FileRepository> remoteRepository;
+	private TestRepository<Repository> remoteRepository;
 
 	private URIish dumbAuthNoneURI;
 
@@ -124,7 +123,9 @@ public class HttpClientTests extends HttpTestCase {
 
 		ServletContextHandler ctx = server.addContext(path);
 		ctx.setResourceBase(base.toString());
-		ctx.addServlet(DefaultServlet.class, "/");
+		ServletHolder holder = ctx.addServlet(DefaultServlet.class, "/");
+		// The tmp directory is symlinked on OS X
+		holder.setInitParameter("aliases", "true");
 		return ctx;
 	}
 
@@ -134,7 +135,7 @@ public class HttpClientTests extends HttpTestCase {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
-				final FileRepository db = remoteRepository.getRepository();
+				final Repository db = remoteRepository.getRepository();
 				if (!name.equals(nameOf(db)))
 					throw new RepositoryNotFoundException(name);
 
@@ -148,7 +149,7 @@ public class HttpClientTests extends HttpTestCase {
 		return ctx;
 	}
 
-	private static String nameOf(final FileRepository db) {
+	private static String nameOf(final Repository db) {
 		return db.getDirectory().getName();
 	}
 
@@ -217,7 +218,7 @@ public class HttpClientTests extends HttpTestCase {
 
 	@Test
 	public void testListRemote_Dumb_NoHEAD() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		File headref = new File(src.getDirectory(), Constants.HEAD);
 		assertTrue("HEAD used to be present", headref.delete());
 		assertFalse("HEAD is gone", headref.exists());
@@ -356,8 +357,8 @@ public class HttpClientTests extends HttpTestCase {
 
 	@Test
 	public void testListRemote_Smart_UploadPackDisabled() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
-		final FileBasedConfig cfg = src.getConfig();
+		Repository src = remoteRepository.getRepository();
+		final StoredConfig cfg = src.getConfig();
 		cfg.setBoolean("http", null, "uploadpack", false);
 		cfg.save();
 
@@ -370,6 +371,22 @@ public class HttpClientTests extends HttpTestCase {
 			} catch (TransportException err) {
 				String exp = smartAuthNoneURI + ": Git access forbidden";
 				assertEquals(exp, err.getMessage());
+			}
+		} finally {
+			t.close();
+		}
+	}
+
+	@Test
+	public void testListRemoteWithoutLocalRepository() throws Exception {
+		Transport t = Transport.open(smartAuthNoneURI);
+		try {
+			FetchConnection c = t.openFetch();
+			try {
+				Ref head = c.getRef(Constants.HEAD);
+				assertNotNull(head);
+			} finally {
+				c.close();
 			}
 		} finally {
 			t.close();

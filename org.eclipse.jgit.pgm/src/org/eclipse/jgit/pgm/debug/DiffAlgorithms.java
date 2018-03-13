@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.pgm.debug;
 
+import static java.lang.Integer.valueOf;
+import static java.lang.Long.valueOf;
+
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
@@ -67,8 +70,9 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -76,6 +80,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
 import org.kohsuke.args4j.Option;
 
+@Command(usage = "usage_DiffAlgorithms")
 class DiffAlgorithms extends TextBuiltin {
 
 	final Algorithm myers = new Algorithm() {
@@ -245,29 +250,31 @@ class DiffAlgorithms extends TextBuiltin {
 			File parent = db.getDirectory().getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
-			out.println(name + ": start at " + startId.name());
+			outw.println(name + ": start at " + startId.name());
 		}
 
-		out.format("  %12d files,     %8d commits\n", files, commits);
-		out.format("  N=%10d min lines, %8d max lines\n", minN, maxN);
+		outw.format("  %12d files,     %8d commits\n", valueOf(files),
+				valueOf(commits));
+		outw.format("  N=%10d min lines, %8d max lines\n", valueOf(minN),
+				valueOf(maxN));
 
-		out.format("%-25s %12s ( %12s  %12s )\n", //
+		outw.format("%-25s %12s ( %12s  %12s )\n", //
 				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
-		out.format("%-25s %12s ( %12s  %12s )\n", //
+		outw.format("%-25s %12s ( %12s  %12s )\n", //
 				"", "", "N=" + minN, "N=" + maxN);
-		out.println("-----------------------------------------------------"
-				+ "----------------");
+		outw.println("-----------------------------------------------------" //$NON-NLS-1$
+				+ "----------------"); //$NON-NLS-1$
 
 		for (Test test : all) {
-			out.format("%-25s %12d ( %12d  %12d )", //
+			outw.format("%-25s %12d ( %12d  %12d )", // //$NON-NLS-1$
 					test.algorithm.name, //
-					test.runningTimeNanos, //
-					test.minN.runningTimeNanos, //
-					test.maxN.runningTimeNanos);
-			out.println();
+					valueOf(test.runningTimeNanos), //
+					valueOf(test.minN.runningTimeNanos), //
+					valueOf(test.maxN.runningTimeNanos));
+			outw.println();
 		}
-		out.println();
-		out.flush();
+		outw.println();
+		outw.flush();
 	}
 
 	private static boolean isFile(TreeWalk tw, int ithTree) {

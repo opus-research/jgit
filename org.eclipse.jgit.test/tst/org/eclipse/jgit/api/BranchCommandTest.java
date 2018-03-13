@@ -59,15 +59,14 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NotMergedException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -122,7 +121,7 @@ public class BranchCommandTest extends RepositoryTestCase {
 		Git localGit = new Git(localRepository);
 		StoredConfig config = localRepository.getConfig();
 		RemoteConfig rc = new RemoteConfig(config, "origin");
-		rc.addURI(new URIish(remoteRepository.getDirectory().getPath()));
+		rc.addURI(new URIish(remoteRepository.getDirectory().getAbsolutePath()));
 		rc.addFetchRefSpec(new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
 		rc.update(config);
 		config.save();
@@ -198,6 +197,20 @@ public class BranchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testListBranchesWithContains() throws Exception {
+		git.branchCreate().setName("foo").setStartPoint(secondCommit).call();
+
+		List<Ref> refs = git.branchList().call();
+		assertEquals(2, refs.size());
+
+		List<Ref> refsContainingSecond = git.branchList()
+				.setContains(secondCommit.name()).call();
+		assertEquals(1, refsContainingSecond.size());
+		// master is on initial commit, so it should not be returned
+		assertEquals("refs/heads/foo", refsContainingSecond.get(0).getName());
+	}
+
+	@Test
 	public void testCreateFromCommit() throws Exception {
 		Ref branch = git.branchCreate().setName("FromInitial").setStartPoint(
 				initialCommit).call();
@@ -264,10 +277,10 @@ public class BranchCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testCreateFromAnnotatetdTag() throws Exception {
-		RevTag tag = git.tag().setName("V10").setObjectId(secondCommit).call();
+		Ref tagRef = git.tag().setName("V10").setObjectId(secondCommit).call();
 		Ref branch = git.branchCreate().setName("FromAnnotatedTag")
 				.setStartPoint("refs/tags/V10").call();
-		assertFalse(tag.getId().equals(branch.getObjectId()));
+		assertFalse(tagRef.getObjectId().equals(branch.getObjectId()));
 		assertEquals(secondCommit.getId(), branch.getObjectId());
 	}
 
@@ -467,9 +480,7 @@ public class BranchCommandTest extends RepositoryTestCase {
 
 	public Ref createBranch(Git actGit, String name, boolean force,
 			String startPoint, SetupUpstreamMode mode)
-			throws JGitInternalException, RefAlreadyExistsException,
-			RefNotFoundException,
-			InvalidRefNameException {
+			throws JGitInternalException, GitAPIException {
 		CreateBranchCommand cmd = actGit.branchCreate();
 		cmd.setName(name);
 		cmd.setForce(force);

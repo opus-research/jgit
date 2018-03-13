@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
@@ -92,6 +93,7 @@ public class SubmoduleAddCommand extends
 	 * Set repository-relative path of submodule
 	 *
 	 * @param path
+	 *            (with <code>/</code> as separator)
 	 * @return this command
 	 */
 	public SubmoduleAddCommand setPath(final String path) {
@@ -134,7 +136,7 @@ public class SubmoduleAddCommand extends
 		return SubmoduleWalk.forIndex(repo).setFilter(filter).next();
 	}
 
-	public Repository call() throws JGitInternalException {
+	public Repository call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().pathNotConfigured);
