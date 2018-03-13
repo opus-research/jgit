@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,48 +41,35 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
-
-import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
+package org.eclipse.jgit.lib;
 
 /**
- * An expected object is missing.
+ * Asynchronous operation handle.
+ *
+ * Callers that start an asynchronous operation are supplied with a handle that
+ * may be used to attempt cancellation of the operation if the caller does not
+ * wish to continue.
  */
-public class MissingObjectException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private final ObjectId missing;
-
+public interface AsyncOperation {
 	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
+	 * Cancels the running task.
 	 *
-	 * @param id SHA-1
-	 * @param type object type
-	 */
-	public MissingObjectException(final ObjectId id, final String type) {
-		super(MessageFormat.format(JGitText.get().missingObject, type, id.name()));
-		missing = id.copy();
-	}
-
-	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
+	 * Attempts to cancel execution of this task. This attempt will fail if the
+	 * task has already completed, already been cancelled, or could not be
+	 * cancelled for some other reason. If successful, and this task has not
+	 * started when cancel is called, this task should never run. If the task
+	 * has already started, then the mayInterruptIfRunning parameter determines
+	 * whether the thread executing this task should be interrupted in an
+	 * attempt to stop the task.
 	 *
-	 * @param id SHA-1
-	 * @param type object type
+	 * @param mayInterruptIfRunning
+	 *            true if the thread executing this task should be interrupted;
+	 *            otherwise, in-progress tasks are allowed to complete
+	 * @return false if the task could not be cancelled, typically because it
+	 *         has already completed normally; true otherwise
 	 */
-	public MissingObjectException(final ObjectId id, final int type) {
-		this(id, Constants.typeString(type));
-	}
+	public boolean cancel(boolean mayInterruptIfRunning);
 
-	/** @return the ObjectId that was not found. */
-	public ObjectId getObjectId() {
-		return missing;
-	}
+	/** Release resources used by the operation, including cancellation. */
+	public void release();
 }

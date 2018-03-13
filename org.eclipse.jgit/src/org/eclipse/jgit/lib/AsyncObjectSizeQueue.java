@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,69 +43,48 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.GitlinksNotSupportedException;
-import org.eclipse.jgit.errors.SymlinksNotSupportedException;
+import org.eclipse.jgit.errors.MissingObjectException;
 
 /**
- * A tree visitor for writing a directory tree to the git object database. Blob
- * data is fetched from the files, not the cached blobs.
+ * Queue to examine object sizes asynchronously.
  *
- * @deprecated Use {@link org.eclipse.jgit.dircache.DirCache} instead.
+ * A queue may perform background lookup of object sizes and supply them
+ * (possibly out-of-order) to the application.
+ *
+ * @param <T>
+ *            type of identifier supplied to the call that made the queue.
  */
-@Deprecated
-public class WriteTree extends TreeVisitorWithCurrentDirectory {
-	private final ObjectInserter inserter;
+public interface AsyncObjectSizeQueue<T extends ObjectId> extends
+		AsyncOperation {
 
 	/**
-	 * Construct a WriteTree for a given directory
+	 * Position this queue onto the next available result.
 	 *
-	 * @param sourceDirectory
-	 * @param db
+	 * @return true if there is a result available; false if the queue has
+	 *         finished its input iteration.
+	 * @throws MissingObjectException
+	 *             the object does not exist. If the implementation is retaining
+	 *             the application's objects {@link #getCurrent()} will be the
+	 *             current object that is missing. There may be more results
+	 *             still available, so the caller should continue invoking next
+	 *             to examine another result.
+	 * @throws IOException
+	 *             the object store cannot be accessed.
 	 */
-	public WriteTree(final File sourceDirectory, final Repository db) {
-		super(sourceDirectory);
-		inserter = db.newObjectInserter();
-	}
+	public boolean next() throws MissingObjectException, IOException;
 
-	public void visitFile(final FileTreeEntry f) throws IOException {
-		File path = new File(getCurrentDirectory(), f.getName());
-		FileInputStream in = new FileInputStream(path);
-		try {
-			long sz = in.getChannel().size();
-			f.setId(inserter.insert(Constants.OBJ_BLOB, sz, in));
-			inserter.flush();
-		} finally {
-			inserter.release();
-			in.close();
-		}
-	}
+	/**
+	 * @return the current object, null if the implementation lost track.
+	 *         Implementations may for performance reasons discard the caller's
+	 *         ObjectId and provider their own through {@link #getObjectId()}.
+	 */
+	public T getCurrent();
 
-	public void visitSymlink(final SymlinkTreeEntry s) throws IOException {
-		if (s.isModified()) {
-			throw new SymlinksNotSupportedException(MessageFormat.format(
-					JGitText.get().symlinkCannotBeWrittenAsTheLinkTarget, s.getFullName()));
-		}
-	}
+	/** @return the ObjectId of the current object. Never null. */
+	public ObjectId getObjectId();
 
-	public void endVisitTree(final Tree t) throws IOException {
-		super.endVisitTree(t);
-		try {
-			t.setId(inserter.insert(Constants.OBJ_TREE, t.format()));
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
-	}
-
-	public void visitGitlink(GitlinkTreeEntry s) throws IOException {
-		if (s.isModified()) {
-			throw new GitlinksNotSupportedException(s.getFullName());
-		}
-	}
+	/** @return the size of the current object. */
+	public long getSize();
 }

@@ -47,17 +47,10 @@
 package org.eclipse.jgit.lib;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.ObjectWritingException;
 
 /**
  * Inserts objects into an existing {@code ObjectDatabase}.
@@ -72,16 +65,6 @@ import org.eclipse.jgit.errors.ObjectWritingException;
  * otherwise making the returned ObjectIds visible to other code.
  */
 public abstract class ObjectInserter {
-	private static final byte[] htree = Constants.encodeASCII("tree");
-
-	private static final byte[] hparent = Constants.encodeASCII("parent");
-
-	private static final byte[] hauthor = Constants.encodeASCII("author");
-
-	private static final byte[] hcommitter = Constants.encodeASCII("committer");
-
-	private static final byte[] hencoding = Constants.encodeASCII("encoding");
-
 	/** An inserter that can be used for formatting and id generation only. */
 	public static class Formatter extends ObjectInserter {
 		@Override
@@ -194,6 +177,38 @@ public abstract class ObjectInserter {
 	}
 
 	/**
+	 * Insert a single commit into the store, returning its unique name.
+	 *
+	 * As a side effect, {@link CommitBuilder#getCommitId()} will also be
+	 * populated with the returned ObjectId.
+	 *
+	 * @param builder
+	 *            the builder containing the proposed commit's data.
+	 * @return the name of the commit object.
+	 * @throws IOException
+	 *             the object could not be stored.
+	 */
+	public final ObjectId insert(CommitBuilder builder) throws IOException {
+		return insert(Constants.OBJ_COMMIT, builder.format(this));
+	}
+
+	/**
+	 * Insert a single annotated tag into the store, returning its unique name.
+	 *
+	 * As a side effect, {@link TagBuilder#getTagId()} will also be populated
+	 * with the returned ObjectId.
+	 *
+	 * @param builder
+	 *            the builder containing the proposed tag's data.
+	 * @return the name of the tag object.
+	 * @throws IOException
+	 *             the object could not be stored.
+	 */
+	public final ObjectId insert(TagBuilder builder) throws IOException {
+		return insert(Constants.OBJ_TAG, builder.format(this));
+	}
+
+	/**
 	 * Insert a single object into the store, returning its unique name.
 	 *
 	 * @param type
@@ -266,134 +281,4 @@ public abstract class ObjectInserter {
 	 * released after the subsequent usage.
 	 */
 	public abstract void release();
-
-	/**
-	 * Format a Tree in canonical format.
-	 *
-	 * @param tree
-	 *            the tree object to format
-	 * @return canonical encoding of the tree object.
-	 * @throws IOException
-	 *             the tree cannot be loaded, or its not in a writable state.
-	 */
-	public final byte[] format(Tree tree) throws IOException {
-		ByteArrayOutputStream o = new ByteArrayOutputStream();
-		for (TreeEntry e : tree.members()) {
-			ObjectId id = e.getId();
-			if (id == null)
-				throw new ObjectWritingException(MessageFormat.format(JGitText
-						.get().objectAtPathDoesNotHaveId, e.getFullName()));
-
-			e.getMode().copyTo(o);
-			o.write(' ');
-			o.write(e.getNameUTF8());
-			o.write(0);
-			id.copyRawTo(o);
-		}
-		return o.toByteArray();
-	}
-
-	/**
-	 * Format a Commit in canonical format.
-	 *
-	 * @param commit
-	 *            the commit object to format
-	 * @return canonical encoding of the commit object.
-	 * @throws UnsupportedEncodingException
-	 *             the commit's chosen encoding isn't supported on this JVM.
-	 */
-	public final byte[] format(Commit commit)
-			throws UnsupportedEncodingException {
-		String encoding = commit.getEncoding();
-		if (encoding == null)
-			encoding = Constants.CHARACTER_ENCODING;
-
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		OutputStreamWriter w = new OutputStreamWriter(os, encoding);
-		try {
-			os.write(htree);
-			os.write(' ');
-			commit.getTreeId().copyTo(os);
-			os.write('\n');
-
-			ObjectId[] ps = commit.getParentIds();
-			for (int i = 0; i < ps.length; ++i) {
-				os.write(hparent);
-				os.write(' ');
-				ps[i].copyTo(os);
-				os.write('\n');
-			}
-
-			os.write(hauthor);
-			os.write(' ');
-			w.write(commit.getAuthor().toExternalString());
-			w.flush();
-			os.write('\n');
-
-			os.write(hcommitter);
-			os.write(' ');
-			w.write(commit.getCommitter().toExternalString());
-			w.flush();
-			os.write('\n');
-
-			if (!encoding.equals(Constants.CHARACTER_ENCODING)) {
-				os.write(hencoding);
-				os.write(' ');
-				os.write(Constants.encodeASCII(encoding));
-				os.write('\n');
-			}
-
-			os.write('\n');
-			w.write(commit.getMessage());
-			w.flush();
-		} catch (IOException err) {
-			// This should never occur, the only way to get it above is
-			// for the ByteArrayOutputStream to throw, but it doesn't.
-			//
-			throw new RuntimeException(err);
-		}
-		return os.toByteArray();
-	}
-
-	/**
-	 * Format a Tag in canonical format.
-	 *
-	 * @param tag
-	 *            the tag object to format
-	 * @return canonical encoding of the tag object.
-	 */
-	public final byte[] format(Tag tag) {
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
-		try {
-			w.write("object ");
-			tag.getObjId().copyTo(w);
-			w.write('\n');
-
-			w.write("type ");
-			w.write(tag.getType());
-			w.write("\n");
-
-			w.write("tag ");
-			w.write(tag.getTag());
-			w.write("\n");
-
-			if (tag.getTagger() != null) {
-				w.write("tagger ");
-				w.write(tag.getTagger().toExternalString());
-				w.write('\n');
-			}
-
-			w.write('\n');
-			if (tag.getMessage() != null)
-				w.write(tag.getMessage());
-			w.close();
-		} catch (IOException err) {
-			// This should never occur, the only way to get it above is
-			// for the ByteArrayOutputStream to throw, but it doesn't.
-			//
-			throw new RuntimeException(err);
-		}
-		return os.toByteArray();
-	}
 }

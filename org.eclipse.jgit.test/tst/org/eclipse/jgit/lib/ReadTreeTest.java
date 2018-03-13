@@ -111,21 +111,25 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	private Tree buildTree(HashMap<String, String> headEntries) throws IOException {
 		Tree tree = new Tree(db);
-		ObjectWriter ow = new ObjectWriter(db);
 		if (headEntries == null)
 			return tree;
 		FileTreeEntry fileEntry;
 		Tree parent;
-		for (java.util.Map.Entry<String, String> e : headEntries.entrySet()) {
-			fileEntry = tree.addFile(e.getKey());
-			fileEntry.setId(genSha1(e.getValue()));
-			parent = fileEntry.getParent();
-			while (parent != null) {
-				parent.setId(ow.writeTree(parent));
-				parent = parent.getParent();
+		ObjectInserter oi = db.newObjectInserter();
+		try {
+			for (java.util.Map.Entry<String, String> e : headEntries.entrySet()) {
+				fileEntry = tree.addFile(e.getKey());
+				fileEntry.setId(genSha1(e.getValue()));
+				parent = fileEntry.getParent();
+				while (parent != null) {
+					parent.setId(oi.insert(Constants.OBJ_TREE, parent.format()));
+					parent = parent.getParent();
+				}
 			}
+			oi.flush();
+		} finally {
+			oi.release();
 		}
-
 		return tree;
 	}
 
@@ -371,7 +375,14 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 								// This test would fail in DirCacheCheckoutTests.
 	}
 
-	// 8 ?
+	public void testDirectoryFileConflicts_8() throws Exception {
+		// 8
+		setupCase(mk("DF"), mk("DF"), mk("DF/DF"));
+		recursiveDelete(new File(db.getWorkTree(), "DF"));
+		writeTrashFile("DF", "xy");
+		go();
+		assertConflict("DF/DF");
+	}
 
 	public void testDirectoryFileConflicts_9() throws Exception {
 		// 9
@@ -384,9 +395,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		// 10
 		cleanUpDF();
 		doit(mk("DF"), mk("DF/DF"), mk("DF/DF"));
-		// TODO Check this failing test
 		assertNoConflicts();
-
 	}
 
 	public void testDirectoryFileConflicts_11() throws Exception {
@@ -479,12 +488,8 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		// 19
 		cleanUpDF();
 		doit(mk("DF/DF/DF/DF"), mk("DF/DF/DF"), null);
-
-		// I think this test is wrong, it should
-		// check for conflicts according to rule 19.
-		// This test would fail in DirCacheCheckout
-		// assertRemoved("DF/DF/DF/DF");
-		// assertUpdated("DF/DF/DF");
+		assertRemoved("DF/DF/DF/DF");
+		assertUpdated("DF/DF/DF");
 	}
 
 	protected void cleanUpDF() throws Exception {
@@ -536,7 +541,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("foo", "foo");
 		go();
 
-		// Why shouldn't we check for conflicts here?
+		// TODO: Why should we expect conflicts here?
 		// H and M are emtpy and according to rule #5 of
 		// the carry-over rules a dirty index is no reason
 		// for a conflict. (I also feel it should be a
@@ -550,6 +555,11 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("foo/bar/baz", "");
 		writeTrashFile("foo/blahblah", "");
 		go();
+
+		// TODO: In DirCacheCheckout the following assertion would pass. But
+		// old WorkDirCheckout fails on this. For now I leave it out. Find out
+		// what's the correct behavior.
+		// assertConflict("foo");
 
 		assertConflict("foo/bar/baz");
 		assertConflict("foo/blahblah");

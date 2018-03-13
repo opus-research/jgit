@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,49 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.treewalk;
 
-package org.eclipse.jgit.errors;
-
-import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.CoreConfig;
 
 /**
- * An expected object is missing.
+ * Contains options used by the WorkingTreeIterator.
  */
-public class MissingObjectException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private final ObjectId missing;
+public class WorkingTreeOptions {
 
 	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
+	 * Creates default options which reflect the original configuration of Git
+	 * on Unix systems.
 	 *
-	 * @param id SHA-1
-	 * @param type object type
+	 * @return created working tree options
 	 */
-	public MissingObjectException(final ObjectId id, final String type) {
-		super(MessageFormat.format(JGitText.get().missingObject, type, id.name()));
-		missing = id.copy();
+	public static WorkingTreeOptions createDefaultInstance() {
+		return new WorkingTreeOptions(false);
 	}
 
 	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
+	 * Creates options based on the specified repository configuration.
 	 *
-	 * @param id SHA-1
-	 * @param type object type
+	 * @param config
+	 *            repository configuration to create options for
+	 *
+	 * @return created working tree options
 	 */
-	public MissingObjectException(final ObjectId id, final int type) {
-		this(id, Constants.typeString(type));
+	public static WorkingTreeOptions createConfigurationInstance(Config config) {
+		return new WorkingTreeOptions(config.get(CoreConfig.KEY).isAutoCRLF());
 	}
 
-	/** @return the ObjectId that was not found. */
-	public ObjectId getObjectId() {
-		return missing;
+	/**
+	 * Indicates whether EOLs of text files should be converted to '\n' before
+	 * calculating the blob ID.
+	 **/
+	private final boolean autoCRLF;
+
+	/**
+	 * Creates new options.
+	 *
+	 * @param autoCRLF
+	 *            indicates whether EOLs of text files should be converted to
+	 *            '\n' before calculating the blob ID.
+	 */
+	public WorkingTreeOptions(boolean autoCRLF) {
+		this.autoCRLF = autoCRLF;
+	}
+
+	/**
+	 * Indicates whether EOLs of text files should be converted to '\n' before
+	 * calculating the blob ID.
+	 *
+	 * @return true if EOLs should be canonicalized.
+	 */
+	public boolean isAutoCRLF() {
+		return autoCRLF;
 	}
 }
