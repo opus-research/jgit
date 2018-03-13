@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.R_REFS;
 import static org.eclipse.jgit.lib.Constants.encode;
@@ -81,7 +80,6 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -245,11 +243,6 @@ public class RefTree {
 		try {
 			DirCacheEditor ed = contents.editor();
 			for (Command cmd : cmdList) {
-				if (!isValidRef(cmd)) {
-					cmd.setResult(REJECTED_OTHER_REASON,
-							JGitText.get().funnyRefname);
-					return abort(cmdList);
-				}
 				apply(ed, cmd);
 			}
 			ed.finish();
@@ -268,11 +261,6 @@ public class RefTree {
 		} catch (LockFailureException e) {
 			return abort(cmdList);
 		}
-	}
-
-	private static boolean isValidRef(Command cmd) {
-		String n = cmd.getRefName();
-		return HEAD.equals(n) || Repository.isValidRefName(n);
 	}
 
 	private void apply(DirCacheEditor ed, final Command cmd) {
@@ -370,7 +358,7 @@ public class RefTree {
 		return R_REFS + path;
 	}
 
-	static String refPath(String name) {
+	private static String refPath(String name) {
 		if (name.startsWith(R_REFS)) {
 			return name.substring(R_REFS.length());
 		}

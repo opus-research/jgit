@@ -132,7 +132,7 @@ public class Command {
 		this.cmd = cmd;
 	}
 
-	static Ref toRef(RevWalk rw, ObjectId id, String name,
+	private static Ref toRef(RevWalk rw, ObjectId id, String name,
 			boolean mustExist) throws MissingObjectException, IOException {
 		if (ObjectId.zeroId().equals(id)) {
 			return null;

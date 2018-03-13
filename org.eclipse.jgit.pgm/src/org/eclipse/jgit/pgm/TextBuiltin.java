@@ -216,7 +216,7 @@ public abstract class TextBuiltin {
 		try {
 			clp.parseArgument(args);
 		} catch (CmdLineException err) {
-			this.errw.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
+			this.errw.println(CLIText.fatalError(err.getMessage()));
 			if (help) {
 				printUsage("", clp); //$NON-NLS-1$
 			}
@@ -277,8 +277,16 @@ public abstract class TextBuiltin {
 	}
 
 	/**
-	 * @return the resource bundle that will be passed to args4j for purpose
-	 *         of string localization
+	 * @return error writer, typically this is standard error.
+	 * @since 4.2
+	 */
+	public ThrowingPrintWriter getErrorWriter() {
+		return errw;
+	}
+
+	/**
+	 * @return the resource bundle that will be passed to args4j for purpose of
+	 *         string localization
 	 */
 	protected ResourceBundle getResourceBundle() {
 		return CLIText.get().resourceBundle();
