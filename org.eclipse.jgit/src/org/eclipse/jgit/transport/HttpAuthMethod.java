@@ -85,21 +85,11 @@ abstract class HttpAuthMethod {
 			public HttpAuthMethod method(String hdr) {
 				return None.INSTANCE;
 			}
-
-			@Override
-			public String getName() {
-				return "None"; //$NON-NLS-1$
-			}
 		},
 		BASIC {
 			@Override
 			public HttpAuthMethod method(String hdr) {
 				return new Basic();
-			}
-
-			@Override
-			public String getName() {
-				return "Basic"; //$NON-NLS-1$
 			}
 		},
 		DIGEST {
@@ -107,21 +97,11 @@ abstract class HttpAuthMethod {
 			public HttpAuthMethod method(String hdr) {
 				return new Digest(hdr);
 			}
-
-			@Override
-			public String getName() {
-				return "Digest"; //$NON-NLS-1$
-			}
 		},
 		NEGOTIATE {
 			@Override
 			public HttpAuthMethod method(String hdr) {
 				return new Negotiate(hdr);
-			}
-
-			@Override
-			public String getName() {
-				return "Negotiate"; //$NON-NLS-1$
 			}
 		};
 		/**
@@ -132,8 +112,6 @@ abstract class HttpAuthMethod {
 		 * @return a configured HttpAuthMethod instance
 		 */
 		public abstract HttpAuthMethod method(String hdr);
-
-		public abstract String getName();
 	}
 
 	static final String EMPTY_STRING = ""; //$NON-NLS-1$
@@ -292,7 +270,7 @@ abstract class HttpAuthMethod {
 		void configureRequest(final HttpConnection conn) throws IOException {
 			String ident = user + ":" + pass; //$NON-NLS-1$
 			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
-			conn.setRequestProperty(HDR_AUTHORIZATION, type.getName()
+			conn.setRequestProperty(HDR_AUTHORIZATION, type.name()
 					+ " " + enc); //$NON-NLS-1$
 		}
 	}
@@ -379,7 +357,7 @@ abstract class HttpAuthMethod {
 				v.append(e.getValue());
 				v.append('"');
 			}
-			conn.setRequestProperty(HDR_AUTHORIZATION, type.getName()
+			conn.setRequestProperty(HDR_AUTHORIZATION, type.name()
 					+ " " + v); //$NON-NLS-1$
 		}
 
