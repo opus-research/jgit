@@ -85,7 +85,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -107,8 +106,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		COULD_NOT_DELETE
 	}
 
-	/** The tree walk which we'll iterate over to merge entries. */
-	protected NameConflictTreeWalk tw;
+	private NameConflictTreeWalk tw;
 
 	/**
 	 * string versions of a list of commit SHA1s
@@ -117,23 +115,17 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	protected String commitNames[];
 
-	/** Index of the base tree within the {@link #tw tree walk}. */
-	protected static final int T_BASE = 0;
+	private static final int T_BASE = 0;
 
-	/** Index of our tree in withthe {@link #tw tree walk}. */
-	protected static final int T_OURS = 1;
+	private static final int T_OURS = 1;
 
-	/** Index of their tree within the {@link #tw tree walk}. */
-	protected static final int T_THEIRS = 2;
+	private static final int T_THEIRS = 2;
 
-	/** Index of the index tree within the {@link #tw tree walk}. */
-	protected static final int T_INDEX = 3;
+	private static final int T_INDEX = 3;
 
-	/** Index of the working directory tree within the {@link #tw tree walk}. */
-	protected static final int T_FILE = 4;
+	private static final int T_FILE = 4;
 
-	/** Builder to update the cache during this merge. */
-	protected DirCacheBuilder builder;
+	private DirCacheBuilder builder;
 
 	/**
 	 * merge result as tree
@@ -142,41 +134,19 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	protected ObjectId resultTree;
 
-	/**
-	 * Paths that could not be merged by this merger because of an unsolvable
-	 * conflict.
-	 */
-	protected List<String> unmergedPaths = new ArrayList<String>();
+	private List<String> unmergedPaths = new ArrayList<String>();
 
-	/** Files modified during this merge operation. */
-	protected List<String> modifiedFiles = new LinkedList<String>();
+	private List<String> modifiedFiles = new LinkedList<String>();
 
-	/**
-	 * If the merger has nothing to do for a file but check it out at the end of
-	 * the operation, it can be added here.
-	 */
-	protected Map<String, DirCacheEntry> toBeCheckedOut = new HashMap<String, DirCacheEntry>();
+	private Map<String, DirCacheEntry> toBeCheckedOut = new HashMap<String, DirCacheEntry>();
 
-	/**
-	 * Paths in this list will be deleted from the local copy at the end of the
-	 * operation.
-	 */
-	protected List<String> toBeDeleted = new ArrayList<String>();
+	private List<String> toBeDeleted = new ArrayList<String>();
 
-	/**
-	 * Low-level textual merge results. Will be passed on to the callers in case
-	 * of conflicts.
-	 */
-	protected Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<String, MergeResult<? extends Sequence>>();
+	private Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<String, MergeResult<? extends Sequence>>();
 
-	/** Paths for which the merge failed altogether. */
-	protected Map<String, MergeFailureReason> failingPaths = new HashMap<String, MergeFailureReason>();
+	private Map<String, MergeFailureReason> failingPaths = new HashMap<String, MergeFailureReason>();
 
-	/**
-	 * Updated as we merge entries of the tree walk. Tells us whether we should
-	 * recurse into the entry if it is a subtree.
-	 */
-	protected boolean enterSubtree;
+	private boolean enterSubtree;
 
 	/**
 	 * Set to true if this merge should work in-memory. The repos dircache and
@@ -308,8 +278,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @throws CorruptObjectException
 	 * @throws NoWorkTreeException
 	 */
-	protected void cleanUp() throws NoWorkTreeException,
-			CorruptObjectException,
+	private void cleanUp() throws NoWorkTreeException, CorruptObjectException,
 			IOException {
 		if (inCore) {
 			modifiedFiles.clear();
@@ -418,7 +387,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @throws CorruptObjectException
 	 * @throws IOException
 	 */
-	protected boolean processEntry(CanonicalTreeParser base,
+	private boolean processEntry(CanonicalTreeParser base,
 			CanonicalTreeParser ours, CanonicalTreeParser theirs,
 			DirCacheBuildIterator index, WorkingTreeIterator work)
 			throws MissingObjectException, IncorrectObjectTypeException,
@@ -470,7 +439,7 @@ public class ResolveMerger extends ThreeWayMerger {
 					else {
 						// the preferred version THEIRS has a different mode
 						// than ours. Check it out!
-						if (isWorktreeDirty(work))
+						if (isWorktreeDirty(work, ourDce))
 							return false;
 						// we know about length and lastMod only after we have written the new content.
 						// This will happen later. Set these values to 0 for know.
@@ -508,7 +477,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// THEIRS. THEIRS is chosen.
 
 			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty(work))
+			if (isWorktreeDirty(work, ourDce))
 				return false;
 			if (nonTree(modeT)) {
 				// we know about length and lastMod only after we have written
@@ -566,7 +535,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		if (nonTree(modeO) && nonTree(modeT)) {
 			// Check worktree before modifying files
-			if (isWorktreeDirty(work))
+			if (isWorktreeDirty(work, ourDce))
 				return false;
 
 			// Don't attempt to resolve submodule link conflicts
@@ -597,7 +566,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				// OURS was deleted checkout THEIRS
 				if (modeO == 0) {
 					// Check worktree before checking out THEIRS
-					if (isWorktreeDirty(work))
+					if (isWorktreeDirty(work, ourDce))
 						return false;
 					if (nonTree(modeT)) {
 						if (e != null)
@@ -656,7 +625,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		return isDirty;
 	}
 
-	private boolean isWorktreeDirty(WorkingTreeIterator work) {
+	private boolean isWorktreeDirty(WorkingTreeIterator work,
+			DirCacheEntry ourDce) throws IOException {
 		if (work == null)
 			return false;
 
@@ -664,9 +634,15 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		boolean isDirty = work.isModeDifferent(modeO);
-		if (!isDirty && nonTree(modeF))
-			isDirty = !tw.idEqual(T_FILE, T_OURS);
+		boolean isDirty;
+		if (ourDce != null)
+			isDirty = work.isModified(ourDce, true, reader);
+		else {
+			isDirty = work.isModeDifferent(modeO);
+			if (!isDirty && nonTree(modeF))
+				isDirty = !tw.idEqual(T_FILE, T_OURS);
+		}
+
 		// Ignore existing empty directories
 		if (isDirty && modeF == FileMode.TYPE_TREE
 				&& modeO == FileMode.TYPE_MISSING)
@@ -956,8 +932,19 @@ public class ResolveMerger extends ThreeWayMerger {
 		if (workingTreeIterator != null)
 			tw.addTree(workingTreeIterator);
 
-		if (!mergeTreeWalk(tw)) {
-			return false;
+		while (tw.next()) {
+			if (!processEntry(
+					tw.getTree(T_BASE, CanonicalTreeParser.class),
+					tw.getTree(T_OURS, CanonicalTreeParser.class),
+					tw.getTree(T_THEIRS, CanonicalTreeParser.class),
+					tw.getTree(T_INDEX, DirCacheBuildIterator.class),
+					(workingTreeIterator == null) ? null : tw.getTree(T_FILE,
+							WorkingTreeIterator.class))) {
+				cleanUp();
+				return false;
+			}
+			if (tw.isSubtree() && enterSubtree)
+				tw.enterSubtree();
 		}
 
 		if (!inCore) {
@@ -988,32 +975,5 @@ public class ResolveMerger extends ThreeWayMerger {
 			resultTree = null;
 			return false;
 		}
-	}
-
-	/**
-	 * Process the given TreeWalk's entries.
-	 *
-	 * @param treeWalk
-	 *            The walk to iterate over.
-	 * @return Whether the trees merged cleanly.
-	 * @throws IOException
-	 */
-	protected boolean mergeTreeWalk(TreeWalk treeWalk) throws IOException {
-		boolean hasWorkingTreeIterator = tw.getTreeCount() > T_FILE;
-		while (treeWalk.next()) {
-			if (!processEntry(
-					treeWalk.getTree(T_BASE, CanonicalTreeParser.class),
-					treeWalk.getTree(T_OURS, CanonicalTreeParser.class),
-					treeWalk.getTree(T_THEIRS, CanonicalTreeParser.class),
-					treeWalk.getTree(T_INDEX, DirCacheBuildIterator.class),
-					hasWorkingTreeIterator ? treeWalk.getTree(T_FILE,
-							WorkingTreeIterator.class) : null)) {
-				cleanUp();
-				return false;
-			}
-			if (treeWalk.isSubtree() && enterSubtree)
-				treeWalk.enterSubtree();
-		}
-		return true;
 	}
 }
