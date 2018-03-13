@@ -115,7 +115,8 @@ public class MergeMessageFormatter {
 
 		String targetName = target.getLeaf().getName();
 		if (!targetName.equals(Constants.R_HEADS + Constants.MASTER)) {
-			String targetShortName = Repository.shortenRefName(targetName);
+			String targetShortName = Repository
+					.shortenRefName(target.getName());
 			sb.append(" into " + targetShortName);
 		}
 
