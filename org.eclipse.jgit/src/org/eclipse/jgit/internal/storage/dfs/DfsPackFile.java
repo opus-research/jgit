@@ -54,7 +54,6 @@ import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.text.MessageFormat;
 import java.util.Set;
@@ -81,6 +80,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.LongList;
 
 /**
@@ -464,73 +464,11 @@ public final class DfsPackFile {
 		return dstbuf;
 	}
 
-	void copyPackAsIs(PackOutputStream out, DfsReader ctx)
+	void copyPackAsIs(PackOutputStream out, boolean validate, DfsReader ctx)
 			throws IOException {
-		// If the length hasn't been determined yet, pin to set it.
-		if (length == -1) {
-			ctx.pin(this, 0);
-			ctx.unpin();
-		}
-		if (cache.shouldCopyThroughCache(length))
-			copyPackThroughCache(out, ctx);
-		else
-			copyPackBypassCache(out, ctx);
-	}
-
-	private void copyPackThroughCache(PackOutputStream out, DfsReader ctx)
-			throws IOException {
-		long position = 12;
-		long remaining = length - (12 + 20);
-		while (0 < remaining) {
-			DfsBlock b = cache.getOrLoad(this, position, ctx);
-			int ptr = (int) (position - b.start);
-			int n = (int) Math.min(b.size() - ptr, remaining);
-			b.write(out, position, n);
-			position += n;
-			remaining -= n;
-		}
-	}
-
-	private long copyPackBypassCache(PackOutputStream out, DfsReader ctx)
-			throws IOException {
-		try (ReadableChannel rc = ctx.db.openFile(packDesc, PACK)) {
-			ByteBuffer buf = newCopyBuffer(out, rc);
-			if (ctx.getOptions().getStreamPackBufferSize() > 0)
-				rc.setReadAheadBytes(ctx.getOptions().getStreamPackBufferSize());
-			long position = 12;
-			long remaining = length - (12 + 20);
-			while (0 < remaining) {
-				DfsBlock b = cache.get(key, alignToBlock(position));
-				if (b != null) {
-					int ptr = (int) (position - b.start);
-					int n = (int) Math.min(b.size() - ptr, remaining);
-					b.write(out, position, n);
-					position += n;
-					remaining -= n;
-					rc.position(position);
-					continue;
-				}
-
-				buf.position(0);
-				int n = read(rc, buf);
-				if (n <= 0)
-					throw packfileIsTruncated();
-				else if (n > remaining)
-					n = (int) remaining;
-				out.write(buf.array(), 0, n);
-				position += n;
-				remaining -= n;
-			}
-			return position;
-		}
-	}
-
-	private ByteBuffer newCopyBuffer(PackOutputStream out, ReadableChannel rc) {
-		int bs = blockSize(rc);
-		byte[] copyBuf = out.getCopyBuffer();
-		if (bs > copyBuf.length)
-			copyBuf = new byte[bs];
-		return ByteBuffer.wrap(copyBuf, 0, bs);
+		// Pin the first window, this ensures the length is accurate.
+		ctx.pin(this, 0);
+		ctx.copyPackAsIs(this, length, validate, out);
 	}
 
 	@SuppressWarnings("null")
@@ -680,7 +618,7 @@ public final class DfsPackFile {
 			// and we have it pinned.  Write this out without copying.
 			//
 			out.writeHeader(src, inflatedLength);
-			quickCopy.write(out, dataOffset, (int) dataLength);
+			quickCopy.write(out, dataOffset, (int) dataLength, null);
 
 		} else if (dataLength <= buf.length) {
 			// Tiny optimization: Lots of objects are very small deltas or
@@ -731,12 +669,6 @@ public final class DfsPackFile {
 		invalid = true;
 	}
 
-	private IOException packfileIsTruncated() {
-		invalid = true;
-		return new IOException(MessageFormat.format(
-				JGitText.get().packfileIsTruncated, getPackName()));
-	}
-
 	private void readFully(long position, byte[] dstbuf, int dstoff, int cnt,
 			DfsReader ctx) throws IOException {
 		if (ctx.copy(this, position, dstbuf, dstoff, cnt) != cnt)
@@ -761,8 +693,18 @@ public final class DfsPackFile {
 
 		ReadableChannel rc = ctx.db.openFile(packDesc, PACK);
 		try {
-			int size = blockSize(rc);
-			pos = (pos / size) * size;
+			// If the block alignment is not yet known, discover it. Prefer the
+			// larger size from either the cache or the file itself.
+			int size = blockSize;
+			if (size == 0) {
+				size = rc.blockSize();
+				if (size <= 0)
+					size = cache.getBlockSize();
+				else if (size < cache.getBlockSize())
+					size = (cache.getBlockSize() / size) * size;
+				blockSize = size;
+				pos = (pos / size) * size;
+			}
 
 			// If the size of the file is not yet known, try to discover it.
 			// Channels may choose to return -1 to indicate they don't
@@ -784,7 +726,7 @@ public final class DfsPackFile {
 
 			byte[] buf = new byte[size];
 			rc.position(pos);
-			int cnt = read(rc, ByteBuffer.wrap(buf, 0, size));
+			int cnt = IO.read(rc, buf, 0, size);
 			if (cnt != size) {
 				if (0 <= len) {
 					throw new EOFException(MessageFormat.format(
@@ -811,30 +753,6 @@ public final class DfsPackFile {
 		} finally {
 			rc.close();
 		}
-	}
-
-	private int blockSize(ReadableChannel rc) {
-		// If the block alignment is not yet known, discover it. Prefer the
-		// larger size from either the cache or the file itself.
-		int size = blockSize;
-		if (size == 0) {
-			size = rc.blockSize();
-			if (size <= 0)
-				size = cache.getBlockSize();
-			else if (size < cache.getBlockSize())
-				size = (cache.getBlockSize() / size) * size;
-			blockSize = size;
-		}
-		return size;
-	}
-
-	private static int read(ReadableChannel rc, ByteBuffer buf)
-			throws IOException {
-		int n;
-		do {
-			n = rc.read(buf);
-		} while (0 < n && buf.hasRemaining());
-		return buf.position();
 	}
 
 	@SuppressWarnings("null")
