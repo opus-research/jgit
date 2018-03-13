@@ -332,6 +332,12 @@ public class BlameResult {
 		int resEnd = gen.getResultEnd();
 
 		for (; resLine < resEnd; resLine++) {
+			// Reverse blame can generate multiple results for the same line.
+			// Favor the first one selected, as this is the oldest and most
+			// likely to be nearest to the inquiry made by the user.
+			if (sourceLines[resLine] != 0)
+				continue;
+
 			sourceCommits[resLine] = srcCommit;
 			sourceAuthors[resLine] = srcAuthor;
 			sourceCommitters[resLine] = srcCommitter;
