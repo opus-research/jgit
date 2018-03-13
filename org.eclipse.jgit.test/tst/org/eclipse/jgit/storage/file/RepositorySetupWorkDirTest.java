@@ -59,7 +59,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 /**
@@ -183,12 +182,12 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	private File getFile(String... pathComponents) throws IOException {
+	private File getFile(String... pathComponents) {
 		String rootPath = new File(new File("target"), "trash").getPath();
 		for (String pathComponent : pathComponents)
 			rootPath = rootPath + File.separatorChar + pathComponent;
 		File result = new File(rootPath);
-		FileUtils.mkdirs(result, true);
+		result.mkdir();
 		return result;
 	}
 

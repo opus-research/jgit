@@ -351,8 +351,12 @@ public class DirCacheCheckout {
 						remove(i.getEntryPathString());
 						conflicts.remove(i.getEntryPathString());
 					} else {
-						// untracked file, neither contained in tree to merge
-						// nor in index
+						// We are about to remove an untracked file. Check that
+						// it is ignored - otherwise that's an conflict
+						if (!f.isEntryIgnored())
+							conflicts.add(walk.getPathString());
+						else
+							remove(f.getEntryPathString());
 					}
 				}
 			} else {
@@ -419,9 +423,7 @@ public class DirCacheCheckout {
 		for (String path : updated.keySet()) {
 			// ... create/overwrite this file ...
 			file = new File(repo.getWorkTree(), path);
-			if (!file.getParentFile().mkdirs()) {
-				// ignore
-			}
+			file.getParentFile().mkdirs();
 			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
 			checkoutEntry(repo, file, entry);
