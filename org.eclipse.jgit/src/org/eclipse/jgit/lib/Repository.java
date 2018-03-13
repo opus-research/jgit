@@ -63,7 +63,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -113,8 +112,6 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Use counter */
 	final AtomicInteger useCnt = new AtomicInteger(1);
-
-	final AtomicLong closedAt = new AtomicLong();
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -867,11 +864,8 @@ public abstract class Repository implements AutoCloseable {
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
 		if (useCnt.decrementAndGet() == 0) {
-			if (RepositoryCache.isCached(this)) {
-				closedAt.set(System.currentTimeMillis());
-			} else {
-				doClose();
-			}
+			doClose();
+			RepositoryCache.unregister(this);
 		}
 	}
 
@@ -904,7 +898,7 @@ public abstract class Repository implements AutoCloseable {
 	 * This is essentially the same as doing:
 	 *
 	 * <pre>
-	 * return getRef(Constants.HEAD).getTarget().getName()
+	 * return exactRef(Constants.HEAD).getTarget().getName()
 	 * </pre>
 	 *
 	 * Except when HEAD is detached, in which case this method returns the
@@ -918,7 +912,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	public String getFullBranch() throws IOException {
-		Ref head = getRef(Constants.HEAD);
+		Ref head = exactRef(Constants.HEAD);
 		if (head == null) {
 			return null;
 		}
