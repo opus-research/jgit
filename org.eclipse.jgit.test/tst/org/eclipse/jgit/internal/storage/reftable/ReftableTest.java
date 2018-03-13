@@ -69,13 +69,11 @@ import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.junit.Test;
 
 public class ReftableTest {
 	private static final String MASTER = "refs/heads/master";
-	private static final String NEXT = "refs/heads/next";
 	private static final String V1_0 = "refs/tags/v1.0";
 
 	private Stats stats;
@@ -122,7 +120,7 @@ public class ReftableTest {
 	}
 
 	@Test
-	public void estimateCurrentBytes() throws IOException {
+	public void estimateCurrentBytesOneRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		int expBytes = 24 + 4 + 5 + 3 + MASTER.length() + 20 + 68;
 
@@ -138,6 +136,33 @@ public class ReftableTest {
 			writer.finish();
 			table = buf.toByteArray();
 		}
+		assertEquals(expBytes, table.length);
+	}
+
+	@SuppressWarnings("boxing")
+	@Test
+	public void estimateCurrentBytesWithIndex() throws IOException {
+		List<Ref> refs = new ArrayList<>();
+		for (int i = 1; i <= 5670; i++) {
+			refs.add(ref(String.format("refs/heads/%04d", i), i));
+		}
+
+		ReftableConfig cfg = new ReftableConfig();
+		cfg.setIndexObjects(false);
+		cfg.setMaxIndexLevels(1);
+
+		int expBytes = 139654;
+		byte[] table;
+		ReftableWriter writer = new ReftableWriter().setConfig(cfg);
+		try (ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
+			writer.begin(buf);
+			writer.sortAndWriteRefs(refs);
+			assertEquals(expBytes, writer.estimateTotalBytes());
+			writer.finish();
+			stats = writer.getStats();
+			table = buf.toByteArray();
+		}
+		assertEquals(1, stats.refIndexLevels());
 		assertEquals(expBytes, table.length);
 	}
 
@@ -302,41 +327,6 @@ public class ReftableTest {
 		}
 	}
 
-	@Test
-	public void namespaceNotFound() throws IOException {
-		Ref exp = ref(MASTER, 1);
-		ReftableReader t = read(write(exp));
-		try (RefCursor rc = t.seek("refs/changes/")) {
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = t.seek("refs/tags/")) {
-			assertFalse(rc.next());
-		}
-	}
-
-	@Test
-	public void namespaceHeads() throws IOException {
-		Ref master = ref(MASTER, 1);
-		Ref next = ref(NEXT, 2);
-		Ref v1 = tag(V1_0, 3, 4);
-
-		ReftableReader t = read(write(master, next, v1));
-		try (RefCursor rc = t.seek("refs/tags/")) {
-			assertTrue(rc.next());
-			assertEquals(V1_0, rc.getRef().getName());
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = t.seek("refs/heads/")) {
-			assertTrue(rc.next());
-			assertEquals(MASTER, rc.getRef().getName());
-
-			assertTrue(rc.next());
-			assertEquals(NEXT, rc.getRef().getName());
-
-			assertFalse(rc.next());
-		}
-	}
-
 	@SuppressWarnings("boxing")
 	@Test
 	public void indexScan() throws IOException {
@@ -401,6 +391,22 @@ public class ReftableTest {
 			fail("expected IOException");
 		} catch (IOException e) {
 			assertEquals(JGitText.get().peeledRefIsRequired, e.getMessage());
+		}
+	}
+
+	@Test
+	public void nameTooLongDoesNotWrite() throws IOException {
+		try {
+			ReftableConfig cfg = new ReftableConfig();
+			cfg.setRefBlockSize(64);
+
+			ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+			ReftableWriter writer = new ReftableWriter(cfg).begin(buffer);
+			writer.writeRef(ref("refs/heads/i-am-not-a-teapot", 1));
+			writer.finish();
+			fail("expected BlockSizeTooSmallException");
+		} catch (BlockSizeTooSmallException e) {
+			assertEquals(84, e.getMinimumBlockSize());
 		}
 	}
 
@@ -479,12 +485,11 @@ public class ReftableTest {
 
 	private byte[] write(Collection<Ref> refs) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter().begin(buffer);
-		for (Ref r : RefComparator.sort(refs)) {
-			writer.writeRef(r);
-		}
-		writer.finish();
-		stats = writer.getStats();
+		stats = new ReftableWriter()
+				.begin(buffer)
+				.sortAndWriteRefs(refs)
+				.finish()
+				.getStats();
 		return buffer.toByteArray();
 	}
 }
