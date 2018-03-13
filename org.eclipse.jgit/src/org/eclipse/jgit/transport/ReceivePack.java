@@ -595,12 +595,7 @@ public class ReceivePack {
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			try {
-				if (msgOut != null)
-					msgOut.write(Constants.encode("error: " + what + "\n"));
-			} catch (IOException e) {
-				// Ignore write failures.
-			}
+			sendBytes(Constants.encode("error: " + what + "\n"));
 		}
 	}
 
@@ -615,32 +610,47 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
+		sendBytes(Constants.encode(what + "\n"));
+	}
+
+	/**
+	 * @see #sendBytes(byte[], int, int)
+	 *
+	 * @param what
+	 *            bytes to send.
+	 */
+	public void sendBytes(final byte[] what) {
+		sendBytes(what, 0, what.length);
+	}
+
+	/**
+	 * Send raw bytes to the the client over the sideband, if supported.
+	 * <p>
+	 * If the client doesn't support receiving messages, the message will be
+	 * discarded, with no other indication to the caller or to the client.
+	 * <p>
+	 * When possible, prefer {@link #sendMessage(String)} or
+	 * {@link #sendError(String)}; this method is intended only for callers who
+	 * need to do their own
+	 * encoding.
+	 *
+	 * @param what
+	 *            bytes to send.
+	 * @param off
+	 *            array offset.
+	 * @param len
+	 *            number of bytes.
+	 */
+	public void sendBytes(final byte[] what, final int off, final int len) {
 		try {
 			if (msgOut != null)
-				msgOut.write(Constants.encode(what + "\n"));
+				msgOut.write(what, off, len);
 		} catch (IOException e) {
 			// Ignore write failures.
 		}
 	}
 
 	/**
-	 * Set a secondary "notice" channel for messages.
-	 * <p>
-	 * When run over SSH, for example, this should be tied back to the standard
-	 * error channel of the command execution. For most other network connections
-	 * this should be null.
-	 *
-	 * @param messages
-	 *            message output channel.
-	 */
-	public void setMessageOutputStream(final OutputStream messages) {
-		if (msgOut != null)
-			throw new IllegalStateException(
-					MessageFormat.format(JGitText.get().illegalStateExists, "msgOut"));
-		msgOut = messages;
-	}
-
-  /**
 	 * Execute the receive task on the socket.
 	 *
 	 * @param input
@@ -652,8 +662,10 @@ public class ReceivePack {
 	 *            the output is buffered, otherwise write performance may
 	 *            suffer.
 	 * @param messages
-	 *            secondary "notice" channel for messages; see
-	 *            {@link #setMessageOutputStream(OutputStream)}.
+	 *            secondary "notice" channel to send additional messages out
+	 *            through. When run over SSH this should be tied back to the
+	 *            standard error channel of the command execution. For most
+	 *            other network connections this should be null.
 	 * @throws IOException
 	 */
 	public void receive(final InputStream input, final OutputStream output,
@@ -661,7 +673,7 @@ public class ReceivePack {
 		try {
 			rawIn = input;
 			rawOut = output;
-			setMessageOutputStream(messages);
+			msgOut = messages;
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
@@ -1142,7 +1154,13 @@ public class ReceivePack {
 	}
 
 	private List<ReceiveCommand> filterCommands(final Result want) {
-		return ReceiveCommand.filter(commands, want);
+		final List<ReceiveCommand> r = new ArrayList<ReceiveCommand>(commands
+				.size());
+		for (final ReceiveCommand cmd : commands) {
+			if (cmd.getResult() == want)
+				r.add(cmd);
+		}
+		return r;
 	}
 
 	private void sendStatusReport(final boolean forClient, final Reporter out)
