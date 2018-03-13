@@ -554,14 +554,11 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		List<CachedPack> cached = new ArrayList<CachedPack>(packList.length);
 		for (DfsPackFile pack : packList) {
 			DfsPackDescription desc = pack.getPackDescription();
-			if (canBeCachedPack(desc))
-				cached.add(new DfsCachedPack(pack));
+			if (desc.getTips() == null || desc.getTips().isEmpty())
+				continue;
+			cached.add(new DfsCachedPack(pack));
 		}
 		return cached;
-	}
-
-	private static boolean canBeCachedPack(DfsPackDescription desc) {
-		return desc.getTips() != null && !desc.getTips().isEmpty();
 	}
 
 	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
@@ -691,7 +688,7 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		for (;;) {
 			dstoff = block.inflate(inf, position, dstbuf, dstoff);
 
-			if (headerOnly & dstoff == dstbuf.length)
+			if (headerOnly && dstoff == dstbuf.length)
 				return dstoff;
 			if (inf.needsInput()) {
 				position += block.remaining(position);
