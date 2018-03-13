@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +42,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+
+package org.eclipse.jgit.errors;
 
 import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.Collection;
-
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.eclipse.jgit.storage.file.ReflogReader;
 
 /**
- * The reflog command
- *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reflog.html"
- *      >Git documentation about reflog</a>
+ * An exception thrown when a gitlink entry is found and cannot be
+ * handled.
  */
-public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
-
-	private String ref = Constants.HEAD;
-
-	/**
-	 * @param repo
-	 */
-	public ReflogCommand(Repository repo) {
-		super(repo);
-	}
+public class GitlinksNotSupportedException extends IOException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * The ref used for the reflog operation. If no ref is set, the default
-	 * value of HEAD will be used.
+	 * Construct a GitlinksNotSupportedException for the specified link
 	 *
-	 * @param ref
-	 * @return {@code this}
+	 * @param s name of link in tree or workdir
 	 */
-	public ReflogCommand setRef(String ref) {
-		checkCallable();
-		this.ref = ref;
-		return this;
+	public GitlinksNotSupportedException(final String s) {
+		super(s);
 	}
-
-	public Collection<ReflogEntry> call() throws Exception {
-		checkCallable();
-
-		try {
-			ReflogReader reader = new ReflogReader(repo, ref);
-			return reader.getReverseEntries();
-		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, ref), e);
-		}
-	}
-
 }
