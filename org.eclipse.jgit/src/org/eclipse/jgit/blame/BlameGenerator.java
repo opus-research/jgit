@@ -46,9 +46,13 @@ package org.eclipse.jgit.blame;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.blame.Candidate.BlobCandidate;
+import org.eclipse.jgit.blame.Candidate.ReverseCandidate;
+import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
@@ -112,17 +116,17 @@ public class BlameGenerator {
 
 	private final PathFilter resultPath;
 
+	private final MutableObjectId idBuf;
+
 	/** Revision pool used to acquire commits from. */
-	private final RevWalk revPool;
+	private RevWalk revPool;
 
 	/** Indicates the commit has already been processed. */
-	private final RevFlag SEEN;
+	private RevFlag SEEN;
 
-	private final ObjectReader reader;
+	private ObjectReader reader;
 
-	private final TreeWalk treeWalk;
-
-	private final MutableObjectId idBuf;
+	private TreeWalk treeWalk;
 
 	private DiffAlgorithm diffAlgorithm = new HistogramDiff();
 
@@ -151,15 +155,29 @@ public class BlameGenerator {
 		this.repository = repository;
 		this.resultPath = PathFilter.create(path);
 
-		revPool = new RevWalk(repository);
+		idBuf = new MutableObjectId();
+		setFollowFileRenames(true);
+		initRevPool(false);
+
+		remaining = -1;
+	}
+
+	private void initRevPool(boolean reverse) {
+		if (queue != null)
+			throw new IllegalStateException();
+
+		if (revPool != null)
+			revPool.release();
+
+		if (reverse)
+			revPool = new ReverseWalk(getRepository());
+		else
+			revPool = new RevWalk(getRepository());
+
 		revPool.setRetainBody(true);
 		SEEN = revPool.newFlag("SEEN");
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
-		idBuf = new MutableObjectId();
-		setFollowFileRenames(true);
-
-		remaining = -1;
 	}
 
 	/** @return repository being scanned for revision history. */
@@ -263,6 +281,8 @@ public class BlameGenerator {
 	 */
 	public BlameGenerator push(String description, RawText contents)
 			throws IOException {
+		if (description == null)
+			description = JGitText.get().blameNotCommittedYet;
 		BlobCandidate c = new BlobCandidate(description, resultPath);
 		c.sourceText = contents;
 		c.regionList = new Region(0, 0, contents.size());
@@ -307,6 +327,76 @@ public class BlameGenerator {
 			return this;
 
 		Candidate c = new Candidate(commit, resultPath);
+		c.sourceBlob = idBuf.toObjectId();
+		c.loadText(reader);
+		c.regionList = new Region(0, 0, c.sourceText.size());
+		remaining = c.sourceText.size();
+		push(c);
+		return this;
+	}
+
+	/**
+	 * Configure the generator to compute reverse blame (history of deletes).
+	 * <p>
+	 * This method is expensive as it immediately runs a RevWalk over the
+	 * history spanning the expression {@code start..end} (end being more recent
+	 * than start) and then performs the equivalent operation as
+	 * {@link #push(String, AnyObjectId)} to begin blame traversal from the
+	 * commit named by {@code start} walking forwards through history until
+	 * {@code end} blaming line deletions.
+	 *
+	 * @param start
+	 *            oldest commit to traverse from. The result file will be loaded
+	 *            from this commit's tree.
+	 * @param end
+	 *            most recent commit to stop traversal at. Usually an active
+	 *            branch tip, tag, or HEAD.
+	 * @return {@code this}
+	 * @throws IOException
+	 *             the repository cannot be read.
+	 */
+	public BlameGenerator reverse(AnyObjectId start, AnyObjectId end)
+			throws IOException {
+		return reverse(start, Collections.singleton(end.toObjectId()));
+	}
+
+	/**
+	 * Configure the generator to compute reverse blame (history of deletes).
+	 * <p>
+	 * This method is expensive as it immediately runs a RevWalk over the
+	 * history spanning the expression {@code start..end} (end being more recent
+	 * than start) and then performs the equivalent operation as
+	 * {@link #push(String, AnyObjectId)} to begin blame traversal from the
+	 * commit named by {@code start} walking forwards through history until
+	 * {@code end} blaming line deletions.
+	 *
+	 * @param start
+	 *            oldest commit to traverse from. The result file will be loaded
+	 *            from this commit's tree.
+	 * @param end
+	 *            most recent commits to stop traversal at. Usually an active
+	 *            branch tip, tag, or HEAD.
+	 * @return {@code this}
+	 * @throws IOException
+	 *             the repository cannot be read.
+	 */
+	public BlameGenerator reverse(AnyObjectId start,
+			Collection<? extends ObjectId> end) throws IOException {
+		initRevPool(true);
+
+		ReverseCommit result = (ReverseCommit) revPool.parseCommit(start);
+		if (!find(result, resultPath))
+			return this;
+
+		revPool.markUninteresting(result);
+		for (ObjectId id : end)
+			revPool.markStart(revPool.parseCommit(id));
+
+		while (revPool.next() != null) {
+			// just pump the queue
+		}
+
+		ReverseCandidate c = new ReverseCandidate(result, resultPath);
 		c.sourceBlob = idBuf.toObjectId();
 		c.loadText(reader);
 		c.regionList = new Region(0, 0, c.sourceText.size());
@@ -374,6 +464,10 @@ public class BlameGenerator {
 			} else if (1 < pCnt) {
 				if (processMerge(n))
 					return true;
+
+			} else if (n instanceof ReverseCandidate) {
+				// Do not generate a tip of a reverse. The region
+				// survives and should not appear to be deleted.
 
 			} else /* if (pCnt == 0) */{
 				// Root commit, with at least one surviving region.
@@ -453,7 +547,7 @@ public class BlameGenerator {
 				return false;
 			}
 
-			Candidate next = new Candidate(parent, n.sourcePath);
+			Candidate next = n.create(parent, n.sourcePath);
 			next.sourceBlob = idBuf.toObjectId();
 			next.loadText(reader);
 			return split(next, n);
@@ -475,7 +569,7 @@ public class BlameGenerator {
 			return false;
 		}
 
-		Candidate next = new Candidate(parent, PathFilter.create(r.getOldPath()));
+		Candidate next = n.create(parent, PathFilter.create(r.getOldPath()));
 		next.sourceBlob = r.getOldId().toObjectId();
 		next.renameScore = r.getScore();
 		next.loadText(reader);
@@ -483,11 +577,10 @@ public class BlameGenerator {
 	}
 
 	private boolean processMerge(Candidate n) throws IOException {
-		RevCommit source = n.sourceCommit;
-		int pCnt = source.getParentCount();
+		int pCnt = n.getParentCount();
 
 		for (int pIdx = 0; pIdx < pCnt; pIdx++) {
-			RevCommit parent = source.getParent(pIdx);
+			RevCommit parent = n.getParent(pIdx);
 			if (parent.has(SEEN))
 				continue;
 			revPool.parseHeaders(parent);
@@ -497,7 +590,7 @@ public class BlameGenerator {
 		// that one parent through history.
 		ObjectId[] ids = null;
 		for (int pIdx = 0; pIdx < pCnt; pIdx++) {
-			RevCommit parent = source.getParent(pIdx);
+			RevCommit parent = n.getParent(pIdx);
 			if (parent.has(SEEN))
 				continue;
 			if (!find(parent, n.sourcePath))
@@ -517,13 +610,13 @@ public class BlameGenerator {
 		if (renameDetector != null) {
 			renames = new DiffEntry[pCnt];
 			for (int pIdx = 0; pIdx < pCnt; pIdx++) {
-				RevCommit parent = source.getParent(pIdx);
+				RevCommit parent = n.getParent(pIdx);
 				if (parent.has(SEEN))
 					continue;
 				if (ids != null && ids[pIdx] != null)
 					continue;
 
-				DiffEntry r = findRename(parent, source, n.sourcePath);
+				DiffEntry r = findRename(parent, n.sourceCommit, n.sourcePath);
 				if (r == null)
 					continue;
 
@@ -547,18 +640,18 @@ public class BlameGenerator {
 		// Construct the candidate for each parent.
 		Candidate[] parents = new Candidate[pCnt];
 		for (int pIdx = 0; pIdx < pCnt; pIdx++) {
-			RevCommit parent = source.getParent(pIdx);
+			RevCommit parent = n.getParent(pIdx);
 			if (parent.has(SEEN))
 				continue;
 
 			Candidate p;
 			if (renames != null && renames[pIdx] != null) {
-				p = new Candidate(parent,
+				p = n.create(parent,
 						PathFilter.create(renames[pIdx].getOldPath()));
 				p.renameScore = renames[pIdx].getScore();
 				p.sourceBlob = renames[pIdx].getOldId().toObjectId();
 			} else if (ids != null && ids[pIdx] != null) {
-				p = new Candidate(parent, n.sourcePath);
+				p = n.create(parent, n.sourcePath);
 				p.sourceBlob = ids[pIdx];
 			} else {
 				continue;
