@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -64,8 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.transport.PackParser;
-import org.eclipse.jgit.transport.TransferConfig;
 import org.eclipse.jgit.util.FileUtils;
 
 /** Creates loose objects in a {@link ObjectDirectory}. */
@@ -104,19 +101,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	public PackParser newPackParser(InputStream in) throws IOException {
-		if (!in.markSupported())
-			in = new BufferedInputStream(in);
-
-		TransferConfig tc = db.getConfig().get(TransferConfig.KEY);
-		long objectCount = PackParser.peekObjectCount(in);
-		if (objectCount < tc.getUnpackLimit())
-			return new UnpackingPackParser(db, this, in);
-
-		return new ObjectDirectoryPackParser(db, in);
-	}
-
-	@Override
 	public void flush() throws IOException {
 		// Do nothing. Objects are immediately visible.
 	}
@@ -141,7 +125,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			FileOutputStream fOut = new FileOutputStream(tmp);
 			try {
 				OutputStream out = fOut;
-				if (getFSyncObjectFiles())
+				if (config.getFSyncObjectFiles())
 					out = Channels.newOutputStream(fOut.getChannel());
 				DeflaterOutputStream cOut = compress(out);
 				DigestOutputStream dOut = new DigestOutputStream(cOut, md);
@@ -158,7 +142,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 				dOut.flush();
 				cOut.finish();
 			} finally {
-				if (getFSyncObjectFiles())
+				if (config.getFSyncObjectFiles())
 					fOut.getChannel().force(true);
 				fOut.close();
 			}
@@ -169,10 +153,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			if (delete)
 				FileUtils.delete(tmp);
 		}
-	}
-
-	boolean getFSyncObjectFiles() {
-		return config.getFSyncObjectFiles();
 	}
 
 	void writeHeader(OutputStream out, final int type, long len)
