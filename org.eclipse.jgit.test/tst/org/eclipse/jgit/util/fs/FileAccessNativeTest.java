@@ -197,11 +197,11 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		if (skipTest())
 			return;
 
-		final File a = new File(root, "a€");
-		final File b = new File(root, "b€");
-		final File d = new File(root, "d€");
-		write(a, "a€");
-		access.symlink(b, "a€");
+		final File a = new File(root, "a");
+		final File b = new File(root, "b");
+		final File d = new File(root, "d");
+		write(a, "a");
+		access.symlink(b, "a");
 		assertTrue("created " + d, d.mkdir());
 
 		for (int i = 0; i < 116; i++) {
@@ -224,9 +224,9 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		DirEnt ent_d = ent[3];
 
 		assertEquals(".git", ent_git.getName());
-		assertEquals("a€", ent_a.getName());
-		assertEquals("b€", ent_b.getName());
-		assertEquals("d€", ent_d.getName());
+		assertEquals("a", ent_a.getName());
+		assertEquals("b", ent_b.getName());
+		assertEquals("d", ent_d.getName());
 
 		assertEquals(DirEnt.TYPE_DIRECTORY, ent_git.getType());
 		assertEquals(DirEnt.TYPE_FILE, ent_a.getType());
