@@ -72,6 +72,7 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
@@ -180,7 +181,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public boolean exists() {
-		return objects.exists();
+		return fs.exists(objects);
 	}
 
 	@Override
@@ -200,29 +201,17 @@ public class ObjectDirectory extends FileObjectDatabase {
 		unpackedObjectCache.clear();
 
 		final PackList packs = packList.get();
-		packList.set(NO_PACKS);
-		for (final PackFile p : packs.packs)
-			p.close();
+		if (packs != NO_PACKS && packList.compareAndSet(packs, NO_PACKS)) {
+			for (PackFile p : packs.packs)
+				p.close();
+		}
 
 		// Fully close all loaded alternates and clear the alternate list.
 		AlternateHandle[] alt = alternates.get();
-		if (alt != null) {
-			alternates.set(null);
+		if (alt != null && alternates.compareAndSet(alt, null)) {
 			for(final AlternateHandle od : alt)
 				od.close();
 		}
-	}
-
-	/**
-	 * Compute the location of a loose object file.
-	 *
-	 * @param objectId
-	 *            identity of the loose object to map to the directory.
-	 * @return location of the object, if it were to exist as a loose object.
-	 */
-	@Override
-	public File fileFor(final AnyObjectId objectId) {
-		return super.fileFor(objectId);
 	}
 
 	/**
@@ -277,37 +266,64 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public String toString() {
-		return "ObjectDirectory[" + getDirectory() + "]"; //$NON-NLS-1$
+		return "ObjectDirectory[" + getDirectory() + "]"; //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
-	boolean hasObject1(final AnyObjectId objectId) {
-		if (unpackedObjectCache.isUnpacked(objectId))
+	@Override
+	public boolean has(AnyObjectId objectId) {
+		return unpackedObjectCache.isUnpacked(objectId)
+				|| hasPackedInSelfOrAlternate(objectId)
+				|| hasLooseInSelfOrAlternate(objectId);
+	}
+
+	private boolean hasPackedInSelfOrAlternate(AnyObjectId objectId) {
+		if (hasPackedObject(objectId))
 			return true;
-		for (final PackFile p : packList.get().packs) {
-			try {
-				if (p.hasObject(objectId)) {
-					return true;
-				}
-			} catch (IOException e) {
-				// The hasObject call should have only touched the index,
-				// so any failure here indicates the index is unreadable
-				// by this process, and the pack is likewise not readable.
-				//
-				removePack(p);
-				continue;
-			}
+		for (AlternateHandle alt : myAlternates()) {
+			if (alt.db.hasPackedInSelfOrAlternate(objectId))
+				return true;
 		}
 		return false;
 	}
 
+	private boolean hasLooseInSelfOrAlternate(AnyObjectId objectId) {
+		if (fileFor(objectId).exists())
+			return true;
+		for (AlternateHandle alt : myAlternates()) {
+			if (alt.db.hasLooseInSelfOrAlternate(objectId))
+				return true;
+		}
+		return false;
+	}
+
+	boolean hasPackedObject(AnyObjectId objectId) {
+		PackList pList;
+		do {
+			pList = packList.get();
+			for (PackFile p : pList.packs) {
+				try {
+					if (p.hasObject(objectId))
+						return true;
+				} catch (IOException e) {
+					// The hasObject call should have only touched the index,
+					// so any failure here indicates the index is unreadable
+					// by this process, and the pack is likewise not readable.
+					removePack(p);
+				}
+			}
+		} while (searchPacksAgain(pList));
+		return false;
+	}
+
+	@Override
 	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
 			throws IOException {
 		// Go through the packs once. If we didn't find any resolutions
 		// scan for new packs and check once more.
-		//
 		int oldSize = matches.size();
-		PackList pList = packList.get();
-		for (;;) {
+		PackList pList;
+		do {
+			pList = packList.get();
 			for (PackFile p : pList.packs) {
 				try {
 					p.resolve(matches, id, RESOLVE_ABBREV_LIMIT);
@@ -319,15 +335,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				if (matches.size() > RESOLVE_ABBREV_LIMIT)
 					return;
 			}
-			if (matches.size() == oldSize) {
-				PackList nList = scanPacks(pList);
-				if (nList == pList || nList.packs.length == 0)
-					break;
-				pList = nList;
-				continue;
-			}
-			break;
-		}
+		} while (matches.size() == oldSize && searchPacksAgain(pList));
 
 		String fanOut = id.name().substring(0, 2);
 		String[] entries = new File(getDirectory(), fanOut).list();
@@ -354,74 +362,164 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	ObjectLoader openObject1(final WindowCursor curs,
-			final AnyObjectId objectId) throws IOException {
+	@Override
+	ObjectLoader openObject(WindowCursor curs, AnyObjectId objectId)
+			throws IOException {
 		if (unpackedObjectCache.isUnpacked(objectId)) {
-			ObjectLoader ldr = openObject2(curs, objectId.name(), objectId);
+			ObjectLoader ldr = openLooseObject(curs, objectId);
 			if (ldr != null)
 				return ldr;
-			else
-				unpackedObjectCache.remove(objectId);
 		}
-
-		PackList pList = packList.get();
-		SEARCH: for (;;) {
-			for (final PackFile p : pList.packs) {
-				try {
-					final ObjectLoader ldr = p.get(curs, objectId);
-					if (ldr != null)
-						return ldr;
-				} catch (PackMismatchException e) {
-					// Pack was modified; refresh the entire pack list.
-					//
-					pList = scanPacks(pList);
-					continue SEARCH;
-				} catch (IOException e) {
-					// Assume the pack is corrupted.
-					//
-					removePack(p);
-				}
-			}
-			return null;
-		}
+		ObjectLoader ldr = openPackedFromSelfOrAlternate(curs, objectId);
+		if (ldr != null)
+			return ldr;
+		return openLooseFromSelfOrAlternate(curs, objectId);
 	}
 
-	long getObjectSize1(final WindowCursor curs, final AnyObjectId objectId)
-			throws IOException {
-		PackList pList = packList.get();
-		SEARCH: for (;;) {
-			for (final PackFile p : pList.packs) {
-				try {
-					long sz = p.getObjectSize(curs, objectId);
-					if (0 <= sz)
-						return sz;
-				} catch (PackMismatchException e) {
-					// Pack was modified; refresh the entire pack list.
-					//
-					pList = scanPacks(pList);
-					continue SEARCH;
-				} catch (IOException e) {
-					// Assume the pack is corrupted.
-					//
-					removePack(p);
-				}
-			}
-			return -1;
+	private ObjectLoader openPackedFromSelfOrAlternate(WindowCursor curs,
+			AnyObjectId objectId) {
+		ObjectLoader ldr = openPackedObject(curs, objectId);
+		if (ldr != null)
+			return ldr;
+		for (AlternateHandle alt : myAlternates()) {
+			ldr = alt.db.openPackedFromSelfOrAlternate(curs, objectId);
+			if (ldr != null)
+				return ldr;
 		}
+		return null;
 	}
 
-	@Override
-	long getObjectSize2(WindowCursor curs, String objectName,
+	private ObjectLoader openLooseFromSelfOrAlternate(WindowCursor curs,
 			AnyObjectId objectId) throws IOException {
+		ObjectLoader ldr = openLooseObject(curs, objectId);
+		if (ldr != null)
+			return ldr;
+		for (AlternateHandle alt : myAlternates()) {
+			ldr = alt.db.openLooseFromSelfOrAlternate(curs, objectId);
+			if (ldr != null)
+				return ldr;
+		}
+		return null;
+	}
+
+	ObjectLoader openPackedObject(WindowCursor curs, AnyObjectId objectId) {
+		PackList pList;
+		do {
+			SEARCH: for (;;) {
+				pList = packList.get();
+				for (PackFile p : pList.packs) {
+					try {
+						ObjectLoader ldr = p.get(curs, objectId);
+						if (ldr != null)
+							return ldr;
+					} catch (PackMismatchException e) {
+						// Pack was modified; refresh the entire pack list.
+						if (searchPacksAgain(pList))
+							continue SEARCH;
+					} catch (IOException e) {
+						// Assume the pack is corrupted.
+						removePack(p);
+					}
+				}
+				break SEARCH;
+			}
+		} while (searchPacksAgain(pList));
+		return null;
+	}
+
+	ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
+			throws IOException {
 		try {
-			File path = fileFor(objectName);
+			File path = fileFor(id);
 			FileInputStream in = new FileInputStream(path);
 			try {
-				return UnpackedObject.getSize(in, objectId, curs);
+				unpackedObjectCache.add(id);
+				return UnpackedObject.open(in, path, id, curs);
 			} finally {
 				in.close();
 			}
 		} catch (FileNotFoundException noFile) {
+			unpackedObjectCache.remove(id);
+			return null;
+		}
+	}
+
+	long getObjectSize(WindowCursor curs, AnyObjectId id)
+			throws IOException {
+		if (unpackedObjectCache.isUnpacked(id)) {
+			long len = getLooseObjectSize(curs, id);
+			if (0 <= len)
+				return len;
+		}
+		long len = getPackedSizeFromSelfOrAlternate(curs, id);
+		if (0 <= len)
+			return len;
+		return getLooseSizeFromSelfOrAlternate(curs, id);
+	}
+
+	private long getPackedSizeFromSelfOrAlternate(WindowCursor curs,
+			AnyObjectId id) {
+		long len = getPackedObjectSize(curs, id);
+		if (0 <= len)
+			return len;
+		for (AlternateHandle alt : myAlternates()) {
+			len = alt.db.getPackedSizeFromSelfOrAlternate(curs, id);
+			if (0 <= len)
+				return len;
+		}
+		return -1;
+	}
+
+	private long getLooseSizeFromSelfOrAlternate(WindowCursor curs,
+			AnyObjectId id) throws IOException {
+		long len = getLooseObjectSize(curs, id);
+		if (0 <= len)
+			return len;
+		for (AlternateHandle alt : myAlternates()) {
+			len = alt.db.getLooseSizeFromSelfOrAlternate(curs, id);
+			if (0 <= len)
+				return len;
+		}
+		return -1;
+	}
+
+	private long getPackedObjectSize(WindowCursor curs, AnyObjectId id) {
+		PackList pList;
+		do {
+			SEARCH: for (;;) {
+				pList = packList.get();
+				for (PackFile p : pList.packs) {
+					try {
+						long len = p.getObjectSize(curs, id);
+						if (0 <= len)
+							return len;
+					} catch (PackMismatchException e) {
+						// Pack was modified; refresh the entire pack list.
+						if (searchPacksAgain(pList))
+							continue SEARCH;
+					} catch (IOException e) {
+						// Assume the pack is corrupted.
+						removePack(p);
+					}
+				}
+				break SEARCH;
+			}
+		} while (searchPacksAgain(pList));
+		return -1;
+	}
+
+	private long getLooseObjectSize(WindowCursor curs, AnyObjectId id)
+			throws IOException {
+		try {
+			FileInputStream in = new FileInputStream(fileFor(id));
+			try {
+				unpackedObjectCache.add(id);
+				return UnpackedObject.getSize(in, id, curs);
+			} finally {
+				in.close();
+			}
+		} catch (FileNotFoundException noFile) {
+			unpackedObjectCache.remove(id);
 			return -1;
 		}
 	}
@@ -454,49 +552,27 @@ public class ObjectDirectory extends FileObjectDatabase {
 			h.db.selectObjectRepresentation(packer, otp, curs);
 	}
 
-	boolean hasObject2(final String objectName) {
-		return fileFor(objectName).exists();
-	}
-
-	ObjectLoader openObject2(final WindowCursor curs,
-			final String objectName, final AnyObjectId objectId)
-			throws IOException {
-		try {
-			File path = fileFor(objectName);
-			FileInputStream in = new FileInputStream(path);
-			try {
-				unpackedObjectCache.add(objectId);
-				return UnpackedObject.open(in, path, objectId, curs);
-			} finally {
-				in.close();
-			}
-		} catch (FileNotFoundException noFile) {
-			unpackedObjectCache.remove(objectId);
-			return null;
-		}
-	}
-
 	@Override
 	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId id,
 			boolean createDuplicate) throws IOException {
 		// If the object is already in the repository, remove temporary file.
 		//
 		if (unpackedObjectCache.isUnpacked(id)) {
-			FileUtils.delete(tmp);
+			FileUtils.delete(tmp, FileUtils.RETRY);
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (!createDuplicate && has(id)) {
-			FileUtils.delete(tmp);
+			FileUtils.delete(tmp, FileUtils.RETRY);
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
 
 		final File dst = fileFor(id);
-		if (dst.exists()) {
+		if (fs.exists(dst)) {
 			// We want to be extra careful and avoid replacing an object
 			// that already exists. We can't be sure renameTo() would
 			// fail on all platforms if dst exists, so we check first.
 			//
-			FileUtils.delete(tmp);
+			FileUtils.delete(tmp, FileUtils.RETRY);
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (tmp.renameTo(dst)) {
@@ -517,7 +593,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 
 		if (!createDuplicate && has(id)) {
-			FileUtils.delete(tmp);
+			FileUtils.delete(tmp, FileUtils.RETRY);
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
 
@@ -526,15 +602,23 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// either. We really don't know what went wrong, so
 		// fail.
 		//
-		FileUtils.delete(tmp);
+		FileUtils.delete(tmp, FileUtils.RETRY);
 		return InsertLooseObjectResult.FAILURE;
 	}
 
-	boolean tryAgain1() {
-		final PackList old = packList.get();
-		if (old.snapshot.isModified(packDirectory))
-			return old != scanPacks(old);
-		return false;
+	private boolean searchPacksAgain(PackList old) {
+		// Whether to trust the pack folder's modification time. If set
+		// to false we will always scan the .git/objects/pack folder to
+		// check for new pack files. If set to true (default) we use the
+		// lastmodified attribute of the folder and assume that no new
+		// pack files can be in this folder if his modification time has
+		// not changed.
+		boolean trustFolderStat = config.getBoolean(
+				ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_TRUSTFOLDERSTAT, true);
+
+		return ((!trustFolderStat) || old.snapshot.isModified(packDirectory))
+				&& old != scanPacks(old);
 	}
 
 	Config getConfig() {
@@ -794,6 +878,20 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return new AlternateHandle(db);
 	}
 
+	/**
+	 * Compute the location of a loose object file.
+	 *
+	 * @param objectId
+	 *            identity of the loose object to map to the directory.
+	 * @return location of the object, if it were to exist as a loose object.
+	 */
+	public File fileFor(AnyObjectId objectId) {
+		String n = objectId.name();
+		String d = n.substring(0, 2);
+		String f = n.substring(2);
+		return new File(new File(getDirectory(), d), f);
+	}
+
 	private static final class PackList {
 		/** State just before reading the pack directory. */
 		final FileSnapshot snapshot;
@@ -807,12 +905,37 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
+	static class AlternateHandle {
+		final ObjectDirectory db;
+
+		AlternateHandle(ObjectDirectory db) {
+			this.db = db;
+		}
+
+		void close() {
+			db.close();
+		}
+	}
+
+	static class AlternateRepository extends AlternateHandle {
+		final FileRepository repository;
+
+		AlternateRepository(FileRepository r) {
+			super(r.getObjectDatabase());
+			repository = r;
+		}
+
+		void close() {
+			repository.close();
+		}
+	}
+
 	@Override
 	public ObjectDatabase newCachedDatabase() {
 		return newCachedFileObjectDatabase();
 	}
 
-	FileObjectDatabase newCachedFileObjectDatabase() {
+	CachedObjectDirectory newCachedFileObjectDatabase() {
 		return new CachedObjectDirectory(this);
 	}
 }

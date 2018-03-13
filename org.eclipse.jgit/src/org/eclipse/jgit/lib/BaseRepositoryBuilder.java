@@ -100,7 +100,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 				&& ref[7] == ' ';
 	}
 
-	private static File getSymRef(File workTree, File dotGit)
+	private static File getSymRef(File workTree, File dotGit, FS fs)
 			throws IOException {
 		byte[] content = IO.readFully(dotGit);
 		if (!isSymRef(content))
@@ -116,7 +116,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
 
 		String gitdirPath = RawParseUtils.decode(content, pathStart, lineEnd);
-		File gitdirFile = new File(gitdirPath);
+		File gitdirFile = fs.resolve(workTree, gitdirPath);
 		if (gitdirFile.isAbsolute())
 			return gitdirFile;
 		else
@@ -514,13 +514,17 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 				if (FileKey.isGitRepository(dir, tryFS)) {
 					setGitDir(dir);
 					break;
-				} else if (dir.isFile())
+				} else if (dir.isFile()) {
 					try {
-						setGitDir(getSymRef(current, dir));
+						setGitDir(getSymRef(current, dir, tryFS));
 						break;
 					} catch (IOException ignored) {
 						// Continue searching if gitdir ref isn't found
 					}
+				} else if (FileKey.isGitRepository(current, tryFS)) {
+					setGitDir(current);
+					break;
+				}
 
 				current = current.getParentFile();
 				if (current != null && ceilingDirectories != null
@@ -597,7 +601,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			if (!dotGit.isFile())
 				setGitDir(dotGit);
 			else
-				setGitDir(getSymRef(getWorkTree(), dotGit));
+				setGitDir(getSymRef(getWorkTree(), dotGit, safeFS()));
 		}
 	}
 
@@ -695,7 +699,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 		String path = cfg.getString(CONFIG_CORE_SECTION, null,
 				CONFIG_KEY_WORKTREE);
 		if (path != null)
-			return safeFS().resolve(getGitDir(), path);
+			return safeFS().resolve(getGitDir(), path).getCanonicalFile();
 
 		// If core.bare is set, honor its value. Assume workTree is
 		// the parent directory of the repository.

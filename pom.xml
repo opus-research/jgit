@@ -51,7 +51,7 @@
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>org.eclipse.jgit-parent</artifactId>
   <packaging>pom</packaging>
-  <version>3.2.0-SNAPSHOT</version>
+  <version>3.7.0-SNAPSHOT</version>
 
   <name>JGit - Parent</name>
   <url>${jgit-url}</url>
@@ -168,6 +168,7 @@
   <properties>
     <jgit-url>http://www.eclipse.org/jgit/</jgit-url>
     <jgit-copyright>Copyright (c) 2005, 2009 Shawn Pearce, Robin Rosenberg, et.al.</jgit-copyright>
+    <jgit.website.url>scp://build.eclipse.org/home/data/httpd/download.eclipse.org/jgit/site/${project.version}/</jgit.website.url>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -175,23 +176,31 @@
     <maven.build.timestamp.format>yyyyMMddHHmm</maven.build.timestamp.format>
     <bundle-manifest>${project.build.directory}/META-INF/MANIFEST.MF</bundle-manifest>
 
-    <jgit-last-release-version>3.0.0.201306101825-r</jgit-last-release-version>
-    <jsch-version>0.1.46</jsch-version>
-    <javaewah-version>0.5.6</javaewah-version>
+    <jgit-last-release-version>3.6.0.201412230720-r</jgit-last-release-version>
+    <jsch-version>0.1.50</jsch-version>
+    <javaewah-version>0.7.9</javaewah-version>
     <junit-version>4.11</junit-version>
+    <test-fork-count>1C</test-fork-count>
     <!-- TODO: update Maven dependency for args4j to 2.0.21 as soon as available on Maven Central -->
     <args4j-version>2.0.12</args4j-version>
-    <commons-compress-version>1.4.1</commons-compress-version>
+    <commons-compress-version>1.6</commons-compress-version>
     <osgi-core-version>4.3.1</osgi-core-version>
     <servlet-api-version>2.5</servlet-api-version>
-    <jetty-version>7.6.11.v20130520</jetty-version>
-    <clirr-version>2.4</clirr-version>
+    <jetty-version>7.6.14.v20131031</jetty-version>
+    <clirr-version>2.6.1</clirr-version>
+    <httpclient-version>4.1.3</httpclient-version>
+    <maven-javadoc-plugin-version>2.9.1</maven-javadoc-plugin-version>
+
+    <!-- Properties to enable jacoco code coverage analysis -->
+    <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
+    <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+    <sonar.jacoco.reportPath>../target/jacoco.exec</sonar.jacoco.reportPath>
   </properties>
 
   <repositories>
     <repository>
       <id>jgit-repository</id>
-      <url>http://download.eclipse.org/jgit/maven</url>
+      <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
     </repository>
   </repositories>
 
@@ -208,7 +217,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.4</version>
+          <version>2.5</version>
           <configuration>
             <archive>
               <manifestEntries>
@@ -238,7 +247,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
-          <version>2.1</version>
+          <version>2.3</version>
         </plugin>
 
         <plugin>
@@ -256,31 +265,35 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
-          <version>2.2.1</version>
+          <version>2.3</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>2.9.1</version>
+          <version>${maven-javadoc-plugin-version}</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.16</version>
+          <version>2.17</version>
+          <configuration>
+            <forkCount>${test-fork-count}</forkCount>
+            <reuseForks>true</reuseForks>
+          </configuration>
         </plugin>
 
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
-          <version>1.8</version>
+          <version>1.9</version>
         </plugin>
 
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>findbugs-maven-plugin</artifactId>
-          <version>2.5.2</version>
+          <version>3.0.0</version>
           <configuration>
             <findbugsXmlOutput>true</findbugsXmlOutput>
             <failOnError>false</failOnError>
@@ -297,7 +310,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
-          <version>3.0.1</version>
+          <version>3.2</version>
           <configuration>
             <sourceEncoding>utf-8</sourceEncoding>
             <minimumTokens>100</minimumTokens>
@@ -327,17 +340,34 @@
         <plugin>
           <groupId>org.eclipse.cbi.maven.plugins</groupId>
           <artifactId>eclipse-jarsigner-plugin</artifactId>
-          <version>1.0.4</version>
+          <version>1.1.1</version>
         </plugin>
         <plugin>
           <groupId>org.eclipse.tycho.extras</groupId>
           <artifactId>tycho-pack200a-plugin</artifactId>
-          <version>0.18.0</version>
+          <version>0.22.0</version>
         </plugin>
         <plugin>
           <groupId>org.eclipse.tycho.extras</groupId>
           <artifactId>tycho-pack200b-plugin</artifactId>
-          <version>0.18.0</version>
+          <version>0.22.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>0.7.1.201405082137</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>3.4</version>
+          <dependencies>
+            <dependency><!-- add support for ssh/scp -->
+              <groupId>org.apache.maven.wagon</groupId>
+              <artifactId>wagon-ssh</artifactId>
+              <version>2.7</version>
+            </dependency>
+          </dependencies>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -422,8 +452,41 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <configuration>
+              <destFile>${sonar.jacoco.reportPath}</destFile>
+              <includes>
+                <include>org.eclipse.jgit.*</include>
+              </includes>
+              <excludes>
+                <exclude>**/*Test*.*</exclude>
+              </excludes>
+              <append>true</append>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven-javadoc-plugin-version}</version>
+        <configuration>
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
 
   <dependencyManagement>
     <dependencies>
@@ -474,6 +537,12 @@
         <artifactId>org.osgi.core</artifactId>
         <version>${osgi-core-version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>${httpclient-version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -489,13 +558,18 @@
       <url>https://repo.eclipse.org/content/repositories/jgit-snapshots/</url>
       <uniqueVersion>true</uniqueVersion>
     </snapshotRepository>
+    <site>
+      <id>jgit.website</id>
+      <name>JGit Website</name>
+      <url>${jgit.website.url}</url>
+    </site>
   </distributionManagement>
 
   <profiles>
     <profile>
       <id>jgit.java6</id>
       <activation>
-        <jdk>1.6</jdk>
+        <jdk>[1.6,)</jdk>
       </activation>
       <modules>
         <module>org.eclipse.jgit.console</module>
@@ -504,13 +578,29 @@
     <profile>
       <id>jgit.java7</id>
       <activation>
-        <jdk>1.7</jdk>
+        <jdk>[1.7,)</jdk>
       </activation>
       <modules>
-        <module>org.eclipse.jgit.console</module>
         <module>org.eclipse.jgit.java7</module>
         <module>org.eclipse.jgit.java7.test</module>
       </modules>
+    </profile>
+    <profile>
+      <id>jgit.java8</id>
+      <activation>
+        <jdk>[1.8,)</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <configuration>
+              <additionalparam>-Xdoclint:-missing</additionalparam>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <profile>
       <id>static-checks</id>
@@ -585,6 +675,12 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>build-server</id>
+      <properties>
+        <jgit.website.url>file:///home/data/httpd/download.eclipse.org/jgit/site/${project.version}/</jgit.website.url>
+      </properties>
+    </profile>
   </profiles>
 
   <modules>
@@ -592,6 +688,7 @@
     <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.archive</module>
     <module>org.eclipse.jgit.ui</module>
+    <module>org.eclipse.jgit.http.apache</module>
     <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.pgm</module>
     <module>org.eclipse.jgit.junit</module>

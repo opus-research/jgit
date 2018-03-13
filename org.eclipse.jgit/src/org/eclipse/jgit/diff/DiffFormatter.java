@@ -67,6 +67,7 @@ import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
@@ -89,6 +90,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
@@ -391,11 +393,14 @@ public class DiffFormatter {
 	 * returned. Callers may choose to format these paths themselves, or convert
 	 * them into {@link FileHeader} instances with a complete edit list by
 	 * calling {@link #toFileHeader(DiffEntry)}.
+	 * <p>
+	 * Either side may be null to indicate that the tree has beed added or
+	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side.
+	 *            the old (or previous) side or null
 	 * @param b
-	 *            the new (or updated) side.
+	 *            the new (or updated) side or null
 	 * @return the paths that are different.
 	 * @throws IOException
 	 *             trees cannot be read or file contents cannot be read.
@@ -405,7 +410,9 @@ public class DiffFormatter {
 		assertHaveRepository();
 
 		RevWalk rw = new RevWalk(reader);
-		return scan(rw.parseTree(a), rw.parseTree(b));
+		RevTree aTree = a != null ? rw.parseTree(a) : null;
+		RevTree bTree = b != null ? rw.parseTree(b) : null;
+		return scan(aTree, bTree);
 	}
 
 	/**
@@ -415,11 +422,14 @@ public class DiffFormatter {
 	 * returned. Callers may choose to format these paths themselves, or convert
 	 * them into {@link FileHeader} instances with a complete edit list by
 	 * calling {@link #toFileHeader(DiffEntry)}.
+	 * <p>
+	 * Either side may be null to indicate that the tree has beed added or
+	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side.
+	 *            the old (or previous) side or null
 	 * @param b
-	 *            the new (or updated) side.
+	 *            the new (or updated) side or null
 	 * @return the paths that are different.
 	 * @throws IOException
 	 *             trees cannot be read or file contents cannot be read.
@@ -427,13 +437,19 @@ public class DiffFormatter {
 	public List<DiffEntry> scan(RevTree a, RevTree b) throws IOException {
 		assertHaveRepository();
 
-		CanonicalTreeParser aParser = new CanonicalTreeParser();
-		CanonicalTreeParser bParser = new CanonicalTreeParser();
+		AbstractTreeIterator aIterator = makeIteratorFromTreeOrNull(a);
+		AbstractTreeIterator bIterator = makeIteratorFromTreeOrNull(b);
+		return scan(aIterator, bIterator);
+	}
 
-		aParser.reset(reader, a);
-		bParser.reset(reader, b);
-
-		return scan(aParser, bParser);
+	private AbstractTreeIterator makeIteratorFromTreeOrNull(RevTree tree)
+			throws IncorrectObjectTypeException, IOException {
+		if (tree != null) {
+			CanonicalTreeParser parser = new CanonicalTreeParser();
+			parser.reset(reader, tree);
+			return parser;
+		} else
+			return new EmptyTreeIterator();
 	}
 
 	/**
@@ -553,11 +569,14 @@ public class DiffFormatter {
 	 *
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
+	 * <p>
+	 * Either side may be null to indicate that the tree has beed added or
+	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side.
+	 *            the old (or previous) side or null
 	 * @param b
-	 *            the new (or updated) side.
+	 *            the new (or updated) side or null
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -572,10 +591,14 @@ public class DiffFormatter {
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
 	 *
+	 * <p>
+	 * Either side may be null to indicate that the tree has beed added or
+	 * removed. The diff will be computed against nothing.
+	 *
 	 * @param a
-	 *            the old (or previous) side.
+	 *            the old (or previous) side or null
 	 * @param b
-	 *            the new (or updated) side.
+	 *            the new (or updated) side or null
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -589,11 +612,14 @@ public class DiffFormatter {
 	 *
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
+	 * <p>
+	 * Either side may be null to indicate that the tree has beed added or
+	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side.
+	 *            the old (or previous) side or null
 	 * @param b
-	 *            the new (or updated) side.
+	 *            the new (or updated) side or null
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -633,7 +659,7 @@ public class DiffFormatter {
 		format(res.header, res.a, res.b);
 	}
 
-	private void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
+	private static void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
 			throws IOException {
 		if (ent.getOldMode() == GITLINK) {
 			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name() //$NON-NLS-1$
@@ -757,7 +783,7 @@ public class DiffFormatter {
 		writeLine(' ', text, line);
 	}
 
-	private boolean isEndOfLineMissing(final RawText text, final int line) {
+	private static boolean isEndOfLineMissing(final RawText text, final int line) {
 		return line + 1 == text.size() && text.isMissingNewlineAtEnd();
 	}
 
@@ -971,9 +997,6 @@ public class DiffFormatter {
 		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
 
-		if (isBinary())
-			return BINARY;
-
 		AbbreviatedObjectId id = entry.getId(side);
 		if (!id.isComplete()) {
 			Collection<ObjectId> ids = reader.resolve(id);
@@ -1012,10 +1035,6 @@ public class DiffFormatter {
 		}
 	}
 
-	private boolean isBinary() {
-		return false;
-	}
-
 	/**
 	 * Output the first header line
 	 *
@@ -1051,6 +1070,17 @@ public class DiffFormatter {
 
 		formatGitDiffFirstHeaderLine(o, type, oldp, newp);
 
+		if ((type == MODIFY || type == COPY || type == RENAME)
+				&& !oldMode.equals(newMode)) {
+			o.write(encodeASCII("old mode ")); //$NON-NLS-1$
+			oldMode.copyTo(o);
+			o.write('\n');
+
+			o.write(encodeASCII("new mode ")); //$NON-NLS-1$
+			newMode.copyTo(o);
+			o.write('\n');
+		}
+
 		switch (type) {
 		case ADD:
 			o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
@@ -1084,12 +1114,6 @@ public class DiffFormatter {
 
 			o.write(encode("copy to " + quotePath(newp))); //$NON-NLS-1$
 			o.write('\n');
-
-			if (!oldMode.equals(newMode)) {
-				o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
-				newMode.copyTo(o);
-				o.write('\n');
-			}
 			break;
 
 		case MODIFY:
@@ -1099,16 +1123,6 @@ public class DiffFormatter {
 				o.write('\n');
 			}
 			break;
-		}
-
-		if ((type == MODIFY || type == RENAME) && !oldMode.equals(newMode)) {
-			o.write(encodeASCII("old mode ")); //$NON-NLS-1$
-			oldMode.copyTo(o);
-			o.write('\n');
-
-			o.write(encodeASCII("new mode ")); //$NON-NLS-1$
-			newMode.copyTo(o);
-			o.write('\n');
 		}
 
 		if (ent.getOldId() != null && !ent.getOldId().equals(ent.getNewId())) {

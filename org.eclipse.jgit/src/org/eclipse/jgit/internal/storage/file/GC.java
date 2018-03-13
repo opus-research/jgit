@@ -45,6 +45,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -92,10 +93,12 @@ import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.GitDateParser;
+import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -114,6 +117,8 @@ public class GC {
 	private long expireAgeMillis = -1;
 
 	private Date expire;
+
+	private PackConfig pconfig = null;
 
 	/**
 	 * the refs which existed during the last call to {@link #repack()}. This is
@@ -174,21 +179,9 @@ public class GC {
 	 *
 	 * @param oldPacks
 	 * @param newPacks
-	 * @param ignoreErrors
-	 *            <code>true</code> if we should ignore the fact that a certain
-	 *            pack files or index files couldn't be deleted.
-	 *            <code>false</code> if an exception should be thrown in such
-	 *            cases
-	 * @throws IOException
-	 *             if a pack file couldn't be deleted and
-	 *             <code>ignoreErrors</code> is set to <code>false</code>
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
-			Collection<PackFile> newPacks, boolean ignoreErrors)
-			throws IOException {
-		int deleteOptions = FileUtils.RETRY | FileUtils.SKIP_MISSING;
-		if (ignoreErrors)
-			deleteOptions |= FileUtils.IGNORE_ERRORS;
+			Collection<PackFile> newPacks) {
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old pack file is also among the list of new
@@ -199,15 +192,48 @@ public class GC {
 
 			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
-				for (PackExt ext : PackExt.values()) {
-					File f = nameFor(oldName, "." + ext.getExtension()); //$NON-NLS-1$
-					FileUtils.delete(f, deleteOptions);
-				}
+				prunePack(oldName);
 			}
 		}
 		// close the complete object database. Thats my only chance to force
 		// rescanning and to detect that certain pack files are now deleted.
 		repo.getObjectDatabase().close();
+	}
+
+	/**
+	 * Delete files associated with a single pack file. First try to delete the
+	 * ".pack" file because on some platforms the ".pack" file may be locked and
+	 * can't be deleted. In such a case it is better to detect this early and
+	 * give up on deleting files for this packfile. Otherwise we may delete the
+	 * ".index" file and when failing to delete the ".pack" file we are left
+	 * with a ".pack" file without a ".index" file.
+	 *
+	 * @param packName
+	 */
+	private void prunePack(String packName) {
+		PackExt[] extensions = PackExt.values();
+		try {
+			// Delete the .pack file first and if this fails give up on deleting
+			// the other files
+			int deleteOptions = FileUtils.RETRY | FileUtils.SKIP_MISSING;
+			for (PackExt ext : extensions)
+				if (PackExt.PACK.equals(ext)) {
+					File f = nameFor(packName, "." + ext.getExtension()); //$NON-NLS-1$
+					FileUtils.delete(f, deleteOptions);
+					break;
+				}
+			// The .pack file has been deleted. Delete as many as the other
+			// files as you can.
+			deleteOptions |= FileUtils.IGNORE_ERRORS;
+			for (PackExt ext : extensions) {
+				if (!PackExt.PACK.equals(ext)) {
+					File f = nameFor(packName, "." + ext.getExtension()); //$NON-NLS-1$
+					FileUtils.delete(f, deleteOptions);
+				}
+			}
+		} catch (IOException e) {
+			// Deletion of the .pack file failed. Silently return.
+		}
 	}
 
 	/**
@@ -285,7 +311,8 @@ public class GC {
 					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 			if (pruneExpireStr == null)
 				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
-			expire = GitDateParser.parse(pruneExpireStr, null);
+			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
+					.getInstance().getLocale());
 			expireAgeMillis = -1;
 		}
 		if (expire != null)
@@ -457,7 +484,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	public void packRefs() throws IOException {
-		Collection<Ref> refs = repo.getAllRefs().values();
+		Collection<Ref> refs = repo.getRefDatabase().getRefs(Constants.R_REFS).values();
 		List<String> refsToBePacked = new ArrayList<String>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
@@ -532,7 +559,7 @@ public class GC {
 			if (rest != null)
 				ret.add(rest);
 		}
-		deleteOldPacks(toBeDeleted, ret, true);
+		deleteOldPacks(toBeDeleted, ret);
 		prunePacked();
 
 		lastPackedRefs = refsBefore;
@@ -574,7 +601,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	private Map<String, Ref> getAllRefs() throws IOException {
-		Map<String, Ref> ret = repo.getAllRefs();
+		Map<String, Ref> ret = repo.getRefDatabase().getRefs(ALL);
 		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
 			ret.put(ref.getName(), ref);
 		return ret;
@@ -662,7 +689,7 @@ public class GC {
 					}
 
 				});
-		PackWriter pw = new PackWriter(repo);
+		PackWriter pw = new PackWriter((pconfig == null) ? new PackConfig(repo) : pconfig, repo.newObjectReader());
 		try {
 			// prepare the PackWriter
 			pw.setDeltaBaseAsOffset(true);
@@ -690,26 +717,27 @@ public class GC {
 						JGitText.get().cannotCreateIndexfile, tmpIdx.getPath()));
 
 			// write the packfile
-			@SuppressWarnings("resource" /* java 7 */)
-			FileChannel channel = new FileOutputStream(tmpPack).getChannel();
+			FileOutputStream fos = new FileOutputStream(tmpPack);
+			FileChannel channel = fos.getChannel();
 			OutputStream channelStream = Channels.newOutputStream(channel);
 			try {
 				pw.writePack(pm, pm, channelStream);
 			} finally {
 				channel.force(true);
 				channelStream.close();
-				channel.close();
+				fos.close();
 			}
 
 			// write the packindex
-			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
+			fos = new FileOutputStream(tmpIdx);
+			FileChannel idxChannel = fos.getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);
 			try {
 				pw.writeIndex(idxStream);
 			} finally {
 				idxChannel.force(true);
 				idxStream.close();
-				idxChannel.close();
+				fos.close();
 			}
 
 			if (pw.prepareBitmapIndex(pm)) {
@@ -721,14 +749,15 @@ public class GC {
 							JGitText.get().cannotCreateIndexfile,
 							tmpBitmapIdx.getPath()));
 
-				idxChannel = new FileOutputStream(tmpBitmapIdx).getChannel();
+				fos = new FileOutputStream(tmpBitmapIdx);
+				idxChannel = fos.getChannel();
 				idxStream = Channels.newOutputStream(idxChannel);
 				try {
 					pw.writeBitmapIndex(idxStream);
 				} finally {
 					idxChannel.force(true);
 					idxStream.close();
-					idxChannel.close();
+					fos.close();
 				}
 			}
 
@@ -919,6 +948,19 @@ public class GC {
 	public void setExpireAgeMillis(long expireAgeMillis) {
 		this.expireAgeMillis = expireAgeMillis;
 		expire = null;
+	}
+
+	/**
+	 * Set the PackConfig used when (re-)writing packfiles. This allows to
+	 * influence how packs are written and to implement something similar to
+	 * "git gc --aggressive"
+	 *
+	 * @since 3.6
+	 * @param pconfig
+	 *            the {@link PackConfig} used when writing packs
+	 */
+	public void setPackConfig(PackConfig pconfig) {
+		this.pconfig = pconfig;
 	}
 
 	/**

@@ -8,6 +8,7 @@ org.eclipse.jgit.pgm.Clone
 org.eclipse.jgit.pgm.Commit
 org.eclipse.jgit.pgm.Config
 org.eclipse.jgit.pgm.Daemon
+org.eclipse.jgit.pgm.Describe
 org.eclipse.jgit.pgm.Diff
 org.eclipse.jgit.pgm.DiffTree
 org.eclipse.jgit.pgm.Fetch
@@ -23,6 +24,7 @@ org.eclipse.jgit.pgm.MergeBase
 org.eclipse.jgit.pgm.Push
 org.eclipse.jgit.pgm.ReceivePack
 org.eclipse.jgit.pgm.Reflog
+org.eclipse.jgit.pgm.Repo
 org.eclipse.jgit.pgm.Reset
 org.eclipse.jgit.pgm.RevList
 org.eclipse.jgit.pgm.RevParse

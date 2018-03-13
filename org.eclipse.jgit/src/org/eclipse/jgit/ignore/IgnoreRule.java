@@ -46,11 +46,16 @@ import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.fnmatch.FileNameMatcher;
 
 /**
- * A single ignore rule corresponding to one line in a .gitignore or
- * ignore file. Parses the ignore pattern
+ * A single ignore rule corresponding to one line in a .gitignore or ignore
+ * file. Parses the ignore pattern
  *
  * Inspiration from: Ferry Huberts
+ *
+ * @deprecated this rule does not support double star pattern and is slow
+ *             parsing glob expressions. Consider to use {@link FastIgnoreRule}
+ *             instead. See https://bugs.eclipse.org/bugs/show_bug.cgi?id=440732
  */
+@Deprecated
 public class IgnoreRule {
 	private String pattern;
 	private boolean negation;
@@ -191,6 +196,9 @@ public class IgnoreRule {
 				final String[] segments = target.split("/"); //$NON-NLS-1$
 				for (int idx = 0; idx < segments.length; idx++) {
 					final String segmentName = segments[idx];
+					// String.split("/") creates empty segment for leading slash
+					if (segmentName.length() == 0)
+						continue;
 					if (segmentName.equals(pattern) &&
 							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
 						return true;
@@ -198,6 +206,7 @@ public class IgnoreRule {
 			}
 
 		} else {
+			matcher.reset();
 			matcher.append(target);
 			if (matcher.isMatch())
 				return true;
@@ -206,6 +215,9 @@ public class IgnoreRule {
 			if (nameOnly) {
 				for (int idx = 0; idx < segments.length; idx++) {
 					final String segmentName = segments[idx];
+					// String.split("/") creates empty segment for leading slash
+					if (segmentName.length() == 0)
+						continue;
 					//Iterate through each sub-directory
 					matcher.reset();
 					matcher.append(segmentName);
@@ -217,14 +229,18 @@ public class IgnoreRule {
 				//TODO: This is the slowest operation
 				//This matches e.g. "/src/ne?" to "/src/new/file.c"
 				matcher.reset();
+
 				for (int idx = 0; idx < segments.length; idx++) {
 					final String segmentName = segments[idx];
-					if (segmentName.length() > 0) {
-						matcher.append("/" + segmentName); //$NON-NLS-1$
-					}
+					// String.split("/") creates empty segment for leading slash
+					if (segmentName.length() == 0)
+						continue;
 
-					if (matcher.isMatch() &&
-							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
+					matcher.append("/" + segmentName); //$NON-NLS-1$
+
+					if (matcher.isMatch()
+							&& doesMatchDirectoryExpectations(isDirectory, idx,
+									segments.length))
 						return true;
 				}
 			}
@@ -253,5 +269,10 @@ public class IgnoreRule {
 
 		// We are checking the last part of the segment for which isDirectory has to be considered.
 		return !dirOnly || isDirectory;
+	}
+
+	@Override
+	public String toString() {
+		return pattern;
 	}
 }

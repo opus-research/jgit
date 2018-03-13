@@ -54,6 +54,7 @@ import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
+
 	protected ObjectId theHead;
 	protected ObjectId theMerge;
 
@@ -185,10 +186,7 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 
 	@Test
 	public void testMaliciousGitPathEndSpaceUnixOk() throws Exception {
-		if (File.separatorChar == '\\')
-			return; // cannot emulate Unix on Windows for this test
-		((MockSystemReader) SystemReader.getInstance()).setUnix();
-		testMaliciousPathGoodFirstCheckout(".git ", "konfig");
+		testMaliciousPathBadFirstCheckout(".git ", "konfig");
 	}
 
 	@Test
@@ -211,10 +209,7 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 
 	@Test
 	public void testMaliciousGitPathEndDotUnixOk() throws Exception {
-		if (File.separatorChar == '\\')
-			return; // cannot emulate Unix on Windows for this test
-		((MockSystemReader) SystemReader.getInstance()).setUnix();
-		testMaliciousPathGoodFirstCheckout(".git.", "konfig");
+		testMaliciousPathBadFirstCheckout(".git.", "konfig");
 	}
 
 	@Test
@@ -230,8 +225,14 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testMaliciousPathEmpty() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setCurrentPlatform();
+	public void testMaliciousPathEmptyUnix() throws Exception {
+		((MockSystemReader) SystemReader.getInstance()).setUnix();
+		testMaliciousPathBadFirstCheckout("", "no");
+	}
+
+	@Test
+	public void testMaliciousPathEmptyWindows() throws Exception {
+		((MockSystemReader) SystemReader.getInstance()).setWindows();
 		testMaliciousPathBadFirstCheckout("", "no");
 	}
 
@@ -398,7 +399,7 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 		} catch (InvalidPathException e) {
 			if (good)
 				throw e;
-			assertTrue(e.getMessage().startsWith("Invalid path: "));
+			assertTrue(e.getMessage().startsWith("Invalid path"));
 		}
 	}
 

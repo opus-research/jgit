@@ -64,13 +64,13 @@ public class CoreConfig {
 
 	/** Permissible values for {@code core.autocrlf}. */
 	public static enum AutoCRLF {
-		/** Automatic CRLF->LF conversion is disabled. */
+		/** Automatic CRLF-&gt;LF conversion is disabled. */
 		FALSE,
 
-		/** Automatic CRLF->LF conversion is enabled. */
+		/** Automatic CRLF-&gt;LF conversion is enabled. */
 		TRUE,
 
-		/** CRLF->LF performed, but no LF->CRLF. */
+		/** CRLF-&gt;LF performed, but no LF-&gt;CRLF. */
 		INPUT;
 	}
 
@@ -100,6 +100,32 @@ public class CoreConfig {
 	private final boolean logAllRefUpdates;
 
 	private final String excludesfile;
+
+	/**
+	 * Options for symlink handling
+	 *
+	 * @since 3.3
+	 */
+	public static enum SymLinks {
+		/** Checkout symbolic links as plain files */
+		FALSE,
+		/** Checkout symbolic links as links */
+		TRUE
+	}
+
+	/**
+	 * Options for hiding files whose names start with a period
+	 *
+	 * @since 3.5
+	 */
+	public static enum HideDotFiles {
+		/** Do not hide .files */
+		FALSE,
+		/** Hide add .files */
+		TRUE,
+		/** Hide only .git */
+		DOTGITONLY
+	}
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,

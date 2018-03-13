@@ -52,6 +52,7 @@ import org.junit.Test;
 /**
  * Tests ignore pattern matches
  */
+@SuppressWarnings("deprecation")
 public class IgnoreMatcherTest {
 
 	@Test
@@ -340,6 +341,18 @@ public class IgnoreMatcherTest {
 		assertEquals(r.getPattern(), "/patter?");
 	}
 
+	@Test
+	public void testResetState() {
+		String pattern = "/build/*";
+		String target = "/build";
+		// Don't use the assert methods of this class, as we want to test
+		// whether the state in IgnoreRule is reset properly
+		IgnoreRule r = new IgnoreRule(pattern);
+		// Result should be the same for the same inputs
+		assertFalse(r.isMatch(target, true));
+		assertFalse(r.isMatch(target, true));
+	}
+
 	/**
 	 * Check for a match. If target ends with "/", match will assume that the
 	 * target is meant to be a directory.
@@ -371,12 +384,12 @@ public class IgnoreMatcherTest {
 	/**
 	 * Check for a match. If target ends with "/", match will assume that the
 	 * target is meant to be a directory.
+	 *
 	 * @param pattern
-	 * 			  Pattern as it would appear in a .gitignore file
+	 *            Pattern as it would appear in a .gitignore file
 	 * @param target
-	 * 			  Target file path relative to repository's GIT_DIR
-	 * @return
-	 * 			  Result of {@link IgnoreRule#isMatch(String, boolean)}
+	 *            Target file path relative to repository's GIT_DIR
+	 * @return Result of IgnoreRule.isMatch(String, boolean)
 	 */
 	private static boolean match(String pattern, String target) {
 		IgnoreRule r = new IgnoreRule(pattern);

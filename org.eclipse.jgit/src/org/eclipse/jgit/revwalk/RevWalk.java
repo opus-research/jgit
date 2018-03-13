@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2014, Gustaf Lundh <gustaf.lundh@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -173,6 +174,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private int delayFreeFlags;
 
+	private int retainOnReset;
 	int carryFlags = UNINTERESTING;
 
 	final ArrayList<RevCommit> roots;
@@ -188,6 +190,8 @@ public class RevWalk implements Iterable<RevCommit> {
 	private TreeFilter treeFilter;
 
 	private boolean retainBody;
+
+	private boolean rewriteParents = true;
 
 	boolean shallowCommitsInitialized;
 
@@ -388,7 +392,11 @@ public class RevWalk implements Iterable<RevCommit> {
 			treeFilter = TreeFilter.ALL;
 			markStart(tip);
 			markStart(base);
-			return next() == base;
+			RevCommit mergeBase;
+			while ((mergeBase = next()) != null)
+				if (mergeBase == base)
+					return true;
+			return false;
 		} finally {
 			filter = oldRF;
 			treeFilter = oldTF;
@@ -528,8 +536,9 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * will not be simplified.
 	 * <p>
 	 * If non-null and not {@link TreeFilter#ALL} then the tree filter will be
-	 * installed and commits will have their ancestry simplified to hide commits
-	 * that do not contain tree entries matched by the filter.
+	 * installed. Commits will have their ancestry simplified to hide commits that
+	 * do not contain tree entries matched by the filter, unless
+	 * {@code setRewriteParents(false)} is called.
 	 * <p>
 	 * Usually callers should be inserting a filter graph including
 	 * {@link TreeFilter#ANY_DIFF} along with one or more
@@ -543,6 +552,28 @@ public class RevWalk implements Iterable<RevCommit> {
 	public void setTreeFilter(final TreeFilter newFilter) {
 		assertNotStarted();
 		treeFilter = newFilter != null ? newFilter : TreeFilter.ALL;
+	}
+
+	/**
+	 * Set whether to rewrite parent pointers when filtering by modified paths.
+	 * <p>
+	 * By default, when {@link #setTreeFilter(TreeFilter)} is called with non-
+	 * null and non-{@link TreeFilter#ALL} filter, commits will have their
+	 * ancestry simplified and parents rewritten to hide commits that do not match
+	 * the filter.
+	 * <p>
+	 * This behavior can be bypassed by passing false to this method.
+	 *
+	 * @param rewrite
+	 *            whether to rewrite parents; defaults to true.
+	 * @since 3.4
+	 */
+	public void setRewriteParents(boolean rewrite) {
+		rewriteParents = rewrite;
+	}
+
+	boolean getRewriteParents() {
+		return rewriteParents;
 	}
 
 	/**
@@ -1063,6 +1094,47 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	/**
+	 * Preserve a RevFlag during all {@code reset} methods.
+	 * <p>
+	 * Calling {@code retainOnReset(flag)} avoids needing to pass the flag
+	 * during each {@code resetRetain()} invocation on this instance.
+	 * <p>
+	 * Clearing flags marked retainOnReset requires disposing of the flag with
+	 * {@code #disposeFlag(RevFlag)} or disposing of the entire RevWalk by
+	 * {@code #dispose()}.
+	 *
+	 * @param flag
+	 *            the flag to retain during all resets.
+	 * @since 3.6
+	 */
+	public final void retainOnReset(RevFlag flag) {
+		if ((freeFlags & flag.mask) != 0)
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().flagIsDisposed, flag.name));
+		if (flag.walker != this)
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().flagNotFromThis, flag.name));
+		retainOnReset |= flag.mask;
+	}
+
+	/**
+	 * Preserve a set of RevFlags during all {@code reset} methods.
+	 * <p>
+	 * Calling {@code retainOnReset(set)} avoids needing to pass the flags
+	 * during each {@code resetRetain()} invocation on this instance.
+	 * <p>
+	 * Clearing flags marked retainOnReset requires disposing of the flag with
+	 * {@code #disposeFlag(RevFlag)} or disposing of the entire RevWalk by
+	 * {@code #dispose()}.
+	 *
+	 * @param flags
+	 *            the flags to retain during all resets.
+	 * @since 3.6
+	 */
+	public final void retainOnReset(Collection<RevFlag> flags) {
+		for (RevFlag f : flags)
+			retainOnReset(f);
+	}
+
+	/**
 	 * Allow a flag to be recycled for a different use.
 	 * <p>
 	 * Recycled flags always come back as a different Java object instance when
@@ -1080,6 +1152,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	void freeFlag(final int mask) {
+		retainOnReset &= ~mask;
 		if (isNotStarted()) {
 			freeFlags |= mask;
 			carryFlags &= ~mask;
@@ -1128,6 +1201,9 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * Unlike {@link #dispose()} previously acquired RevObject (and RevCommit)
 	 * instances are not invalidated. RevFlag instances are not invalidated, but
 	 * are removed from all RevObjects.
+	 * <p>
+	 * See {@link #retainOnReset(RevFlag)} for an alternative that does not
+	 * require passing the flags during each reset.
 	 *
 	 * @param retainFlags
 	 *            application flags that should <b>not</b> be cleared from
@@ -1153,7 +1229,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 */
 	protected void reset(int retainFlags) {
 		finishDelayedFreeFlags();
-		retainFlags |= PARSED;
+		retainFlags |= PARSED | retainOnReset;
 		final int clearFlags = ~retainFlags;
 
 		final FIFORevQueue q = new FIFORevQueue();
@@ -1197,6 +1273,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		reader.release();
 		freeFlags = APP_FLAGS;
 		delayFreeFlags = 0;
+		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
 		reader.release();
@@ -1306,6 +1383,19 @@ public class RevWalk implements Iterable<RevCommit> {
 		final int carry = c.flags & carryFlags;
 		if (carry != 0)
 			RevCommit.carryFlags(c, carry);
+	}
+
+	/**
+	 * Assume additional commits are shallow (have no parents).
+	 *
+	 * @param ids
+	 *            commits that should be treated as shallow commits, in addition
+	 *            to any commits already known to be shallow by the repository.
+	 * @since 3.3
+	 */
+	public void assumeShallow(Collection<? extends ObjectId> ids) {
+		for (ObjectId id : ids)
+			lookupCommit(id).parents = RevCommit.NO_PARENTS;
 	}
 
 	void initializeShallowCommits() throws IOException {
