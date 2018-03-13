@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,46 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.revwalk;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import static org.junit.Assert.assertNull;
 
-/**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
- * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
- */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
+import org.junit.Test;
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
+public class MaxCountRevFilterTest extends RevWalkTestCase {
+	@Test
+	public void testMaxCountRevFilter() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c1 = commit(b);
+		final RevCommit c2 = commit(b);
+		final RevCommit d = commit(c1, c2);
+		final RevCommit e = commit(d);
+
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(3));
+		markStart(e);
+		assertCommit(e, rw.next());
+		assertCommit(d, rw.next());
+		assertCommit(c2, rw.next());
+		assertNull(rw.next());
+
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(e);
+		assertNull(rw.next());
 	}
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 * @param size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out);
-	}
+	@Test
+	public void testMaxCountRevFilter0() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(b);
+		assertNull(rw.next());
 	}
 }
