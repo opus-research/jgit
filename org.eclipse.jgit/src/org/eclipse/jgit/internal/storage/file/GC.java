@@ -46,7 +46,6 @@ package org.eclipse.jgit.internal.storage.file;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
-import static org.eclipse.jgit.treewalk.TreeWalk.T_BASE;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -619,22 +618,19 @@ public class GC {
 	 */
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
-		RevWalk revWalk = null;
 		try {
 			if (repo.getIndexFile() == null)
 				return Collections.emptySet();
 		} catch (NoWorkTreeException e) {
 			return Collections.emptySet();
 		}
-		TreeWalk treeWalk = new TreeWalk(repo);
-		try {
+		try (TreeWalk treeWalk = new TreeWalk(repo)) {
 			treeWalk.addTree(new DirCacheIterator(repo.readDirCache()));
 			ObjectId headID = repo.resolve(Constants.HEAD);
 			if (headID != null) {
-				revWalk = new RevWalk(repo);
-				treeWalk.addTree(revWalk.parseTree(headID));
-				revWalk.dispose();
-				revWalk = null;
+				try (RevWalk revWalk = new RevWalk(repo)) {
+					treeWalk.addTree(revWalk.parseTree(headID));
+				}
 			}
 
 			treeWalk.setFilter(TreeFilter.ANY_DIFF);
@@ -643,7 +639,7 @@ public class GC {
 
 			while (treeWalk.next()) {
 				ObjectId objectId = treeWalk.getObjectId(0);
-				switch (treeWalk.getRawMode(T_BASE) & FileMode.TYPE_MASK) {
+				switch (treeWalk.getRawMode(0) & FileMode.TYPE_MASK) {
 				case FileMode.TYPE_MISSING:
 				case FileMode.TYPE_GITLINK:
 					continue;
@@ -653,21 +649,16 @@ public class GC {
 					ret.add(objectId);
 					continue;
 				default:
-					throw new IOException(MessageFormat
-							.format(JGitText.get().corruptObjectInvalidMode3,
-									String.format("%o", //$NON-NLS-1$
-											Integer.valueOf(treeWalk
-													.getRawMode(T_BASE))),
+					throw new IOException(MessageFormat.format(
+							JGitText.get().corruptObjectInvalidMode3,
+							String.format("%o", //$NON-NLS-1$
+									Integer.valueOf(treeWalk.getRawMode(0))),
 							(objectId == null) ? "null" : objectId.name(), //$NON-NLS-1$
 							treeWalk.getPathString(), //
 							repo.getIndexFile()));
 				}
 			}
 			return ret;
-		} finally {
-			if (revWalk != null)
-				revWalk.dispose();
-			treeWalk.release();
 		}
 	}
 
@@ -691,8 +682,9 @@ public class GC {
 					}
 
 				});
-		PackWriter pw = new PackWriter((pconfig == null) ? new PackConfig(repo) : pconfig, repo.newObjectReader());
-		try {
+		try (PackWriter pw = new PackWriter(
+				(pconfig == null) ? new PackConfig(repo) : pconfig,
+				repo.newObjectReader())) {
 			// prepare the PackWriter
 			pw.setDeltaBaseAsOffset(true);
 			pw.setReuseDeltaCommits(false);
@@ -812,7 +804,6 @@ public class GC {
 			}
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
-			pw.release();
 			if (tmpPack != null && tmpPack.exists())
 				tmpPack.delete();
 			for (File tmpExt : tmpExts.values()) {
