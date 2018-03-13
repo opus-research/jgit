@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.diff;
 
+import org.eclipse.jgit.JGitText;
+
 /**
  * Support {@link HistogramDiff} by computing occurrence counts of elements.
  *
@@ -56,6 +58,20 @@ package org.eclipse.jgit.diff;
  *            type of the base sequence.
  */
 final class HistogramDiffIndex<S extends Sequence> {
+	private static final int REC_NEXT_SHIFT = 28 + 8;
+
+	private static final int REC_PTR_SHIFT = 8;
+
+	private static final int REC_PTR_MASK = (1 << 28) - 1;
+
+	private static final int REC_CNT_MASK = (1 << 8) - 1;
+
+	private static final int MAX_PTR = REC_PTR_MASK;
+
+	private static final int MAX_CNT = (1 << 8) - 1;
+
+	private final int maxChainLength;
+
 	private final HashedSequenceComparator<S> cmp;
 
 	private final HashedSequence<S> a;
@@ -64,130 +80,155 @@ final class HistogramDiffIndex<S extends Sequence> {
 
 	private final Edit region;
 
-	/** Keyed by {@code cmp.hash() & tableMask} to get {@link #recs} index. */
+	/** Keyed by {@link #hash(HashedSequence, int)} for {@link #recs} index. */
 	private final int[] table;
 
-	private final int tableMask;
+	/** Number of low bits to discard from a key to index {@link #table}. */
+	private final int keyShift;
 
 	/**
-	 * Pair of <code>(count, {@link #ptrs} index)</code>
+	 * Describes a unique element in sequence A.
 	 *
-	 * The upper 32 bits stores the number of occurrences of the element whose
-	 * first occurrence is in the {@link #ptrs} array. The lower 32 bits stores
-	 * the array index for {@link #ptrs} for the position that has the first
-	 * element's index.
-	 */
-	private final long[] recs;
-
-	/** Array index of the next entry in the table; 0 if at end of chain. */
-	private final int[] recNext;
-
-	/**
-	 * Total number of valid pairs in {@link #recs}.
+	 * The records in this table are actually 3-tuples of:
+	 * <ul>
+	 * <li>index of next record in this table that has same hash code</li>
+	 * <li>index of first element in this occurrence chain</li>
+	 * <li>occurrence count for this element (length of locs list)</li>
+	 * </ul>
 	 *
-	 * After scanning this is the number of distinct elements in {@code #a}.
+	 * The occurrence count is capped at {@link #MAX_CNT}, as the field is only
+	 * a few bits wide. Elements that occur more frequently will have their
+	 * count capped.
 	 */
+	private long[] recs;
+
+	/** Number of elements in {@link #recs}; also is the unique element count. */
 	private int recCnt;
 
-	/** An element of {@code #a}. */
-	private final int[] ptrs;
+	/**
+	 * For {@code ptr}, {@code next[ptr - nextShift]} has subsequent index.
+	 *
+	 * For the sequence element {@code ptr}, the value stored at location
+	 * {@code next[ptr - nextShift]} is the next occurrence of the exact same
+	 * element in the sequence.
+	 *
+	 * Chains always run from the lowest index to the largest index. Therefore
+	 * the array will store {@code next[1] = 2}, but never {@code next[2] = 1}.
+	 * This allows a chain to terminate with {@code 0}, as {@code 0} would never
+	 * be a valid next element.
+	 *
+	 * The array is sized to be {@code region.getLenghtA()} and element indexes
+	 * are converted to array indexes by subtracting {@link #nextShift}, which
+	 * is just a cached version of {@code region.beginA}.
+	 */
+	private int[] next;
 
-	/** Array index of the next entry in the table; 0 if at end of chain. */
-	private final int[] ptrNext;
-
-	private int ptrCnt;
+	/** Value to subtract from element indexes to key {@link #next} array. */
+	private int nextShift;
 
 	private Edit lcs;
 
 	private int cnt;
 
-	HistogramDiffIndex(HashedSequenceComparator<S> cmp, HashedSequence<S> a,
-			HashedSequence<S> b, Edit r) {
+	HistogramDiffIndex(int maxChainLength, HashedSequenceComparator<S> cmp,
+			HashedSequence<S> a, HashedSequence<S> b, Edit r) {
+		this.maxChainLength = maxChainLength;
 		this.cmp = cmp;
 		this.a = a;
 		this.b = b;
 		this.region = r;
 
-		final int sz = r.endA - r.beginA;
-		table = new int[tableSize(sz)];
-		tableMask = table.length - 1;
+		if (region.endA >= MAX_PTR)
+			throw new IllegalArgumentException(
+					JGitText.get().sequenceTooLargeForDiffAlgorithm);
 
-		// As we insert elements we preincrement so that 0 is never a
-		// valid entry. Therefore we have to allocate one extra space.
-		//
-		recs = new long[1 + sz];
-		ptrs = new int[recs.length];
-		recNext = new int[recs.length];
-		ptrNext = new int[recs.length];
+		final int sz = r.getLengthA();
+		final int tableBits = tableBits(sz);
+		table = new int[1 << tableBits];
+		keyShift = 32 - tableBits;
+		nextShift = r.beginA;
+
+		recs = new long[Math.max(4, sz >>> 3)];
+		next = new int[sz];
 	}
 
 	Edit findLongestCommonSequence() {
-		scanA();
+		if (!scanA())
+			return null;
 
 		lcs = new Edit(0, 0);
-		cnt = Integer.MAX_VALUE;
+		cnt = maxChainLength + 1;
 
 		for (int bPtr = region.beginB; bPtr < region.endB;)
 			bPtr = tryLongestCommonSequence(bPtr);
 
-		return cnt != Integer.MAX_VALUE ? lcs : null;
+		return cnt <= maxChainLength ? lcs : null;
 	}
 
-	private void scanA() {
+	private boolean scanA() {
 		// Scan the elements backwards, inserting them into the hash table
 		// as we go. Going in reverse places the earliest occurrence of any
 		// element at the start of the chain, so we consider earlier matches
 		// before later matches.
 		//
 		SCAN: for (int ptr = region.endA - 1; region.beginA <= ptr; ptr--) {
-			final int tIdx = cmp.hash(a, ptr) & tableMask;
+			final int tIdx = hash(a, ptr);
 
-			for (int rIdx = table[tIdx]; rIdx != 0; rIdx = recNext[rIdx]) {
+			int chainLen = 0;
+			for (int rIdx = table[tIdx]; rIdx != 0;) {
 				final long rec = recs[rIdx];
-
-				if (cmp.equals(a, ptrs[idxOf(rec)], a, ptr)) {
+				if (cmp.equals(a, recPtr(rec), a, ptr)) {
 					// ptr is identical to another element. Insert it onto
 					// the front of the existing element chain.
 					//
-					final int pIdx = ++ptrCnt;
-					ptrs[pIdx] = ptr;
-					ptrNext[pIdx] = idxOf(rec);
-					recs[rIdx] = pair(cntOf(rec) + 1, pIdx);
+					int newCnt = recCnt(rec) + 1;
+					if (MAX_CNT < newCnt)
+						newCnt = MAX_CNT;
+					recs[rIdx] = recCreate(recNext(rec), ptr, newCnt);
+					next[ptr - nextShift] = recPtr(rec);
 					continue SCAN;
 				}
+
+				rIdx = recNext(rec);
+				chainLen++;
 			}
+
+			if (chainLen == maxChainLength)
+				return false;
 
 			// This is the first time we have ever seen this particular
 			// element in the sequence. Construct a new chain for it.
 			//
-			final int pIdx = ++ptrCnt;
-			ptrs[pIdx] = ptr;
-
 			final int rIdx = ++recCnt;
-			recs[rIdx] = pair(1, pIdx);
-			recNext[rIdx] = table[tIdx];
+			if (rIdx == recs.length) {
+				int sz = Math.min(recs.length << 1, 1 + region.getLengthA());
+				long[] n = new long[sz];
+				System.arraycopy(recs, 0, n, 0, recs.length);
+				recs = n;
+			}
+
+			recs[rIdx] = recCreate(table[tIdx], ptr, 1);
 			table[tIdx] = rIdx;
 		}
+		return true;
 	}
 
 	private int tryLongestCommonSequence(final int bPtr) {
 		int bNext = bPtr + 1;
-		int rIdx = table[cmp.hash(b, bPtr) & tableMask];
-		for (; rIdx != 0; rIdx = recNext[rIdx]) {
-			final long rec = recs[rIdx];
-			if (cntOf(rec) > cnt) {
-				// If there are more occurrences in A, don't use this chain.
-				continue;
-			}
+		int rIdx = table[hash(b, bPtr)];
+		for (long rec; rIdx != 0; rIdx = recNext(rec)) {
+			rec = recs[rIdx];
 
-			int aIdx = idxOf(rec);
-			if (!cmp.equals(a, ptrs[aIdx], b, bPtr)) {
-				// This chain doesn't match the element, look for another.
+			// If there are more occurrences in A, don't use this chain.
+			if (recCnt(rec) > cnt)
 				continue;
-			}
 
-			do {
-				int as = ptrs[aIdx];
+			int as = recPtr(rec);
+			if (!cmp.equals(a, as, b, bPtr))
+				continue;
+
+			TRY_LOCATIONS: for (;;) {
+				int np = next[as - nextShift];
 				int bs = bPtr;
 				int ae = as + 1;
 				int be = bs + 1;
@@ -203,7 +244,9 @@ final class HistogramDiffIndex<S extends Sequence> {
 					be++;
 				}
 
-				if (cntOf(rec) < cnt || lcs.getLengthA() < ae - as) {
+				if (bNext < be)
+					bNext = be;
+				if (lcs.getLengthA() < ae - as || recCnt(rec) < cnt) {
 					// If this region is the longest, or there are less
 					// occurrences of it in A, its now our LCS.
 					//
@@ -211,34 +254,60 @@ final class HistogramDiffIndex<S extends Sequence> {
 					lcs.beginB = bs;
 					lcs.endA = ae;
 					lcs.endB = be;
-					cnt = cntOf(rec);
+					cnt = recCnt(rec);
 				}
 
-				if (bNext < be)
-					bNext = be;
-				aIdx = ptrNext[aIdx];
-			} while (aIdx != 0);
+				// Because we added elements in reverse order index 0
+				// cannot possibly be the next position. Its the first
+				// element of the sequence and thus would have been the
+				// value of as at the start of the TRY_LOCATIONS loop.
+				//
+				if (np == 0)
+					break TRY_LOCATIONS;
+
+				while (np < ae) {
+					// The next location to consider was actually within
+					// the LCS we examined above. Don't reconsider it.
+					//
+					np = next[np - nextShift];
+					if (np == 0)
+						break TRY_LOCATIONS;
+				}
+
+				as = np;
+			}
 		}
 		return bNext;
 	}
 
-	private static long pair(int cnt, int idx) {
-		return (((long) cnt) << 32) | idx;
+	private int hash(HashedSequence<S> s, int idx) {
+		return (cmp.hash(s, idx) * 0x9e370001 /* mix bits */) >>> keyShift;
 	}
 
-	private static int cntOf(long rec) {
-		return (int) (rec >>> 32);
+	private static long recCreate(int next, int ptr, int cnt) {
+		return ((long) next << REC_NEXT_SHIFT) //
+				| ((long) ptr << REC_PTR_SHIFT) //
+				| cnt;
 	}
 
-	private static int idxOf(long rec) {
-		return (int) rec;
+	private static int recNext(long rec) {
+		return (int) (rec >>> REC_NEXT_SHIFT);
 	}
 
-	private static int tableSize(final int worstCaseBlockCnt) {
-		int shift = 32 - Integer.numberOfLeadingZeros(worstCaseBlockCnt);
-		int sz = 1 << (shift - 1);
-		if (sz < worstCaseBlockCnt)
-			sz <<= 1;
-		return sz;
+	private static int recPtr(long rec) {
+		return ((int) (rec >>> REC_PTR_SHIFT)) & REC_PTR_MASK;
+	}
+
+	private static int recCnt(long rec) {
+		return ((int) rec) & REC_CNT_MASK;
+	}
+
+	private static int tableBits(final int sz) {
+		int bits = 31 - Integer.numberOfLeadingZeros(sz);
+		if (bits == 0)
+			bits = 1;
+		if (1 << bits < sz)
+			bits++;
+		return bits;
 	}
 }

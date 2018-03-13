@@ -48,8 +48,10 @@ import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
 
 public class HistogramDiffTest extends AbstractDiffTestCase {
 	@Override
-	protected DiffAlgorithm algorithm() {
-		return HistogramDiff.INSTANCE;
+	protected HistogramDiff algorithm() {
+		HistogramDiff hd = new HistogramDiff();
+		hd.setFallbackAlgorithm(null);
+		return hd;
 	}
 
 	public void testEdit_NoUniqueMiddleSide_FlipBlocks() {
@@ -72,12 +74,81 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		assertEquals(new Edit(3, 3, 2, 5), r.get(1)); // INSERT "SRR"
 	}
 
-	public void testPerformanceTestDeltaLength() {
+	public void testExceedsChainLenght_DuringScanOfA() {
+		HistogramDiff hd = new HistogramDiff();
+		hd.setFallbackAlgorithm(null);
+		hd.setMaxChainLength(3);
+
+		SequenceComparator<RawText> cmp = new SequenceComparator<RawText>() {
+			@Override
+			public boolean equals(RawText a, int ai, RawText b, int bi) {
+				return RawTextComparator.DEFAULT.equals(a, ai, b, bi);
+			}
+
+			@Override
+			public int hash(RawText a, int ai) {
+				return 1;
+			}
+		};
+
+		EditList r = hd.diff(cmp, t("RabS"), t("QabT"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(0, 4, 0, 4), r.get(0));
+	}
+
+	public void testExceedsChainLenght_DuringScanOfB() {
+		HistogramDiff hd = new HistogramDiff();
+		hd.setFallbackAlgorithm(null);
+		hd.setMaxChainLength(1);
+
+		EditList r = hd.diff(RawTextComparator.DEFAULT, t("RaaS"), t("QaaT"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(0, 4, 0, 4), r.get(0));
+	}
+
+	public void testFallbackToMyersDiff() {
+		HistogramDiff hd = new HistogramDiff();
+		hd.setMaxChainLength(64);
+
 		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
 		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharCmp cmp = new CharCmp();
 		CharArray ac = new CharArray(a);
 		CharArray bc = new CharArray(b);
-		EditList r = algorithm().diff(new CharCmp(), ac, bc);
+		EditList r;
+
+		// Without fallback our results are limited due to collisions.
+		hd.setFallbackAlgorithm(null);
+		r = hd.diff(cmp, ac, bc);
+		assertEquals(69, r.size());
+
+		// Results go when we add a fallback for the high collision regions.
+		hd.setFallbackAlgorithm(MyersDiff.INSTANCE);
+		r = hd.diff(cmp, ac, bc);
+		assertEquals(72, r.size());
+
+		// But they still differ from Myers due to the way we did early steps.
+		EditList myersResult = MyersDiff.INSTANCE.diff(cmp, ac, bc);
+		assertFalse("Not same as Myers", myersResult.equals(r));
+	}
+
+	public void testPerformanceTestDeltaLength() {
+		HistogramDiff hd = new HistogramDiff();
+		hd.setFallbackAlgorithm(null);
+
+		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
+		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharCmp cmp = new CharCmp();
+		CharArray ac = new CharArray(a);
+		CharArray bc = new CharArray(b);
+		EditList r;
+
+		hd.setMaxChainLength(64);
+		r = hd.diff(cmp, ac, bc);
+		assertEquals(69, r.size());
+
+		hd.setMaxChainLength(176);
+		r = hd.diff(cmp, ac, bc);
 		assertEquals(71, r.size());
 	}
 }
