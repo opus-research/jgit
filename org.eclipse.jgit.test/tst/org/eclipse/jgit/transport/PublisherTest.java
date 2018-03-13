@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
@@ -66,7 +67,6 @@ import org.eclipse.jgit.transport.SubscribeCommand.Command;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.junit.Before;
 import org.junit.Test;
 
 /** End-to-end stream emulation tests for Publisher and helper classes. */
@@ -89,10 +89,12 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 	Publisher publisher;
 
-	@Before
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+	volatile CountDownLatch connectLatch;
+
+	private void setUpPublisher(int expectedClients) {
+		// Every PublisherTestClient that is created makes 2 calls to
+		// connectClient.
+		connectLatch = new CountDownLatch(2 * expectedClients);
 		buffer = new PublisherBuffer(64 * 1024);
 		packFactory = new PublisherPackFactory(buffer);
 		packFactory.setSliceSize(1024);
@@ -113,7 +115,15 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			public String generate() {
 				return "fixed-session-id-" + sid.incrementAndGet();
 			}
-		});
+		}) {
+			@Override
+			public synchronized PublisherSession connectClient(
+					PublisherClient c) {
+				PublisherSession s = super.connectClient(c);
+				connectLatch.countDown();
+				return s;
+			}
+		};
 		buffer.startGC();
 	}
 
@@ -124,6 +134,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testSubscribe() throws Exception {
+		setUpPublisher(1);
 		PublisherClientTest pc = new PublisherClientTest(0) {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
@@ -139,7 +150,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			}
 		};
 
-		Thread.sleep(2000);
+		connectLatch.await();
 
 		assertEquals(pc.getPublisherState().getKey(), pc.getRestartToken());
 
@@ -191,6 +202,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testInitialUpdate() throws Exception {
+		setUpPublisher(1);
 		PublisherClientTest c = new PublisherClientTest(0) {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
@@ -205,6 +217,8 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				pckLineOut.writeString("done");
 			}
 		};
+
+		connectLatch.await();
 
 		// Wait for all buffers to be flushed and ready
 		Thread.sleep(2000);
@@ -243,6 +257,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 	private void runPackStreamTest(int clients, int updates, int update_size)
 			throws Exception {
+		setUpPublisher(clients);
 		List<ReceiveCommand> refUpdates = Collections.nCopies(update_size,
 				new ReceiveCommand(ObjectId.zeroId(), OBJECT_ID2, refName));
 
@@ -271,8 +286,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			states.add(t.getPublisherState());
 		}
 
-		// Wait for clients to subscribe
-		Thread.sleep(2000);
+		connectLatch.await();
 
 		for (int i = 0; i < updates; i++) {
 			Thread.sleep(500);
@@ -385,7 +399,6 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		public synchronized void close() {
 			// Nothing
 		}
-
 
 		protected abstract void writeSubscribePacket(PacketLineOut pckLineOut)
 				throws IOException;

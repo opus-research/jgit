@@ -71,8 +71,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PostReceiveHook;
-import org.eclipse.jgit.transport.PostReceiveHookChain;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
@@ -116,11 +114,8 @@ class ReceivePackServlet extends HttpServlet {
 	static class Factory implements Filter {
 		private final ReceivePackFactory<HttpServletRequest> receivePackFactory;
 
-		private PostReceiveHook postReceiveHook;
-
 		Factory(ReceivePackFactory<HttpServletRequest> receivePackFactory) {
 			this.receivePackFactory = receivePackFactory;
-			postReceiveHook = PostReceiveHook.NULL;
 		}
 
 		public void doFilter(ServletRequest request, ServletResponse response,
@@ -130,8 +125,6 @@ class ReceivePackServlet extends HttpServlet {
 			ReceivePack rp;
 			try {
 				rp = receivePackFactory.create(req, getRepository(req));
-				rp.setPostReceiveHook(PostReceiveHookChain.newChain(
-						postReceiveHook, rp.getPostReceiveHook()));
 			} catch (ServiceNotAuthorizedException e) {
 				rsp.sendError(SC_UNAUTHORIZED);
 				return;
@@ -155,13 +148,6 @@ class ReceivePackServlet extends HttpServlet {
 
 		public void destroy() {
 			// Nothing.
-		}
-
-		/**
-		 * @param hook
-		 */
-		public void setPostReceiveHook(PostReceiveHook hook) {
-			this.postReceiveHook = hook != null ? hook : PostReceiveHook.NULL;
 		}
 	}
 

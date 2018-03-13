@@ -61,11 +61,11 @@ public class PublisherPack {
 	private final long packNumber;
 
 	/** The Slices of data for this pack. This list will not change. */
-	private List<PublisherPackSlice> dataSlices;
+	private final List<PublisherPackSlice> dataSlices;
 
-	private Collection<ReceiveCommand> commands;
+	private final Collection<ReceiveCommand> commands;
 
-	private String repositoryName;
+	private final String repositoryName;
 
 	/**
 	 * @param name
