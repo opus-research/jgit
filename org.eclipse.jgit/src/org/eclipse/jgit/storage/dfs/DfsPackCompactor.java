@@ -283,7 +283,7 @@ public class DfsPackCompactor {
 
 	private void writePack(DfsObjDatabase objdb, DfsPackDescription pack,
 			PackWriter pw, ProgressMonitor pm) throws IOException {
-		DfsOutputStream out = objdb.writeFile(pack, DfsObjDatabase.PACK_EXT);
+		DfsOutputStream out = objdb.writePackFile(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writePack(pm, pm, cnt);
@@ -296,8 +296,7 @@ public class DfsPackCompactor {
 
 	private void writeIndex(DfsObjDatabase objdb, DfsPackDescription pack,
 			PackWriter pw) throws IOException {
-		DfsOutputStream out = objdb.writeFile(
-				pack, DfsObjDatabase.PACK_INDEX_EXT);
+		DfsOutputStream out = objdb.writePackIndex(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
