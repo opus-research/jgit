@@ -56,7 +56,6 @@ import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.diff.RawTextIgnoreAllWhitespace;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
@@ -77,9 +76,6 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--", metaVar = "metaVar_port", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;
-
-	@Option(name = "--ignore-all-whitespace")
-	private boolean ignoreAllWhitespace;
 
 	private DiffFormatter fmt = new DiffFormatter();
 
@@ -129,11 +125,7 @@ class Diff extends TextBuiltin {
 	private RawText getRawText(ObjectId id) throws IOException {
 		if (id.equals(ObjectId.zeroId()))
 			return new RawText(new byte[] { });
-		byte[] raw = db.openBlob(id).getCachedBytes();
-		if(ignoreAllWhitespace)
-			return new RawTextIgnoreAllWhitespace(raw);
-		else
-			return new RawText(raw);
+		return new RawText(db.openBlob(id).getCachedBytes());
 	}
 }
 

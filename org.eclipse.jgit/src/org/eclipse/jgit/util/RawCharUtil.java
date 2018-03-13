@@ -83,10 +83,11 @@ public class RawCharUtil {
 	 * @return the new end point
 	 */
 	public static int trimTrailingWhitespace(byte[] raw, int start, int end) {
-		while (end > start && isWhitespace(raw[end - 1]))
-			end--;
+		int ptr = end - 1;
+		while (start <= ptr && isWhitespace(raw[ptr]))
+			ptr--;
 
-		return end;
+		return ptr + 1;
 	}
 
 	/**
