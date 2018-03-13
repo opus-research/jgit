@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,76 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.submodule;
 
-package org.eclipse.jgit.revwalk;
+import org.eclipse.jgit.lib.ObjectId;
 
-import static org.junit.Assert.assertEquals;
+/**
+ * Status class containing the type, path, and commit id of the submodule.
+ */
+public class SubmoduleStatus {
 
-import org.junit.Test;
+	private final SubmoduleStatusType type;
 
-public class RevWalkCountTest extends RevWalkTestCase {
+	private final String path;
 
-	@Test
-	public void shouldWorkForNormalCase() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b = commit(a);
+	private final ObjectId indexId;
 
-		assertEquals(1, rw.count(b, a));
+	private final ObjectId headId;
+
+	/**
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
+	 */
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId) {
+		this(type, path, indexId, null);
 	}
 
-	@Test
-	public void shouldReturnZeroOnSameCommit() throws Exception {
-		final RevCommit c1 = commit(commit(commit()));
-		assertEquals(0, rw.count(c1, c1));
+	/**
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
+	 * @param headId
+	 */
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId, final ObjectId headId) {
+		this.type = type;
+		this.path = path;
+		this.indexId = indexId;
+		this.headId = headId;
 	}
 
-	@Test
-	public void shouldReturnZeroWhenMergedInto() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b = commit(a);
-
-		assertEquals(0, rw.count(a, b));
+	/**
+	 * @return type
+	 */
+	public SubmoduleStatusType getType() {
+		return type;
 	}
 
-	@Test
-	public void shouldWorkWithMerges() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b1 = commit(a);
-		final RevCommit b2 = commit(a);
-		final RevCommit c = commit(b1, b2);
-
-		assertEquals(3, rw.count(c, a));
+	/**
+	 * @return path
+	 */
+	public String getPath() {
+		return path;
 	}
 
-	@Test
-	public void shouldWorkWithoutCommonAncestor() throws Exception {
-		final RevCommit a1 = commit();
-		final RevCommit a2 = commit();
-		final RevCommit b = commit(a1);
-
-		assertEquals(2, rw.count(b, a2));
+	/**
+	 * @return index object id
+	 */
+	public ObjectId getIndexId() {
+		return indexId;
 	}
 
-	@Test
-	public void shouldWorkWithZeroAsEnd() throws Exception {
-		final RevCommit c = commit(commit());
-
-		assertEquals(2, rw.count(c, null));
+	/**
+	 * @return HEAD object id
+	 */
+	public ObjectId getHeadId() {
+		return headId;
 	}
 }

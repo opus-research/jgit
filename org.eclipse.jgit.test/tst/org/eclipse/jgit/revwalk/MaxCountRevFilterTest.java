@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,75 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertNull;
 
-import java.net.URISyntaxException;
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
+import org.junit.Test;
 
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
+public class MaxCountRevFilterTest extends RevWalkTestCase {
+	@Test
+	public void testMaxCountRevFilter() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c1 = commit(b);
+		final RevCommit c2 = commit(b);
+		final RevCommit d = commit(c1, c2);
+		final RevCommit e = commit(d);
 
-/**
- * Branch section of a Git configuration file.
- */
-public class BranchConfig {
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(3));
+		markStart(e);
+		assertCommit(e, rw.next());
+		assertCommit(d, rw.next());
+		assertCommit(c2, rw.next());
+		assertNull(rw.next());
 
-	private final Config config;
-	private final String branchName;
-
-	/**
-	 * Create a new branch config, which will read configuration from config
-	 * about specified branch.
-	 *
-	 * @param config
-	 *            the config to read from
-	 * @param branchName
-	 *            the short branch name of the section to read
-	 */
-	public BranchConfig(final Config config, String branchName) {
-		this.config = config;
-		this.branchName = branchName;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(e);
+		assertNull(rw.next());
 	}
 
-	/**
-	 * @return the full remote-tracking branch name or <code>null</code> if it
-	 *         could not be determined
-	 */
-	public String getRemoteTrackingBranch() {
-		String remote = getRemote();
-		String mergeRef = getMergeBranch();
-		if (remote == null || mergeRef == null)
-			return null;
+	@Test
+	public void testMaxCountRevFilter0() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-		RemoteConfig remoteConfig;
-		try {
-			remoteConfig = new RemoteConfig(config, remote);
-		} catch (URISyntaxException e) {
-			return null;
-		}
-		for (RefSpec refSpec : remoteConfig.getFetchRefSpecs()) {
-			if (refSpec.matchSource(mergeRef)) {
-				RefSpec expanded = refSpec.expandFromSource(mergeRef);
-				return expanded.getDestination();
-			}
-		}
-		return null;
-	}
-
-	private String getRemote() {
-		String remoteName = config.getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-				ConfigConstants.CONFIG_KEY_REMOTE);
-		if (remoteName == null)
-			return Constants.DEFAULT_REMOTE_NAME;
-		else
-			return remoteName;
-	}
-
-	private String getMergeBranch() {
-		String mergeRef = config.getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-				ConfigConstants.CONFIG_KEY_MERGE);
-		return mergeRef;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(b);
+		assertNull(rw.next());
 	}
 }
