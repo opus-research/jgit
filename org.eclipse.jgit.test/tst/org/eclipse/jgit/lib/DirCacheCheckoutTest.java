@@ -523,13 +523,13 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertConflict("DF/DF/DF/DF/DF");
 
 		// assertUpdated("DF/DF");
-								// Why do we expect an update on DF/DF. H==M,
-								// H&M are files and index contains a dir, index
-								// is dirty: that case is not in the table but
-								// we cannot update DF/DF to a file, this would
-								// require that we delete DF/DF/DF/DF/DF in workdir
-								// throwing away unsaved contents.
-								// This test would fail in DirCacheCheckoutTests.
+		// Why do we expect an update on DF/DF. H==M,
+		// H&M are files and index contains a dir, index
+		// is dirty: that case is not in the table but
+		// we cannot update DF/DF to a file, this would
+		// require that we delete DF/DF/DF/DF/DF in workdir
+		// throwing away unsaved contents.
+		// This test would fail in DirCacheCheckoutTests.
 	}
 
 	@Test
