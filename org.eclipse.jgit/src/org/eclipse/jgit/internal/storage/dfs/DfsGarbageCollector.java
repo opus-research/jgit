@@ -43,12 +43,9 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.COMPACT;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_REST;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_TXN;
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.INSERT;
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.RECEIVE;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
@@ -56,11 +53,8 @@ import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
-import java.util.GregorianCalendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -69,7 +63,6 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
-import org.eclipse.jgit.internal.storage.file.PackReverseIndex;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.internal.storage.reftree.RefTreeNames;
@@ -84,7 +77,6 @@ import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackStatistics;
-import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
 /** Repack and garbage collect a repository. */
@@ -103,8 +95,7 @@ public class DfsGarbageCollector {
 
 	private PackConfig packConfig;
 
-	// See packIsCoalesceableGarbage(), below, for how these two variables
-	// interact.
+	// See pack(), below, for how these two variables interact.
 	private long coalesceGarbageLimit = 50 << 20;
 	private long garbageTtlMillis = TimeUnit.DAYS.toMillis(1);
 
@@ -127,9 +118,9 @@ public class DfsGarbageCollector {
 		repo = repository;
 		refdb = repo.getRefDatabase();
 		objdb = repo.getObjectDatabase();
-		newPackDesc = new ArrayList<>(4);
-		newPackStats = new ArrayList<>(4);
-		newPackObj = new ArrayList<>(4);
+		newPackDesc = new ArrayList<DfsPackDescription>(4);
+		newPackStats = new ArrayList<PackStatistics>(4);
+		newPackObj = new ArrayList<ObjectIdSet>(4);
 
 		packConfig = new PackConfig(repo);
 		packConfig.setIndexVersion(2);
@@ -232,8 +223,14 @@ public class DfsGarbageCollector {
 		if (packConfig.getIndexVersion() != 2)
 			throw new IllegalStateException(
 					JGitText.get().supportOnlyPackIndexVersion2);
+		if (garbageTtlMillis > 0) {
+			// We disable coalescing because the coalescing step will keep
+			// refreshing the UNREACHABLE_GARBAGE pack and we wouldn't
+			// actually prune anything.
+			coalesceGarbageLimit = 0;
+		}
 
-		startTimeMillis = SystemReader.getInstance().getCurrentTime();
+		startTimeMillis = System.currentTimeMillis();
 		ctx = (DfsReader) objdb.newReader();
 		try {
 			refdb.refresh();
@@ -249,10 +246,10 @@ public class DfsGarbageCollector {
 				return true;
 			}
 
-			allHeads = new HashSet<>();
-			nonHeads = new HashSet<>();
-			txnHeads = new HashSet<>();
-			tagTargets = new HashSet<>();
+			allHeads = new HashSet<ObjectId>();
+			nonHeads = new HashSet<ObjectId>();
+			txnHeads = new HashSet<ObjectId>();
+			tagTargets = new HashSet<ObjectId>();
 			for (Ref ref : refsBefore) {
 				if (ref.isSymbolic() || ref.getObjectId() == null)
 					continue;
@@ -304,18 +301,18 @@ public class DfsGarbageCollector {
 
 	private void readPacksBefore() throws IOException {
 		DfsPackFile[] packs = objdb.getPacks();
-		packsBefore = new ArrayList<>(packs.length);
-		expiredGarbagePacks = new ArrayList<>(packs.length);
+		packsBefore = new ArrayList<DfsPackFile>(packs.length);
+		expiredGarbagePacks = new ArrayList<DfsPackFile>(packs.length);
 
 		long mostRecentGC = mostRecentGC(packs);
-		long now = SystemReader.getInstance().getCurrentTime();
+		long now = System.currentTimeMillis();
 		for (DfsPackFile p : packs) {
 			DfsPackDescription d = p.getPackDescription();
 			if (d.getPackSource() != UNREACHABLE_GARBAGE) {
 				packsBefore.add(p);
 			} else if (packIsExpiredGarbage(d, mostRecentGC, now)) {
 				expiredGarbagePacks.add(p);
-			} else if (packIsCoalesceableGarbage(d, now)) {
+			} else if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit) {
 				packsBefore.add(p);
 			}
 		}
@@ -358,68 +355,6 @@ public class DfsGarbageCollector {
 				&& now - d.getLastModified() >= garbageTtlMillis;
 	}
 
-	private boolean packIsCoalesceableGarbage(DfsPackDescription d, long now) {
-		// An UNREACHABLE_GARBAGE pack can be coalesced if its size is less than
-		// the coalesceGarbageLimit and either garbageTtl is zero or if the pack
-		// is created in a close time interval (on a single calendar day when
-		// the garbageTtl is more than one day or one third of the garbageTtl).
-		//
-		// When the garbageTtl is more than 24 hours, garbage packs that are
-		// created within a single calendar day are coalesced together. This
-		// would make the effective ttl of the garbage pack as garbageTtl+23:59
-		// and limit the number of garbage to a maximum number of
-		// garbageTtl_in_days + 1 (assuming all of them are less than the size
-		// of coalesceGarbageLimit).
-		//
-		// When the garbageTtl is less than or equal to 24 hours, garbage packs
-		// that are created within a one third of garbageTtl are coalesced
-		// together. This would make the effective ttl of the garbage packs as
-		// garbageTtl + (garbageTtl / 3) and would limit the number of garbage
-		// packs to a maximum number of 4 (assuming all of them are less than
-		// the size of coalesceGarbageLimit).
-
-		if (d.getPackSource() != UNREACHABLE_GARBAGE
-				|| d.getFileSize(PackExt.PACK) >= coalesceGarbageLimit) {
-			return false;
-		}
-
-		if (garbageTtlMillis == 0) {
-			return true;
-		}
-
-		long lastModified = d.getLastModified();
-		long dayStartLastModified = dayStartInMillis(lastModified);
-		long dayStartToday = dayStartInMillis(now);
-
-		if (dayStartLastModified != dayStartToday) {
-			return false; // this pack is not created today.
-		}
-
-		if (garbageTtlMillis > TimeUnit.DAYS.toMillis(1)) {
-			return true; // ttl is more than one day and pack is created today.
-		}
-
-		long timeInterval = garbageTtlMillis / 3;
-		if (timeInterval == 0) {
-			return false; // ttl is too small, don't try to coalesce.
-		}
-
-		long modifiedTimeSlot = (lastModified - dayStartLastModified) / timeInterval;
-		long presentTimeSlot = (now - dayStartToday) / timeInterval;
-		return modifiedTimeSlot == presentTimeSlot;
-	}
-
-	private static long dayStartInMillis(long timeInMillis) {
-		Calendar cal = new GregorianCalendar(
-				SystemReader.getInstance().getTimeZone());
-		cal.setTimeInMillis(timeInMillis);
-		cal.set(Calendar.HOUR_OF_DAY, 0);
-		cal.set(Calendar.MINUTE, 0);
-		cal.set(Calendar.SECOND, 0);
-		cal.set(Calendar.MILLISECOND, 0);
-		return cal.getTimeInMillis();
-	}
-
 	/** @return all of the source packs that fed into this compaction. */
 	public List<DfsPackDescription> getSourcePacks() {
 		return toPrune();
@@ -437,7 +372,7 @@ public class DfsGarbageCollector {
 
 	private List<DfsPackDescription> toPrune() {
 		int cnt = packsBefore.size();
-		List<DfsPackDescription> all = new ArrayList<>(cnt);
+		List<DfsPackDescription> all = new ArrayList<DfsPackDescription>(cnt);
 		for (DfsPackFile pack : packsBefore) {
 			all.add(pack.getPackDescription());
 		}
@@ -455,8 +390,7 @@ public class DfsGarbageCollector {
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
-				writePack(GC, pw, pm,
-						estimateGcPackSize(INSERT, RECEIVE, COMPACT, GC));
+				writePack(GC, pw, pm);
 		}
 	}
 
@@ -469,8 +403,7 @@ public class DfsGarbageCollector {
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
-				writePack(GC_REST, pw, pm,
-						estimateGcPackSize(INSERT, RECEIVE, COMPACT, GC_REST));
+				writePack(GC_REST, pw, pm);
 		}
 	}
 
@@ -483,7 +416,7 @@ public class DfsGarbageCollector {
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, txnHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
-				writePack(GC_TXN, pw, pm, 0 /* unknown pack size */);
+				writePack(GC_TXN, pw, pm);
 		}
 	}
 
@@ -499,29 +432,21 @@ public class DfsGarbageCollector {
 			pw.setDeltaBaseAsOffset(true);
 			pw.setReuseDeltaCommits(true);
 			pm.beginTask(JGitText.get().findingGarbage, objectsBefore());
-			long estimatedPackSize = 12 + 20; // header and trailer sizes.
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
-				PackReverseIndex oldRevIdx = oldPack.getReverseIdx(ctx);
-				long maxOffset = oldPack.getPackDescription().getFileSize(PACK)
-						- 20; // pack size - trailer size.
 				for (PackIndex.MutableEntry ent : oldIdx) {
 					pm.update(1);
 					ObjectId id = ent.toObjectId();
 					if (pool.lookupOrNull(id) != null || anyPackHas(id))
 						continue;
 
-					long offset = ent.getOffset();
-					int type = oldPack.getObjectType(ctx, offset);
+					int type = oldPack.getObjectType(ctx, ent.getOffset());
 					pw.addObject(pool.lookupAny(id, type));
-					long objSize = oldRevIdx.findNextOffset(offset, maxOffset)
-							- offset;
-					estimatedPackSize += objSize;
 				}
 			}
 			pm.endTask();
 			if (0 < pw.getObjectCount())
-				writePack(UNREACHABLE_GARBAGE, pw, pm, estimatedPackSize);
+				writePack(UNREACHABLE_GARBAGE, pw, pm);
 		}
 	}
 
@@ -554,24 +479,9 @@ public class DfsGarbageCollector {
 		return pw;
 	}
 
-	private long estimateGcPackSize(PackSource first, PackSource... rest) {
-		EnumSet<PackSource> sourceSet = EnumSet.of(first, rest);
-		// Every pack file contains 12 bytes of header and 20 bytes of trailer.
-		// Include the final pack file header and trailer size here and ignore
-		// the same from individual pack files.
-		long size = 32;
-		for (DfsPackDescription pack : getSourcePacks()) {
-			if (sourceSet.contains(pack.getPackSource())) {
-				size += pack.getFileSize(PACK) - 32;
-			}
-		}
-		return size;
-	}
-
 	private DfsPackDescription writePack(PackSource source, PackWriter pw,
-			ProgressMonitor pm, long estimatedPackSize) throws IOException {
-		DfsPackDescription pack = repo.getObjectDatabase().newPack(source,
-				estimatedPackSize);
+			ProgressMonitor pm) throws IOException {
+		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
 		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {

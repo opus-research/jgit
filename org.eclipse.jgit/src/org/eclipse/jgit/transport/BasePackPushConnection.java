@@ -152,7 +152,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		pushOptions = transport.getPushOptions();
 	}
 
-	@Override
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
@@ -162,7 +161,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	/**
 	 * @since 3.0
 	 */
-	@Override
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates, OutputStream outputStream)
 			throws TransportException {
@@ -328,8 +326,8 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 
 	private void writePack(final Map<String, RemoteRefUpdate> refUpdates,
 			final ProgressMonitor monitor) throws IOException {
-		Set<ObjectId> remoteObjects = new HashSet<>();
-		Set<ObjectId> newObjects = new HashSet<>();
+		Set<ObjectId> remoteObjects = new HashSet<ObjectId>();
+		Set<ObjectId> newObjects = new HashSet<ObjectId>();
 
 		try (final PackWriter writer = new PackWriter(transport.getPackConfig(),
 				local.newObjectReader())) {

@@ -71,7 +71,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.transport.FetchResult;
-import org.eclipse.jgit.transport.TagOpt;
 
 /**
  * The Pull command
@@ -92,8 +91,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	private String remoteBranchName;
 
 	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
-
-	private TagOpt tagOption;
 
 	/**
 	 * @param repo
@@ -197,7 +194,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 * @throws GitAPIException
 	 */
-	@Override
 	public PullResult call() throws GitAPIException,
 			WrongRepositoryStateException, InvalidConfigurationException,
 			DetachedHeadException, InvalidRemoteException, CanceledException,
@@ -276,8 +272,9 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 						JGitText.get().operationCanceled,
 						JGitText.get().pullTaskName));
 
-			FetchCommand fetch = new FetchCommand(repo).setRemote(remote)
-					.setProgressMonitor(monitor).setTagOpt(tagOption);
+			FetchCommand fetch = new FetchCommand(repo);
+			fetch.setRemote(remote);
+			fetch.setProgressMonitor(monitor);
 			configure(fetch);
 
 			fetchRes = fetch.call();
@@ -411,19 +408,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 */
 	public PullCommand setStrategy(MergeStrategy strategy) {
 		this.strategy = strategy;
-		return this;
-	}
-
-	/**
-	 * Sets the specification of annotated tag behavior during fetch
-	 *
-	 * @param tagOpt
-	 * @return {@code this}
-	 * @since 4.7
-	 */
-	public PullCommand setTagOpt(TagOpt tagOpt) {
-		checkCallable();
-		this.tagOption = tagOpt;
 		return this;
 	}
 
