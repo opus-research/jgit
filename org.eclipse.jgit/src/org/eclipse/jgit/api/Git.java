@@ -43,11 +43,7 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
 
 /**
  * Offers a "GitPorcelain"-like API to interact with a git repository.
@@ -84,30 +80,6 @@ public class Git {
 	private final Repository repo;
 
 	/**
-	 * @return a {@link Git} object for the existing git repository
-	 * @param gitDir
-	 *            {@code GIT_DIR}, the repository meta directory. Even for
-	 *            non-bare repositories the location of the .git folder has to
-	 *            be specified.
-	 * @throws IOException
-	 */
-	public static Git open(File gitDir) throws IOException {
-		Repository repo = new RepositoryBuilder().setGitDir(gitDir)
-				.setMustExist(true).build();
-		return new Git(repo);
-	}
-
-	/**
-	 * @return a {@link Git} object for the existing git repository
-	 * @param repo
-	 *            the git repository this class is interacting with.
-	 *            {@code null} is not allowed
-	 */
-	public static Git wrap(Repository repo) {
-		return new Git(repo);
-	}
-
-	/**
 	 * Returns a command object to execute a {@code clone} command
 	 *
 	 * @see <a
@@ -116,7 +88,7 @@ public class Git {
 	 * @return a {@link CloneCommand} used to collect all optional parameters
 	 *         and to finally execute the {@code clone} command
 	 */
-	public static CloneCommand cloneRepository() {
+	static public CloneCommand cloneRepository() {
 		return new CloneCommand();
 	}
 
