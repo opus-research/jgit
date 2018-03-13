@@ -349,6 +349,10 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 	}
 
 	private void writeReflog(List<ReceiveCommand> commands) {
+		if (getRefLogMessage() == null && !isRefLogIncludingResult()) {
+			return;
+		}
+
 		ReflogWriter w = refdb.getLogWriter();
 		for (ReceiveCommand cmd : commands) {
 			// Assume any pending commands have already been executed atomically.
@@ -366,12 +370,8 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				continue;
 			}
 
-			if (isRefLogDisabled(cmd)) {
-				continue;
-			}
-
-			String msg = getRefLogMessage(cmd);
-			if (isRefLogIncludingResult(cmd)) {
+			String msg = getRefLogMessage();
+			if (isRefLogIncludingResult()) {
 				String strResult = toResultString(cmd);
 				if (strResult != null) {
 					msg = msg.isEmpty()
