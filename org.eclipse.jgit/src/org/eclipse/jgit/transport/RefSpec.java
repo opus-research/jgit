@@ -453,7 +453,7 @@ public class RefSpec implements Serializable {
 			return false;
 		if (s.contains("//")) //$NON-NLS-1$
 			return false;
-		if (s.endsWith("/")) //$NON-NLS-1$
+		if (s.charAt(s.length() - 1) == '/')
 			return false;
 		int i = s.indexOf('*');
 		if (i != -1) {
