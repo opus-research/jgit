@@ -672,8 +672,6 @@ public class GC {
 				channel.close();
 			}
 
-			pw.prepareIndexBitmaps(pm, want);
-
 			// write the packindex
 			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);

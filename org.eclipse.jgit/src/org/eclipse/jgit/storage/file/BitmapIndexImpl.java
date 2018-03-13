@@ -363,7 +363,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 				public BitmapObject next() {
 					if (!hasNext())
 						throw new NoSuchElementException();
-					
+
 					int position = cached.next();
 					if (position < indexObjectCount) {
 						out.type = type;
