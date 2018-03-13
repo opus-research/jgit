@@ -309,7 +309,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @param b
 	 *            the other pack.
 	 */
-	@Override
 	public int compareTo(DfsPackDescription b) {
 		// Cluster by PackSource, pushing UNREACHABLE_GARBAGE to the end.
 		PackSource as = getPackSource();

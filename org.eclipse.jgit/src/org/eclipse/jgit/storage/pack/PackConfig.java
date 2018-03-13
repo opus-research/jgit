@@ -1044,7 +1044,6 @@ public class PackConfig {
 						getBitmapInactiveBranchAgeInDays()));
 	}
 
-	@Override
 	public String toString() {
 		final StringBuilder b = new StringBuilder();
 		b.append("maxDeltaDepth=").append(getMaxDeltaDepth()); //$NON-NLS-1$

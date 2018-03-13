@@ -107,7 +107,6 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		return rng;
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -121,7 +120,6 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)

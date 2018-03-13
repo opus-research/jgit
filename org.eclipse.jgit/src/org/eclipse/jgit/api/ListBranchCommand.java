@@ -101,7 +101,6 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 		super(repo);
 	}
 
-	@Override
 	public List<Ref> call() throws GitAPIException {
 		checkCallable();
 		List<Ref> resultRefs;
@@ -127,7 +126,6 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 		}
 
 		Collections.sort(resultRefs, new Comparator<Ref>() {
-			@Override
 			public int compare(Ref o1, Ref o2) {
 				return o1.getName().compareTo(o2.getName());
 			}
