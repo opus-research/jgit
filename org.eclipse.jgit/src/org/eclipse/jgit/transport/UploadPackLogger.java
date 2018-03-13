@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,39 +41,24 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.transport;
 
-import javax.servlet.http.HttpServletRequest;
+import org.eclipse.jgit.storage.pack.PackWriter;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.UploadPack;
-
-/** Create and configure {@link UploadPack} service instance. */
-public interface UploadPackFactory {
-	/** A factory disabling the UploadPack service for all repositories. */
-	public static final UploadPackFactory DISABLED = new UploadPackFactory() {
-		public UploadPack create(HttpServletRequest req, Repository db)
-				throws ServiceNotEnabledException {
-			throw new ServiceNotEnabledException();
-		}
-	};
-
+/**
+ * Logs activity that occurred within {@link UploadPack}.
+ * <p>
+ * Implementors of the interface are responsible for associating the current
+ * thread to a particular connection, if they need to also include connection
+ * information. One method is to use a {@link java.lang.ThreadLocal} to remember
+ * the connection information before invoking UploadPack.
+ */
+public interface UploadPackLogger {
 	/**
-	 * Create and configure a new UploadPack instance for a repository.
+	 * Notice to the logger after a pack has been sent.
 	 *
-	 * @param req
-	 *            current HTTP request, in case information from the request may
-	 *            help configure the UploadPack instance.
-	 * @param db
-	 *            the repository the upload would read from.
-	 * @return the newly configured UploadPack instance, must not be null.
-	 * @throws ServiceNotEnabledException
-	 *             this factory refuses to create the instance because it is not
-	 *             allowed on the target repository, by any user.
-	 * @throws ServiceNotAuthorizedException
-	 *             this factory refuses to create the instance for this HTTP
-	 *             request and repository, such as due to a permission error.
+	 * @param stats
+	 *            the statistics after sending a pack to the client.
 	 */
-	UploadPack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
+	public void onPackStatistics(PackWriter.Statistics stats);
 }
