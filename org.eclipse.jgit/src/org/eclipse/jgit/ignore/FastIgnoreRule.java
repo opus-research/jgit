@@ -188,14 +188,6 @@ public class FastIgnoreRule {
 		return !inverse;
 	}
 
-	/**
-	 * @return true if the rule never matches (comment line or broken pattern)
-	 * @since 4.1
-	 */
-	public boolean isEmpty() {
-		return matcher == NO_MATCH;
-	}
-
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();

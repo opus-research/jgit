@@ -110,10 +110,7 @@ public class IgnoreNode {
 		String txt;
 		while ((txt = br.readLine()) != null) {
 			if (txt.length() > 0 && !txt.startsWith("#") && !txt.equals("/")) { //$NON-NLS-1$ //$NON-NLS-2$
-				FastIgnoreRule rule = new FastIgnoreRule(txt);
-				if (!rule.isEmpty()) {
-					rules.add(rule);
-				}
+				rules.add(new FastIgnoreRule(txt));
 			}
 		}
 	}
