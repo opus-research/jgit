@@ -57,8 +57,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
+import org.eclipse.jgit.gitrepo.RepoProject.LinkFile;
+import org.eclipse.jgit.gitrepo.RepoProject.ReferenceFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
@@ -77,7 +80,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
  */
 public class ManifestParser extends DefaultHandler {
 	private final String filename;
-	private final String baseUrl;
+	private final URI baseUrl;
 	private final String defaultBranch;
 	private final Repository rootRepo;
 	private final Map<String, Remote> remotes;
@@ -124,15 +127,10 @@ public class ManifestParser extends DefaultHandler {
 		this.filename = filename;
 		this.defaultBranch = defaultBranch;
 		this.rootRepo = rootRepo;
+		this.baseUrl = normalizeEmptyPath(URI.create(baseUrl));
 
-		// Strip trailing /s to match repo behavior.
-		int lastIndex = baseUrl.length() - 1;
-		while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-			lastIndex--;
-		this.baseUrl = baseUrl.substring(0, lastIndex + 1);
-
-		plusGroups = new HashSet<String>();
-		minusGroups = new HashSet<String>();
+		plusGroups = new HashSet<>();
+		minusGroups = new HashSet<>();
 		if (groups == null || groups.length() == 0
 				|| groups.equals("default")) { //$NON-NLS-1$
 			// default means "all,-notdefault"
@@ -146,9 +144,9 @@ public class ManifestParser extends DefaultHandler {
 			}
 		}
 
-		remotes = new HashMap<String, Remote>();
-		projects = new ArrayList<RepoProject>();
-		filteredProjects = new ArrayList<RepoProject>();
+		remotes = new HashMap<>();
+		projects = new ArrayList<>();
+		filteredProjects = new ArrayList<>();
 	}
 
 	/**
@@ -213,12 +211,24 @@ public class ManifestParser extends DefaultHandler {
 						currentProject.getPath(),
 						attributes.getValue("src"), //$NON-NLS-1$
 						attributes.getValue("dest"))); //$NON-NLS-1$
+		} else if ("linkfile".equals(qName)) { //$NON-NLS-1$
+			if (currentProject == null) {
+				throw new SAXException(RepoText.get().invalidManifest);
+			}
+			currentProject.addLinkFile(new LinkFile(
+						rootRepo,
+						currentProject.getPath(),
+						attributes.getValue("src"), //$NON-NLS-1$
+						attributes.getValue("dest"))); //$NON-NLS-1$
 		} else if ("include".equals(qName)) { //$NON-NLS-1$
 			String name = attributes.getValue("name"); //$NON-NLS-1$
-			InputStream is = null;
 			if (includedReader != null) {
-				try {
-					is = includedReader.readIncludeFile(name);
+				try (InputStream is = includedReader.readIncludeFile(name)) {
+					if (is == null) {
+						throw new SAXException(
+								RepoText.get().errorIncludeNotImplemented);
+					}
+					read(is);
 				} catch (Exception e) {
 					throw new SAXException(MessageFormat.format(
 							RepoText.get().errorIncludeFile, name), e);
@@ -226,21 +236,12 @@ public class ManifestParser extends DefaultHandler {
 			} else if (filename != null) {
 				int index = filename.lastIndexOf('/');
 				String path = filename.substring(0, index + 1) + name;
-				try {
-					is = new FileInputStream(path);
+				try (InputStream is = new FileInputStream(path)) {
+					read(is);
 				} catch (IOException e) {
 					throw new SAXException(MessageFormat.format(
 							RepoText.get().errorIncludeFile, path), e);
 				}
-			}
-			if (is == null) {
-				throw new SAXException(
-						RepoText.get().errorIncludeNotImplemented);
-			}
-			try {
-				read(is);
-			} catch (IOException e) {
-				throw new SAXException(e);
 			}
 		}
 	}
@@ -263,13 +264,7 @@ public class ManifestParser extends DefaultHandler {
 			return;
 
 		// Only do the following after we finished reading everything.
-		Map<String, String> remoteUrls = new HashMap<String, String>();
-		URI baseUri;
-		try {
-			baseUri = new URI(baseUrl);
-		} catch (URISyntaxException e) {
-			throw new SAXException(e);
-		}
+		Map<String, URI> remoteUrls = new HashMap<>();
 		if (defaultRevision == null && defaultRemote != null) {
 			Remote remote = remotes.get(defaultRemote);
 			if (remote != null) {
@@ -299,21 +294,40 @@ public class ManifestParser extends DefaultHandler {
 					revision = r.revision;
 				}
 			}
-			String remoteUrl = remoteUrls.get(remote);
+			URI remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				remoteUrl =
-						baseUri.resolve(remotes.get(remote).fetch).toString();
-				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
-					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
+				String fetch = remotes.get(remote).fetch;
+				if (fetch == null) {
+					throw new SAXException(MessageFormat
+							.format(RepoText.get().errorNoFetch, remote));
+				}
+				remoteUrl = normalizeEmptyPath(baseUrl.resolve(fetch));
 				remoteUrls.put(remote, remoteUrl);
 			}
-			proj.setUrl(remoteUrl + proj.getName())
-					.setDefaultRevision(revision);
+			proj.setUrl(remoteUrl.resolve(proj.getName()).toString())
+				.setDefaultRevision(revision);
 		}
 
 		filteredProjects.addAll(projects);
 		removeNotInGroup();
 		removeOverlaps();
+	}
+
+	static URI normalizeEmptyPath(URI u) {
+		// URI.create("scheme://host").resolve("a/b") => "scheme://hosta/b"
+		// That seems like bug https://bugs.openjdk.java.net/browse/JDK-4666701.
+		// We workaround this by special casing the empty path case.
+		if (u.getHost() != null && !u.getHost().isEmpty() &&
+			(u.getPath() == null || u.getPath().isEmpty())) {
+			try {
+				return new URI(u.getScheme(),
+					u.getUserInfo(), u.getHost(), u.getPort(),
+						"/", u.getQuery(), u.getFragment()); //$NON-NLS-1$
+			} catch (URISyntaxException x) {
+				throw new IllegalArgumentException(x.getMessage(), x);
+			}
+		}
+		return u;
 	}
 
 	/**
@@ -330,7 +344,7 @@ public class ManifestParser extends DefaultHandler {
 	 *
 	 * @return filtered projects list reference, never null
 	 */
-	public List<RepoProject> getFilteredProjects() {
+	public @NonNull List<RepoProject> getFilteredProjects() {
 		return filteredProjects;
 	}
 
@@ -356,17 +370,23 @@ public class ManifestParser extends DefaultHandler {
 			else
 				last = p;
 		}
-		removeNestedCopyfiles();
+		removeNestedCopyAndLinkfiles();
 	}
 
-	/** Remove copyfiles that sit in a subdirectory of any other project. */
-	void removeNestedCopyfiles() {
+	private void removeNestedCopyAndLinkfiles() {
 		for (RepoProject proj : filteredProjects) {
 			List<CopyFile> copyfiles = new ArrayList<>(proj.getCopyFiles());
 			proj.clearCopyFiles();
 			for (CopyFile copyfile : copyfiles) {
-				if (!isNestedCopyfile(copyfile)) {
+				if (!isNestedReferencefile(copyfile)) {
 					proj.addCopyFile(copyfile);
+				}
+			}
+			List<LinkFile> linkfiles = new ArrayList<>(proj.getLinkFiles());
+			proj.clearLinkFiles();
+			for (LinkFile linkfile : linkfiles) {
+				if (!isNestedReferencefile(linkfile)) {
+					proj.addLinkFile(linkfile);
 				}
 			}
 		}
@@ -390,18 +410,18 @@ public class ManifestParser extends DefaultHandler {
 		return false;
 	}
 
-	private boolean isNestedCopyfile(CopyFile copyfile) {
-		if (copyfile.dest.indexOf('/') == -1) {
-			// If the copyfile is at root level then it won't be nested.
+	private boolean isNestedReferencefile(ReferenceFile referencefile) {
+		if (referencefile.dest.indexOf('/') == -1) {
+			// If the referencefile is at root level then it won't be nested.
 			return false;
 		}
 		for (RepoProject proj : filteredProjects) {
-			if (proj.getPath().compareTo(copyfile.dest) > 0) {
+			if (proj.getPath().compareTo(referencefile.dest) > 0) {
 				// Early return as remaining projects can't be ancestor of this
-				// copyfile config (filteredProjects is sorted).
+				// referencefile config (filteredProjects is sorted).
 				return false;
 			}
-			if (proj.isAncestorOf(copyfile.dest)) {
+			if (proj.isAncestorOf(referencefile.dest)) {
 				return true;
 			}
 		}

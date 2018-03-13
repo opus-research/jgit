@@ -82,9 +82,13 @@ import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.util.FileUtils;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class T0003_BasicTest extends SampleDataRepositoryTestCase {
+	@Rule
+	public ExpectedException expectedException = ExpectedException.none();
 
 	@Test
 	public void test001_Initalize() {
@@ -323,6 +327,17 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 				new File(db.getDirectory(), "objects"), "4b"),
 				"825dc642cb6eb9a060e54bf8d69288fbee4904");
 		assertFalse("Exists " + o, o.isFile());
+	}
+
+	@Test
+	public void test002_CreateBadTree() throws Exception {
+		// We won't create a tree entry with an empty filename
+		//
+		expectedException.expect(IllegalArgumentException.class);
+		expectedException.expectMessage(JGitText.get().invalidTreeZeroLengthName);
+		final TreeFormatter formatter = new TreeFormatter();
+		formatter.append("", FileMode.TREE,
+				ObjectId.fromString("4b825dc642cb6eb9a060e54bf8d69288fbee4904"));
 	}
 
 	@Test
@@ -646,33 +661,39 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void test028_LockPackedRef() throws IOException {
+		ObjectId id1;
+		ObjectId id2;
+		try (ObjectInserter ins = db.newObjectInserter()) {
+			id1 = ins.insert(
+					Constants.OBJ_BLOB, "contents1".getBytes(Constants.CHARSET));
+			id2 = ins.insert(
+					Constants.OBJ_BLOB, "contents2".getBytes(Constants.CHARSET));
+			ins.flush();
+		}
+
 		writeTrashFile(".git/packed-refs",
-				"7f822839a2fe9760f386cbbbcb3f92c5fe81def7 refs/heads/foobar");
+				id1.name() + " refs/heads/foobar");
 		writeTrashFile(".git/HEAD", "ref: refs/heads/foobar\n");
 		BUG_WorkAroundRacyGitIssues("packed-refs");
 		BUG_WorkAroundRacyGitIssues("HEAD");
 
 		ObjectId resolve = db.resolve("HEAD");
-		assertEquals("7f822839a2fe9760f386cbbbcb3f92c5fe81def7", resolve.name());
+		assertEquals(id1, resolve);
 
 		RefUpdate lockRef = db.updateRef("HEAD");
-		ObjectId newId = ObjectId
-				.fromString("07f822839a2fe9760f386cbbbcb3f92c5fe81def");
-		lockRef.setNewObjectId(newId);
+		lockRef.setNewObjectId(id2);
 		assertEquals(RefUpdate.Result.FORCED, lockRef.forceUpdate());
 
 		assertTrue(new File(db.getDirectory(), "refs/heads/foobar").exists());
-		assertEquals(newId, db.resolve("refs/heads/foobar"));
+		assertEquals(id2, db.resolve("refs/heads/foobar"));
 
 		// Again. The ref already exists
 		RefUpdate lockRef2 = db.updateRef("HEAD");
-		ObjectId newId2 = ObjectId
-				.fromString("7f822839a2fe9760f386cbbbcb3f92c5fe81def7");
-		lockRef2.setNewObjectId(newId2);
+		lockRef2.setNewObjectId(id1);
 		assertEquals(RefUpdate.Result.FORCED, lockRef2.forceUpdate());
 
 		assertTrue(new File(db.getDirectory(), "refs/heads/foobar").exists());
-		assertEquals(newId2, db.resolve("refs/heads/foobar"));
+		assertEquals(id1, db.resolve("refs/heads/foobar"));
 	}
 
 	@Test

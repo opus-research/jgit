@@ -56,7 +56,6 @@ import java.util.ArrayList;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * A fully buffered output stream.
@@ -326,7 +325,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		if (blocks != null)
 			blocks.clear();
 		else
-			blocks = new ArrayList<Block>(initialBlocks);
+			blocks = new ArrayList<>(initialBlocks);
 		blocks.add(new Block(Math.min(inCoreLimit, Block.SZ)));
 	}
 
@@ -360,10 +359,11 @@ public abstract class TemporaryBuffer extends OutputStream {
 			overflow.write(b.buffer, 0, b.count);
 		blocks = null;
 
-		overflow = new SafeBufferedOutputStream(overflow, Block.SZ);
+		overflow = new BufferedOutputStream(overflow, Block.SZ);
 		overflow.write(last.buffer, 0, last.count);
 	}
 
+	@Override
 	public void close() throws IOException {
 		if (overflow != null) {
 			try {
@@ -442,11 +442,13 @@ public abstract class TemporaryBuffer extends OutputStream {
 			this.directory = directory;
 		}
 
+		@Override
 		protected OutputStream overflow() throws IOException {
 			onDiskFile = File.createTempFile("jgit_", ".buf", directory); //$NON-NLS-1$ //$NON-NLS-2$
 			return new BufferedOutputStream(new FileOutputStream(onDiskFile));
 		}
 
+		@Override
 		public long length() {
 			if (onDiskFile == null) {
 				return super.length();
@@ -454,6 +456,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 			return onDiskFile.length();
 		}
 
+		@Override
 		public byte[] toByteArray() throws IOException {
 			if (onDiskFile == null) {
 				return super.toByteArray();
@@ -472,6 +475,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 			return out;
 		}
 
+		@Override
 		public void writeTo(final OutputStream os, ProgressMonitor pm)
 				throws IOException {
 			if (onDiskFile == null) {
