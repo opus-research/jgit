@@ -59,8 +59,6 @@ import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 
-import org.eclipse.jgit.annotations.Nullable;
-
 /**
  * The interface of connections used during HTTP communication. This interface
  * is that subset of the interface exposed by {@link HttpURLConnection} which is
@@ -265,7 +263,7 @@ public interface HttpConnection {
 	 * @throws KeyManagementException
 	 */
 	public void configure(KeyManager[] km, TrustManager[] tm,
-			@Nullable SecureRandom random) throws NoSuchAlgorithmException,
+			SecureRandom random) throws NoSuchAlgorithmException,
 			KeyManagementException;
 
 	/**

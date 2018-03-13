@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.util;
 
-import static java.util.Objects.requireNonNull;
-
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
@@ -52,7 +50,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -110,7 +107,6 @@ public class RefMap extends AbstractMap<String, Ref> {
 
 	boolean sizeIsValid;
 
-	@Nullable
 	private Set<Entry<String, Ref>> entrySet;
 
 	/** Construct an empty map with a small initial capacity. */
@@ -150,14 +146,13 @@ public class RefMap extends AbstractMap<String, Ref> {
 	}
 
 	@Override
-	public boolean containsKey(@Nullable Object name) {
+	public boolean containsKey(Object name) {
 		return get(name) != null;
 	}
 
 	@Override
-	@Nullable
-	public Ref get(@Nullable Object key) {
-		String name = toRefName((String) requireNonNull(key));
+	public Ref get(Object key) {
+		String name = toRefName((String) key);
 		Ref ref = resolved.get(name);
 		if (ref == null)
 			ref = loose.get(name);
@@ -167,7 +162,6 @@ public class RefMap extends AbstractMap<String, Ref> {
 	}
 
 	@Override
-	@Nullable
 	public Ref put(final String keyName, Ref value) {
 		String name = toRefName(keyName);
 
@@ -196,9 +190,8 @@ public class RefMap extends AbstractMap<String, Ref> {
 	}
 
 	@Override
-	@Nullable
-	public Ref remove(@Nullable Object key) {
-		String name = toRefName((String) requireNonNull(key));
+	public Ref remove(Object key) {
+		String name = toRefName((String) key);
 		Ref res = null;
 		int idx;
 		if (0 <= (idx = packed.find(name))) {
@@ -301,7 +294,6 @@ public class RefMap extends AbstractMap<String, Ref> {
 
 		private int resolvedIdx;
 
-		@Nullable
 		private Entry<String, Ref> next;
 
 		SetIterator() {
@@ -322,12 +314,11 @@ public class RefMap extends AbstractMap<String, Ref> {
 			if (hasNext()) {
 				Entry<String, Ref> r = next;
 				next = peek();
-				return requireNonNull(r);
+				return r;
 			}
 			throw new NoSuchElementException();
 		}
 
-		@Nullable
 		public Entry<String, Ref> peek() {
 			if (packedIdx < packed.size() && looseIdx < loose.size()) {
 				Ref p = packed.get(packedIdx);
@@ -367,7 +358,6 @@ public class RefMap extends AbstractMap<String, Ref> {
 			return l;
 		}
 
-		@Nullable
 		private Ent toEntry(Ref p) {
 			if (p.getName().startsWith(prefix))
 				return new Ent(p);
@@ -397,11 +387,10 @@ public class RefMap extends AbstractMap<String, Ref> {
 			return ref;
 		}
 
-		@Override
 		public Ref setValue(Ref value) {
 			Ref prior = put(getKey(), value);
 			ref = value;
-			return requireNonNull(prior);
+			return prior;
 		}
 
 		@Override
@@ -410,7 +399,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 		}
 
 		@Override
-		public boolean equals(@Nullable Object obj) {
+		public boolean equals(Object obj) {
 			if (obj instanceof Map.Entry) {
 				final Object key = ((Map.Entry) obj).getKey();
 				final Object val = ((Map.Entry) obj).getValue();

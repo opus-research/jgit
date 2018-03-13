@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.util;
 
-import static java.util.Objects.requireNonNull;
-
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -55,7 +53,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -72,7 +69,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 	protected static final int DEFAULT_IN_CORE_LIMIT = 1024 * 1024;
 
 	/** Chain of data, if we are still completely in-core; otherwise null. */
-	@Nullable
 	ArrayList<Block> blocks;
 
 	/**
@@ -87,7 +83,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 	private int initialBlocks;
 
 	/** If {@link #inCoreLimit} has been reached, remainder goes here. */
-	@Nullable
 	private OutputStream overflow;
 
 	/**
@@ -112,7 +107,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 *            overflow output path.
 	 * @since 4.0
 	 */
-	@SuppressWarnings("method.invocation.invalid")
 	protected TemporaryBuffer(final int estimatedSize, final int limit) {
 		if (estimatedSize > limit)
 			throw new IllegalArgumentException();
@@ -163,7 +157,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		}
 
 		if (len > 0)
-			requireNonNull(overflow).write(b, off, len);
+			overflow.write(b, off, len);
 	}
 
 	/**
@@ -206,11 +200,10 @@ public abstract class TemporaryBuffer extends OutputStream {
 			}
 		}
 
-		OutputStream stream = requireNonNull(overflow);
 		final byte[] tmp = new byte[Block.SZ];
 		int n;
 		while ((n = in.read(tmp)) > 0)
-			stream.write(tmp, 0, n);
+			overflow.write(tmp, 0, n);
 	}
 
 	/**
@@ -246,7 +239,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 			throw new OutOfMemoryError(JGitText.get().lengthExceedsMaximumArraySize);
 		final byte[] out = new byte[(int) len];
 		int outPtr = 0;
-		for (final Block b : requireNonNull(blocks)) {
+		for (final Block b : blocks) {
 			System.arraycopy(b.buffer, 0, out, outPtr, b.count);
 			outPtr += b.count;
 		}
@@ -277,7 +270,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 					JGitText.get().lengthExceedsMaximumArraySize);
 		final byte[] out = new byte[(int) len];
 		int outPtr = 0;
-		for (final Block b : requireNonNull(blocks)) {
+		for (final Block b : blocks) {
 			System.arraycopy(b.buffer, 0, out, outPtr, b.count);
 			outPtr += b.count;
 		}
@@ -304,7 +297,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 			throws IOException {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
-		for (final Block b : requireNonNull(blocks)) {
+		for (final Block b : blocks) {
 			os.write(b.buffer, 0, b.count);
 			pm.update(b.count / 1024);
 		}
@@ -348,7 +341,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 	protected abstract OutputStream overflow() throws IOException;
 
 	private Block last() {
-		return requireNonNull(blocks).get(blocks.size() - 1);
+		return blocks.get(blocks.size() - 1);
 	}
 
 	private boolean reachedInCoreLimit() throws IOException {
@@ -360,18 +353,15 @@ public abstract class TemporaryBuffer extends OutputStream {
 	}
 
 	private void switchToOverflow() throws IOException {
-		OutputStream stream = overflow();
-		overflow = stream;
+		overflow = overflow();
 
-		requireNonNull(blocks);
 		final Block last = blocks.remove(blocks.size() - 1);
 		for (final Block b : blocks)
-			stream.write(b.buffer, 0, b.count);
+			overflow.write(b.buffer, 0, b.count);
 		blocks = null;
 
-		stream = new SafeBufferedOutputStream(stream, Block.SZ);
-		stream.write(last.buffer, 0, last.count);
-		overflow = stream;
+		overflow = new SafeBufferedOutputStream(overflow, Block.SZ);
+		overflow.write(last.buffer, 0, last.count);
 	}
 
 	public void close() throws IOException {
@@ -411,7 +401,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 */
 	public static class LocalFile extends TemporaryBuffer {
 		/** Directory to store the temporary file under. */
-		@Nullable
 		private final File directory;
 
 		/**
@@ -421,7 +410,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 * and created this file instead. All output goes here through
 		 * {@link #overflow}.
 		 */
-		@Nullable
 		private File onDiskFile;
 
 		/**
@@ -433,7 +421,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 *            system default temporary directory (for example /tmp) will
 		 *            be used instead.
 		 */
-		public LocalFile(final @Nullable File directory) {
+		public LocalFile(final File directory) {
 			this(directory, DEFAULT_IN_CORE_LIMIT);
 		}
 
@@ -449,7 +437,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 *            maximum number of bytes to store in memory. Storage beyond
 		 *            this limit will use the local file.
 		 */
-		public LocalFile(final @Nullable File directory, final int inCoreLimit) {
+		public LocalFile(final File directory, final int inCoreLimit) {
 			super(inCoreLimit);
 			this.directory = directory;
 		}
@@ -474,8 +462,8 @@ public abstract class TemporaryBuffer extends OutputStream {
 			final long len = length();
 			if (Integer.MAX_VALUE < len)
 				throw new OutOfMemoryError(JGitText.get().lengthExceedsMaximumArraySize);
-			final FileInputStream in = new FileInputStream(requireNonNull(onDiskFile));
 			final byte[] out = new byte[(int) len];
+			final FileInputStream in = new FileInputStream(onDiskFile);
 			try {
 				IO.readFully(in, out, 0, (int) len);
 			} finally {
@@ -589,13 +577,13 @@ public abstract class TemporaryBuffer extends OutputStream {
 	}
 
 	private class BlockInputStream extends InputStream {
-		private byte @Nullable [] singleByteBuffer;
+		private byte[] singleByteBuffer;
 		private int blockIndex;
 		private Block block;
 		private int blockPos;
 
 		BlockInputStream() {
-			block = requireNonNull(blocks).get(blockIndex);
+			block = blocks.get(blockIndex);
 		}
 
 		@Override
@@ -645,7 +633,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 		}
 
 		private boolean nextBlock() {
-			requireNonNull(blocks);
 			if (++blockIndex < blocks.size()) {
 				block = blocks.get(blockIndex);
 				blockPos = 0;

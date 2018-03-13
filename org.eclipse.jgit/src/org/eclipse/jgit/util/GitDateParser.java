@@ -52,7 +52,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 
 /**
@@ -73,7 +72,6 @@ public class GitDateParser {
 	// Since SimpleDateFormat instances are expensive to instantiate they should
 	// be cached. Since they are also not threadsafe they are cached using
 	// ThreadLocal.
-	@SuppressWarnings("type.argument.type.incompatible")
 	private static ThreadLocal<Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>> formatCache =
 			new ThreadLocal<Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>>() {
 
@@ -249,7 +247,6 @@ public class GitDateParser {
 	}
 
 	// tries to parse a string with a relative time specification
-	@Nullable
 	private static Date parse_relative(String dateStr, Calendar now) {
 		Calendar cal;
 		SystemReader sysRead = SystemReader.getInstance();
