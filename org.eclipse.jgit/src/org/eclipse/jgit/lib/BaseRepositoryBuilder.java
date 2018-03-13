@@ -177,12 +177,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 * @return {@code this} (for chaining calls).
 	 */
 	public B setGitDir(File gitDir) {
-		// Handle the case where .git is a git file symRef, but only
-		// once as it's not allowed to point to another git file,
-		// but only a proper git directory.
-		if (gitDir.isFile()) {
-			gitDir = getSymRef(gitDir.getParentFile(), gitDir, safeFS());
-		}
 		this.gitDir = gitDir;
 		this.config = null;
 		return self();
@@ -603,10 +597,14 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 *             the repository could not be accessed
 	 */
 	protected void setupGitDir() throws IOException {
-		// No gitDir? Try to assume its under the workTree
+		// No gitDir? Try to assume its under the workTree or a ref to another
+		// location
 		if (getGitDir() == null && getWorkTree() != null) {
 			File dotGit = new File(getWorkTree(), DOT_GIT);
-			setGitDir(dotGit);
+			if (!dotGit.isFile())
+				setGitDir(dotGit);
+			else
+				setGitDir(getSymRef(getWorkTree(), dotGit, safeFS()));
 		}
 	}
 
