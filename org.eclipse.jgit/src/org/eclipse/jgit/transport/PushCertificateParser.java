@@ -54,7 +54,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
@@ -184,7 +183,7 @@ public class PushCertificateParser {
 		if (s.length() <= header.length()
 				|| !s.startsWith(header)
 				|| s.charAt(header.length()) != ' ') {
-			throw new PackProtocolException(MessageFormat.format(
+			throw new IOException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidHeader, header));
 		}
 		return s.substring(header.length() + 1);
@@ -215,13 +214,13 @@ public class PushCertificateParser {
 		try {
 			version = parseHeader(pckIn, VERSION);
 			if (!version.equals(VERSION_0_1)) {
-				throw new PackProtocolException(MessageFormat.format(
+				throw new IOException(MessageFormat.format(
 						JGitText.get().pushCertificateInvalidFieldValue, VERSION, version));
 			}
 			String pusherStr = parseHeader(pckIn, PUSHER);
 			pusher = RawParseUtils.parsePersonIdent(pusherStr);
 			if (pusher == null) {
-				throw new PackProtocolException(MessageFormat.format(
+				throw new IOException(MessageFormat.format(
 						JGitText.get().pushCertificateInvalidFieldValue,
 						PUSHER, pusherStr));
 			}
@@ -229,11 +228,11 @@ public class PushCertificateParser {
 			receivedNonce = parseHeader(pckIn, NONCE);
 			// An empty line.
 			if (!pckIn.readString().isEmpty()) {
-				throw new PackProtocolException(
+				throw new IOException(
 						JGitText.get().pushCertificateInvalidHeader);
 			}
 		} catch (EOFException eof) {
-			throw new PackProtocolException(
+			throw new IOException(
 					JGitText.get().pushCertificateInvalidHeader, eof);
 		}
 		nonceStatus = nonceGenerator != null
@@ -265,11 +264,10 @@ public class PushCertificateParser {
 			}
 			signature = sig.toString();
 			if (!pckIn.readStringRaw().equals(END_CERT)) {
-				throw new PackProtocolException(
-						JGitText.get().pushCertificateInvalidSignature);
+				throw new IOException(JGitText.get().pushCertificateInvalidSignature);
 			}
 		} catch (EOFException eof) {
-			throw new PackProtocolException(
+			throw new IOException(
 					JGitText.get().pushCertificateInvalidSignature, eof);
 		}
 	}
