@@ -46,16 +46,11 @@ import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.fnmatch.FileNameMatcher;
 
 /**
- * A single ignore rule corresponding to one line in a .gitignore or ignore
- * file. Parses the ignore pattern
- * 
- * Inspiration from: Ferry Huberts
+ * A single ignore rule corresponding to one line in a .gitignore or
+ * ignore file. Parses the ignore pattern
  *
- * @deprecated this rule does not support double star pattern and is slow
- *             parsing glob expressions. Consider to use {@link FastIgnoreRule}
- *             instead. See https://bugs.eclipse.org/bugs/show_bug.cgi?id=440732
+ * Inspiration from: Ferry Huberts
  */
-@Deprecated
 public class IgnoreRule {
 	private String pattern;
 	private boolean negation;
