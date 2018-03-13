@@ -50,7 +50,6 @@ package org.eclipse.jgit.transport;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
 
 /**
  * The base class for transports that use SSH protocol. This class allows
@@ -82,17 +81,6 @@ public abstract class SshTransport extends TcpTransport {
 	}
 
 	/**
-	 * Create a new transport instance without a local repository.
-	 *
-	 * @param uri the URI used to access the remote repository. This must be the
-	 *            URI passed to {@link #open(URIish)}.
-	 */
-	protected SshTransport(URIish uri) {
-		super(uri);
-		sch = SshSessionFactory.getInstance();
-	}
-
-    /**
 	 * Set SSH session factory instead of the default one for this instance of
 	 * the transport.
 	 *
@@ -130,10 +118,8 @@ public abstract class SshTransport extends TcpTransport {
 
 		final int tms = getTimeout() > 0 ? getTimeout() * 1000 : 0;
 
-		final FS fs = local == null ? FS.detect() : local.getFS();
-
 		sock = sch
-				.getSession(uri, getCredentialsProvider(), fs, tms);
+				.getSession(uri, getCredentialsProvider(), local.getFS(), tms);
 		return sock;
 	}
 
