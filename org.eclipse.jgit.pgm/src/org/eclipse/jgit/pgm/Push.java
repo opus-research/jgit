@@ -77,7 +77,7 @@ class Push extends TextBuiltin {
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
 	@Argument(index = 1, metaVar = "metaVar_refspec")
-	private final List<RefSpec> refSpecs = new ArrayList<>();
+	private final List<RefSpec> refSpecs = new ArrayList<RefSpec>();
 
 	@Option(name = "--all")
 	private boolean all;
@@ -108,9 +108,6 @@ class Push extends TextBuiltin {
 	@Option(name = "--dry-run")
 	private boolean dryRun;
 
-	@Option(name = "--push-option", aliases = { "-t" })
-	private List<String> pushOptions = new ArrayList<>();
-
 	private boolean shownURI;
 
 	@Override
@@ -130,9 +127,6 @@ class Push extends TextBuiltin {
 			push.setThin(thin);
 			push.setAtomic(atomic);
 			push.setTimeout(timeout);
-			if (!pushOptions.isEmpty()) {
-				push.setPushOptions(pushOptions);
-			}
 			Iterable<PushResult> results = push.call();
 			for (PushResult result : results) {
 				try (ObjectReader reader = db.newObjectReader()) {

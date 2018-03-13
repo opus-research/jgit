@@ -47,12 +47,9 @@ import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
@@ -68,7 +65,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PushResult;
-import org.eclipse.jgit.transport.RefLeaseSpec;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
@@ -89,8 +85,6 @@ public class PushCommand extends
 
 	private final List<RefSpec> refSpecs;
 
-	private final Map<String, RefLeaseSpec> refLeaseSpecs;
-
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private String receivePack = RemoteConfig.DEFAULT_RECEIVE_PACK;
@@ -102,15 +96,12 @@ public class PushCommand extends
 
 	private OutputStream out;
 
-	private List<String> pushOptions;
-
 	/**
 	 * @param repo
 	 */
 	protected PushCommand(Repository repo) {
 		super(repo);
-		refSpecs = new ArrayList<>(3);
-		refLeaseSpecs = new HashMap<>();
+		refSpecs = new ArrayList<RefSpec>(3);
 	}
 
 	/**
@@ -126,13 +117,12 @@ public class PushCommand extends
 	 *             when an error occurs with the transport
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Iterable<PushResult> call() throws GitAPIException,
 			InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
 
-		ArrayList<PushResult> pushResults = new ArrayList<>(3);
+		ArrayList<PushResult> pushResults = new ArrayList<PushResult>(3);
 
 		try {
 			if (refSpecs.isEmpty()) {
@@ -159,11 +149,10 @@ public class PushCommand extends
 				if (receivePack != null)
 					transport.setOptionReceivePack(receivePack);
 				transport.setDryRun(dryRun);
-				transport.setPushOptions(pushOptions);
 				configure(transport);
 
 				final Collection<RemoteRefUpdate> toPush = transport
-						.findRemoteRefUpdatesFor(refSpecs, refLeaseSpecs);
+						.findRemoteRefUpdatesFor(refSpecs);
 
 				try {
 					PushResult result = transport.push(monitor, toPush, out);
@@ -200,6 +189,7 @@ public class PushCommand extends
 		}
 
 		return pushResults;
+
 	}
 
 	/**
@@ -275,43 +265,6 @@ public class PushCommand extends
 			monitor = NullProgressMonitor.INSTANCE;
 		}
 		this.monitor = monitor;
-		return this;
-	}
-
-	/**
-	 * @return the ref lease specs
-	 * @since 4.7
-	 */
-	public List<RefLeaseSpec> getRefLeaseSpecs() {
-		return new ArrayList<>(refLeaseSpecs.values());
-	}
-
-	/**
-	 * The ref lease specs to be used in the push operation,
-	 * for a force-with-lease push operation.
-	 *
-	 * @param specs
-	 * @return {@code this}
-	 * @since 4.7
-	 */
-	public PushCommand setRefLeaseSpecs(RefLeaseSpec... specs) {
-		return setRefLeaseSpecs(Arrays.asList(specs));
-	}
-
-	/**
-	 * The ref lease specs to be used in the push operation,
-	 * for a force-with-lease push operation.
-	 *
-	 * @param specs
-	 * @return {@code this}
-	 * @since 4.7
-	 */
-	public PushCommand setRefLeaseSpecs(List<RefLeaseSpec> specs) {
-		checkCallable();
-		this.refLeaseSpecs.clear();
-		for (RefLeaseSpec spec : specs) {
-			refLeaseSpecs.put(spec.getRef(), spec);
-		}
 		return this;
 	}
 
@@ -498,26 +451,6 @@ public class PushCommand extends
 	 */
 	public PushCommand setOutputStream(OutputStream out) {
 		this.out = out;
-		return this;
-	}
-
-	/**
-	 * @return the option strings associated with the push operation
-	 * @since 4.5
-	 */
-	public List<String> getPushOptions() {
-		return pushOptions;
-	}
-
-	/**
-	 * Sets the option strings associated with the push operation.
-	 *
-	 * @param pushOptions
-	 * @return {@code this}
-	 * @since 4.5
-	 */
-	public PushCommand setPushOptions(List<String> pushOptions) {
-		this.pushOptions = pushOptions;
 		return this;
 	}
 }

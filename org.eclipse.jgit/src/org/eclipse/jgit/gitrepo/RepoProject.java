@@ -70,17 +70,14 @@ public class RepoProject implements Comparable<RepoProject> {
 	private final String remote;
 	private final Set<String> groups;
 	private final List<CopyFile> copyfiles;
-	private final List<LinkFile> linkfiles;
 	private String recommendShallow;
 	private String url;
 	private String defaultRevision;
 
 	/**
-	 * The representation of a reference file configuration.
-	 *
-	 * @since 4.8
+	 * The representation of a copy file configuration.
 	 */
-	public static class ReferenceFile {
+	public static class CopyFile {
 		final Repository repo;
 		final String path;
 		final String src;
@@ -96,30 +93,11 @@ public class RepoProject implements Comparable<RepoProject> {
 		 * @param dest
 		 *            the destination path relative to the super project.
 		 */
-		public ReferenceFile(Repository repo, String path, String src, String dest) {
+		public CopyFile(Repository repo, String path, String src, String dest) {
 			this.repo = repo;
 			this.path = path;
 			this.src = src;
 			this.dest = dest;
-		}
-	}
-
-	/**
-	 * The representation of a copy file configuration.
-	 */
-	public static class CopyFile extends ReferenceFile {
-		/**
-		 * @param repo
-		 *            the super project.
-		 * @param path
-		 *            the path of the project containing this copyfile config.
-		 * @param src
-		 *            the source path relative to the sub repo.
-		 * @param dest
-		 *            the destination path relative to the super project.
-		 */
-		public CopyFile(Repository repo, String path, String src, String dest) {
-			super(repo, path, src, dest);
 		}
 
 		/**
@@ -144,27 +122,6 @@ public class RepoProject implements Comparable<RepoProject> {
 			} finally {
 				input.close();
 			}
-		}
-	}
-
-	/**
-	 * The representation of a link file configuration.
-	 *
-	 * @since 4.8
-	 */
-	public static class LinkFile extends ReferenceFile {
-		/**
-		 * @param repo
-		 *            the super project.
-		 * @param path
-		 *            the path of the project containing this linkfile config.
-		 * @param src
-		 *            the source path relative to the sub repo.
-		 * @param dest
-		 *            the destination path relative to the super project.
-		 */
-		public LinkFile(Repository repo, String path, String src, String dest) {
-			super(repo, path, src, dest);
 		}
 	}
 
@@ -198,8 +155,7 @@ public class RepoProject implements Comparable<RepoProject> {
 		this.remote = remote;
 		this.groups = groups;
 		this.recommendShallow = recommendShallow;
-		copyfiles = new ArrayList<>();
-		linkfiles = new ArrayList<>();
+		copyfiles = new ArrayList<CopyFile>();
 	}
 
 	/**
@@ -211,14 +167,14 @@ public class RepoProject implements Comparable<RepoProject> {
 	 *            a SHA-1 or branch name or tag name
 	 * @param remote
 	 *            name of the remote definition
-	 * @param groupsParam
+	 * @param groups
 	 *            comma separated group list
 	 */
 	public RepoProject(String name, String path, String revision,
-			String remote, String groupsParam) {
+			String remote, String groups) {
 		this(name, path, revision, remote, new HashSet<String>(), null);
-		if (groupsParam != null && groupsParam.length() > 0)
-			this.setGroups(groupsParam);
+		if (groups != null && groups.length() > 0)
+			this.setGroups(groups);
 	}
 
 	/**
@@ -235,14 +191,14 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Set the url of the sub repo.
 	 *
-	 * @param groupsParam
+	 * @param groups
 	 *            comma separated group list
 	 * @return this for chaining.
 	 * @since 4.4
 	 */
-	public RepoProject setGroups(String groupsParam) {
+	public RepoProject setGroups(String groups) {
 		this.groups.clear();
-		this.groups.addAll(Arrays.asList(groupsParam.split(","))); //$NON-NLS-1$
+		this.groups.addAll(Arrays.asList(groups.split(","))); //$NON-NLS-1$
 		return this;
 	}
 
@@ -291,16 +247,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	 */
 	public List<CopyFile> getCopyFiles() {
 		return Collections.unmodifiableList(copyfiles);
-	}
-
-	/**
-	 * Getter for the linkfile configurations.
-	 *
-	 * @return Immutable copy of {@code linkfiles}
-	 * @since 4.8
-	 */
-	public List<LinkFile> getLinkFiles() {
-		return Collections.unmodifiableList(linkfiles);
 	}
 
 	/**
@@ -387,35 +333,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	 */
 	public void clearCopyFiles() {
 		this.copyfiles.clear();
-	}
-
-	/**
-	 * Add a link file configuration.
-	 *
-	 * @param linkfile
-	 * @since 4.8
-	 */
-	public void addLinkFile(LinkFile linkfile) {
-		linkfiles.add(linkfile);
-	}
-
-	/**
-	 * Add a bunch of linkfile configurations.
-	 *
-	 * @param linkFiles
-	 * @since 4.8
-	 */
-	public void addLinkFiles(Collection<LinkFile> linkFiles) {
-		this.linkfiles.addAll(linkFiles);
-	}
-
-	/**
-	 * Clear all the linkfiles.
-	 *
-	 * @since 4.8
-	 */
-	public void clearLinkFiles() {
-		this.linkfiles.clear();
 	}
 
 	private String getPathWithSlash() {

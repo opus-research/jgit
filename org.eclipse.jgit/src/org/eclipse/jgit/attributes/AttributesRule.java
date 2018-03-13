@@ -71,7 +71,7 @@ public class AttributesRule {
 
 	private static List<Attribute> parseAttributes(String attributesLine) {
 		// the C implementation oddly enough allows \r between attributes too.
-		ArrayList<Attribute> result = new ArrayList<>();
+		ArrayList<Attribute> result = new ArrayList<Attribute>();
 		for (String attribute : attributesLine.split(ATTRIBUTES_SPLIT_REGEX)) {
 			attribute = attribute.trim();
 			if (attribute.length() == 0)

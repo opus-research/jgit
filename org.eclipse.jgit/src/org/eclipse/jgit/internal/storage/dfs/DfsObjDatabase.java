@@ -61,22 +61,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 
 /** Manages objects stored in {@link DfsPackFile} on a storage system. */
 public abstract class DfsObjDatabase extends ObjectDatabase {
-	private static final PackList NO_PACKS = new PackList(new DfsPackFile[0]) {
-		@Override
-		boolean dirty() {
-			return true;
-		}
-
-		@Override
-		void clearDirty() {
-			// Always dirty.
-		}
-
-		@Override
-		public void markDirty() {
-			// Always dirty.
-		}
-	};
+	private static final PackList NO_PACKS = new PackList(new DfsPackFile[0]);
 
 	/** Sources for a pack file. */
 	public static enum PackSource {
@@ -160,7 +145,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	protected DfsObjDatabase(DfsRepository repository,
 			DfsReaderOptions options) {
 		this.repository = repository;
-		this.packList = new AtomicReference<>(NO_PACKS);
+		this.packList = new AtomicReference<PackList>(NO_PACKS);
 		this.readerOptions = options;
 	}
 
@@ -170,7 +155,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	}
 
 	@Override
-	public DfsReader newReader() {
+	public ObjectReader newReader() {
 		return new DfsReader(this);
 	}
 
@@ -188,20 +173,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 *             the pack list cannot be initialized.
 	 */
 	public DfsPackFile[] getPacks() throws IOException {
-		return getPackList().packs;
-	}
-
-	/**
-	 * Scan and list all available pack files in the repository.
-	 *
-	 * @return list of available packs, with some additional metadata. The
-	 *         returned array is shared with the implementation and must not be
-	 *         modified by the caller.
-	 * @throws IOException
-	 *             the pack list cannot be initialized.
-	 */
-	public PackList getPackList() throws IOException {
-		return scanPacks(NO_PACKS);
+		return scanPacks(NO_PACKS).packs;
 	}
 
 	/** @return repository owning this object database. */
@@ -216,18 +188,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 *         implementation and must not be modified by the caller.
 	 */
 	public DfsPackFile[] getCurrentPacks() {
-		return getCurrentPackList().packs;
-	}
-
-	/**
-	 * List currently known pack files in the repository, without scanning.
-	 *
-	 * @return list of available packs, with some additional metadata. The
-	 *         returned array is shared with the implementation and must not be
-	 *         modified by the caller.
-	 */
-	public PackList getCurrentPackList() {
-		return packList.get();
+		return packList.get().packs;
 	}
 
 	/**
@@ -264,32 +225,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 */
 	protected abstract DfsPackDescription newPack(PackSource source)
 			throws IOException;
-
-	/**
-	 * Generate a new unique name for a pack file.
-	 *
-	 * <p>
-	 * Default implementation of this method would be equivalent to
-	 * {@code newPack(source).setEstimatedPackSize(estimatedPackSize)}. But the
-	 * clients can override this method to use the given
-	 * {@code estomatedPackSize} value more efficiently in the process of
-	 * creating a new {@link DfsPackDescription} object.
-	 *
-	 * @param source
-	 *            where the pack stream is created.
-	 * @param estimatedPackSize
-	 *            the estimated size of the pack.
-	 * @return a unique name for the pack file. Must not collide with any other
-	 *         pack file name in the same DFS.
-	 * @throws IOException
-	 *             a new unique pack description cannot be generated.
-	 */
-	protected DfsPackDescription newPack(PackSource source,
-			long estimatedPackSize) throws IOException {
-		DfsPackDescription pack = newPack(source);
-		pack.setEstimatedPackSize(estimatedPackSize);
-		return pack;
-	}
 
 	/**
 	 * Commit a pack and index pair that was written to the DFS.
@@ -428,11 +363,11 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			DfsPackFile[] packs = new DfsPackFile[1 + o.packs.length];
 			packs[0] = newPack;
 			System.arraycopy(o.packs, 0, packs, 1, o.packs.length);
-			n = new PackListImpl(packs);
+			n = new PackList(packs);
 		} while (!packList.compareAndSet(o, n));
 	}
 
-	PackList scanPacks(final PackList original) throws IOException {
+	private PackList scanPacks(final PackList original) throws IOException {
 		PackList o, n;
 		synchronized (packList) {
 			do {
@@ -458,7 +393,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		List<DfsPackDescription> scanned = listPacks();
 		Collections.sort(scanned);
 
-		List<DfsPackFile> list = new ArrayList<>(scanned.size());
+		List<DfsPackFile> list = new ArrayList<DfsPackFile>(scanned.size());
 		boolean foundNew = false;
 		for (DfsPackDescription dsc : scanned) {
 			DfsPackFile oldPack = forReuse.remove(dsc);
@@ -473,17 +408,15 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		for (DfsPackFile p : forReuse.values())
 			p.close();
 		if (list.isEmpty())
-			return new PackListImpl(NO_PACKS.packs);
-		if (!foundNew) {
-			old.clearDirty();
+			return new PackList(NO_PACKS.packs);
+		if (!foundNew)
 			return old;
-		}
-		return new PackListImpl(list.toArray(new DfsPackFile[list.size()]));
+		return new PackList(list.toArray(new DfsPackFile[list.size()]));
 	}
 
 	private static Map<DfsPackDescription, DfsPackFile> reuseMap(PackList old) {
 		Map<DfsPackDescription, DfsPackFile> forReuse
-			= new HashMap<>();
+			= new HashMap<DfsPackDescription, DfsPackFile>();
 		for (DfsPackFile p : old.packs) {
 			if (p.invalid()) {
 				// The pack instance is corrupted, and cannot be safely used
@@ -523,62 +456,12 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		// p.close();
 	}
 
-	/** Snapshot of packs scanned in a single pass. */
-	public static abstract class PackList {
+	private static final class PackList {
 		/** All known packs, sorted. */
-		public final DfsPackFile[] packs;
+		final DfsPackFile[] packs;
 
-		private long lastModified = -1;
-
-		PackList(DfsPackFile[] packs) {
+		PackList(final DfsPackFile[] packs) {
 			this.packs = packs;
-		}
-
-		/** @return last modified time of all packs, in milliseconds. */
-		public long getLastModified() {
-			if (lastModified < 0) {
-				long max = 0;
-				for (DfsPackFile pack : packs) {
-					max = Math.max(max, pack.getPackDescription().getLastModified());
-				}
-				lastModified = max;
-			}
-			return lastModified;
-		}
-
-		abstract boolean dirty();
-		abstract void clearDirty();
-
-		/**
-		 * Mark pack list as dirty.
-		 * <p>
-		 * Used when the caller knows that new data might have been written to the
-		 * repository that could invalidate open readers depending on this pack list,
-		 * for example if refs are newly scanned.
-		 */
-		public abstract void markDirty();
-	}
-
-	private static final class PackListImpl extends PackList {
-		private volatile boolean dirty;
-
-		PackListImpl(DfsPackFile[] packs) {
-			super(packs);
-		}
-
-		@Override
-		boolean dirty() {
-			return dirty;
-		}
-
-		@Override
-		void clearDirty() {
-			dirty = false;
-		}
-
-		@Override
-		public void markDirty() {
-			dirty = true;
 		}
 	}
 }

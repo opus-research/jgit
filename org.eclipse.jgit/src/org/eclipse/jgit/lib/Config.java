@@ -52,13 +52,11 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -84,7 +82,7 @@ public class Config {
 	private static final long KiB = 1024;
 	private static final long MiB = 1024 * KiB;
 	private static final long GiB = 1024 * MiB;
-	private static final int MAX_DEPTH = 10;
+	private static final int MAX_DEPTH = 999;
 
 	/** the change listeners */
 	private final ListenerList listeners = new ListenerList();
@@ -122,7 +120,7 @@ public class Config {
 	 */
 	public Config(Config defaultConfig) {
 		baseConfig = defaultConfig;
-		state = new AtomicReference<>(newState());
+		state = new AtomicReference<ConfigSnapshot>(newState());
 	}
 
 	/**
@@ -836,11 +834,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + "g"; //$NON-NLS-1$
+			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + "m"; //$NON-NLS-1$
+			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + "k"; //$NON-NLS-1$
+			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
 		else
 			s = String.valueOf(value);
 
@@ -896,7 +894,7 @@ public class Config {
 		if (value instanceof ConfigEnum)
 			n = ((ConfigEnum) value).toConfigValue();
 		else
-			n = value.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+			n = value.name().toLowerCase().replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
@@ -960,7 +958,7 @@ public class Config {
 			final String section,
 			final String subsection) {
 		final int max = srcState.entryList.size();
-		final ArrayList<ConfigLine> r = new ArrayList<>(max);
+		final ArrayList<ConfigLine> r = new ArrayList<ConfigLine>(max);
 
 		boolean lastWasMatch = false;
 		for (ConfigLine e : srcState.entryList) {
@@ -1075,7 +1073,7 @@ public class Config {
 		// for a new section header. Assume that and allocate the space.
 		//
 		final int max = src.entryList.size() + values.size() + 1;
-		final ArrayList<ConfigLine> r = new ArrayList<>(max);
+		final ArrayList<ConfigLine> r = new ArrayList<ConfigLine>(max);
 		r.addAll(src.entryList);
 		return r;
 	}
@@ -1163,7 +1161,7 @@ public class Config {
 			throw new ConfigInvalidException(
 					JGitText.get().tooManyIncludeRecursions);
 		}
-		final List<ConfigLine> newEntries = new ArrayList<>();
+		final List<ConfigLine> newEntries = new ArrayList<ConfigLine>();
 		final StringReader in = new StringReader(text);
 		ConfigLine last = null;
 		ConfigLine e = new ConfigLine();
@@ -1249,15 +1247,9 @@ public class Config {
 				decoded = RawParseUtils.decode(bytes);
 			}
 			newEntries.addAll(fromTextRecurse(decoded, depth + 1));
-		} catch (FileNotFoundException fnfe) {
-			if (path.exists()) {
-				throw new ConfigInvalidException(MessageFormat
-						.format(JGitText.get().cannotReadFile, path), fnfe);
-			}
 		} catch (IOException ioe) {
-			throw new ConfigInvalidException(
-					MessageFormat.format(JGitText.get().cannotReadFile, path),
-					ioe);
+			throw new ConfigInvalidException(MessageFormat.format(
+					JGitText.get().invalidIncludedPathInConfigFile, path));
 		}
 	}
 

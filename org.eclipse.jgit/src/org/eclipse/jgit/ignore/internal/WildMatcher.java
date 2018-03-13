@@ -47,6 +47,8 @@ package org.eclipse.jgit.ignore.internal;
  * matcher matches any path.
  * <p>
  * This class is immutable and thread safe.
+ *
+ * @since 3.6
  */
 public final class WildMatcher extends AbstractMatcher {
 
@@ -61,12 +63,10 @@ public final class WildMatcher extends AbstractMatcher {
 		super(WILDMATCH, false);
 	}
 
-	@Override
 	public final boolean matches(String path, boolean assumeDirectory) {
 		return true;
 	}
 
-	@Override
 	public final boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		return true;

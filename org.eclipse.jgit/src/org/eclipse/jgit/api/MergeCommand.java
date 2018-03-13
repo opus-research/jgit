@@ -50,10 +50,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -103,7 +101,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
-	private List<Ref> commits = new LinkedList<>();
+	private List<Ref> commits = new LinkedList<Ref>();
 
 	private Boolean squash;
 
@@ -135,12 +133,10 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		 */
 		FF_ONLY;
 
-		@Override
 		public String toConfigValue() {
-			return "--" + name().toLowerCase(Locale.ROOT).replace('_', '-'); //$NON-NLS-1$
+			return "--" + name().toLowerCase().replace('_', '-'); //$NON-NLS-1$
 		}
 
-		@Override
 		public boolean matchConfigValue(String in) {
 			if (StringUtils.isEmptyOrNull(in))
 				return false;
@@ -224,7 +220,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 *
 	 * @return the result of the merge
 	 */
-	@Override
 	@SuppressWarnings("boxing")
 	public MergeResult call() throws GitAPIException, NoHeadException,
 			ConcurrentRefUpdateException, CheckoutConflictException,
@@ -386,7 +381,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 									.call().getId();
 						}
 						mergeStatus = MergeStatus.MERGED;
-						getRepository().autoGC(monitor);
 					}
 					if (commit && squash) {
 						msg = JGitText.get().squashCommitNotUpdatingHEAD;
@@ -555,15 +549,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * Sets the fast forward mode.
 	 *
 	 * @param fastForwardMode
-	 *            corresponds to the --ff/--no-ff/--ff-only options. If
-	 *            {@code null} use the value of the {@code merge.ff} option
-	 *            configured in git config. If this option is not configured
-	 *            --ff is the built-in default.
+	 *            corresponds to the --ff/--no-ff/--ff-only options. --ff is the
+	 *            default option.
 	 * @return {@code this}
 	 * @since 2.2
 	 */
-	public MergeCommand setFastForward(
-			@Nullable FastForwardMode fastForwardMode) {
+	public MergeCommand setFastForward(FastForwardMode fastForwardMode) {
 		checkCallable();
 		this.fastForwardMode = fastForwardMode;
 		return this;

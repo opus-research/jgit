@@ -59,15 +59,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.CommandFailedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -163,7 +162,7 @@ public abstract class FS {
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
 
-	private volatile static FSFactory factory;
+	private static FSFactory factory;
 
 	/**
 	 * Auto-detect the appropriate file system abstraction.
@@ -375,7 +374,7 @@ public abstract class FS {
 	public File userHome() {
 		Holder<File> p = userHome;
 		if (p == null) {
-			p = new Holder<>(userHomeImpl());
+			p = new Holder<File>(userHomeImpl());
 			userHome = p;
 		}
 		return p.value;
@@ -390,7 +389,7 @@ public abstract class FS {
 	 * @return {@code this}.
 	 */
 	public FS setUserHome(File path) {
-		userHome = new Holder<>(path);
+		userHome = new Holder<File>(path);
 		return this;
 	}
 
@@ -409,7 +408,6 @@ public abstract class FS {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getProperty("user.home"); //$NON-NLS-1$
 					}
@@ -455,12 +453,9 @@ public abstract class FS {
 	 *            to be used to parse the command's output
 	 * @return the one-line output of the command or {@code null} if there is
 	 *         none
-	 * @throws CommandFailedException
-	 *             thrown when the command failed (return code was non-zero)
 	 */
 	@Nullable
-	protected static String readPipe(File dir, String[] command,
-			String encoding) throws CommandFailedException {
+	protected static String readPipe(File dir, String[] command, String encoding) {
 		return readPipe(dir, command, encoding, null);
 	}
 
@@ -478,14 +473,10 @@ public abstract class FS {
 	 *            current process
 	 * @return the one-line output of the command or {@code null} if there is
 	 *         none
-	 * @throws CommandFailedException
-	 *             thrown when the command failed (return code was non-zero)
 	 * @since 4.0
 	 */
 	@Nullable
-	protected static String readPipe(File dir, String[] command,
-			String encoding, Map<String, String> env)
-			throws CommandFailedException {
+	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
 		try {
 			if (debug) {
@@ -497,13 +488,7 @@ public abstract class FS {
 			if (env != null) {
 				pb.environment().putAll(env);
 			}
-			Process p;
-			try {
-				p = pb.start();
-			} catch (IOException e) {
-				// Process failed to start
-				throw new CommandFailedException(-1, e.getMessage(), e);
-			}
+			Process p = pb.start();
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
@@ -527,14 +512,11 @@ public abstract class FS {
 					gobbler.join();
 					if (rc == 0 && !gobbler.fail.get()) {
 						return r;
-					} else {
-						if (debug) {
-							LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
-						}
-						throw new CommandFailedException(rc,
-								gobbler.errorMessage.get(),
-								gobbler.exception.get());
 					}
+					if (debug) {
+						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
+					}
+					break;
 				} catch (InterruptedException ie) {
 					// Stop bothering me, I have a zombie to reap.
 				}
@@ -553,8 +535,6 @@ public abstract class FS {
 		private final String desc;
 		private final String dir;
 		final AtomicBoolean fail = new AtomicBoolean();
-		final AtomicReference<String> errorMessage = new AtomicReference<>();
-		final AtomicReference<Throwable> exception = new AtomicReference<>();
 
 		GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
@@ -562,7 +542,6 @@ public abstract class FS {
 			this.dir = Objects.toString(dir);
 		}
 
-		@Override
 		public void run() {
 			StringBuilder err = new StringBuilder();
 			try (InputStream is = p.getErrorStream()) {
@@ -572,26 +551,22 @@ public abstract class FS {
 				}
 			} catch (IOException e) {
 				if (p.exitValue() != 0) {
-					setError(e, e.getMessage());
+					logError(e);
 					fail.set(true);
 				} else {
-					// ignore. command terminated faster and stream was just closed
+					// ignore. git terminated faster and stream was just closed
 				}
 			} finally {
 				if (err.length() > 0) {
-					setError(null, err.toString());
-					if (p.exitValue() != 0) {
-						fail.set(true);
-					}
+					LOG.error(err.toString());
 				}
 			}
 		}
 
-		private void setError(IOException e, String message) {
-			exception.set(e);
-			errorMessage.set(MessageFormat.format(
-					JGitText.get().exceptionCaughtDuringExcecutionOfCommand,
-					desc, dir, Integer.valueOf(p.exitValue()), message));
+		private void logError(Throwable t) {
+			String msg = MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
+			LOG.error(msg, t);
 		}
 	}
 
@@ -614,17 +589,10 @@ public abstract class FS {
 		}
 
 		// Bug 480782: Check if the discovered git executable is JGit CLI
-		String v;
-		try {
-			v = readPipe(gitExe.getParentFile(),
+		String v = readPipe(gitExe.getParentFile(),
 				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
 				Charset.defaultCharset().name());
-		} catch (CommandFailedException e) {
-			LOG.warn(e.getMessage());
-			return null;
-		}
-		if (StringUtils.isEmptyOrNull(v)
-				|| (v != null && v.startsWith("jgit"))) { //$NON-NLS-1$
+		if (v != null && v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
@@ -633,15 +601,9 @@ public abstract class FS {
 		Map<String, String> env = new HashMap<>();
 		env.put("GIT_EDITOR", "echo"); //$NON-NLS-1$ //$NON-NLS-2$
 
-		String w;
-		try {
-			w = readPipe(gitExe.getParentFile(),
+		String w = readPipe(gitExe.getParentFile(),
 				new String[] { "git", "config", "--system", "--edit" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 				Charset.defaultCharset().name(), env);
-		} catch (CommandFailedException e) {
-			LOG.warn(e.getMessage());
-			return null;
-		}
 		if (StringUtils.isEmptyOrNull(w)) {
 			return null;
 		}
@@ -656,7 +618,7 @@ public abstract class FS {
 	 */
 	public File getGitSystemConfig() {
 		if (gitSystemConfig == null) {
-			gitSystemConfig = new Holder<>(discoverGitSystemConfig());
+			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
 		}
 		return gitSystemConfig.value;
 	}
@@ -670,7 +632,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public FS setGitSystemConfig(File configFile) {
-		gitSystemConfig = new Holder<>(configFile);
+		gitSystemConfig = new Holder<File>(configFile);
 		return this;
 	}
 
@@ -783,7 +745,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * See {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 * See {@link FileUtils#relativize(String, String)}.
 	 *
 	 * @param base
 	 *            The path against which <code>other</code> should be
@@ -792,11 +754,11 @@ public abstract class FS {
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @see FileUtils#relativizePath(String, String, String, boolean)
+	 * @see FileUtils#relativize(String, String)
 	 * @since 3.7
 	 */
 	public String relativize(String base, String other) {
-		return FileUtils.relativizePath(base, other, File.separator, this.isCaseSensitive());
+		return FileUtils.relativize(base, other);
 	}
 
 	/**
@@ -1017,24 +979,18 @@ public abstract class FS {
 		IOException ioException = null;
 		try {
 			process = processBuilder.start();
-			executor.execute(
-					new StreamGobbler(process.getErrorStream(), errRedirect));
-			executor.execute(
-					new StreamGobbler(process.getInputStream(), outRedirect));
+			final Callable<Void> errorGobbler = new StreamGobbler(
+					process.getErrorStream(), errRedirect);
+			final Callable<Void> outputGobbler = new StreamGobbler(
+					process.getInputStream(), outRedirect);
+			executor.submit(errorGobbler);
+			executor.submit(outputGobbler);
 			OutputStream outputStream = process.getOutputStream();
 			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream).copy();
+				new StreamGobbler(inRedirect, outputStream)
+						.call();
 			}
-			try {
-				outputStream.close();
-			} catch (IOException e) {
-				// When the process exits before consuming the input, the OutputStream
-				// is replaced with the null output stream. This null output stream
-				// throws IOException for all write calls. When StreamGobbler fails to
-				// flush the buffer because of this, this close call tries to flush it
-				// again. This causes another IOException. Since we ignore the
-				// IOException in StreamGobbler, we also ignore the exception here.
-			}
+			outputStream.close();
 			return process.waitFor();
 		} catch (IOException e) {
 			ioException = e;
@@ -1339,7 +1295,7 @@ public abstract class FS {
 	 * streams.
 	 * </p>
 	 */
-	private static class StreamGobbler implements Runnable {
+	private static class StreamGobbler implements Callable<Void> {
 		private InputStream in;
 
 		private OutputStream out;
@@ -1349,16 +1305,7 @@ public abstract class FS {
 			this.out = output;
 		}
 
-		@Override
-		public void run() {
-			try {
-				copy();
-			} catch (IOException e) {
-				// Do nothing on read failure; leave streams open.
-			}
-		}
-
-		void copy() throws IOException {
+		public Void call() throws IOException {
 			boolean writeFailure = false;
 			byte buffer[] = new byte[4096];
 			int readBytes;
@@ -1375,6 +1322,7 @@ public abstract class FS {
 					}
 				}
 			}
+			return null;
 		}
 	}
 }

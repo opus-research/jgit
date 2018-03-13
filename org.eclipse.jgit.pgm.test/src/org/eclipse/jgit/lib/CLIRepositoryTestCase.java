@@ -62,11 +62,15 @@ public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
 	/** Test repository, initialized for this test case. */
 	protected Repository db;
 
+	/** Working directory of {@link #db}. */
+	protected File trash;
+
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
+		trash = db.getWorkTree();
 	}
 
 	/**
@@ -79,7 +83,7 @@ public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * @throws Exception
 	 */
 	protected String[] executeUnchecked(String... cmds) throws Exception {
-		List<String> result = new ArrayList<>(cmds.length);
+		List<String> result = new ArrayList<String>(cmds.length);
 		for (String cmd : cmds) {
 			result.addAll(CLIGitCommand.executeUnchecked(cmd, db));
 		}
@@ -97,7 +101,7 @@ public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * @throws Exception
 	 */
 	protected String[] execute(String... cmds) throws Exception {
-		List<String> result = new ArrayList<>(cmds.length);
+		List<String> result = new ArrayList<String>(cmds.length);
 		for (String cmd : cmds) {
 			Result r = CLIGitCommand.executeRaw(cmd, db);
 			if (r.ex instanceof TerminatedByHelpException) {
@@ -127,7 +131,6 @@ public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
 		return JGitTestUtil.writeTrashFile(db, name, data);
 	}
 
-	@Override
 	protected String read(final File file) throws IOException {
 		return JGitTestUtil.read(file);
 	}

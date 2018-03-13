@@ -87,21 +87,21 @@ class Daemon extends TextBuiltin {
 	int timeout = -1;
 
 	@Option(name = "--enable", metaVar = "metaVar_service", usage = "usage_enableTheServiceInAllRepositories", multiValued = true)
-	final List<String> enable = new ArrayList<>();
+	final List<String> enable = new ArrayList<String>();
 
 	@Option(name = "--disable", metaVar = "metaVar_service", usage = "usage_disableTheServiceInAllRepositories", multiValued = true)
-	final List<String> disable = new ArrayList<>();
+	final List<String> disable = new ArrayList<String>();
 
 	@Option(name = "--allow-override", metaVar = "metaVar_service", usage = "usage_configureTheServiceInDaemonServicename", multiValued = true)
-	final List<String> canOverride = new ArrayList<>();
+	final List<String> canOverride = new ArrayList<String>();
 
 	@Option(name = "--forbid-override", metaVar = "metaVar_service", usage = "usage_configureTheServiceInDaemonServicename", multiValued = true)
-	final List<String> forbidOverride = new ArrayList<>();
+	final List<String> forbidOverride = new ArrayList<String>();
 
 	@Option(name = "--export-all", usage = "usage_exportWithoutGitDaemonExportOk")
 	boolean exportAll;
 
-	@Option(name = "--ketch", metaVar = "metaVar_ketchServerType", usage = "usage_ketchServerType")
+	@Option(name = "--ketch")
 	KetchServerType ketchServerType;
 
 	enum KetchServerType {
@@ -109,7 +109,7 @@ class Daemon extends TextBuiltin {
 	}
 
 	@Argument(required = true, metaVar = "metaVar_directory", usage = "usage_directoriesToExport")
-	final List<File> directory = new ArrayList<>();
+	final List<File> directory = new ArrayList<File>();
 
 	@Override
 	protected boolean requiresRepository() {
@@ -139,7 +139,7 @@ class Daemon extends TextBuiltin {
 		if (1 < threads)
 			packConfig.setExecutor(Executors.newFixedThreadPool(threads));
 
-		final FileResolver<DaemonClient> resolver = new FileResolver<>();
+		final FileResolver<DaemonClient> resolver = new FileResolver<DaemonClient>();
 		for (final File f : directory) {
 			outw.println(MessageFormat.format(CLIText.get().exporting, f.getAbsolutePath()));
 			resolver.exportDirectory(f);

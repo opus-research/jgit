@@ -121,9 +121,7 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private ResetType mode;
 
-	private Collection<String> filepaths = new LinkedList<>();
-
-	private boolean isReflogDisabled;
+	private Collection<String> filepaths = new LinkedList<String>();
 
 	/**
 	 *
@@ -141,7 +139,6 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * @return the Ref after reset
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Ref call() throws GitAPIException, CheckoutConflictException {
 		checkCallable();
 
@@ -184,12 +181,8 @@ public class ResetCommand extends GitCommand<Ref> {
 				ru.setNewObjectId(commitId);
 
 				String refName = Repository.shortenRefName(getRefOrHEAD());
-				if (isReflogDisabled) {
-					ru.disableRefLog();
-				} else {
-					String message = refName + ": updating " + Constants.HEAD; //$NON-NLS-1$
-					ru.setRefLogMessage(message, false);
-				}
+				String message = refName + ": updating " + Constants.HEAD; //$NON-NLS-1$
+				ru.setRefLogMessage(message, false);
 				if (ru.forceUpdate() == RefUpdate.Result.LOCK_FAILURE)
 					throw new JGitInternalException(MessageFormat.format(
 							JGitText.get().cannotLock, ru.getName()));
@@ -294,26 +287,6 @@ public class ResetCommand extends GitCommand<Ref> {
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
 		filepaths.add(path);
 		return this;
-	}
-
-	/**
-	 * @param disable
-	 *            if {@code true} disables writing a reflog entry for this reset
-	 *            command
-	 * @return this instance
-	 * @since 4.5
-	 */
-	public ResetCommand disableRefLog(boolean disable) {
-		this.isReflogDisabled = disable;
-		return this;
-	}
-
-	/**
-	 * @return {@code true} if writing reflog is disabled for this reset command
-	 * @since 4.5
-	 */
-	public boolean isReflogDisabled() {
-		return this.isReflogDisabled;
 	}
 
 	private String getRefOrHEAD() {
@@ -431,14 +404,6 @@ public class ResetCommand extends GitCommand<Ref> {
 	private void resetRevert() throws IOException {
 		repo.writeRevertHead(null);
 		repo.writeMergeCommitMsg(null);
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return "ResetCommand [repo=" + repo + ", ref=" + ref + ", mode=" + mode
-				+ ", isReflogDisabled=" + isReflogDisabled + ", filepaths="
-				+ filepaths + "]";
 	}
 
 }
