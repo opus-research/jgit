@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
 import org.eclipse.jgit.internal.storage.reftable.ReftableWriter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -105,17 +106,18 @@ class WriteReftable extends TextBuiltin {
 
 		ReftableWriter.Stats stats;
 		try (OutputStream os = new FileOutputStream(out)) {
-			ReftableWriter w = new ReftableWriter();
+			ReftableConfig cfg = new ReftableConfig();
 			if (refBlockSize > 0) {
-				w.setRefBlockSize(refBlockSize);
+				cfg.setRefBlockSize(refBlockSize);
 			}
 			if (logBlockSize > 0) {
-				w.setLogBlockSize(logBlockSize);
+				cfg.setLogBlockSize(logBlockSize);
 			}
 			if (restartInterval > 0) {
-				w.setRestartInterval(restartInterval);
+				cfg.setRestartInterval(restartInterval);
 			}
-			w.begin(os);
+
+			ReftableWriter w = new ReftableWriter().setConfig(cfg).begin(os);
 			w.sortAndWriteRefs(refs);
 			for (LogEntry e : logs) {
 				w.writeLog(e.ref, e.who, e.oldId, e.newId, e.message);
