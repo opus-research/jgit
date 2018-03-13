@@ -58,6 +58,7 @@ import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.util.FS;
 
 /**
  * The cached instance of an {@link ObjectDirectory}.
@@ -130,6 +131,11 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	Config getConfig() {
 		return wrapped.getConfig();
+	}
+
+	@Override
+	FS getFS() {
+		return wrapped.getFS();
 	}
 
 	@Override
@@ -222,8 +228,7 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		switch (result) {
 		case INSERTED:
 		case EXISTS_LOOSE:
-			if (!unpackedObjects.contains(objectId))
-				unpackedObjects.add(objectId);
+			unpackedObjects.addIfAbsent(objectId);
 			break;
 
 		case EXISTS_PACKED:
@@ -231,6 +236,11 @@ class CachedObjectDirectory extends FileObjectDatabase {
 			break;
 		}
 		return result;
+	}
+
+	@Override
+	PackFile openPack(File pack, File idx) throws IOException {
+		return wrapped.openPack(pack, idx);
 	}
 
 	@Override
