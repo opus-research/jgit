@@ -107,18 +107,15 @@ import org.eclipse.jgit.util.LongList;
  */
 public class MyersDiff<S extends Sequence> {
 	/** Singleton instance of MyersDiff. */
-	public static final DiffAlgorithm INSTANCE = new LowLevelDiffAlgorithm() {
-		@Override
-		public <S extends Sequence> void diffNonCommon(EditList edits,
-				HashedSequenceComparator<S> cmp, HashedSequence<S> a,
-				HashedSequence<S> b, Edit region) {
-			new MyersDiff<S>(edits, cmp, a, b, region);
+	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
+		public <S extends Sequence> EditList diffNonCommon(
+				SequenceComparator<? super S> cmp, S a, S b) {
+			return new MyersDiff<S>(cmp, a, b).edits;
 		}
 	};
 
 	/**
-	 * The list of edits found during the last call to
-	 * {@link #calculateEdits(Edit)}
+	 * The list of edits found during the last call to {@link #calculateEdits()}
 	 */
 	protected EditList edits;
 
@@ -135,13 +132,15 @@ public class MyersDiff<S extends Sequence> {
 	 */
 	protected HashedSequence<S> b;
 
-	private MyersDiff(EditList edits, HashedSequenceComparator<S> cmp,
-			HashedSequence<S> a, HashedSequence<S> b, Edit region) {
-		this.edits = edits;
-		this.cmp = cmp;
-		this.a = a;
-		this.b = b;
-		calculateEdits(region);
+	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b) {
+		HashedSequencePair<S> pair;
+
+		pair = new HashedSequencePair<S>(cmp, a, b);
+		this.cmp = pair.getComparator();
+		this.a = pair.getA();
+		this.b = pair.getB();
+
+		calculateEdits();
 	}
 
 	// TODO: use ThreadLocal for future multi-threaded operations
@@ -150,10 +149,11 @@ public class MyersDiff<S extends Sequence> {
 	/**
 	 * Entrypoint into the algorithm this class is all about. This method triggers that the
 	 * differences between A and B are calculated in form of a list of edits.
-	 * @param r portion of the sequences to examine.
 	 */
-	private void calculateEdits(Edit r) {
-		middle.initialize(r.beginA, r.endA, r.beginB, r.endB);
+	protected void calculateEdits() {
+		edits = new EditList();
+
+		middle.initialize(0, a.size(), 0, b.size());
 		if (middle.beginA >= middle.endA &&
 				middle.beginB >= middle.endB)
 			return;

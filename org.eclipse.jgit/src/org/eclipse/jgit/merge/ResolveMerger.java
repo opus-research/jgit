@@ -132,7 +132,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private DirCache dircache;
 
-	private WorkingTreeIterator workingTreeIterator;
+	private WorkingTreeIterator workingTreeIt;
 
 
 	/**
@@ -176,8 +176,8 @@ public class ResolveMerger extends ThreeWayMerger {
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
 			tw.addTree(buildIt);
-			if (workingTreeIterator != null)
-				tw.addTree(workingTreeIterator);
+			if (workingTreeIt != null)
+				tw.addTree(workingTreeIt);
 
 			while (tw.next()) {
 				if (!processEntry(
@@ -185,7 +185,7 @@ public class ResolveMerger extends ThreeWayMerger {
 						tw.getTree(T_OURS, CanonicalTreeParser.class),
 						tw.getTree(T_THEIRS, CanonicalTreeParser.class),
 						tw.getTree(T_INDEX, DirCacheBuildIterator.class),
-						(workingTreeIterator == null) ? null : tw.getTree(T_FILE, WorkingTreeIterator.class))) {
+						(workingTreeIt == null) ? null : tw.getTree(T_FILE, WorkingTreeIterator.class))) {
 					cleanUp();
 					return false;
 				}
@@ -612,10 +612,10 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * TODO: enhance WorkingTreeIterator to support write operations. Then this
 	 * merger will be able to merge with a different working tree abstraction.
 	 *
-	 * @param workingTreeIterator
+	 * @param workingTreeIt
 	 *            the workingTreeIt to set
 	 */
-	public void setWorkingTreeIterator(WorkingTreeIterator workingTreeIterator) {
-		this.workingTreeIterator = workingTreeIterator;
+	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
+		this.workingTreeIt = workingTreeIt;
 	}
 }

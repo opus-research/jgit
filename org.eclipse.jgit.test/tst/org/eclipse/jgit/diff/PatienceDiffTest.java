@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.transport.FetchResult;
+package org.eclipse.jgit.diff;
 
-/**
- * Encapsulates the result of a {@link PullCommand}
- */
-public class PullResult {
-	private final FetchResult fetchResult;
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
 
-	private final MergeResult mergeResult;
-
-	private final String fetchedFrom;
-
-	PullResult(FetchResult fetchResult, String fetchedFrom,
-			MergeResult mergeResult) {
-		this.fetchResult = fetchResult;
-		this.fetchedFrom = fetchedFrom;
-		this.mergeResult = mergeResult;
-	}
-
-	/**
-	 * @return the fetch result, or <code>null</code>
-	 */
-	public FetchResult getFetchResult() {
-		return this.fetchResult;
-	}
-
-	/**
-	 * @return the merge result, or <code>null</code>
-	 */
-	public MergeResult getMergeResult() {
-		return this.mergeResult;
-	}
-
-	/**
-	 * @return the name of the remote configuration from which fetch was tried,
-	 *         or <code>null</code>
-	 */
-	public String getFetchedFrom() {
-		return this.fetchedFrom;
-	}
-
+public class PatienceDiffTest extends AbstractDiffTestCase {
 	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		if (fetchResult != null)
-			sb.append(fetchResult.toString());
-		else
-			sb.append("No fetch result");
-		sb.append("\n");
-		if (mergeResult != null)
-			sb.append(mergeResult.toString());
-		else
-			sb.append("No merge result");
-		return sb.toString();
+	protected DiffAlgorithm algorithm() {
+		PatienceDiff pd = new PatienceDiff();
+		pd.setFallbackAlgorithm(null);
+		return pd;
+	}
+
+	public void testEdit_NoUniqueMiddleSideA() {
+		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 5, 1, 5), r.get(0));
+	}
+
+	public void testEdit_NoUniqueMiddleSideB() {
+		EditList r = diff(t("aRSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 3, 1, 5), r.get(0));
+	}
+
+	public void testPerformanceTestDeltaLength() {
+		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
+		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharArray ac = new CharArray(a);
+		CharArray bc = new CharArray(b);
+		EditList r = algorithm().diff(new CharCmp(), ac, bc);
+		assertEquals(25, r.size());
 	}
 }

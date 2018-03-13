@@ -54,9 +54,6 @@ public class ConfigConstants {
 	/** The "branch" section */
 	public static final String CONFIG_BRANCH_SECTION = "branch";
 
-	/** The "remote" section */
-	public static final String CONFIG_REMOTE_SECTION = "remote";
-
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
@@ -84,9 +81,4 @@ public class ConfigConstants {
 	/** The "rebase" key */
 	public static final String CONFIG_KEY_REBASE = "rebase";
 
-	/** The "url" key */
-	public static final String CONFIG_KEY_URL = "url";
-
-	/** The "autosetupmerge" key */
-	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
 }
