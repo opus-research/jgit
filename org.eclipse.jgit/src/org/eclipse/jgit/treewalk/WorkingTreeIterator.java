@@ -335,36 +335,39 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private InputStream possiblyFilteredInputStream(final Entry e,
 			final InputStream is, final long len) throws IOException {
+		InputStream filteredIs;
 		if (!mightNeedCleaning()) {
+			filteredIs = is;
 			canonLen = len;
-			return is;
-		}
-
-		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
-			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			byte[] raw = rawbuf.array();
-			int n = rawbuf.limit();
-			if (!isBinary(raw, n)) {
-				rawbuf = filterClean(raw, n);
-				raw = rawbuf.array();
-				n = rawbuf.limit();
+		} else {
+			if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
+				ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
+				byte[] raw = rawbuf.array();
+				int n = rawbuf.limit();
+				if (!isBinary(raw, n)) {
+					rawbuf = filterClean(raw, n);
+					raw = rawbuf.array();
+					n = rawbuf.limit();
+				}
+				filteredIs = new ByteArrayInputStream(raw, 0, n);
+				canonLen = n;
+			} else {
+				if (isBinary(e)) {
+					filteredIs = is;
+					canonLen = len;
+				} else {
+					final InputStream lenIs = filterClean(e
+							.openInputStream());
+					try {
+						canonLen = computeLength(lenIs);
+					} finally {
+						safeClose(lenIs);
+					}
+					filteredIs = filterClean(is);
+				}
 			}
-			canonLen = n;
-			return new ByteArrayInputStream(raw, 0, n);
 		}
-
-		if (isBinary(e)) {
-			canonLen = len;
-			return is;
-		}
-
-		final InputStream lenIs = filterClean(e.openInputStream());
-		try {
-			canonLen = computeLength(lenIs);
-		} finally {
-			safeClose(lenIs);
-		}
-		return filterClean(is);
+		return filteredIs;
 	}
 
 	private static void safeClose(final InputStream in) {
@@ -412,7 +415,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) {
+	private InputStream filterClean(InputStream in) throws IOException {
 		return new EolCanonicalizingInputStream(in, true);
 	}
 
@@ -494,15 +497,18 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			long rawLen = getEntryLength();
 			if (rawLen == 0)
 				canonLen = 0;
-			InputStream is = current().openInputStream();
-			try {
-				// canonLen gets updated here
-				possiblyFilteredInputStream(current(), is, current()
-						.getLength());
-			} finally {
-				safeClose(is);
+			if (getEntryLastModified() == 0)
+				System.out.println("W0?");
+			// else {
+				InputStream is = current().openInputStream();
+				try {
+					possiblyFilteredInputStream(current(), is, current()
+							.getLength());
+				} finally {
+					safeClose(is);
+				}
 			}
-		}
+		// }
 		return canonLen;
 	}
 
@@ -711,7 +717,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isUpdateNeeded())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
+		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
 			return MetadataDiff.DIFFER_BY_METADATA;
 
 		// Determine difference in mode-bits of file and index-entry. In the

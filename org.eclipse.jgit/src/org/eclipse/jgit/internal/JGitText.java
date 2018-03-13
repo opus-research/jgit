@@ -536,7 +536,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unexpectedRefReport;
 	/***/ public String unexpectedReportLine;
 	/***/ public String unexpectedReportLine2;
-	/***/ public String unknownOrUnsupportedCommand;
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;

@@ -34,8 +34,7 @@ public class InMemoryRepository extends DfsRepository {
 	 * Initialize a new in-memory repository.
 	 *
 	 * @param repoDesc
-	 *            description of the repository.
-	 * @since 2.0
+	 *             description of the repository.
 	 */
 	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
 		super(new DfsRepositoryBuilder<DfsRepositoryBuilder, InMemoryRepository>() {
