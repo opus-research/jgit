@@ -156,7 +156,7 @@ A ref block is written as:
     uint24 ( block_len )
     ref_record+
     uint32( restart_offset )+
-    uint16( restart_count_m1 )
+    uint16( restart_count )
     padding?
 
 Blocks begin with `block_type = 'r'` and a 3-byte `block_len` which
@@ -172,18 +172,17 @@ is described below.
 A variable number of 4-byte `restart_offset` values follow the
 records.  Offsets are relative to the start of the block and refer to
 the first byte of any `ref_record` whose name has not been prefix
-compressed.  Readers can start linear scans from any of these records.
+compressed.  Entries in the `restart_offset` list must be sorted,
+ascending.  Readers can start linear scans from any of these records.
 Offsets in the first block are relative to the start of the file
 (position 0), and include the file header.  This requires the first
 restart in the first block to be at offset 8.
 
-The 2-byte `restart_count_m1` stores *one less* than the number of
-entries in the `restart_offset` list.  There is always a restart
-corresponding to the first ref record. Readers are responsible for
-computing `restart_count = restart_count_m1 + 1`.
+The 2-byte `restart_count` stores the number of entries in the
+`restart_offset` list, which must not be empty.
 
 Readers can use the restart count to binary search between restarts
-before starting a linear scan.  The `restart_count_m1` field must be
+before starting a linear scan.  The `restart_count` field must be
 the last 2 bytes of the block as specified by `block_len` from the
 block header.
 
@@ -224,18 +223,17 @@ the following:
 - `0x0`: deletion; no value data (see transactions, below)
 - `0x1`: one 20-byte object id; value of the ref
 - `0x2`: two 20-byte object ids; value of the ref, peeled target
-- `0x3`: symbolic reference: `varint( target_len ) target`
-- `0x4`: length delimited extension: `varint( data_len ) data`
+- `0x3`: symref and text: `varint( text_len ) text`
+- `0x4`: index record (see below)
+- `0x5`: log record (see below)
 
-Symbolic references use a varint length followed by a variable number
-of bytes to encode the complete reference target.  No compression is
-applied to the target name.
+Symbolic references use `0x3` with a `text` string starting with `"ref: "`,
+followed by the complete name of the reference target.  No
+compression is applied to the target name.  Other types of contents
+that are also reference like, such as `FETCH_HEAD` and `MERGE_HEAD`,
+may also be stored using type `0x3`.
 
-Type `0x4` is available for use by systems that need to store
-additional data under a reference name like `FETCH_HEAD` or
-`MERGE_HEAD`.
-
-Types `0x5..0x7` are reserved.
+Types `0x6..0x7` are reserved for future use.
 
 ### Ref index
 
@@ -258,7 +256,7 @@ Index block format:
     uint32( (0x80 << 24) | block_len )
     index_record+
     uint32( restart_offset )+
-    uint16( restart_count_m1 )
+    uint16( restart_count )
     padding?
 
 The index block header starts with the high bit set.  This identifies
@@ -268,7 +266,7 @@ byte order, and allowed to occupy space normally used by the block
 type in other blocks.  This supports indexes significantly larger than
 the file's `block_size`.
 
-The `restart_offset` and `restart_count_m1` fields are identical in
+The `restart_offset` and `restart_count` fields are identical in
 format, meaning and usage as in ref blocks.
 
 To reduce the number of reads required for random access in very large
@@ -287,7 +285,7 @@ An index record describes the last entry in another block.
 Index records are written as:
 
     varint( prefix_length )
-    varint( (suffix_length << 3) | 0 )
+    varint( (suffix_length << 3) | 0x4 )
     suffix
     varint( block_offset )
 
@@ -319,7 +317,7 @@ An object block is written as:
     uint24 ( block_len )
     obj_record+
     uint32( restart_offset )+
-    uint16( restart_count_m1 )
+    uint16( restart_count )
     padding?
 
 Fields are identical to ref block.  Binary search using the restart
@@ -414,7 +412,7 @@ A log block is written as:
     zlib_deflate {
       log_record+
       int32( restart_offset )+
-      int16( restart_count_m1 )
+      int16( restart_count )
     }
 
 Log blocks look similar to ref blocks, except `block_type = 'g'`.
@@ -429,7 +427,7 @@ prefer prefixing the inflation output buffer with the 4-byte header.
 Within the deflate container, a variable number of `log_record`
 describe reference changes.  The log record format is described
 below.  See ref block format (above) for a description of
-`restart_offset` and `restart_count_m1`.
+`restart_offset` and `restart_count`.
 
 Unlike ref blocks, log blocks are written at any alignment, without
 padding.  The first log block immediately follows the end of the prior
@@ -450,7 +448,7 @@ where `time_usec` is the update time in microseconds since the epoch.
 The `reverse_int64` function inverses the value so lexographical
 ordering the network byte order time sorts more recent records first:
 
-    reverse_int(int64 t) {
+    reverse_int64(int64 t) {
       return 0xffffffffffffffff - t;
     }
 
@@ -466,7 +464,7 @@ key described above.
 
 ```
     varint( prefix_length )
-    varint( (suffix_length << 3) | 0 )
+    varint( (suffix_length << 3) | 0x5 )
     suffix
 
     old_id
@@ -501,7 +499,7 @@ not block aligned.
 
 ### Log index
 
-The log index stores the log key (`refname \0 reverse_int32(time_sec)`)
+The log index stores the log key (`refname \0 reverse_int64(time_sec)`)
 for the last log record of every log block in the file, supporting
 bounded-time lookup.
 
@@ -511,7 +509,7 @@ block.  There is no padding used to align the log index to block
 alignment.
 
 Log index format is identical to ref index, except the keys are 5
-bytes longer to include `'\0'` and the 4-byte `reverse_int32(time)`.
+bytes longer to include `'\0'` and the 4-byte `reverse_int64(time)`.
 Records use `block_offset` to refer to the start of a log block.
 
 #### Reading the index
@@ -607,9 +605,7 @@ Less frequent restart points makes prefix compression more effective,
 decreasing overall file size, with increased penalities for readers
 walking through more records after the binary search step.
 
-A maximum of `65536` restart points per block is supported.  The
-`restart_count` field stores restart points `-1`, with a maximum
-value of `65535`.
+A maximum of `65535` restart points per block is supported.
 
 ## Considerations
 
