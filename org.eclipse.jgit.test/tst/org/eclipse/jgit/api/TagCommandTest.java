@@ -50,6 +50,7 @@ import java.util.List;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
@@ -60,8 +61,8 @@ import org.junit.Test;
 public class TagCommandTest extends RepositoryTestCase {
 
 	@Test
-	public void testTaggingOnHead() throws JGitInternalException,
-			GitAPIException {
+	public void testTaggingOnHead() throws UnmergedPathException,
+			JGitInternalException, GitAPIException {
 		Git git = new Git(db);
 		RevCommit commit = git.commit().setMessage("initial commit").call();
 		RevTag tag = git.tag().setName("tag").call();
@@ -69,7 +70,8 @@ public class TagCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testTagging() throws JGitInternalException, GitAPIException {
+	public void testTagging() throws UnmergedPathException,
+			JGitInternalException, GitAPIException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		RevCommit commit = git.commit().setMessage("second commit").call();
@@ -79,8 +81,8 @@ public class TagCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testEmptyTagName() throws JGitInternalException,
-			GitAPIException {
+	public void testEmptyTagName() throws UnmergedPathException,
+			JGitInternalException, GitAPIException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		try {
@@ -93,8 +95,8 @@ public class TagCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testInvalidTagName() throws JGitInternalException,
-			GitAPIException {
+	public void testInvalidTagName() throws UnmergedPathException,
+			JGitInternalException, GitAPIException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		try {
@@ -106,8 +108,8 @@ public class TagCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testFailureOnSignedTags() throws JGitInternalException,
-			GitAPIException {
+	public void testFailureOnSignedTags() throws UnmergedPathException,
+			JGitInternalException, GitAPIException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		try {
