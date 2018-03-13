@@ -51,14 +51,13 @@ import org.eclipse.jgit.errors.MissingObjectException;
 abstract class BlockRevQueue extends AbstractRevQueue {
 	protected BlockFreeList free;
 
-	protected BlockRevQueue(boolean firstParent) {
-		super(firstParent);
+	/** Create an empty revision queue. */
+	protected BlockRevQueue() {
 		free = new BlockFreeList();
 	}
 
 	BlockRevQueue(final Generator s) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
-		super(s.firstParent);
 		free = new BlockFreeList();
 		outputType = s.outputType();
 		s.shareFreeList(this);

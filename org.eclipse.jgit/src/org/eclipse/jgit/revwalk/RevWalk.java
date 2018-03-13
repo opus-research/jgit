@@ -194,8 +194,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	private boolean retainBody = true;
 
-	private boolean firstParent;
-
 	private boolean rewriteParents = true;
 
 	boolean shallowCommitsInitialized;
@@ -230,7 +228,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		idBuffer = new MutableObjectId();
 		objects = new ObjectIdOwnerMap<RevObject>();
 		roots = new ArrayList<RevCommit>();
-		queue = new DateRevQueue(false);
+		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
 		sorting = EnumSet.of(RevSort.NONE);
 		filter = RevFilter.ALL;
@@ -621,30 +619,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	public void setRetainBody(final boolean retain) {
 		retainBody = retain;
-	}
-
-	/**
-	 * @return whether only first-parent links should be followed when walking.
-	 * @since 4.1
-	 */
-	public boolean isFirstParent() {
-		return firstParent;
-	}
-
-	/**
-	 * Set whether or not only first parent links should be followed.
-	 * <p>
-	 * If set, second- and higher-parent links are not traversed at all.
-	 *
-	 * @param enable
-	 *            true to walk only first-parent links.
-	 * @since 4.1
-	 */
-	public void setFirstParent(final boolean enable) {
-		assertNotStarted();
-		firstParent = enable;
-		queue = new DateRevQueue(firstParent);
-		pending = new StartGenerator(this);
 	}
 
 	/**
@@ -1302,7 +1276,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		}
 
 		roots.clear();
-		queue = new DateRevQueue(firstParent);
+		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
 	}
 
@@ -1323,7 +1297,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		objects.clear();
 		reader.close();
 		roots.clear();
-		queue = new DateRevQueue(firstParent);
+		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
 		shallowCommitsInitialized = false;
 	}

@@ -105,7 +105,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotChangeActionOnComment;
 	/***/ public String cannotChangeToComment;
 	/***/ public String cannotCheckoutOursSwitchBranch;
-	/***/ public String cannotCombineMergeBaseWithFirstParent;
 	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;

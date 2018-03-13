@@ -49,10 +49,6 @@ abstract class AbstractRevQueue extends Generator {
 	/** Current output flags set for this generator instance. */
 	int outputType;
 
-	AbstractRevQueue(boolean firstParent) {
-		super(firstParent);
-	}
-
 	/**
 	 * Add a commit to the queue.
 	 * <p>
@@ -100,15 +96,10 @@ abstract class AbstractRevQueue extends Generator {
 	 */
 	public final void addParents(final RevCommit c, final RevFlag queueControl) {
 		final RevCommit[] pList = c.parents;
-		if (pList == null) {
+		if (pList == null)
 			return;
-		}
-		for (int i = 0; i < pList.length; i++) {
-			if (firstParent && i > 0) {
-				break;
-			}
-			add(pList[i], queueControl);
-		}
+		for (RevCommit p : pList)
+			add(p, queueControl);
 	}
 
 	/**
@@ -136,10 +127,6 @@ abstract class AbstractRevQueue extends Generator {
 	}
 
 	private static class AlwaysEmptyQueue extends AbstractRevQueue {
-		private AlwaysEmptyQueue() {
-			super(false);
-		}
-
 		@Override
 		public void add(RevCommit c) {
 			throw new UnsupportedOperationException();

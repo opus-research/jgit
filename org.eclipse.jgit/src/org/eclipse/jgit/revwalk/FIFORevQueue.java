@@ -56,11 +56,7 @@ public class FIFORevQueue extends BlockRevQueue {
 
 	/** Create an empty FIFO queue. */
 	public FIFORevQueue() {
-		super(false);
-	}
-
-	FIFORevQueue(boolean firstParent) {
-		super(firstParent);
+		super();
 	}
 
 	FIFORevQueue(final Generator s) throws MissingObjectException,

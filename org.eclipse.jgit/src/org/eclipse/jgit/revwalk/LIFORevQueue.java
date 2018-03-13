@@ -55,7 +55,7 @@ public class LIFORevQueue extends BlockRevQueue {
 
 	/** Create an empty LIFO queue. */
 	public LIFORevQueue() {
-		super(false);
+		super();
 	}
 
 	LIFORevQueue(final Generator s) throws MissingObjectException,
