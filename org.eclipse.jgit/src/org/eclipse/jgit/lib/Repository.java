@@ -727,7 +727,7 @@ public abstract class Repository implements AutoCloseable {
 			return ObjectId.fromString(revstr);
 
 		if (Repository.isValidRefName("x/" + revstr)) { //$NON-NLS-1$
-			Ref r = getRefDatabase().findRef(revstr);
+			Ref r = getRefDatabase().getRef(revstr);
 			if (r != null)
 				return r.getObjectId();
 		}
@@ -907,7 +907,7 @@ public abstract class Repository implements AutoCloseable {
 	 * @throws IOException
 	 */
 	public Ref getRef(final String name) throws IOException {
-		return getRefDatabase().findRef(name);
+		return getRefDatabase().getRef(name);
 	}
 
 	/**
