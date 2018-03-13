@@ -60,65 +60,32 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
- * Filter applying a {@link TreeFilter} against changed paths in each commit.
+ * First phase of a path limited revision walk.
+ * <p>
+ * This filter is ANDed to evaluate after all other filters and ties the
+ * configured {@link TreeFilter} into the revision walking process.
  * <p>
  * Each commit is differenced concurrently against all of its parents to look
- * for tree entries that are interesting to the {@link TreeFilter}.
+ * for tree entries that are interesting to the TreeFilter. If none are found
+ * the commit is colored with {@link RevWalk#REWRITE}, allowing a later pass
+ * implemented by {@link RewriteGenerator} to remove those colored commits from
+ * the DAG.
  *
- * @since 3.5
+ * @see RewriteGenerator
  */
-public class TreeRevFilter extends RevFilter {
+class RewriteTreeFilter extends RevFilter {
 	private static final int PARSED = RevWalk.PARSED;
 
 	private static final int UNINTERESTING = RevWalk.UNINTERESTING;
 
-	private final int rewriteFlag;
+	private static final int REWRITE = RevWalk.REWRITE;
+
 	private final TreeWalk pathFilter;
 
-	/**
-	 * Create a {@link RevFilter} from a {@link TreeFilter}.
-	 *
-	 * @param walker
-	 *            walker used for reading trees.
-	 * @param t
-	 *            filter to compare against any changed paths in each commit. If a
-	 *            {@link FollowFilter}, will be replaced with a new filter
-	 *            following new paths after a rename.
-	 * @since 3.5
-	 */
-	public TreeRevFilter(final RevWalk walker, final TreeFilter t) {
-		this(walker, t, 0);
-	}
-
-
-	/**
-	 * Create a filter for the first phase of a parent-rewriting limited revision
-	 * walk.
-	 * <p>
-	 * This filter is ANDed to evaluate before all other filters and ties the
-	 * configured {@link TreeFilter} into the revision walking process.
-	 * <p>
-	 * If no interesting tree entries are found the commit is colored with
-	 * {@code rewriteFlag}, allowing a later pass implemented by
-	 * {@link RewriteGenerator} to remove those colored commits from the DAG.
-	 *
-	 * @see RewriteGenerator
-	 *
-	 * @param walker
-	 *            walker used for reading trees.
-	 * @param t
-	 *            filter to compare against any changed paths in each commit. If a
-	 *            {@link FollowFilter}, will be replaced with a new filter
-	 *            following new paths after a rename.
-	 * @param rewriteFlag
-	 *            flag to color commits to be removed from the simplified DAT.
-	 */
-	TreeRevFilter(final RevWalk walker, final TreeFilter t,
-			final int rewriteFlag) {
+	RewriteTreeFilter(final RevWalk walker, final TreeFilter t) {
 		pathFilter = new TreeWalk(walker.reader);
 		pathFilter.setFilter(t);
 		pathFilter.setRecursive(t.shouldBeRecursive());
-		this.rewriteFlag = rewriteFlag;
 	}
 
 	@Override
@@ -161,7 +128,7 @@ public class TreeRevFilter extends RevFilter {
 				// No changes, so our tree is effectively the same as
 				// our parent tree. We pass the buck to our parent.
 				//
-				c.flags |= rewriteFlag;
+				c.flags |= REWRITE;
 				return false;
 			} else {
 				// We have interesting items, but neither of the special
@@ -182,7 +149,7 @@ public class TreeRevFilter extends RevFilter {
 			//
 			if (tw.next())
 				return true;
-			c.flags |= rewriteFlag;
+			c.flags |= REWRITE;
 			return false;
 		}
 
@@ -225,7 +192,7 @@ public class TreeRevFilter extends RevFilter {
 					continue;
 				}
 
-				c.flags |= rewriteFlag;
+				c.flags |= REWRITE;
 				c.parents = new RevCommit[] { p };
 				return false;
 			}
@@ -256,7 +223,7 @@ public class TreeRevFilter extends RevFilter {
 		// as they are and allow those parents to flow into pending
 		// for further scanning.
 		//
-		c.flags |= rewriteFlag;
+		c.flags |= REWRITE;
 		return false;
 	}
 
