@@ -92,6 +92,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
+	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
@@ -529,7 +530,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
-	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;
 	/***/ public String uriNotFound;
 	/***/ public String userConfigFileInvalid;

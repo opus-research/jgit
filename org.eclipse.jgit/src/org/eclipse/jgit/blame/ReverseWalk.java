@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,74 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+package org.eclipse.jgit.blame;
 
-import java.io.File;
 import java.io.IOException;
 
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 
-public class InitCommandTest extends RepositoryTestCase {
+final class ReverseWalk extends RevWalk {
+	ReverseWalk(Repository repo) {
+		super(repo);
+	}
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
+	public ReverseCommit next() throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		ReverseCommit c = (ReverseCommit) super.next();
+		if (c == null)
+			return null;
+		for (int pIdx = 0; pIdx < c.getParentCount(); pIdx++)
+			((ReverseCommit) c.getParent(pIdx)).addChild(c);
+		return c;
 	}
 
-	@Test
-	public void testInitRepository() {
-		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			addRepoToClose(repository);
-			assertNotNull(repository);
-		} catch (Exception e) {
-			fail(e.getMessage());
+	@Override
+	protected RevCommit createCommit(AnyObjectId id) {
+		return new ReverseCommit(id);
+	}
+
+	static final class ReverseCommit extends RevCommit {
+		private static final ReverseCommit[] NO_CHILDREN = {};
+
+		private ReverseCommit[] children = NO_CHILDREN;
+
+		ReverseCommit(AnyObjectId id) {
+			super(id);
+		}
+
+		void addChild(ReverseCommit c) {
+			// Always put the most recent child onto the front of the list.
+			// This works correctly because our ReverseWalk parent (above)
+			// runs in COMMIT_TIME_DESC order. Older commits will be popped
+			// later and should go in front of the children list so they are
+			// visited first by BlameGenerator when considering candidates.
+
+			int cnt = children.length;
+			if (cnt == 0)
+				children = new ReverseCommit[] { c };
+			else if (cnt == 1)
+				children = new ReverseCommit[] { c, children[0] };
+			else {
+				ReverseCommit[] n = new ReverseCommit[1 + cnt];
+				n[0] = c;
+				System.arraycopy(children, 0, n, 1, cnt);
+				children = n;
+			}
+		}
+
+		int getChildCount() {
+			return children.length;
+		}
+
+		ReverseCommit getChild(final int nth) {
+			return children[nth];
 		}
 	}
-
-	@Test
-	public void testInitBareRepository() {
-		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			addRepoToClose(repository);
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-		FileUtils.delete(temp);
-		FileUtils.mkdir(temp);
-		return temp;
-	}
-
 }
