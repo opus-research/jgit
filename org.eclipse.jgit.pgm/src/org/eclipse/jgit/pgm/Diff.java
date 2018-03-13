@@ -53,9 +53,11 @@ import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.List;
 
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
+import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.diff.HistogramDiff;
+import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -98,6 +100,16 @@ class Diff extends TextBuiltin {
 	void noRenames(@SuppressWarnings("unused") boolean on) {
 		detectRenames = Boolean.FALSE;
 	}
+
+	enum SupportedAlgorithm {
+		myers(MyersDiff.INSTANCE), histogram(new HistogramDiff());
+
+		public DiffAlgorithm algorithm;
+
+		SupportedAlgorithm(DiffAlgorithm a) {
+			algorithm = a;
+		}
+	};
 
 	@Option(name = "--algorithm", metaVar = "metaVar_diffAlg", usage = "usage_diffAlgorithm")
 	void setAlgorithm(SupportedAlgorithm s) {
