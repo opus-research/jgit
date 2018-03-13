@@ -42,26 +42,22 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
-import org.junit.Test;
 
 public class FetchCommandTest extends RepositoryTestCase {
 
-	@Test
 	public void testFetch() throws JGitInternalException, IOException,
 			GitAPIException, URISyntaxException {
 
@@ -79,7 +75,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 
 		// create some refs via commits and tag
 		RevCommit commit = git2.commit().setMessage("initial commit").call();
-		Ref tagRef = git2.tag().setName("tag").call();
+		RevTag tag = git2.tag().setName("tag").call();
 
 		Git git1 = new Git(db);
 
@@ -89,8 +85,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 
 		assertEquals(commit.getId(),
 				db.resolve(commit.getId().getName() + "^{commit}"));
-		assertEquals(tagRef.getObjectId(),
-				db.resolve(tagRef.getObjectId().getName()));
+		assertEquals(tag.getId(), db.resolve(tag.getId().getName()));
 
 	}
 

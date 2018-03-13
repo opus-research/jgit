@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,26 +43,13 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 
-import org.eclipse.jgit.events.IndexChangedEvent;
-import org.eclipse.jgit.events.IndexChangedListener;
-import org.eclipse.jgit.events.ListenerList;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 
 public class DirCacheBuilderTest extends RepositoryTestCase {
-	@Test
 	public void testBuildEmpty() throws Exception {
 		{
 			final DirCache dc = db.lockDirCache();
@@ -79,7 +65,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testBuildRejectsUnsetFileMode() throws Exception {
 		final DirCache dc = DirCache.newInCore();
 		final DirCacheBuilder b = dc.builder();
@@ -94,7 +79,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testBuildOneFile_FinishWriteCommit() throws Exception {
 		final String path = "a-file-path";
 		final FileMode mode = FileMode.REGULAR_FILE;
@@ -144,7 +128,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testBuildOneFile_Commit() throws Exception {
 		final String path = "a-file-path";
 		final FileMode mode = FileMode.REGULAR_FILE;
@@ -192,74 +175,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
-	public void testBuildOneFile_Commit_IndexChangedEvent()
-			throws Exception {
-		final class ReceivedEventMarkerException extends RuntimeException {
-			private static final long serialVersionUID = 1L;
-			// empty
-		}
-
-		final String path = "a-file-path";
-		final FileMode mode = FileMode.REGULAR_FILE;
-		// "old" date in 2008
-		final long lastModified = 1218123387057L;
-		final int length = 1342;
-		DirCacheEntry entOrig;
-		boolean receivedEvent = false;
-
-		DirCache dc = db.lockDirCache();
-		IndexChangedListener listener = new IndexChangedListener() {
-
-			public void onIndexChanged(IndexChangedEvent event) {
-				throw new ReceivedEventMarkerException();
-			}
-		};
-
-		ListenerList l = db.getListenerList();
-		l.addIndexChangedListener(listener);
-		DirCacheBuilder b = dc.builder();
-
-		entOrig = new DirCacheEntry(path);
-		entOrig.setFileMode(mode);
-		entOrig.setLastModified(lastModified);
-		entOrig.setLength(length);
-		b.add(entOrig);
-		try {
-			b.commit();
-		} catch (ReceivedEventMarkerException e) {
-			receivedEvent = true;
-		}
-		if (!receivedEvent)
-			fail("did not receive IndexChangedEvent");
-
-		// do the same again, as this doesn't change index compared to first
-		// round we should get no event this time
-		dc = db.lockDirCache();
-		listener = new IndexChangedListener() {
-
-			public void onIndexChanged(IndexChangedEvent event) {
-				throw new ReceivedEventMarkerException();
-			}
-		};
-
-		l = db.getListenerList();
-		l.addIndexChangedListener(listener);
-		b = dc.builder();
-
-		entOrig = new DirCacheEntry(path);
-		entOrig.setFileMode(mode);
-		entOrig.setLastModified(lastModified);
-		entOrig.setLength(length);
-		b.add(entOrig);
-		try {
-			b.commit();
-		} catch (ReceivedEventMarkerException e) {
-			fail("unexpected IndexChangedEvent");
-		}
-	}
-
-	@Test
 	public void testFindSingleFile() throws Exception {
 		final String path = "a-file-path";
 		final DirCache dc = db.readDirCache();
@@ -286,7 +201,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		assertSame(entOrig, dc.getEntry(path));
 	}
 
-	@Test
 	public void testAdd_InGitSortOrder() throws Exception {
 		final DirCache dc = db.readDirCache();
 
@@ -311,7 +225,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testAdd_ReverseGitSortOrder() throws Exception {
 		final DirCache dc = db.readDirCache();
 
@@ -336,7 +249,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testBuilderClear() throws Exception {
 		final DirCache dc = db.readDirCache();
 

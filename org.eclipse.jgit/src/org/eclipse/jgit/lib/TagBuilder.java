@@ -162,20 +162,20 @@ public class TagBuilder {
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
 		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
 		try {
-			w.write("object "); //$NON-NLS-1$
+			w.write("object ");
 			getObjectId().copyTo(w);
 			w.write('\n');
 
-			w.write("type "); //$NON-NLS-1$
+			w.write("type ");
 			w.write(Constants.typeString(getObjectType()));
-			w.write("\n"); //$NON-NLS-1$
+			w.write("\n");
 
-			w.write("tag "); //$NON-NLS-1$
+			w.write("tag ");
 			w.write(getTag());
-			w.write("\n"); //$NON-NLS-1$
+			w.write("\n");
 
 			if (getTagger() != null) {
-				w.write("tagger "); //$NON-NLS-1$
+				w.write("tagger ");
 				w.write(getTagger().toExternalString());
 				w.write('\n');
 			}
@@ -203,7 +203,6 @@ public class TagBuilder {
 		return build();
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();

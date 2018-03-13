@@ -47,64 +47,41 @@ package org.eclipse.jgit.pgm;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.text.DateFormat;
 import java.text.MessageFormat;
-import java.util.ArrayList;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.RenameDetector;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.notes.NoteMap;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.util.GitDateFormatter;
-import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_viewCommitHistory")
 class Log extends RevWalkTextBuiltin {
+	private final TimeZone myTZ = TimeZone.getDefault();
 
-	private GitDateFormatter dateFormatter = new GitDateFormatter(
-			Format.DEFAULT);
+	private final DateFormat fmt;
 
-	private DiffFormatter diffFmt;
+	private final DiffFormatter diffFmt = new DiffFormatter( //
+			new BufferedOutputStream(System.out));
 
 	private Map<AnyObjectId, Set<Ref>> allRefsByPeeledObjectId;
 
-	private Map<String, NoteMap> noteMaps;
-
 	@Option(name="--decorate", usage="usage_showRefNamesMatchingCommits")
 	private boolean decorate;
-
-	@Option(name = "--no-standard-notes", usage = "usage_noShowStandardNotes")
-	private boolean noStandardNotes;
-
-	private List<String> additionalNoteRefs = new ArrayList<String>();
-
-	@Option(name = "--show-notes", usage = "usage_showNotes", metaVar = "metaVar_ref")
-	void addAdditionalNoteRef(String notesRef) {
-		additionalNoteRefs.add(notesRef);
-	}
-
-	@Option(name = "--date", usage = "usage_date")
-	void dateFormat(String date) {
-		if (date.toLowerCase().equals(date))
-			date = date.toUpperCase();
-		dateFormatter = new GitDateFormatter(Format.valueOf(date));
-	}
 
 	// BEGIN -- Options shared with Diff
 	@Option(name = "-p", usage = "usage_showPatch")
@@ -171,21 +148,22 @@ class Log extends RevWalkTextBuiltin {
 
 	@Option(name = "--no-prefix", usage = "usage_noPrefix")
 	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix(""); //$NON-NLS-1$
-		diffFmt.setNewPrefix(""); //$NON-NLS-1$
+		diffFmt.setOldPrefix("");
+		diffFmt.setNewPrefix("");
 	}
 
 	// END -- Options shared with Diff
 
-
 	Log() {
-		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US);
 	}
 
 	@Override
-	protected void init(final Repository repository, final String gitDir) {
-		super.init(repository, gitDir);
-		diffFmt = new DiffFormatter(new BufferedOutputStream(outs));
+	protected RevWalk createWalk() {
+		RevWalk ret = super.createWalk();
+		if (decorate)
+			allRefsByPeeledObjectId = getRepository().getAllRefsByPeeledObjectId();
+		return ret;
 	}
 
 	@Override
@@ -200,147 +178,50 @@ class Log extends RevWalkTextBuiltin {
 				rd.setRenameLimit(renameLimit.intValue());
 			}
 
-			if (!noStandardNotes || !additionalNoteRefs.isEmpty()) {
-				createWalk();
-				noteMaps = new LinkedHashMap<String, NoteMap>();
-				if (!noStandardNotes) {
-					addNoteMap(Constants.R_NOTES_COMMITS);
-				}
-				if (!additionalNoteRefs.isEmpty()) {
-					for (String notesRef : additionalNoteRefs) {
-						if (!notesRef.startsWith(Constants.R_NOTES)) {
-							notesRef = Constants.R_NOTES + notesRef;
-						}
-						addNoteMap(notesRef);
-					}
-				}
-			}
-
-			if (decorate)
-				allRefsByPeeledObjectId = getRepository()
-						.getAllRefsByPeeledObjectId();
-
 			super.run();
 		} finally {
 			diffFmt.release();
 		}
 	}
 
-	private void addNoteMap(String notesRef) throws IOException {
-		Ref notes = db.getRef(notesRef);
-		if (notes == null)
-			return;
-		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());
-		noteMaps.put(notesRef,
-				NoteMap.read(argWalk.getObjectReader(), notesCommit));
-	}
-
 	@Override
 	protected void show(final RevCommit c) throws Exception {
-		outw.print(CLIText.get().commitLabel);
-		outw.print(" "); //$NON-NLS-1$
-		c.getId().copyTo(outbuffer, outw);
+		out.print(CLIText.get().commitLabel);
+		out.print(" ");
+		c.getId().copyTo(outbuffer, out);
 		if (decorate) {
 			Collection<Ref> list = allRefsByPeeledObjectId.get(c);
 			if (list != null) {
-				outw.print(" ("); //$NON-NLS-1$
+				out.print(" (");
 				for (Iterator<Ref> i = list.iterator(); i.hasNext(); ) {
-					outw.print(i.next().getName());
+					out.print(i.next().getName());
 					if (i.hasNext())
-						outw.print(" "); //$NON-NLS-1$
+						out.print(" ");
 				}
-				outw.print(")"); //$NON-NLS-1$
+				out.print(")");
 			}
 		}
-		outw.println();
+		out.println();
 
 		final PersonIdent author = c.getAuthorIdent();
-		outw.println(MessageFormat.format(CLIText.get().authorInfo, author.getName(), author.getEmailAddress()));
-		outw.println(MessageFormat.format(CLIText.get().dateInfo,
-				dateFormatter.formatDate(author)));
+		out.println(MessageFormat.format(CLIText.get().authorInfo, author.getName(), author.getEmailAddress()));
 
-		outw.println();
-		final String[] lines = c.getFullMessage().split("\n"); //$NON-NLS-1$
+		final TimeZone authorTZ = author.getTimeZone();
+		fmt.setTimeZone(authorTZ != null ? authorTZ : myTZ);
+		out.println(MessageFormat.format(CLIText.get().dateInfo, fmt.format(author.getWhen())));
+
+		out.println();
+		final String[] lines = c.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    "); //$NON-NLS-1$
-			outw.print(s);
-			outw.println();
+			out.print("    ");
+			out.print(s);
+			out.println();
 		}
 
-		outw.println();
-		if (showNotes(c))
-			outw.println();
-
+		out.println();
 		if (c.getParentCount() == 1 && (showNameAndStatusOnly || showPatch))
 			showDiff(c);
-		outw.flush();
-	}
-
-	/**
-	 * @param c
-	 * @return <code>true</code> if at least one note was printed,
-	 *         <code>false</code> otherwise
-	 * @throws IOException
-	 */
-	private boolean showNotes(RevCommit c) throws IOException {
-		if (noteMaps == null)
-			return false;
-
-		boolean printEmptyLine = false;
-		boolean atLeastOnePrinted = false;
-		for (Map.Entry<String, NoteMap> e : noteMaps.entrySet()) {
-			String label = null;
-			String notesRef = e.getKey();
-			if (! notesRef.equals(Constants.R_NOTES_COMMITS)) {
-				if (notesRef.startsWith(Constants.R_NOTES))
-					label = notesRef.substring(Constants.R_NOTES.length());
-				else
-					label = notesRef;
-			}
-			boolean printedNote = showNotes(c, e.getValue(), label,
-					printEmptyLine);
-			atLeastOnePrinted |= printedNote;
-			printEmptyLine = printedNote;
-		}
-		return atLeastOnePrinted;
-	}
-
-	/**
-	 * @param c
-	 * @param map
-	 * @param label
-	 * @param emptyLine
-	 * @return <code>true</code> if note was printed, <code>false</code>
-	 *         otherwise
-	 * @throws IOException
-	 */
-	private boolean showNotes(RevCommit c, NoteMap map, String label,
-			boolean emptyLine)
-			throws IOException {
-		ObjectId blobId = map.get(c);
-		if (blobId == null)
-			return false;
-		if (emptyLine)
-			outw.println();
-		outw.print("Notes");
-		if (label != null) {
-			outw.print(" ("); //$NON-NLS-1$
-			outw.print(label);
-			outw.print(")"); //$NON-NLS-1$
-		}
-		outw.println(":"); //$NON-NLS-1$
-		try {
-			RawText rawText = new RawText(argWalk.getObjectReader()
-					.open(blobId).getCachedBytes(Integer.MAX_VALUE));
-			for (int i = 0; i < rawText.size(); i++) {
-				outw.print("    "); //$NON-NLS-1$
-				outw.println(rawText.getString(i));
-			}
-		} catch (LargeObjectException e) {
-			outw.println(MessageFormat.format(
-					CLIText.get().noteObjectTooLargeToPrint, blobId.name()));
-		}
-		return true;
+		out.flush();
 	}
 
 	private void showDiff(RevCommit c) throws IOException {
@@ -348,12 +229,12 @@ class Log extends RevWalkTextBuiltin {
 		final RevTree b = c.getTree();
 
 		if (showNameAndStatusOnly)
-			Diff.nameStatus(outw, diffFmt.scan(a, b));
+			Diff.nameStatus(out, diffFmt.scan(a, b));
 		else {
-			outw.flush();
+			out.flush();
 			diffFmt.format(a, b);
 			diffFmt.flush();
 		}
-		outw.println();
+		out.println();
 	}
 }

@@ -48,7 +48,7 @@ package org.eclipse.jgit.errors;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Exception thrown if a conflict occurs during a merge checkout.
@@ -77,7 +77,7 @@ public class CheckoutConflictException extends IOException {
 	private static String buildList(String[] files) {
 		StringBuilder builder = new StringBuilder();
 		for (String f : files) {
-			builder.append("\n"); //$NON-NLS-1$
+			builder.append("\n");
 			builder.append(f);
 		}
 		return builder.toString();

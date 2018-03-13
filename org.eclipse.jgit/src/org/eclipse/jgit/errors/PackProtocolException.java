@@ -63,7 +63,7 @@ public class PackProtocolException extends TransportException {
 	 *            message
 	 */
 	public PackProtocolException(final URIish uri, final String s) {
-		super(uri + ": " + s); //$NON-NLS-1$
+		super(uri + ": " + s);
 	}
 
 	/**
@@ -79,7 +79,7 @@ public class PackProtocolException extends TransportException {
 	 */
 	public PackProtocolException(final URIish uri, final String s,
 			final Throwable cause) {
-		this(uri + ": " + s, cause); //$NON-NLS-1$
+		this(uri + ": " + s, cause);
 	}
 
 	/**

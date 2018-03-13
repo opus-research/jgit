@@ -42,11 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.util.List;
-import java.util.Map;
-
-import org.eclipse.jgit.merge.ResolveMerger;
-import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
@@ -60,151 +55,43 @@ public class RebaseResult {
 		/**
 		 * Rebase was successful, HEAD points to the new commit
 		 */
-		OK {
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
+		OK,
 		/**
 		 * Aborted; the original HEAD was restored
 		 */
-		ABORTED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
+		ABORTED,
 		/**
 		 * Stopped due to a conflict; must either abort or resolve or skip
 		 */
-		STOPPED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * Failed; the original HEAD was restored
-		 */
-		FAILED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * Conflicts: checkout of target HEAD failed
-		 */
-		CONFLICTS {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
+		STOPPED,
 		/**
 		 * Already up-to-date
 		 */
-		UP_TO_DATE {
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
-		/**
-		 * Fast-forward, HEAD points to the new commit
-		 */
-		FAST_FORWARD {
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
-
-		/**
-		 * Continue with nothing left to commit (possibly want skip).
-		 *
-		 * @since 2.0
-		 */
-		NOTHING_TO_COMMIT {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		};
-
-		/**
-		 * @return whether the status indicates a successful result
-		 */
-		public abstract boolean isSuccessful();
+		UP_TO_DATE;
 	}
-
-	static final RebaseResult OK_RESULT = new RebaseResult(Status.OK);
-
-	static final RebaseResult ABORTED_RESULT = new RebaseResult(Status.ABORTED);
 
 	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
 			Status.UP_TO_DATE);
 
-	static final RebaseResult FAST_FORWARD_RESULT = new RebaseResult(
-			Status.FAST_FORWARD);
-
-	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
-			Status.NOTHING_TO_COMMIT);
-
-	private final Status status;
+	private final Status mySatus;
 
 	private final RevCommit currentCommit;
 
-	private Map<String, MergeFailureReason> failingPaths;
-
-	private List<String> conflicts;
-
-	private RebaseResult(Status status) {
-		this.status = status;
+	RebaseResult(Status status) {
+		this.mySatus = status;
 		currentCommit = null;
 	}
 
-	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#STOPPED}
-	 *
-	 * @param commit
-	 *            current commit
-	 */
 	RebaseResult(RevCommit commit) {
-		status = Status.STOPPED;
+		this.mySatus = Status.STOPPED;
 		currentCommit = commit;
-	}
-
-	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#FAILED}
-	 *
-	 * @param failingPaths
-	 *            list of paths causing this rebase to fail
-	 */
-	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
-		status = Status.FAILED;
-		currentCommit = null;
-		this.failingPaths = failingPaths;
-	}
-
-	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#CONFLICTS}
-	 *
-	 * @param conflicts
-	 *            the list of conflicting paths
-	 */
-	RebaseResult(List<String> conflicts) {
-		status = Status.CONFLICTS;
-		currentCommit = null;
-		this.conflicts = conflicts;
 	}
 
 	/**
 	 * @return the overall status
 	 */
 	public Status getStatus() {
-		return status;
+		return mySatus;
 	}
 
 	/**
@@ -213,21 +100,5 @@ public class RebaseResult {
 	 */
 	public RevCommit getCurrentCommit() {
 		return currentCommit;
-	}
-
-	/**
-	 * @return the list of paths causing this rebase to fail (see
-	 *         {@link ResolveMerger#getFailingPaths()} for details) if status is
-	 *         {@link Status#FAILED}, otherwise <code>null</code>
-	 */
-	public Map<String, MergeFailureReason> getFailingPaths() {
-		return failingPaths;
-	}
-
-	/**
-	 * @return the list of conflicts if status is {@link Status#CONFLICTS}
-	 */
-	public List<String> getConflicts() {
-		return conflicts;
 	}
 }

@@ -59,8 +59,6 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 
 	static final PlotLane[] NO_LANES = {};
 
-	static final Ref[] NO_REFS = {};
-
 	PlotLane[] passingLanes;
 
 	PlotLane lane;
@@ -79,7 +77,6 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 		super(id);
 		passingLanes = NO_LANES;
 		children = NO_CHILDREN;
-		refs = NO_REFS;
 	}
 
 	void addPassingLane(final PlotLane c) {
@@ -100,13 +97,9 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 		final int cnt = children.length;
 		if (cnt == 0)
 			children = new PlotCommit[] { c };
-		else if (cnt == 1) {
-			if (!c.getId().equals(children[0].getId()))
-				children = new PlotCommit[] { children[0], c };
-		} else {
-			for (PlotCommit pc : children)
-				if (c.getId().equals(pc.getId()))
-					return;
+		else if (cnt == 1)
+			children = new PlotCommit[] { children[0], c };
+		else {
 			final PlotCommit[] n = new PlotCommit[cnt + 1];
 			System.arraycopy(children, 0, n, 0, cnt);
 			n[cnt] = c;
@@ -149,29 +142,6 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 			if (a == c)
 				return true;
 		return false;
-	}
-
-	/**
-	 * Get the number of refs for this commit.
-	 *
-	 * @return number of refs; always a positive value but can be 0.
-	 */
-	public final int getRefCount() {
-		return refs.length;
-	}
-
-	/**
-	 * Get the nth Ref from this commit's ref list.
-	 *
-	 * @param nth
-	 *            ref index to obtain. Must be in the range 0 through
-	 *            {@link #getRefCount()}-1.
-	 * @return the specified ref.
-	 * @throws ArrayIndexOutOfBoundsException
-	 *             an invalid ref index was specified.
-	 */
-	public final Ref getRef(final int nth) {
-		return refs[nth];
 	}
 
 	/**

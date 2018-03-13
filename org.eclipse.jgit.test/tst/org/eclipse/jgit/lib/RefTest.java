@@ -45,24 +45,13 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.junit.Assert.assertEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Map;
 
-import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate.Result;
-import org.junit.Test;
 
 /**
  * Misc tests for refs. A lot of things are tested elsewhere so not having a
@@ -82,7 +71,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testReadAllIncludingSymrefs() throws Exception {
 		ObjectId masterId = db.resolve("refs/heads/master");
 		RefUpdate updateRef = db.updateRef("refs/remotes/origin/master");
@@ -108,7 +96,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertNull(refmaster.getPeeledObjectId());
 	}
 
-	@Test
 	public void testReadSymRefToPacked() throws IOException {
 		writeSymref("HEAD", "refs/heads/b");
 		Ref ref = db.getRef("HEAD");
@@ -119,7 +106,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertEquals(Ref.Storage.PACKED, ref.getStorage());
 	}
 
-	@Test
 	public void testReadSymRefToLoosePacked() throws IOException {
 		ObjectId pid = db.resolve("refs/heads/master^");
 		RefUpdate updateRef = db.updateRef("refs/heads/master");
@@ -136,7 +122,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertEquals(Ref.Storage.LOOSE, ref.getStorage());
 	}
 
-	@Test
 	public void testReadLooseRef() throws IOException {
 		RefUpdate updateRef = db.updateRef("ref/heads/new");
 		updateRef.setNewObjectId(db.resolve("refs/heads/master"));
@@ -152,7 +137,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	@Test
 	public void testReadLoosePackedRef() throws IOException,
 			InterruptedException {
 		Ref ref = db.getRef("refs/heads/master");
@@ -173,7 +157,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testReadSimplePackedRefSameRepo() throws IOException {
 		Ref ref = db.getRef("refs/heads/master");
 		ObjectId pid = db.resolve("refs/heads/master^");
@@ -188,13 +171,11 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertEquals(Storage.LOOSE, ref.getStorage());
 	}
 
-	@Test
 	public void testResolvedNamesBranch() throws IOException {
 		Ref ref = db.getRef("a");
 		assertEquals("refs/heads/a", ref.getName());
 	}
 
-	@Test
 	public void testResolvedSymRef() throws IOException {
 		Ref ref = db.getRef(Constants.HEAD);
 		assertEquals(Constants.HEAD, ref.getName());

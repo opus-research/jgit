@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,10 +43,8 @@
 package org.eclipse.jgit.treewalk;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 
 /** Options used by the {@link WorkingTreeIterator}. */
 public class WorkingTreeOptions {
@@ -62,15 +59,9 @@ public class WorkingTreeOptions {
 
 	private final AutoCRLF autoCRLF;
 
-	private final CheckStat checkStat;
-
 	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_FILEMODE, true);
-		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
-		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
+		fileMode = rc.getBoolean("core", "filemode", true);
+		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
 	}
 
 	/** @return true if the execute bit on working files should be trusted. */
@@ -81,13 +72,5 @@ public class WorkingTreeOptions {
 	/** @return how automatic CRLF conversion has been configured. */
 	public AutoCRLF getAutoCRLF() {
 		return autoCRLF;
-	}
-
-	/**
-	 * @return how stat data is compared
-	 * @since 2.3
-	 */
-	public CheckStat getCheckStat() {
-		return checkStat;
 	}
 }

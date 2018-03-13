@@ -98,13 +98,12 @@ class PackIndexV1 extends PackIndex {
 		IO.readFully(fd, packChecksum, 0, packChecksum.length);
 	}
 
-	@Override
-	public long getObjectCount() {
+	long getObjectCount() {
 		return objectCnt;
 	}
 
 	@Override
-	public long getOffset64Count() {
+	long getOffset64Count() {
 		long n64 = 0;
 		for (final MutableEntry e : this) {
 			if (e.getOffset() >= Integer.MAX_VALUE)
@@ -114,7 +113,7 @@ class PackIndexV1 extends PackIndex {
 	}
 
 	@Override
-	public ObjectId getObjectId(final long nthPosition) {
+	ObjectId getObjectId(final long nthPosition) {
 		int levelOne = Arrays.binarySearch(idxHeader, nthPosition + 1);
 		long base;
 		if (levelOne >= 0) {
@@ -136,8 +135,7 @@ class PackIndexV1 extends PackIndex {
 		return ObjectId.fromRaw(idxdata[levelOne], dataIdx);
 	}
 
-	@Override
-	public long findOffset(final AnyObjectId objId) {
+	long findOffset(final AnyObjectId objId) {
 		final int levelOne = objId.getFirstByte();
 		byte[] data = idxdata[levelOne];
 		if (data == null)
@@ -163,23 +161,22 @@ class PackIndexV1 extends PackIndex {
 	}
 
 	@Override
-	public long findCRC32(AnyObjectId objId) {
+	long findCRC32(AnyObjectId objId) {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public boolean hasCRC32Support() {
+	boolean hasCRC32Support() {
 		return false;
 	}
 
-	@Override
 	public Iterator<MutableEntry> iterator() {
 		return new IndexV1Iterator();
 	}
 
 	@Override
-	public void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
-			int matchLimit) throws IOException {
+	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id, int matchLimit)
+			throws IOException {
 		byte[] data = idxdata[id.getFirstByte()];
 		if (data == null)
 			return;

@@ -45,15 +45,13 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.lang.Integer.valueOf;
 import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 
 import java.io.BufferedOutputStream;
-import java.io.IOException;
+import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
@@ -64,20 +62,19 @@ import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.io.ThrowingPrintWriter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_ShowDiffs")
 class Diff extends TextBuiltin {
-	private DiffFormatter diffFmt;
+	private final DiffFormatter diffFmt = new DiffFormatter( //
+			new BufferedOutputStream(System.out));
 
 	@Argument(index = 0, metaVar = "metaVar_treeish")
 	private AbstractTreeIterator oldTree;
@@ -161,17 +158,11 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--no-prefix", usage = "usage_noPrefix")
 	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix(""); //$NON-NLS-1$
-		diffFmt.setNewPrefix(""); //$NON-NLS-1$
+		diffFmt.setOldPrefix("");
+		diffFmt.setNewPrefix("");
 	}
 
 	// END -- Options shared with Log
-
-	@Override
-	protected void init(final Repository repository, final String gitDir) {
-		super.init(repository, gitDir);
-		diffFmt = new DiffFormatter(new BufferedOutputStream(outs));
-	}
 
 	@Override
 	protected void run() throws Exception {
@@ -179,7 +170,7 @@ class Diff extends TextBuiltin {
 		try {
 			if (cached) {
 				if (oldTree == null) {
-					ObjectId head = db.resolve(HEAD + "^{tree}"); //$NON-NLS-1$
+					ObjectId head = db.resolve(HEAD + "^{tree}");
 					if (head == null)
 						die(MessageFormat.format(CLIText.get().notATree, HEAD));
 					CanonicalTreeParser p = new CanonicalTreeParser();
@@ -198,9 +189,7 @@ class Diff extends TextBuiltin {
 			} else if (newTree == null)
 				newTree = new FileTreeIterator(db);
 
-			TextProgressMonitor pm = new TextProgressMonitor();
-			pm.setDelayStart(2, TimeUnit.SECONDS);
-			diffFmt.setProgressMonitor(pm);
+			diffFmt.setProgressMonitor(new TextProgressMonitor());
 			diffFmt.setPathFilter(pathFilter);
 			if (detectRenames != null)
 				diffFmt.setDetectRenames(detectRenames.booleanValue());
@@ -210,8 +199,8 @@ class Diff extends TextBuiltin {
 			}
 
 			if (showNameAndStatusOnly) {
-				nameStatus(outw, diffFmt.scan(oldTree, newTree));
-				outw.flush();
+				nameStatus(out, diffFmt.scan(oldTree, newTree));
+				out.flush();
 
 			} else {
 				diffFmt.format(oldTree, newTree);
@@ -222,26 +211,25 @@ class Diff extends TextBuiltin {
 		}
 	}
 
-	static void nameStatus(ThrowingPrintWriter out, List<DiffEntry> files)
-			throws IOException {
+	static void nameStatus(PrintWriter out, List<DiffEntry> files) {
 		for (DiffEntry ent : files) {
 			switch (ent.getChangeType()) {
 			case ADD:
-				out.println("A\t" + ent.getNewPath()); //$NON-NLS-1$
+				out.println("A\t" + ent.getNewPath());
 				break;
 			case DELETE:
-				out.println("D\t" + ent.getOldPath()); //$NON-NLS-1$
+				out.println("D\t" + ent.getOldPath());
 				break;
 			case MODIFY:
-				out.println("M\t" + ent.getNewPath()); //$NON-NLS-1$
+				out.println("M\t" + ent.getNewPath());
 				break;
 			case COPY:
-				out.format("C%1$03d\t%2$s\t%3$s", valueOf(ent.getScore()), // //$NON-NLS-1$
+				out.format("C%1$03d\t%2$s\t%3$s", ent.getScore(), //
 						ent.getOldPath(), ent.getNewPath());
 				out.println();
 				break;
 			case RENAME:
-				out.format("R%1$03d\t%2$s\t%3$s", valueOf(ent.getScore()), // //$NON-NLS-1$
+				out.format("R%1$03d\t%2$s\t%3$s", ent.getScore(), //
 						ent.getOldPath(), ent.getNewPath());
 				out.println();
 				break;

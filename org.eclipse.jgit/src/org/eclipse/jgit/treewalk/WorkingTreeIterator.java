@@ -2,7 +2,6 @@
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,7 +48,6 @@ package org.eclipse.jgit.treewalk;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -62,23 +60,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
-import org.eclipse.jgit.submodule.SubmoduleWalk;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
@@ -126,15 +117,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
-
-	/** Repository that is the root level being iterated over */
-	protected Repository repository;
-
-	/** Cached canonical length, initialized from {@link #idBuffer()} */
-	private long canonLen = -1;
-
-	/** The offset of the content id in {@link #idBuffer()} */
-	private int contentIdOffset;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -191,31 +173,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            the repository.
 	 */
 	protected void initRootIterator(Repository repo) {
-		repository = repo;
 		Entry entry;
 		if (ignoreNode instanceof PerDirectoryIgnoreNode)
 			entry = ((PerDirectoryIgnoreNode) ignoreNode).entry;
 		else
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
-	}
-
-	/**
-	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
-	 *
-	 * Once the DirCacheIterator has been set this iterator must only be
-	 * advanced by the TreeWalk that is supplied, as it assumes that itself and
-	 * the corresponding DirCacheIterator are positioned on the same file path
-	 * whenever {@link #idBuffer()} is invoked.
-	 *
-	 * @param walk
-	 *            the walk that will be advancing this iterator.
-	 * @param treeId
-	 *            index of the matching {@link DirCacheIterator}.
-	 */
-	public void setDirCacheIterator(TreeWalk walk, int treeId) {
-		state.walk = walk;
-		state.dirCacheTree = treeId;
 	}
 
 	@Override
@@ -229,26 +192,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public byte[] idBuffer() {
 		if (contentIdFromPtr == ptr)
 			return contentId;
-
-		if (state.walk != null) {
-			// If there is a matching DirCacheIterator, we can reuse
-			// its idBuffer, but only if we appear to be clean against
-			// the cached index information for the path.
-			//
-			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
-					DirCacheIterator.class);
-			if (i != null) {
-				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
-					contentIdOffset = i.idOffset();
-					contentIdFromPtr = ptr;
-					return contentId = i.idBuffer();
-				}
-				contentIdOffset = 0;
-			} else {
-				contentIdOffset = 0;
-			}
-		}
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -259,62 +202,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			//
 			return zeroid;
 		case FileMode.TYPE_GITLINK:
-			contentIdFromPtr = ptr;
-			return contentId = idSubmodule(entries[ptr]);
+			// TODO: Support obtaining current HEAD SHA-1 from nested repository
+			//
+			return zeroid;
 		}
 		return zeroid;
-	}
-
-	/**
-	 * Get submodule id for given entry.
-	 *
-	 * @param e
-	 * @return non-null submodule id
-	 */
-	protected byte[] idSubmodule(Entry e) {
-		if (repository == null)
-			return zeroid;
-		File directory;
-		try {
-			directory = repository.getWorkTree();
-		} catch (NoWorkTreeException nwte) {
-			return zeroid;
-		}
-		return idSubmodule(directory, e);
-	}
-
-	/**
-	 * Get submodule id using the repository at the location of the entry
-	 * relative to the directory.
-	 *
-	 * @param directory
-	 * @param e
-	 * @return non-null submodule id
-	 */
-	protected byte[] idSubmodule(File directory, Entry e) {
-		final Repository submoduleRepo;
-		try {
-			submoduleRepo = SubmoduleWalk.getSubmoduleRepository(directory,
-					e.getName());
-		} catch (IOException exception) {
-			return zeroid;
-		}
-		if (submoduleRepo == null)
-			return zeroid;
-
-		final ObjectId head;
-		try {
-			head = submoduleRepo.resolve(Constants.HEAD);
-		} catch (IOException exception) {
-			return zeroid;
-		} finally {
-			submoduleRepo.close();
-		}
-		if (head == null)
-			return zeroid;
-		final byte[] id = new byte[Constants.OBJECT_ID_LENGTH];
-		head.copyRawTo(id, 0);
-		return id;
 	}
 
 	private static final byte[] digits = { '0', '1', '2', '3', '4', '5', '6',
@@ -332,8 +224,33 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				state.initializeDigestAndReadBuffer();
 
 				final long len = e.getLength();
-				InputStream filteredIs = possiblyFilteredInputStream(e, is, len);
-				return computeHash(filteredIs, canonLen);
+				if (!mightNeedCleaning())
+					return computeHash(is, len);
+
+				if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
+					ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
+					byte[] raw = rawbuf.array();
+					int n = rawbuf.limit();
+					if (!isBinary(raw, n)) {
+						rawbuf = filterClean(raw, n);
+						raw = rawbuf.array();
+						n = rawbuf.limit();
+					}
+					return computeHash(new ByteArrayInputStream(raw, 0, n), n);
+				}
+
+				if (isBinary(e))
+					return computeHash(is, len);
+
+				final long canonLen;
+				final InputStream lenIs = filterClean(e.openInputStream());
+				try {
+					canonLen = computeLength(lenIs);
+				} finally {
+					safeClose(lenIs);
+				}
+
+				return computeHash(filterClean(is), canonLen);
 			} finally {
 				safeClose(is);
 			}
@@ -341,40 +258,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Can't read the file? Don't report the failure either.
 			return zeroid;
 		}
-	}
-
-	private InputStream possiblyFilteredInputStream(final Entry e,
-			final InputStream is, final long len) throws IOException {
-		if (!mightNeedCleaning()) {
-			canonLen = len;
-			return is;
-		}
-
-		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
-			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			byte[] raw = rawbuf.array();
-			int n = rawbuf.limit();
-			if (!isBinary(raw, n)) {
-				rawbuf = filterClean(raw, n);
-				raw = rawbuf.array();
-				n = rawbuf.limit();
-			}
-			canonLen = n;
-			return new ByteArrayInputStream(raw, 0, n);
-		}
-
-		if (isBinary(e)) {
-			canonLen = len;
-			return is;
-		}
-
-		final InputStream lenIs = filterClean(e.openInputStream());
-		try {
-			canonLen = computeLength(lenIs);
-		} finally {
-			safeClose(lenIs);
-		}
-		return filterClean(is);
 	}
 
 	private static void safeClose(final InputStream in) {
@@ -415,15 +298,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	private ByteBuffer filterClean(byte[] src, int n)
 			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
-		try {
-			return IO.readWholeStream(filterClean(in), n);
-		} finally {
-			safeClose(in);
-		}
+		return IO.readWholeStream(filterClean(in), n);
 	}
 
 	private InputStream filterClean(InputStream in) {
-		return new EolCanonicalizingInputStream(in, true);
+		return new EolCanonicalizingInputStream(in);
 	}
 
 	/**
@@ -437,7 +316,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	@Override
 	public int idOffset() {
-		return contentIdOffset;
+		return 0;
 	}
 
 	@Override
@@ -462,10 +341,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	@Override
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
-		if (!eof()) {
-			canonLen = -1;
+		if (!eof())
 			parseEntry();
-		}
 	}
 
 	@Override
@@ -485,35 +362,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * Get the raw byte length of this entry.
+	 * Get the byte length of this entry.
 	 *
 	 * @return size of this file, in bytes.
 	 */
 	public long getEntryLength() {
 		return current().getLength();
-	}
-
-	/**
-	 * Get the filtered input length of this entry
-	 *
-	 * @return size of the content, in bytes
-	 * @throws IOException
-	 */
-	public long getEntryContentLength() throws IOException {
-		if (canonLen == -1) {
-			long rawLen = getEntryLength();
-			if (rawLen == 0)
-				canonLen = 0;
-			InputStream is = current().openInputStream();
-			try {
-				// canonLen gets updated here
-				possiblyFilteredInputStream(current(), is, current()
-						.getLength());
-			} finally {
-				safeClose(is);
-			}
-		}
-		return canonLen;
 	}
 
 	/**
@@ -543,11 +397,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             the file could not be opened for reading.
 	 */
 	public InputStream openEntryStream() throws IOException {
-		InputStream rawis = current().openInputStream();
-		if (mightNeedCleaning())
-			return filterClean(rawis);
-		else
-			return rawis;
+		return current().openInputStream();
 	}
 
 	/**
@@ -648,7 +498,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (e == null)
 				continue;
 			final String name = e.getName();
-			if (".".equals(name) || "..".equals(name)) //$NON-NLS-1$ //$NON-NLS-2$
+			if (".".equals(name) || "..".equals(name))
 				continue;
 			if (Constants.DOT_GIT.equals(name))
 				continue;
@@ -678,111 +528,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * The result of a metadata-comparison between the current entry and a
-	 * {@link DirCacheEntry}
-	 */
-	public enum MetadataDiff {
-		/**
-		 * The entries are equal by metaData (mode, length,
-		 * modification-timestamp) or the <code>assumeValid</code> attribute of
-		 * the index entry is set
-		 */
-		EQUAL,
-
-		/**
-		 * The entries are not equal by metaData (mode, length) or the
-		 * <code>isUpdateNeeded</code> attribute of the index entry is set
-		 */
-		DIFFER_BY_METADATA,
-
-		/** index entry is smudged - can't use that entry for comparison */
-		SMUDGED,
-
-		/**
-		 * The entries are equal by metaData (mode, length) but differ by
-		 * modification-timestamp.
-		 */
-		DIFFER_BY_TIMESTAMP
-	}
-
-	/**
-	 * Is the file mode of the current entry different than the given raw mode?
-	 *
-	 * @param rawMode
-	 * @return true if different, false otherwise
-	 */
-	public boolean isModeDifferent(final int rawMode) {
-		// Determine difference in mode-bits of file and index-entry. In the
-		// bitwise presentation of modeDiff we'll have a '1' when the two modes
-		// differ at this position.
-		int modeDiff = getEntryRawMode() ^ rawMode;
-
-		if (modeDiff == 0)
-			return false;
-
-		// Do not rely on filemode differences in case of symbolic links
-		if (FileMode.SYMLINK.equals(rawMode))
-			return false;
-
-		// Ignore the executable file bits if WorkingTreeOptions tell me to
-		// do so. Ignoring is done by setting the bits representing a
-		// EXECUTABLE_FILE to '0' in modeDiff
-		if (!state.options.isFileMode())
-			modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
-		return modeDiff != 0;
-	}
-
-	/**
-	 * Compare the metadata (mode, length, modification-timestamp) of the
-	 * current entry and a {@link DirCacheEntry}
-	 *
-	 * @param entry
-	 *            the {@link DirCacheEntry} to compare with
-	 * @return a {@link MetadataDiff} which tells whether and how the entries
-	 *         metadata differ
-	 */
-	public MetadataDiff compareMetadata(DirCacheEntry entry) {
-		if (entry.isAssumeValid())
-			return MetadataDiff.EQUAL;
-
-		if (entry.isUpdateNeeded())
-			return MetadataDiff.DIFFER_BY_METADATA;
-
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
-			return MetadataDiff.DIFFER_BY_METADATA;
-
-		if (isModeDifferent(entry.getRawMode()))
-			return MetadataDiff.DIFFER_BY_METADATA;
-
-		// Git under windows only stores seconds so we round the timestamp
-		// Java gives us if it looks like the timestamp in index is seconds
-		// only. Otherwise we compare the timestamp at millisecond precision,
-		// unless core.checkstat is set to "minimal", in which case we only
-		// compare the whole second part.
-		long cacheLastModified = entry.getLastModified();
-		long fileLastModified = getEntryLastModified();
-		long lastModifiedMillis = fileLastModified % 1000;
-		long cacheMillis = cacheLastModified % 1000;
-		if (getOptions().getCheckStat() == CheckStat.MINIMAL) {
-			fileLastModified = fileLastModified - lastModifiedMillis;
-			cacheLastModified = cacheLastModified - cacheMillis;
-		} else if (cacheMillis == 0)
-			fileLastModified = fileLastModified - lastModifiedMillis;
-		// Some Java version on Linux return whole seconds only even when
-		// the file systems supports more precision.
-		else if (lastModifiedMillis == 0)
-			cacheLastModified = cacheLastModified - cacheMillis;
-
-		if (fileLastModified != cacheLastModified)
-			return MetadataDiff.DIFFER_BY_TIMESTAMP;
-		else if (!entry.isSmudged())
-			// The file is clean when you look at timestamps.
-			return MetadataDiff.EQUAL;
-		else
-			return MetadataDiff.SMUDGED;
-	}
-
-	/**
 	 * Checks whether this entry differs from a given entry from the
 	 * {@link DirCache}.
 	 *
@@ -798,54 +543,63 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @return true if content is most likely different.
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
-		MetadataDiff diff = compareMetadata(entry);
-		switch (diff) {
-		case DIFFER_BY_TIMESTAMP:
-			if (forceContentCheck)
+		if (entry.isAssumeValid())
+			return false;
+
+		if (entry.isUpdateNeeded())
+			return true;
+
+		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
+			return true;
+
+		// Determine difference in mode-bits of file and index-entry. In the
+		// bitwise presentation of modeDiff we'll have a '1' when the two modes
+		// differ at this position.
+		int modeDiff = getEntryRawMode() ^ entry.getRawMode();
+
+		// Do not rely on filemode differences in case of symbolic links
+		if (modeDiff != 0 && !FileMode.SYMLINK.equals(entry.getRawMode())) {
+			// Ignore the executable file bits if WorkingTreeOptions tell me to
+			// do so. Ignoring is done by setting the bits representing a
+			// EXECUTABLE_FILE to '0' in modeDiff
+			if (!state.options.isFileMode())
+				modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
+			if (modeDiff != 0)
+				// Report a modification if the modes still (after potentially
+				// ignoring EXECUTABLE_FILE bits) differ
+				return true;
+		}
+
+		// Git under windows only stores seconds so we round the timestamp
+		// Java gives us if it looks like the timestamp in index is seconds
+		// only. Otherwise we compare the timestamp at millisecond precision.
+		long cacheLastModified = entry.getLastModified();
+		long fileLastModified = getEntryLastModified();
+		if (cacheLastModified % 1000 == 0)
+			fileLastModified = fileLastModified - fileLastModified % 1000;
+
+		if (fileLastModified != cacheLastModified) {
+			// The file is dirty by timestamps
+			if (forceContentCheck) {
 				// But we are told to look at content even though timestamps
 				// tell us about modification
 				return contentCheck(entry);
-			else
+			} else {
 				// We are told to assume a modification if timestamps differs
 				return true;
-		case SMUDGED:
-			// The file is clean by timestamps but the entry was smudged.
-			// Lets do a content check
-			return contentCheck(entry);
-		case EQUAL:
-			return false;
-		case DIFFER_BY_METADATA:
-			return true;
-		default:
-			throw new IllegalStateException(MessageFormat.format(
-					JGitText.get().unexpectedCompareResult, diff.name()));
+			}
+		} else {
+			// The file is clean when you look at timestamps.
+			if (entry.isSmudged()) {
+				// The file is clean by timestamps but the entry was smudged.
+				// Lets do a content check
+				return contentCheck(entry);
+			} else {
+				// The file is clean by timestamps and the entry is not
+				// smudged: Can't get any cleaner!
+				return false;
+			}
 		}
-	}
-
-	/**
-	 * Get the file mode to use for the current entry when it is to be updated
-	 * in the index.
-	 *
-	 * @param indexIter
-	 *            {@link DirCacheIterator} positioned at the same entry as this
-	 *            iterator or null if no {@link DirCacheIterator} is available
-	 *            at this iterator's current entry
-	 * @return index file mode
-	 */
-	public FileMode getIndexFileMode(final DirCacheIterator indexIter) {
-		final FileMode wtMode = getEntryFileMode();
-		if (indexIter == null)
-			return wtMode;
-		if (getOptions().isFileMode())
-			return wtMode;
-		final FileMode iMode = indexIter.getEntryFileMode();
-		if (FileMode.REGULAR_FILE == wtMode
-				&& FileMode.EXECUTABLE_FILE == iMode)
-			return iMode;
-		if (FileMode.EXECUTABLE_FILE == wtMode
-				&& FileMode.REGULAR_FILE == iMode)
-			return iMode;
-		return wtMode;
 	}
 
 	/**
@@ -950,7 +704,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 
 		public String toString() {
-			return getMode().toString() + " " + getName(); //$NON-NLS-1$
+			return getMode().toString() + " " + getName();
 		}
 
 		/**
@@ -1062,27 +816,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				r = new IgnoreNode();
 			}
 
-			FS fs = repository.getFS();
-			String path = repository.getConfig().get(CoreConfig.KEY)
-					.getExcludesFile();
-			if (path != null) {
-				File excludesfile;
-				if (path.startsWith("~/")) //$NON-NLS-1$
-					excludesfile = fs.resolve(fs.userHome(), path.substring(2));
-				else
-					excludesfile = fs.resolve(null, path);
-				loadRulesFromFile(r, excludesfile);
-			}
-
-			File exclude = fs
-					.resolve(repository.getDirectory(), "info/exclude"); //$NON-NLS-1$
-			loadRulesFromFile(r, exclude);
-
-			return r.getRules().isEmpty() ? null : r;
-		}
-
-		private void loadRulesFromFile(IgnoreNode r, File exclude)
-				throws FileNotFoundException, IOException {
+			File exclude = new File(repository.getDirectory(), "info/exclude");
 			if (exclude.exists()) {
 				FileInputStream in = new FileInputStream(exclude);
 				try {
@@ -1091,6 +825,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					in.close();
 				}
 			}
+
+			return r.getRules().isEmpty() ? null : r;
 		}
 	}
 
@@ -1106,12 +842,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
-
-		/** TreeWalk with a (supposedly) matching DirCacheIterator. */
-		TreeWalk walk;
-
-		/** Position of the matching {@link DirCacheIterator}. */
-		int dirCacheTree;
 
 		IteratorState(WorkingTreeOptions options) {
 			this.options = options;
