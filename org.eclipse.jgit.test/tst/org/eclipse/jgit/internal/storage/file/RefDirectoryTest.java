@@ -1191,7 +1191,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
+		batchUpdate
+				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
 		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
 		assertEquals(ReceiveCommand.Result.REJECTED_NONFASTFORWARD, commands
@@ -1214,7 +1215,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
+		batchUpdate
+				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
 		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
 		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
@@ -1265,7 +1267,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
+		batchUpdate
+				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
 		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
 		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
@@ -1307,29 +1310,5 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private void deleteLooseRef(String name) {
 		File path = new File(diskRepo.getDirectory(), name);
 		assertTrue("deleted " + name, path.delete());
-	}
-
-	private static final class StrictWorkMonitor implements ProgressMonitor {
-		private int lastWork, totalWork;
-
-		public void start(int totalTasks) {}
-
-		public void beginTask(String title, int totalWork) {
-			this.totalWork = totalWork;
-			lastWork = 0;
-		}
-
-		public void update(int completed) {
-			lastWork += completed;
-		}
-
-		public void endTask() {
-			assert lastWork == totalWork : "Recorded " + lastWork +
-					" units of work where "+totalWork+" were planned";
-		}
-
-		public boolean isCancelled() {
-			return false;
-		}
 	}
 }
