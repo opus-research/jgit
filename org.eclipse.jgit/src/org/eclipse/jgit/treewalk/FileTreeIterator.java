@@ -159,7 +159,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			file = f;
 
 			if (f.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists())
+				if (new File(f, Constants.DOT_GIT).isDirectory())
 					mode = FileMode.GITLINK;
 				else
 					mode = FileMode.TREE;
