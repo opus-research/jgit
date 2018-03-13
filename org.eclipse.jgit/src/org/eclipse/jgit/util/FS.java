@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2011 Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,9 +49,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-
-import org.eclipse.jgit.util.io.InterruptTimer;
-import org.eclipse.jgit.util.io.TimeoutInputStream;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -267,22 +264,26 @@ public abstract class FS {
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
 		try {
-			InterruptTimer timer = new InterruptTimer("FS.readPipe");
-			Process p = null;
+			final Process p = Runtime.getRuntime().exec(command, null, dir);
+			final BufferedReader lineRead = new BufferedReader(
+					new InputStreamReader(p.getInputStream(), encoding));
+			String r = null;
 			try {
-				p = Runtime.getRuntime().exec(command, null, dir);
-				TimeoutInputStream in = new TimeoutInputStream(
-						p.getInputStream(), timer);
-				in.setTimeout(10000);
-				BufferedReader lineRead = new BufferedReader(
-						new InputStreamReader(in, encoding));
-				String r = lineRead.readLine();
-				if (r != null && r.length() > 0)
-					return r;
+				r = lineRead.readLine();
 			} finally {
-				timer.terminate();
 				p.getOutputStream().close();
 				p.getErrorStream().close();
+				lineRead.close();
+			}
+
+			for (;;) {
+				try {
+					if (p.waitFor() == 0 && r != null && r.length() > 0)
+						return r;
+					break;
+				} catch (InterruptedException ie) {
+					// Stop bothering me, I have a zombie to reap.
+				}
 			}
 		} catch (IOException e) {
 			if (SystemReader.getInstance().getProperty("jgit.fs.debug") != null)
