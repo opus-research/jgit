@@ -52,7 +52,6 @@ import org.ietf.jgss.GSSManager;
 /**
  * Factory to detect which GSSManager implementation should be used.
  *
- * @since 3.4
  */
 public abstract class GSSManagerFactory {
 	/**
