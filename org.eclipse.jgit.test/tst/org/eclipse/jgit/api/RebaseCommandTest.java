@@ -322,8 +322,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		checkFile(theFile,
 				"<<<<<<< OURS\n1master\n=======\n1topic\n>>>>>>> THEIRS\n2\n3\ntopic4\n");
 
-		assertEquals(RepositoryState.REBASING_INTERACTIVE, db
-				.getRepositoryState());
+		assertEquals(RepositoryState.REBASING_MERGE, db.getRepositoryState());
 		assertTrue(new File(db.getDirectory(), "rebase-merge").exists());
 		// the first one should be included, so we should have left two picks in
 		// the file
@@ -411,8 +410,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals(Status.STOPPED, res.getStatus());
 		assertEquals(conflicting, res.getCurrentCommit());
 
-		assertEquals(RepositoryState.REBASING_INTERACTIVE, db
-				.getRepositoryState());
+		assertEquals(RepositoryState.REBASING_MERGE, db.getRepositoryState());
 		assertTrue(new File(db.getDirectory(), "rebase-merge").exists());
 		// the first one should be included, so we should have left two picks in
 		// the file
