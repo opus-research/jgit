@@ -43,7 +43,6 @@
 package org.eclipse.jgit.attributes;
 
 import static org.eclipse.jgit.ignore.internal.IMatcher.NO_MATCH;
-import static org.eclipse.jgit.ignore.internal.Strings.stripTrailing;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -207,14 +206,10 @@ public class AttributesRule {
 	 * @return True if a match was made.
 	 */
 	public boolean isMatch(String relativeTarget, boolean isDirectory) {
-		if (relativeTarget == null) {
+		if (relativeTarget == null)
 			return false;
-		}
-		relativeTarget = stripTrailing(relativeTarget,
-				FastIgnoreRule.PATH_SEPARATOR);
-		if (relativeTarget.length() == 0) {
+		if (relativeTarget.length() == 0)
 			return false;
-		}
 		boolean match = matcher.matches(relativeTarget, isDirectory);
 		return match;
 	}
