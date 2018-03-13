@@ -43,10 +43,12 @@
 
 package org.eclipse.jgit.internal.storage.reftable;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
 
@@ -60,16 +62,14 @@ public abstract class Reftable implements AutoCloseable {
 	public static Reftable from(Collection<Ref> refs) {
 		try {
 			ReftableConfig cfg = new ReftableConfig();
-			cfg.setRefBlockSize(refs.size() < 10000 ? (4 << 10) : (64 << 10));
 			cfg.setIndexObjects(false);
-
-			MemoryReftable buf = new MemoryReftable(cfg.getRefBlockSize());
+			ByteArrayOutputStream buf = new ByteArrayOutputStream();
 			new ReftableWriter()
 				.setConfig(cfg)
-				.begin(buf.getOutput())
+				.begin(buf)
 				.sortAndWriteRefs(refs)
 				.finish();
-			return new ReftableReader(buf.getBlockSource());
+			return new ReftableReader(BlockSource.from(buf.toByteArray()));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -134,13 +134,26 @@ public abstract class Reftable implements AutoCloseable {
 	public abstract LogCursor allLogs() throws IOException;
 
 	/**
-	 * Seek to a timestamp in a reference's log.
+	 * Read a single reference's log.
+	 *
+	 * @param refName
+	 *            exact name of the reference whose log to read.
+	 * @return cursor to iterate.
+	 * @throws IOException
+	 *             logs cannot be read.
+	 */
+	public LogCursor seekLog(String refName) throws IOException {
+		return seekLog(refName, Long.MAX_VALUE);
+	}
+
+	/**
+	 * Seek to an update index in a reference's log.
 	 *
 	 * @param refName
 	 *            exact name of the reference whose log to read.
 	 * @param updateIndex
 	 *            most recent index to return first in the log cursor. Log
-	 *            records for {@code updateIndex} and earlier will be returned.
+	 *            records at or before {@code updateIndex} will be returned.
 	 * @return cursor to iterate.
 	 * @throws IOException
 	 *             logs cannot be read.
