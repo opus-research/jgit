@@ -558,7 +558,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * By default, when {@link #setTreeFilter(TreeFilter)} is called with non-
 	 * null and non-{@link TreeFilter#ALL} filter, commits will have their
-   * ancestry simplified and parents rewritten to hide commits that do not match
+	 * ancestry simplified and parents rewritten to hide commits that do not match
 	 * the filter.
 	 * <p>
 	 * This behavior can be bypassed by passing false to this method.
