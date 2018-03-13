@@ -199,7 +199,7 @@ class BenchmarkReftable extends TextBuiltin {
 			try (FileInputStream in = new FileInputStream(reftablePath);
 					BlockSource src = BlockSource.from(in);
 					ReftableReader reader = new ReftableReader(src)) {
-				try (RefCursor rc = reader.seek(refName)) {
+				try (RefCursor rc = reader.seekRef(refName)) {
 					while (rc.next()) {
 						rc.getRef();
 					}
@@ -232,7 +232,7 @@ class BenchmarkReftable extends TextBuiltin {
 				BlockSource src = BlockSource.from(in);
 				ReftableReader reader = new ReftableReader(src)) {
 			for (int i = 0; i < tries; i++) {
-				try (RefCursor rc = reader.seek(refName)) {
+				try (RefCursor rc = reader.seekRef(refName)) {
 					while (rc.next()) {
 						rc.getRef();
 					}
