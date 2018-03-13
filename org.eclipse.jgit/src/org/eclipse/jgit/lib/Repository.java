@@ -865,7 +865,6 @@ public abstract class Repository implements AutoCloseable {
 	public void close() {
 		if (useCnt.decrementAndGet() == 0) {
 			doClose();
-			RepositoryCache.unregister(this);
 		}
 	}
 
