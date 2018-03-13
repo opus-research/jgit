@@ -588,7 +588,8 @@ public class RefDirectory extends RefDatabase {
 		// we don't miss an edit made externally.
 		final PackedRefList packed = getPackedRefs();
 		if (packed.contains(name)) {
-			LockFile lck = new LockFile(packedRefsFile);
+			LockFile lck = new LockFile(packedRefsFile,
+					update.getRepository().getFS());
 			if (!lck.lock())
 				throw new LockFailedException(packedRefsFile);
 			try {
@@ -638,7 +639,7 @@ public class RefDirectory extends RefDatabase {
 		FS fs = parent.getFS();
 
 		// Lock the packed refs file and read the content
-		LockFile lck = new LockFile(packedRefsFile);
+		LockFile lck = new LockFile(packedRefsFile, fs);
 		if (!lck.lock())
 			throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLock, packedRefsFile));
@@ -669,7 +670,8 @@ public class RefDirectory extends RefDatabase {
 				File refFile = fileFor(refName);
 				if (!fs.exists(refFile))
 					continue;
-				LockFile rLck = new LockFile(refFile);
+				LockFile rLck = new LockFile(refFile,
+						parent.getFS());
 				if (!rLck.lock())
 					continue;
 				try {

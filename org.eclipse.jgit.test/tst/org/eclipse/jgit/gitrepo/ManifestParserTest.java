@@ -43,9 +43,8 @@
 package org.eclipse.jgit.gitrepo;
 
 import static org.junit.Assert.assertTrue;
-import static java.nio.charset.StandardCharsets.UTF_8;
 
-import java.io.ByteArrayInputStream;
+import java.io.StringBufferInputStream;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -78,7 +77,7 @@ public class ManifestParserTest {
 
 		ManifestParser parser = new ManifestParser(
 				null, null, "master", baseUrl, null, null);
-		parser.read(new ByteArrayInputStream(xmlContent.toString().getBytes(UTF_8)));
+		parser.read(new StringBufferInputStream(xmlContent.toString()));
 		// Unfiltered projects should have them all.
 		results.clear();
 		results.add("foo");
