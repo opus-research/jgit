@@ -60,10 +60,8 @@ package org.eclipse.jgit.diff;
  *
  * @param <S>
  *            type of sequence the scanner will scan.
- * @param <C>
- *            type of comparator to evaluate the sequence elements.
  */
-final class PatienceDiffIndex<S extends Sequence, C extends SequenceComparator<? super S>> {
+final class PatienceDiffIndex<S extends Sequence> {
 	private static final int A_DUPLICATE = 1;
 
 	private static final int B_DUPLICATE = 2;
@@ -76,11 +74,11 @@ final class PatienceDiffIndex<S extends Sequence, C extends SequenceComparator<?
 
 	private static final int PTR_MASK = 0x7fffffff;
 
-	private final C cmp;
+	private final HashedSequenceComparator<S> cmp;
 
-	private final S a;
+	private final HashedSequence<S> a;
 
-	private final S b;
+	private final HashedSequence<S> b;
 
 	private final Edit region;
 
@@ -149,7 +147,10 @@ final class PatienceDiffIndex<S extends Sequence, C extends SequenceComparator<?
 	/** Index of the longest common subsequence in {@link #nCommon}. */
 	int cIdx;
 
-	PatienceDiffIndex(C cmp, S a, S b, Edit region, //
+	PatienceDiffIndex(HashedSequenceComparator<S> cmp, //
+			HashedSequence<S> a, //
+			HashedSequence<S> b, //
+			Edit region, //
 			long[] pCommon, int pIdx, int pCnt) {
 		this.cmp = cmp;
 		this.a = a;

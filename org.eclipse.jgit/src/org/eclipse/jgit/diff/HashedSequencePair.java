@@ -46,8 +46,8 @@ package org.eclipse.jgit.diff;
 /**
  * Wraps two {@link Sequence} instances to cache their element hash codes.
  *
- * This pair wraps two sequences that contain cached hash codes for the
- * specified region of each input sequence.
+ * This pair wraps two sequences that contain cached hash codes for the input
+ * sequences.
  *
  * @param <S>
  *            the base sequence type.
@@ -58,8 +58,6 @@ public class HashedSequencePair<S extends Sequence> {
 	private final S baseA;
 
 	private final S baseB;
-
-	private final Edit region;
 
 	private HashedSequence<S> cachedA;
 
@@ -74,16 +72,11 @@ public class HashedSequencePair<S extends Sequence> {
 	 *            the A sequence.
 	 * @param b
 	 *            the B sequence.
-	 * @param region
-	 *            a range of elements in each sequence that should be hashed.
-	 *            Only these elements are accessible.
 	 */
-	public HashedSequencePair(SequenceComparator<? super S> cmp, S a, S b,
-			Edit region) {
+	public HashedSequencePair(SequenceComparator<? super S> cmp, S a, S b) {
 		this.cmp = cmp;
 		this.baseA = a;
 		this.baseB = b;
-		this.region = region;
 	}
 
 	/** @return obtain a comparator that uses the cached hash codes. */
@@ -94,23 +87,22 @@ public class HashedSequencePair<S extends Sequence> {
 	/** @return wrapper around A that includes cached hash codes. */
 	public HashedSequence<S> getA() {
 		if (cachedA == null)
-			cachedA = wrap(baseA, region.beginA, region.endA);
+			cachedA = wrap(baseA);
 		return cachedA;
 	}
 
 	/** @return wrapper around B that includes cached hash codes. */
 	public HashedSequence<S> getB() {
 		if (cachedB == null)
-			cachedB = wrap(baseB, region.beginB, region.endB);
+			cachedB = wrap(baseB);
 		return cachedB;
 	}
 
-	private HashedSequence<S> wrap(S base, int ptr, int end) {
-		final int begin = ptr;
-		int[] hashes = new int[end - ptr];
-		int i = 0;
-		while (ptr < end)
-			hashes[i++] = cmp.hash(base, ptr++);
-		return new HashedSequence<S>(base, hashes, begin);
+	private HashedSequence<S> wrap(S base) {
+		final int end = base.size();
+		final int[] hashes = new int[end];
+		for (int ptr = 0; ptr < end; ptr++)
+			hashes[ptr] = cmp.hash(base, ptr);
+		return new HashedSequence<S>(base, hashes);
 	}
 }

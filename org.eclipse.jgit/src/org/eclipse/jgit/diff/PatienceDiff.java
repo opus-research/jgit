@@ -116,25 +116,22 @@ public class PatienceDiff implements DiffAlgorithm {
 
 	public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
 			C cmp, S a, S b) {
-		Edit e = new Edit(0, a.size(), 0, b.size());
-		e = cmp.reduceCommonStartEnd(a, b, e);
+		Edit region = new Edit(0, a.size(), 0, b.size());
+		region = cmp.reduceCommonStartEnd(a, b, region);
 
-		switch (e.getType()) {
+		switch (region.getType()) {
 		case INSERT:
 		case DELETE: {
 			EditList r = new EditList();
-			r.add(e);
+			r.add(region);
 			return r;
 		}
 
 		case REPLACE: {
-			HashedSequencePair<S> p = new HashedSequencePair<S>(cmp, a, b, e);
-			State<HashedSequence<S>, HashedSequenceComparator<S>> s;
-
-			s = new State<HashedSequence<S>, HashedSequenceComparator<S>>(
-					p.getComparator(), p.getA(), p.getB());
-			s.diff(e, null, 0, 0);
-			return s.edits;
+			SubsequenceComparator<S> cs = new SubsequenceComparator<S>(cmp);
+			Subsequence<S> as = Subsequence.a(a, region);
+			Subsequence<S> bs = Subsequence.b(b, region);
+			return Subsequence.toBase(diffImpl(cs, as, bs), as, bs);
 		}
 
 		case EMPTY:
@@ -145,28 +142,35 @@ public class PatienceDiff implements DiffAlgorithm {
 		}
 	}
 
-	private class State<S extends Sequence, C extends SequenceComparator<? super S>> {
-		private final C cmp;
+	private <S extends Sequence, C extends SequenceComparator<? super S>> EditList diffImpl(
+			C cmp, S a, S b) {
+		State<S> s = new State<S>(new HashedSequencePair<S>(cmp, a, b));
+		s.diff(new Edit(0, s.a.size(), 0, s.b.size()), null, 0, 0);
+		return s.edits;
+	}
 
-		private final S a;
+	private class State<S extends Sequence> {
+		private final HashedSequenceComparator<S> cmp;
 
-		private final S b;
+		private final HashedSequence<S> a;
+
+		private final HashedSequence<S> b;
 
 		/** Result edits we have determined that must be made to convert a to b. */
 		final EditList edits;
 
-		State(C cmp, S a, S b) {
-			this.cmp = cmp;
-			this.a = a;
-			this.b = b;
+		State(HashedSequencePair<S> p) {
+			this.cmp = p.getComparator();
+			this.a = p.getA();
+			this.b = p.getB();
 			this.edits = new EditList();
 		}
 
-		private void diff(Edit e, long[] pCommon, int pIdx, int pEnd) {
-			switch (e.getType()) {
+		private void diff(Edit r, long[] pCommon, int pIdx, int pEnd) {
+			switch (r.getType()) {
 			case INSERT:
 			case DELETE:
-				edits.add(e);
+				edits.add(r);
 				return;
 
 			case REPLACE:
@@ -177,9 +181,9 @@ public class PatienceDiff implements DiffAlgorithm {
 				throw new IllegalStateException();
 			}
 
-			PatienceDiffIndex<S, C> p;
+			PatienceDiffIndex<S> p;
 
-			p = new PatienceDiffIndex<S, C>(cmp, a, b, e, pCommon, pIdx, pEnd);
+			p = new PatienceDiffIndex<S>(cmp, a, b, r, pCommon, pIdx, pEnd);
 			Edit lcs = p.findLongestCommonSequence();
 
 			if (lcs != null) {
@@ -188,26 +192,23 @@ public class PatienceDiff implements DiffAlgorithm {
 				pEnd = p.nCnt;
 				p = null;
 
-				diff(e.before(lcs), pCommon, 0, pIdx);
-				diff(e.after(lcs), pCommon, pIdx + 1, pEnd);
+				diff(r.before(lcs), pCommon, 0, pIdx);
+				diff(r.after(lcs), pCommon, pIdx + 1, pEnd);
 
 			} else if (fallback != null) {
 				p = null;
+				pCommon = null;
 
-				SubsequenceComparator<S> c = new SubsequenceComparator<S>(cmp);
-				Subsequence<S> x = new Subsequence<S>(a, e.beginA, e.endA);
-				Subsequence<S> y = new Subsequence<S>(b, e.beginB, e.endB);
+				SubsequenceComparator<HashedSequence<S>> cs;
+				cs = new SubsequenceComparator<HashedSequence<S>>(cmp);
 
-				for (Edit r : fallback.diff(c, x, y)) {
-					r.beginA += e.beginA;
-					r.beginB += e.beginB;
-					r.endA += e.beginA;
-					r.endB += e.beginB;
-					edits.add(r);
-				}
+				Subsequence<HashedSequence<S>> as = Subsequence.a(a, r);
+				Subsequence<HashedSequence<S>> bs = Subsequence.b(b, r);
+				EditList res = fallback.diff(cs, as, bs);
+				edits.addAll(Subsequence.toBase(res, as, bs));
 
 			} else {
-				edits.add(e);
+				edits.add(r);
 			}
 		}
 	}
