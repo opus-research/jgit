@@ -273,7 +273,6 @@ public class FsckPackParser extends PackParser {
 	 * @throws CorruptPackIndexException
 	 *             when the index file is corrupt.
 	 */
-	@SuppressWarnings("boxing")
 	public void verifyIndex(PackIndex idx)
 			throws CorruptPackIndexException {
 		ObjectIdOwnerMap<ObjFromPack> inPack = new ObjectIdOwnerMap<>();
@@ -287,7 +286,7 @@ public class FsckPackParser extends PackParser {
 						MessageFormat.format(JGitText.get().missingObject,
 								entry.getType(), entry.getName()),
 						ErrorType.MISSING_OBJ);
-			} else if (offset != entry.getOffset()) {
+			} else if (offs != entry.getOffset()) {
 				throw new CorruptPackIndexException(MessageFormat
 						.format(JGitText.get().mismatchOffset, entry.getName()),
 						ErrorType.MISMATCH_OFFSET);
