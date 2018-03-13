@@ -58,17 +58,13 @@ import java.util.Set;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.submodule.SubmoduleWalk;
-import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
@@ -272,10 +268,6 @@ public class IndexDiff {
 
 	private IndexDiffFilter indexDiffFilter;
 
-	private Map<String, IndexDiff> submoduleIndexDiffs = new HashMap<String, IndexDiff>();
-
-	private IgnoreSubmoduleMode ignoreSubmoduleMode = null;
-
 	/**
 	 * Construct an IndexDiff
 	 *
@@ -289,7 +281,13 @@ public class IndexDiff {
 	 */
 	public IndexDiff(Repository repository, String revstr,
 			WorkingTreeIterator workingTreeIterator) throws IOException {
-		this(repository, repository.resolve(revstr), workingTreeIterator);
+		this.repository = repository;
+		ObjectId objectId = repository.resolve(revstr);
+		if (objectId != null)
+			tree = new RevWalk(repository).parseTree(objectId);
+		else
+			tree = null;
+		this.initialWorkingTreeIterator = workingTreeIterator;
 	}
 
 	/**
@@ -310,40 +308,6 @@ public class IndexDiff {
 		else
 			tree = null;
 		this.initialWorkingTreeIterator = workingTreeIterator;
-	}
-
-	/**
-	 * @param mode
-	 *            defines how modifications in submodules are treated
-	 */
-	public void setIgnoreSubmoduleMode(IgnoreSubmoduleMode mode) {
-		this.ignoreSubmoduleMode = mode;
-	}
-
-	/**
-	 * A factory to producing WorkingTreeIterators
-	 */
-	public interface WorkingTreeIteratorFactory {
-		/**
-		 * @param repo
-		 * @return a WorkingTreeIterator for repo
-		 */
-		public WorkingTreeIterator getWorkingTreeIterator(Repository repo);
-	}
-
-	private WorkingTreeIteratorFactory wTreeIt = new WorkingTreeIteratorFactory() {
-		public WorkingTreeIterator getWorkingTreeIterator(Repository repo) {
-			return new FileTreeIterator(repo);
-		}
-	};
-
-	/**
-	 * Allows higher layers to set the factory for WorkingTreeIterators.
-	 *
-	 * @param wTreeIt
-	 */
-	public void setWorkingTreeItFactory(WorkingTreeIteratorFactory wTreeIt) {
-		this.wTreeIt = wTreeIt;
 	}
 
 	/**
@@ -449,25 +413,18 @@ public class IndexDiff {
 							|| treeIterator.getEntryRawMode()
 							!= dirCacheIterator.getEntryRawMode()) {
 						// in repo, in index, content diff => changed
-						if (!isEntryGitLink(treeIterator)
-								|| !isEntryGitLink(dirCacheIterator)
-								|| ignoreSubmoduleMode != IgnoreSubmoduleMode.ALL)
-							changed.add(treeWalk.getPathString());
+						changed.add(treeWalk.getPathString());
 					}
 				} else {
 					// in repo, not in index => removed
-					if (!isEntryGitLink(treeIterator)
-							|| ignoreSubmoduleMode != IgnoreSubmoduleMode.ALL)
-						removed.add(treeWalk.getPathString());
+					removed.add(treeWalk.getPathString());
 					if (workingTreeIterator != null)
 						untracked.add(treeWalk.getPathString());
 				}
 			} else {
 				if (dirCacheIterator != null) {
 					// not in repo, in index => added
-					if (!isEntryGitLink(dirCacheIterator)
-							|| ignoreSubmoduleMode != IgnoreSubmoduleMode.ALL)
-						added.add(treeWalk.getPathString());
+					added.add(treeWalk.getPathString());
 				} else {
 					// not in repo, not in index => untracked
 					if (workingTreeIterator != null
@@ -480,59 +437,13 @@ public class IndexDiff {
 			if (dirCacheIterator != null) {
 				if (workingTreeIterator == null) {
 					// in index, not in workdir => missing
-					if (!isEntryGitLink(dirCacheIterator)
-							|| ignoreSubmoduleMode != IgnoreSubmoduleMode.ALL)
-						missing.add(treeWalk.getPathString());
+					missing.add(treeWalk.getPathString());
 				} else {
 					if (workingTreeIterator.isModified(
 							dirCacheIterator.getDirCacheEntry(), true,
 							treeWalk.getObjectReader())) {
 						// in index, in workdir, content differs => modified
-						if (!isEntryGitLink(dirCacheIterator) || !isEntryGitLink(workingTreeIterator)
-								|| (ignoreSubmoduleMode != IgnoreSubmoduleMode.ALL && ignoreSubmoduleMode != IgnoreSubmoduleMode.DIRTY))
-							modified.add(treeWalk.getPathString());
-					}
-				}
-			}
-		}
-
-		if (ignoreSubmoduleMode != IgnoreSubmoduleMode.ALL) {
-			IgnoreSubmoduleMode localIgnoreSubmoduleMode = ignoreSubmoduleMode;
-			SubmoduleWalk smw = SubmoduleWalk.forIndex(repository);
-			while (smw.next()) {
-				try {
-					if (localIgnoreSubmoduleMode == null)
-						localIgnoreSubmoduleMode = smw.getModulesIgnore();
-					if (IgnoreSubmoduleMode.ALL
-							.equals(localIgnoreSubmoduleMode))
-						continue;
-				} catch (ConfigInvalidException e) {
-					throw new IOException(
-							"Found invalid ignore param for submodule "
-									+ smw.getPath());
-				}
-				Repository subRepo = smw.getRepository();
-				ObjectId subHead = subRepo.resolve("HEAD");
-				if (subHead != null && !subHead.equals(smw.getObjectId()))
-					modified.add(smw.getPath());
-				else if (ignoreSubmoduleMode != IgnoreSubmoduleMode.DIRTY) {
-					IndexDiff smid = submoduleIndexDiffs.get(smw.getPath());
-					if (smid == null) {
-						smid = new IndexDiff(subRepo, smw.getObjectId(),
-								wTreeIt.getWorkingTreeIterator(subRepo));
-						submoduleIndexDiffs.put(smw.getPath(), smid);
-					}
-					if (smid.diff()) {
-						if (ignoreSubmoduleMode == IgnoreSubmoduleMode.UNTRACKED
-								&& smid.getAdded().isEmpty()
-								&& smid.getChanged().isEmpty()
-								&& smid.getConflicting().isEmpty()
-								&& smid.getMissing().isEmpty()
-								&& smid.getModified().isEmpty()
-								&& smid.getRemoved().isEmpty()) {
-							continue;
-						}
-						modified.add(smw.getPath());
+						modified.add(treeWalk.getPathString());
 					}
 				}
 			}
@@ -549,11 +460,6 @@ public class IndexDiff {
 			return false;
 		else
 			return true;
-	}
-
-	private boolean isEntryGitLink(AbstractTreeIterator ti) {
-		return ((ti != null) && (ti.getEntryRawMode() == FileMode.GITLINK
-				.getBits()));
 	}
 
 	private void addConflict(String path, int stage) {
