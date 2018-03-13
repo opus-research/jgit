@@ -152,7 +152,7 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * undefined behavior.
  * </p>
  */
-public class PackWriter {
+public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	/** A collection of object ids. */
@@ -1085,9 +1085,22 @@ public class PackWriter {
 		return state.snapshot();
 	}
 
-	/** Release all resources used by this writer. */
+	/**
+	 * Release all resources used by this writer. Use {@link #close()} instead.
+	 */
+	@Deprecated
 	public void release() {
-		reader.release();
+		close();
+	}
+
+	/**
+	 * Release all resources used by this writer.
+	 *
+	 * @since 4.0
+	 */
+	@Override
+	public void close() {
+		reader.close();
 		if (myDeflater != null) {
 			myDeflater.end();
 			myDeflater = null;
@@ -1847,9 +1860,10 @@ public class PackWriter {
 			Set<? extends ObjectId> have)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null);
+		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null, true);
 		bitmapWalker.reset();
-		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap);
+		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap,
+				false);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
 		if (useCachedPacks && reuseSupport != null
@@ -2049,7 +2063,7 @@ public class PackWriter {
 				walker = bitmapPreparer.newBitmapWalker();
 
 			BitmapBuilder bitmap = walker.findObjects(
-					Collections.singleton(cmit), null);
+					Collections.singleton(cmit), null, false);
 
 			if (last != null && cmit.isReuseWalker() && !bitmap.contains(last))
 				throw new IllegalStateException(MessageFormat.format(

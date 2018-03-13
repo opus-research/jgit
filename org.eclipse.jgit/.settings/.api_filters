@@ -36,4 +36,20 @@
             </message_arguments>
         </filter>
     </resource>
+    <resource path="src/org/eclipse/jgit/transport/GitProtocolConstants.java" type="org.eclipse.jgit.transport.GitProtocolConstants">
+        <filter id="388194388">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.transport.GitProtocolConstants"/>
+                <message_argument value="CAPABILITY_ATOMIC"/>
+                <message_argument value="atomic-push"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/eclipse/jgit/util/FileUtil.java" type="org.eclipse.jgit.util.FileUtil">
+        <filter comment="moved into another bundle keeping original package" id="1110441988">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.util.FileUtil"/>
+            </message_arguments>
+        </filter>
+    </resource>
 </component>

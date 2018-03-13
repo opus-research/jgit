@@ -76,7 +76,34 @@ import org.eclipse.jgit.util.FS;
 /**
  * Walker that visits all submodule entries found in a tree
  */
-public class SubmoduleWalk {
+public class SubmoduleWalk implements AutoCloseable {
+
+	/**
+	 * The values for the config param submodule.<name>.ignore
+	 *
+	 * @since 3.6
+	 */
+	public enum IgnoreSubmoduleMode {
+		/**
+		 * Ignore all modifications to submodules
+		 */
+		ALL,
+
+		/**
+		 * Ignore changes to the working tree of a submodule
+		 */
+		DIRTY,
+
+		/**
+		 * Ignore changes to untracked files in the working tree of a submodule
+		 */
+		UNTRACKED,
+
+		/**
+		 * Ignore nothing. That's the default
+		 */
+		NONE;
+	}
 
 	/**
 	 * Create a generator to walk over the submodule entries currently in the
@@ -426,6 +453,29 @@ public class SubmoduleWalk {
 		return this;
 	}
 
+	/**
+	 * Checks whether the working tree (or the index in case of a bare repo)
+	 * contains a .gitmodules file. That's a hint that the repo contains
+	 * submodules.
+	 *
+	 * @param repository
+	 *            the repository to check
+	 * @return <code>true</code> if the repo contains a .gitmodules file
+	 * @throws IOException
+	 * @throws CorruptObjectException
+	 * @since 3.6
+	 */
+	public static boolean containsGitModulesFile(Repository repository)
+			throws IOException {
+		if (repository.isBare()) {
+			DirCache dc = repository.readDirCache();
+			return (dc.findEntry(Constants.DOT_GIT_MODULES) >= 0);
+		}
+		File modulesFile = new File(repository.getWorkTree(),
+				Constants.DOT_GIT_MODULES);
+		return (modulesFile.exists());
+	}
+
 	private void lazyLoadModulesConfig() throws IOException, ConfigInvalidException {
 		if (modulesConfig == null)
 			loadModulesConfig();
@@ -600,6 +650,26 @@ public class SubmoduleWalk {
 	}
 
 	/**
+	 * Get the configured ignore field for the current entry. This will be the
+	 * value from the .gitmodules file in the current repository's working tree.
+	 *
+	 * @return ignore value
+	 * @throws ConfigInvalidException
+	 * @throws IOException
+	 * @since 3.6
+	 */
+	public IgnoreSubmoduleMode getModulesIgnore() throws IOException,
+			ConfigInvalidException {
+		lazyLoadModulesConfig();
+		String name = modulesConfig.getString(
+				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_IGNORE);
+		if (name == null)
+			return null;
+		return IgnoreSubmoduleMode.valueOf(name.trim().toUpperCase());
+	}
+
+	/**
 	 * Get repository for current submodule entry
 	 *
 	 * @return repository or null if non-existent
@@ -659,8 +729,22 @@ public class SubmoduleWalk {
 		return url != null ? getSubmoduleRemoteUrl(repository, url) : null;
 	}
 
-	/** Release any resources used by this walker's reader. */
+	/**
+	 * Release any resources used by this walker's reader. Use {@link #close()}
+	 * instead.
+	 */
+	@Deprecated
 	public void release() {
-		walk.release();
+		close();
+	}
+
+	/**
+	 * Release any resources used by this walker's reader.
+	 *
+	 * @since 4.0
+	 */
+	@Override
+	public void close() {
+		walk.close();
 	}
 }

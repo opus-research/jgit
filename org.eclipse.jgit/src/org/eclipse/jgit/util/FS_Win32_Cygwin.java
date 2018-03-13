@@ -44,12 +44,19 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
 
 /**
  * FS implementation for Cygwin on Windows
@@ -134,5 +141,111 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		ProcessBuilder proc = new ProcessBuilder();
 		proc.command(argv);
 		return proc;
+	}
+
+	/**
+	 * @since 3.7
+	 */
+	@Override
+	public String relativize(String base, String other) {
+		final String relativized = super.relativize(base, other);
+		return relativized.replace(File.separatorChar, '/');
+	}
+
+	/**
+	 * @since 4.0
+	 */
+	@Override
+	public ProcessResult runHookIfPresent(Repository repository, String hookName,
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
+		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
+				errRedirect, stdinArgs);
+	}
+
+	@Override
+	public boolean supportsSymlinks() {
+		return true;
+	}
+
+	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
+	}
+
+	/**
+	 * @since 3.3
+	 */
+	@Override
+	public Attributes getAttributes(File path) {
+		return FileUtil.getFileAttributesBasic(this, path);
+	}
+
+	/**
+	 * @since 3.7
+	 */
+	@Override
+	public File findHook(Repository repository, String hookName) {
+		final File gitdir = repository.getDirectory();
+		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
+				.resolve(hookName);
+		if (Files.isExecutable(hookPath))
+			return hookPath.toFile();
+		return null;
 	}
 }
