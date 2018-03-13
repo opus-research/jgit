@@ -138,13 +138,11 @@ public class RefDirectory extends RefDatabase {
 
 	private final File gitDir;
 
-	private final File refsDir;
+	final File refsDir;
 
 	private final ReflogWriter logWriter;
 
 	private final File packedRefsFile;
-
-	private final String[] refSearchPaths;
 
 	/**
 	 * Immutable sorted list of loose references.
@@ -157,7 +155,7 @@ public class RefDirectory extends RefDatabase {
 	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
 	/** Immutable sorted list of packed references. */
-	private final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
+	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -175,14 +173,13 @@ public class RefDirectory extends RefDatabase {
 	 */
 	private final AtomicInteger lastNotifiedModCnt = new AtomicInteger();
 
-	RefDirectory(final FileRepository db, String[] refSearchPaths) {
+	RefDirectory(final FileRepository db) {
 		final FS fs = db.getFS();
 		parent = db;
 		gitDir = db.getDirectory();
 		logWriter = new ReflogWriter(db);
 		refsDir = fs.resolve(gitDir, R_REFS);
 		packedRefsFile = fs.resolve(gitDir, PACKED_REFS);
-		this.refSearchPaths = refSearchPaths;
 
 		looseRefs.set(RefList.<LooseRef> emptyList());
 		packedRefs.set(PackedRefList.NO_PACKED_REFS);
@@ -268,7 +265,7 @@ public class RefDirectory extends RefDatabase {
 	public Ref getRef(final String needle) throws IOException {
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = null;
-		for (String prefix : refSearchPaths) {
+		for (String prefix : SEARCH_PATH) {
 			try {
 				ref = readRef(prefix + needle, packed);
 				if (ref != null) {
@@ -904,7 +901,7 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
+	LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
 

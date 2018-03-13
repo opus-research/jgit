@@ -51,7 +51,6 @@ import static org.eclipse.jgit.lib.RefDatabase.ALL;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -198,16 +197,7 @@ public class FileRepository extends Repository {
 			}
 		});
 
-		final String[] refSearchPath;
-		final List<String> refSearchPathList = options.getRefSearchPaths();
-		if (refSearchPathList == null) {
-			refSearchPath = RefDatabase.getSearchPath();
-		}
-		else {
-			refSearchPath = refSearchPathList.toArray(new String[refSearchPathList.size()]);
-		}
-
-		refs = new RefDirectory(this, refSearchPath);
+		refs = new RefDirectory(this);
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
