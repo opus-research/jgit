@@ -43,14 +43,11 @@
 
 package org.eclipse.jgit.util;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -71,9 +68,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.ProcessResult.Status;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -632,45 +627,28 @@ public abstract class FS {
 	}
 
 	/**
-	 * See {@link FileUtils#relativize(String, String)}.
-	 *
-	 * @param base
-	 *            The path against which <code>other</code> should be
-	 *            relativized.
-	 * @param other
-	 *            The path that will be made relative to <code>base</code>.
-	 * @return A relative path that, when resolved against <code>base</code>,
-	 *         will yield the original <code>other</code>.
-	 * @see FileUtils#relativize(String, String)
-	 * @since 3.7
-	 */
-	public String relativize(String base, String other) {
-		return FileUtils.relativize(base, other);
-	}
-
-	/**
 	 * Checks whether the given hook is defined for the given repository, then
 	 * runs it with the given arguments.
 	 * <p>
-	 * The hook's standard output and error streams will be redirected to
+	 * By default, the hook's standard output and error will be redirected to
 	 * <code>System.out</code> and <code>System.err</code> respectively. The
 	 * hook will have no stdin.
 	 * </p>
 	 *
 	 * @param repository
-	 *            The repository for which a hook should be run.
+	 *            The repository from which a hook should be run.
 	 * @param hook
-	 *            The hook to be executed.
+	 *            The particular hook we wish to execute.
 	 * @param args
-	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
-	 *            but can be an empty array.
-	 * @return The ProcessResult describing this hook's execution.
+	 *            Arguments to pass to this hook.
+	 * @return The exit value of the hook. Defaults to <code>0</code> if the
+	 *         hook has no exit value, does not exist or cannot be run on this
+	 *         {@link FS}.
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 3.7
 	 */
-	public ProcessResult runIfPresent(Repository repository, final Hook hook,
+	public int runIfPresent(Repository repository, final Hook hook,
 			String[] args) throws JGitInternalException {
 		return runIfPresent(repository, hook, args, System.out, System.err,
 				null);
@@ -681,12 +659,11 @@ public abstract class FS {
 	 * runs it with the given arguments.
 	 *
 	 * @param repository
-	 *            The repository for which a hook should be run.
+	 *            The repository from which a hook should be run.
 	 * @param hook
-	 *            The hook to be executed.
+	 *            The particular hook we wish to execute.
 	 * @param args
-	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
-	 *            but can be an empty array.
+	 *            Arguments to pass to this hook.
 	 * @param outRedirect
 	 *            A print stream on which to redirect the hook's stdout. Can be
 	 *            <code>null</code>, in which case the hook's standard output
@@ -698,96 +675,50 @@ public abstract class FS {
 	 * @param stdinArgs
 	 *            A string to pass on to the standard input of the hook. May be
 	 *            <code>null</code>.
-	 * @return The ProcessResult describing this hook's execution.
+	 * @return The exit value of the hook. Defaults to <code>0</code> if the
+	 *         hook has no exit value, does not exist or cannot be run on this
+	 *         {@link FS}.
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 3.7
 	 */
-	public ProcessResult runIfPresent(Repository repository, final Hook hook,
+	public int runIfPresent(Repository repository, final Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
 			String stdinArgs) throws JGitInternalException {
-		return new ProcessResult(Status.NOT_SUPPORTED);
+		return 0;
 	}
 
 	/**
-	 * See
-	 * {@link #runIfPresent(Repository, Hook, String[], PrintStream, PrintStream, String)}
-	 * . Should only be called by FS supporting shell scripts execution.
-	 *
-	 * @param repository
-	 *            The repository for which a hook should be run.
-	 * @param hook
-	 *            The hook to be executed.
-	 * @param args
-	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
-	 *            but can be an empty array.
-	 * @param outRedirect
-	 *            A print stream on which to redirect the hook's stdout. Can be
-	 *            <code>null</code>, in which case the hook's standard output
-	 *            will be lost.
-	 * @param errRedirect
-	 *            A print stream on which to redirect the hook's stderr. Can be
-	 *            <code>null</code>, in which case the hook's standard error
-	 *            will be lost.
-	 * @param stdinArgs
-	 *            A string to pass on to the standard input of the hook. May be
-	 *            <code>null</code>.
-	 * @return The ProcessResult describing this hook's execution.
-	 * @throws JGitInternalException
-	 *             if we fail to run the hook somehow. Causes may include an
-	 *             interrupted process or I/O errors.
-	 * @since 3.7
-	 */
-	protected ProcessResult internalRunIfPresent(Repository repository,
-			final Hook hook, String[] args, PrintStream outRedirect,
-			PrintStream errRedirect, String stdinArgs)
-			throws JGitInternalException {
-		final File hookFile = findHook(repository, hook);
-		if (hookFile == null)
-			return new ProcessResult(Status.NOT_PRESENT);
-
-		final String hookPath = hookFile.getAbsolutePath();
-		final File runDirectory;
-		if (repository.isBare())
-			runDirectory = repository.getDirectory();
-		else
-			runDirectory = repository.getWorkTree();
-		final String cmd = relativize(runDirectory.getAbsolutePath(),
-				hookPath);
-		ProcessBuilder hookProcess = runInShell(cmd, args);
-		hookProcess.directory(runDirectory);
-		try {
-			return new ProcessResult(runProcess(hookProcess, outRedirect,
-					errRedirect, stdinArgs), Status.OK);
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionCaughtDuringExecutionOfHook,
-					hook.getName()), e);
-		} catch (InterruptedException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionHookExecutionInterrupted,
-					hook.getName()), e);
-		}
-	}
-
-
-	/**
-	 * Tries to find a hook matching the given one in the given repository.
+	 * Tries and find a hook matching the given one in the given repository.
 	 *
 	 * @param repository
 	 *            The repository within which to find a hook.
 	 * @param hook
 	 *            The hook we're trying to find.
 	 * @return The {@link File} containing this particular hook if it exists in
-	 *         the given repository and can be executed, <code>null</code>
-	 *         otherwise.
-	 * @since 3.7
+	 *         the given repository, <code>null</code> otherwise.
 	 */
-	public File findHook(Repository repository, final Hook hook) {
-		final File hookFile = new File(new File(repository.getDirectory(),
-				Constants.HOOKS), hook.getName());
-		return hookFile.isFile() && canExecute(hookFile) ? hookFile : null;
+	protected File tryFindHook(Repository repository, final Hook hook) {
+		final File gitDir = repository.getDirectory();
+		final File[] hookDirCandidates = gitDir.listFiles(new FileFilter() {
+			public boolean accept(File pathname) {
+				return pathname.isDirectory()
+						&& pathname.getName().equals("hooks"); //$NON-NLS-1$
+			}
+		});
+		if (hookDirCandidates.length < 1)
+			return null;
+
+		final File[] matchingHooks = hookDirCandidates[0]
+				.listFiles(new FileFilter() {
+					public boolean accept(File pathname) {
+						return pathname.isFile()
+								&& pathname.getName().equals(hook.getName());
+					}
+				});
+		if (matchingHooks.length < 1)
+			return null;
+		return matchingHooks[0];
 	}
 
 	/**
@@ -813,11 +744,8 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 3.7
 	 */
-	protected int runProcess(ProcessBuilder hookProcessBuilder,
-			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
-			throws IOException, InterruptedException {
+	protected int runHook(ProcessBuilder hookProcessBuilder, OutputStream outRedirect, OutputStream errRedirect, String stdinArgs) throws IOException, InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
 		// We'll record the first I/O exception that occurs, but keep on trying
@@ -875,9 +803,11 @@ public abstract class FS {
 				}
 				process.destroy();
 			}
+			if (ioException != null) {
+				throw ioException;
+			}
 		}
-		// We can only be here if the outer try threw an IOException.
-		throw ioException;
+		return -1;
 	}
 
 	/**
@@ -1105,55 +1035,6 @@ public abstract class FS {
 	}
 
 	/**
-	 * Write the given string into the given file, encoding in UTF-8.
-	 *
-	 * @param msg
-	 * @param file
-	 * @throws IOException
-	 * @since 4.0
-	 */
-	public void writeToFile(String msg, File file) throws IOException {
-		BufferedWriter writer = null;
-		try {
-			writer = new BufferedWriter(new OutputStreamWriter(
-					new FileOutputStream(file), "UTF-8")); //$NON-NLS-1$
-			writer.write(msg);
-		} finally {
-			if (writer != null)
-				writer.close();
-		}
-	}
-
-	/**
-	 * Read the commit message from the file where it is supposed to have been
-	 * exported previously, assuming it is encoded in UTF-8.
-	 *
-	 * @param file
-	 *
-	 * @return The current commit message.
-	 * @throws IOException
-	 * @since 4.0
-	 */
-	public String readFileContent(File file) throws IOException {
-		BufferedReader reader = null;
-		try {
-			StringBuilder builder = new StringBuilder();
-			reader = new BufferedReader(new InputStreamReader(
-					new FileInputStream(file), "UTF-8")); //$NON-NLS-1$
-			char[] buf = new char[1024];
-			int numRead = 0;
-			while ((numRead = reader.read(buf)) != -1) {
-				String readData = String.valueOf(buf, 0, numRead);
-				builder.append(readData);
-			}
-			return builder.toString();
-		} finally {
-			if (reader != null)
-				reader.close();
-		}
-	}
-
-	/**
 	 * This runnable will consume an input stream's content into an output
 	 * stream as soon as it gets available.
 	 * <p>
@@ -1173,7 +1054,8 @@ public abstract class FS {
 		public StreamGobbler(InputStream stream, OutputStream output) {
 			this.reader = new BufferedReader(new InputStreamReader(stream));
 			if (output == null)
-				this.writer = null;
+				this.writer = new BufferedWriter(new OutputStreamWriter(
+						new ByteArrayOutputStream()));
 			else
 				this.writer = new BufferedWriter(new OutputStreamWriter(output));
 		}
@@ -1185,7 +1067,7 @@ public abstract class FS {
 			while ((line = reader.readLine()) != null) {
 				// Do not try to write again after a failure, but keep reading
 				// as long as possible to prevent the input stream from choking.
-				if (!writeFailure && writer != null) {
+				if (!writeFailure) {
 					try {
 						writer.write(line);
 						writer.newLine();

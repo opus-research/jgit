@@ -99,7 +99,6 @@ import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
@@ -295,7 +294,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 								walk.parseCommit(repo.resolve(Constants.HEAD)),
 								upstreamCommit)) {
 					org.eclipse.jgit.api.Status status = Git.wrap(repo)
-							.status().setIgnoreSubmodules(IgnoreSubmoduleMode.ALL).call();
+							.status().call();
 					if (status.hasUncommittedChanges()) {
 						List<String> list = new ArrayList<String>();
 						list.addAll(status.getUncommittedChanges());

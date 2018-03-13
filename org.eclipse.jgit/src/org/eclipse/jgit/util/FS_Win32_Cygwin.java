@@ -44,15 +44,19 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
+
 
 /**
  * FS implementation for Cygwin on Windows
@@ -139,23 +143,35 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		return proc;
 	}
 
-	/**
-	 * @since 3.7
-	 */
 	@Override
-	public String relativize(String base, String other) {
-		final String relativized = super.relativize(base, other);
-		return relativized.replace(File.separatorChar, '/');
-	}
+	public int runIfPresent(Repository repository, Hook hook, String[] args,
+			PrintStream outRedirect, PrintStream errRedirect, String stdinArgs)
+			throws UnsupportedOperationException {
+		final File hookFile = tryFindHook(repository, hook);
+		if (hookFile == null)
+			return 0;
 
-	/**
-	 * @since 3.7
-	 */
-	@Override
-	public ProcessResult runIfPresent(Repository repository, Hook hook,
-			String[] args, PrintStream outRedirect, PrintStream errRedirect,
-			String stdinArgs) throws JGitInternalException {
-		return internalRunIfPresent(repository, hook, args, outRedirect,
-				errRedirect, stdinArgs);
+		final String hookPath = hookFile.getAbsolutePath();
+		final File runDirectory;
+		if (repository.isBare())
+			runDirectory = repository.getDirectory();
+		else
+			runDirectory = repository.getWorkTree();
+		String cmd = FileUtils.relativize(runDirectory.getAbsolutePath(),
+				hookPath);
+		cmd = cmd.replace(File.separatorChar, '/');
+		ProcessBuilder hookProcess = runInShell(cmd, args);
+		hookProcess.directory(runDirectory);
+		try {
+			return runHook(hookProcess, outRedirect, errRedirect, stdinArgs);
+		} catch (IOException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExecutionOfHook,
+					hook.getName()), e);
+		} catch (InterruptedException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionHookExecutionInterrupted,
+					hook.getName()), e);
+		}
 	}
 }

@@ -42,7 +42,13 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileFilter;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -54,11 +60,11 @@ import java.util.List;
 
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.HookFailureException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.RejectedCommitException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -67,7 +73,6 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.hooks.Hooks;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -88,6 +93,7 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.ChangeIdUtil;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.Hook;
 
 /**
@@ -126,11 +132,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Setting this option bypasses the {@link Hook#PRE_COMMIT pre-commit} and
-	 * {@link Hook#COMMIT_MSG commit-msg} hooks.
+	 * {@link Hook#COMMIT_MSG} hooks.
 	 */
 	private boolean noVerify;
-
-	private PrintStream hookOutputStream;
 
 	/**
 	 * @param repo
@@ -157,14 +161,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
-	 * @throws HookFailureException
-	 *             if there are either pre-commit or commit-msg hooks present in
-	 *             the repository and at least one of them rejects the commit.
 	 */
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException, WrongRepositoryStateException,
-			HookFailureException {
+			ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		checkCallable();
 		Collections.sort(only);
 
@@ -178,7 +179,16 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						state.name()));
 
 			if (!noVerify) {
-				Hooks.preCommit(repo).setOutputStream(hookOutputStream).run();
+				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
+				final PrintStream hookErrRedirect = new PrintStream(
+						errorByteArray);
+				int preCommitHookResult = FS.DETECTED.runIfPresent(repo,
+						Hook.PRE_COMMIT, new String[0], System.out,
+						hookErrRedirect, null);
+				final String errorDetails = errorByteArray.toString();
+				if (preCommitHookResult != 0) {
+					commitRejectedByHook(Hook.PRE_COMMIT, errorDetails);
+				}
 			}
 
 			processOptions(state, rw);
@@ -217,9 +227,14 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				}
 
 			if (!noVerify) {
-				repo.getFS().writeToFile(message,
-						repo.getCommitEditMessageFile());
-				String path = repo.getCommitEditMessageFile().getAbsolutePath();
+				// FIXME this message should have been saved beforehand, since
+				// the prepare-commit-msg hook also works on it
+				exportPreparedMessage(message);
+				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
+				final PrintStream hookErrRedirect = new PrintStream(
+						errorByteArray);
+				String messageFilePath = getMessageFile(false)
+						.getAbsolutePath();
 				// We know the hooks can only run on unix or windows-cygwin...
 				// both of which need their argument in unix format ('/' as path
 				// separator, not '\'). Windows generally accepts '/' as a path
@@ -227,11 +242,16 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				// issue, but might hurt if we wish to somehow add support for
 				// git hooks on windows without cygwin and this new support
 				// doesn't accept '/' as a path separator.
-				path = path.replace(File.separatorChar, '/');
-				Hooks.commitMsg(repo).setOutputStream(hookOutputStream)
-						.setParameters(path).run();
-				message = repo.getFS().readFileContent(
-						repo.getCommitEditMessageFile());
+				messageFilePath = messageFilePath.replace(File.separatorChar,
+						'/');
+				int commitMsgHookResult = FS.DETECTED.runIfPresent(repo,
+						Hook.COMMIT_MSG, new String[] { messageFilePath, },
+						System.out, hookErrRedirect, null);
+				final String errorDetails = errorByteArray.toString();
+				if (commitMsgHookResult != 0) {
+					commitRejectedByHook(Hook.COMMIT_MSG, errorDetails);
+				}
+				message = readPreparedMessage();
 			}
 
 			// lock the index
@@ -318,8 +338,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			throw new UnmergedPathsException(e);
 		} catch (IOException e) {
 			throw new JGitInternalException(
-					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand,
-					e);
+					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
 		} finally {
 			rw.dispose();
 		}
@@ -339,7 +358,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	private DirCache createTemporaryIndex(ObjectId headId, DirCache index,
-			RevWalk rw) throws IOException {
+			RevWalk rw)
+			throws IOException {
 		ObjectInserter inserter = null;
 
 		// get DirCacheBuilder for existing index
@@ -354,8 +374,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		boolean emptyCommit = true;
 
 		TreeWalk treeWalk = new TreeWalk(repo);
-		int dcIdx = treeWalk
-				.addTree(new DirCacheBuildIterator(existingBuilder));
+		int dcIdx = treeWalk.addTree(new DirCacheBuildIterator(existingBuilder));
 		int fIdx = treeWalk.addTree(new FileTreeIterator(repo));
 		int hIdx = -1;
 		if (headId != null)
@@ -548,10 +567,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				try {
 					message = repo.readMergeCommitMsg();
 				} catch (IOException e) {
-					throw new JGitInternalException(
-							MessageFormat.format(
-									JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
-									Constants.MERGE_MSG, e), e);
+					throw new JGitInternalException(MessageFormat.format(
+							JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
+							Constants.MERGE_MSG, e), e);
 				}
 			}
 		} else if (state == RepositoryState.SAFE && message == null) {
@@ -569,8 +587,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		if (message == null)
 			// as long as we don't support -C option we have to have
 			// an explicit message
-			throw new NoMessageException(
-					JGitText.get().commitMessageNotSpecified);
+			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
 	}
 
 	private boolean isMergeDuringRebase(RepositoryState state) {
@@ -776,36 +793,85 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Sets the {@link #noVerify} option on this commit command.
-	 * <p>
-	 * Both the {@link Hook#PRE_COMMIT pre-commit} and {@link Hook#COMMIT_MSG
-	 * commit-msg} hooks can block a commit by their return value; setting this
-	 * option to <code>true</code> will bypass these two hooks.
-	 * </p>
 	 *
 	 * @param noVerify
-	 *            Whether this commit should be verified by the pre-commit and
-	 *            commit-msg hooks.
+	 *            Whether this commit should be verified.
 	 * @return {@code this}
-	 * @since 3.7
 	 */
 	public CommitCommand setNoVerify(boolean noVerify) {
 		this.noVerify = noVerify;
 		return this;
 	}
 
-	/**
-	 * Set the output stream for hook scripts executed by this command. If not
-	 * set it defaults to {@code System.out}.
-	 *
-	 * @param hookStdOut
-	 *            the output stream for hook scripts executed by this command
-	 * @return {@code this}
-	 * @since 3.7
-	 */
-	public CommitCommand setHookOutputStream(PrintStream hookStdOut) {
-		if (hookStdOut != null) {
-			this.hookOutputStream = hookStdOut;
+	private void exportPreparedMessage(String msg) throws IOException {
+		final File messageFile = getMessageFile(true);
+		if (messageFile == null) {
+			final String errorMessage = MessageFormat.format(
+					JGitText.get().cannotCreateCommitMessageFile, repo
+							.getDirectory().getAbsolutePath()
+							+ Constants.COMMIT_EDITMSG);
+			throw new IOException(errorMessage);
 		}
-		return this;
+		BufferedWriter writer = null;
+		try {
+			writer = new BufferedWriter(new FileWriter(messageFile));
+			writer.write(msg);
+		} finally {
+			if (writer != null)
+				writer.close();
+		}
+	}
+
+	private String readPreparedMessage() throws IOException {
+		final File messageFile = getMessageFile(false);
+		if (messageFile == null)
+			return ""; //$NON-NLS-1$
+		BufferedReader reader = null;
+		try {
+			reader = new BufferedReader(new FileReader(messageFile));
+			StringBuilder builder = new StringBuilder();
+			String line = reader.readLine();
+			while (line != null) {
+				builder.append(line);
+				line = reader.readLine();
+				// TODO do we wish to respect OS line separator in the commit
+				// message (we can use a java.util.Scanner in such a case)?
+				if (line != null)
+					builder.append('\n');
+			}
+			return builder.toString();
+		} finally {
+			if (reader != null)
+				reader.close();
+		}
+	}
+
+	private File getMessageFile(boolean createOnDemand) throws IOException {
+		final File gitdir = repo.getDirectory();
+		final File[] messageFileCandidates = gitdir.listFiles(new FileFilter() {
+			public boolean accept(File pathname) {
+				return pathname.isFile()
+						&& pathname.getName().equals(Constants.COMMIT_EDITMSG);
+			}
+		});
+		final File messageFile;
+		if (messageFileCandidates.length > 0)
+			messageFile = messageFileCandidates[0];
+		else if (createOnDemand) {
+			messageFile = new File(gitdir.getAbsolutePath(),
+					Constants.COMMIT_EDITMSG);
+			messageFile.createNewFile();
+		} else
+			messageFile = null;
+		return messageFile;
+	}
+
+	private void commitRejectedByHook(Hook cause, String errorDetails)
+			throws RejectedCommitException {
+		String errorMessage = MessageFormat.format(
+				JGitText.get().commitRejectedByHook, cause.getName());
+		if (errorDetails.length() > 0)
+			errorMessage += '\n' + errorDetails;
+		throw new RejectedCommitException(errorMessage);
 	}
 }

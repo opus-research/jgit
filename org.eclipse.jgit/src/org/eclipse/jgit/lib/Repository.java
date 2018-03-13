@@ -65,6 +65,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.dircache.InvalidPathException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -88,7 +90,6 @@ import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
@@ -1153,11 +1154,11 @@ public abstract class Repository {
 		if (refName.endsWith(".lock")) //$NON-NLS-1$
 			return false;
 
-		// Refs may be stored as loose files so invalid paths
-		// on the local system must also be invalid refs.
+		// Borrow logic for filtering out invalid paths. These
+		// are also invalid ref
 		try {
-			SystemReader.getInstance().checkPath(refName);
-		} catch (CorruptObjectException e) {
+			DirCacheCheckout.checkValidPath(refName);
+		} catch (InvalidPathException e) {
 			return false;
 		}
 
@@ -1654,16 +1655,5 @@ public abstract class Repository {
 	public Set<String> getRemoteNames() {
 		return getConfig()
 				.getSubsections(ConfigConstants.CONFIG_REMOTE_SECTION);
-	}
-
-	/**
-	 * Provides the commit edit message file, without creating it if it does not
-	 * exist. The returned file is never null, but it may return false when
-	 * calling <code>exists()</code>.
-	 *
-	 * @return The commit edit message file, never <code>null</code>.
-	 */
-	public File getCommitEditMessageFile() {
-		return new File(getDirectory(), Constants.COMMIT_EDITMSG);
 	}
 }
