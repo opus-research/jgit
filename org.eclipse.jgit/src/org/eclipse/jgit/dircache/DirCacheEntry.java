@@ -65,7 +65,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A single file (or stage of a file) in a {@link DirCache}.
@@ -192,7 +191,7 @@ public class DirCacheEntry {
 		}
 
 		try {
-			checkPath(path);
+			DirCacheCheckout.checkValidPath(toString(path));
 		} catch (InvalidPathException e) {
 			CorruptObjectException p =
 				new CorruptObjectException(e.getMessage());
@@ -264,7 +263,7 @@ public class DirCacheEntry {
 	/**
 	 * Create an empty entry at the specified stage.
 	 *
-	 * @param path
+	 * @param newPath
 	 *            name of the cache entry, in the standard encoding.
 	 * @param stage
 	 *            the stage index of the new entry.
@@ -275,16 +274,16 @@ public class DirCacheEntry {
 	 *             range 0..3, inclusive.
 	 */
 	@SuppressWarnings("boxing")
-	public DirCacheEntry(byte[] path, final int stage) {
-		checkPath(path);
+	public DirCacheEntry(final byte[] newPath, final int stage) {
+		DirCacheCheckout.checkValidPath(toString(newPath));
 		if (stage < 0 || 3 < stage)
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().invalidStageForPath,
-					stage, toString(path)));
+					stage, toString(newPath)));
 
 		info = new byte[INFO_LEN];
 		infoOffset = 0;
-		this.path = path;
+		path = newPath;
 
 		int flags = ((stage & 0x3) << 12);
 		if (path.length < NAME_MASK)
@@ -499,14 +498,10 @@ public class DirCacheEntry {
 		switch (mode.getBits() & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_MISSING:
 		case FileMode.TYPE_TREE:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidModeForPath, mode, getPathString()));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidModeForPath
+					, mode, getPathString()));
 		}
 		NB.encodeInt32(info, infoOffset + P_MODE, mode.getBits());
-	}
-
-	void setFileMode(int mode) {
-		NB.encodeInt32(info, infoOffset + P_MODE, mode);
 	}
 
 	/**
@@ -733,16 +728,6 @@ public class DirCacheEntry {
 			return NB.decodeUInt16(info, infoOffset + P_FLAGS2) << 16;
 		else
 			return 0;
-	}
-
-	private static void checkPath(byte[] path) {
-		try {
-			SystemReader.getInstance().checkPath(path);
-		} catch (CorruptObjectException e) {
-			InvalidPathException p = new InvalidPathException(toString(path));
-			p.initCause(e);
-			throw p;
-		}
 	}
 
 	private static String toString(final byte[] path) {

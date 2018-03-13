@@ -154,14 +154,10 @@ class Branch extends TextBuiltin {
 					startBranch = Constants.HEAD;
 				Ref startRef = db.getRef(startBranch);
 				ObjectId startAt = db.resolve(startBranch + "^0"); //$NON-NLS-1$
-				if (startRef != null) {
+				if (startRef != null)
 					startBranch = startRef.getName();
-				} else if (startAt != null) {
+				else
 					startBranch = startAt.name();
-				} else {
-					throw die(MessageFormat.format(
-							CLIText.get().notAValidCommitName, startBranch));
-				}
 				startBranch = Repository.shortenRefName(startBranch);
 				String newRefName = newHead;
 				if (!newRefName.startsWith(Constants.R_HEADS))
@@ -190,31 +186,29 @@ class Branch extends TextBuiltin {
 		// This can happen if HEAD is stillborn
 		if (head != null) {
 			String current = head.getLeaf().getName();
-			try (Git git = new Git(db)) {
-				ListBranchCommand command = git.branchList();
-				if (all)
-					command.setListMode(ListMode.ALL);
-				else if (remote)
-					command.setListMode(ListMode.REMOTE);
+			ListBranchCommand command = new Git(db).branchList();
+			if (all)
+				command.setListMode(ListMode.ALL);
+			else if (remote)
+				command.setListMode(ListMode.REMOTE);
 
-				if (containsCommitish != null)
-					command.setContains(containsCommitish);
+			if (containsCommitish != null)
+				command.setContains(containsCommitish);
 
-				List<Ref> refs = command.call();
-				for (Ref ref : refs) {
-					if (ref.getName().equals(Constants.HEAD))
-						addRef("(no branch)", head); //$NON-NLS-1$
-				}
+			List<Ref> refs = command.call();
+			for (Ref ref : refs) {
+				if (ref.getName().equals(Constants.HEAD))
+					addRef("(no branch)", head); //$NON-NLS-1$
+			}
 
-				addRefs(refs, Constants.R_HEADS);
-				addRefs(refs, Constants.R_REMOTES);
+			addRefs(refs, Constants.R_HEADS);
+			addRefs(refs, Constants.R_REMOTES);
 
-				try (ObjectReader reader = db.newObjectReader()) {
-					for (final Entry<String, Ref> e : printRefs.entrySet()) {
-						final Ref ref = e.getValue();
-						printHead(reader, e.getKey(),
-								current.equals(ref.getName()), ref);
-					}
+			try (ObjectReader reader = db.newObjectReader()) {
+				for (final Entry<String, Ref> e : printRefs.entrySet()) {
+					final Ref ref = e.getValue();
+					printHead(reader, e.getKey(),
+							current.equals(ref.getName()), ref);
 				}
 			}
 		}
@@ -253,7 +247,7 @@ class Branch extends TextBuiltin {
 		String current = db.getBranch();
 		ObjectId head = db.resolve(Constants.HEAD);
 		for (String branch : branches) {
-			if (branch.equals(current)) {
+			if (current.equals(branch)) {
 				throw die(MessageFormat.format(CLIText.get().cannotDeleteTheBranchWhichYouAreCurrentlyOn, branch));
 			}
 			RefUpdate update = db.updateRef((remote ? Constants.R_REMOTES

@@ -85,8 +85,7 @@ public class PathMatcher extends AbstractMatcher {
 	}
 
 	private boolean isSimplePathWithSegments(String path) {
-		return !isWildCard(path) && path.indexOf('\\') < 0
-				&& count(path, slash, true) > 0;
+		return !isWildCard(path) && count(path, slash, true) > 0;
 	}
 
 	static private List<IMatcher> createMatchers(List<String> segments,
@@ -168,7 +167,7 @@ public class PathMatcher extends AbstractMatcher {
 		case COMPLEX:
 			return new WildCardMatcher(segment, pathSeparator, dirOnly);
 		default:
-			return new NameMatcher(segment, pathSeparator, dirOnly, true);
+			return new NameMatcher(segment, pathSeparator, dirOnly);
 		}
 	}
 

@@ -49,7 +49,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 
-import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -92,13 +91,6 @@ public abstract class AbstractTreeIterator {
 
 	/** The iterator this current entry is path equal to. */
 	AbstractTreeIterator matches;
-
-	/**
-	 * Parsed rules of .gitattributes file if it exists.
-	 *
-	 * @since 4.2
-	 */
-	protected AttributesNode attributesNode;
 
 	/**
 	 * Number of entries we moved forward to force a D/F conflict match.
@@ -325,42 +317,6 @@ public abstract class AbstractTreeIterator {
 		//
 		int cPos = alreadyMatch(this, p);
 		return pathCompare(p.path, cPos, p.pathLen, pMode, cPos);
-	}
-
-	/**
-	 * Seek the iterator on a file, if present.
-	 *
-	 * @param name
-	 *            file name to find (will not find a directory).
-	 * @return true if the file exists in this tree; false otherwise.
-	 * @throws CorruptObjectException
-	 *             tree is invalid.
-	 * @since 4.2
-	 */
-	public boolean findFile(String name) throws CorruptObjectException {
-		return findFile(Constants.encode(name));
-	}
-
-	/**
-	 * Seek the iterator on a file, if present.
-	 *
-	 * @param name
-	 *            file name to find (will not find a directory).
-	 * @return true if the file exists in this tree; false otherwise.
-	 * @throws CorruptObjectException
-	 *             tree is invalid.
-	 * @since 4.2
-	 */
-	public boolean findFile(byte[] name) throws CorruptObjectException {
-		for (; !eof(); next(1)) {
-			int cmp = pathCompare(name, 0, name.length, 0, pathOffset);
-			if (cmp == 0) {
-				return true;
-			} else if (cmp > 0) {
-				return false;
-			}
-		}
-		return false;
 	}
 
 	/**

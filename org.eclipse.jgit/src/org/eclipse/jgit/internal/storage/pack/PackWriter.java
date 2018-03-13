@@ -218,7 +218,7 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	@SuppressWarnings("unchecked")
-	BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
+	private BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
 	{
 		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
 		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
@@ -249,7 +249,7 @@ public class PackWriter implements AutoCloseable {
 	/** {@link #reader} recast to the reuse interface, if it supports it. */
 	private final ObjectReuseAsIs reuseSupport;
 
-	final PackConfig config;
+	private final PackConfig config;
 
 	private final PackStatistics.Accumulator stats;
 
@@ -1306,7 +1306,8 @@ public class PackWriter implements AutoCloseable {
 		long totalWeight = 0;
 		for (int i = 0; i < cnt; i++) {
 			ObjectToPack o = list[i];
-			totalWeight += DeltaTask.getAdjustedWeight(o);
+			if (!o.isEdge() && !o.doNotAttemptDelta())
+				totalWeight += o.getWeight();
 		}
 
 		long bytesPerUnit = 1;
@@ -1717,7 +1718,6 @@ public class PackWriter implements AutoCloseable {
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
 		BlockList<RevCommit> commits = new BlockList<RevCommit>();
-		Set<ObjectId> roots = new HashSet<>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
 			if (exclude(c))
@@ -1729,12 +1729,8 @@ public class PackWriter implements AutoCloseable {
 			}
 
 			commits.add(c);
-			if (c.getParentCount() == 0) {
-				roots.add(c.copy());
-			}
 			countingMonitor.update(1);
 		}
-		stats.rootCommits = Collections.unmodifiableSet(roots);
 
 		if (shallowPack) {
 			for (RevCommit cmit : commits) {
@@ -2014,10 +2010,10 @@ public class PackWriter implements AutoCloseable {
 		byName = null;
 
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
-				reader, writeBitmaps, pm, stats.interestingObjects, config);
+				reader, writeBitmaps, pm, stats.interestingObjects);
 
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
-				bitmapPreparer.selectCommits(numCommits);
+				bitmapPreparer.doCommitSelection(numCommits);
 
 		beginPhase(PackingPhase.BUILDING_BITMAPS, pm, selectedCommits.size());
 

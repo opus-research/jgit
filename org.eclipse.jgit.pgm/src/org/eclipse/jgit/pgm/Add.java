@@ -62,12 +62,10 @@ class Add extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		try (Git git = new Git(db)) {
-			AddCommand addCmd = git.add();
-			addCmd.setUpdate(update);
-			for (String p : filepatterns)
-				addCmd.addFilepattern(p);
-			addCmd.call();
-		}
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
 	}
 }
