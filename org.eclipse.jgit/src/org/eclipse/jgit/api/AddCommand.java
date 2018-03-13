@@ -119,7 +119,8 @@ public class AddCommand extends GitCommand<DirCache> {
 			final TreeWalk tw = new TreeWalk(repo);
 			tw.reset();
 			tw.addTree(new DirCacheBuildIterator(builder));
-			FileTreeIterator fileTreeIterator = new FileTreeIterator(repo);
+			FileTreeIterator fileTreeIterator = new FileTreeIterator(
+					repo.getWorkDir(), repo.getFS());
 			tw.addTree(fileTreeIterator);
 			tw.setRecursive(true);
 			tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
