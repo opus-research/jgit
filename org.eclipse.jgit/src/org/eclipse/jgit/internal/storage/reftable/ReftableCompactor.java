@@ -49,34 +49,44 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.ReflogEntry;
+
 /**
  * Merges reftables and compacts them into a single output.
+ * <p>
+ * For a partial compaction callers should {@link #setIncludeDeletes(boolean)}
+ * to {@code true} to ensure the new reftable continues to use a delete marker
+ * to shadow any lower reftable that may have the reference present.
+ * <p>
+ * By default all log entries are copied, even if no references in the output
+ * file match the log records. Callers may truncate the log to a more recent
+ * time horizon with {@link #setOldestReflogTime(long)}, or disable the log
+ * altogether with {@code setOldestReflogTime(Long.MAX_VALUE)}.
  */
 public class ReftableCompactor {
 	private final ReftableWriter writer = new ReftableWriter();
 	private final ArrayDeque<RefCursor> tables = new ArrayDeque<>();
-
-	private long compactBytesLimit;
-	private long bytesToCompact;
 	private boolean includeDeletes;
+	private long oldestReflogTime;
 
 	/**
-	 * @param bytes
-	 *            limit on number of bytes from source tables to compact.
+	 * @param szBytes
+	 *            desired output block size for references, in bytes.
 	 * @return {@code this}
 	 */
-	public ReftableCompactor setCompactBytesLimit(long bytes) {
-		compactBytesLimit = bytes;
+	public ReftableCompactor setRefBlockSize(int szBytes) {
+		writer.setRefBlockSize(szBytes);
 		return this;
 	}
 
 	/**
 	 * @param szBytes
-	 *            desired output block size in bytes.
+	 *            desired output block size for log entries, in bytes.
 	 * @return {@code this}
 	 */
-	public ReftableCompactor setBlockSize(int szBytes) {
-		writer.setBlockSize(szBytes);
+	public ReftableCompactor setLogBlockSize(int szBytes) {
+		writer.setLogBlockSize(szBytes);
 		return this;
 	}
 
@@ -95,7 +105,7 @@ public class ReftableCompactor {
 	/**
 	 * @param deletes
 	 *            {@code true} to include deletions in the output, which may be
-	 *            necessary for partial compactions.
+	 *            necessary for partial compaction.
 	 * @return {@code this}
 	 */
 	public ReftableCompactor setIncludeDeletes(boolean deletes) {
@@ -104,10 +114,20 @@ public class ReftableCompactor {
 	}
 
 	/**
+	 * @param timeMillis
+	 *            oldest log time to preserve. Entries whose timestamps are
+	 *            {@code >= timeMillis} will be copied into the output file. Log
+	 *            entries that predate {@code timeMillis} will be discarded.
+	 *            Specified in the usual Java way, milliseconds since the epoch.
+	 * @return {@code this}
+	 */
+	public ReftableCompactor setOldestReflogTime(long timeMillis) {
+		oldestReflogTime = timeMillis;
+		return this;
+	}
+
+	/**
 	 * Add all of the tables, in the specified order.
-	 * <p>
-	 * Unconditionally adds all tables, ignoring the
-	 * {@link #setCompactBytesLimit(long)}.
 	 *
 	 * @param readers
 	 *            tables to compact. Tables should be ordered oldest first/most
@@ -116,32 +136,6 @@ public class ReftableCompactor {
 	 */
 	public void addAll(List<RefCursor> readers) {
 		tables.addAll(readers);
-	}
-
-	/**
-	 * Try to add this reader at the bottom of the stack.
-	 * <p>
-	 * A reader may be rejected by returning {@code false} if the compactor is
-	 * already rewriting its {@link #setCompactBytesLimit(long)}. When this
-	 * happens the caller should stop trying to add tables, and execute the
-	 * compaction.
-	 *
-	 * @param reader
-	 *            the reader to insert at the bottom of the stack. Caller is
-	 *            responsible for closing the reader.
-	 * @return {@code true} if the compactor accepted this table; {@code false}
-	 *         if the compactor has reached its limit.
-	 * @throws IOException
-	 *             size of {@code reader} cannot be read.
-	 */
-	public boolean tryAddFirst(ReftableReader reader) throws IOException {
-		long sz = reader.size();
-		if (compactBytesLimit > 0 && bytesToCompact + sz > compactBytesLimit) {
-			return false;
-		}
-		bytesToCompact += sz;
-		tables.addFirst(reader);
-		return true;
 	}
 
 	/**
@@ -154,15 +148,35 @@ public class ReftableCompactor {
 	 *             tables cannot be read, or cannot be written.
 	 */
 	public void compact(OutputStream out) throws IOException {
-		@SuppressWarnings("resource")
 		MergedReftable mr = new MergedReftable(new ArrayList<>(tables));
 		mr.setIncludeDeletes(includeDeletes);
-		mr.seekToFirstRef();
 
 		writer.begin(out);
-		while (mr.next()) {
-			writer.write(mr.getRef());
-		}
+		mergeRefs(mr);
+		mergeLogs(mr);
 		writer.finish();
+	}
+
+	private void mergeRefs(MergedReftable mr) throws IOException {
+		mr.seekToFirstRef();
+		while (mr.next()) {
+			writer.writeRef(mr.getRef());
+		}
+	}
+
+	private void mergeLogs(MergedReftable mr) throws IOException {
+		mr.seekToFirstLog();
+		while (mr.next()) {
+			ReflogEntry log = mr.getReflogEntry();
+			PersonIdent who = log.getWho();
+			if (who.getWhen().getTime() >= oldestReflogTime) {
+				writer.writeLog(
+						mr.getRefName(),
+						who,
+						log.getOldId(),
+						log.getNewId(),
+						log.getComment());
+			}
+		}
 	}
 }

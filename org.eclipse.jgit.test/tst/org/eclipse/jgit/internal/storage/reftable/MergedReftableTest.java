@@ -259,7 +259,7 @@ public class MergedReftableTest {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		ReftableWriter writer = new ReftableWriter().begin(buffer);
 		for (Ref r : RefComparator.sort(refs)) {
-			writer.write(r);
+			writer.writeRef(r);
 		}
 		writer.finish();
 		return buffer.toByteArray();
