@@ -78,11 +78,12 @@ public class DfsInserterTest {
 
 	@Test
 	public void testInserterDiscardsPack() throws IOException {
-		try (ObjectInserter ins = db.newObjectInserter()) {
-			ins.insert(Constants.OBJ_BLOB, Constants.encode("foo"));
-			ins.insert(Constants.OBJ_BLOB, Constants.encode("bar"));
-			assertEquals(0, db.getObjectDatabase().listPacks().size());
-		}
+		ObjectInserter ins = db.newObjectInserter();
+		ins.insert(Constants.OBJ_BLOB, Constants.encode("foo"));
+		ins.insert(Constants.OBJ_BLOB, Constants.encode("bar"));
+		assertEquals(0, db.getObjectDatabase().listPacks().size());
+
+		ins.release();
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 	}
 

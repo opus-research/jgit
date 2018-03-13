@@ -214,10 +214,15 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		 */
 		protected byte[] readFileFromRepo(Repository repo,
 				String ref, String path) throws GitAPIException, IOException {
-			try (ObjectReader reader = repo.newObjectReader()) {
+			ObjectReader reader = repo.newObjectReader();
+			byte[] result;
+			try {
 				ObjectId oid = repo.resolve(ref + ":" + path); //$NON-NLS-1$
-				return reader.open(oid).getBytes(Integer.MAX_VALUE);
+				result = reader.open(oid).getBytes(Integer.MAX_VALUE);
+			} finally {
+				reader.release();
 			}
+			return result;
 		}
 	}
 
@@ -743,7 +748,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			DirCache index = DirCache.newInCore();
 			DirCacheBuilder builder = index.builder();
 			ObjectInserter inserter = repo.newObjectInserter();
-			try (RevWalk rw = new RevWalk(repo)) {
+			RevWalk rw = new RevWalk(repo);
+			try {
 				Config cfg = new Config();
 				for (Project proj : bareProjects) {
 					String name = proj.path;
@@ -825,6 +831,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				return rw.parseCommit(commitId);
 			} catch (IOException e) {
 				throw new ManifestErrorException(e);
+			} finally {
+				rw.release();
 			}
 		} else {
 			return git
@@ -851,10 +859,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			try {
 				Repository subRepo = add.call();
 				if (revision != null) {
-					try (Git sub = new Git(subRepo)) {
-						sub.checkout().setName(findRef(revision, subRepo))
-								.call();
-					}
+					Git sub = new Git(subRepo);
+					sub.checkout().setName(findRef(revision, subRepo)).call();
 					subRepo.close();
 					git.add().addFilepattern(name).call();
 				}
