@@ -66,6 +66,7 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -112,6 +113,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * and also all commits mentioned in .git/MERGE_HEAD
 	 */
 	private List<ObjectId> parents = new LinkedList<ObjectId>();
+
+	private String reflogComment;
 
 	/**
 	 * @param repo
@@ -217,11 +220,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						RevCommit revCommit = revWalk.parseCommit(commitId);
 						RefUpdate ru = repo.updateRef(Constants.HEAD);
 						ru.setNewObjectId(commitId);
-						String prefix = amend ? "commit (amend): " : "commit: ";
-						ru.setRefLogMessage(
-								prefix + revCommit.getShortMessage(), false);
-
-						ru.setExpectedOldObjectId(headId);
+						if (reflogComment != null) {
+							ru.setRefLogMessage(reflogComment, false);
+						} else {
+							String prefix = amend ? "commit (amend): "
+									: "commit: ";
+							ru.setRefLogMessage(
+									prefix + revCommit.getShortMessage(), false);
+						}
+						if (headId != null)
+							ru.setExpectedOldObjectId(headId);
+						else
+							ru.setExpectedOldObjectId(ObjectId.zeroId());
 						Result rc = ru.forceUpdate();
 						switch (rc) {
 						case NEW:
@@ -341,17 +351,24 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					if (objectExists) {
 						dcEntry.setObjectId(fTree.getEntryObjectId());
 					} else {
-						// insert object
-						if (inserter == null)
-							inserter = repo.newObjectInserter();
+						if (FileMode.GITLINK.equals(dcEntry.getFileMode())) {
+							// Do not check the content of submodule entries
+							// Use the old entry information instead.
+							dcEntry.copyMetaData(index.getEntry(dcEntry
+									.getPathString()));
+						} else {
+							// insert object
+							if (inserter == null)
+								inserter = repo.newObjectInserter();
 
-						InputStream inputStream = fTree.openEntryStream();
-						try {
-							dcEntry.setObjectId(inserter.insert(
-									Constants.OBJ_BLOB, entryLength,
-									inputStream));
-						} finally {
-							inputStream.close();
+							InputStream inputStream = fTree.openEntryStream();
+							try {
+								dcEntry.setObjectId(inserter.insert(
+										Constants.OBJ_BLOB, entryLength,
+										inputStream));
+							} finally {
+								inputStream.close();
+							}
 						}
 					}
 
@@ -656,6 +673,17 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public CommitCommand setInsertChangeId(boolean insertChangeId) {
 		checkCallable();
 		this.insertChangeId = insertChangeId;
+		return this;
+	}
+
+	/**
+	 * Override the message written to the reflog
+	 *
+	 * @param reflogComment
+	 * @return {@code this}
+	 */
+	public CommitCommand setReflogComment(String reflogComment) {
+		this.reflogComment = reflogComment;
 		return this;
 	}
 

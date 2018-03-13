@@ -116,7 +116,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotGet;
 	/***/ public String cannotListRefs;
 	/***/ public String cannotLock;
-	/***/ public String cannotLockFile;
 	/***/ public String cannotLockPackIn;
 	/***/ public String cannotMatchOnEmptyString;
 	/***/ public String cannotMoveIndexTo;
@@ -275,6 +274,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
 	/***/ public String illegalCombinationOfArguments;
+	/***/ public String illegalPackingPhase;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
 	/***/ public String inMemoryBufferLimitExceeded;
@@ -309,6 +309,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidPacketLineHeader;
 	/***/ public String invalidPath;
 	/***/ public String invalidRemote;
+	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
@@ -411,6 +412,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String problemWithResolvingPushRefSpecsLocally;
 	/***/ public String progressMonUploading;
 	/***/ public String propertyIsAlreadyNonNull;
+	/***/ public String pullOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;
 	/***/ public String pushIsNotSupportedForBundleTransport;
@@ -418,11 +420,13 @@ public class JGitText extends TranslationBundle {
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
 	/***/ public String readTimedOut;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
+	/***/ public String receivePackObjectTooLarge1;
+	/***/ public String receivePackObjectTooLarge2;
 	/***/ public String receivingObjects;
-	/***/ public String refAlreadExists;
+	/***/ public String refAlreadyExists;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
-	/***/ public String reflogsNotYetSupportedByRevisionParser;
+	/***/ public String reflogEntryNotFound;
 	/***/ public String remoteConfigHasNoURIAssociated;
 	/***/ public String remoteDoesNotHaveSpec;
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
@@ -552,6 +556,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String year;
 	/***/ public String years;
 	/***/ public String yearsAgo;
+	/***/ public String years0MonthsAgo;
 	/***/ public String yearsMonthsAgo;
 	/***/ public String treeWalkMustHaveExactlyTwoTrees;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;

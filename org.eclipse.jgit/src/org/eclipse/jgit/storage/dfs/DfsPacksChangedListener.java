@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,41 +41,17 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.storage.dfs;
 
-import org.eclipse.jgit.api.DescribeCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.events.RepositoryListener;
 
-class Describe extends TextBuiltin {
-	@Option(name = "--abbrev", metaVar = "metaVar_n")
-	private Integer abbrev;
-
-	@Argument(index = 0, required = false, metaVar = "metaVar_refspec")
-	private String revstr;
-
-	@Override
-	protected void run() throws Exception {
-		Repository r = new RepositoryBuilder().readEnvironment()
-				.findGitDir()
-				.build();
-
-		Git g = new Git(r);
-
-		DescribeCommand dc = g.describe();
-		if (revstr != null) {
-			dc.setObjectId(db.resolve(revstr));
-		} else {
-			dc.setObjectId(db.resolve("HEAD"));
-
-		}
-		if (abbrev != null) {
-			dc.setAbbrev(abbrev);
-		}
-		out.print(dc.call());
-		out.println();
-	}
+/** Receives {@link DfsPacksChangedEvent}s. */
+public interface DfsPacksChangedListener extends RepositoryListener {
+	/**
+	 * Invoked when all packs in a repository are listed.
+	 *
+	 * @param event
+	 *            information about the packs.
+	 */
+	void onPacksChanged(DfsPacksChangedEvent event);
 }

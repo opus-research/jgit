@@ -174,7 +174,7 @@ public class DirCacheCheckout {
 	 * @param dc
 	 *            the (already locked) Dircache for this repo
 	 * @param mergeCommitTree
-	 *            the id of the tree of the
+	 *            the id of the tree we want to fast-forward to
 	 * @throws IOException
 	 */
 	public DirCacheCheckout(Repository repo, ObjectId headCommitTree,
@@ -352,12 +352,10 @@ public class DirCacheCheckout {
 					}
 				}
 			} else {
-				// There is no file/folder for that path in the working tree.
-				// The only entry we have is the index entry. If that entry is a
-				// conflict simply remove it. Otherwise keep that entry in the
-				// index
-				if (i.getDirCacheEntry().getStage() == 0)
-					keep(i.getDirCacheEntry());
+				// There is no file/folder for that path in the working tree,
+				// nor in the merge head.
+				// The only entry we have is the index entry. Like the case
+				// where there is a file with the same name, remove it,
 			}
 		}
 	}
@@ -396,10 +394,9 @@ public class DirCacheCheckout {
 				prescanOneTree();
 
 			if (!conflicts.isEmpty()) {
-				if (failOnConflict) {
-					dc.unlock();
+				if (failOnConflict)
 					throw new CheckoutConflictException(conflicts.toArray(new String[conflicts.size()]));
-				} else
+				else
 					cleanUpConflicts();
 			}
 
@@ -414,9 +411,15 @@ public class DirCacheCheckout {
 			for (int i = removed.size() - 1; i >= 0; i--) {
 				String r = removed.get(i);
 				file = new File(repo.getWorkTree(), r);
-				if (!file.delete() && file.exists())
-					toBeDeleted.add(r);
-				else {
+				if (!file.delete() && file.exists()) {
+					// The list of stuff to delete comes from the index
+					// which will only contain a directory if it is
+					// a submodule, in which case we shall not attempt
+					// to delete it. A submodule is not empty, so it
+					// is safe to check this after a failed delete.
+					if (!file.isDirectory())
+						toBeDeleted.add(r);
+				} else {
 					if (!isSamePrefix(r, last))
 						removeEmptyParents(new File(repo.getWorkTree(), last));
 					last = r;
@@ -442,10 +445,8 @@ public class DirCacheCheckout {
 			}
 
 			// commit the index builder - a new index is persisted
-			if (!builder.commit()) {
-				dc.unlock();
+			if (!builder.commit())
 				throw new IndexWriteException();
-			}
 		} finally {
 			objectReader.release();
 		}
@@ -624,7 +625,7 @@ public class DirCacheCheckout {
 				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
 					if (f == null || f.isModified(dce, true))
-						conflict(name, i.getDirCacheEntry(), h, m);
+						conflict(name, dce, h, m);
 					else
 						remove(name);
 				} else
@@ -654,11 +655,14 @@ public class DirCacheCheckout {
 		if (i == null) {
 			// make sure not to overwrite untracked files
 			if (f != null) {
-				// a dirty worktree: the index is empty but we have a
-				// workingtree-file
-				if (mId == null || !mId.equals(f.getEntryObjectId())) {
-					conflict(name, null, h, m);
-					return;
+				// A submodule is not a file. We should ignore it
+				if (!FileMode.GITLINK.equals(m.getEntryFileMode())) {
+					// a dirty worktree: the index is empty but we have a
+					// workingtree-file
+					if (mId == null || !mId.equals(f.getEntryObjectId())) {
+						conflict(name, null, h, m);
+						return;
+					}
 				}
 			}
 
@@ -700,13 +704,13 @@ public class DirCacheCheckout {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
 								&& (f == null || f.isModified(dce, true)))
-							conflict(name, i.getDirCacheEntry(), h, m);
+							conflict(name, dce, h, m);
 						else
 							remove(name);
 					} else
-						keep(i.getDirCacheEntry());
+						keep(dce);
 				} else
-					conflict(name, i.getDirCacheEntry(), h, m);
+					conflict(name, dce, h, m);
 			} else if (m == null) {
 
 				/**
@@ -720,23 +724,35 @@ public class DirCacheCheckout {
 				 * </pre>
 				 */
 
-				if (hId.equals(iId)) {
-					if (f == null || f.isModified(dce, true))
-						conflict(name, i.getDirCacheEntry(), h, m);
-					else
-						remove(name);
-				} else
-					conflict(name, i.getDirCacheEntry(), h, m);
+				if (dce.getFileMode() == FileMode.GITLINK) {
+					// Submodules that disappear from the checkout must
+					// be removed from the index, but not deleted from disk.
+					remove(name);
+				} else {
+					if (hId.equals(iId)) {
+						if (f == null || f.isModified(dce, true))
+							conflict(name, dce, h, m);
+						else
+							remove(name);
+					} else
+						conflict(name, dce, h, m);
+				}
 			} else {
 				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
-					conflict(name, i.getDirCacheEntry(), h, m);
+					conflict(name, dce, h, m);
 				else if (hId.equals(iId) && !mId.equals(iId)) {
-					if (dce != null && (f == null || f.isModified(dce, true)))
-						conflict(name, i.getDirCacheEntry(), h, m);
-					else
+					// For submodules just update the index with the new SHA-1
+					if (dce != null
+							&& FileMode.GITLINK.equals(dce.getFileMode())) {
 						update(name, mId, m.getEntryFileMode());
+					} else if (dce != null
+							&& (f == null || f.isModified(dce, true))) {
+						conflict(name, dce, h, m);
+					} else {
+						update(name, mId, m.getEntryFileMode());
+					}
 				} else {
-					keep(i.getDirCacheEntry());
+					keep(dce);
 				}
 			}
 		}
