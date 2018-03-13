@@ -197,7 +197,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				8 + 4 + 2 + HEAD.length() + 1 + MASTER.length() + 6 + 52,
+				8 + 4 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 6 + 52,
 				table.length);
 
 		ReftableReader t = read(table);
