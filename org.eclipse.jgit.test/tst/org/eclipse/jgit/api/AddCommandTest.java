@@ -119,12 +119,12 @@ public class AddCommandTest extends RepositoryTestCase {
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 		writeTrashFile("src/a.tmp", "foo");
 		writeTrashFile("src/a.txt", "foo");
-		File script = writeTempFile("tr o e");
+		File script = writeTempFile("sed s/o/e/g");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + script.getPath());
+				"sh " + standardizePath(script.getPath()));
 		config.save();
 
 		git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
@@ -145,12 +145,12 @@ public class AddCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + script.getPath());
+				"sh " + standardizePath(script.getPath()));
 		config.save();
-
 		git.add().addFilepattern("src/a.txt").call();
 
-		String path = db.getWorkTree().getAbsolutePath();
+		String path = standardizePath(db.getWorkTree().getCanonicalPath());
+
 		String gitDir = db.getDirectory().getAbsolutePath();
 		assertEquals("[src/a.txt, mode:100644, content:" + path + " " + gitDir
 				+ "\n]", indexState(CONTENT));
@@ -162,15 +162,15 @@ public class AddCommandTest extends RepositoryTestCase {
 				"*.txt filter=tstFilter\n*.tmp filter=tstFilter2");
 		writeTrashFile("src/a.tmp", "foo");
 		writeTrashFile("src/a.txt", "foo");
-		File script = writeTempFile("tr o e");
-		File script2 = writeTempFile("tr f x");
+		File script = writeTempFile("sed s/o/e/g");
+		File script2 = writeTempFile("sed s/f/x/g");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + script.getPath());
+				"sh " + standardizePath(script.getPath()));
 		config.setString("filter", "tstFilter2", "clean",
-				"sh " + script2.getPath());
+				"sh " + standardizePath(script2.getPath()));
 		config.save();
 
 		git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
@@ -194,12 +194,12 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testCommandInjection() throws IOException, GitAPIException {
 		writeTrashFile("; echo virus", "foo");
-		File script = writeTempFile("tr o e");
+		File script = writeTempFile("sed s/o/e/g");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + script.getPath() + " %f");
+				"sh " + standardizePath(script.getPath()) + " %f");
 		writeTrashFile(".gitattributes", "* filter=tstFilter");
 
 		git.add().addFilepattern("; echo virus").call();
@@ -212,7 +212,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testBadCleanFilter() throws IOException, GitAPIException {
 		writeTrashFile("a.txt", "foo");
-		File script = writeTempFile("sedfoo s/o/e/");
+		File script = writeTempFile("sedfoo s/o/e/g");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -232,7 +232,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testBadCleanFilter2() throws IOException, GitAPIException {
 		writeTrashFile("a.txt", "foo");
-		File script = writeTempFile("sed s/o/e/");
+		File script = writeTempFile("sed s/o/e/g");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -258,7 +258,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + script.getPath());
+				"sh " + standardizePath(script.getPath()));
 		config.save();
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 
@@ -273,7 +273,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testNotApplicableFilter() throws IOException, GitAPIException {
 		writeTrashFile("a.txt", "foo");
-		File script = writeTempFile("sed s/o/e/");
+		File script = writeTempFile("sed s/o/e/g");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
