@@ -45,7 +45,7 @@ package org.eclipse.jgit.util;
 import java.text.MessageFormat;
 import java.util.Date;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Formatter to format timestamps relative to the current time using time units
@@ -75,8 +75,7 @@ public class RelativeDateFormatter {
 	@SuppressWarnings("boxing")
 	public static String format(Date when) {
 
-		long ageMillis = SystemReader.getInstance().getCurrentTime()
-				- when.getTime();
+		long ageMillis = (System.currentTimeMillis() - when.getTime());
 
 		// shouldn't happen in a perfect world
 		if (ageMillis < 0)
@@ -119,10 +118,8 @@ public class RelativeDateFormatter {
 					JGitText.get().year;
 			long months = round(ageMillis % YEAR_IN_MILLIS, MONTH_IN_MILLIS);
 			String monthLabel = (months > 1) ? JGitText.get().months : //
-					(months == 1 ? JGitText.get().month : ""); //$NON-NLS-1$
-			return MessageFormat.format(
-					months == 0 ? JGitText.get().years0MonthsAgo : JGitText
-							.get().yearsMonthsAgo,
+					JGitText.get().month;
+			return MessageFormat.format(JGitText.get().yearsMonthsAgo,
 					new Object[] { years, yearLabel, months, monthLabel });
 		}
 

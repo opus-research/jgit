@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2013 Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -138,18 +138,20 @@ public class UnionInputStream extends InputStream {
 
 	@Override
 	public int read(byte[] b, int off, int len) throws IOException {
-		if (len == 0)
-			return 0;
-		for (;;) {
+		int cnt = 0;
+		while (0 < len) {
 			final InputStream in = head();
 			final int n = in.read(b, off, len);
-			if (0 < n)
-				return n;
-			else if (in == EOF)
-				return -1;
+			if (0 < n) {
+				cnt += n;
+				off += n;
+				len -= n;
+			} else if (in == EOF)
+				return 0 < cnt ? cnt : -1;
 			else
 				pop();
 		}
+		return cnt;
 	}
 
 	@Override
@@ -158,18 +160,17 @@ public class UnionInputStream extends InputStream {
 	}
 
 	@Override
-	public long skip(final long count) throws IOException {
-		long skipped = 0;
-		long cnt = count;
-		while (0 < cnt) {
+	public long skip(long len) throws IOException {
+		long cnt = 0;
+		while (0 < len) {
 			final InputStream in = head();
-			final long n = in.skip(cnt);
+			final long n = in.skip(len);
 			if (0 < n) {
-				skipped += n;
-				cnt -= n;
+				cnt += n;
+				len -= n;
 
 			} else if (in == EOF) {
-				return skipped;
+				return cnt;
 
 			} else {
 				// Is this stream at EOF? We can't tell from skip alone.
@@ -179,15 +180,13 @@ public class UnionInputStream extends InputStream {
 				final int r = in.read();
 				if (r < 0) {
 					pop();
-					if (0 < skipped)
-						break;
 				} else {
-					skipped += 1;
-					cnt -= 1;
+					cnt += 1;
+					len -= 1;
 				}
 			}
 		}
-		return skipped;
+		return cnt;
 	}
 
 	@Override

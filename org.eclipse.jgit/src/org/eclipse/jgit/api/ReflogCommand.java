@@ -46,13 +46,12 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Collection;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ReflogEntry;
-import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.ReflogEntry;
+import org.eclipse.jgit.storage.file.ReflogReader;
 
 /**
  * The reflog command
@@ -85,22 +84,15 @@ public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
 		return this;
 	}
 
-	/**
-	 * Run the reflog command
-	 *
-	 * @throws GitAPIException
-	 * @throws InvalidRefNameException
-	 */
-	public Collection<ReflogEntry> call() throws GitAPIException,
-			InvalidRefNameException {
+	public Collection<ReflogEntry> call() throws Exception {
 		checkCallable();
 
 		try {
-			ReflogReader reader = repo.getReflogReader(ref);
+			ReflogReader reader = new ReflogReader(repo, ref);
 			return reader.getReverseEntries();
 		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, ref), e);
+			throw new InvalidRemoteException(MessageFormat.format(
+					JGitText.get().cannotRead, ref));
 		}
 	}
 

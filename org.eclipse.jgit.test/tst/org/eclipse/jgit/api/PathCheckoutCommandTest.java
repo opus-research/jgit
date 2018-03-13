@@ -45,18 +45,8 @@ package org.eclipse.jgit.api;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
-import java.io.IOException;
 
-import org.eclipse.jgit.api.CheckoutCommand.Stage;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Before;
 import org.junit.Test;
@@ -69,8 +59,6 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 	private static final String FILE1 = "f/Test.txt";
 
 	private static final String FILE2 = "Test2.txt";
-
-	private static final String FILE3 = "Test3.txt";
 
 	Git git;
 
@@ -160,150 +148,4 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 		assertEquals("c", read(new File(db.getWorkTree(), FILE2)));
 	}
 
-	@Test
-	public void testUpdateWorkingDirectoryFromIndex2() throws Exception {
-		CheckoutCommand co = git.checkout();
-		fsTick(git.getRepository().getIndexFile());
-
-		File written1 = writeTrashFile(FILE1, "3(modified)");
-		File written2 = writeTrashFile(FILE2, "a(modified)");
-		fsTick(written2);
-
-		// make sure that we get unsmudged entries for FILE1 and FILE2
-		writeTrashFile(FILE3, "foo");
-		git.add().addFilepattern(FILE3).call();
-		fsTick(git.getRepository().getIndexFile());
-
-		git.add().addFilepattern(FILE1).addFilepattern(FILE2).call();
-		fsTick(git.getRepository().getIndexFile());
-
-		writeTrashFile(FILE1, "3(modified again)");
-		writeTrashFile(FILE2, "a(modified again)");
-		fsTick(written2);
-
-		co.addPath(FILE1).setStartPoint(secondCommit).call();
-
-		assertEquals("2", read(written1));
-		assertEquals("a(modified again)", read(written2));
-
-		validateIndex(git);
-	}
-
-	public static void validateIndex(Git git) throws NoWorkTreeException,
-			IOException {
-		DirCache dc = git.getRepository().lockDirCache();
-		ObjectReader r = git.getRepository().getObjectDatabase().newReader();
-		try {
-			for (int i = 0; i < dc.getEntryCount(); ++i) {
-				DirCacheEntry entry = dc.getEntry(i);
-				if (entry.getLength() > 0)
-					assertEquals(entry.getLength(), r.getObjectSize(
-							entry.getObjectId(), ObjectReader.OBJ_ANY));
-			}
-		} finally {
-			dc.unlock();
-			r.release();
-		}
-	}
-
-	public void testCheckoutMixedNewlines() throws Exception {
-		// "git config core.autocrlf true"
-		StoredConfig config = git.getRepository().getConfig();
-		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, true);
-		config.save();
-		// edit <FILE1>
-		File written = writeTrashFile(FILE1, "4\r\n4");
-		assertEquals("4\r\n4", read(written));
-		// "git add <FILE1>"
-		git.add().addFilepattern(FILE1).call();
-		// "git commit -m 'CRLF'"
-		git.commit().setMessage("CRLF").call();
-		// edit <FILE1>
-		written = writeTrashFile(FILE1, "4\n4");
-		assertEquals("4\n4", read(written));
-		// "git add <FILE1>"
-		git.add().addFilepattern(FILE1).call();
-		// "git checkout -- <FILE1>
-		git.checkout().addPath(FILE1).call();
-		// "git status" => clean
-		Status status = git.status().call();
-		assertEquals(0, status.getAdded().size());
-		assertEquals(0, status.getChanged().size());
-		assertEquals(0, status.getConflicting().size());
-		assertEquals(0, status.getMissing().size());
-		assertEquals(0, status.getModified().size());
-		assertEquals(0, status.getRemoved().size());
-		assertEquals(0, status.getUntracked().size());
-	}
-
-	@Test
-	public void testCheckoutRepository() throws Exception {
-		CheckoutCommand co = git.checkout();
-		File test = writeTrashFile(FILE1, "");
-		File test2 = writeTrashFile(FILE2, "");
-		co.setStartPoint("HEAD~2").setAllPaths(true).call();
-		assertEquals("1", read(test));
-		assertEquals("a", read(test2));
-	}
-
-
-	@Test(expected = JGitInternalException.class)
-	public void testCheckoutOfConflictingFileShouldThrow()
-			throws Exception {
-		setupConflictingState();
-
-		git.checkout().addPath(FILE1).call();
-	}
-
-	@Test
-	public void testCheckoutOurs() throws Exception {
-		setupConflictingState();
-
-		git.checkout().setStage(Stage.OURS).addPath(FILE1).call();
-
-		assertEquals("3", read(FILE1));
-		assertStageOneToThree(FILE1);
-	}
-
-	@Test
-	public void testCheckoutTheirs() throws Exception {
-		setupConflictingState();
-
-		git.checkout().setStage(Stage.THEIRS).addPath(FILE1).call();
-
-		assertEquals("Conflicting", read(FILE1));
-		assertStageOneToThree(FILE1);
-	}
-
-	@Test(expected = IllegalStateException.class)
-	public void testStageNotPossibleWithBranch() throws Exception {
-		git.checkout().setStage(Stage.OURS).setStartPoint("master").call();
-	}
-
-	private void setupConflictingState() throws Exception {
-		git.checkout().setCreateBranch(true).setName("conflict")
-				.setStartPoint(initialCommit).call();
-		writeTrashFile(FILE1, "Conflicting");
-		RevCommit conflict = git.commit().setAll(true)
-				.setMessage("Conflicting change").call();
-
-		git.checkout().setName("master").call();
-
-		git.merge().include(conflict).call();
-		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
-		assertStageOneToThree(FILE1);
-	}
-
-	private void assertStageOneToThree(String name) throws Exception {
-		DirCache cache = DirCache.read(db.getIndexFile(), db.getFS());
-		int i = cache.findEntry(name);
-		DirCacheEntry stage1 = cache.getEntry(i);
-		DirCacheEntry stage2 = cache.getEntry(i + 1);
-		DirCacheEntry stage3 = cache.getEntry(i + 2);
-
-		assertEquals(DirCacheEntry.STAGE_1, stage1.getStage());
-		assertEquals(DirCacheEntry.STAGE_2, stage2.getStage());
-		assertEquals(DirCacheEntry.STAGE_3, stage3.getStage());
-	}
 }

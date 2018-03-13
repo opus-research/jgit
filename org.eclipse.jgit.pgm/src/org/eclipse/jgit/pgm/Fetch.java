@@ -65,7 +65,7 @@ class Fetch extends AbstractFetchCommand {
 	private Boolean fsck;
 
 	@Option(name = "--no-fsck")
-	void nofsck(@SuppressWarnings("unused") final boolean ignored) {
+	void nofsck(final boolean ignored) {
 		fsck = Boolean.FALSE;
 	}
 
@@ -79,12 +79,9 @@ class Fetch extends AbstractFetchCommand {
 	private Boolean thin;
 
 	@Option(name = "--no-thin")
-	void nothin(@SuppressWarnings("unused") final boolean ignored) {
+	void nothin(final boolean ignored) {
 		thin = Boolean.FALSE;
 	}
-
-	@Option(name = "--quiet", usage = "usage_quiet")
-	private Boolean quiet;
 
 	@Argument(index = 0, metaVar = "metaVar_uriish")
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
@@ -108,8 +105,7 @@ class Fetch extends AbstractFetchCommand {
 		fetch.setRemote(remote);
 		if (thin != null)
 			fetch.setThin(thin.booleanValue());
-		if (quiet == null || !quiet.booleanValue())
-			fetch.setProgressMonitor(new TextProgressMonitor());
+		fetch.setProgressMonitor(new TextProgressMonitor());
 
 		FetchResult result = fetch.call();
 		if (result.getTrackingRefUpdates().isEmpty())

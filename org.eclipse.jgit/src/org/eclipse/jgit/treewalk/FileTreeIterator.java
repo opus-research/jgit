@@ -120,8 +120,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the subdirectory. This should be a directory contained within
 	 *            the parent directory.
 	 */
-	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
-			FS fs) {
+	protected FileTreeIterator(final FileTreeIterator p, final File root, FS fs) {
 		super(p);
 		directory = root;
 		this.fs = fs;
@@ -156,19 +155,11 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 		private long lastModified;
 
-		/**
-		 * Create a new file entry.
-		 *
-		 * @param f
-		 *            file
-		 * @param fs
-		 *            file system
-		 */
-		public FileEntry(final File f, FS fs) {
+		FileEntry(final File f, FS fs) {
 			file = f;
 
 			if (f.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists())
+				if (new File(f, Constants.DOT_GIT).isDirectory())
 					mode = FileMode.GITLINK;
 				else
 					mode = FileMode.TREE;
@@ -231,12 +222,5 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 */
 	public File getEntryFile() {
 		return ((FileEntry) current()).getFile();
-	}
-
-	@Override
-	protected byte[] idSubmodule(final Entry e) {
-		if (repository == null)
-			return idSubmodule(getDirectory(), e);
-		return super.idSubmodule(e);
 	}
 }

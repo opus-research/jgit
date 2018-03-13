@@ -46,17 +46,21 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.errors.CanceledException;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.DetachedHeadException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidConfigurationException;
+import org.eclipse.jgit.api.errors.InvalidMergeHeadsException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -66,6 +70,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 
 /**
@@ -74,25 +79,30 @@ import org.eclipse.jgit.transport.FetchResult;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-pull.html"
  *      >Git documentation about Pull</a>
  */
-public class PullCommand extends TransportCommand<PullCommand, PullResult> {
+public class PullCommand extends GitCommand<PullResult> {
+	private int timeout = 0;
 
-	private final static String DOT = "."; //$NON-NLS-1$
+	private final static String DOT = ".";
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
-	private PullRebaseMode pullRebaseMode = PullRebaseMode.USE_CONFIG;
-
-	private enum PullRebaseMode {
-		USE_CONFIG,
-		REBASE,
-		NO_REBASE
-	}
+	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
 	 */
 	protected PullCommand(Repository repo) {
 		super(repo);
+	}
+
+	/**
+	 * @param timeout
+	 *            in seconds
+	 * @return this instance
+	 */
+	public PullCommand setTimeout(int timeout) {
+		this.timeout = timeout;
+		return this;
 	}
 
 	/**
@@ -106,24 +116,14 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	/**
-	 * Set if rebase should be used after fetching. If set to true, rebase is
-	 * used instead of merge. This is equivalent to --rebase on the command line.
-	 * <p/>
-	 * If set to false, merge is used after fetching, overriding the configuration
-	 * file. This is equivalent to --no-rebase on the command line.
-	 * <p/>
-	 * This setting overrides the settings in the configuration file.
-	 * By default, the setting in the repository configuration file is used.
-	 * <p/>
-	 * A branch can be configured to use rebase by default.
-	 * See branch.[name].rebase and branch.autosetuprebase.
-	 *
-	 * @param useRebase
-	 * @return {@code this}
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return this instance
 	 */
-	public PullCommand setRebase(boolean useRebase) {
+	public PullCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
 		checkCallable();
-		pullRebaseMode = useRebase ? PullRebaseMode.REBASE : PullRebaseMode.NO_REBASE;
+		this.credentialsProvider = credentialsProvider;
 		return this;
 	}
 
@@ -135,21 +135,10 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * command. Don't call this method twice on an instance.
 	 *
 	 * @return the result of the pull
-	 * @throws WrongRepositoryStateException
-	 * @throws InvalidConfigurationException
-	 * @throws DetachedHeadException
-	 * @throws InvalidRemoteException
-	 * @throws CanceledException
-	 * @throws RefNotFoundException
-	 * @throws NoHeadException
-	 * @throws org.eclipse.jgit.api.errors.TransportException
-	 * @throws GitAPIException
 	 */
-	public PullResult call() throws GitAPIException,
-			WrongRepositoryStateException, InvalidConfigurationException,
-			DetachedHeadException, InvalidRemoteException, CanceledException,
-			RefNotFoundException, NoHeadException,
-			org.eclipse.jgit.api.errors.TransportException {
+	public PullResult call() throws WrongRepositoryStateException,
+			InvalidConfigurationException, DetachedHeadException,
+			InvalidRemoteException, CanceledException, RefNotFoundException {
 		checkCallable();
 
 		monitor.beginTask(JGitText.get().pullTaskName, 2);
@@ -157,9 +146,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 		String branchName;
 		try {
 			String fullBranch = repo.getFullBranch();
-			if (fullBranch == null)
-				throw new NoHeadException(
-						JGitText.get().pullOnRepoWithoutHEADCurrentlyNotSupported);
 			if (!fullBranch.startsWith(Constants.R_HEADS)) {
 				// we can not pull if HEAD is detached and branch is not
 				// specified explicitly
@@ -192,24 +178,10 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 		String remoteBranchName = repoConfig.getString(
 				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
 				ConfigConstants.CONFIG_KEY_MERGE);
-
-        // determines whether rebase should be used after fetching
-        boolean doRebase = false;
-        switch (pullRebaseMode) {
-            case REBASE:
-                doRebase = true;
-                break;
-            case NO_REBASE:
-                doRebase = false;
-                break;
-            case USE_CONFIG:
-            default:
-                // check if the branch is configured for pull-rebase
-                doRebase = repoConfig.getBoolean(
-                        ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-                        ConfigConstants.CONFIG_KEY_REBASE, false);
-                break;
-        }
+		// check if the branch is configured for pull-rebase
+		boolean doRebase = repoConfig.getBoolean(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_REBASE, false);
 
 		if (remoteBranchName == null) {
 			String missingKey = ConfigConstants.CONFIG_BRANCH_SECTION + DOT
@@ -218,7 +190,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 					JGitText.get().missingConfigurationForKey, missingKey));
 		}
 
-		final boolean isRemote = !remote.equals("."); //$NON-NLS-1$
+		final boolean isRemote = !remote.equals(".");
 		String remoteUri;
 		FetchResult fetchRes;
 		if (isRemote) {
@@ -240,7 +212,8 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			FetchCommand fetch = new FetchCommand(repo);
 			fetch.setRemote(remote);
 			fetch.setProgressMonitor(monitor);
-			configure(fetch);
+			fetch.setTimeout(this.timeout);
+			fetch.setCredentialsProvider(credentialsProvider);
 
 			fetchRes = fetch.call();
 		} else {
@@ -286,24 +259,47 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			}
 		}
 
-		String upstreamName = "branch \'"
-				+ Repository.shortenRefName(remoteBranchName) + "\' of "
-				+ remoteUri;
-
 		PullResult result;
 		if (doRebase) {
 			RebaseCommand rebase = new RebaseCommand(repo);
-			RebaseResult rebaseRes = rebase.setUpstream(commitToMerge)
-					.setUpstreamName(upstreamName)
-					.setProgressMonitor(monitor).setOperation(Operation.BEGIN)
-					.call();
-			result = new PullResult(fetchRes, remote, rebaseRes);
+			try {
+				RebaseResult rebaseRes = rebase.setUpstream(commitToMerge)
+						.setProgressMonitor(monitor).setOperation(
+								Operation.BEGIN).call();
+				result = new PullResult(fetchRes, remote, rebaseRes);
+			} catch (NoHeadException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (RefNotFoundException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (JGitInternalException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (GitAPIException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			}
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
-			merge.include(upstreamName, commitToMerge);
-			MergeResult mergeRes = merge.call();
-			monitor.update(1);
-			result = new PullResult(fetchRes, remote, mergeRes);
+			String name = "branch \'"
+					+ Repository.shortenRefName(remoteBranchName) + "\' of "
+					+ remoteUri;
+			merge.include(name, commitToMerge);
+			MergeResult mergeRes;
+			try {
+				mergeRes = merge.call();
+				monitor.update(1);
+				result = new PullResult(fetchRes, remote, mergeRes);
+			} catch (NoHeadException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (ConcurrentRefUpdateException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (CheckoutConflictException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (InvalidMergeHeadsException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (WrongRepositoryStateException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			} catch (NoMessageException e) {
+				throw new JGitInternalException(e.getMessage(), e);
+			}
 		}
 		monitor.endTask();
 		return result;

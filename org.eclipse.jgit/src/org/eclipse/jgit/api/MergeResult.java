@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
- * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,10 +45,9 @@ package org.eclipse.jgit.api;
 
 import java.text.MessageFormat;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.merge.MergeChunk;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
@@ -77,23 +76,8 @@ public class MergeResult {
 				return true;
 			}
 		},
-		/**
-		 * @since 2.0
-		 */
-		FAST_FORWARD_SQUASHED {
-			@Override
-			public String toString() {
-				return "Fast-forward-squashed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
 		/** */
 		ALREADY_UP_TO_DATE {
-			@Override
 			public String toString() {
 				return "Already-up-to-date";
 			}
@@ -105,7 +89,6 @@ public class MergeResult {
 		},
 		/** */
 		FAILED {
-			@Override
 			public String toString() {
 				return "Failed";
 			}
@@ -117,7 +100,6 @@ public class MergeResult {
 		},
 		/** */
 		MERGED {
-			@Override
 			public String toString() {
 				return "Merged";
 			}
@@ -127,37 +109,8 @@ public class MergeResult {
 				return true;
 			}
 		},
-		/**
-		 * @since 2.0
-		 */
-		MERGED_SQUASHED {
-			@Override
-			public String toString() {
-				return "Merged-squashed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
-		/**
-		 * @since 3.0
-		 */
-		MERGED_SQUASHED_NOT_COMMITTED {
-			@Override
-			public String toString() {
-				return "Merged-squashed-not-committed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
 		/** */
 		CONFLICTING {
-			@Override
 			public String toString() {
 				return "Conflicting";
 			}
@@ -167,53 +120,10 @@ public class MergeResult {
 				return false;
 			}
 		},
-		/**
-		 * @since 2.2
-		 */
-		ABORTED {
-			@Override
-			public String toString() {
-				return "Aborted";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * @since 3.0
-		 **/
-		MERGED_NOT_COMMITTED {
-			public String toString() {
-				return "Merged-not-committed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
 		/** */
 		NOT_SUPPORTED {
-			@Override
 			public String toString() {
 				return "Not-yet-supported";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * Status representing a checkout conflict, meaning that nothing could
-		 * be merged, as the pre-scan for the trees already failed for certain
-		 * files (i.e. local modifications prevent checkout of files).
-		 */
-		CHECKOUT_CONFLICT {
-			public String toString() {
-				return "Checkout Conflict";
 			}
 
 			@Override
@@ -244,8 +154,6 @@ public class MergeResult {
 
 	private Map<String, MergeFailureReason> failingPaths;
 
-	private List<String> checkoutConflicts;
-
 	/**
 	 * @param newHead
 	 *            the object the head points at after the merge
@@ -257,19 +165,17 @@ public class MergeResult {
 	 *            all the commits which have been merged together
 	 * @param mergeStatus
 	 *            the status the merge resulted in
-	 * @param mergeStrategy
-	 *            the used {@link MergeStrategy}
 	 * @param lowLevelResults
 	 *            merge results as returned by
 	 *            {@link ResolveMerger#getMergeResults()}
-	 * @since 2.0
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
 	 */
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			MergeStrategy mergeStrategy,
-			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults) {
-		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null);
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
+			MergeStrategy mergeStrategy) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, lowLevelResults, null);
 	}
 
 	/**
@@ -296,7 +202,7 @@ public class MergeResult {
 			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
 			String description) {
 		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null, description);
+				lowLevelResults, null, null);
 	}
 
 	/**
@@ -340,18 +246,6 @@ public class MergeResult {
 	}
 
 	/**
-	 * Creates a new result that represents a checkout conflict before the
-	 * operation even started for real.
-	 *
-	 * @param checkoutConflicts
-	 *            the conflicting files
-	 */
-	public MergeResult(List<String> checkoutConflicts) {
-		this.checkoutConflicts = checkoutConflicts;
-		this.mergeStatus = MergeStatus.CHECKOUT_CONFLICT;
-	}
-
-	/**
 	 * @return the object the head points at after the merge
 	 */
 	public ObjectId getNewHead() {
@@ -381,7 +275,6 @@ public class MergeResult {
 		return base;
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		boolean first = true;
@@ -506,15 +399,5 @@ public class MergeResult {
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return failingPaths;
-	}
-
-	/**
-	 * Returns a list of paths that cause a checkout conflict. These paths
-	 * prevent the operation from even starting.
-	 *
-	 * @return the list of files that caused the checkout conflict.
-	 */
-	public List<String> getCheckoutConflicts() {
-		return checkoutConflicts;
 	}
 }

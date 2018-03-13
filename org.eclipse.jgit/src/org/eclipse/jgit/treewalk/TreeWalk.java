@@ -594,7 +594,6 @@ public class TreeWalk {
 	 * @return r the current iterator of the requested type; null if the tree
 	 *         has no entry to match the current path.
 	 */
-	@SuppressWarnings("unchecked")
 	public <T extends AbstractTreeIterator> T getTree(final int nth,
 			final Class<T> clazz) {
 		final AbstractTreeIterator t = trees[nth];
@@ -835,17 +834,13 @@ public class TreeWalk {
 		final AbstractTreeIterator t = currentHead;
 		final byte[] c = t.path;
 		final int cLen = t.pathLen;
+		int ci;
 
-		for (int i = 1; i <= pLen; i++) {
-			// Pattern longer than current path
-			if (i > cLen)
-				return false;
-			// Current path doesn't match pattern
-			if (c[cLen - i] != p[pLen - i])
+		for (ci = 1; ci < cLen && ci < pLen; ci++) {
+			if (c[cLen-ci] != p[pLen-ci])
 				return false;
 		}
 
-		// Whole pattern tested -> matches
 		return true;
 	}
 
@@ -919,7 +914,6 @@ public class TreeWalk {
 		System.arraycopy(tmp, 0, trees, 0, trees.length);
 	}
 
-	@SuppressWarnings("unused")
 	AbstractTreeIterator min() throws CorruptObjectException {
 		int i = 0;
 		AbstractTreeIterator minRef = trees[i];

@@ -66,15 +66,15 @@ import java.util.List;
 public class CommitBuilder {
 	private static final ObjectId[] EMPTY_OBJECTID_LIST = new ObjectId[0];
 
-	private static final byte[] htree = Constants.encodeASCII("tree"); //$NON-NLS-1$
+	private static final byte[] htree = Constants.encodeASCII("tree");
 
-	private static final byte[] hparent = Constants.encodeASCII("parent"); //$NON-NLS-1$
+	private static final byte[] hparent = Constants.encodeASCII("parent");
 
-	private static final byte[] hauthor = Constants.encodeASCII("author"); //$NON-NLS-1$
+	private static final byte[] hauthor = Constants.encodeASCII("author");
 
-	private static final byte[] hcommitter = Constants.encodeASCII("committer"); //$NON-NLS-1$
+	private static final byte[] hcommitter = Constants.encodeASCII("committer");
 
-	private static final byte[] hencoding = Constants.encodeASCII("encoding"); //$NON-NLS-1$
+	private static final byte[] hencoding = Constants.encodeASCII("encoding");
 
 	private ObjectId treeId;
 
@@ -204,7 +204,8 @@ public class CommitBuilder {
 			setParentId(additionalParent);
 		} else {
 			ObjectId[] newParents = new ObjectId[parentIds.length + 1];
-			System.arraycopy(parentIds, 0, newParents, 0, parentIds.length);
+			for (int i = 0; i < parentIds.length; i++)
+				newParents[i] = parentIds[i];
 			newParents[parentIds.length] = additionalParent.copy();
 			parentIds = newParents;
 		}
@@ -322,7 +323,6 @@ public class CommitBuilder {
 		return build();
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();

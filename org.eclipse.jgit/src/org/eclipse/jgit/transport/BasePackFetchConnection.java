@@ -47,27 +47,24 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -76,6 +73,7 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.transport.PacketLineIn.AckNackResult;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -122,72 +120,25 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	protected static final int MIN_CLIENT_BUFFER = 2 * 32 * 46 + 8;
 
-	/**
-	 * Include tags if we are also including the referenced objects.
-	 * @since 2.0
-	 */
-	public static final String OPTION_INCLUDE_TAG = "include-tag"; //$NON-NLS-1$
+	static final String OPTION_INCLUDE_TAG = "include-tag";
 
-	/**
-	 * Mutli-ACK support for improved negotiation.
-	 * @since 2.0
-	 */
-	public static final String OPTION_MULTI_ACK = "multi_ack"; //$NON-NLS-1$
+	static final String OPTION_MULTI_ACK = "multi_ack";
 
-	/**
-	 * Mutli-ACK detailed support for improved negotiation.
-	 * @since 2.0
-	 */
-	public static final String OPTION_MULTI_ACK_DETAILED = "multi_ack_detailed"; //$NON-NLS-1$
+	static final String OPTION_MULTI_ACK_DETAILED = "multi_ack_detailed";
 
-	/**
-	 * The client supports packs with deltas but not their bases.
-	 * @since 2.0
-	 */
-	public static final String OPTION_THIN_PACK = "thin-pack"; //$NON-NLS-1$
+	static final String OPTION_THIN_PACK = "thin-pack";
 
-	/**
-	 * The client supports using the side-band for progress messages.
-	 * @since 2.0
-	 */
-	public static final String OPTION_SIDE_BAND = "side-band"; //$NON-NLS-1$
+	static final String OPTION_SIDE_BAND = "side-band";
 
-	/**
-	 * The client supports using the 64K side-band for progress messages.
-	 * @since 2.0
-	 */
-	public static final String OPTION_SIDE_BAND_64K = "side-band-64k"; //$NON-NLS-1$
+	static final String OPTION_SIDE_BAND_64K = "side-band-64k";
 
-	/**
-	 * The client supports packs with OFS deltas.
-	 * @since 2.0
-	 */
-	public static final String OPTION_OFS_DELTA = "ofs-delta"; //$NON-NLS-1$
+	static final String OPTION_OFS_DELTA = "ofs-delta";
 
-	/**
-	 * The client supports shallow fetches.
-	 * @since 2.0
-	 */
-	public static final String OPTION_SHALLOW = "shallow"; //$NON-NLS-1$
+	static final String OPTION_SHALLOW = "shallow";
 
-	/**
-	 * The client does not want progress messages and will ignore them.
-	 * @since 2.0
-	 */
-	public static final String OPTION_NO_PROGRESS = "no-progress"; //$NON-NLS-1$
+	static final String OPTION_NO_PROGRESS = "no-progress";
 
-	/**
-	 * The client supports receiving a pack before it has sent "done".
-	 * @since 2.0
-	 */
-	public static final String OPTION_NO_DONE = "no-done"; //$NON-NLS-1$
-
-	/**
-	 * The client supports fetching objects at the tip of any ref, even if not
-	 * advertised.
-	 * @since 3.1
-	 */
-	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = "allow-tip-sha1-in-want"; //$NON-NLS-1$
+	static final String OPTION_NO_DONE = "no-done";
 
 	static enum MultiAck {
 		OFF, CONTINUE, DETAILED;
@@ -222,8 +173,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private boolean noDone;
 
-	private boolean noProgress;
-
 	private String lockMessage;
 
 	private PackLock packLock;
@@ -242,33 +191,21 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	public BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
-		if (local != null) {
-			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
-			allowOfsDelta = cfg.allowOfsDelta;
-		} else {
-			allowOfsDelta = true;
-		}
+		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
 		includeTags = transport.getTagOpt() != TagOpt.NO_TAGS;
 		thinPack = transport.isFetchThin();
+		allowOfsDelta = cfg.allowOfsDelta;
 
-		if (local != null) {
-			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<RevCommit>();
-			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
-			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
-			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
-			ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
+		walk = new RevWalk(local);
+		reachableCommits = new RevCommitList<RevCommit>();
+		REACHABLE = walk.newFlag("REACHABLE");
+		COMMON = walk.newFlag("COMMON");
+		STATE = walk.newFlag("STATE");
+		ADVERTISED = walk.newFlag("ADVERTISED");
 
-			walk.carry(COMMON);
-			walk.carry(REACHABLE);
-			walk.carry(ADVERTISED);
-		} else {
-			walk = null;
-			REACHABLE = null;
-			COMMON = null;
-			STATE = null;
-			ADVERTISED = null;
-		}
+		walk.carry(COMMON);
+		walk.carry(REACHABLE);
+		walk.carry(ADVERTISED);
 	}
 
 	private static class FetchConfig {
@@ -281,24 +218,15 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		final boolean allowOfsDelta;
 
 		FetchConfig(final Config c) {
-			allowOfsDelta = c.getBoolean("repack", "usedeltabaseoffset", true); //$NON-NLS-1$ //$NON-NLS-2$
+			allowOfsDelta = c.getBoolean("repack", "usedeltabaseoffset", true);
 		}
 	}
 
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
-		fetch(monitor, want, have, null);
-	}
-
-	/**
-	 * @since 3.0
-	 */
-	public final void fetch(final ProgressMonitor monitor,
-			final Collection<Ref> want, final Set<ObjectId> have,
-			OutputStream outputStream) throws TransportException {
 		markStartedOperation();
-		doFetch(monitor, want, have, outputStream);
+		doFetch(monitor, want, have);
 	}
 
 	public boolean didFetchIncludeTags() {
@@ -323,27 +251,20 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 * Execute common ancestor negotiation and fetch the objects.
 	 *
 	 * @param monitor
-	 *            progress monitor to receive status updates. If the monitor is
-	 *            the {@link NullProgressMonitor#INSTANCE}, then the no-progress
-	 *            option enabled.
+	 *            progress monitor to receive status updates.
 	 * @param want
 	 *            the advertised remote references the caller wants to fetch.
 	 * @param have
 	 *            additional objects to assume that already exist locally. This
 	 *            will be added to the set of objects reachable from the
 	 *            destination repository's references.
-	 * @param outputStream
-	 *            ouputStream to write sideband messages to
 	 * @throws TransportException
 	 *             if any exception occurs.
-	 * @since 3.0
 	 */
 	protected void doFetch(final ProgressMonitor monitor,
-			final Collection<Ref> want, final Set<ObjectId> have,
-			OutputStream outputStream) throws TransportException {
+			final Collection<Ref> want, final Set<ObjectId> have)
+			throws TransportException {
 		try {
-			noProgress = monitor == NullProgressMonitor.INSTANCE;
-
 			markRefsAdvertised();
 			markReachable(have, maxTimeWanted(want));
 
@@ -360,7 +281,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 				state = null;
 				pckState = null;
 
-				receivePack(monitor, outputStream);
+				receivePack(monitor);
 			}
 		} catch (CancelledException ce) {
 			close();
@@ -376,8 +297,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	@Override
 	public void close() {
-		if (walk != null)
-			walk.release();
+		walk.release();
 		super.close();
 	}
 
@@ -469,7 +389,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			}
 
 			final StringBuilder line = new StringBuilder(46);
-			line.append("want "); //$NON-NLS-1$
+			line.append("want ");
 			line.append(r.getObjectId().name());
 			if (first) {
 				line.append(enableCapabilities());
@@ -487,8 +407,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private String enableCapabilities() throws TransportException {
 		final StringBuilder line = new StringBuilder();
-		if (noProgress)
-			wantCapability(line, OPTION_NO_PROGRESS);
 		if (includeTags)
 			includeTags = wantCapability(line, OPTION_INCLUDE_TAG);
 		if (allowOfsDelta)
@@ -515,9 +433,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			// ACK status to tell us common objects for reuse in future
 			// requests.  If its not enabled, we can't talk to the peer.
 			//
-			throw new PackProtocolException(uri, MessageFormat.format(
-					JGitText.get().statelessRPCRequiresOptionToBeEnabled,
-					OPTION_MULTI_ACK_DETAILED));
+			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().statelessRPCRequiresOptionToBeEnabled, OPTION_MULTI_ACK_DETAILED));
 		}
 
 		return line.toString();
@@ -537,12 +453,12 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			state.writeTo(out, null);
 
 		negotiateBegin();
-		SEND_HAVES: for (;;) {
+		SEND_HAVES: while (!receivedReady) {
 			final RevCommit c = walk.next();
 			if (c == null)
 				break SEND_HAVES;
 
-			pckOut.writeString("have " + c.getId().name() + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
+			pckOut.writeString("have " + c.getId().name() + "\n");
 			havesSent++;
 			havesSinceLastContinue++;
 
@@ -612,8 +528,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					throw new CancelledException();
 			}
 
-			if (noDone & receivedReady)
-				break SEND_HAVES;
 			if (statelessRPC)
 				state.writeTo(out, null);
 
@@ -637,7 +551,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			// loop above while in the middle of a request. This allows us
 			// to just write done immediately.
 			//
-			pckOut.writeString("done\n"); //$NON-NLS-1$
+			pckOut.writeString("done\n");
 			pckOut.flush();
 		}
 
@@ -744,13 +658,10 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			((RevCommit) obj).carry(COMMON);
 	}
 
-	private void receivePack(final ProgressMonitor monitor,
-			OutputStream outputStream) throws IOException {
-		onReceivePack();
+	private void receivePack(final ProgressMonitor monitor) throws IOException {
 		InputStream input = in;
 		if (sideband)
-			input = new SideBandInputStream(input, monitor, getMessageWriter(),
-					outputStream);
+			input = new SideBandInputStream(input, monitor, getMessageWriter());
 
 		ObjectInserter ins = local.newObjectInserter();
 		try {
@@ -763,17 +674,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		} finally {
 			ins.release();
 		}
-	}
-
-	/**
-	 * Notification event delivered just before the pack is received from the
-	 * network. This event can be used by RPC such as {@link TransportHttp} to
-	 * disable its request magic and ensure the pack stream is read correctly.
-	 *
-	 * @since 2.0
-	 */
-	protected void onReceivePack() {
-		// By default do nothing for TCP based protocols.
 	}
 
 	private static class CancelledException extends Exception {
