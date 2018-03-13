@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2011-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,35 +41,35 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.internal.storage.file;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.CLIText;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.archive.ArchiveCommand;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.lib.CheckoutEntry;
+import org.eclipse.jgit.lib.ReflogEntry;
 
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private ObjectId tree;
+/**
+ * Parsed information about a checkout.
+ */
+public class CheckoutEntryImpl implements CheckoutEntry {
+	static final String CHECKOUT_MOVING_FROM = "checkout: moving from "; //$NON-NLS-1$
 
-	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private ArchiveCommand.Format format = ArchiveCommand.Format.ZIP;
+	private String from;
 
-	@Override
-	protected void run() throws Exception {
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
+	private String to;
 
-		final ArchiveCommand cmd = new ArchiveCommand(db);
-		try {
-			cmd.setTree(tree)
-					.setFormat(format)
-					.setOutputStream(outs).call();
-		} finally {
-			cmd.release();
-		}
+	CheckoutEntryImpl(ReflogEntry reflogEntry) {
+		String comment = reflogEntry.getComment();
+		int p1 = CHECKOUT_MOVING_FROM.length();
+		int p2 = comment.indexOf(" to ", p1); //$NON-NLS-1$
+		int p3 = comment.length();
+		from = comment.substring(p1,p2);
+		to = comment.substring(p2 + " to ".length(), p3); //$NON-NLS-1$
+	}
+
+	public String getFromBranch() {
+		return from;
+	}
+
+	public String getToBranch() {
+		return to;
 	}
 }

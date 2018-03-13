@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2011-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,40 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lib;
 
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.CLIText;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.archive.ArchiveCommand;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.lib.PersonIdent;
 
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private ObjectId tree;
+/**
+ * Parsed reflog entry
+ */
+public interface ReflogEntry {
 
-	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private ArchiveCommand.Format format = ArchiveCommand.Format.ZIP;
+	/**
+	 * @return the commit id before the change
+	 */
+	public abstract ObjectId getOldId();
 
-	@Override
-	protected void run() throws Exception {
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
+	/**
+	 * @return the commit id after the change
+	 */
+	public abstract ObjectId getNewId();
 
-		final ArchiveCommand cmd = new ArchiveCommand(db);
-		try {
-			cmd.setTree(tree)
-					.setFormat(format)
-					.setOutputStream(outs).call();
-		} finally {
-			cmd.release();
-		}
-	}
+	/**
+	 * @return user performing the change
+	 */
+	public abstract PersonIdent getWho();
+
+	/**
+	 * @return textual description of the change
+	 */
+	public abstract String getComment();
+
+	/**
+	 * @return a {@link CheckoutEntry} with parsed information about a branch
+	 *         switch, or null if the entry is not a checkout
+	 */
+	public abstract CheckoutEntry parseCheckout();
+
 }
