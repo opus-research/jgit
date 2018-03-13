@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -60,15 +59,15 @@ import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 
-@Command(common = true, usage = "usage_UpdateRemoteRepositoryFromLocalRefs")
+@Command(common = true, usage = "Update remote repository from local refs")
 class Push extends TextBuiltin {
-	@Option(name = "--timeout", metaVar = "metaVar_seconds", usage = "usage_abortConnectionIfNoActivity")
+	@Option(name = "--timeout", metaVar = "SECONDS", usage = "abort connection if no activity")
 	int timeout = -1;
 
-	@Argument(index = 0, metaVar = "metaVar_uriish")
+	@Argument(index = 0, metaVar = "uri-ish")
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
-	@Argument(index = 1, metaVar = "metaVar_refspec")
+	@Argument(index = 1, metaVar = "refspec")
 	private final List<RefSpec> refSpecs = new ArrayList<RefSpec>();
 
 	@Option(name = "--all")
@@ -95,7 +94,7 @@ class Push extends TextBuiltin {
 	@Option(name = "--force", aliases = { "-f" })
 	private boolean force;
 
-	@Option(name = "--receive-pack", metaVar = "metaVar_path")
+	@Option(name = "--receive-pack", metaVar = "path")
 	private String receivePack;
 
 	@Option(name = "--dry-run")
@@ -165,14 +164,14 @@ class Push extends TextBuiltin {
 
 		AbstractFetchCommand.showRemoteMessages(result.getMessages());
 		if (everythingUpToDate)
-			out.println(CLIText.get().everythingUpToDate);
+			out.println("Everything up-to-date");
 	}
 
 	private void printRefUpdateResult(final URIish uri,
 			final PushResult result, final RemoteRefUpdate rru) {
 		if (!shownURI) {
 			shownURI = true;
-			out.println(MessageFormat.format(CLIText.get().pushTo, uri));
+			out.format("To %s\n", uri);
 		}
 
 		final String remoteName = rru.getRemoteName();
@@ -198,7 +197,7 @@ class Push extends TextBuiltin {
 							.name()
 							+ (fastForward ? ".." : "...")
 							+ rru.getNewObjectId().abbreviate(db).name();
-					final String message = fastForward ? null : CLIText.get().forcedUpdate;
+					final String message = fastForward ? null : "forced update";
 					printUpdateLine(flag, summary, srcRef, remoteName, message);
 				}
 			}
@@ -210,18 +209,17 @@ class Push extends TextBuiltin {
 
 		case REJECTED_NODELETE:
 			printUpdateLine('!', "[rejected]", null, remoteName,
-					CLIText.get().remoteSideDoesNotSupportDeletingRefs);
+					"remote side does not support deleting refs");
 			break;
 
 		case REJECTED_NONFASTFORWARD:
 			printUpdateLine('!', "[rejected]", srcRef, remoteName,
-					CLIText.get().nonFastForward);
+					"non-fast forward");
 			break;
 
 		case REJECTED_REMOTE_CHANGED:
-			final String message = MessageFormat.format(
-					CLIText.get().remoteRefObjectChangedIsNotExpectedOne
-					, rru.getExpectedOldObjectId().abbreviate(db).name());
+			final String message = "remote ref object changed - is not expected one "
+					+ rru.getExpectedOldObjectId().abbreviate(db).name();
 			printUpdateLine('!', "[rejected]", srcRef, remoteName, message);
 			break;
 

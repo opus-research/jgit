@@ -45,12 +45,10 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -139,7 +137,7 @@ class BasePackPushConnection extends BasePackConnection implements
 		} catch (TransportException e) {
 			// Fall through.
 		}
-		return new TransportException(uri, JGitText.get().pushNotPermitted);
+		return new TransportException(uri, "push not permitted");
 	}
 
 	protected void doPush(final ProgressMonitor monitor,
@@ -160,7 +158,8 @@ class BasePackPushConnection extends BasePackConnection implements
 					//
 					int b = in.read();
 					if (0 <= b)
-						throw new TransportException(uri, MessageFormat.format(JGitText.get().expectedEOFReceived, (char) b));
+						throw new TransportException(uri, "expected EOF;"
+								+ " received '" + (char) b + "' instead");
 				}
 			}
 		} catch (TransportException e) {
@@ -202,7 +201,7 @@ class BasePackPushConnection extends BasePackConnection implements
 		}
 
 		if (monitor.isCancelled())
-			throw new TransportException(uri, JGitText.get().pushCancelled);
+			throw new TransportException(uri, "push cancelled");
 		pckOut.end();
 		outNeedsEnd = false;
 	}
@@ -253,11 +252,13 @@ class BasePackPushConnection extends BasePackConnection implements
 			throws IOException {
 		final String unpackLine = readStringLongTimeout();
 		if (!unpackLine.startsWith("unpack "))
-			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().unexpectedReportLine, unpackLine));
+			throw new PackProtocolException(uri, "unexpected report line: "
+					+ unpackLine);
 		final String unpackStatus = unpackLine.substring("unpack ".length());
 		if (!unpackStatus.equals("ok"))
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().errorOccurredDuringUnpackingOnTheRemoteEnd, unpackStatus));
+			throw new TransportException(uri,
+					"error occurred during unpacking on the remote end: "
+							+ unpackStatus);
 
 		String refLine;
 		while ((refLine = pckIn.readString()) != PacketLineIn.END) {
@@ -271,15 +272,16 @@ class BasePackPushConnection extends BasePackConnection implements
 				refNameEnd = refLine.indexOf(" ", 3);
 			}
 			if (refNameEnd == -1)
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().unexpectedReportLine2
-						, uri, refLine));
+				throw new PackProtocolException(uri
+						+ ": unexpected report line: " + refLine);
 			final String refName = refLine.substring(3, refNameEnd);
 			final String message = (ok ? null : refLine
 					.substring(refNameEnd + 1));
 
 			final RemoteRefUpdate rru = refUpdates.get(refName);
 			if (rru == null)
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().unexpectedRefReport, uri, refName));
+				throw new PackProtocolException(uri
+						+ ": unexpected ref report: " + refName);
 			if (ok) {
 				rru.setStatus(Status.OK);
 			} else {
@@ -289,8 +291,9 @@ class BasePackPushConnection extends BasePackConnection implements
 		}
 		for (final RemoteRefUpdate rru : refUpdates.values()) {
 			if (rru.getStatus() == Status.AWAITING_REPORT)
-				throw new PackProtocolException(MessageFormat.format(
-						JGitText.get().expectedReportForRefNotReceived , uri, rru.getRemoteName()));
+				throw new PackProtocolException(uri
+						+ ": expected report for ref " + rru.getRemoteName()
+						+ " not received");
 		}
 	}
 

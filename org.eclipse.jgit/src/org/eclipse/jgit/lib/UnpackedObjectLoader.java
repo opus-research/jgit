@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
@@ -115,29 +114,25 @@ public class UnpackedObjectLoader extends ObjectLoader {
 				int avail = 0;
 				while (!inflater.finished() && avail < hdr.length)
 					try {
-						int uncompressed = inflater.inflate(hdr, avail,
-								hdr.length - avail);
-						if (uncompressed == 0) {
-							throw new CorruptObjectException(id,
-									JGitText.get().corruptObjectBadStreamCorruptHeader);
-						}
-						avail += uncompressed;
+						avail += inflater.inflate(hdr, avail, hdr.length
+								- avail);
 					} catch (DataFormatException dfe) {
 						final CorruptObjectException coe;
-						coe = new CorruptObjectException(id, JGitText.get().corruptObjectBadStream);
+						coe = new CorruptObjectException(id, "bad stream");
 						coe.initCause(dfe);
+						inflater.end();
 						throw coe;
 					}
 				if (avail < 5)
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectNoHeader);
+					throw new CorruptObjectException(id, "no header");
 
 				final MutableInteger p = new MutableInteger();
 				objectType = Constants.decodeTypeString(id, hdr, (byte) ' ', p);
 				objectSize = RawParseUtils.parseBase10(hdr, p.value, p);
 				if (objectSize < 0)
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectNegativeSize);
+					throw new CorruptObjectException(id, "negative size");
 				if (hdr[p.value++] != 0)
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectGarbageAfterSize);
+					throw new CorruptObjectException(id, "garbage after size");
 				bytes = new byte[objectSize];
 				if (p.value < avail)
 					System.arraycopy(hdr, p.value, bytes, 0, avail - p.value);
@@ -162,7 +157,7 @@ public class UnpackedObjectLoader extends ObjectLoader {
 					objectType = typeCode;
 					break;
 				default:
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+					throw new CorruptObjectException(id, "invalid type");
 				}
 
 				objectSize = size;
@@ -178,22 +173,16 @@ public class UnpackedObjectLoader extends ObjectLoader {
 	private void decompress(final AnyObjectId id, final Inflater inf, int p)
 			throws CorruptObjectException {
 		try {
-			while (!inf.finished()) {
-				int uncompressed = inf.inflate(bytes, p, objectSize - p);
-				p += uncompressed;
-				if (uncompressed == 0 && !inf.finished()) {
-					throw new CorruptObjectException(id,
-							JGitText.get().corruptObjectBadStreamCorruptHeader);
-				}
-			}
+			while (!inf.finished())
+				p += inf.inflate(bytes, p, objectSize - p);
 		} catch (DataFormatException dfe) {
 			final CorruptObjectException coe;
-			coe = new CorruptObjectException(id, JGitText.get().corruptObjectBadStream);
+			coe = new CorruptObjectException(id, "bad stream");
 			coe.initCause(dfe);
 			throw coe;
 		}
 		if (p != objectSize)
-			throw new CorruptObjectException(id, JGitText.get().corruptObjectIncorrectLength);
+			throw new CorruptObjectException(id, "incorrect length");
 	}
 
 	@Override

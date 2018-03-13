@@ -59,7 +59,6 @@ import java.net.ProxySelector;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -136,8 +135,8 @@ class IPZillaQuery {
 
 		HttpURLConnection conn = open(csv);
 		if (HttpSupport.response(conn) != HttpURLConnection.HTTP_OK) {
-			throw new IOException(MessageFormat.format(IpLogText.get().queryFailed
-					, csv, conn.getResponseCode() + " " + conn.getResponseMessage()));
+			throw new IOException("Query " + csv + " failed: "
+					+ conn.getResponseCode() + " " + conn.getResponseMessage());
 		}
 
 		BufferedReader br = reader(conn);
@@ -186,23 +185,23 @@ class IPZillaQuery {
 		out.close();
 
 		if (HttpSupport.response(c) != HttpURLConnection.HTTP_OK) {
-			throw new IOException(MessageFormat.format(IpLogText.get().loginFailed
-					, username, login, c.getResponseCode() + " " + c.getResponseMessage()));
+			throw new IOException("Login as " + username + " to " + login
+					+ " failed: " + c.getResponseCode() + " "
+					+ c.getResponseMessage());
 		}
 
 		String content = readFully(c);
 		Matcher matcher = Pattern.compile("<title>(.*)</title>",
 				Pattern.CASE_INSENSITIVE).matcher(content);
 		if (!matcher.find()) {
-			throw new IOException(MessageFormat.format(IpLogText.get().loginFailed
-					, username, login, IpLogText.get().responseNotHTMLAsExpected));
+			throw new IOException("Login as " + username + " to " + login
+					+ " failed: Response not HTML as expected");
 		}
 
 		String title = matcher.group(1);
 		if (!"IPZilla Main Page".equals(title)) {
-			throw new IOException(MessageFormat.format(IpLogText.get().loginFailed
-					, username, login
-					, MessageFormat.format(IpLogText.get().pageTitleWas, title)));
+			throw new IOException("Login as " + username + " to " + login
+					+ " failed; page title was \"" + title + "\"");
 		}
 	}
 
@@ -247,7 +246,7 @@ class IPZillaQuery {
 		try {
 			CookieHandler.getDefault().put(url.toURI(), cols);
 		} catch (URISyntaxException e) {
-			IOException err = new IOException(MessageFormat.format(IpLogText.get().invalidURIFormat, url));
+			IOException err = new IOException("Invalid URI format:" + url);
 			err.initCause(e);
 			throw err;
 		}

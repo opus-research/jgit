@@ -46,7 +46,6 @@ package org.eclipse.jgit.iplog;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -156,7 +155,7 @@ public class IpLogMeta {
 
 		LockFile lf = new LockFile(file);
 		if (!lf.lock())
-			throw new IOException(MessageFormat.format(IpLogText.get().cannotLock, file));
+			throw new IOException("Cannot lock " + file);
 		try {
 			FileBasedConfig cfg = new FileBasedConfig(file);
 			cfg.load();
@@ -182,7 +181,7 @@ public class IpLogMeta {
 
 			lf.write(Constants.encode(cfg.toText()));
 			if (!lf.commit())
-				throw new IOException(MessageFormat.format(IpLogText.get().cannotWrite, file));
+				throw new IOException("Cannot write " + file);
 		} finally {
 			lf.unlock();
 		}

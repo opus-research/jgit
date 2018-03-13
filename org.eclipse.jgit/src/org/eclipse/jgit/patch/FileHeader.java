@@ -54,12 +54,10 @@ import static org.eclipse.jgit.util.RawParseUtils.parseBase10;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -243,7 +241,8 @@ public class FileHeader {
 		}
 
 		if (charsetGuess != null && charsetGuess.length != getParentCount() + 1)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().expectedCharacterEncodingGuesses, (getParentCount() + 1)));
+			throw new IllegalArgumentException("Expected "
+					+ (getParentCount() + 1) + " character encoding guesses");
 
 		if (trySimpleConversion(charsetGuess)) {
 			Charset cs = charsetGuess != null ? charsetGuess[0] : null;
@@ -303,7 +302,7 @@ public class FileHeader {
 			}
 			return r;
 		} catch (IOException ioe) {
-			throw new RuntimeException(JGitText.get().cannotConvertScriptToText, ioe);
+			throw new RuntimeException("Cannot convert script to text", ioe);
 		} finally {
 			for (final TemporaryBuffer b : tmp) {
 				if (b != null)
@@ -411,7 +410,7 @@ public class FileHeader {
 
 	void addHunk(final HunkHeader h) {
 		if (h.getFileHeader() != this)
-			throw new IllegalArgumentException(JGitText.get().hunkBelongsToAnotherFile);
+			throw new IllegalArgumentException("Hunk belongs to another file");
 		if (hunks == null)
 			hunks = new ArrayList<HunkHeader>();
 		hunks.add(h);

@@ -51,23 +51,22 @@ import java.net.URL;
 
 import org.eclipse.jgit.iplog.IpLogMeta;
 import org.eclipse.jgit.iplog.SimpleCookieManager;
-import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.kohsuke.args4j.Option;
 
-@Command(name = "eclipse-ipzilla", common = false, usage = "usage_synchronizeIPZillaData")
+@Command(name = "eclipse-ipzilla", common = false, usage = "Synchronize IPZilla data")
 class Ipzilla extends TextBuiltin {
-	@Option(name = "--url", metaVar = "metaVar_url", usage = "usage_IPZillaURL")
+	@Option(name = "--url", metaVar = "URL", usage = "IPZilla URL")
 	private String url = "https://dev.eclipse.org/ipzilla/";
 
-	@Option(name = "--username", metaVar = "metaVar_user", usage = "usage_IPZillaUsername")
+	@Option(name = "--username", metaVar = "USER", usage = "IPZilla Username")
 	private String username;
 
-	@Option(name = "--password", metaVar = "metaVar_pass", usage = "usage_IPZillaPassword")
+	@Option(name = "--password", metaVar = "PASS", usage = "IPZilla Password")
 	private String password;
 
-	@Option(name = "--file", aliases = { "-f" }, metaVar = "metaVar_file", usage = "usage_inputOutputFile")
+	@Option(name = "--file", aliases = { "-f" }, metaVar = "FILE", usage = "Input/output file")
 	private File output;
 
 	@Override
@@ -82,7 +81,7 @@ class Ipzilla extends TextBuiltin {
 							null, //
 							ipzilla.getPort(), //
 							ipzilla.getProtocol(), //
-							CLIText.get().IPZillaPasswordPrompt, //
+							"IPZilla Password", //
 							ipzilla.getProtocol(), //
 							ipzilla, //
 							Authenticator.RequestorType.SERVER);

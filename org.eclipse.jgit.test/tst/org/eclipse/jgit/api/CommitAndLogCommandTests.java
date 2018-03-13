@@ -42,14 +42,17 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.IOException;
+
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 public class CommitAndLogCommandTests extends RepositoryTestCase {
-	public void testSomeCommits() throws NoHeadException, NoMessageException,
-			UnmergedPathException, ConcurrentRefUpdateException {
+	public void testSomeCommits() throws CorruptObjectException,
+			UnmergedPathException, IOException {
 
 		// do 4 commits
 		Git git = new Git(db);
@@ -81,37 +84,15 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	// try to do a commit without specifying a message. Should fail!
-	public void testWrongParams() throws UnmergedPathException,
-			NoHeadException, ConcurrentRefUpdateException {
+	public void testWrongParams() throws CorruptObjectException,
+			UnmergedPathException, IOException {
 		Git git = new Git(db);
 		try {
 			git.commit().setAuthor(author).call();
 			fail("Didn't get the expected exception");
-		} catch (NoMessageException e) {
-		}
-	}
-
-	// try to work with Commands after command has been invoked. Should throw
-	// exceptions
-	public void testMultipleInvocations() throws NoHeadException,
-			ConcurrentRefUpdateException, NoMessageException,
-			UnmergedPathException {
-		Git git = new Git(db);
-		CommitCommand commitCmd = git.commit();
-		commitCmd.setMessage("initial commit").call();
-		try {
-			// check that setters can't be called after invocation
-			commitCmd.setAuthor(author);
-			fail("didn't catch the expected exception");
-		} catch (IllegalStateException e) {
-		}
-		LogCommand logCmd = git.log();
-		logCmd.call();
-		try {
-			// check that call can't be called twice
-			logCmd.call();
-			fail("didn't catch the expected exception");
-		} catch (IllegalStateException e) {
+		} catch (IllegalArgumentException e) {
+			assertEquals(e.getMessage(),
+					CommitCommand.COMMIT_MESSAGE_NOT_SPECIFIED);
 		}
 	}
 }

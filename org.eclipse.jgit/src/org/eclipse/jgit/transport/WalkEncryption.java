@@ -51,7 +51,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.text.MessageFormat;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -61,8 +60,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.PBEParameterSpec;
-
-import org.eclipse.jgit.JGitText;
 
 abstract class WalkEncryption {
 	static final WalkEncryption NONE = new NoEncryption();
@@ -87,18 +84,18 @@ abstract class WalkEncryption {
 		if (v == null)
 			v = "";
 		if (!version.equals(v))
-			throw new IOException(MessageFormat.format(JGitText.get().unsupportedEncryptionVersion, v));
+			throw new IOException("Unsupported encryption version: " + v);
 
 		v = u.getHeaderField(p + JETS3T_CRYPTO_ALG);
 		if (v == null)
 			v = "";
 		if (!name.equals(v))
-			throw new IOException(JGitText.get().unsupportedEncryptionAlgorithm + v);
+			throw new IOException("Unsupported encryption algorithm: " + v);
 	}
 
 	IOException error(final Throwable why) {
 		final IOException e;
-		e = new IOException(MessageFormat.format(JGitText.get().encryptionError, why.getMessage()));
+		e = new IOException("Encryption error: " + why.getMessage());
 		e.initCause(why);
 		return e;
 	}

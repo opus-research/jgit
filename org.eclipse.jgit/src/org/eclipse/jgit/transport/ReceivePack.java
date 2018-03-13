@@ -57,7 +57,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -65,7 +64,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.Config;
@@ -726,7 +724,7 @@ public class ReceivePack {
 			}
 
 			if (line.length() < 83) {
-				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
+				final String m = "error: invalid protocol: wanted 'old new ref'";
 				sendError(m);
 				throw new PackProtocolException(m);
 			}
@@ -900,7 +898,7 @@ public class ReceivePack {
 				// other requested old id is invalid.
 				//
 				cmd.setResult(Result.REJECTED_OTHER_REASON,
-						JGitText.get().invalidOldIdSent);
+						"invalid old id sent");
 				continue;
 			}
 
@@ -908,7 +906,7 @@ public class ReceivePack {
 				if (ref == null) {
 					// The ref must have been advertised in order to be updated.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().noSuchRef);
+					cmd.setResult(Result.REJECTED_OTHER_REASON, "no such ref");
 					continue;
 				}
 
@@ -917,7 +915,7 @@ public class ReceivePack {
 					// object id we advertised.
 					//
 					cmd.setResult(Result.REJECTED_OTHER_REASON,
-							JGitText.get().invalidOldIdSent);
+							"invalid old id sent");
 					continue;
 				}
 
@@ -960,7 +958,7 @@ public class ReceivePack {
 
 			if (!cmd.getRefName().startsWith(Constants.R_REFS)
 					|| !Repository.isValidRefName(cmd.getRefName())) {
-				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().funnyRefname);
+				cmd.setResult(Result.REJECTED_OTHER_REASON, "funny refname");
 			}
 		}
 	}
@@ -999,8 +997,8 @@ public class ReceivePack {
 				break;
 			}
 		} catch (IOException err) {
-			cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
-					JGitText.get().lockError, err.getMessage()));
+			cmd.setResult(Result.REJECTED_OTHER_REASON, "lock error: "
+					+ err.getMessage());
 		}
 	}
 
@@ -1049,7 +1047,7 @@ public class ReceivePack {
 	private void sendStatusReport(final boolean forClient, final Reporter out)
 			throws IOException {
 		if (unpackError != null) {
-			out.sendString(MessageFormat.format(JGitText.get().unpackError, unpackError.getMessage()));
+			out.sendString("unpack error " + unpackError.getMessage());
 			if (forClient) {
 				for (final ReceiveCommand cmd : commands) {
 					out.sendString("ng " + cmd.getRefName()
