@@ -52,7 +52,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -95,10 +94,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the repository whose working tree will be scanned.
 	 */
 	public FileTreeIterator(Repository repo) {
-		this(repo,
-				repo.getConfig().get(WorkingTreeOptions.KEY).isDirNoGitLinks() ?
-						NoGitlinksStrategy.INSTANCE :
-						DefaultFileModeStrategy.INSTANCE);
+		this(repo, DefaultFileModeStrategy.INSTANCE);
 	}
 
 	/**
@@ -109,6 +105,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fileModeStrategy
 	 *            the strategy to use to determine the FileMode for a FileEntry;
 	 *            controls gitlinks etc.
+	 *
+	 * @since 4.3
 	 */
 	public FileTreeIterator(Repository repo, FileModeStrategy fileModeStrategy) {
 		this(repo.getWorkTree(), repo.getFS(),
@@ -147,6 +145,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fileModeStrategy
 	 *            the strategy to use to determine the FileMode for a FileEntry;
 	 *            controls gitlinks etc.
+	 *
+	 * @since 4.3
 	 */
 	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options,
 							FileModeStrategy fileModeStrategy) {
@@ -168,6 +168,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
+	 *
+	 * @since 4.3
 	 */
 	protected FileTreeIterator(final FileTreeIterator p, final File root,
 			FS fs) {
@@ -189,6 +191,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fileModeStrategy
 	 *            the strategy to use to determine the FileMode for a given
 	 *            FileEntry.
+	 *
+	 * @since 4.3
 	 */
 	protected FileTreeIterator(final FileTreeIterator p, final File root,
 			FS fs, FileModeStrategy fileModeStrategy) {
@@ -218,6 +222,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	/**
 	 * An interface representing the methods used to determine the FileMode for
 	 * a FileEntry.
+	 *
+	 * @since 4.3
 	 */
 	public interface FileModeStrategy {
 		/**
@@ -236,6 +242,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	/**
 	 * A default implementation of a FileModeStrategy; defaults to treating
 	 * nested .git directories as gitlinks, etc.
+	 *
+	 * @since 4.3
 	 */
 	static public class DefaultFileModeStrategy implements FileModeStrategy {
 		/**
@@ -254,33 +262,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 				} else {
 					return FileMode.TREE;
 				}
-			} else if (attributes.isExecutable()) {
-				return FileMode.EXECUTABLE_FILE;
-			} else {
-				return FileMode.REGULAR_FILE;
-			}
-		}
-	}
-
-	/**
-	 * A FileModeStrategy that implements native git's DIR_NO_GITLINKS
-	 * behavior. This is the same as the default FileModeStrategy, except
-	 * all directories will be treated as directories regardless of whether
-	 * or not they contain a .git directory.
-	 */
-	static public class NoGitlinksStrategy implements FileModeStrategy {
-
-		/**
-		 * a singleton instance of the default FileModeStrategy
-		 */
-		public final static NoGitlinksStrategy INSTANCE = new NoGitlinksStrategy();
-
-		@Override
-		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink()) {
-				return FileMode.SYMLINK;
-			} else if (attributes.isDirectory()) {
-				return FileMode.TREE;
 			} else if (attributes.isExecutable()) {
 				return FileMode.EXECUTABLE_FILE;
 			} else {
@@ -322,6 +303,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 * @param fileModeStrategy
 		 *            the strategy to use when determining the FileMode of a
 		 *            file; controls gitlinks etc.
+		 *
+		 * @since 4.3
 		 */
 		public FileEntry(File f, FS fs, FileModeStrategy fileModeStrategy) {
 			this.fs = fs;
