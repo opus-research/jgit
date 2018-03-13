@@ -511,6 +511,7 @@ public abstract class PackParser {
 				inflater.release();
 			} finally {
 				inflater = null;
+				objectDatabase.close();
 			}
 		}
 		return null; // By default there is no locking.
