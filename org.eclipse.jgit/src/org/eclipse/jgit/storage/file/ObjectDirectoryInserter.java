@@ -52,7 +52,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.channels.Channels;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.util.zip.Deflater;
@@ -63,6 +62,7 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.util.io.ChannelOutputStream;
 
 /** Creates loose objects in a {@link ObjectDirectory}. */
 class ObjectDirectoryInserter extends ObjectInserter {
@@ -125,7 +125,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			try {
 				OutputStream out = fOut;
 				if (config.getFSyncObjectFiles())
-					out = Channels.newOutputStream(fOut.getChannel());
+					out = new ChannelOutputStream(fOut.getChannel());
 				DeflaterOutputStream cOut = compress(out);
 				DigestOutputStream dOut = new DigestOutputStream(cOut, md);
 				writeHeader(dOut, type, len);
