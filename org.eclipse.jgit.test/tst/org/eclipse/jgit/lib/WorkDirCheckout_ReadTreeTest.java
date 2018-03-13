@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
- * A TreeVisitor is invoked depth first for every node in a tree and is expected
- * to perform different actions.
+ * Test cases for ReadTree operations as implemented in
+ * {@link WorkDirCheckout}
  */
-public interface TreeVisitor {
-	/**
-	 * Visit to a tree node before child nodes are visited.
-	 *
-	 * @param t
-	 *            Tree
-	 * @throws IOException
-	 */
-	public void startVisitTree(final Tree t) throws IOException;
+public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
+	private WorkDirCheckout wdc;
+	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkDir(), head, db.getIndex(), merge);
+		wdc.prescanTwoTrees();
+	}
 
-	/**
-	 * Visit to a tree node. after child nodes have been visited.
-	 *
-	 * @param t Tree
-	 * @throws IOException
-	 */
-	public void endVisitTree(final Tree t) throws IOException;
+	public void checkout() throws IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkDir(), theHead, db.getIndex(), theMerge);
+		wdc.checkout();
+	}
 
-	/**
-	 * Visit to a blob.
-	 *
-	 * @param f Blob
-	 * @throws IOException
-	 */
-	public void visitFile(final FileTreeEntry f) throws IOException;
+	public ArrayList<String> getRemoved() {
+		return wdc.getRemoved();
+	}
 
-	/**
-	 * Visit to a symlink.
-	 *
-	 * @param s Symlink entry
-	 * @throws IOException
-	 */
-	public void visitSymlink(final SymlinkTreeEntry s) throws IOException;
+	public HashMap<String, ObjectId> getUpdated() {
+		return wdc.updated;
+	}
 
-	/**
-	 * Visit to a gitlink.
-	 *
-	 * @param s Gitlink entry
-	 * @throws IOException
-	 */
-	public void visitGitlink(final GitlinkTreeEntry s) throws IOException;
+	public ArrayList<String> getConflicts() {
+		return wdc.getConflicts();
+	}
 }
+
