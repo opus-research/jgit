@@ -196,32 +196,16 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testRepositoryUnregisteringWhenClosing() throws Exception {
+	public void testRepositoryNotUnregisteringWhenClosing() throws Exception {
 		FileKey loc = FileKey.exact(db.getDirectory(), db.getFS());
 		Repository d2 = RepositoryCache.open(loc);
 		assertEquals(1, d2.useCnt.get());
 		assertThat(RepositoryCache.getRegisteredKeys(),
 				hasItem(FileKey.exact(db.getDirectory(), db.getFS())));
 		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
-
 		d2.close();
-
 		assertEquals(0, d2.useCnt.get());
-		assertEquals(0, RepositoryCache.getRegisteredKeys().size());
-	}
-
-	@Test
-	public void testRepositoryReconfigure() throws InterruptedException {
-		RepositoryCache.register(db);
+		// TODO: adapt test to check that the repo gets evicted
 		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
-		db.close();
-		assertEquals(0, ((Repository) db).useCnt.get());
-		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
-		RepositoryCacheConfig config = new RepositoryCacheConfig();
-		config.setExpireAfter(1);
-		config.setCleanupDelay(1);
-		RepositoryCache.reconfigure(config);
-		Thread.sleep(50);
-		assertEquals(0, RepositoryCache.getRegisteredKeys().size());
 	}
 }
