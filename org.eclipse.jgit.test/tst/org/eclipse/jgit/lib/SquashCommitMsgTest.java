@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,59 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URISyntaxException;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.transport.PubSubConfig;
-import org.eclipse.jgit.util.FS;
+import org.junit.Test;
 
-@Command(common = false, usage = "usage_RunSubscribeDaemon")
-class SubscribeDaemon extends TextBuiltin {
-	/** Name of the pubsub config file */
-	public static String GLOBAL_PUBSUB_FILE = ".gitpubsub";
+public class SquashCommitMsgTest extends RepositoryTestCase {
+	private static final String squashMsg = "squashed commit";
 
-	/** @return the pubsub config file */
-	public static File getConfigFile() {
-		return new File(FS.detect().userHome(), GLOBAL_PUBSUB_FILE);
-	}
-
-	/**
-	 * @return the config file for this user
-	 * @throws ConfigInvalidException
-	 * @throws IOException
-	 * @throws URISyntaxException
-	 */
-	public static PubSubConfig getConfig()
-			throws IOException, ConfigInvalidException, URISyntaxException {
-		File cfg = getConfigFile();
-		FileBasedConfig c = new FileBasedConfig(cfg, FS.detect());
-		c.load();
-		return new PubSubConfig(c);
-	}
-
-	/**
-	 * @param pubsubConfig
-	 * @throws IOException
-	 */
-	public static void updateConfig(PubSubConfig pubsubConfig)
-			throws IOException {
-		File cfg = getConfigFile();
-		FileBasedConfig c = new FileBasedConfig(cfg, FS.detect());
-		pubsubConfig.update(c);
-		c.save();
-	}
-
-	private PubSubConfig config;
-
-	@Override
-	protected void run() throws Exception {
-		// TODO(wetherbeei): fill in daemon launch
-		config = getConfig();
+	@Test
+	public void testReadWriteMergeMsg() throws IOException {
+		assertEquals(db.readSquashCommitMsg(), null);
+		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
+		db.writeSquashCommitMsg(squashMsg);
+		assertEquals(squashMsg, db.readSquashCommitMsg());
+		assertEquals(read(new File(db.getDirectory(), Constants.SQUASH_MSG)),
+				squashMsg);
+		db.writeSquashCommitMsg(null);
+		assertEquals(db.readSquashCommitMsg(), null);
+		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
+		FileOutputStream fos = new FileOutputStream(new File(db.getDirectory(),
+				Constants.SQUASH_MSG));
+		try {
+			fos.write(squashMsg.getBytes(Constants.CHARACTER_ENCODING));
+		} finally {
+			fos.close();
+		}
+		assertEquals(db.readSquashCommitMsg(), squashMsg);
 	}
 }

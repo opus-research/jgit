@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,67 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.merge;
 
-package org.eclipse.jgit.pgm;
+import java.util.List;
 
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.HashSet;
-import java.util.Set;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
 
-import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.transport.PubSubConfig;
-import org.eclipse.jgit.transport.PubSubConfig.Publisher;
-import org.eclipse.jgit.transport.PubSubConfig.Subscriber;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
+/**
+ * Formatter for constructing the commit message for a squashed commit.
+ * <p>
+ * The format should be the same as C Git does it, for compatibility.
+ */
+public class SquashMessageFormatter {
 
-import org.kohsuke.args4j.Argument;
+	private GitDateFormatter dateFormatter;
 
-@Command(common = false, usage = "usage_SubscribeToRemoteRepository")
-class Subscribe extends TextBuiltin {
-	static final String DEFAULT_SUBSCRIBE_REF = "refs/heads/*";
-
-	@Argument(index = 0, metaVar = "metaVar_remoteName")
-	private String remote = Constants.DEFAULT_REMOTE_NAME;
-
-	@Override
-	protected void run() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, remote);
-		PubSubConfig pubsubConfig = SubscribeDaemon.getConfig();
-		URIish uriish = remoteConfig.getURIs().get(0);
-		String uriRoot = PubSubConfig.getUriRoot(uriish);
-		String dir = db.getDirectory().getAbsolutePath();
-
-		// Add new repository + remote to config
-		Publisher p = pubsubConfig.getPublisher(uriRoot);
-		if (p == null) {
-			p = new Publisher(uriRoot);
-			pubsubConfig.addPublisher(p);
+	/**
+	 * Create a new squash message formatter.
+	 */
+	public SquashMessageFormatter() {
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+	}
+	/**
+	 * Construct the squashed commit message.
+	 *
+	 * @param squashedCommits
+	 *            the squashed commits
+	 * @param target
+	 *            the target branch
+	 * @return squashed commit message
+	 */
+	public String format(List<RevCommit> squashedCommits, Ref target) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("Squashed commit of the following:\n");
+		for (RevCommit c : squashedCommits) {
+			sb.append("\ncommit ");
+			sb.append(c.getName());
+			sb.append("\n");
+			sb.append(toString(c.getAuthorIdent()));
+			sb.append("\n\t");
+			sb.append(c.getShortMessage());
+			sb.append("\n");
 		}
+		return sb.toString();
+	}
 
-		Subscriber s = p.getSubscriber(remote, dir);
+	private String toString(PersonIdent author) {
+		final StringBuilder a = new StringBuilder();
 
-		if (s == null)
-			p.addSubscriber(new Subscriber(p, remote, dir));
+		a.append("Author: ");
+		a.append(author.getName());
+		a.append(" <");
+		a.append(author.getEmailAddress());
+		a.append(">\n");
+		a.append("Date:   ");
+		a.append(dateFormatter.formatDate(author));
+		a.append("\n");
 
-		try {
-			SubscribeDaemon.updateConfig(pubsubConfig);
-		} catch (IOException e) {
-			out.println(MessageFormat.format(CLIText.get().cannotWrite,
-					SubscribeDaemon.getConfigFile()));
-			return;
-		}
-		// TODO(wetherbeei): reload the SubscribeDaemon
+		return a.toString();
 	}
 }

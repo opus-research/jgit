@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,56 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.merge;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertEquals;
 
-import java.io.IOException;
-import java.text.MessageFormat;
+import java.util.Arrays;
 
-import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.transport.PubSubConfig;
-import org.eclipse.jgit.transport.PubSubConfig.Publisher;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.junit.Before;
+import org.junit.Test;
 
-import org.kohsuke.args4j.Argument;
-
-@Command(common = false, usage = "usage_UnsubscribeFromRemoteRepository")
-class Unsubscribe extends TextBuiltin {
-	@Argument(index = 0, metaVar = "metaVar_remoteName")
-	private String remote = Constants.DEFAULT_REMOTE_NAME;
+/**
+ * Test construction of squash message by {@link SquashMessageFormatterTest}.
+ */
+public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
+	private GitDateFormatter dateFormatter;
+	private SquashMessageFormatter msgFormatter;
+	private RevCommit revCommit;
 
 	@Override
-	protected void run() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, remote);
-		PubSubConfig pubsubConfig = SubscribeDaemon.getConfig();
-		URIish uriish = remoteConfig.getURIs().get(0);
-		String uriRoot = PubSubConfig.getUriRoot(uriish);
-		String dir = db.getDirectory().getAbsolutePath();
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+		msgFormatter = new SquashMessageFormatter();
+	}
 
-		if (uriish != null) {
-			Publisher p = pubsubConfig.getPublisher(uriRoot);
-			if (p == null || !p.removeSubscriber(remote, dir)) {
-				out.println(MessageFormat.format(
-						CLIText.get().doesNotExist, remote));
-				return;
-			}
+	@Test
+	public void testCommit() throws Exception {
+		Git git = new Git(db);
+		revCommit = git.commit().setMessage("squash_me").call();
 
-			// See if this publisher is now empty
-			if (p.getSubscribers().size() == 0)
-				pubsubConfig.removePublisher(p);
-
-			try {
-				SubscribeDaemon.updateConfig(pubsubConfig);
-			} catch (IOException e) {
-				out.println(MessageFormat.format(CLIText.get().cannotWrite,
-						SubscribeDaemon.getConfigFile()));
-				return;
-			}
-		}
-		// TODO(wetherbeei): reload the SubscribeDaemon
+		Ref master = db.getRef("refs/heads/master");
+		String message = msgFormatter.format(Arrays.asList(revCommit), master);
+		assertEquals(
+				"Squashed commit of the following:\n\ncommit "
+						+ revCommit.getName() + "\nAuthor: "
+						+ revCommit.getAuthorIdent().getName() + " <"
+						+ revCommit.getAuthorIdent().getEmailAddress()
+						+ ">\nDate:   " + dateFormatter.formatDate(author)
+						+ "\n\n\tsquash_me\n", message);
 	}
 }
