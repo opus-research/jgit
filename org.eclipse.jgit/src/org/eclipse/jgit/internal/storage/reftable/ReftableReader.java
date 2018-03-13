@@ -92,6 +92,7 @@ public class ReftableReader implements AutoCloseable {
 
 	private byte[] match;
 	private Ref ref;
+	private long logTimeUsec;
 	private ReflogEntry log;
 
 	/**
@@ -177,14 +178,14 @@ public class ReftableReader implements AutoCloseable {
 	 *
 	 * @param refName
 	 *            exact name of the reference whose log to read.
-	 * @param time
-	 *            time in seconds since the epoch to scan from. Records at this
-	 *            time and older will be returned.
+	 * @param timeUsec
+	 *            time in microseconds since the epoch to scan backwards from.
+	 *            Records at this time and older will be returned.
 	 * @throws IOException
 	 *             reftable cannot be read.
 	 */
-	public void seekLog(String refName, int time) throws IOException {
-		byte[] key = LogEntry.key(refName, time);
+	public void seekLog(String refName, long timeUsec) throws IOException {
+		byte[] key = LogEntry.key(refName, timeUsec);
 
 		initLogIndex();
 		initScan(LOG_BLOCK_TYPE, logEnd);
@@ -266,7 +267,8 @@ public class ReftableReader implements AutoCloseable {
 					continue;
 				}
 			} else if (blockType == LOG_BLOCK_TYPE) {
-				log = block.readLog();
+				logTimeUsec = block.readLogTimeUsec();
+				log = block.readLog(logTimeUsec);
 			}
 			return true;
 		}
@@ -293,6 +295,11 @@ public class ReftableReader implements AutoCloseable {
 	/** @return name of the current reference. */
 	public String getRefName() {
 		return ref != null ? ref.getName() : block.name();
+	}
+
+	/** @return time of reflog entry, microseconds since the epoch. */
+	public long getReflogTimeUsec() {
+		return logTimeUsec;
 	}
 
 	/** @return current log entry. */
