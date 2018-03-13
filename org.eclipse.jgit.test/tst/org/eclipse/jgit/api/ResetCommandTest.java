@@ -596,7 +596,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 	 * @throws IOException
 	 */
 	private void assertSameAsHead(Ref ref) throws IOException {
-		Ref headRef = db.exactRef(Constants.HEAD);
+		Ref headRef = db.getRef(Constants.HEAD);
 		assertEquals(headRef.getName(), ref.getName());
 		assertEquals(headRef.getObjectId(), ref.getObjectId());
 	}
