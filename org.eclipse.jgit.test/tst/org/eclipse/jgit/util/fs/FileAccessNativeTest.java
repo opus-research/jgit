@@ -44,6 +44,10 @@
 
 package org.eclipse.jgit.util.fs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -51,6 +55,8 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.NativeLibrary;
+import org.junit.Before;
+import org.junit.Test;
 
 public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 	private static boolean skipTest() {
@@ -64,7 +70,8 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 	private FileAccessNative access;
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 
 		if (!skipTest()) {
@@ -74,6 +81,7 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testStatRegularFile() throws IOException {
 		if (skipTest())
 			return;
@@ -104,6 +112,7 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testStatDirectory() throws IOException {
 		if (skipTest())
 			return;
@@ -123,6 +132,7 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testMissingFile() throws IOException {
 		if (skipTest())
 			return;
@@ -136,6 +146,7 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testNotDirectory() throws IOException {
 		if (skipTest())
 			return;
@@ -150,43 +161,7 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	public void testSymlink() throws IOException {
-		if (skipTest() || !isPosix())
-			return;
-
-		final File path = new File(root, "sym");
-		String dst = "dst";
-
-		access.symlink(path, dst);
-		FileInfo info = access.lstat(path);
-		assertTrue(FileMode.SYMLINK.equals(info.mode()));
-		assertEquals(dst, access.readlink(path));
-		path.delete();
-
-		dst = longString(510);
-		access.symlink(path, dst);
-		info = access.lstat(path);
-		assertTrue(FileMode.SYMLINK.equals(info.mode()));
-		assertEquals(dst, access.readlink(path));
-
-		dst = "a";
-		try {
-			access.symlink(path, dst);
-			fail("symlink replaced an existing link");
-		} catch (FileExistsException exists) {
-			assertEquals(path.getPath(), exists.getMessage());
-		}
-	}
-
 	private static boolean isPosix() {
 		return System.getProperty("os.name").toLowerCase().indexOf("windows") == -1;
-	}
-
-	private static String longString(int len) {
-		StringBuilder r = new StringBuilder(len);
-		r.append('t');
-		for (int i = 0; i < len - 1; i++)
-			r.append('a');
-		return r.toString();
 	}
 }

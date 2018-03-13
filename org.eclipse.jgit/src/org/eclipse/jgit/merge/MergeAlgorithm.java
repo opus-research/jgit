@@ -47,24 +47,37 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
-import org.eclipse.jgit.diff.MyersDiff;
+import org.eclipse.jgit.diff.HistogramDiff;
 import org.eclipse.jgit.diff.Sequence;
 import org.eclipse.jgit.diff.SequenceComparator;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 
 /**
  * Provides the merge algorithm which does a three-way merge on content provided
- * as RawText. Makes use of {@link MyersDiff} to compute the diffs.
+ * as RawText. By default {@link HistogramDiff} is used as diff algorithm.
  */
 public final class MergeAlgorithm {
+	private final DiffAlgorithm diffAlg;
 
 	/**
-	 * Since this class provides only static methods I add a private default
-	 * constructor to prevent instantiation.
+	 * Creates a new MergeAlgorithm which uses {@link HistogramDiff} as diff
+	 * algorithm
 	 */
-	private MergeAlgorithm() {
+	public MergeAlgorithm() {
+		this(new HistogramDiff());
+	}
+
+	/**
+	 * Creates a new MergeAlgorithm
+	 *
+	 * @param diff
+	 *            the diff algorithm used by this merge
+	 */
+	public MergeAlgorithm(DiffAlgorithm diff) {
+		this.diffAlg = diff;
 	}
 
 	// An special edit which acts as a sentinel value by marking the end the
@@ -83,16 +96,47 @@ public final class MergeAlgorithm {
 	 * @param theirs the second sequence to be merged
 	 * @return the resulting content
 	 */
-	public static <S extends Sequence> MergeResult<S> merge(
+	public <S extends Sequence> MergeResult<S> merge(
 			SequenceComparator<S> cmp, S base, S ours, S theirs) {
 		List<S> sequences = new ArrayList<S>(3);
 		sequences.add(base);
 		sequences.add(ours);
 		sequences.add(theirs);
-		MergeResult result = new MergeResult<S>(sequences);
-		EditList oursEdits = MyersDiff.INSTANCE.diff(cmp, base, ours);
+		MergeResult<S> result = new MergeResult<S>(sequences);
+
+		if (ours.size() == 0) {
+			if (theirs.size() != 0) {
+				EditList theirsEdits = diffAlg.diff(cmp, base, theirs);
+				if (!theirsEdits.isEmpty()) {
+					// we deleted, they modified -> Let their complete content
+					// conflict with empty text
+					result.add(1, 0, 0, ConflictState.FIRST_CONFLICTING_RANGE);
+					result.add(2, 0, theirs.size(),
+							ConflictState.NEXT_CONFLICTING_RANGE);
+				} else
+					// we deleted, they didn't modify -> Let our deletion win
+					result.add(1, 0, 0, ConflictState.NO_CONFLICT);
+			} else
+				// we and they deleted -> return a single chunk of nothing
+				result.add(1, 0, 0, ConflictState.NO_CONFLICT);
+			return result;
+		} else if (theirs.size() == 0) {
+			EditList oursEdits = diffAlg.diff(cmp, base, ours);
+			if (!oursEdits.isEmpty()) {
+				// we modified, they deleted -> Let our complete content
+				// conflict with empty text
+				result.add(1, 0, ours.size(),
+						ConflictState.FIRST_CONFLICTING_RANGE);
+				result.add(2, 0, 0, ConflictState.NEXT_CONFLICTING_RANGE);
+			} else
+				// they deleted, we didn't modify -> Let their deletion win
+				result.add(2, 0, 0, ConflictState.NO_CONFLICT);
+			return result;
+		}
+
+		EditList oursEdits = diffAlg.diff(cmp, base, ours);
 		Iterator<Edit> baseToOurs = oursEdits.iterator();
-		EditList theirsEdits = MyersDiff.INSTANCE.diff(cmp, base, theirs);
+		EditList theirsEdits = diffAlg.diff(cmp, base, theirs);
 		Iterator<Edit> baseToTheirs = theirsEdits.iterator();
 		int current = 0; // points to the next line (first line is 0) of base
 		                 // which was not handled yet

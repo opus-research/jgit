@@ -44,6 +44,7 @@
 package org.eclipse.jgit.notes;
 
 import java.io.IOException;
+import java.util.Iterator;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -52,6 +53,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -66,7 +68,7 @@ import org.eclipse.jgit.revwalk.RevTree;
  * is not released by this class. The caller should arrange for releasing the
  * shared {@code ObjectReader} at the proper times.
  */
-public class NoteMap {
+public class NoteMap implements Iterable<Note> {
 	/**
 	 * Construct a new empty note map.
 	 *
@@ -76,6 +78,19 @@ public class NoteMap {
 		NoteMap r = new NoteMap(null /* no reader */);
 		r.root = new LeafBucket(0);
 		return r;
+	}
+
+	/**
+	 * Shorten the note ref name by trimming off the {@link Constants#R_NOTES}
+	 * prefix if it exists.
+	 *
+	 * @param noteRefName
+	 * @return a more user friendly note name
+	 */
+	public static String shortenRefName(String noteRefName) {
+		if (noteRefName.startsWith(Constants.R_NOTES))
+			return noteRefName.substring(Constants.R_NOTES.length());
+		return noteRefName;
 	}
 
 	/**
@@ -155,6 +170,23 @@ public class NoteMap {
 		return map;
 	}
 
+	/**
+	 * Construct a new note map from an existing note bucket.
+	 *
+	 * @param root
+	 *            the root bucket of this note map
+	 * @param reader
+	 *            reader to scan the note branch with. This reader may be
+	 *            retained by the NoteMap for the life of the map in order to
+	 *            support lazy loading of entries.
+	 * @return the note map built from the note bucket
+	 */
+	static NoteMap newMap(InMemoryNoteBucket root, ObjectReader reader) {
+		NoteMap map = new NoteMap(reader);
+		map.root = root;
+		return map;
+	}
+
 	/** Borrowed reader to access the repository. */
 	private final ObjectReader reader;
 
@@ -163,6 +195,18 @@ public class NoteMap {
 
 	private NoteMap(ObjectReader reader) {
 		this.reader = reader;
+	}
+
+	/**
+	 * @return an iterator that iterates over notes of this NoteMap. Non note
+	 *         entries are ignored by this iterator.
+	 */
+	public Iterator<Note> iterator() {
+		try {
+			return root.iterator(new MutableObjectId(), reader);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	/**
@@ -175,7 +219,21 @@ public class NoteMap {
 	 *             a portion of the note space is not accessible.
 	 */
 	public ObjectId get(AnyObjectId id) throws IOException {
-		return root.get(id, reader);
+		Note n = root.getNote(id, reader);
+		return n == null ? null : n.getData();
+	}
+
+	/**
+	 * Lookup a note for a specific ObjectId.
+	 *
+	 * @param id
+	 *            the object to look for.
+	 * @return the note for the given object id, or null if no note exists.
+	 * @throws IOException
+	 *             a portion of the note space is not accessible.
+	 */
+	public Note getNote(AnyObjectId id) throws IOException {
+		return root.getNote(id, reader);
 	}
 
 	/**
@@ -324,9 +382,14 @@ public class NoteMap {
 		return root.writeTree(inserter);
 	}
 
+	/** @return the root note bucket */
+	InMemoryNoteBucket getRoot() {
+		return root;
+	}
+
 	private void load(ObjectId rootTree) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		AbbreviatedObjectId none = AbbreviatedObjectId.fromString("");
+		AbbreviatedObjectId none = AbbreviatedObjectId.fromString(""); //$NON-NLS-1$
 		root = NoteParser.parse(none, rootTree, reader);
 	}
 }

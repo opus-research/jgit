@@ -58,7 +58,7 @@ import org.eclipse.jgit.lib.ObjectReader;
  * @see LeafBucket
  */
 abstract class NoteBucket {
-	abstract ObjectId get(AnyObjectId objId, ObjectReader reader)
+	abstract Note getNote(AnyObjectId objId, ObjectReader reader)
 			throws IOException;
 
 	abstract Iterator<Note> iterator(AnyObjectId objId, ObjectReader reader)
@@ -71,4 +71,6 @@ abstract class NoteBucket {
 			ObjectReader reader) throws IOException;
 
 	abstract ObjectId writeTree(ObjectInserter inserter) throws IOException;
+
+	abstract ObjectId getTreeId();
 }

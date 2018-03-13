@@ -45,6 +45,9 @@
 
 package org.eclipse.jgit.storage.file;
 
+import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
+import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
+
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -61,13 +64,12 @@ import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -75,6 +77,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
+import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackOutputStream;
 import org.eclipse.jgit.util.LongList;
 import org.eclipse.jgit.util.NB;
@@ -93,9 +96,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 	};
 
-	private final File idxFile;
-
 	private final File packFile;
+
+	private final int extensions;
+
+	private File keepFile;
+
+	private volatile String packName;
 
 	final int hash;
 
@@ -120,6 +127,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private PackReverseIndex reverseIdx;
 
+	private PackBitmapIndex bitmapIdx;
+
 	/**
 	 * Objects we have tried to read, and discovered to be corrupt.
 	 * <p>
@@ -132,15 +141,15 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Construct a reader for an existing, pre-indexed packfile.
 	 *
-	 * @param idxFile
-	 *            path of the <code>.idx</code> file listing the contents.
 	 * @param packFile
 	 *            path of the <code>.pack</code> file holding the data.
+	 * @param extensions
+	 *            additional pack file extensions with the same base as the pack
 	 */
-	public PackFile(final File idxFile, final File packFile) {
-		this.idxFile = idxFile;
+	public PackFile(final File packFile, int extensions) {
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
+		this.extensions = extensions;
 
 		// Multiply by 31 here so we can more directly combine with another
 		// value in WindowCache.hash(), without doing the multiply there.
@@ -155,7 +164,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				throw new PackInvalidException(packFile);
 
 			try {
-				final PackIndex idx = PackIndex.open(idxFile);
+				final PackIndex idx = PackIndex.open(extFile(INDEX));
 
 				if (packChecksum == null)
 					packChecksum = idx.packChecksum;
@@ -177,6 +186,28 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	/**
+	 * @return the index for this pack file.
+	 * @throws IOException
+	 */
+	public PackIndex getIndex() throws IOException {
+		return idx();
+	}
+
+	/** @return name extracted from {@code pack-*.pack} pattern. */
+	public String getPackName() {
+		String name = packName;
+		if (name == null) {
+			name = getPackFile().getName();
+			if (name.startsWith("pack-")) //$NON-NLS-1$
+				name = name.substring("pack-".length()); //$NON-NLS-1$
+			if (name.endsWith(".pack")) //$NON-NLS-1$
+				name = name.substring(0, name.length() - ".pack".length()); //$NON-NLS-1$
+			packName = name;
+		}
+		return name;
+	}
+
+	/**
 	 * Determine if an object is contained within the pack file.
 	 * <p>
 	 * For performance reasons only the index file is searched; the main pack
@@ -192,6 +223,17 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	public boolean hasObject(final AnyObjectId id) throws IOException {
 		final long offset = idx().findOffset(id);
 		return 0 < offset && !isCorrupt(offset);
+	}
+
+	/**
+	 * Determines whether a .keep file exists for this pack file.
+	 *
+	 * @return true if a .keep file exist.
+	 */
+	public boolean shouldBeKept() {
+		if (keepFile == null)
+			keepFile = new File(packFile.getPath() + ".keep"); //$NON-NLS-1$
+		return keepFile.exists();
 	}
 
 	/**
@@ -221,7 +263,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 * Close the resources utilized by this repository
 	 */
 	public void close() {
-		DeltaBaseCache.purge(this);
 		WindowCache.purge(this);
 		synchronized (this) {
 			loadedIdx = null;
@@ -275,29 +316,52 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return getReverseIdx().findObject(offset);
 	}
 
-	private final void decompress(final long position, final WindowCursor curs,
-			final byte[] dstbuf, final int dstoff, final int dstsz)
-			throws IOException, DataFormatException {
-		if (curs.inflate(this, position, dstbuf, dstoff) != dstsz)
-			throw new EOFException(MessageFormat.format(JGitText.get().shortCompressedStreamAt, position));
+	private final byte[] decompress(final long position, final int sz,
+			final WindowCursor curs) throws IOException, DataFormatException {
+		byte[] dstbuf;
+		try {
+			dstbuf = new byte[sz];
+		} catch (OutOfMemoryError noMemory) {
+			// The size may be larger than our heap allows, return null to
+			// let the caller know allocation isn't possible and it should
+			// use the large object streaming approach instead.
+			//
+			// For example, this can occur when sz is 640 MB, and JRE
+			// maximum heap size is only 256 MB. Even if the JRE has
+			// 200 MB free, it cannot allocate a 640 MB byte array.
+			return null;
+		}
+
+		if (curs.inflate(this, position, dstbuf, 0) != sz)
+			throw new EOFException(MessageFormat.format(
+					JGitText.get().shortCompressedStreamAt,
+					Long.valueOf(position)));
+		return dstbuf;
+	}
+
+	void copyPackAsIs(PackOutputStream out, boolean validate, WindowCursor curs)
+			throws IOException {
+		// Pin the first window, this ensures the length is accurate.
+		curs.pin(this, 0);
+		curs.copyPackAsIs(this, length, validate, out);
 	}
 
 	final void copyAsIs(PackOutputStream out, LocalObjectToPack src,
-			WindowCursor curs) throws IOException,
+			boolean validate, WindowCursor curs) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
 		beginCopyAsIs(src);
 		try {
-			copyAsIs2(out, src, curs);
+			copyAsIs2(out, src, validate, curs);
 		} finally {
 			endCopyAsIs();
 		}
 	}
 
 	private void copyAsIs2(PackOutputStream out, LocalObjectToPack src,
-			WindowCursor curs) throws IOException,
+			boolean validate, WindowCursor curs) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
-		final CRC32 crc1 = new CRC32();
-		final CRC32 crc2 = new CRC32();
+		final CRC32 crc1 = validate ? new CRC32() : null;
+		final CRC32 crc2 = validate ? new CRC32() : null;
 		final byte[] buf = out.getCopyBuffer();
 
 		// Rip apart the header so we can discover the size.
@@ -310,7 +374,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int headerCnt = 1;
 		while ((c & 0x80) != 0) {
 			c = buf[headerCnt++] & 0xff;
-			inflatedLength += (c & 0x7f) << shift;
+			inflatedLength += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
@@ -318,17 +382,23 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			do {
 				c = buf[headerCnt++] & 0xff;
 			} while ((c & 128) != 0);
-			crc1.update(buf, 0, headerCnt);
-			crc2.update(buf, 0, headerCnt);
+			if (validate) {
+				crc1.update(buf, 0, headerCnt);
+				crc2.update(buf, 0, headerCnt);
+			}
 		} else if (typeCode == Constants.OBJ_REF_DELTA) {
-			crc1.update(buf, 0, headerCnt);
-			crc2.update(buf, 0, headerCnt);
+			if (validate) {
+				crc1.update(buf, 0, headerCnt);
+				crc2.update(buf, 0, headerCnt);
+			}
 
 			readFully(src.offset + headerCnt, buf, 0, 20, curs);
-			crc1.update(buf, 0, 20);
-			crc2.update(buf, 0, 20);
+			if (validate) {
+				crc1.update(buf, 0, 20);
+				crc2.update(buf, 0, 20);
+			}
 			headerCnt += 20;
-		} else {
+		} else if (validate) {
 			crc1.update(buf, 0, headerCnt);
 			crc2.update(buf, 0, headerCnt);
 		}
@@ -344,7 +414,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		try {
 			quickCopy = curs.quickCopy(this, dataOffset, dataLength);
 
-			if (idx().hasCRC32Support()) {
+			if (validate && idx().hasCRC32Support()) {
 				// Index has the CRC32 code cached, validate the object.
 				//
 				expectedCRC = idx().findCRC32(src);
@@ -365,9 +435,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					setCorrupt(src.offset);
 					throw new CorruptObjectException(MessageFormat.format(
 							JGitText.get().objectAtHasBadZlibStream,
-							src.offset, getPackFile()));
+							Long.valueOf(src.offset), getPackFile()));
 				}
-			} else {
+			} else if (validate) {
 				// We don't have a CRC32 code in the index, so compute it
 				// now while inflating the raw data to get zlib to tell us
 				// whether or not the data is safe.
@@ -394,9 +464,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					setCorrupt(src.offset);
 					throw new EOFException(MessageFormat.format(
 							JGitText.get().shortCompressedStreamAt,
-							src.offset));
+							Long.valueOf(src.offset)));
 				}
 				expectedCRC = crc1.getValue();
+			} else {
+				expectedCRC = -1;
 			}
 		} catch (DataFormatException dataFormat) {
 			setCorrupt(src.offset);
@@ -404,7 +476,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			CorruptObjectException corruptObject = new CorruptObjectException(
 					MessageFormat.format(
 							JGitText.get().objectAtHasBadZlibStream,
-							src.offset, getPackFile()));
+							Long.valueOf(src.offset), getPackFile()));
 			corruptObject.initCause(dataFormat);
 
 			StoredObjectRepresentationNotAvailableException gone;
@@ -424,12 +496,22 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// and we have it pinned.  Write this out without copying.
 			//
 			out.writeHeader(src, inflatedLength);
-			quickCopy.write(out, dataOffset, (int) dataLength);
+			quickCopy.write(out, dataOffset, (int) dataLength, null);
 
 		} else if (dataLength <= buf.length) {
 			// Tiny optimization: Lots of objects are very small deltas or
 			// deflated commits that are likely to fit in the copy buffer.
 			//
+			if (!validate) {
+				long pos = dataOffset;
+				long cnt = dataLength;
+				while (cnt > 0) {
+					final int n = (int) Math.min(cnt, buf.length);
+					readFully(pos, buf, 0, n, curs);
+					pos += n;
+					cnt -= n;
+				}
+			}
 			out.writeHeader(src, inflatedLength);
 			out.write(buf, 0, (int) dataLength);
 		} else {
@@ -443,21 +525,26 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			while (cnt > 0) {
 				final int n = (int) Math.min(cnt, buf.length);
 				readFully(pos, buf, 0, n, curs);
-				crc2.update(buf, 0, n);
+				if (validate)
+					crc2.update(buf, 0, n);
 				out.write(buf, 0, n);
 				pos += n;
 				cnt -= n;
 			}
-			if (crc2.getValue() != expectedCRC) {
-				throw new CorruptObjectException(MessageFormat.format(JGitText
-						.get().objectAtHasBadZlibStream, src.offset,
-						getPackFile()));
+			if (validate && crc2.getValue() != expectedCRC) {
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().objectAtHasBadZlibStream,
+						Long.valueOf(src.offset), getPackFile()));
 			}
 		}
 	}
 
 	boolean invalid() {
 		return invalid;
+	}
+
+	void setInvalid() {
+		invalid = true;
 	}
 
 	private void readFully(final long position, final byte[] dstbuf,
@@ -508,7 +595,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			if (invalid)
 				throw new PackInvalidException(packFile);
 			synchronized (readLock) {
-				fd = new RandomAccessFile(packFile, "r");
+				fd = new RandomAccessFile(packFile, "r"); //$NON-NLS-1$
 				length = fd.length();
 				onOpenPack();
 			}
@@ -592,11 +679,14 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		final long vers = NB.decodeUInt32(buf, 4);
 		final long packCnt = NB.decodeUInt32(buf, 8);
 		if (vers != 2 && vers != 3)
-			throw new IOException(MessageFormat.format(JGitText.get().unsupportedPackVersion, vers));
+			throw new IOException(MessageFormat.format(
+					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
 
 		if (packCnt != idx.getObjectCount())
 			throw new PackMismatchException(MessageFormat.format(
-					JGitText.get().packObjectCountMismatch, packCnt, idx.getObjectCount(), getPackFile()));
+					JGitText.get().packObjectCountMismatch,
+					Long.valueOf(packCnt), Long.valueOf(idx.getObjectCount()),
+					getPackFile()));
 
 		fd.seek(length - 20);
 		fd.readFully(buf, 0, 20);
@@ -608,67 +698,144 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					, getPackFile()));
 	}
 
-	ObjectLoader load(final WindowCursor curs, final long pos)
+	ObjectLoader load(final WindowCursor curs, long pos)
 			throws IOException {
-		final byte[] ib = curs.tempId;
-		readFully(pos, ib, 0, 20, curs);
-		int c = ib[0] & 0xff;
-		final int type = (c >> 4) & 7;
-		long sz = c & 15;
-		int shift = 4;
-		int p = 1;
-		while ((c & 0x80) != 0) {
-			c = ib[p++] & 0xff;
-			sz += (c & 0x7f) << shift;
-			shift += 7;
-		}
-
 		try {
-			switch (type) {
-			case Constants.OBJ_COMMIT:
-			case Constants.OBJ_TREE:
-			case Constants.OBJ_BLOB:
-			case Constants.OBJ_TAG: {
-				if (sz < curs.getStreamFileThreshold()) {
-					byte[] data;
-					try {
-						data = new byte[(int) sz];
-					} catch (OutOfMemoryError tooBig) {
-						return largeWhole(curs, pos, type, sz, p);
-					}
-					decompress(pos + p, curs, data, 0, data.length);
-					return new ObjectLoader.SmallObject(type, data);
-				}
-				return largeWhole(curs, pos, type, sz, p);
-			}
+			final byte[] ib = curs.tempId;
+			Delta delta = null;
+			byte[] data = null;
+			int type = Constants.OBJ_BAD;
+			boolean cached = false;
 
-			case Constants.OBJ_OFS_DELTA: {
-				c = ib[p++] & 0xff;
-				long ofs = c & 127;
-				while ((c & 128) != 0) {
-					ofs += 1;
+			SEARCH: for (;;) {
+				readFully(pos, ib, 0, 20, curs);
+				int c = ib[0] & 0xff;
+				final int typeCode = (c >> 4) & 7;
+				long sz = c & 15;
+				int shift = 4;
+				int p = 1;
+				while ((c & 0x80) != 0) {
 					c = ib[p++] & 0xff;
-					ofs <<= 7;
-					ofs += (c & 127);
+					sz += ((long) (c & 0x7f)) << shift;
+					shift += 7;
 				}
-				return loadDelta(pos, p, sz, pos - ofs, curs);
+
+				switch (typeCode) {
+				case Constants.OBJ_COMMIT:
+				case Constants.OBJ_TREE:
+				case Constants.OBJ_BLOB:
+				case Constants.OBJ_TAG: {
+					if (sz < curs.getStreamFileThreshold())
+						data = decompress(pos + p, (int) sz, curs);
+
+					if (delta != null) {
+						type = typeCode;
+						break SEARCH;
+					}
+
+					if (data != null)
+						return new ObjectLoader.SmallObject(typeCode, data);
+					else
+						return new LargePackedWholeObject(typeCode, sz, pos, p,
+								this, curs.db);
+				}
+
+				case Constants.OBJ_OFS_DELTA: {
+					c = ib[p++] & 0xff;
+					long base = c & 127;
+					while ((c & 128) != 0) {
+						base += 1;
+						c = ib[p++] & 0xff;
+						base <<= 7;
+						base += (c & 127);
+					}
+					base = pos - base;
+					delta = new Delta(delta, pos, (int) sz, p, base);
+					if (sz != delta.deltaSize)
+						break SEARCH;
+
+					DeltaBaseCache.Entry e = curs.getDeltaBaseCache().get(this, base);
+					if (e != null) {
+						type = e.type;
+						data = e.data;
+						cached = true;
+						break SEARCH;
+					}
+					pos = base;
+					continue SEARCH;
+				}
+
+				case Constants.OBJ_REF_DELTA: {
+					readFully(pos + p, ib, 0, 20, curs);
+					long base = findDeltaBase(ObjectId.fromRaw(ib));
+					delta = new Delta(delta, pos, (int) sz, p + 20, base);
+					if (sz != delta.deltaSize)
+						break SEARCH;
+
+					DeltaBaseCache.Entry e = curs.getDeltaBaseCache().get(this, base);
+					if (e != null) {
+						type = e.type;
+						data = e.data;
+						cached = true;
+						break SEARCH;
+					}
+					pos = base;
+					continue SEARCH;
+				}
+
+				default:
+					throw new IOException(MessageFormat.format(
+							JGitText.get().unknownObjectType,
+							Integer.valueOf(typeCode)));
+				}
 			}
 
-			case Constants.OBJ_REF_DELTA: {
-				readFully(pos + p, ib, 0, 20, curs);
-				long ofs = findDeltaBase(ObjectId.fromRaw(ib));
-				return loadDelta(pos, p + 20, sz, ofs, curs);
-			}
+			// At this point there is at least one delta to apply to data.
+			// (Whole objects with no deltas to apply return early above.)
 
-			default:
-				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType, type));
-			}
+			if (data == null)
+				return delta.large(this, curs);
+
+			do {
+				// Cache only the base immediately before desired object.
+				if (cached)
+					cached = false;
+				else if (delta.next == null)
+					curs.getDeltaBaseCache().store(this, delta.basePos, data, type);
+
+				pos = delta.deltaPos;
+
+				final byte[] cmds = decompress(pos + delta.hdrLen,
+						delta.deltaSize, curs);
+				if (cmds == null) {
+					data = null; // Discard base in case of OutOfMemoryError
+					return delta.large(this, curs);
+				}
+
+				final long sz = BinaryDelta.getResultSize(cmds);
+				if (Integer.MAX_VALUE <= sz)
+					return delta.large(this, curs);
+
+				final byte[] result;
+				try {
+					result = new byte[(int) sz];
+				} catch (OutOfMemoryError tooBig) {
+					data = null; // Discard base in case of OutOfMemoryError
+					return delta.large(this, curs);
+				}
+
+				BinaryDelta.apply(data, cmds, result);
+				data = result;
+				delta = delta.next;
+			} while (delta != null);
+
+			return new ObjectLoader.SmallObject(type, data);
+
 		} catch (DataFormatException dfe) {
 			CorruptObjectException coe = new CorruptObjectException(
 					MessageFormat.format(
-							JGitText.get().objectAtHasBadZlibStream, pos,
-							getPackFile()));
+							JGitText.get().objectAtHasBadZlibStream,
+							Long.valueOf(pos), getPackFile()));
 			coe.initCause(dfe);
 			throw coe;
 		}
@@ -683,61 +850,41 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return ofs;
 	}
 
-	private ObjectLoader loadDelta(long posSelf, int hdrLen, long sz,
-			long posBase, WindowCursor curs) throws IOException,
-			DataFormatException {
-		if (Integer.MAX_VALUE <= sz)
-			return largeDelta(posSelf, hdrLen, posBase, curs);
+	private static class Delta {
+		/** Child that applies onto this object. */
+		final Delta next;
 
-		byte[] base;
-		int type;
+		/** Offset of the delta object. */
+		final long deltaPos;
 
-		DeltaBaseCache.Entry e = DeltaBaseCache.get(this, posBase);
-		if (e != null) {
-			base = e.data;
-			type = e.type;
-		} else {
-			ObjectLoader p = load(curs, posBase);
-			try {
-				base = p.getCachedBytes(curs.getStreamFileThreshold());
-			} catch (LargeObjectException tooBig) {
-				return largeDelta(posSelf, hdrLen, posBase, curs);
-			}
-			type = p.getType();
-			DeltaBaseCache.store(this, posBase, base, type);
+		/** Size of the inflated delta stream. */
+		final int deltaSize;
+
+		/** Total size of the delta's pack entry header (including base). */
+		final int hdrLen;
+
+		/** Offset of the base object this delta applies onto. */
+		final long basePos;
+
+		Delta(Delta next, long ofs, int sz, int hdrLen, long baseOffset) {
+			this.next = next;
+			this.deltaPos = ofs;
+			this.deltaSize = sz;
+			this.hdrLen = hdrLen;
+			this.basePos = baseOffset;
 		}
 
-		final byte[] delta;
-		try {
-			delta = new byte[(int) sz];
-		} catch (OutOfMemoryError tooBig) {
-			return largeDelta(posSelf, hdrLen, posBase, curs);
+		ObjectLoader large(PackFile pack, WindowCursor wc) {
+			Delta d = this;
+			while (d.next != null)
+				d = d.next;
+			return d.newLargeLoader(pack, wc);
 		}
 
-		decompress(posSelf + hdrLen, curs, delta, 0, delta.length);
-		sz = BinaryDelta.getResultSize(delta);
-		if (Integer.MAX_VALUE <= sz)
-			return largeDelta(posSelf, hdrLen, posBase, curs);
-
-		final byte[] result;
-		try {
-			result = new byte[(int) sz];
-		} catch (OutOfMemoryError tooBig) {
-			return largeDelta(posSelf, hdrLen, posBase, curs);
+		private ObjectLoader newLargeLoader(PackFile pack, WindowCursor wc) {
+			return new LargePackedDeltaObject(deltaPos, basePos, hdrLen,
+					pack, wc.db);
 		}
-
-		BinaryDelta.apply(base, delta, result);
-		return new ObjectLoader.SmallObject(type, result);
-	}
-
-	private LargePackedWholeObject largeWhole(final WindowCursor curs,
-			final long pos, final int type, long sz, int p) {
-		return new LargePackedWholeObject(type, sz, pos, p, this, curs.db);
-	}
-
-	private LargePackedDeltaObject largeDelta(long posObj, int hdrLen,
-			long posBase, WindowCursor wc) {
-		return new LargePackedDeltaObject(posObj, posBase, hdrLen, this, wc.db);
 	}
 
 	byte[] getDeltaHeader(WindowCursor wc, long pos)
@@ -758,12 +905,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			readFully(pos, ib, 0, 20, curs);
 			int c = ib[0] & 0xff;
 			final int type = (c >> 4) & 7;
-			int shift = 4;
-			int p = 1;
-			while ((c & 0x80) != 0) {
-				c = ib[p++] & 0xff;
-				shift += 7;
-			}
 
 			switch (type) {
 			case Constants.OBJ_COMMIT:
@@ -773,6 +914,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				return type;
 
 			case Constants.OBJ_OFS_DELTA: {
+				int p = 1;
+				while ((c & 0x80) != 0)
+					c = ib[p++] & 0xff;
 				c = ib[p++] & 0xff;
 				long ofs = c & 127;
 				while ((c & 128) != 0) {
@@ -786,14 +930,18 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			}
 
 			case Constants.OBJ_REF_DELTA: {
+				int p = 1;
+				while ((c & 0x80) != 0)
+					c = ib[p++] & 0xff;
 				readFully(pos + p, ib, 0, 20, curs);
 				pos = findDeltaBase(ObjectId.fromRaw(ib));
 				continue;
 			}
 
 			default:
-				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType, type));
+				throw new IOException(
+						MessageFormat.format(JGitText.get().unknownObjectType,
+								Integer.valueOf(type)));
 			}
 		}
 	}
@@ -815,7 +963,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int p = 1;
 		while ((c & 0x80) != 0) {
 			c = ib[p++] & 0xff;
-			sz += (c & 0x7f) << shift;
+			sz += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
@@ -840,14 +988,15 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 		default:
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType, type));
+					JGitText.get().unknownObjectType, Integer.valueOf(type)));
 		}
 
 		try {
 			return BinaryDelta.getResultSize(getDeltaHeader(curs, deltaAt));
 		} catch (DataFormatException e) {
-			throw new CorruptObjectException(MessageFormat.format(JGitText
-					.get().objectAtHasBadZlibStream, pos, getPackFile()));
+			throw new CorruptObjectException(MessageFormat.format(
+					JGitText.get().objectAtHasBadZlibStream, Long.valueOf(pos),
+					getPackFile()));
 		}
 	}
 
@@ -895,8 +1044,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 
 		default:
-			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType, typeCode));
+			throw new IOException(
+					MessageFormat.format(JGitText.get().unknownObjectType,
+							Integer.valueOf(typeCode)));
 		}
 	}
 
@@ -904,6 +1054,24 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			throws IOException, CorruptObjectException {
 		final long maxOffset = length - 20;
 		return getReverseIdx().findNextOffset(startOffset, maxOffset);
+	}
+
+	synchronized PackBitmapIndex getBitmapIndex() throws IOException {
+		if (invalid)
+			return null;
+		if (bitmapIdx == null && hasExt(BITMAP_INDEX)) {
+			final PackBitmapIndex idx = PackBitmapIndex.open(
+					extFile(BITMAP_INDEX), idx(), getReverseIdx());
+
+			if (packChecksum == null)
+				packChecksum = idx.packChecksum;
+			else if (!Arrays.equals(packChecksum, idx.packChecksum))
+				throw new PackMismatchException(
+						JGitText.get().packChecksumMismatch);
+
+			bitmapIdx = idx;
+		}
+		return bitmapIdx;
 	}
 
 	private synchronized PackReverseIndex getReverseIdx() throws IOException {
@@ -935,5 +1103,16 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		synchronized (list) {
 			list.add(offset);
 		}
+	}
+
+	private File extFile(PackExt ext) {
+		String p = packFile.getName();
+		int dot = p.lastIndexOf('.');
+		String b = (dot < 0) ? p : p.substring(0, dot);
+		return new File(packFile.getParentFile(), b + '.' + ext.getExtension());
+	}
+
+	private boolean hasExt(PackExt ext) {
+		return (extensions & ext.getBit()) != 0;
 	}
 }

@@ -58,11 +58,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CompoundException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -87,6 +87,7 @@ import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.file.UnpackedObject;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Generic fetch support for dumb transport protocols.
@@ -211,9 +212,9 @@ class WalkFetchConnection extends BaseFetchConnection {
 		revWalk = new RevWalk(reader);
 		revWalk.setRetainBody(false);
 		treeWalk = new TreeWalk(reader);
-		COMPLETE = revWalk.newFlag("COMPLETE");
-		IN_WORK_QUEUE = revWalk.newFlag("IN_WORK_QUEUE");
-		LOCALLY_SEEN = revWalk.newFlag("LOCALLY_SEEN");
+		COMPLETE = revWalk.newFlag("COMPLETE"); //$NON-NLS-1$
+		IN_WORK_QUEUE = revWalk.newFlag("IN_WORK_QUEUE"); //$NON-NLS-1$
+		LOCALLY_SEEN = revWalk.newFlag("LOCALLY_SEEN"); //$NON-NLS-1$
 
 		localCommitQueue = new DateRevQueue();
 		workQueue = new LinkedList<ObjectId>();
@@ -405,7 +406,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			final String idStr = id.name();
 			final String subdir = idStr.substring(0, 2);
 			final String file = idStr.substring(2);
-			final String looseName = subdir + "/" + file;
+			final String looseName = subdir + "/" + file; //$NON-NLS-1$
 
 			for (int i = lastRemoteIdx; i < remotes.size(); i++) {
 				if (downloadLooseObject(id, looseName, remotes.get(i))) {
@@ -540,8 +541,12 @@ class WalkFetchConnection extends BaseFetchConnection {
 				// it failed the index and pack are unusable and we
 				// shouldn't consult them again.
 				//
-				if (pack.tmpIdx != null)
-					pack.tmpIdx.delete();
+				try {
+					if (pack.tmpIdx != null)
+						FileUtils.delete(pack.tmpIdx);
+				} catch (IOException e) {
+					throw new TransportException(e.getMessage(), e);
+				}
 				packItr.remove();
 			}
 
@@ -633,8 +638,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 		ObjectId act = inserter.insert(type, raw);
 		if (!AnyObjectId.equals(id, act)) {
-			throw new TransportException(MessageFormat.format(JGitText.get().incorrectHashFor
-					, id.name(), act.name(), Constants.typeString(type), compressed.length));
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().incorrectHashFor, id.name(), act.name(),
+					Constants.typeString(type),
+					Integer.valueOf(compressed.length)));
 		}
 		inserter.flush();
 	}
@@ -784,17 +791,18 @@ class WalkFetchConnection extends BaseFetchConnection {
 		RemotePack(final WalkRemoteObjectDatabase c, final String pn) {
 			connection = c;
 			packName = pn;
-			idxName = packName.substring(0, packName.length() - 5) + ".idx";
+			idxName = packName.substring(0, packName.length() - 5) + ".idx"; //$NON-NLS-1$
 
 			String tn = idxName;
-			if (tn.startsWith("pack-"))
+			if (tn.startsWith("pack-")) //$NON-NLS-1$
 				tn = tn.substring(5);
-			if (tn.endsWith(".idx"))
+			if (tn.endsWith(".idx")) //$NON-NLS-1$
 				tn = tn.substring(0, tn.length() - 4);
 
 			if (local.getObjectDatabase() instanceof ObjectDirectory) {
 				tmpIdx = new File(((ObjectDirectory) local.getObjectDatabase())
-						.getDirectory(), "walk-" + tn + ".walkidx");
+								.getDirectory(),
+						"walk-" + tn + ".walkidx"); //$NON-NLS-1$ //$NON-NLS-2$
 			}
 		}
 
@@ -802,7 +810,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			if (index != null)
 				return;
 			if (tmpIdx == null)
-				tmpIdx = File.createTempFile("jgit-walk-", ".idx");
+				tmpIdx = File.createTempFile("jgit-walk-", ".idx"); //$NON-NLS-1$ //$NON-NLS-2$
 			else if (tmpIdx.isFile()) {
 				try {
 					index = PackIndex.open(tmpIdx);
@@ -813,8 +821,8 @@ class WalkFetchConnection extends BaseFetchConnection {
 			}
 
 			final WalkRemoteObjectDatabase.FileStream s;
-			s = connection.open("pack/" + idxName);
-			pm.beginTask("Get " + idxName.substring(0, 12) + "..idx",
+			s = connection.open("pack/" + idxName); //$NON-NLS-1$
+			pm.beginTask("Get " + idxName.substring(0, 12) + "..idx", //$NON-NLS-1$ //$NON-NLS-2$
 					s.length < 0 ? ProgressMonitor.UNKNOWN
 							: (int) (s.length / 1024));
 			try {
@@ -830,7 +838,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					fos.close();
 				}
 			} catch (IOException err) {
-				tmpIdx.delete();
+				FileUtils.delete(tmpIdx);
 				throw err;
 			} finally {
 				s.in.close();
@@ -838,30 +846,29 @@ class WalkFetchConnection extends BaseFetchConnection {
 			pm.endTask();
 
 			if (pm.isCancelled()) {
-				tmpIdx.delete();
+				FileUtils.delete(tmpIdx);
 				return;
 			}
 
 			try {
 				index = PackIndex.open(tmpIdx);
 			} catch (IOException e) {
-				tmpIdx.delete();
+				FileUtils.delete(tmpIdx);
 				throw e;
 			}
 		}
 
 		void downloadPack(final ProgressMonitor monitor) throws IOException {
-			final WalkRemoteObjectDatabase.FileStream s;
-			final IndexPack ip;
-
-			s = connection.open("pack/" + packName);
-			ip = IndexPack.create(local, s.in);
-			ip.setFixThin(false);
-			ip.setObjectChecker(objCheck);
-			ip.index(monitor);
-			final PackLock keep = ip.renameAndOpenPack(lockMessage);
-			if (keep != null)
-				packLocks.add(keep);
+			String name = "pack/" + packName; //$NON-NLS-1$
+			WalkRemoteObjectDatabase.FileStream s = connection.open(name);
+			PackParser parser = inserter.newPackParser(s.in);
+			parser.setAllowThin(false);
+			parser.setObjectChecker(objCheck);
+			parser.setLockMessage(lockMessage);
+			PackLock lock = parser.parse(monitor);
+			if (lock != null)
+				packLocks.add(lock);
+			inserter.flush();
 		}
 	}
 }

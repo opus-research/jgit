@@ -43,12 +43,18 @@
 
 package org.eclipse.jgit.revwalk;
 
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileTreeEntry;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Tree;
+import org.junit.Test;
 
+@SuppressWarnings("deprecation")
 public class ObjectWalkTest extends RevWalkTestCase {
 	protected ObjectWalk objw;
 
@@ -57,11 +63,13 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		return objw = new ObjectWalk(db);
 	}
 
+	@Test
 	public void testNoCommits() throws Exception {
 		assertNull(objw.next());
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testTwoCommitsEmptyTree() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -75,6 +83,7 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testOneCommitOneTreeTwoBlob() throws Exception {
 		final RevBlob f0 = blob("0");
 		final RevBlob f1 = blob("1");
@@ -91,6 +100,7 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testTwoCommitTwoTreeTwoBlob() throws Exception {
 		final RevBlob f0 = blob("0");
 		final RevBlob f1 = blob("1");
@@ -115,6 +125,7 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testTwoCommitDeepTree1() throws Exception {
 		final RevBlob f0 = blob("0");
 		final RevBlob f1 = blob("0v2");
@@ -141,6 +152,7 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testTwoCommitDeepTree2() throws Exception {
 		final RevBlob f1 = blob("1");
 		final RevTree ta = tree(file("a/b/0", f1), file("a/c/q", f1));
@@ -166,6 +178,7 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testCull() throws Exception {
 		final RevBlob f1 = blob("1");
 		final RevBlob f2 = blob("2");
@@ -201,6 +214,7 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertNull(objw.nextObject());
 	}
 
+	@Test
 	public void testEmptyTreeCorruption() throws Exception {
 		ObjectId bId = ObjectId
 				.fromString("abbbfafe3129f85747aba7bfac992af77134c607");
