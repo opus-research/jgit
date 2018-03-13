@@ -97,28 +97,28 @@ public abstract class TextBuiltin {
 	 *
 	 * @since 2.2
 	 */
-	public ThrowingPrintWriter outw;
+	protected ThrowingPrintWriter outw;
 
 	/**
 	 * Stream to output to, typically this is standard output.
 	 *
 	 * @since 2.2
 	 */
-	public OutputStream outs;
+	protected OutputStream outs;
 
 	/**
 	 * Error writer, typically this is standard error.
 	 *
 	 * @since 3.4
 	 */
-	public ThrowingPrintWriter errw;
+	protected ThrowingPrintWriter errw;
 
 	/**
 	 * Error output stream, typically this is standard error.
 	 *
 	 * @since 3.4
 	 */
-	public OutputStream errs;
+	protected OutputStream errs;
 
 	/** Git repository the command was invoked within. */
 	protected Repository db;
@@ -147,7 +147,7 @@ public abstract class TextBuiltin {
 	 *            value of the {@code --git-dir} command line option, if
 	 *            {@code repository} is null.
 	 */
-	public void init(final Repository repository, final String gitDir) {
+	protected void init(final Repository repository, final String gitDir) {
 		try {
 			final String outputEncoding = repository != null ? repository
 					.getConfig().getString("i18n", null, "logOutputEncoding") : null; //$NON-NLS-1$ //$NON-NLS-2$
