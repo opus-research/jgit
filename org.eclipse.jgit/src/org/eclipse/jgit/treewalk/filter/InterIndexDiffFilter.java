@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,26 +41,65 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.treewalk.filter;
 
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FS.FSFactory;
-import org.eclipse.jgit.util.SystemReader;
+import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
 
 /**
- * A factory for creating FS instances on Java7
+ * A filter for extracting changes between two versions of the dircache. In
+ * addition to what {@link TreeFilter#ANY_DIFF} would do, it also detects
+ * changes that will affect decorations and show up in an attempt to commit.
  */
-public class Java7FSFactory extends FSFactory {
+public final class InterIndexDiffFilter extends TreeFilter {
+	private static final int baseTree = 0;
+
+	/**
+	 * Predefined InterIndexDiffFilter for finding changes between two dircaches
+	 */
+	public static final TreeFilter INSTANCE = new InterIndexDiffFilter();
+
 	@Override
-	public FS detect(Boolean cygwinUsed) {
-		if (SystemReader.getInstance().isWindows()) {
-			if (cygwinUsed == null)
-				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
-			if (cygwinUsed.booleanValue())
-				return new FS_Win32_Java7Cygwin();
-			else
-				return new FS_Win32_Java7();
-		} else
-			return new FS_POSIX_Java7();
+	public boolean include(final TreeWalk walker) {
+		final int n = walker.getTreeCount();
+		if (n == 1) // Assume they meant difference to empty tree.
+			return true;
+
+		final int m = walker.getRawMode(baseTree);
+		for (int i = 1; i < n; i++) {
+			DirCacheIterator baseDirCache = walker.getTree(baseTree,
+					DirCacheIterator.class);
+			DirCacheIterator newDirCache = walker.getTree(i,
+					DirCacheIterator.class);
+			if (baseDirCache != null && newDirCache != null) {
+				DirCacheEntry baseDci = baseDirCache.getDirCacheEntry();
+				DirCacheEntry newDci = newDirCache.getDirCacheEntry();
+				if (baseDci != null && newDci != null) {
+					if (baseDci.isAssumeValid() != newDci.isAssumeValid())
+						return true;
+					if (baseDci.isAssumeValid()) // && newDci.isAssumeValid()
+						return false;
+				}
+			}
+			if (walker.getRawMode(i) != m || !walker.idEqual(i, baseTree))
+				return true;
+		}
+		return false;
+	}
+
+	@Override
+	public boolean shouldBeRecursive() {
+		return false;
+	}
+
+	@Override
+	public TreeFilter clone() {
+		return this;
+	}
+
+	@Override
+	public String toString() {
+		return "INTERINDEX_DIFF"; //$NON-NLS-1$
 	}
 }

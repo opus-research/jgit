@@ -73,6 +73,12 @@
       <name>Christian Halstrick</name>
     </developer>
     <developer>
+      <name>Colby Ranger</name>
+    </developer>
+    <developer>
+      <name>Dave Borowitz</name>
+    </developer>
+    <developer>
       <name>Gunnar Wagenknecht</name>
     </developer>
     <developer>
@@ -170,7 +176,7 @@
     <bundle-manifest>${project.build.directory}/META-INF/MANIFEST.MF</bundle-manifest>
 
     <jgit-last-release-version>2.1.0.201209190230-r</jgit-last-release-version>
-    <jsch-version>0.1.44-1</jsch-version>
+    <jsch-version>0.1.46</jsch-version>
     <junit-version>4.5</junit-version>
     <args4j-version>2.0.12</args4j-version>
     <commons-compress-version>1.3</commons-compress-version>
@@ -440,24 +446,16 @@
   </distributionManagement>
 
   <profiles>
+    <!-- Set -Djgit.java6.skip=true to compile with only Java 5 -->
     <profile>
       <id>jgit.java6</id>
-	  <activation>
-	    <jdk>1.6</jdk>
-	  </activation>
+      <activation>
+        <property>
+          <name>!jgit.java6.skip</name>
+        </property>
+      </activation>
       <modules>
         <module>org.eclipse.jgit.console</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>jgit.java7</id>
-	  <activation>
-	    <jdk>1.7</jdk>
-	  </activation>
-      <modules>
-        <module>org.eclipse.jgit.console</module>
-        <module>org.eclipse.jgit.java7</module>
-        <module>org.eclipse.jgit.java7.test</module>
       </modules>
     </profile>
     <profile>
