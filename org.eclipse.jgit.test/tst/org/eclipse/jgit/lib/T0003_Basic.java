@@ -674,8 +674,6 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	public void test028_LockPackedRef() throws IOException {
 		writeTrashFile(".git/packed-refs", "7f822839a2fe9760f386cbbbcb3f92c5fe81def7 refs/heads/foobar");
 		writeTrashFile(".git/HEAD", "ref: refs/heads/foobar\n");
-		BUG_WorkAroundRacyGitIssues("packed-refs");
-		BUG_WorkAroundRacyGitIssues("HEAD");
 
 		ObjectId resolve = db.resolve("HEAD");
 		assertEquals("7f822839a2fe9760f386cbbbcb3f92c5fe81def7", resolve.name());
@@ -729,24 +727,5 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File file = new File(new File(db.getWorkDir(), "subdir"), "File.java");
 		assertEquals("subdir/File.java", Repository.stripWorkDir(db.getWorkDir(), file));
 
-	}
-
-	/**
-	 * Kick the timestamp of a local file.
-	 * <p>
-	 * We shouldn't have to make these method calls. The cache is using file
-	 * system timestamps, and on many systems unit tests run faster than the
-	 * modification clock. Dumping the cache after we make an edit behind
-	 * RefDirectory's back allows the tests to pass.
-	 *
-	 * @param name
-	 *            the file in the repository to force a time change on.
-	 */
-	private void BUG_WorkAroundRacyGitIssues(String name) {
-		File path = new File(db.getDirectory(), name);
-		long old = path.lastModified();
-		long set = 1250379778668L; // Sat Aug 15 20:12:58 GMT-03:30 2009
-		path.setLastModified(set);
-		assertTrue("time changed", old != path.lastModified());
 	}
 }

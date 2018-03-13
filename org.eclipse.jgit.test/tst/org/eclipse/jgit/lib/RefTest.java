@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
  * Copyright (C) 2009, Robin Rosenberg
  * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
@@ -100,8 +99,8 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		writeSymref("HEAD", "refs/heads/b");
 		Ref ref = db.getRef("HEAD");
 		assertEquals(Ref.Storage.LOOSE, ref.getStorage());
-		assertTrue("is symref", ref.isSymbolic());
-		ref = ref.getTarget();
+		assertTrue("is symref", ref instanceof SymbolicRef);
+		ref = ((SymbolicRef) ref).getTarget();
 		assertEquals("refs/heads/b", ref.getName());
 		assertEquals(Ref.Storage.PACKED, ref.getStorage());
 	}
@@ -117,9 +116,9 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		writeSymref("HEAD", "refs/heads/master");
 		Ref ref = db.getRef("HEAD");
 		assertEquals(Ref.Storage.LOOSE, ref.getStorage());
-		ref = ref.getTarget();
+		ref = ((SymbolicRef)ref).getTarget();
 		assertEquals("refs/heads/master", ref.getName());
-		assertEquals(Ref.Storage.LOOSE, ref.getStorage());
+		assertEquals(Ref.Storage.LOOSE_PACKED, ref.getStorage());
 	}
 
 	public void testReadLooseRef() throws IOException {
@@ -148,7 +147,7 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		os.close();
 
 		ref = db.getRef("refs/heads/master");
-		assertEquals(Storage.LOOSE, ref.getStorage());
+		assertEquals(Storage.LOOSE_PACKED, ref.getStorage());
 	}
 
 	/**
@@ -168,7 +167,7 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertEquals(Result.FORCED, update);
 
 		ref = db.getRef("refs/heads/master");
-		assertEquals(Storage.LOOSE, ref.getStorage());
+		assertEquals(Storage.LOOSE_PACKED, ref.getStorage());
 	}
 
 	public void testResolvedNamesBranch() throws IOException {
@@ -179,10 +178,10 @@ public class RefTest extends SampleDataRepositoryTestCase {
 	public void testResolvedSymRef() throws IOException {
 		Ref ref = db.getRef(Constants.HEAD);
 		assertEquals(Constants.HEAD, ref.getName());
-		assertTrue("is symbolic ref", ref.isSymbolic());
+		assertTrue("is symbolic ref", ref instanceof SymbolicRef);
 		assertSame(Ref.Storage.LOOSE, ref.getStorage());
 
-		Ref dst = ref.getTarget();
+		Ref dst = ((SymbolicRef) ref).getTarget();
 		assertNotNull("has target", dst);
 		assertEquals("refs/heads/master", dst.getName());
 

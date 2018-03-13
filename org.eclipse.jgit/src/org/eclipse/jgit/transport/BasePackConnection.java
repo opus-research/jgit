@@ -210,10 +210,10 @@ abstract class BasePackConnection extends BaseConnection {
 				if (prior.getPeeledObjectId() != null)
 					throw duplicateAdvertisement(name + "^{}");
 
-				avail.put(name, new ObjectIdRef.PeeledTag(
-						Ref.Storage.NETWORK, name, prior.getObjectId(), id));
+				avail.put(name, new ObjectIdRef(Ref.Storage.NETWORK, name,
+						prior.getObjectId(), id, true));
 			} else {
-				final Ref prior = avail.put(name, new ObjectIdRef.PeeledNonTag(
+				final Ref prior = avail.put(name, new ObjectIdRef(
 						Ref.Storage.NETWORK, name, id));
 				if (prior != null)
 					throw duplicateAdvertisement(name);

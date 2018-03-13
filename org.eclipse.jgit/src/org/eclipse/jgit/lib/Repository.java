@@ -213,11 +213,15 @@ public class Repository {
 		}
 
 		if (workDir == null) {
-			String workTreeConfig = getConfig().getString("core", null, "worktree");
-			if (workTreeConfig != null) {
-				workDir = FS.resolve(d, workTreeConfig);
-			} else {
-				workDir = gitDir.getParentFile();
+			if (d != null) {
+				// Only read core.worktree if GIT_DIR is set explicitly. See
+				// git-config(1).
+				String workTreeConfig = getConfig().getString("core", null, "worktree");
+				if (workTreeConfig != null) {
+					workDir = FS.resolve(d, workTreeConfig);
+				} else {
+					workDir = gitDir.getParentFile();
+				}
 			}
 		}
 
@@ -911,10 +915,10 @@ public class Repository {
 	 * This is essentially the same as doing:
 	 *
 	 * <pre>
-	 * return getRef(Constants.HEAD).getTarget().getName()
+	 * return ((SymbolicRef)getRef(Constants.HEAD)).getTarget().getName()
 	 * </pre>
 	 *
-	 * Except when HEAD is detached, in which case this method returns the
+	 * Except when HEAD is detached in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
 	 * @return name of current branch (for example {@code refs/heads/master}) or
@@ -923,11 +927,9 @@ public class Repository {
 	 */
 	public String getFullBranch() throws IOException {
 		Ref head = getRef(Constants.HEAD);
-		if (head == null)
-			return null;
-		if (head.isSymbolic())
-			return head.getTarget().getName();
-		if (head.getObjectId() != null)
+		if (head instanceof SymbolicRef)
+			return ((SymbolicRef)head).getTarget().getName();
+		if (head != null && head.getObjectId() != null)
 			return head.getObjectId().name();
 		return null;
 	}
@@ -965,7 +967,7 @@ public class Repository {
 	}
 
 	/**
-	 * @return mutable map of all known refs (heads, tags, remotes).
+	 * @return all known refs (heads, tags, remotes).
 	 */
 	public Map<String, Ref> getAllRefs() {
 		try {
@@ -976,9 +978,8 @@ public class Repository {
 	}
 
 	/**
-	 * @return mutable map of all tags; key is short tag name ("v1.0") and value
-	 *         of the entry contains the ref with the full tag name
-	 *         ("refs/tags/v1.0").
+	 * @return all tags; key is short tag name ("v1.0") and value of the entry
+	 *         contains the ref with the full tag name ("refs/tags/v1.0").
 	 */
 	public Map<String, Ref> getTags() {
 		try {

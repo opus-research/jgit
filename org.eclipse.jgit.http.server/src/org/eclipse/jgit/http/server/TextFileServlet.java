@@ -55,7 +55,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 
 /** Sends a small text meta file from the repository. */
@@ -71,7 +70,7 @@ class TextFileServlet extends HttpServlet {
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
 		try {
-			rsp.setContentType(HttpSupport.TEXT_PLAIN);
+			rsp.setContentType("text/plain");
 			send(read(req), req, rsp);
 		} catch (FileNotFoundException noFile) {
 			rsp.sendError(SC_NOT_FOUND);

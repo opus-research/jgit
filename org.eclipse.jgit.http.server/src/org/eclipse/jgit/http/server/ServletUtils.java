@@ -44,10 +44,8 @@
 package org.eclipse.jgit.http.server;
 
 import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
-import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ETAG;
-import static org.eclipse.jgit.util.HttpSupport.TEXT_PLAIN;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -106,7 +104,7 @@ public final class ServletUtils {
 			throws IOException {
 		InputStream in = req.getInputStream();
 		final String enc = req.getHeader(HDR_CONTENT_ENCODING);
-		if (ENCODING_GZIP.equals(enc) || "x-gzip".equals(enc)) //$NON-NLS-1$
+		if (ENCODING_GZIP.equals(enc) || "x-gzip".equals(enc))
 			in = new GZIPInputStream(in);
 		else if (enc != null)
 			throw new IOException(HDR_CONTENT_ENCODING + " \"" + enc + "\""
@@ -139,9 +137,10 @@ public final class ServletUtils {
 	public static void sendPlainText(final String content,
 			final HttpServletRequest req, final HttpServletResponse rsp)
 			throws IOException {
-		final byte[] raw = content.getBytes(Constants.CHARACTER_ENCODING);
-		rsp.setContentType(TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
+		final String enc = Constants.CHARACTER_ENCODING;
+		final byte[] raw = content.getBytes(enc);
+		rsp.setContentType("text/plain");
+		rsp.setCharacterEncoding(enc);
 		send(raw, req, rsp);
 	}
 
@@ -190,7 +189,7 @@ public final class ServletUtils {
 	}
 
 	private static boolean acceptsGzipEncoding(final HttpServletRequest req) {
-		final String accepts = req.getHeader(HDR_ACCEPT_ENCODING);
+		final String accepts = req.getHeader(HDR_CONTENT_ENCODING);
 		return accepts != null && 0 <= accepts.indexOf(ENCODING_GZIP);
 	}
 
