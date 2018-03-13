@@ -47,7 +47,7 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 
 /** In-memory representation of a single note attached to one object. */
-class Note extends ObjectId {
+public class Note extends ObjectId {
 	private ObjectId data;
 
 	/**
@@ -58,12 +58,13 @@ class Note extends ObjectId {
 	 * @param noteData
 	 *            the actual note data contained in this note
 	 */
-	Note(AnyObjectId noteOn, ObjectId noteData) {
+	public Note(AnyObjectId noteOn, ObjectId noteData) {
 		super(noteOn);
 		data = noteData;
 	}
 
-	ObjectId getData() {
+	/** @return the note content */
+	public ObjectId getData() {
 		return data;
 	}
 

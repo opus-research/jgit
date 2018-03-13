@@ -42,6 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
+import java.util.Map;
+
+import org.eclipse.jgit.merge.ResolveMerger;
+import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
@@ -65,9 +69,17 @@ public class RebaseResult {
 		 */
 		STOPPED,
 		/**
+		 * Failed; the original HEAD was restored
+		 */
+		FAILED,
+		/**
 		 * Already up-to-date
 		 */
-		UP_TO_DATE;
+		UP_TO_DATE,
+		/**
+		 * Fast-forward, HEAD points to the new commit
+		 */
+		FAST_FORWARD;
 	}
 
 	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
@@ -77,14 +89,34 @@ public class RebaseResult {
 
 	private final RevCommit currentCommit;
 
+	private Map<String, MergeFailureReason> failingPaths;
+
 	RebaseResult(Status status) {
 		this.mySatus = status;
 		currentCommit = null;
 	}
 
+	/**
+	 * Create <code>RebaseResult</code> with status {@link Status#STOPPED}
+	 *
+	 * @param commit
+	 *            current commit
+	 */
 	RebaseResult(RevCommit commit) {
-		this.mySatus = Status.STOPPED;
+		mySatus = Status.STOPPED;
 		currentCommit = commit;
+	}
+
+	/**
+	 * Create <code>RebaseResult</code> with status {@link Status#FAILED}
+	 *
+	 * @param failingPaths
+	 *            list of paths causing this rebase to fail
+	 */
+	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
+		mySatus = Status.FAILED;
+		currentCommit = null;
+		this.failingPaths = failingPaths;
 	}
 
 	/**
@@ -100,5 +132,14 @@ public class RebaseResult {
 	 */
 	public RevCommit getCurrentCommit() {
 		return currentCommit;
+	}
+
+	/**
+	 * @return the list of paths causing this rebase to fail (see
+	 *         {@link ResolveMerger#getFailingPaths()} for details) if status is
+	 *         {@link Status#FAILED}, otherwise <code>null</code>
+	 */
+	public Map<String, MergeFailureReason> getFailingPaths() {
+		return failingPaths;
 	}
 }

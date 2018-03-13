@@ -43,28 +43,35 @@
 
 package org.eclipse.jgit.util;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-public class FileUtilTest extends TestCase {
+public class FileUtilTest {
 
 	private final File trash = new File(new File("target"), "trash");
 
-	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		assertTrue(trash.mkdirs());
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
+	@After
+	public void tearDown() throws Exception {
 		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
 	}
 
+	@Test
 	public void testDeleteFile() throws IOException {
 		File f = new File(trash, "test");
-		assertTrue(f.createNewFile());
+		FileUtils.createNewFile(f);
 		FileUtils.delete(f);
 		assertFalse(f.exists());
 
@@ -82,12 +89,13 @@ public class FileUtilTest extends TestCase {
 		}
 	}
 
+	@Test
 	public void testDeleteRecursive() throws IOException {
 		File f1 = new File(trash, "test/test/a");
-		f1.mkdirs();
-		f1.createNewFile();
+		FileUtils.mkdirs(f1.getParentFile());
+		FileUtils.createNewFile(f1);
 		File f2 = new File(trash, "test/test/b");
-		f2.createNewFile();
+		FileUtils.createNewFile(f2);
 		File d = new File(trash, "test");
 		FileUtils.delete(d, FileUtils.RECURSIVE);
 		assertFalse(d.exists());
@@ -106,6 +114,7 @@ public class FileUtilTest extends TestCase {
 		}
 	}
 
+	@Test
 	public void testMkdir() throws IOException {
 		File d = new File(trash, "test");
 		FileUtils.mkdir(d);
@@ -123,7 +132,7 @@ public class FileUtilTest extends TestCase {
 
 		assertTrue(d.delete());
 		File f = new File(trash, "test");
-		assertTrue(f.createNewFile());
+		FileUtils.createNewFile(f);
 		try {
 			FileUtils.mkdir(d);
 			fail("creation of directory having same path as existing file must"
@@ -134,6 +143,7 @@ public class FileUtilTest extends TestCase {
 		assertTrue(f.delete());
 	}
 
+	@Test
 	public void testMkdirs() throws IOException {
 		File root = new File(trash, "test");
 		assertTrue(root.mkdir());
@@ -154,7 +164,7 @@ public class FileUtilTest extends TestCase {
 
 		FileUtils.delete(root, FileUtils.RECURSIVE);
 		File f = new File(trash, "test");
-		assertTrue(f.createNewFile());
+		FileUtils.createNewFile(f);
 		try {
 			FileUtils.mkdirs(d);
 			fail("creation of directory having path conflicting with existing"
@@ -163,6 +173,21 @@ public class FileUtilTest extends TestCase {
 			// expected
 		}
 		assertTrue(f.delete());
+	}
+
+	public void testCreateNewFile() throws IOException {
+		File f = new File(trash, "x");
+		FileUtils.createNewFile(f);
+		assertTrue(f.exists());
+
+		try {
+			FileUtils.createNewFile(f);
+			fail("creation of already existing file must fail");
+		} catch (IOException e) {
+			// expected
+		}
+
+		FileUtils.delete(f);
 	}
 
 }
