@@ -49,8 +49,8 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collection;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
@@ -62,7 +62,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.internal.storage.file.GC;
@@ -77,9 +76,9 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.junit.TestRepository.CommitBuilder;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.EmptyProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref.Storage;
@@ -435,27 +434,6 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
-
-		// Do the gc again and check that it hasn't changed anything
-		gc.gc();
-		stats = gc.getStatistics();
-		assertEquals(0, stats.numberOfLooseObjects);
-		assertEquals(4, stats.numberOfPackedObjects);
-		assertEquals(1, stats.numberOfPackFiles);
-	}
-
-	@Test
-	public void testPackRepoWithCorruptReflog() throws Exception {
-		// create a reflog entry "0000... 0000... foobar" by doing an initial
-		// refupdate for HEAD which points to a non-existing ref. The
-		// All-Projects repo of gerrit instances had such entries
-		RefUpdate ru = repo.updateRef(Constants.HEAD);
-		ru.link("refs/to/garbage");
-		tr.branch("refs/heads/master").commit().add("A", "A").add("B", "B")
-				.create();
-		// make sure HEAD exists
-		Git.wrap(repo).checkout().setName("refs/heads/master").call();
-		gc.gc();
 	}
 
 	@Test
@@ -499,10 +477,9 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		assertEquals(4, ind2.getObjectCount());
 		for (MutableEntry e: ind1)
 			if (ind2.hasObject(e.toObjectId()))
-				assertFalse(
-						"the following object is in both packfiles: "
-								+ e.toObjectId(),
-						ind2.hasObject(e.toObjectId()));
+			assertFalse(
+					"the following object is in both packfiles: "
+							+ e.toObjectId(), ind2.hasObject(e.toObjectId()));
 	}
 
 	@Test
