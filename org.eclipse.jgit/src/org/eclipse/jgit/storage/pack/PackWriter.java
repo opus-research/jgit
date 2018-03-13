@@ -449,11 +449,11 @@ public class PackWriter {
 	}
 
 	/**
-	 * @param useBitmap
+	 * @param useBitmaps
 	 *            if set to true, bitmaps will be used when preparing a pack.
 	 */
-	public void setUseBitmaps(boolean useBitmap) {
-		useBitmaps = useBitmap;
+	public void setUseBitmaps(boolean useBitmaps) {
+		this.useBitmaps = useBitmaps;
 	}
 
 	/**
@@ -1553,10 +1553,9 @@ public class PackWriter {
 		if (!shallowPack && useBitmaps) {
 			BitmapIndex bitmapIndex = reader.getBitmapIndex();
 			if (bitmapIndex != null) {
-				PackWriterBitmapWalker bitmapWalker =
-						new PackWriterBitmapWalker(walker, bitmapIndex);
-				findObjectsToPackUsingBitmaps(
-						bitmapWalker, countingMonitor, want, have);
+				PackWriterBitmapWalker bitmapWalker = new PackWriterBitmapWalker(
+						walker, bitmapIndex, countingMonitor);
+				findObjectsToPackUsingBitmaps(bitmapWalker, want, have);
 				endPhase(countingMonitor);
 				stats.timeCounting = System.currentTimeMillis() - countingStart;
 				return;
@@ -1784,8 +1783,8 @@ public class PackWriter {
 	}
 
 	private void findObjectsToPackUsingBitmaps(
-			PackWriterBitmapWalker bitmapWalker, ProgressMonitor pm,
-			Set<? extends ObjectId> want, Set<? extends ObjectId> have)
+			PackWriterBitmapWalker bitmapWalker, Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null);
@@ -1794,12 +1793,9 @@ public class PackWriter {
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
 		if (useCachedPacks && reuseSupport != null
-				&& (excludeInPacks == null || excludeInPacks.length == 0)) {
+				&& (excludeInPacks == null || excludeInPacks.length == 0))
 			cachedPacks.addAll(
 					reuseSupport.getCachedPacksAndUpdate(needBitmap));
-			for (CachedPack cachedPack : cachedPacks)
-				pm.update((int) cachedPack.getObjectCount());
-		}
 
 		for (BitmapObject obj : needBitmap) {
 			ObjectId objectId = obj.getObjectId();
@@ -1808,7 +1804,6 @@ public class PackWriter {
 				continue;
 			}
 			addObject(objectId, obj.getType(), 0);
-			pm.update(1);
 		}
 
 		if (thin)
