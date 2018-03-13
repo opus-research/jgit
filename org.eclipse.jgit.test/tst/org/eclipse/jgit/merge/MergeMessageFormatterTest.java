@@ -42,15 +42,20 @@
  */
 package org.eclipse.jgit.merge;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.util.Arrays;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.SymbolicRef;
+import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.lib.Ref.Storage;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Test construction of merge message by {@link MergeMessageFormatter}.
@@ -60,7 +65,8 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 	private MergeMessageFormatter formatter;
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 
 		RefUpdate createRemoteRefA = db
@@ -76,6 +82,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 		formatter = new MergeMessageFormatter();
 	}
 
+	@Test
 	public void testOneBranch() throws IOException {
 		Ref a = db.getRef("refs/heads/a");
 		Ref master = db.getRef("refs/heads/master");
@@ -83,6 +90,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 		assertEquals("Merge branch 'a'", message);
 	}
 
+	@Test
 	public void testTwoBranches() throws IOException {
 		Ref a = db.getRef("refs/heads/a");
 		Ref b = db.getRef("refs/heads/b");
@@ -91,6 +99,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 		assertEquals("Merge branches 'a' and 'b'", message);
 	}
 
+	@Test
 	public void testThreeBranches() throws IOException {
 		Ref c = db.getRef("refs/heads/c");
 		Ref b = db.getRef("refs/heads/b");
@@ -100,6 +109,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 		assertEquals("Merge branches 'c', 'b' and 'a'", message);
 	}
 
+	@Test
 	public void testRemoteBranch() throws Exception {
 		Ref remoteA = db.getRef("refs/remotes/origin/remote-a");
 		Ref master = db.getRef("refs/heads/master");
@@ -107,6 +117,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 		assertEquals("Merge remote branch 'origin/remote-a'", message);
 	}
 
+	@Test
 	public void testMixed() throws IOException {
 		Ref c = db.getRef("refs/heads/c");
 		Ref remoteA = db.getRef("refs/remotes/origin/remote-a");
@@ -116,6 +127,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 				message);
 	}
 
+	@Test
 	public void testTag() throws IOException {
 		Ref tagA = db.getRef("refs/tags/A");
 		Ref master = db.getRef("refs/heads/master");
@@ -123,6 +135,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 		assertEquals("Merge tag 'A'", message);
 	}
 
+	@Test
 	public void testCommit() throws IOException {
 		ObjectId objectId = ObjectId
 				.fromString("6db9c2ebf75590eef973081736730a9ea169a0c4");
@@ -134,6 +147,7 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 				message);
 	}
 
+	@Test
 	public void testPullWithUri() throws IOException {
 		String name = "branch 'test' of http://egit.eclipse.org/jgit.git";
 		ObjectId objectId = ObjectId
@@ -146,10 +160,29 @@ public class MergeMessageFormatterTest extends SampleDataRepositoryTestCase {
 				message);
 	}
 
+	@Test
 	public void testIntoOtherThanMaster() throws IOException {
 		Ref a = db.getRef("refs/heads/a");
 		Ref b = db.getRef("refs/heads/b");
 		String message = formatter.format(Arrays.asList(a), b);
 		assertEquals("Merge branch 'a' into b", message);
+	}
+
+	@Test
+	public void testIntoHeadOtherThanMaster() throws IOException {
+		Ref a = db.getRef("refs/heads/a");
+		Ref b = db.getRef("refs/heads/b");
+		SymbolicRef head = new SymbolicRef("HEAD", b);
+		String message = formatter.format(Arrays.asList(a), head);
+		assertEquals("Merge branch 'a' into b", message);
+	}
+
+	@Test
+	public void testIntoSymbolicRefHeadPointingToMaster() throws IOException {
+		Ref a = db.getRef("refs/heads/a");
+		Ref master = db.getRef("refs/heads/master");
+		SymbolicRef head = new SymbolicRef("HEAD", master);
+		String message = formatter.format(Arrays.asList(a), head);
+		assertEquals("Merge branch 'a'", message);
 	}
 }

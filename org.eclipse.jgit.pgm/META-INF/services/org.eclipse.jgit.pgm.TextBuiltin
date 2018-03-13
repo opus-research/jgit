@@ -1,6 +1,8 @@
 org.eclipse.jgit.pgm.Add
 org.eclipse.jgit.pgm.AmazonS3Client
+org.eclipse.jgit.pgm.Blame
 org.eclipse.jgit.pgm.Branch
+org.eclipse.jgit.pgm.Checkout
 org.eclipse.jgit.pgm.Clone
 org.eclipse.jgit.pgm.Commit
 org.eclipse.jgit.pgm.Daemon
@@ -13,6 +15,7 @@ org.eclipse.jgit.pgm.Init
 org.eclipse.jgit.pgm.Log
 org.eclipse.jgit.pgm.LsRemote
 org.eclipse.jgit.pgm.LsTree
+org.eclipse.jgit.pgm.Merge
 org.eclipse.jgit.pgm.MergeBase
 org.eclipse.jgit.pgm.Push
 org.eclipse.jgit.pgm.ReceivePack

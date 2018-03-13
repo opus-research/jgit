@@ -50,12 +50,12 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>jgit.tycho.parent</artifactId>
-    <version>0.10.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.source.feature</artifactId>
   <packaging>eclipse-feature</packaging>
 
-  <name>JGit Source Feature (Incubation)</name>
+  <name>JGit Source Feature</name>
 
 </project>

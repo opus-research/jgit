@@ -54,6 +54,38 @@ package org.eclipse.jgit.diff;
  */
 public abstract class DiffAlgorithm {
 	/**
+	 * Supported diff algorithm
+	 */
+	public enum SupportedAlgorithm {
+		/**
+		 * Myers diff algorithm
+		 */
+		MYERS,
+
+		/**
+		 * Histogram diff algorithm
+		 */
+		HISTOGRAM
+	}
+
+	/**
+	 * @param alg
+	 *            the diff algorithm for which an implementation should be
+	 *            returned
+	 * @return an implementation of the specified diff algorithm
+	 */
+	public static DiffAlgorithm getAlgorithm(SupportedAlgorithm alg) {
+		switch (alg) {
+		case MYERS:
+			return MyersDiff.INSTANCE;
+		case HISTOGRAM:
+			return new HistogramDiff();
+		default:
+			throw new IllegalArgumentException();
+		}
+	}
+
+	/**
 	 * Compare two sequences and identify a list of edits between them.
 	 *
 	 * @param <S>
@@ -94,7 +126,7 @@ public abstract class DiffAlgorithm {
 			Edit last = e.get(e.size() - 1);
 			if (last.getType() == Edit.Type.INSERT) {
 				while (last.endB < b.size()
-						&& cmp.equals(b, last.beginB, b, region.endB)) {
+						&& cmp.equals(b, last.beginB, b, last.endB)) {
 					last.beginA++;
 					last.endA++;
 					last.beginB++;

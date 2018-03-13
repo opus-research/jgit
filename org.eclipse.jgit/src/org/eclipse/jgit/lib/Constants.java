@@ -240,6 +240,12 @@ public final class Constants {
 	/** Prefix for tag refs */
 	public static final String R_TAGS = "refs/tags/";
 
+	/** Prefix for notes refs */
+	public static final String R_NOTES = "refs/notes/";
+
+	/** Standard notes ref */
+	public static final String R_NOTES_COMMITS = R_NOTES + "commits";
+
 	/** Prefix for any ref */
 	public static final String R_REFS = "refs/";
 
@@ -288,7 +294,7 @@ public final class Constants {
 	/**
 	 * The environment variable that tells us which file holds the Git index.
 	 */
-	public static final String GIT_INDEX_KEY = "GIT_INDEX";
+	public static final String GIT_INDEX_FILE_KEY = "GIT_INDEX_FILE";
 
 	/**
 	 * The environment variable that tells us where objects are stored
@@ -529,6 +535,9 @@ public final class Constants {
 
 	/** name of the file containing the IDs of the parents of a merge commit */
 	public static final String MERGE_HEAD = "MERGE_HEAD";
+
+	/** name of the file containing the ID of a cherry pick commit in case of conflicts */
+	public static final String CHERRY_PICK_HEAD = "CHERRY_PICK_HEAD";
 
 	/**
 	 * name of the ref ORIG_HEAD used by certain commands to store the original
