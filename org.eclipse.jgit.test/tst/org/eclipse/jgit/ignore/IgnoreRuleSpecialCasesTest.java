@@ -836,12 +836,6 @@ public class IgnoreRuleSpecialCasesTest {
 	}
 
 	@Test
-	public void testEscapedTrailingSpaces() throws Exception {
-		assertMatch("\\ ", " ", true);
-		assertMatch("a\\ ", "a ", true);
-	}
-
-	@Test
 	public void testNotEscapingBackslash() throws Exception {
 		assertMatch("\\out", "\\out", true);
 		assertMatch("\\out", "a/\\out", true);
