@@ -159,7 +159,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
 		workdir.mkdir();
-		Repository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.getConfig().setString("core", null, "worktree",
 				workdir.getAbsolutePath());
@@ -184,7 +184,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
 		workdir.mkdir();
-		Repository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.getConfig()
 				.setString("core", null, "worktree", "../../rw");
@@ -283,7 +283,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	}
 
 	public void test005_ReadSimpleConfig() {
-		final RepositoryConfig c = db.getConfig();
+		final Config c = db.getConfig();
 		assertNotNull(c);
 		assertEquals("0", c.getString("core", null, "repositoryformatversion"));
 		assertEquals("0", c.getString("CoRe", null, "REPOSITORYFoRmAtVeRsIoN"));
@@ -294,8 +294,8 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 
 	public void test006_ReadUglyConfig() throws IOException,
 			ConfigInvalidException {
-		final RepositoryConfig c = db.getConfig();
 		final File cfg = new File(db.getDirectory(), "config");
+		final FileBasedConfig c = new FileBasedConfig(cfg);
 		final FileWriter pw = new FileWriter(cfg);
 		final String configStr = "  [core];comment\n\tfilemode = yes\n"
 				+ "[user]\n"
@@ -321,7 +321,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	}
 
 	public void test007_Open() throws IOException {
-		final Repository db2 = new FileRepository(db.getDirectory());
+		final FileRepository db2 = new FileRepository(db.getDirectory());
 		assertEquals(db.getDirectory(), db2.getDirectory());
 		assertEquals(db.getObjectsDirectory(), db2.getObjectsDirectory());
 		assertNotSame(db.getConfig(), db2.getConfig());
@@ -345,11 +345,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		}
 	}
 
-	public void test009_CreateCommitOldFormat() throws IOException,
-			ConfigInvalidException {
-		writeTrashFile(".git/config", "[core]\n" + "legacyHeaders=1\n");
-		db.getConfig().load();
-
+	public void test009_CreateCommitOldFormat() throws IOException {
 		final Tree t = new Tree(db);
 		final FileTreeEntry f = t.addFile("i-am-a-file");
 		writeTrashFile(f.getName(), "and this is the data in me\n");
