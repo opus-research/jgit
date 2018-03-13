@@ -258,7 +258,7 @@ class Blame extends TextBuiltin {
 		else if (beginStr.startsWith("/"))
 			begin = findLine(0, beginStr);
 		else
-			begin = Integer.parseInt(beginStr);
+			begin = Math.max(0, Integer.parseInt(beginStr) - 1);
 
 		if (endStr.equals(""))
 			end = blame.getResultContents().size();
@@ -269,7 +269,7 @@ class Blame extends TextBuiltin {
 		else if (endStr.startsWith("+"))
 			end = begin + Integer.parseInt(endStr.substring(1));
 		else
-			end = Integer.parseInt(endStr);
+			end = Math.max(0, Integer.parseInt(endStr) - 1);
 	}
 
 	private int findLine(int b, String regex) {
