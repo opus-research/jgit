@@ -79,7 +79,7 @@ public interface UploadSession {
 	/**
 	 * Explicitly set advertised refs.
 	 * <p>
-	 * May be called by the configured {@link #getAdvertisedRefsHook()}. If called
+	 * May be called by the configured {@link #getAdvertiseRefsHook()}. If called
 	 * with {@code null} or not called at all by the hook, all refs are
 	 * advertised.
 	 *
@@ -102,7 +102,7 @@ public interface UploadSession {
 	public RequestPolicy getRequestPolicy();
 
 	/** @return the hook used while advertising the refs to the client */
-	public AdvertiseRefsHook getAdvertisedRefsHook();
+	public AdvertiseRefsHook getAdvertiseRefsHook();
 
 	/** @return the configured upload hook. */
 	public PreUploadHook getPreUploadHook();

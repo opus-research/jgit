@@ -76,7 +76,7 @@ public interface ReceiveSession {
 	/**
 	 * Explicitly set advertised refs.
 	 * <p>
-	 * May be called by the configured {@link #getAdvertisedRefsHook()}.
+	 * May be called by the configured {@link #getAdvertiseRefsHook()}.
 	 *
 	 * @param allRefs
 	 *            explicit set of references to claim as advertised by this
@@ -125,7 +125,7 @@ public interface ReceiveSession {
 	public PersonIdent getRefLogIdent();
 
 	/** @return the hook used while advertising the refs to the client */
-	public AdvertiseRefsHook getAdvertisedRefsHook();
+	public AdvertiseRefsHook getAdvertiseRefsHook();
 
 	/** @return get the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook();

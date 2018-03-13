@@ -399,7 +399,7 @@ public class ReceivePack implements ReceiveSession {
 	}
 
 	/** @return the hook used while advertising the refs to the client */
-	public AdvertiseRefsHook getAdvertisedRefsHook() {
+	public AdvertiseRefsHook getAdvertiseRefsHook() {
 		return advertiseRefsHook;
 	}
 

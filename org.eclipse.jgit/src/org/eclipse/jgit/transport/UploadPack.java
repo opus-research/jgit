@@ -307,7 +307,7 @@ public class UploadPack implements UploadSession {
 		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
 	}
 
-	public AdvertiseRefsHook getAdvertisedRefsHook() {
+	public AdvertiseRefsHook getAdvertiseRefsHook() {
 		return advertiseRefsHook;
 	}
 
@@ -539,6 +539,7 @@ public class UploadPack implements UploadSession {
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
 			ServiceMayNotContinueException {
 		try {
+			preUploadHook.onPreAdvertiseRefs(this);
 			advertiseRefsHook.advertiseRefs(this);
 		} catch (ServiceMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
