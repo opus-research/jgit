@@ -44,15 +44,17 @@
 package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.transport.SubscribeCommand.Command;
@@ -61,7 +63,6 @@ import org.junit.Test;
 
 /** Subscriber tests. */
 public class SubscribeTest extends SampleDataRepositoryTestCase {
-
 	PubSubConfig.Publisher publisherConfig;
 
 	@Override
@@ -157,9 +158,26 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		SubscribedRepository r = new SubscribedRepository(publisherConfig
 				.getSubscriber("origin", db.getDirectory().getAbsolutePath()));
 		r.setUpRefs();
-		assertTrue(null != db.getRef("refs/pubsub/origin/heads/master"));
-		assertTrue(null != db.getRef("refs/pubsub/origin/tags/A"));
-		assertTrue(null != db.getRef("refs/pubsub/origin/tags/B"));
+		Set<String> keys = db.getRefDatabase()
+				.getRefs("refs/pubsub/origin/").keySet();
+		assertEquals(13, keys.size());
+		assertNotNull(db.getRef("refs/pubsub/origin/heads/master"));
+		assertNotNull(db.getRef("refs/pubsub/origin/tags/A"));
+		assertNotNull(db.getRef("refs/pubsub/origin/tags/B"));
+	}
+
+	@Test
+	public void testRefRemove() throws Exception {
+		SubscribedRepository r = new SubscribedRepository(publisherConfig
+				.getSubscriber("origin", db.getDirectory().getAbsolutePath()));
+		r.setUpRefs();
+		List<RefSpec> newSpecs = new ArrayList<RefSpec>();
+		newSpecs.add(new RefSpec("refs/tags/*:refs/doesntmatter/*"));
+		r.setSubscribeSpecs(newSpecs);
+		r.setUpRefs();
+		assertNull(db.getRef("refs/pubsub/origin/heads/master"));
+		assertNotNull(db.getRef("refs/pubsub/origin/tags/A"));
+		assertNotNull(db.getRef("refs/pubsub/origin/tags/B"));
 	}
 
 	@Test
@@ -167,13 +185,15 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		SubscribedRepository r = new SubscribedRepository(publisherConfig
 				.getSubscriber("origin", db.getDirectory().getAbsolutePath()));
 		r.setUpRefs();
-		Map<String, Ref> refs = r.getRemoteRefs();
-		assertTrue(refs.containsKey("refs/heads/master"));
-		assertTrue(refs.containsKey("refs/tags/A"));
+		Set<String> refs = r.getRemoteRefs().keySet();
+		assertEquals(13, refs.size());
+		assertTrue(refs.contains("refs/heads/master"));
+		assertTrue(refs.contains("refs/tags/A"));
 
-		Map<String, Ref> pubsubRefs = r.getPubSubRefs();
-		assertTrue(pubsubRefs.containsKey("refs/heads/master"));
-		assertTrue(pubsubRefs.containsKey("refs/tags/A"));
+		Set<String> pubsubRefs = r.getPubSubRefs().keySet();
+		assertEquals(13, pubsubRefs.size());
+		assertTrue(pubsubRefs.contains("refs/heads/master"));
+		assertTrue(pubsubRefs.contains("refs/tags/A"));
 	}
 
 	@Test

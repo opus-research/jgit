@@ -217,7 +217,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	public void testBadRestart() throws Exception {
 		// Setup client
 		subscriber.setRestartToken("badtoken");
-		subscriber.setRestartSequence("0");
+		subscriber.setLastPackNumber("0");
 		// Setup server response
 		publisherLineOut.writeString("reconnect");
 		try {
@@ -246,7 +246,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 			// Stream timeout
 		}
 		assertEquals("server-token", subscriber.getRestartToken());
-		assertTrue(null == subscriber.getRestartSequence());
+		assertTrue(null == subscriber.getLastPackNumber());
 	}
 
 	@Test
@@ -267,7 +267,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		String tagId = db.getRef("refs/pubsub/origin/tags/pubsubtest")
 				.getLeaf().getObjectId().name();
 		assertEquals(id.name(), tagId);
-		assertEquals("1234", subscriber.getRestartSequence());
+		assertEquals("1234", subscriber.getLastPackNumber());
 	}
 
 	@Test
@@ -297,7 +297,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		String pubsubId2 = db.getRef("refs/pubsub/origin/heads/pubsub2")
 				.getLeaf().getObjectId().name();
 		assertEquals(id2.name(), pubsubId2);
-		assertEquals("5678", subscriber.getRestartSequence());
+		assertEquals("5678", subscriber.getLastPackNumber());
 	}
 
 	private void writeHeartbeat() throws IOException {
