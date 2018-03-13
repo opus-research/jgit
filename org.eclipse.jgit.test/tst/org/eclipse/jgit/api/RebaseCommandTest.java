@@ -53,7 +53,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.EnumSet;
 
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.RebaseCommand.Action;
@@ -214,7 +213,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		checkoutBranch("refs/heads/topic");
 		MergeResult result = git.merge().include(sideCommit.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
-		assertEquals(EnumSet.of(MergeStatus.MERGED), result.getMergeStatus());
+		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 
 		try {
 			RebaseResult rebase = git.rebase().setUpstream("refs/heads/master")
@@ -1426,7 +1425,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		checkoutBranch("refs/heads/master");
 		MergeResult result = git.merge().include(fourth.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
-		assertEquals(EnumSet.of(MergeStatus.MERGED), result.getMergeStatus());
+		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 
 		// switch back to topic branch and rebase it onto master
 		checkoutBranch("refs/heads/topic");

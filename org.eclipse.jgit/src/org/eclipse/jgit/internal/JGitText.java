@@ -484,12 +484,14 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceIsNotAWildcard;
 	/***/ public String sourceRefDoesntResolveToAnyObject;
 	/***/ public String sourceRefNotSpecifiedForRefspec;
-	/***/ public String squashCommitNotUpdatingHEAD;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyOnUnsafeRepository;
 	/***/ public String stashCommitMissingTwoParents;
+	/***/ public String stashDropDeleteRefFailed;
+	/***/ public String stashDropFailed;
+	/***/ public String stashDropMissingReflog;
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
@@ -534,6 +536,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unexpectedRefReport;
 	/***/ public String unexpectedReportLine;
 	/***/ public String unexpectedReportLine2;
+	/***/ public String unknownOrUnsupportedCommand;
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;

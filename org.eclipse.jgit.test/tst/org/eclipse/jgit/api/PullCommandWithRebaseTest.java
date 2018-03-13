@@ -52,7 +52,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.EnumSet;
 
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
@@ -140,7 +139,7 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 		// merge side into master
 		MergeResult result = source.merge().include(sideCommit.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
-		assertEquals(EnumSet.of(MergeStatus.MERGED), result.getMergeStatus());
+		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 
 	}
 
