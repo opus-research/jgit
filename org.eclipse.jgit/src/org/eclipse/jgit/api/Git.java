@@ -242,16 +242,6 @@ public class Git {
 	}
 
 	/**
-	 *
-	 * Returns a command object used to list tags
-	 *
-	 * @return a {@link ListTagCommand}
-	 */
-	public ListTagCommand tagList() {
-		return new ListTagCommand(repo);
-	}
-
-	/**
 	 * Returns a command object used to rename branches
 	 *
 	 * @return a {@link RenameBranchCommand}
@@ -502,6 +492,15 @@ public class Git {
 	 */
 	public DiffCommand diff() {
 		return new DiffCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to delete tags
+	 *
+	 * @return a {@link DeleteBranchCommand}
+	 */
+	public DeleteTagCommand tagDelete() {
+		return new DeleteTagCommand(repo);
 	}
 
 	/**

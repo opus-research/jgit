@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Ketan Padegaonkar <ketanpadegaonkar@gmail.com>
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,53 +43,98 @@
 package org.eclipse.jgit.api;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 
 /**
- * Used to obtain a list of tags.
+ * Used to delete one or several tags.
+ *
+ * The result of {@link #call()} is a list with the (full) names of the deleted
+ * tags.
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
  *      >Git documentation about Tag</a>
  */
-public class ListTagCommand extends GitCommand<List<Ref>> {
+public class DeleteTagCommand extends GitCommand<List<String>> {
+
+	private final Set<String> tags = new HashSet<String>();
 
 	/**
 	 * @param repo
 	 */
-	protected ListTagCommand(Repository repo) {
+	protected DeleteTagCommand(Repository repo) {
 		super(repo);
 	}
 
 	/**
 	 * @throws JGitInternalException
-	 *             upon internal failure
+	 *             when trying to delete a tag that doesn't exist
+	 *
+	 * @return the list with the full names of the deleted tags
 	 */
-	public List<Ref> call() throws JGitInternalException {
+	public List<String> call() throws JGitInternalException {
 		checkCallable();
-		Map<String, Ref> refList;
+		List<String> result = new ArrayList<String>();
+		if (tags.isEmpty())
+			return result;
 		try {
-			refList = repo.getRefDatabase().getRefs(Constants.R_TAGS);
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
-		List<Ref> resultRefs = new ArrayList<Ref>();
-		resultRefs.addAll(refList.values());
-		Collections.sort(resultRefs, new Comparator<Ref>() {
-			public int compare(Ref o1, Ref o2) {
-				return o1.getName().compareTo(o2.getName());
+			setCallable(false);
+			for (String tagName : tags) {
+				if (tagName == null)
+					continue;
+				Ref currentRef = repo.getRef(tagName);
+				if (currentRef == null)
+					continue;
+				String fullName = currentRef.getName();
+				RefUpdate update = repo.updateRef(fullName);
+				update.setForceUpdate(true);
+				Result deleteResult = update.delete();
+
+				boolean ok = true;
+				switch (deleteResult) {
+				case IO_FAILURE:
+				case LOCK_FAILURE:
+				case REJECTED:
+					ok = false;
+					break;
+				default:
+					break;
+				}
+
+				if (ok) {
+					result.add(fullName);
+				} else
+					throw new JGitInternalException(MessageFormat.format(
+							JGitText.get().deleteTagUnexpectedResult,
+							deleteResult.name()));
 			}
-		});
-		setCallable(false);
-		return resultRefs;
+			return result;
+		} catch (IOException ioe) {
+			throw new JGitInternalException(ioe.getMessage(), ioe);
+		}
 	}
 
+	/**
+	 * @param tags
+	 *            the names of the tags to delete; if not set, this will do
+	 *            nothing; invalid tag names will simply be ignored
+	 * @return this instance
+	 */
+	public DeleteTagCommand setTags(String... tags) {
+		checkCallable();
+		this.tags.clear();
+		for (String tagName : tags)
+			this.tags.add(tagName);
+		return this;
+	}
 }
