@@ -126,7 +126,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notATagVersionIsRequired;
 	/***/ public String notATree;
 	/***/ public String notAValidRefName;
-	/***/ public String notAValidObjectName;
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;

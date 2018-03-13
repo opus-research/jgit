@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Ketan Padegaonkar <KetanPadegaonkar@gmail.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.events;
 
-import junit.framework.TestCase;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
-public class ConstantsTest extends TestCase {
+public class ConfigChangeEventTest extends RepositoryTestCase {
+	public void testFileRepository_ChangeEventsOnlyOnSave() throws Exception {
+		final ConfigChangedEvent[] events = new ConfigChangedEvent[1];
+		db.getListenerList().addConfigChangedListener(
+				new ConfigChangedListener() {
+					public void onConfigChanged(ConfigChangedEvent event) {
+						events[0] = event;
+					}
+				});
+		FileBasedConfig config = db.getConfig();
+		assertNull(events[0]);
 
-	public void testShouldConvertStringsToIntegerTypes() throws Exception {
-		assertTypeCode(Constants.OBJ_BLOB, Constants.TYPE_BLOB);
-		assertTypeCode(Constants.OBJ_COMMIT, Constants.TYPE_COMMIT);
-		assertTypeCode(Constants.OBJ_TREE, Constants.TYPE_TREE);
-		assertTypeCode(Constants.OBJ_TAG, Constants.TYPE_TAG);
-	}
+		// set a value to some arbitrary key
+		config.setString("test", "section", "event", "value");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 
-	public void testShouldThrowExceptionWhenConvertingInvalidTypeCodeToString() throws Exception {
-		try {
-			Constants.typeCode("foo");
-			fail("Was expecting an exception!");
-		} catch (IllegalArgumentException e) {
-			assertEquals("Bad object type: foo", e.getMessage());
-		}
-	}
+		// reset for the next test
+		events[0] = null;
 
-	public void testShouldThrowExceptionWhenConvertingInvalidTypeStringToCode() throws Exception {
-		try {
-			Constants.typeString(-1);
-			fail("Was expecting an exception!");
-		} catch (IllegalArgumentException e) {
-			assertEquals("Bad object type: -1", e.getMessage());
-		}
-	}
-
-	private void assertTypeCode(int typeCode, String typeString) {
-		assertEquals(typeCode, Constants.typeCode(typeString));
-		assertEquals(typeString, Constants.typeString(typeCode));
+		// unset the value we have just set above
+		config.unset("test", "section", "event");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 	}
 }
