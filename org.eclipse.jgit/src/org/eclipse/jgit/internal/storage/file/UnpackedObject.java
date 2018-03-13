@@ -91,8 +91,11 @@ public class UnpackedObject {
 	 */
 	public static ObjectLoader parse(byte[] raw, AnyObjectId id)
 			throws IOException {
-		try (WindowCursor wc = new WindowCursor(null)) {
+		WindowCursor wc = new WindowCursor(null);
+		try {
 			return open(new ByteArrayInputStream(raw), null, id, wc);
+		} finally {
+			wc.release();
 		}
 	}
 

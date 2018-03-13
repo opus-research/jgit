@@ -136,8 +136,8 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * Typical usage consists of creating instance intended for some pack,
  * configuring options, preparing the list of objects by calling
  * {@link #preparePack(Iterator)} or
- * {@link #preparePack(ProgressMonitor, Set, Set)}, and finally producing the
- * stream with
+ * {@link #preparePack(ProgressMonitor, Collection, Collection)}, and finally
+ * producing the stream with
  * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
  * </p>
  * <p>
@@ -293,7 +293,7 @@ public class PackWriter implements AutoCloseable {
 	 * Create writer for specified repository.
 	 * <p>
 	 * Objects for packing are specified in {@link #preparePack(Iterator)} or
-	 * {@link #preparePack(ProgressMonitor, Set, Set)}.
+	 * {@link #preparePack(ProgressMonitor, Collection, Collection)}.
 	 *
 	 * @param repo
 	 *            repository where objects are stored.
@@ -306,7 +306,7 @@ public class PackWriter implements AutoCloseable {
 	 * Create a writer to load objects from the specified reader.
 	 * <p>
 	 * Objects for packing are specified in {@link #preparePack(Iterator)} or
-	 * {@link #preparePack(ProgressMonitor, Set, Set)}.
+	 * {@link #preparePack(ProgressMonitor, Collection, Collection)}.
 	 *
 	 * @param reader
 	 *            reader to read from the repository with.
@@ -319,7 +319,7 @@ public class PackWriter implements AutoCloseable {
 	 * Create writer for specified repository.
 	 * <p>
 	 * Objects for packing are specified in {@link #preparePack(Iterator)} or
-	 * {@link #preparePack(ProgressMonitor, Set, Set)}.
+	 * {@link #preparePack(ProgressMonitor, Collection, Collection)}.
 	 *
 	 * @param repo
 	 *            repository where objects are stored.
@@ -334,7 +334,7 @@ public class PackWriter implements AutoCloseable {
 	 * Create writer with a specified configuration.
 	 * <p>
 	 * Objects for packing are specified in {@link #preparePack(Iterator)} or
-	 * {@link #preparePack(ProgressMonitor, Set, Set)}.
+	 * {@link #preparePack(ProgressMonitor, Collection, Collection)}.
 	 *
 	 * @param config
 	 *            configuration for the pack writer.
@@ -495,7 +495,7 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * @return true to ignore objects that are uninteresting and also not found
 	 *         on local disk; false to throw a {@link MissingObjectException}
-	 *         out of {@link #preparePack(ProgressMonitor, Set, Set)} if an
+	 *         out of {@link #preparePack(ProgressMonitor, Collection, Collection)} if an
 	 *         uninteresting object is not in the source repository. By default,
 	 *         true, permitting gracefully ignoring of uninteresting objects.
 	 */
@@ -646,6 +646,86 @@ public class PackWriter implements AutoCloseable {
 		while (objectsSource.hasNext()) {
 			addObject(objectsSource.next());
 		}
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Basing on these 2 sets, another set of objects to put in a pack file is
+	 * created: this set consists of all objects reachable (ancestors) from
+	 * interesting objects, except uninteresting objects and their ancestors.
+	 * This method uses class {@link ObjectWalk} extensively to find out that
+	 * appropriate set of output objects and their optimal order in output pack.
+	 * Order is consistent with general git in-pack rules: sort by object type,
+	 * recency, path and delta-base first.
+	 * </p>
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param want
+	 *            collection of objects to be marked as interesting (start
+	 *            points of graph traversal).
+	 * @param have
+	 *            collection of objects to be marked as uninteresting (end
+	 *            points of graph traversal).
+	 * @throws IOException
+	 *             when some I/O problem occur during reading objects.
+	 * @deprecated to be removed in 2.0; use the Set version of this method.
+	 */
+	@Deprecated
+	public void preparePack(ProgressMonitor countingMonitor,
+			final Collection<? extends ObjectId> want,
+			final Collection<? extends ObjectId> have) throws IOException {
+		preparePack(countingMonitor, ensureSet(want), ensureSet(have));
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Basing on these 2 sets, another set of objects to put in a pack file is
+	 * created: this set consists of all objects reachable (ancestors) from
+	 * interesting objects, except uninteresting objects and their ancestors.
+	 * This method uses class {@link ObjectWalk} extensively to find out that
+	 * appropriate set of output objects and their optimal order in output pack.
+	 * Order is consistent with general git in-pack rules: sort by object type,
+	 * recency, path and delta-base first.
+	 * </p>
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param walk
+	 *            ObjectWalk to perform enumeration.
+	 * @param interestingObjects
+	 *            collection of objects to be marked as interesting (start
+	 *            points of graph traversal).
+	 * @param uninterestingObjects
+	 *            collection of objects to be marked as uninteresting (end
+	 *            points of graph traversal).
+	 * @throws IOException
+	 *             when some I/O problem occur during reading objects.
+	 * @deprecated to be removed in 2.0; use the Set version of this method.
+	 */
+	@Deprecated
+	public void preparePack(ProgressMonitor countingMonitor,
+			ObjectWalk walk,
+			final Collection<? extends ObjectId> interestingObjects,
+			final Collection<? extends ObjectId> uninterestingObjects)
+			throws IOException {
+		preparePack(countingMonitor, walk,
+				ensureSet(interestingObjects),
+				ensureSet(uninterestingObjects));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Set<ObjectId> ensureSet(Collection<? extends ObjectId> objs) {
+		Set<ObjectId> set;
+		if (objs instanceof Set<?>)
+			set = (Set<ObjectId>) objs;
+		else if (objs == null)
+			set = Collections.emptySet();
+		else
+			set = new HashSet<ObjectId>(objs);
+		return set;
 	}
 
 	/**
@@ -968,7 +1048,7 @@ public class PackWriter implements AutoCloseable {
 				stats.reusedObjects += pack.getObjectCount();
 				stats.reusedDeltas += deltaCnt;
 				stats.totalDeltas += deltaCnt;
-				reuseSupport.copyPackAsIs(out, pack);
+				reuseSupport.copyPackAsIs(out, pack, reuseValidate);
 			}
 			writeChecksum(out);
 			out.flush();
@@ -987,7 +1067,7 @@ public class PackWriter implements AutoCloseable {
 		}
 
 		stats.totalBytes = out.length();
-		reader.close();
+		reader.release();
 		endPhase(writeMonitor);
 	}
 
@@ -1003,6 +1083,14 @@ public class PackWriter implements AutoCloseable {
 	/** @return snapshot of the current state of this PackWriter. */
 	public State getState() {
 		return state.snapshot();
+	}
+
+	/**
+	 * Release all resources used by this writer. Use {@link #close()} instead.
+	 */
+	@Deprecated
+	public void release() {
+		close();
 	}
 
 	/**
@@ -1579,6 +1667,8 @@ public class PackWriter implements AutoCloseable {
 		stats.interestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(want));
 		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(have));
 
+		walker.setRetainBody(false);
+
 		canBuildBitmaps = config.isBuildBitmaps()
 				&& !shallowPack
 				&& have.isEmpty()
@@ -1591,7 +1681,6 @@ public class PackWriter implements AutoCloseable {
 				findObjectsToPackUsingBitmaps(bitmapWalker, want, have);
 				endPhase(countingMonitor);
 				stats.timeCounting = System.currentTimeMillis() - countingStart;
-				stats.bitmapIndexMisses = bitmapWalker.getCountOfBitmapIndexMisses();
 				return;
 			}
 		}
@@ -1777,7 +1866,7 @@ public class PackWriter implements AutoCloseable {
 				false);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
-		if (useCachedPacks && reuseSupport != null && !reuseValidate
+		if (useCachedPacks && reuseSupport != null
 				&& (excludeInPacks == null || excludeInPacks.length == 0))
 			cachedPacks.addAll(
 					reuseSupport.getCachedPacksAndUpdate(needBitmap));
@@ -2085,8 +2174,6 @@ public class PackWriter implements AutoCloseable {
 
 		long totalObjects;
 
-		long bitmapIndexMisses;
-
 		long totalDeltas;
 
 		long reusedObjects;
@@ -2166,16 +2253,6 @@ public class PackWriter implements AutoCloseable {
 		 */
 		public long getTotalObjects() {
 			return totalObjects;
-		}
-
-		/**
-		 * @return the count of objects that needed to be discovered through an
-		 *         object walk because they were not found in bitmap indices.
-		 *
-		 * @since 4.0
-		 */
-		public long getBitmapIndexMisses() {
-			return bitmapIndexMisses;
 		}
 
 		/**
