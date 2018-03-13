@@ -171,12 +171,12 @@ public abstract class BlockSource implements AutoCloseable {
 	/**
 	 * Advise the {@code BlockSource} a sequential scan is starting.
 	 *
-	 * @param start
+	 * @param startPos
 	 *            starting position.
-	 * @param end
+	 * @param endPos
 	 *            ending position.
 	 */
-	public void adviseSequentialRead(long start, long end) {
+	public void adviseSequentialRead(long startPos, long endPos) {
 		// Do nothing by default.
 	}
 
