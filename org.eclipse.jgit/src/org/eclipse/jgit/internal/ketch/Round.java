@@ -104,7 +104,7 @@ abstract class Round {
 	 */
 	void runAsync(AnyObjectId newId) {
 		acceptedNewIndex = acceptedOldIndex.nextIndex(newId);
-		leader.acceptAsync(this);
+		leader.runAsync(this);
 	}
 
 	/**

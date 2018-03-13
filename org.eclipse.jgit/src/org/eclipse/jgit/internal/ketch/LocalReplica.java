@@ -97,7 +97,7 @@ public class LocalReplica extends KetchReplica {
 	 * @throws IOException
 	 *             cannot read repository state.
 	 */
-	protected void initialize(Repository repo) throws IOException {
+	void initialize(Repository repo) throws IOException {
 		RefDatabase refdb = repo.getRefDatabase();
 		if (refdb instanceof RefTreeDatabase) {
 			RefTreeDatabase treeDb = (RefTreeDatabase) refdb;
@@ -133,6 +133,12 @@ public class LocalReplica extends KetchReplica {
 		});
 	}
 
+	@Override
+	protected void blockingFetch(Repository repo, ReplicaFetchRequest req)
+			throws IOException {
+		throw new IOException(KetchText.get().cannotFetchFromLocalReplica);
+	}
+
 	private void update(Repository git, ReplicaPushRequest req)
 			throws IOException {
 		RefDatabase refdb = git.getRefDatabase();
@@ -154,16 +160,17 @@ public class LocalReplica extends KetchReplica {
 		batch.setRefLogMessage("ketch", false); //$NON-NLS-1$
 		batch.setAllowNonFastForwards(true);
 
-		// JGit does not execute multiple references atomically.
+		// RefDirectory updates multiple references sequentially.
 		// Run everything else first, then accepted (if present),
 		// then committed (if present). This ensures an earlier
 		// failure will not update these critical references.
 		ReceiveCommand accepted = null;
 		ReceiveCommand committed = null;
 		for (ReceiveCommand cmd : req.getCommands()) {
-			if (getSystem().getTxnAccepted().equals(cmd.getRefName())) {
+			String name = cmd.getRefName();
+			if (name.equals(getSystem().getTxnAccepted())) {
 				accepted = cmd;
-			} else if (getSystem().getTxnCommitted().equals(cmd.getRefName())) {
+			} else if (name.equals(getSystem().getTxnCommitted())) {
 				committed = cmd;
 			} else {
 				batch.addCommand(cmd);

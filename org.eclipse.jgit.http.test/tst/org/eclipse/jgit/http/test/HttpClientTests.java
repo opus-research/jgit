@@ -195,10 +195,9 @@ public class HttpClientTests extends HttpTestCase {
 
 		Repository dst = createBareRepository();
 		Ref head;
-		try (Transport t = Transport.open(dst, dumbAuthNoneURI)) {
-			try (FetchConnection c = t.openFetch()) {
-				head = c.getRef(Constants.HEAD);
-			}
+		try (Transport t = Transport.open(dst, dumbAuthNoneURI);
+				FetchConnection c = t.openFetch()) {
+			head = c.getRef(Constants.HEAD);
 		}
 		assertNotNull("has " + Constants.HEAD, head);
 		assertEquals(Q, head.getObjectId());

@@ -50,10 +50,12 @@ import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_NODELETE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_NONFASTFORWARD;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
+import static org.eclipse.jgit.lib.Ref.Storage.NETWORK;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,8 +66,10 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.PushConnection;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -235,6 +239,39 @@ public class RemoteGitReplica extends KetchReplica {
 			tmp.add(cmd.cmd);
 		}
 		ReceiveCommand.abort(tmp);
+	}
+
+	protected void blockingFetch(Repository repo, ReplicaFetchRequest req)
+			throws NotSupportedException, TransportException {
+		try (Transport transport = Transport.open(repo, uri)) {
+			RemoteConfig rc = getRemoteConfig();
+			if (rc != null) {
+				transport.applyConfig(rc);
+			}
+			fetch(transport, req);
+		}
+	}
+
+	private void fetch(Transport transport, ReplicaFetchRequest req)
+			throws NotSupportedException, TransportException {
+		try (FetchConnection conn = transport.openFetch()) {
+			Map<String, Ref> remoteRefs = conn.getRefsMap();
+			req.setRefs(remoteRefs);
+
+			List<Ref> want = new ArrayList<>();
+			for (String name : req.getWantRefs()) {
+				Ref ref = remoteRefs.get(name);
+				if (ref != null && ref.getObjectId() != null) {
+					want.add(ref);
+				}
+			}
+			for (ObjectId id : req.getWantObjects()) {
+				want.add(new ObjectIdRef.Unpeeled(NETWORK, id.name(), id));
+			}
+
+			conn.fetch(NullProgressMonitor.INSTANCE, want,
+					Collections.<ObjectId> emptySet());
+		}
 	}
 
 	static class RemoteCommand extends RemoteRefUpdate {

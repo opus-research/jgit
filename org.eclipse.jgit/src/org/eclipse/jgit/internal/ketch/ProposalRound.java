@@ -75,7 +75,46 @@ class ProposalRound extends Round {
 			@Nullable RefTree tree) {
 		super(leader, head);
 		this.todo = todo;
-		this.queuedTree = tree;
+
+		if (tree != null && canCombine(todo)) {
+			this.queuedTree = tree;
+		} else {
+			leader.roundHoldsReferenceToRefTree = false;
+		}
+	}
+
+	private static boolean canCombine(List<Proposal> todo) {
+		Proposal first = todo.get(0);
+		for (int i = 1; i < todo.size(); i++) {
+			if (!canCombine(first, todo.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static boolean canCombine(Proposal a, Proposal b) {
+		String aMsg = nullToEmpty(a.getMessage());
+		String bMsg = nullToEmpty(b.getMessage());
+		return aMsg.equals(bMsg) && canCombine(a.getAuthor(), b.getAuthor());
+	}
+
+	private static String nullToEmpty(@Nullable String str) {
+		return str != null ? str : ""; //$NON-NLS-1$
+	}
+
+	private static boolean canCombine(@Nullable PersonIdent a,
+			@Nullable PersonIdent b) {
+		if (a != null && b != null) {
+			// Same name and email address. Combine timestamp as the two
+			// proposals are running concurrently and appear together or
+			// not at all from the point of view of an outside reader.
+			return a.getName().equals(b.getName())
+					&& a.getEmailAddress().equals(b.getEmailAddress());
+		}
+
+		// If a and b are null, both will be the system identity.
+		return a == null && b == null;
 	}
 
 	void start() throws IOException {
@@ -110,13 +149,9 @@ class ProposalRound extends Round {
 		try (ObjectInserter inserter = git.newObjectInserter()) {
 			// TODO(sop) Process signed push certificates.
 
-			if (queuedTree != null && todo.size() == 1) {
+			if (queuedTree != null) {
 				id = insertSingleProposal(git, inserter);
 			} else {
-				if (queuedTree != null) {
-					queuedTree = null;
-					leader.roundHoldsReferenceToRefTree = false;
-				}
 				id = insertMultiProposal(git, inserter);
 			}
 
@@ -128,8 +163,7 @@ class ProposalRound extends Round {
 
 	private ObjectId insertSingleProposal(Repository git,
 			ObjectInserter inserter) throws IOException, NoOp {
-		// Fast path: tree is passed in with only one proposal to run,
-		// and it already has the proposal applied.
+		// Fast path: tree is passed in with all proposals applied.
 		ObjectId treeId = queuedTree.writeTree(inserter);
 		queuedTree = null;
 		leader.roundHoldsReferenceToRefTree = false;
@@ -156,11 +190,10 @@ class ProposalRound extends Round {
 	}
 
 	private ObjectId insertMultiProposal(Repository git,
-			ObjectInserter inserter)
-			throws IOException, NoOp {
+			ObjectInserter inserter) throws IOException, NoOp {
 		// The tree was not passed in, or there are multiple proposals
-		// each needing their own commit. Reset the tree to acceptedOld
-		// and replay the proposals.
+		// each needing their own commit. Reset the tree and replay each
+		// proposal in order as individual commits.
 		ObjectId lastIndex = acceptedOldIndex;
 		ObjectId oldTreeId;
 		RefTree tree;

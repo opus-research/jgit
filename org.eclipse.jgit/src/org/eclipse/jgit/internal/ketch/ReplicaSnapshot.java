@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.internal.ketch;
 
+import java.util.Date;
+
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.ObjectId;
 
 /**
@@ -51,14 +54,56 @@ import org.eclipse.jgit.lib.ObjectId;
  * @see LeaderSnapshot
  */
 public class ReplicaSnapshot {
-	String name;
-	KetchReplica.Participation type;
-	ObjectId txnAccepted;
-	ObjectId txnCommitted;
+	final KetchReplica replica;
+	ObjectId accepted;
+	ObjectId committed;
 	KetchReplica.State state;
 	String error;
 	long retryAtMillis;
 
-	ReplicaSnapshot() {
+	ReplicaSnapshot(KetchReplica replica) {
+		this.replica = replica;
+	}
+
+	/** @return the replica this snapshot describes the state of. */
+	public KetchReplica getReplica() {
+		return replica;
+	}
+
+	/** @return current state of the replica. */
+	public KetchReplica.State getState() {
+		return state;
+	}
+
+	/** @return last known Git commit at {@code refs/txn/accepted}. */
+	@Nullable
+	public ObjectId getAccepted() {
+		return accepted;
+	}
+
+	/** @return last known Git commit at {@code refs/txn/committed}. */
+	@Nullable
+	public ObjectId getCommitted() {
+		return committed;
+	}
+
+	/**
+	 * @return if {@link #getState()} == {@link KetchReplica.State#OFFLINE} an
+	 *         optional human-readable message from the transport system
+	 *         explaining the failure.
+	 */
+	@Nullable
+	public String getErrorMessage() {
+		return error;
+	}
+
+	/**
+	 * @return time (usually in the future) when the leader will retry
+	 *         communication with the offline or lagging replica; null if no
+	 *         retry is scheduled or necessary.
+	 */
+	@Nullable
+	public Date getRetryAt() {
+		return retryAtMillis > 0 ? new Date(retryAtMillis) : null;
 	}
 }
