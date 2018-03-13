@@ -85,6 +85,7 @@ import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
+ * @since 2.0
  */
 public class StashCreateCommand extends GitCommand<RevCommit> {
 
@@ -211,7 +212,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 *
 	 * @return stashed commit or null if no changes to stash
 	 */
-	public RevCommit call() throws GitAPIException, JGitInternalException {
+	public RevCommit call() throws GitAPIException {
 		checkCallable();
 
 		Ref head = getHead();

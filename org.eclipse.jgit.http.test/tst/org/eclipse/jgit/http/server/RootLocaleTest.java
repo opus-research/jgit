@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,58 +41,20 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.http.server;
 
-import java.util.List;
+import org.eclipse.jgit.nls.NLS;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * {@link AdvertiseRefsHook} that delegates to a list of other hooks.
- * <p>
- * Hooks are run in the order passed to the constructor. A hook may inspect or
- * modify the results of the previous hooks in the chain by calling
- * {@link UploadPack#getAdvertisedRefs()}, or
- * {@link BaseReceivePack#getAdvertisedRefs()} or
- * {@link BaseReceivePack#getAdvertisedObjects()}.
- */
-public class AdvertiseRefsHookChain implements AdvertiseRefsHook {
-	private final AdvertiseRefsHook[] hooks;
-	private final int count;
-
-	/**
-	 * Create a new hook chaining the given hooks together.
-	 *
-	 * @param hooks
-	 *            hooks to execute, in order.
-	 * @return a new hook chain of the given hooks.
-	 */
-	public static AdvertiseRefsHook newChain(List<? extends AdvertiseRefsHook> hooks) {
-		AdvertiseRefsHook[] newHooks = new AdvertiseRefsHook[hooks.size()];
-		int i = 0;
-		for (AdvertiseRefsHook hook : hooks)
-			if (hook != AdvertiseRefsHook.DEFAULT)
-				newHooks[i++] = hook;
-		if (i == 0)
-			return AdvertiseRefsHook.DEFAULT;
-		else if (i == 1)
-			return newHooks[0];
-		else
-			return new AdvertiseRefsHookChain(newHooks, i);
+public class RootLocaleTest {
+	@Before
+	public void setUp() {
+		NLS.setLocale(NLS.ROOT_LOCALE);
 	}
 
-	public void advertiseRefs(BaseReceivePack rp)
-			throws ServiceMayNotContinueException {
-		for (int i = 0; i < count; i++)
-			hooks[i].advertiseRefs(rp);
-	}
-
-	public void advertiseRefs(UploadPack rp)
-			throws ServiceMayNotContinueException {
-		for (int i = 0; i < count; i++)
-			hooks[i].advertiseRefs(rp);
-	}
-
-	private AdvertiseRefsHookChain(AdvertiseRefsHook[] hooks, int count) {
-		this.hooks = hooks;
-		this.count = count;
+	@Test
+	public void testHttpServerText() {
+		NLS.getBundleFor(HttpServerText.class);
 	}
 }
