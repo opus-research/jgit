@@ -511,7 +511,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
-	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String theFactoryMustNotBeNull;
