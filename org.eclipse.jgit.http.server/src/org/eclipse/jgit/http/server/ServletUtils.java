@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,12 +44,8 @@
 package org.eclipse.jgit.http.server;
 
 import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
-import static org.eclipse.jgit.util.HttpSupport.HDR_CACHE_CONTROL;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
-import static org.eclipse.jgit.util.HttpSupport.HDR_DATE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ETAG;
-import static org.eclipse.jgit.util.HttpSupport.HDR_EXPIRES;
-import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -117,37 +113,6 @@ public final class ServletUtils {
 	}
 
 	/**
-	 * Disallow caching of the HTTP response.
-	 *
-	 * @param rsp
-	 *            the response whose content must not be cached.
-	 */
-	public static void nocache(final HttpServletResponse rsp) {
-		rsp.setHeader(HDR_EXPIRES, "Fri, 01 Jan 1980 00:00:00 GMT");
-		rsp.setHeader(HDR_PRAGMA, "no-cache");
-
-		final String nocache = "no-cache, max-age=0, must-revalidate";
-		rsp.setHeader(HDR_CACHE_CONTROL, nocache);
-	}
-
-	/**
-	 * Allow caching of the HTTP response for an indefinite period.
-	 * <p>
-	 * The server will set cache control headers such that the content may be
-	 * cached by any proxy server for a very long period of time, potentially
-	 * for many years.
-	 *
-	 * @param rsp
-	 *            the response whose content can be cached for a long time.
-	 */
-	public static void cacheForever(final HttpServletResponse rsp) {
-		final long now = System.currentTimeMillis();
-		rsp.setDateHeader(HDR_DATE, now);
-		rsp.setDateHeader(HDR_EXPIRES, now + 31536000000L);
-		rsp.setHeader(HDR_CACHE_CONTROL, "public, max-age=31536000");
-	}
-
-	/**
 	 * Send a plain text response to a {@code GET} or {@code HEAD} HTTP request.
 	 * <p>
 	 * The text response is encoded in the Git character encoding, UTF-8.
@@ -158,9 +123,7 @@ public final class ServletUtils {
 	 * The {@code ETag} and {@code Content-Length} headers are automatically set
 	 * by this method. {@code Content-Encoding} is conditionally set if the user
 	 * agent supports a compressed transfer. Callers are responsible for setting
-	 * any cache control headers (
-	 * {@link ServletUtils#cacheForever(HttpServletResponse)} or
-	 * {@link ServletUtils#nocache(HttpServletResponse)}).
+	 * any cache control headers.
 	 *
 	 * @param content
 	 *            to return to the user agent as this entity's body.
@@ -190,9 +153,7 @@ public final class ServletUtils {
 	 * The {@code ETag} and {@code Content-Length} headers are automatically set
 	 * by this method. {@code Content-Encoding} is conditionally set if the user
 	 * agent supports a compressed transfer. Callers are responsible for setting
-	 * {@code Content-Type} and any cache control headers (
-	 * {@link ServletUtils#cacheForever(HttpServletResponse)} or
-	 * {@link ServletUtils#nocache(HttpServletResponse)}).
+	 * {@code Content-Type} and any cache control headers.
 	 *
 	 * @param content
 	 *            to return to the user agent as this entity's body.

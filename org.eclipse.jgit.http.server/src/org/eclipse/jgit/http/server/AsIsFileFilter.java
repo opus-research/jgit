@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,10 +46,7 @@ package org.eclipse.jgit.http.server;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.nocache;
-import static org.eclipse.jgit.http.server.ServletUtils.send;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import javax.servlet.Filter;
@@ -61,18 +58,16 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
 import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PacketLineOut;
-import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 
-/** Filter in front of {@link InfoRefsServlet} to catch smart service requests. */
-abstract class SmartServiceInfoRefs implements Filter {
-	private final String svc;
+class AsIsFileFilter implements Filter {
+	private final AsIsFileService asIs;
 
-	SmartServiceInfoRefs(final String service) {
-		this.svc = service;
+	AsIsFileFilter(final AsIsFileService getAnyFile) {
+		this.asIs = getAnyFile;
 	}
 
 	public void init(FilterConfig config) throws ServletException {
@@ -85,32 +80,14 @@ abstract class SmartServiceInfoRefs implements Filter {
 
 	public void doFilter(ServletRequest request, ServletResponse response,
 			FilterChain chain) throws IOException, ServletException {
-		final HttpServletRequest req = (HttpServletRequest) request;
-
-		if (svc.equals(req.getParameter("service"))) {
-			final HttpServletResponse rsp = (HttpServletResponse) response;
-			nocache(rsp);
-			try {
-				final Repository db = getRepository(req);
-				final ByteArrayOutputStream buf = new ByteArrayOutputStream();
-				final PacketLineOut out = new PacketLineOut(buf);
-				out.writeString("# service=" + svc + "\n");
-				out.end();
-				advertise(req, db, new PacketLineOutRefAdvertiser(out));
-				rsp.setContentType("application/x-" + svc + "-advertisement");
-				send(buf.toByteArray(), req, rsp);
-			} catch (ServiceNotAuthorizedException e) {
-				rsp.sendError(SC_UNAUTHORIZED);
-
-			} catch (ServiceNotEnabledException e) {
-				rsp.sendError(SC_FORBIDDEN);
-			}
-		} else {
+		try {
+			final Repository db = getRepository(request);
+			asIs.access((HttpServletRequest) request, db);
 			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
 		}
 	}
-
-	protected abstract void advertise(HttpServletRequest req, Repository db,
-			PacketLineOutRefAdvertiser pck) throws IOException,
-			ServiceNotEnabledException, ServiceNotAuthorizedException;
 }

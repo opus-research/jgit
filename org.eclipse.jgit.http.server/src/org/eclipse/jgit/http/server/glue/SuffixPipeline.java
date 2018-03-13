@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -51,6 +51,18 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+/**
+ * Selects requests by matching the suffix of the URI.
+ * <p>
+ * The suffix string is literally matched against the path info of the servlet
+ * request, as this class assumes it is invoked by {@link MetaServlet}. Suffix
+ * strings may include path components. Examples include {@code /info/refs}, or
+ * just simple extension matches like {@code .txt}.
+ * <p>
+ * When dispatching to the rest of the pipeline the HttpServletRequest is
+ * modified so that {@code getPathInfo()} does not contain the suffix that
+ * caused this pipeline to be selected.
+ */
 class SuffixPipeline extends UrlPipeline {
 	static class Binder extends ServletBinderImpl {
 		private final String suffix;

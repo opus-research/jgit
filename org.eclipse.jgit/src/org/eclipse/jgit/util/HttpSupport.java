@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -85,6 +85,9 @@ public class HttpSupport {
 
 	/** The {@code Content-Type} header. */
 	public static final String HDR_CONTENT_TYPE = "Content-Type";
+
+	/** The {@code Content-Length} header. */
+	public static final String HDR_CONTENT_LENGTH = "Content-Length";
 
 	/** The {@code Content-Encoding} header. */
 	public static final String HDR_CONTENT_ENCODING = "Content-Encoding";

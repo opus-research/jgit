@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,39 +41,34 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.http.server.glue;
 
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.ReceivePack;
+/** Sends a fixed status code to the client. */
+public class ErrorServlet extends HttpServlet {
+	private static final long serialVersionUID = 1L;
 
-/** Create and configure {@link ReceivePack} service instance. */
-public interface ReceivePackFactory {
-	/** A factory disabling the ReceivePack service for all repositories. */
-	public static final ReceivePackFactory DISABLED = new ReceivePackFactory() {
-		public ReceivePack create(HttpServletRequest req, Repository db)
-				throws ServiceNotEnabledException {
-			throw new ServiceNotEnabledException();
-		}
-	};
+	private final int status;
 
 	/**
-	 * Create and configure a new ReceivePack instance for a repository.
+	 * Sends a specific status code.
 	 *
-	 * @param req
-	 *            current HTTP request, in case information from the request may
-	 *            help configure the ReceivePack instance.
-	 * @param db
-	 *            the repository the receive would write into.
-	 * @return the newly configured ReceivePack instance, must not be null.
-	 * @throws ServiceNotEnabledException
-	 *             this factory refuses to create the instance because it is not
-	 *             allowed on the target repository, by any user.
-	 * @throws ServiceNotAuthorizedException
-	 *             this factory refuses to create the instance for this HTTP
-	 *             request and repository, such as due to a permission error.
+	 * @param status
+	 *            the HTTP status code to always send.
 	 */
-	ReceivePack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
+	public ErrorServlet(final int status) {
+		this.status = status;
+	}
+
+	@Override
+	protected void doGet(HttpServletRequest req, HttpServletResponse rsp)
+			throws ServletException, IOException {
+		rsp.sendError(status);
+	}
 }
