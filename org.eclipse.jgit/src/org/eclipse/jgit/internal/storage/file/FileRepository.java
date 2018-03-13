@@ -260,10 +260,13 @@ public class FileRepository extends Repository {
 	 * Create a new Git repository initializing the necessary files and
 	 * directories.
 	 *
+	 * @param bare
+	 *            if true, a bare repository is created.
+	 *
 	 * @throws IOException
 	 *             in case of IO problem
 	 */
-	public void create() throws IOException {
+	public void create(boolean bare) throws IOException {
 		final FileBasedConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
 			throw new IllegalStateException(MessageFormat.format(
@@ -322,16 +325,16 @@ public class FileRepository extends Repository {
 				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_FILEMODE, fileMode);
-		if (isBare())
+		if (bare)
 			cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 					ConfigConstants.CONFIG_KEY_BARE, true);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !isBare());
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
 		if (SystemReader.getInstance().isMacOS())
 			// Java has no other way
 			cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 					ConfigConstants.CONFIG_KEY_PRECOMPOSEUNICODE, true);
-		if (!isBare()) {
+		if (!bare) {
 			File workTree = getWorkTree();
 			if (!getDirectory().getParentFile().equals(workTree)) {
 				cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,

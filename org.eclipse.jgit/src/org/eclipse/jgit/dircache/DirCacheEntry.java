@@ -294,23 +294,6 @@ public class DirCacheEntry {
 		NB.encodeInt16(info, infoOffset + P_FLAGS, flags);
 	}
 
-	/**
-	 * Duplicate DirCacheEntry with same path and copied info.
-	 * <p>
-	 * The same path buffer is reused (avoiding copying), however a new info
-	 * buffer is created and its contents are copied.
-	 *
-	 * @param src
-	 *            entry to clone.
-	 * @since 4.2
-	 */
-	public DirCacheEntry(DirCacheEntry src) {
-		path = src.path;
-		info = new byte[INFO_LEN];
-		infoOffset = 0;
-		System.arraycopy(src.info, src.infoOffset, info, 0, INFO_LEN);
-	}
-
 	void write(final OutputStream os) throws IOException {
 		final int len = isExtended() ? INFO_LEN_EXTENDED : INFO_LEN;
 		final int pathLen = path.length;
@@ -520,10 +503,6 @@ public class DirCacheEntry {
 					JGitText.get().invalidModeForPath, mode, getPathString()));
 		}
 		NB.encodeInt32(info, infoOffset + P_MODE, mode.getBits());
-	}
-
-	void setFileMode(int mode) {
-		NB.encodeInt32(info, infoOffset + P_MODE, mode);
 	}
 
 	/**
@@ -762,7 +741,7 @@ public class DirCacheEntry {
 		}
 	}
 
-	static String toString(final byte[] path) {
+	private static String toString(final byte[] path) {
 		return Constants.CHARSET.decode(ByteBuffer.wrap(path)).toString();
 	}
 

@@ -161,43 +161,29 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
-	 * Create a new Git repository initializing the necessary files and
-	 * directories.
+	 * Create a new Git repository.
+	 * <p>
+	 * Repository with working tree is created using this method. This method is
+	 * the same as {@code create(false)}.
 	 *
 	 * @throws IOException
-	 *             in case of IO problem
+	 * @see #create(boolean)
 	 */
-	public abstract void create() throws IOException;
+	public void create() throws IOException {
+		create(false);
+	}
 
 	/**
 	 * Create a new Git repository initializing the necessary files and
 	 * directories.
-	 * <p>
-	 * This method is provided solely for backwards compatibility. Please use
-	 * {@link #create()} method instead.
-	 * <p>
-	 * Since instances of this class are immutable and intended to be created
-	 * with an appropriate builder, it's impossible to change whether repository
-	 * is bare or not after construction. Therefore {@code bare} argument of
-	 * this function has to be redundantly equal to {@code isBare()}.
 	 *
 	 * @param bare
-	 *            has to be equal to {@code isBare()}.
+	 *            if true, a bare repository (a repository without a working
+	 *            directory) is created.
 	 * @throws IOException
-	 * @throws IllegalArgumentException
-	 *             in case {@code bare} paremeter is not equal to
-	 *             {@code isBare()}
-	 * @see #create()
+	 *             in case of IO problem
 	 */
-	@Deprecated
-	public final void create(boolean bare) throws IOException {
-		if (bare != isBare()) {
-			throw new IllegalArgumentException(
-					MessageFormat.format(JGitText.get().expectedGot,
-							Boolean.valueOf(isBare()), Boolean.valueOf(bare)));
-		}
-		create();
-	}
+	public abstract void create(boolean bare) throws IOException;
 
 	/**
 	 * @return local metadata directory; {@code null} if repository isn't local.
@@ -925,16 +911,12 @@ public abstract class Repository implements AutoCloseable {
 	@Nullable
 	public String getFullBranch() throws IOException {
 		Ref head = getRef(Constants.HEAD);
-		if (head == null) {
+		if (head == null)
 			return null;
-		}
-		if (head.isSymbolic()) {
+		if (head.isSymbolic())
 			return head.getTarget().getName();
-		}
-		ObjectId objectId = head.getObjectId();
-		if (objectId != null) {
-			return objectId.name();
-		}
+		if (head.getObjectId() != null)
+			return head.getObjectId().name();
 		return null;
 	}
 

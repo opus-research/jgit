@@ -67,8 +67,8 @@ import org.eclipse.jgit.util.FS;
  */
 public class FileTreeIterator extends WorkingTreeIterator {
 	/**
-	 * the starting directory of this Iterator. All entries are located directly
-	 * in this directory.
+	 * the starting directory. This directory should correspond to the root of
+	 * the repository.
 	 */
 	protected final File directory;
 
@@ -238,6 +238,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 	@Override
 	protected byte[] idSubmodule(final Entry e) {
-		return idSubmodule(getDirectory(), e);
+		if (repository == null)
+			return idSubmodule(getDirectory(), e);
+		return super.idSubmodule(e);
 	}
 }
