@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.diff;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-/**
- * Wrap another comparator for use with {@link HashedSequence}.
- *
- * This comparator acts as a proxy for the real comparator, translating element
- * indexes on the fly by adding the subsequence's begin offset to them.
- * Comparators of this type must be used with a {@link HashedSequence}.
- *
- * To construct an instance of this type use {@link HashedSequencePair}.
- *
- * @param <S>
- *            the base sequence type.
- */
-public final class HashedSequenceComparator<S extends Sequence> extends
-		SequenceComparator<HashedSequence<S>> {
-	private final SequenceComparator<? super S> cmp;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-	HashedSequenceComparator(SequenceComparator<? super S> cmp) {
-		this.cmp = cmp;
+public class FetchCommandTest extends RepositoryTestCase {
+
+	public void testFetch() throws JGitInternalException, IOException,
+			GitAPIException, URISyntaxException {
+
+		// create other repository
+		Repository db2 = createWorkRepository();
+		Git git2 = new Git(db2);
+
+		// setup the first repository to fetch from the second repository
+		final Config config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+		remoteConfig.update(config);
+
+		// create some refs via commits and tag
+		RevCommit commit = git2.commit().setMessage("initial commit").call();
+		RevTag tag = git2.tag().setName("tag").call();
+
+		Git git1 = new Git(db);
+
+		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
+		git1.fetch().setRemote("test").setRefSpecs(spec)
+				.call();
+
+		assertEquals(commit.getId(),
+				db.resolve(commit.getId().getName() + "^{commit}"));
+		assertEquals(tag.getId(), db.resolve(tag.getId().getName()));
+
 	}
 
-	@Override
-	public boolean equals(HashedSequence<S> a, int ai, //
-			HashedSequence<S> b, int bi) {
-		return a.hashes[ai - a.begin] == b.hashes[bi - b.begin]
-				&& cmp.equals(a.base, ai, b.base, bi);
-	}
-
-	@Override
-	public int hash(HashedSequence<S> seq, int ptr) {
-		return seq.hashes[ptr - seq.begin];
-	}
 }
