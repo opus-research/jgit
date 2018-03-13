@@ -80,7 +80,6 @@ import java.util.zip.CheckedOutputStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
@@ -162,9 +161,6 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  */
 public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
-
-	/** Empty set of objects for {@code preparePack()}. */
-	public static Set<ObjectId> NONE = Collections.emptySet();
 
 	private static final Map<WeakReference<PackWriter>, Boolean> instances =
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
@@ -674,7 +670,7 @@ public class PackWriter implements AutoCloseable {
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
-	public void preparePack(@NonNull Iterator<RevObject> objectsSource)
+	public void preparePack(final Iterator<RevObject> objectsSource)
 			throws IOException {
 		while (objectsSource.hasNext()) {
 			addObject(objectsSource.next());
@@ -697,18 +693,16 @@ public class PackWriter implements AutoCloseable {
 	 *            progress during object enumeration.
 	 * @param want
 	 *            collection of objects to be marked as interesting (start
-	 *            points of graph traversal). Must not be {@code null}.
+	 *            points of graph traversal).
 	 * @param have
 	 *            collection of objects to be marked as uninteresting (end
-	 *            points of graph traversal). Pass {@link #NONE} if all objects
-	 *            reachable from {@code want} are desired, such as when serving
-	 *            a clone.
+	 *            points of graph traversal).
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
-			@NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have) throws IOException {
+			Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have) throws IOException {
 		ObjectWalk ow;
 		if (shallowPack)
 			ow = new DepthWalk.ObjectWalk(reader, depth);
@@ -735,19 +729,17 @@ public class PackWriter implements AutoCloseable {
 	 *            ObjectWalk to perform enumeration.
 	 * @param interestingObjects
 	 *            collection of objects to be marked as interesting (start
-	 *            points of graph traversal). Must not be {@code null}.
+	 *            points of graph traversal).
 	 * @param uninterestingObjects
 	 *            collection of objects to be marked as uninteresting (end
-	 *            points of graph traversal). Pass {@link #NONE} if all objects
-	 *            reachable from {@code want} are desired, such as when serving
-	 *            a clone.
+	 *            points of graph traversal).
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
-			@NonNull ObjectWalk walk,
-			@NonNull Set<? extends ObjectId> interestingObjects,
-			@NonNull Set<? extends ObjectId> uninterestingObjects)
+			ObjectWalk walk,
+			final Set<? extends ObjectId> interestingObjects,
+			final Set<? extends ObjectId> uninterestingObjects)
 			throws IOException {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
@@ -1605,11 +1597,16 @@ public class PackWriter implements AutoCloseable {
 		out.write(packcsum);
 	}
 
-	private void findObjectsToPack(@NonNull ProgressMonitor countingMonitor,
-			@NonNull ObjectWalk walker, @NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have) throws IOException {
+	private void findObjectsToPack(final ProgressMonitor countingMonitor,
+			final ObjectWalk walker, final Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have)
+			throws MissingObjectException, IOException,
+			IncorrectObjectTypeException {
 		final long countingStart = System.currentTimeMillis();
 		beginPhase(PackingPhase.COUNTING, countingMonitor, ProgressMonitor.UNKNOWN);
+
+		if (have == null)
+			have = Collections.emptySet();
 
 		stats.interestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(want));
 		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(have));
