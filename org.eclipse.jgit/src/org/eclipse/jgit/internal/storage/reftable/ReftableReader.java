@@ -47,6 +47,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.eclipse.jgit.internal.storage.reftable.BlockReader.decodeIndexSize;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
@@ -67,6 +68,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.util.IntList;
+import org.eclipse.jgit.util.LongMap;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -87,6 +89,7 @@ public class ReftableReader extends Reftable {
 	private long objEnd;
 	private long logPosition;
 	private long logEnd;
+	private int objIdLen;
 
 	private long refIndexPosition = -1;
 	private long objIndexPosition = -1;
@@ -95,6 +98,7 @@ public class ReftableReader extends Reftable {
 	private BlockReader refIndex;
 	private BlockReader objIndex;
 	private BlockReader logIndex;
+	private LongMap<BlockReader> indexCache;
 
 	/**
 	 * Initialize a new reftable reader.
@@ -220,10 +224,13 @@ public class ReftableReader extends Reftable {
 	private BlockReader seek(byte blockType, byte[] key, BlockReader idx,
 			long startPos, long endPos) throws IOException {
 		if (idx != null) {
-			long position = idx.seekKey(key) <= 0
-					? idx.readPositionFromIndex()
-					: ((blocksIn(startPos, endPos) - 1) * blockSize);
-			BlockReader block = readBlock(position, endPos);
+			BlockReader block = idx;
+			do {
+				long position = block.seekKey(key) <= 0
+						? block.readPositionFromIndex()
+						: ((blocksIn(startPos, endPos) - 1) * blockSize);
+				block = readBlock(position, endPos);
+			} while (block.type() == INDEX_BLOCK_TYPE);
 			block.seekKey(key);
 			return block;
 		}
@@ -268,7 +275,9 @@ public class ReftableReader extends Reftable {
 		}
 
 		refIndexPosition = NB.decodeInt64(ftr, 24);
-		objPosition = NB.decodeInt64(ftr, 32);
+		long p = NB.decodeInt64(ftr, 32);
+		objPosition = p >>> 5;
+		objIdLen = (int) (p & 0x1f);
 		objIndexPosition = NB.decodeInt64(ftr, 40);
 		logPosition = NB.decodeInt64(ftr, 48);
 		logIndexPosition = NB.decodeInt64(ftr, 56);
@@ -382,6 +391,13 @@ public class ReftableReader extends Reftable {
 	}
 
 	private BlockReader readBlock(long pos, long end) throws IOException {
+		if (indexCache != null) {
+			BlockReader b = indexCache.get(pos);
+			if (b != null) {
+				return b;
+			}
+		}
+
 		int sz = blockSize;
 		if (pos + sz > end) {
 			sz = (int) (end - pos); // last block may omit padding.
@@ -389,23 +405,18 @@ public class ReftableReader extends Reftable {
 
 		BlockReader b = new BlockReader();
 		b.readBlock(src, pos, sz);
+		if (b.type() == INDEX_BLOCK_TYPE && !b.truncated()) {
+			if (indexCache == null) {
+				indexCache = new LongMap<>();
+			}
+			indexCache.put(pos, b);
+		}
 		return b;
 	}
 
 	private int blocksIn(long pos, long end) {
 		int blocks = (int) ((end - pos) / blockSize);
 		return end % blockSize == 0 ? blocks : (blocks + 1);
-	}
-
-	/**
-	 * Get size of the reftable, in bytes.
-	 *
-	 * @return size of the reftable, in bytes.
-	 * @throws IOException
-	 *             size cannot be obtained.
-	 */
-	public long size() throws IOException {
-		return src.size();
 	}
 
 	@Override
@@ -503,6 +514,9 @@ public class ReftableReader extends Reftable {
 				refName = block.name();
 				updateIndex = block.readLogUpdateIndex();
 				entry = block.readLogEntry();
+				if (entry == null && !includeDeletes) {
+					continue;
+				}
 				return true;
 			}
 		}
@@ -544,17 +558,21 @@ public class ReftableReader extends Reftable {
 		}
 
 		void initSeek() throws IOException {
-			byte[] key = new byte[OBJECT_ID_LENGTH];
-			match.copyRawTo(key, 0);
+			byte[] rawId = new byte[OBJECT_ID_LENGTH];
+			match.copyRawTo(rawId, 0);
+			byte[] key = Arrays.copyOf(rawId, objIdLen);
 
-			long position = objIndex.seekAbbrevId(key) <= 0
-					? objIndex.readPositionFromIndex()
-					: ((blocksIn(objPosition, objEnd) - 1) * blockSize);
-			BlockReader b = readBlock(position, objEnd);
-			b.seekAbbrevId(key);
+			BlockReader b = objIndex;
+			do {
+				long position = b.seekKey(key) <= 0
+						? b.readPositionFromIndex()
+						: ((blocksIn(objPosition, objEnd) - 1) * blockSize);
+				b = readBlock(position, objEnd);
+			} while (b.type() == INDEX_BLOCK_TYPE);
+			b.seekKey(key);
 			while (b.next()) {
 				b.parseKey();
-				if (b.matchAbbrevId(key)) {
+				if (b.match(key, false)) {
 					blockIds = b.readBlockIdList();
 					if (blockIds == null) {
 						initScan();
