@@ -61,7 +61,6 @@ import org.eclipse.jgit.errors.RevWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
@@ -171,9 +170,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private final ObjectIdSubclassMap<RevObject> objects;
 
-	/** Largest commit or annotated tag we are willing to touch. */
-	private final int bigFileThreshold;
-
 	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
@@ -230,13 +226,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
 		retainBody = true;
-
-		if (repo != null) {
-			CoreConfig cfg = repo.getConfig().get(CoreConfig.KEY);
-			bigFileThreshold = cfg.getStreamFileThreshold();
-		} else {
-			bigFileThreshold = 15 * 1024 * 1024;
-		}
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -824,14 +813,13 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	private RevObject parseNew(AnyObjectId id, ObjectLoader ldr)
-			throws LargeObjectException, CorruptObjectException,
-			MissingObjectException, IOException {
+			throws CorruptObjectException, LargeObjectException {
 		RevObject r;
 		int type = ldr.getType();
 		switch (type) {
 		case Constants.OBJ_COMMIT: {
 			final RevCommit c = createCommit(id);
-			c.parseCanonical(this, getCachedBytes(c, ldr));
+			c.parseCanonical(this, ldr.getCachedBytes());
 			r = c;
 			break;
 		}
@@ -847,7 +835,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		}
 		case Constants.OBJ_TAG: {
 			final RevTag t = new RevTag(id);
-			t.parseCanonical(this, getCachedBytes(t, ldr));
+			t.parseCanonical(this, ldr.getCachedBytes());
 			r = t;
 			break;
 		}
@@ -857,21 +845,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		}
 		objects.add(r);
 		return r;
-	}
-
-	byte[] getCachedBytes(RevObject obj) throws LargeObjectException,
-			MissingObjectException, IncorrectObjectTypeException, IOException {
-		return getCachedBytes(obj, reader.open(obj, obj.getType()));
-	}
-
-	byte[] getCachedBytes(RevObject obj, ObjectLoader ldr)
-			throws LargeObjectException, MissingObjectException, IOException {
-		try {
-			return ldr.getCachedBytes(bigFileThreshold);
-		} catch (LargeObjectException tooBig) {
-			tooBig.setObjectId(obj);
-			throw tooBig;
-		}
 	}
 
 	/**

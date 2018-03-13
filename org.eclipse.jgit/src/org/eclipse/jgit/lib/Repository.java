@@ -63,7 +63,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -394,15 +393,10 @@ public abstract class Repository {
 	 * @param revstr
 	 *            A git object references expression
 	 * @return an ObjectId or null if revstr can't be resolved to any ObjectId
-	 * @throws AmbiguousObjectException
-	 *             {@code revstr} contains an abbreviated ObjectId and this
-	 *             repository contains more than one object which match to the
-	 *             input abbreviation.
 	 * @throws IOException
 	 *             on serious errors
 	 */
-	public ObjectId resolve(final String revstr)
-			throws AmbiguousObjectException, IOException {
+	public ObjectId resolve(final String revstr) throws IOException {
 		RevWalk rw = new RevWalk(this);
 		try {
 			return resolve(rw, revstr);
@@ -590,8 +584,6 @@ public abstract class Repository {
 				Collection<ObjectId> matches = reader.resolve(id);
 				if (matches.size() == 1)
 					return matches.iterator().next();
-				if (1 < matches.size())
-					throw new AmbiguousObjectException(id, matches);
 			} finally {
 				reader.release();
 			}
