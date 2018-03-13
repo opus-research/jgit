@@ -987,7 +987,7 @@ public class PackWriter implements AutoCloseable {
 		}
 
 		stats.totalBytes = out.length();
-		reader.close();
+		reader.release();
 		endPhase(writeMonitor);
 	}
 
