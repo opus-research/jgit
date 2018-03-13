@@ -55,10 +55,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -87,11 +85,9 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -632,10 +628,6 @@ public class PackWriter {
 				if (cmp != 0)
 					return cmp;
 
-				cmp = (a.isEdge() ? 0 : 1) - (b.isEdge() ? 0 : 1);
-				if (cmp != 0)
-					return cmp;
-
 				return b.getWeight() - a.getWeight();
 			}
 		});
@@ -1028,31 +1020,14 @@ public class PackWriter {
 			q.release();
 		}
 
-		final int maxBases = config.getDeltaSearchWindowSize();
-		Set<RevTree> baseTrees = new HashSet<RevTree>();
 		RevObject o;
+
 		while ((o = walker.next()) != null) {
-			if (o.has(RevFlag.UNINTERESTING)) {
-				if (baseTrees.size() <= maxBases)
-					baseTrees.add(((RevCommit) o).getTree());
-				continue;
-			}
 			addObject(o, 0);
 			countingMonitor.update(1);
 		}
-
-		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
-				edgeObjects, reader);
 		while ((o = walker.nextObject()) != null) {
-			if (o.has(RevFlag.UNINTERESTING))
-				continue;
-
-			int pathHash = walker.getPathHashCode();
-			byte[] pathBuf = walker.getPathBuffer();
-			int pathLen = walker.getPathLength();
-
-			bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-			addObject(o, pathHash);
+			addObject(o, walker.getPathHashCode());
 			countingMonitor.update(1);
 		}
 		countingMonitor.endTask();
@@ -1072,25 +1047,25 @@ public class PackWriter {
 	 */
 	public void addObject(final RevObject object)
 			throws IncorrectObjectTypeException {
+		addObject(object, 0);
+	}
+
+	private void addObject(final RevObject object, final int pathHashCode)
+			throws IncorrectObjectTypeException {
 		if (object.has(RevFlag.UNINTERESTING)) {
 			switch (object.getType()) {
 			case Constants.OBJ_TREE:
 			case Constants.OBJ_BLOB:
 				ObjectToPack otp = new ObjectToPack(object);
-				otp.setPathHash(0);
+				otp.setPathHash(pathHashCode);
 				otp.setEdge();
-				edgeObjects.addIfAbsent(otp);
+				edgeObjects.add(otp);
 				thin = true;
 				break;
 			}
 			return;
 		}
 
-		addObject(object, 0);
-	}
-
-	private void addObject(final RevObject object, final int pathHashCode)
-			throws IncorrectObjectTypeException {
 		final ObjectToPack otp;
 		if (reuseSupport != null)
 			otp = reuseSupport.newObjectToPack(object);
