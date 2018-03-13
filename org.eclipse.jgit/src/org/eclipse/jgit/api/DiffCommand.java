@@ -120,7 +120,17 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 		try {
 			if (cached) {
 				if (oldTree == null) {
-					oldTree = getAbstractTreeIterator(HEAD);
+					ObjectId head = repo.resolve(HEAD + "^{tree}"); //$NON-NLS-1$
+					if (head == null)
+						throw new NoHeadException(JGitText.get().cannotReadTree);
+					CanonicalTreeParser p = new CanonicalTreeParser();
+					ObjectReader reader = repo.newObjectReader();
+					try {
+						p.reset(reader, head);
+					} finally {
+						reader.release();
+					}
+					oldTree = p;
 				}
 				newTree = new DirCacheIterator(repo.readDirCache());
 			} else {
@@ -151,21 +161,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 		} finally {
 			diffFmt.release();
 		}
-	}
-
-	private AbstractTreeIterator getAbstractTreeIterator(String rev)
-			throws GitAPIException, IOException {
-		ObjectId head = repo.resolve(rev + "^{tree}"); //$NON-NLS-1$
-		if (head == null)
-			throw new NoHeadException(JGitText.get().cannotReadTree);
-		CanonicalTreeParser p = new CanonicalTreeParser();
-		ObjectReader reader = repo.newObjectReader();
-		try {
-			p.reset(reader, head);
-		} finally {
-			reader.release();
-		}
-		return p;
 	}
 
 	/**
