@@ -44,15 +44,19 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.lang.Math.log;
+import static org.eclipse.jgit.internal.storage.reftable.BlockWriter.padBetweenBlocks;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_MAGIC;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_BLOCK_SIZE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_INDEX_SIZE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_RESTARTS;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
+import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -66,14 +70,15 @@ import java.util.Set;
 import java.util.zip.CRC32;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.internal.storage.reftable.BlockWriter.DeleteLogEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.Entry;
+import org.eclipse.jgit.internal.storage.reftable.BlockWriter.IndexEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.ObjEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.RefEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.TextEntry;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
@@ -93,6 +98,7 @@ public class ReftableWriter {
 	private int refBlockSize;
 	private int logBlockSize;
 	private int restartInterval;
+	private int maxIndexLevels;
 	private boolean indexObjects;
 
 	private long minUpdateIndex;
@@ -101,28 +107,10 @@ public class ReftableWriter {
 	private ReftableOutputStream out;
 	private ObjectIdSubclassMap<RefList> obj2ref;
 
-	private BlockWriter refIndex;
-	private BlockWriter objIndex;
-	private BlockWriter logIndex;
 	private BlockWriter cur;
-
-	private long objPosition;
-	private long logPosition;
-	private long refIndexPosition;
-	private long objIndexPosition;
-	private long logIndexPosition;
-
-	private long refCnt;
-	private int objCnt;
-	private long logCnt;
-	private long refBytes;
-	private long objBytes;
-	private long logBytes;
-	private int refBlocks;
-	private int objBlocks;
-	private int logBlocks;
-	private int refIndexSize;
-	private int objIndexSize;
+	private Section refs;
+	private Section objs;
+	private Section logs;
 	private int objIdLen;
 	private Stats stats;
 
@@ -190,6 +178,7 @@ public class ReftableWriter {
 		refBlockSize = config.getRefBlockSize();
 		logBlockSize = config.getLogBlockSize();
 		restartInterval = config.getRestartInterval();
+		maxIndexLevels = config.getMaxIndexLevels();
 		indexObjects = config.isIndexObjects();
 
 		if (refBlockSize <= 0) {
@@ -204,8 +193,8 @@ public class ReftableWriter {
 			restartInterval = refBlockSize < (60 << 10) ? 16 : 64;
 		}
 
-		refIndex = newIndex(REF_BLOCK_TYPE, refBlockSize);
 		out = new ReftableOutputStream(os, refBlockSize);
+		refs = new Section(REF_BLOCK_TYPE);
 		if (indexObjects) {
 			obj2ref = new ObjectIdSubclassMap<>();
 		}
@@ -216,21 +205,21 @@ public class ReftableWriter {
 	/**
 	 * Sort a collection of references and write them to the reftable.
 	 *
-	 * @param refs
+	 * @param refsToPack
 	 *            references to sort and write.
 	 * @return {@code this}
 	 * @throws IOException
 	 *             reftable cannot be written.
 	 */
-	public ReftableWriter sortAndWriteRefs(Collection<Ref> refs)
+	public ReftableWriter sortAndWriteRefs(Collection<Ref> refsToPack)
 			throws IOException {
-		Iterator<RefEntry> itr = refs.stream()
+		Iterator<RefEntry> itr = refsToPack.stream()
 				.map(RefEntry::new)
 				.sorted(Entry::compare)
 				.iterator();
 		while (itr.hasNext()) {
 			RefEntry entry = itr.next();
-			int blockId = write(refIndex, entry);
+			int blockId = refs.write(entry);
 			indexRef(entry.ref, blockId);
 		}
 		return this;
@@ -247,12 +236,12 @@ public class ReftableWriter {
 	 *             reftable cannot be written.
 	 */
 	public void writeRef(Ref ref) throws IOException {
-		int blockId = write(refIndex, new RefEntry(ref));
+		int blockId = refs.write(new RefEntry(ref));
 		indexRef(ref, blockId);
 	}
 
 	void writeText(String name, String content) throws IOException {
-		write(refIndex, new TextEntry(name, content));
+		refs.write(new TextEntry(name, content));
 	}
 
 	private void indexRef(Ref ref, int blockId) {
@@ -260,7 +249,6 @@ public class ReftableWriter {
 			indexId(ref.getObjectId(), blockId);
 			indexId(ref.getPeeledObjectId(), blockId);
 		}
-		refCnt++;
 	}
 
 	private void indexId(ObjectId id, int blockId) {
@@ -303,46 +291,40 @@ public class ReftableWriter {
 					throws IOException {
 		String msg = message != null ? message : ""; //$NON-NLS-1$
 		beginLog();
-		logCnt++;
-		write(logIndex, new LogEntry(ref, updateIndex, who, oldId, newId, msg));
+		logs.write(new LogEntry(ref, updateIndex, who, oldId, newId, msg));
+	}
+
+	/**
+	 * Record deletion of one reflog entry in this reftable.
+	 *
+	 * <p>
+	 * The deletion can shadow an entry stored in a lower table in the stack.
+	 * This is useful for {@code refs/stash} and dropping an entry from its
+	 * reflog.
+	 * <p>
+	 * Deletion must be properly interleaved in sorted updateIndex order with
+	 * any other logs written by
+	 * {@link #writeLog(String, long, PersonIdent, ObjectId, ObjectId, String)}.
+	 *
+	 * @param ref
+	 *            the ref to delete (hide) a reflog entry from.
+	 * @param updateIndex
+	 *            the update index that must be hidden.
+	 * @throws IOException
+	 *             reftable cannot be written.
+	 */
+	public void deleteLog(String ref, long updateIndex) throws IOException {
+		beginLog();
+		logs.write(new DeleteLogEntry(ref, updateIndex));
 	}
 
 	private void beginLog() throws IOException {
-		if (logPosition == 0) {
+		if (logs == null) {
 			finishRef(); // close prior ref blocks and their index, if present.
 			out.flushFileHeader();
-
 			out.setBlockSize(logBlockSize);
-			logIndex = newIndex(REF_BLOCK_TYPE, logBlockSize);
-			logPosition = out.size();
+			logs = new Section(LOG_BLOCK_TYPE);
 		}
-	}
-
-	private int write(BlockWriter idx, BlockWriter.Entry entry)
-			throws IOException {
-		if (cur == null) {
-			beginBlock(entry);
-		} else if (!cur.tryAdd(entry)) {
-			idx.addIndex(cur.lastKey(), out.size());
-			cur.writeTo(out);
-			if (cur.padBetweenBlocks()) {
-				out.padBetweenBlocksToNextBlock();
-			}
-			beginBlock(entry);
-		}
-		return out.blockCount();
-	}
-
-	private void beginBlock(BlockWriter.Entry entry)
-			throws BlockSizeTooSmallException {
-		byte type = entry.blockType();
-		int bs = out.bytesAvailableInBlock();
-		cur = new BlockWriter(type, type, bs, restartInterval);
-		cur.addFirst(entry);
-	}
-
-	private BlockWriter newIndex(byte keyType, int bs) {
-		return new BlockWriter(INDEX_BLOCK_TYPE, keyType, bs, restartInterval);
 	}
 
 	/**
@@ -357,21 +339,21 @@ public class ReftableWriter {
 			bytes += FILE_HEADER_LEN;
 		}
 		if (cur != null) {
-			long position = out.size();
+			// long position = out.size();
 			int sz = cur.currentSize();
 			bytes += sz;
 
-			BlockWriter idx = null;
+			IndexBuilder idx = null;
 			if (cur.blockType() == REF_BLOCK_TYPE) {
-				idx = refIndex;
+				idx = refs.idx;
 			} else if (cur.blockType() == LOG_BLOCK_TYPE) {
-				idx = logIndex;
+				idx = logs.idx;
 			}
 			if (idx != null && shouldHaveIndex(idx)) {
-				if (idx == refIndex) {
+				if (idx == refs.idx) {
 					bytes += out.estimatePadBetweenBlocks(sz);
 				}
-				bytes += idx.estimateIndexSizeIfAdding(cur.lastKey(), position);
+				// TODO(sop) estimate index size
 			}
 		}
 		bytes += FILE_FOOTER_LEN;
@@ -391,26 +373,20 @@ public class ReftableWriter {
 		writeFileFooter();
 		out.finishFile();
 
-		stats = new Stats(this, out, refIndex);
-		refIndex = null;
-		objIndex = null;
-		logIndex = null;
-		cur = null;
+		stats = new Stats(this, out);
 		out = null;
 		obj2ref = null;
+		cur = null;
+		refs = null;
+		objs = null;
+		logs = null;
 		return this;
 	}
 
 	private void finishRef() throws IOException {
 		if (cur != null && cur.blockType() == REF_BLOCK_TYPE) {
-			refBlocks = out.blockCount() + 1;
-			refIndexPosition = finishBlockMaybeWriteIndex(refIndex);
-			if (refIndexPosition > 0) {
-				refIndexSize = (int) (out.size() - refIndexPosition);
-			}
-			refBytes = out.size();
-
-			if (indexObjects && !obj2ref.isEmpty() && refIndexPosition > 0) {
+			refs.finishSectionMaybeWriteIndex();
+			if (indexObjects && !obj2ref.isEmpty() && refs.idx.bytes > 0) {
 				writeObjBlocks();
 			}
 			obj2ref = null;
@@ -423,49 +399,23 @@ public class ReftableWriter {
 		objIdLen = shortestUniqueAbbreviation(sorted);
 
 		out.padBetweenBlocksToNextBlock();
-		objCnt = sorted.size();
-		objPosition = out.size();
-		objIndex = newIndex(OBJ_BLOCK_TYPE, refBlockSize);
+		objs = new Section(OBJ_BLOCK_TYPE);
+		objs.entryCnt = sorted.size();
 		for (RefList l : sorted) {
-			write(objIndex, new ObjEntry(objIdLen, l, l.blockIds));
+			objs.write(new ObjEntry(objIdLen, l, l.blockIds));
 		}
-		objBlocks = (out.blockCount() + 1) - refBlocks;
-		objIndexPosition = finishBlockMaybeWriteIndex(objIndex);
-		if (objIndexPosition > 0) {
-			objIndexSize = (int) (out.size() - objIndexPosition);
-		}
-		objBytes = out.size() - objPosition;
+		objs.finishSectionMaybeWriteIndex();
 	}
 
 	private void finishLog() throws IOException {
 		if (cur != null && cur.blockType() == LOG_BLOCK_TYPE) {
-			logBlocks = (out.blockCount() + 1) - (refBlocks + objBlocks);
-			logIndexPosition = finishBlockMaybeWriteIndex(logIndex);
-			logBytes = out.size() - logPosition;
+			logs.finishSectionMaybeWriteIndex();
 		}
 	}
 
-	private long finishBlockMaybeWriteIndex(BlockWriter idx)
-			throws IOException {
-		idx.addIndex(cur.lastKey(), out.size());
-		cur.writeTo(out);
-		cur = null;
-
-		if (!shouldHaveIndex(idx)) {
-			return 0;
-		}
-
-		if (idx == refIndex || idx == objIndex) {
-			out.padBetweenBlocksToNextBlock();
-		}
-		long position = out.size();
-		idx.writeTo(out);
-		return position;
-	}
-
-	private boolean shouldHaveIndex(BlockWriter idx) {
-		int threshold = idx == refIndex ? 4 : 1;
-		return idx.entryCount() + (cur != null ? 1 : 0) > threshold;
+	private boolean shouldHaveIndex(IndexBuilder idx) {
+		int threshold = idx == refs.idx ? 4 : 1;
+		return idx.entries.size() + (cur != null ? 1 : 0) > threshold;
 	}
 
 	private void writeFileHeader() {
@@ -486,17 +436,25 @@ public class ReftableWriter {
 		byte[] ftr = new byte[ftrLen];
 		encodeHeader(ftr);
 
-		NB.encodeInt64(ftr, 24, refIndexPosition);
-		NB.encodeInt64(ftr, 32, objPosition);
-		NB.encodeInt64(ftr, 40, objIndexPosition);
-		NB.encodeInt64(ftr, 48, logPosition);
-		NB.encodeInt64(ftr, 56, logIndexPosition);
+		NB.encodeInt64(ftr, 24, indexPosition(refs));
+		NB.encodeInt64(ftr, 32, (firstBlockPosition(objs) << 5) | objIdLen);
+		NB.encodeInt64(ftr, 40, indexPosition(objs));
+		NB.encodeInt64(ftr, 48, firstBlockPosition(logs));
+		NB.encodeInt64(ftr, 56, indexPosition(logs));
 
 		CRC32 crc = new CRC32();
 		crc.update(ftr, 0, ftrLen - 4);
 		NB.encodeInt32(ftr, ftrLen - 4, (int) crc.getValue());
 
 		out.write(ftr, 0, ftrLen);
+	}
+
+	private static long firstBlockPosition(@Nullable Section s) {
+		return s != null ? s.firstBlockPosition : 0;
+	}
+
+	private static long indexPosition(@Nullable Section s) {
+		return s != null && s.idx != null ? s.idx.rootPosition : 0;
 	}
 
 	/** @return statistics of the last written reftable. */
@@ -514,7 +472,7 @@ public class ReftableWriter {
 		private final long maxUpdateIndex;
 
 		private final long refCnt;
-		private final int objCnt;
+		private final long objCnt;
 		private final int objIdLen;
 		private final long logCnt;
 		private final long refBytes;
@@ -526,34 +484,41 @@ public class ReftableWriter {
 		private final int objBlocks;
 		private final int logBlocks;
 
-		private final int refIndexKeys;
 		private final int refIndexSize;
+		private final int refIndexLevels;
 		private final int objIndexSize;
+		private final int objIndexLevels;
 
-		Stats(ReftableWriter w, ReftableOutputStream o, BlockWriter refIdx) {
+		Stats(ReftableWriter w, ReftableOutputStream o) {
 			refBlockSize = w.refBlockSize;
 			logBlockSize = w.logBlockSize;
 			restartInterval = w.restartInterval;
 
 			minUpdateIndex = w.minUpdateIndex;
 			maxUpdateIndex = w.maxUpdateIndex;
-
-			refCnt = w.refCnt;
-			objCnt = w.objCnt;
-			objIdLen = w.objIdLen;
-			logCnt = w.logCnt;
-			refBytes = w.refBytes;
-			objBytes = w.objBytes;
-			logBytes = w.logBytes;
 			paddingUsed = o.paddingUsed();
 			totalBytes = o.size();
-			refBlocks = w.refBlocks;
-			objBlocks = w.objBlocks;
-			logBlocks = w.logBlocks;
 
-			refIndexKeys = w.refIndexPosition > 0 ? refIdx.entryCount() : 0;
-			refIndexSize = w.refIndexSize;
-			objIndexSize = w.objIndexSize;
+			refCnt = w.refs.entryCnt;
+			refBytes = w.refs.bytes;
+			refBlocks = w.refs.blockCnt;
+
+			objCnt = w.objs != null ? w.objs.entryCnt : 0;
+			objBytes = w.objs != null ? w.objs.bytes : 0;
+			objBlocks = w.objs != null ? w.objs.blockCnt : 0;
+			objIdLen = w.objIdLen;
+
+			logCnt = w.logs != null ? w.logs.entryCnt : 0;
+			logBytes = w.logs != null ? w.logs.bytes : 0;
+			logBlocks = w.logs != null ? w.logs.blockCnt : 0;
+
+			IndexBuilder refIdx = w.refs.idx;
+			refIndexSize = refIdx.bytes;
+			refIndexLevels = refIdx.levels;
+
+			IndexBuilder objIdx = w.objs != null ? w.objs.idx : null;
+			objIndexSize = objIdx != null ? objIdx.bytes : 0;
+			objIndexLevels = objIdx != null ? objIdx.levels : 0;
 		}
 
 		/** @return number of bytes in a ref block. */
@@ -636,19 +601,24 @@ public class ReftableWriter {
 			return paddingUsed;
 		}
 
-		/** @return number of keys in the ref index; 0 if no index was used. */
-		public int refIndexKeys() {
-			return refIndexKeys;
-		}
-
 		/** @return number of bytes in the ref index; 0 if no index was used. */
 		public int refIndexSize() {
 			return refIndexSize;
 		}
 
+		/** @return number of levels in the ref index. */
+		public int refIndexLevels() {
+			return refIndexLevels;
+		}
+
 		/** @return number of bytes in the object index; 0 if no index. */
 		public int objIndexSize() {
 			return objIndexSize;
+		}
+
+		/** @return number of levels in the object index. */
+		public int objIndexLevels() {
+			return objIndexLevels;
 		}
 
 		/**
@@ -662,8 +632,8 @@ public class ReftableWriter {
 
 		/** @return estimated number of disk seeks per ref read. */
 		public double diskSeeksPerRead() {
-			if (refIndexKeys() > 0) {
-				return 1;
+			if (refIndexLevels() > 0) {
+				return 1 + (refIndexLevels() - 1);
 			}
 			return log(refBlockCount()) / log(2);
 		}
@@ -679,15 +649,16 @@ public class ReftableWriter {
 	}
 
 	private static int shortestUniqueAbbreviation(List<RefList> in) {
+		// Estimate minimum number of bytes necessary for unique abbreviations.
+		int bytes = Math.max(2, (int) (log(in.size()) / log(8)));
 		Set<AbbreviatedObjectId> tmp = new HashSet<>((int) (in.size() * 0.75f));
-		int bytes = 2;
 		retry: for (;;) {
 			int hexLen = bytes * 2;
 			for (ObjectId id : in) {
 				AbbreviatedObjectId a = id.abbreviate(hexLen);
 				if (!tmp.add(a)) {
-					if (++bytes >= Constants.OBJECT_ID_LENGTH) {
-						return Constants.OBJECT_ID_LENGTH;
+					if (++bytes >= OBJECT_ID_LENGTH) {
+						return OBJECT_ID_LENGTH;
 					}
 					tmp.clear();
 					continue retry;
@@ -708,6 +679,127 @@ public class ReftableWriter {
 			if (!blockIds.contains(id)) {
 				blockIds.add(id);
 			}
+		}
+	}
+
+	private class Section {
+		final IndexBuilder idx;
+		final long firstBlockPosition;
+		final int priorBlockCnt;
+
+		long entryCnt;
+		long bytes;
+		int blockCnt;
+
+		Section(byte keyType) {
+			idx = new IndexBuilder(keyType);
+			priorBlockCnt = out.blockCount();
+			firstBlockPosition = out.size();
+		}
+
+		int write(BlockWriter.Entry entry) throws IOException {
+			if (cur == null) {
+				beginBlock(entry);
+			} else if (!cur.tryAdd(entry)) {
+				flushCurBlock();
+				if (cur.padBetweenBlocks()) {
+					out.padBetweenBlocksToNextBlock();
+				}
+				beginBlock(entry);
+			}
+			entryCnt++;
+			return out.blockCount();
+		}
+
+		private void beginBlock(BlockWriter.Entry entry)
+				throws BlockSizeTooSmallException {
+			byte blockType = entry.blockType();
+			int bs = out.bytesAvailableInBlock();
+			cur = new BlockWriter(blockType, idx.keyType, bs, restartInterval);
+			cur.mustAdd(entry);
+		}
+
+		void flushCurBlock() throws IOException {
+			idx.entries.add(new IndexEntry(cur.lastKey(), out.size()));
+			cur.writeTo(out);
+		}
+
+		void finishSectionMaybeWriteIndex() throws IOException {
+			flushCurBlock();
+			cur = null;
+			blockCnt = out.blockCount() - priorBlockCnt;
+			if (shouldHaveIndex(idx)) {
+				idx.writeIndex();
+			}
+			bytes = out.size() - firstBlockPosition;
+		}
+	}
+
+	private class IndexBuilder {
+		final byte keyType;
+		List<IndexEntry> entries = new ArrayList<>();
+		long rootPosition;
+		int bytes;
+		int levels;
+
+		IndexBuilder(byte kt) {
+			keyType = kt;
+		}
+
+		void writeIndex() throws IOException {
+			if (padBetweenBlocks(keyType)) {
+				out.padBetweenBlocksToNextBlock();
+			}
+			long startPos = out.size();
+			writeMultiLevelIndex(entries);
+			bytes = (int) (out.size() - startPos);
+			entries = null;
+		}
+
+		private void writeMultiLevelIndex(List<IndexEntry> keys)
+				throws IOException {
+			levels = 1;
+			while (maxIndexLevels == 0 || levels < maxIndexLevels) {
+				keys = writeOneLevel(keys);
+				if (keys == null) {
+					return;
+				}
+				levels++;
+			}
+
+			// When maxIndexLevels has restricted the writer, write one
+			// index block with the entire remaining set of keys.
+			BlockWriter b = new BlockWriter(
+					INDEX_BLOCK_TYPE, keyType,
+					MAX_INDEX_SIZE,
+					Math.max(restartInterval, keys.size() / MAX_RESTARTS));
+			for (Entry e : keys) {
+				b.mustAdd(e);
+			}
+			rootPosition = out.size();
+			b.writeTo(out);
+		}
+
+		private List<IndexEntry> writeOneLevel(List<IndexEntry> keys)
+				throws IOException {
+			Section thisLevel = new Section(keyType);
+			for (Entry e : keys) {
+				thisLevel.write(e);
+			}
+			if (!thisLevel.idx.entries.isEmpty()) {
+				thisLevel.flushCurBlock();
+				if (cur.padBetweenBlocks()) {
+					out.padBetweenBlocksToNextBlock();
+				}
+				cur = null;
+				return thisLevel.idx.entries;
+			}
+
+			// The current block fit entire level; make it the root.
+			rootPosition = out.size();
+			cur.writeTo(out);
+			cur = null;
+			return null;
 		}
 	}
 }
