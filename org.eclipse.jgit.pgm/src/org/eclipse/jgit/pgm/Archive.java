@@ -56,7 +56,7 @@ class Archive extends TextBuiltin {
 	private ObjectId tree;
 
 	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private String format = "zip";
+	private ArchiveCommand.Format format = ArchiveCommand.Format.ZIP;
 
 	@Override
 	protected void run() throws Exception {
