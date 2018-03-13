@@ -137,22 +137,12 @@
     <jetty-version>7.1.6.v20100715</jetty-version>
   </properties>
 
-  <pluginRepositories>
-    <pluginRepository>
-      <!-- need maven-findbugs-2.3.2-SNAPSHOT, see
-           http://jira.codehaus.org/browse/MFINDBUGS-122
-           remove this when this version is released -->
-      <id>codehaus.snapshots</id>
-      <url>http://snapshots.repository.codehaus.org/</url>
-    </pluginRepository>
-  </pluginRepositories>
-
   <build>
     <pluginManagement>
       <plugins>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
-	  <artifactId>maven-jar-plugin</artifactId>
+          <artifactId>maven-jar-plugin</artifactId>
           <version>2.3</version>
           <configuration>
             <archive>
@@ -220,12 +210,9 @@
         </plugin>
 
         <plugin>
-          <!-- need maven-findbugs-2.3.2-SNAPSHOT, see
-               http://jira.codehaus.org/browse/MFINDBUGS-122
-               switch to released version when available -->
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>findbugs-maven-plugin</artifactId>
-          <version>2.3.2-SNAPSHOT</version>
+          <version>2.3.2</version>
           <configuration>
             <findbugsXmlOutput>true</findbugsXmlOutput>
             <failOnError>false</failOnError>
@@ -279,7 +266,7 @@
             <id>translate-qualifier</id>
             <phase>generate-resources</phase>
             <configuration>
-	          <tasks unless="${translate-qualifier}">
+              <tasks unless="${translate-qualifier}">
                 <copy file="META-INF/MANIFEST.MF" tofile="${bundle-manifest}" overwrite="true"/>
                 <replace file="${bundle-manifest}">
                   <replacefilter token=".qualifier" value=".${maven.build.timestamp}"/>
@@ -405,15 +392,18 @@
 
   <modules>
     <module>org.eclipse.jgit</module>
+    <module>org.eclipse.jgit.storage.dht</module>
+    <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.ui</module>
     <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.iplog</module>
     <module>org.eclipse.jgit.pgm</module>
     <module>org.eclipse.jgit.junit</module>
-	<module>org.eclipse.jgit.junit.http</module>
+    <module>org.eclipse.jgit.junit.http</module>
 
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.http.test</module>
+    <module>org.eclipse.jgit.storage.dht.test</module>
   </modules>
 
 </project>
