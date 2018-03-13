@@ -43,12 +43,7 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.text.MessageFormat;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
 
 import org.eclipse.jgit.pgm.internal.CLIText;
 
@@ -56,46 +51,15 @@ import org.eclipse.jgit.pgm.internal.CLIText;
 class Version extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
-		// read the Implementation-Version from Manifest
-		String version = getImplementationVersion();
-
-		// if Implementation-Version is not available then try reading
-		// Bundle-Version
-		if (version == null)
-			version = getBundleVersion();
-
-		// if both Implementation-Version and Bundle-Version are not available
-		// then throw an exception
-		if (version == null)
+		final Package pkg = getClass().getPackage();
+		if (pkg == null || pkg.getImplementationVersion() == null)
 			throw die(CLIText.get().cannotReadPackageInformation);
 
-		outw.println(MessageFormat.format(CLIText.get().jgitVersion, version));
+		outw.println(MessageFormat.format(CLIText.get().jgitVersion, pkg.getImplementationVersion()));
 	}
 
 	@Override
 	protected final boolean requiresRepository() {
 		return false;
-	}
-
-	private String getImplementationVersion() {
-		Package pkg = getClass().getPackage();
-		if (pkg != null) {
-			return pkg.getImplementationVersion();
-		}
-		return null;
-	}
-
-	private String getBundleVersion() {
-		ClassLoader cl = getClass().getClassLoader();
-		if (cl instanceof URLClassLoader) {
-			URL url = ((URLClassLoader) cl).findResource(JarFile.MANIFEST_NAME);
-			try {
-				Manifest manifest = new Manifest(url.openStream());
-				return manifest.getMainAttributes().getValue("Bundle-Version");
-			} catch (IOException e) {
-				// do nothing - will return null
-			}
-		}
-		return null;
 	}
 }
