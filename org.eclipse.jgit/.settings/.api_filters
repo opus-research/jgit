@@ -17,19 +17,19 @@
         </filter>
     </resource>
     <resource path="src/org/eclipse/jgit/lib/ReflogEntry.java" type="org.eclipse.jgit.lib.ReflogEntry">
-        <filter comment="osgi semantic versioning allows breaking implementors in minor releases" id="403767336">
+        <filter comment="adding enum constant does not break binary compatibility" id="403767336">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.lib.ReflogEntry"/>
                 <message_argument value="PREFIX_CREATED"/>
             </message_arguments>
         </filter>
-        <filter comment="osgi semantic versioning allows breaking implementors in minor releases" id="403767336">
+        <filter comment="adding enum constant does not break binary compatibility" id="403767336">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.lib.ReflogEntry"/>
                 <message_argument value="PREFIX_FAST_FORWARD"/>
             </message_arguments>
         </filter>
-        <filter comment="osgi semantic versioning allows breaking implementors in minor releases" id="403767336">
+        <filter comment="adding enum constant does not break binary compatibility" id="403767336">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.lib.ReflogEntry"/>
                 <message_argument value="PREFIX_FORCED_UPDATE"/>
