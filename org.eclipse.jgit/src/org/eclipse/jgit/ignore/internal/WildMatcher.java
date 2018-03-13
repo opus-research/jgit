@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.ignore.internal;
 
-package org.eclipse.jgit.internal.storage.file;
+/**
+ * Wildmatch matcher for "double star" (<code>**</code>) pattern only. This
+ * matcher matches any path.
+ * <p>
+ * This class is immutable and thread safe.
+ *
+ * @since 3.6
+ */
+public final class WildMatcher extends AbstractMatcher {
 
-import static org.junit.Assert.assertEquals;
+	static final String WILDMATCH = "**"; //$NON-NLS-1$
 
-import org.eclipse.jgit.internal.storage.file.BasePackBitmapIndex.StoredBitmap;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+	// double star for the beginning of pattern
+	static final String WILDMATCH2 = "/**"; //$NON-NLS-1$
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
+	static final WildMatcher INSTANCE = new WildMatcher();
 
-public class StoredBitmapTest {
-
-	@Test
-	public void testGetBitmapWithoutXor() {
-		EWAHCompressedBitmap b = bitmapOf(100);
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
-		assertEquals(b, sb.getBitmap());
+	private WildMatcher() {
+		super(WILDMATCH, false);
 	}
 
-	@Test
-	public void testGetBitmapWithOneXor() {
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
-		assertEquals(bitmapOf(101), sb.getBitmap());
+	public final boolean matches(String path, boolean assumeDirectory) {
+		return true;
 	}
 
-	@Test
-	public void testGetBitmapWithThreeXor() {
-		StoredBitmap sb = newStoredBitmap(
-				bitmapOf(100),
-				bitmapOf(90, 101),
-				bitmapOf(100, 101),
-				bitmapOf(50));
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
+	public final boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		return true;
 	}
 
-	private static final StoredBitmap newStoredBitmap(
-			EWAHCompressedBitmap... bitmaps) {
-		StoredBitmap sb = null;
-		for (EWAHCompressedBitmap bitmap : bitmaps)
-			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb, 0);
-		return sb;
-	}
-
-	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
-		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
-		for (int bit : bits)
-			b.set(bit);
-		return b;
-	}
 }

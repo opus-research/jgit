@@ -70,8 +70,8 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
-import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
@@ -573,23 +573,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
 	protected boolean isEntryIgnored(final int pLen) throws IOException {
-		return isEntryIgnored(pLen, false);
-	}
-
-	/**
-	 * Determine if the entry path is ignored by an ignore rule. Consider
-	 * possible rule negation from child iterator.
-	 *
-	 * @param pLen
-	 *            the length of the path in the path buffer.
-	 * @param negatePrevious
-	 *            true if the previous matching iterator rule was negation
-	 * @return true if the entry is ignored by an ignore rule.
-	 * @throws IOException
-	 *             a relevant ignore rule file exists but cannot be read.
-	 */
-	private boolean isEntryIgnored(final int pLen, boolean negatePrevious)
-			throws IOException {
 		IgnoreNode rules = getIgnoreNode();
 		if (rules != null) {
 			// The ignore code wants path to start with a '/' if possible.
@@ -600,23 +583,17 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (0 < pOff)
 				pOff--;
 			String p = TreeWalk.pathOf(path, pOff, pLen);
-			switch (rules.isIgnored(p, FileMode.TREE.equals(mode),
-					negatePrevious)) {
+			switch (rules.isIgnored(p, FileMode.TREE.equals(mode))) {
 			case IGNORED:
 				return true;
 			case NOT_IGNORED:
 				return false;
 			case CHECK_PARENT:
-				negatePrevious = false;
-				break;
-			case CHECK_PARENT_NEGATE_FIRST_MATCH:
-				negatePrevious = true;
 				break;
 			}
 		}
 		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen,
-					negatePrevious);
+			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen);
 		return false;
 	}
 
@@ -691,6 +668,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ptr = 0;
 		if (!eof())
 			parseEntry();
+		else if (pathLen == 0) // see bug 445363
+			pathLen = pathOffset;
 	}
 
 	/**
@@ -1153,7 +1132,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		final Entry entry;
 
 		PerDirectoryIgnoreNode(Entry entry) {
-			super(Collections.<IgnoreRule> emptyList());
+			super(Collections.<FastIgnoreRule> emptyList());
 			this.entry = entry;
 		}
 
