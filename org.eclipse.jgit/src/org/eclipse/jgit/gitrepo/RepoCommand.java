@@ -46,15 +46,17 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -101,6 +103,14 @@ import org.xml.sax.helpers.XMLReaderFactory;
  * This will parse a repo XML manifest, convert it into .gitmodules file and the
  * repository config file.
  *
+ * If called against a bare repository, it will replace all the existing content
+ * of the repository with the contents populated from the manifest.
+ *
+ * repo manifest allows projects overlapping, e.g. one project's path is
+ * &quot;foo&quot; and another project's path is &quot;foo/bar&quot;. This won't
+ * work in git submodule, so we'll skip all the sub projects
+ * (&quot;foo/bar&quot; in the example) while converting.
+ *
  * @see <a href="https://code.google.com/p/git-repo/">git-repo project page</a>
  * @since 3.4
  */
@@ -112,6 +122,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private String branch;
 	private PersonIdent author;
 	private RemoteReader callback;
+	private InputStream inputStream;
 
 	private List<Project> bareProjects;
 	private Git git;
@@ -160,16 +171,10 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/** A default implementation of {@link RemoteReader} callback. */
 	public static class DefaultRemoteReader implements RemoteReader {
 		public ObjectId sha1(String uri, String ref) throws GitAPIException {
-			Collection<Ref> refs = Git
+			Map<String, Ref> map = Git
 					.lsRemoteRepository()
 					.setRemote(uri)
-					.call();
-			// Since LsRemoteCommand.call() only returned Map.values() to us, we
-			// have to rebuild the map here.
-			Map<String, Ref> map = new HashMap<String, Ref>(refs.size());
-			for (Ref r : refs)
-				map.put(r.getName(), r);
-
+					.callAsMap();
 			Ref r = RefDatabase.findRef(map, ref);
 			return r != null ? r.getObjectId() : null;
 		}
@@ -184,6 +189,29 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					.setURI(uri)
 					.call()
 					.getRepository();
+			try {
+				return readFileFromRepo(repo, ref, path);
+			} finally {
+				FileUtils.delete(dir, FileUtils.RECURSIVE);
+			}
+		}
+
+		/**
+		 * Read a file from the repository
+		 *
+		 * @param repo
+		 *            The repository containing the file
+		 * @param ref
+		 *            The ref (branch/tag/etc.) to read
+		 * @param path
+		 *            The relative path (inside the repo) to the file to read
+		 * @return the file's content
+		 * @throws GitAPIException
+		 * @throws IOException
+		 * @since 3.5
+		 */
+		protected byte[] readFileFromRepo(Repository repo,
+				String ref, String path) throws GitAPIException, IOException {
 			ObjectReader reader = repo.newObjectReader();
 			byte[] result;
 			try {
@@ -191,7 +219,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				result = reader.open(oid).getBytes(Integer.MAX_VALUE);
 			} finally {
 				reader.release();
-				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
 			return result;
 		}
@@ -229,7 +256,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 	}
 
-	private static class Project {
+	private static class Project implements Comparable<Project> {
 		final String name;
 		final String path;
 		final String revision;
@@ -249,24 +276,62 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		void addCopyFile(CopyFile copyfile) {
 			copyfiles.add(copyfile);
 		}
+
+		String getPathWithSlash() {
+			if (path.endsWith("/")) //$NON-NLS-1$
+				return path;
+			else
+				return path + "/"; //$NON-NLS-1$
+		}
+
+		boolean isAncestorOf(Project that) {
+			return that.getPathWithSlash().startsWith(this.getPathWithSlash());
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (o instanceof Project) {
+				Project that = (Project) o;
+				return this.getPathWithSlash().equals(that.getPathWithSlash());
+			}
+			return false;
+		}
+
+		@Override
+		public int hashCode() {
+			return this.getPathWithSlash().hashCode();
+		}
+
+		public int compareTo(Project that) {
+			return this.getPathWithSlash().compareTo(that.getPathWithSlash());
+		}
 	}
 
 	private static class XmlManifest extends DefaultHandler {
 		private final RepoCommand command;
+		private final InputStream inputStream;
 		private final String filename;
 		private final String baseUrl;
 		private final Map<String, String> remotes;
-		private final List<Project> projects;
 		private final Set<String> plusGroups;
 		private final Set<String> minusGroups;
+		private List<Project> projects;
 		private String defaultRemote;
 		private String defaultRevision;
 		private Project currentProject;
 
-		XmlManifest(RepoCommand command, String filename, String baseUrl, String groups) {
+		XmlManifest(RepoCommand command, InputStream inputStream,
+				String filename, String baseUrl, String groups) {
 			this.command = command;
+			this.inputStream = inputStream;
 			this.filename = filename;
-			this.baseUrl = baseUrl;
+
+			// Strip trailing /s to match repo behavior.
+			int lastIndex = baseUrl.length() - 1;
+			while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
+				lastIndex--;
+			this.baseUrl = baseUrl.substring(0, lastIndex + 1);
+
 			remotes = new HashMap<String, String>();
 			projects = new ArrayList<Project>();
 			plusGroups = new HashSet<String>();
@@ -292,16 +357,13 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				throw new IOException(JGitText.get().noXMLParserAvailable);
 			}
 			xr.setContentHandler(this);
-			final FileInputStream in = new FileInputStream(filename);
 			try {
-				xr.parse(new InputSource(in));
+				xr.parse(new InputSource(inputStream));
 			} catch (SAXException e) {
-				IOException error = new IOException(MessageFormat.format(
-							RepoText.get().errorParsingManifestFile, filename));
+				IOException error = new IOException(
+							RepoText.get().errorParsingManifestFile);
 				error.initCause(e);
 				throw error;
-			} finally {
-				in.close();
 			}
 		}
 
@@ -312,7 +374,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				String qName,
 				Attributes attributes) throws SAXException {
 			if ("project".equals(qName)) { //$NON-NLS-1$
-				currentProject = new Project( //$NON-NLS-1$
+				currentProject = new Project(
 						attributes.getValue("name"), //$NON-NLS-1$
 						attributes.getValue("path"), //$NON-NLS-1$
 						attributes.getValue("revision"), //$NON-NLS-1$
@@ -350,24 +412,51 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		@Override
 		public void endDocument() throws SAXException {
 			if (defaultRemote == null) {
-				throw new SAXException(MessageFormat.format(
-						RepoText.get().errorNoDefault, filename));
+				if (filename != null)
+					throw new SAXException(MessageFormat.format(
+							RepoText.get().errorNoDefaultFilename, filename));
+				else
+					throw new SAXException(RepoText.get().errorNoDefault);
 			}
 			final String remoteUrl;
 			try {
-				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote))); //$NON-NLS-1$
-				remoteUrl = uri.normalize().toString();
+				URI uri = new URI(baseUrl);
+				remoteUrl = uri.resolve(remotes.get(defaultRemote)).toString();
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
 			}
+			removeNotInGroup();
+			removeOverlaps();
 			for (Project proj : projects) {
-				if (inGroups(proj)) {
-					command.addSubmodule(remoteUrl + proj.name,
-							proj.path,
-							proj.revision == null ?
-									defaultRevision : proj.revision,
-							proj.copyfiles);
-				}
+				command.addSubmodule(remoteUrl + proj.name,
+						proj.path,
+						proj.revision == null
+								? defaultRevision : proj.revision,
+						proj.copyfiles);
+			}
+		}
+
+		/** Remove projects that are not in our desired groups. */
+		void removeNotInGroup() {
+			Iterator<Project> iter = projects.iterator();
+			while (iter.hasNext())
+				if (!inGroups(iter.next()))
+					iter.remove();
+		}
+
+		/** Remove projects that sits in a subdirectory of any other project. */
+		void removeOverlaps() {
+			Collections.sort(projects);
+			Iterator<Project> iter = projects.iterator();
+			if (!iter.hasNext())
+				return;
+			Project last = iter.next();
+			while (iter.hasNext()) {
+				Project p = iter.next();
+				if (last.isAncestorOf(p))
+					iter.remove();
+				else
+					last = p;
 			}
 		}
 
@@ -410,7 +499,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set path to the manifest XML file
+	 * Set path to the manifest XML file.
+	 *
+	 * Calling {@link #setInputStream} will ignore the path set here.
 	 *
 	 * @param path
 	 *            (with <code>/</code> as separator)
@@ -418,6 +509,21 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 */
 	public RepoCommand setPath(final String path) {
 		this.path = path;
+		return this;
+	}
+
+	/**
+	 * Set the input stream to the manifest XML.
+	 *
+	 * Setting inputStream will ignore the path set. It will be closed in
+	 * {@link #call}.
+	 *
+	 * @param inputStream
+	 * @return this command
+	 * @since 3.5
+	 */
+	public RepoCommand setInputStream(final InputStream inputStream) {
+		this.inputStream = inputStream;
 		return this;
 	}
 
@@ -474,7 +580,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/**
 	 * Set the author/committer for the bare repository commit.
 	 *
-	 * For non-bare repositories, the current user will be used and this will be ignored.
+	 * For non-bare repositories, the current user will be used and this will be
+	 * ignored.
 	 *
 	 * @param author
 	 * @return this command
@@ -499,26 +606,46 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	@Override
 	public RevCommit call() throws GitAPIException {
-		checkCallable();
-		if (path == null || path.length() == 0)
-			throw new IllegalArgumentException(JGitText.get().pathNotConfigured);
-		if (uri == null || uri.length() == 0)
-			throw new IllegalArgumentException(JGitText.get().uriNotConfigured);
-
-		if (repo.isBare()) {
-			bareProjects = new ArrayList<Project>();
-			if (author == null)
-				author = new PersonIdent(repo);
-			if (callback == null)
-				callback = new DefaultRemoteReader();
-		} else
-			git = new Git(repo);
-
-		XmlManifest manifest = new XmlManifest(this, path, uri, groups);
 		try {
-			manifest.read();
-		} catch (IOException e) {
-			throw new ManifestErrorException(e);
+			checkCallable();
+			if (uri == null || uri.length() == 0)
+				throw new IllegalArgumentException(
+						JGitText.get().uriNotConfigured);
+			if (inputStream == null) {
+				if (path == null || path.length() == 0)
+					throw new IllegalArgumentException(
+							JGitText.get().pathNotConfigured);
+				try {
+					inputStream = new FileInputStream(path);
+				} catch (IOException e) {
+					throw new IllegalArgumentException(
+							JGitText.get().pathNotConfigured);
+				}
+			}
+
+			if (repo.isBare()) {
+				bareProjects = new ArrayList<Project>();
+				if (author == null)
+					author = new PersonIdent(repo);
+				if (callback == null)
+					callback = new DefaultRemoteReader();
+			} else
+				git = new Git(repo);
+
+			XmlManifest manifest = new XmlManifest(
+					this, inputStream, path, uri, groups);
+			try {
+				manifest.read();
+			} catch (IOException e) {
+				throw new ManifestErrorException(e);
+			}
+		} finally {
+			try {
+				if (inputStream != null)
+					inputStream.close();
+			} catch (IOException e) {
+				// Just ignore it, it's not important.
+			}
 		}
 
 		if (repo.isBare()) {
@@ -526,7 +653,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			DirCacheBuilder builder = index.builder();
 			ObjectInserter inserter = repo.newObjectInserter();
 			RevWalk rw = new RevWalk(repo);
-
 			try {
 				Config cfg = new Config();
 				for (Project proj : bareProjects) {

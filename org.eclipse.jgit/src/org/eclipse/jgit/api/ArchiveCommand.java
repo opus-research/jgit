@@ -204,7 +204,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 			this.format = format;
 			this.refcnt = refcnt;
 		}
-	};
+	}
 
 	/**
 	 * Available archival formats (corresponding to values for
@@ -475,6 +475,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * Set an optional parameter path. without an optional path parameter, all
 	 * files and subdirectories of the current working directory are included in
 	 * the archive. If one or more paths are specified, only these are included.
+	 *
 	 * @param paths
 	 *            file names (e.g <code>file1.c</code>) or directory names (e.g.
 	 *            <code>dir</code> to add <code>dir/file1</code> and
@@ -482,6 +483,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *            the directory, recursively. Fileglobs (e.g. *.c) are not yet
 	 *            supported.
 	 * @return this
+	 * @since 3.4
 	 */
 	public ArchiveCommand setPaths(String... paths) {
 		this.paths = Arrays.asList(paths);
