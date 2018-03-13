@@ -177,10 +177,7 @@ class Diff extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		HistogramDiff alg = new HistogramDiff();
-		alg.setFallbackAlgorithm(null);
 		diffFmt.setRepository(db);
-		diffFmt.setDiffAlgorithm(alg);
 		try {
 			if (cached) {
 				if (oldTree == null) {
