@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,51 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.lib;
 
-import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 
-import junit.textui.TestRunner;
-
-public class T0005_ShallowSpeedTest extends SpeedTestBase {
-
-	protected void setUp() throws Exception {
-		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d" });
+/**
+ * Test cases for ReadTree operations as implemented in
+ * {@link WorkDirCheckout}
+ */
+public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
+	private WorkDirCheckout wdc;
+	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkDir(), head, db.getIndex(), merge);
+		wdc.prescanTwoTrees();
 	}
 
-	public void testShallowHistoryScan() throws IOException {
-		long start = System.currentTimeMillis();
-		Repository db = new Repository(new File(kernelrepo));
-		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
-		int n = 1;
-		for (;;) {
-			ObjectId[] parents = commit.getParentIds();
-			if (parents.length == 0)
-				break;
-			ObjectId parentId = parents[0];
-			commit = db.mapCommit(parentId);
-			commit.getCommitId().name();
-			++n;
-		}
-		assertEquals(12275, n);
-		long stop = System.currentTimeMillis();
-		long time = stop - start;
-		System.out.println("native="+nativeTime);
-		System.out.println("jgit="+time);
-		// ~0.750s (hot cache), ok
-		/*
-native=1795
-jgit=722
-		 */
-		// native git seems to run SLOWER than jgit here, at roughly half the speed
-		// creating the git process is not the issue here, btw.
-		long factor10 = (nativeTime*150/time+50)/100;
-		assertEquals(3, factor10);
+	public void checkout() throws IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkDir(), theHead, db.getIndex(), theMerge);
+		wdc.checkout();
 	}
 
-	public static void main(String[] args) {
-		TestRunner.run(T0005_ShallowSpeedTest.class);
+	public ArrayList<String> getRemoved() {
+		return wdc.getRemoved();
+	}
+
+	public HashMap<String, ObjectId> getUpdated() {
+		return wdc.updated;
+	}
+
+	public ArrayList<String> getConflicts() {
+		return wdc.getConflicts();
 	}
 }
+
