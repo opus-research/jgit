@@ -88,9 +88,9 @@ public abstract class TextBuiltin {
 	private boolean help;
 
     /**
-     * Input stream, typically the is standard input.
+     * Input stream, typically this is standard input.
      *
-     * @since 3.3
+     * @since 3.4
      */
     protected InputStream ins;
 
@@ -113,14 +113,15 @@ public abstract class TextBuiltin {
 	 *
 	 * @deprecated Use outw instead
 	 */
+	@Deprecated
 	protected PrintWriter out;
 
-    /**
-     * Error output stream, typically this is standard error.
-     *
-     * @since 3.3
-     */
-    protected PrintStream err;
+	/**
+	 * Error output stream, typically this is standard error.
+	 *
+	 * @since 3.4
+	 */
+	protected PrintStream err;
 
     /** Git repository the command was invoked within. */
 	protected Repository db;
@@ -153,9 +154,8 @@ public abstract class TextBuiltin {
 		try {
 			final String outputEncoding = repository != null ? repository
 					.getConfig().getString("i18n", null, "logOutputEncoding") : null; //$NON-NLS-1$ //$NON-NLS-2$
-            if (ins == null) {
-                ins = new FileInputStream(FileDescriptor.in);
-            }
+			if (ins == null)
+				ins = new FileInputStream(FileDescriptor.in);
 			if (outs == null)
 				outs = new FileOutputStream(FileDescriptor.out);
 			BufferedWriter bufw;
@@ -166,9 +166,8 @@ public abstract class TextBuiltin {
 				bufw = new BufferedWriter(new OutputStreamWriter(outs));
 			out = new PrintWriter(bufw);
 			outw = new ThrowingPrintWriter(bufw);
-            if (err == null) {
-                err = System.err;
-            }
+			if (err == null)
+				err = System.err;
 		} catch (IOException e) {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}
@@ -253,7 +252,7 @@ public abstract class TextBuiltin {
 		writer.println();
 
 		writer.flush();
-        throw die(true);
+		throw die(true);
 	}
 
 	/**
@@ -310,13 +309,15 @@ public abstract class TextBuiltin {
 		return new Die(why, cause);
 	}
 
-    /**
-     * @param aborted
-     * @return a runtime exception the caller is expected to throw
-     */
-    protected static Die die(boolean aborted) {
-        return new Die(aborted);
-    }
+	/**
+	 * @param aborted
+     *            boolean indicating that the exception should be aborted
+	 * @return a runtime exception the caller is expected to throw
+     * @since 3.4
+	 */
+	protected static Die die(boolean aborted) {
+		return new Die(aborted);
+	}
 
 	String abbreviateRef(String dst, boolean abbreviateRemote) {
 		if (dst.startsWith(R_HEADS))
