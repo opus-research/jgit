@@ -234,6 +234,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			refLogMessage.append(ref.getName());
 
 			// handle annotated tags
+			ref = repo.peel(ref);
 			ObjectId objectId = ref.getPeeledObjectId();
 			if (objectId == null)
 				objectId = ref.getObjectId();
@@ -269,7 +270,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						headCommit, srcCommit },
 						MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy, null, null);
 			} else if (revWalk.isMergedInto(headCommit, srcCommit)
-					&& fastForwardMode == FastForwardMode.FF) {
+					&& fastForwardMode != FastForwardMode.NO_FF) {
 				// FAST_FORWARD detected: skip doing a real merge but only
 				// update HEAD
 				refLogMessage.append(": " + MergeStatus.FAST_FORWARD); //$NON-NLS-1$
