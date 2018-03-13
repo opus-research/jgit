@@ -160,7 +160,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	protected DfsObjDatabase(DfsRepository repository,
 			DfsReaderOptions options) {
 		this.repository = repository;
-		this.packList = new AtomicReference<>(NO_PACKS);
+		this.packList = new AtomicReference<PackList>(NO_PACKS);
 		this.readerOptions = options;
 	}
 
@@ -170,7 +170,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	}
 
 	@Override
-	public DfsReader newReader() {
+	public ObjectReader newReader() {
 		return new DfsReader(this);
 	}
 
@@ -264,32 +264,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 */
 	protected abstract DfsPackDescription newPack(PackSource source)
 			throws IOException;
-
-	/**
-	 * Generate a new unique name for a pack file.
-	 *
-	 * <p>
-	 * Default implementation of this method would be equivalent to
-	 * {@code newPack(source).setEstimatedPackSize(estimatedPackSize)}. But the
-	 * clients can override this method to use the given
-	 * {@code estomatedPackSize} value more efficiently in the process of
-	 * creating a new {@link DfsPackDescription} object.
-	 *
-	 * @param source
-	 *            where the pack stream is created.
-	 * @param estimatedPackSize
-	 *            the estimated size of the pack.
-	 * @return a unique name for the pack file. Must not collide with any other
-	 *         pack file name in the same DFS.
-	 * @throws IOException
-	 *             a new unique pack description cannot be generated.
-	 */
-	protected DfsPackDescription newPack(PackSource source,
-			long estimatedPackSize) throws IOException {
-		DfsPackDescription pack = newPack(source);
-		pack.setEstimatedPackSize(estimatedPackSize);
-		return pack;
-	}
 
 	/**
 	 * Commit a pack and index pair that was written to the DFS.
@@ -458,7 +432,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		List<DfsPackDescription> scanned = listPacks();
 		Collections.sort(scanned);
 
-		List<DfsPackFile> list = new ArrayList<>(scanned.size());
+		List<DfsPackFile> list = new ArrayList<DfsPackFile>(scanned.size());
 		boolean foundNew = false;
 		for (DfsPackDescription dsc : scanned) {
 			DfsPackFile oldPack = forReuse.remove(dsc);
@@ -483,7 +457,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 
 	private static Map<DfsPackDescription, DfsPackFile> reuseMap(PackList old) {
 		Map<DfsPackDescription, DfsPackFile> forReuse
-			= new HashMap<>();
+			= new HashMap<DfsPackDescription, DfsPackFile>();
 		for (DfsPackFile p : old.packs) {
 			if (p.invalid()) {
 				// The pack instance is corrupted, and cannot be safely used

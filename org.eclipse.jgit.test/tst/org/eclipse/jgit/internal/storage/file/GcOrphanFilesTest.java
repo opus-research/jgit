@@ -67,7 +67,6 @@ public class GcOrphanFilesTest extends GcTestCase {
 
 	private File packDir;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -79,7 +78,7 @@ public class GcOrphanFilesTest extends GcTestCase {
 		createFileInPackFolder(BITMAP_File_1);
 		createFileInPackFolder(IDX_File_2);
 		createFileInPackFolder(PACK_File_3);
-		gc.collectGarbage();
+		gc.gc();
 		assertFalse(new File(packDir, BITMAP_File_1).exists());
 		assertFalse(new File(packDir, IDX_File_2).exists());
 		assertTrue(new File(packDir, PACK_File_3).exists());
@@ -91,7 +90,7 @@ public class GcOrphanFilesTest extends GcTestCase {
 		createFileInPackFolder(IDX_File_2);
 		createFileInPackFolder(PACK_File_2);
 		createFileInPackFolder(PACK_File_3);
-		gc.collectGarbage();
+		gc.gc();
 		assertFalse(new File(packDir, BITMAP_File_1).exists());
 		assertTrue(new File(packDir, IDX_File_2).exists());
 		assertTrue(new File(packDir, PACK_File_2).exists());
@@ -101,7 +100,7 @@ public class GcOrphanFilesTest extends GcTestCase {
 	@Test
 	public void malformedIdxNotDeleted() throws Exception {
 		createFileInPackFolder(IDX_File_malformed);
-		gc.collectGarbage();
+		gc.gc();
 		assertTrue(new File(packDir, IDX_File_malformed).exists());
 	}
 
@@ -115,6 +114,6 @@ public class GcOrphanFilesTest extends GcTestCase {
 	@Test
 	public void noSuchPackFolder() throws Exception {
 		assertTrue(packDir.delete());
-		gc.collectGarbage();
+		gc.gc();
 	}
 }

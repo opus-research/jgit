@@ -114,7 +114,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		HttpTransport.setConnectionFactory(cf);
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -125,7 +124,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			@Override
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -241,7 +239,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<>(remoteRepository).packAndPrune();
+		new TestRepository<Repository>(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));

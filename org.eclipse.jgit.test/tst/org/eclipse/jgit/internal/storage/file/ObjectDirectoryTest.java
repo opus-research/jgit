@@ -47,18 +47,13 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -66,14 +61,9 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.junit.Assume;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 public class ObjectDirectoryTest extends RepositoryTestCase {
-
-	@Rule
-	public ExpectedException expectedEx = ExpectedException.none();
 
 	@Test
 	public void testConcurrentInsertionOfBlobsToTheSameNewFanOutDirectory()
@@ -124,7 +114,7 @@ public class ObjectDirectoryTest extends RepositoryTestCase {
 			// setup a repo which has at least one pack file and trigger
 			// scanning of the packs directory
 			ObjectId id = commitFile("file.txt", "test", "master").getId();
-			gc.collectGarbage();
+			gc.gc();
 			assertFalse(receivingDB.hasObject(unknownID));
 			assertTrue(receivingDB.getObjectDatabase().hasPackedObject(id));
 
@@ -153,7 +143,7 @@ public class ObjectDirectoryTest extends RepositoryTestCase {
 
 			// trigger a gc. This will create packfiles which have likely the
 			// same mtime than the packfolder
-			gc.collectGarbage();
+			gc.gc();
 
 			// To deal with racy-git situations JGit's Filesnapshot class will
 			// report a file/folder potentially dirty if
@@ -172,7 +162,7 @@ public class ObjectDirectoryTest extends RepositoryTestCase {
 					return name.endsWith(".pack");
 				}
 			});
-			assertTrue(ret != null && ret.length == 1);
+			assertTrue(ret.length == 1);
 			Assume.assumeTrue(tmpFile.lastModified() == ret[0].lastModified());
 
 			// all objects are in a new packfile but we will not detect it
@@ -181,44 +171,9 @@ public class ObjectDirectoryTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
-	public void testShallowFile()
-			throws Exception {
-		FileRepository repository = createBareRepository();
-		ObjectDirectory dir = repository.getObjectDatabase();
-
-		String commit = "d3148f9410b071edd4a4c85d2a43d1fa2574b0d2";
-		try (PrintWriter writer = new PrintWriter(
-				new File(repository.getDirectory(), Constants.SHALLOW))) {
-			writer.println(commit);
-		}
-		Set<ObjectId> shallowCommits = dir.getShallowCommits();
-		assertTrue(shallowCommits.remove(ObjectId.fromString(commit)));
-		assertTrue(shallowCommits.isEmpty());
-	}
-
-	@Test
-	public void testShallowFileCorrupt()
-			throws Exception {
-		FileRepository repository = createBareRepository();
-		ObjectDirectory dir = repository.getObjectDatabase();
-
-		String commit = "X3148f9410b071edd4a4c85d2a43d1fa2574b0d2";
-		try (PrintWriter writer = new PrintWriter(
-				new File(repository.getDirectory(), Constants.SHALLOW))) {
-			writer.println(commit);
-		}
-
-		expectedEx.expect(IOException.class);
-		expectedEx.expectMessage(MessageFormat
-				.format(JGitText.get().badShallowLine, commit));
-		dir.getShallowCommits();
-	}
-
 	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
 			final ObjectDirectory dir) {
 		Callable<ObjectId> callable = new Callable<ObjectId>() {
-			@Override
 			public ObjectId call() throws Exception {
 				return dir.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
 			}

@@ -305,7 +305,7 @@ public class FileHeader extends DiffEntry {
 		if (h.getFileHeader() != this)
 			throw new IllegalArgumentException(JGitText.get().hunkBelongsToAnotherFile);
 		if (hunks == null)
-			hunks = new ArrayList<>();
+			hunks = new ArrayList<HunkHeader>();
 		hunks.add(h);
 	}
 

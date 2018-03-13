@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.Config.SectionParser;
 public class CoreConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
 	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
-		@Override
 		public CoreConfig parse(final Config cfg) {
 			return new CoreConfig(cfg);
 		}

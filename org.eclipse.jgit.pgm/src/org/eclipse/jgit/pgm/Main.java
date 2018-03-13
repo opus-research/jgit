@@ -44,11 +44,8 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
@@ -56,7 +53,6 @@ import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
 import org.eclipse.jgit.awtui.AwtCredentialsProvider;
@@ -94,7 +90,7 @@ public class Main {
 	private TextBuiltin subcommand;
 
 	@Argument(index = 1, metaVar = "metaVar_arg")
-	private List<String> arguments = new ArrayList<>();
+	private List<String> arguments = new ArrayList<String>();
 
 	PrintWriter writer;
 
@@ -195,7 +191,7 @@ public class Main {
 	}
 
 	PrintWriter createErrorWriter() {
-		return new PrintWriter(new OutputStreamWriter(System.err, UTF_8));
+		return new PrintWriter(System.err);
 	}
 
 	private void execute(final String[] argv) throws Exception {
@@ -244,8 +240,7 @@ public class Main {
 		}
 
 		if (version) {
-			String cmdId = Version.class.getSimpleName()
-					.toLowerCase(Locale.ROOT);
+			String cmdId = Version.class.getSimpleName().toLowerCase();
 			subcommand = CommandCatalog.get(cmdId).create();
 		}
 

@@ -63,7 +63,7 @@ public class GcKeepFilesTest extends GcTestCase {
 		assertEquals(4, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
 		assertEquals(0, stats.numberOfPackFiles);
-		gc.collectGarbage();
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
@@ -73,10 +73,7 @@ public class GcKeepFilesTest extends GcTestCase {
 				.iterator();
 		PackFile singlePack = packIt.next();
 		assertFalse(packIt.hasNext());
-		String packFileName = singlePack.getPackFile().getPath();
-		String keepFileName = packFileName.substring(0,
-				packFileName.lastIndexOf('.')) + ".keep";
-		File keepFile = new File(keepFileName);
+		File keepFile = new File(singlePack.getPackFile().getPath() + ".keep");
 		assertFalse(keepFile.exists());
 		assertTrue(keepFile.createNewFile());
 		bb.commit().add("A", "A2").add("B", "B2").create();
@@ -84,7 +81,7 @@ public class GcKeepFilesTest extends GcTestCase {
 		assertEquals(4, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
-		gc.collectGarbage();
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(8, stats.numberOfPackedObjects);
