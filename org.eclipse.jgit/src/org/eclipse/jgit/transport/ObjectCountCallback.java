@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015, Google Inc.
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -13,17 +14,17 @@
  * conditions are met:
  *
  * - Redistributions of source code must retain the above copyright
- *	 notice, this list of conditions and the following disclaimer.
+ *   notice, this list of conditions and the following disclaimer.
  *
  * - Redistributions in binary form must reproduce the above
- *	 copyright notice, this list of conditions and the following
- *	 disclaimer in the documentation and/or other materials provided
- *	 with the distribution.
+ *   copyright notice, this list of conditions and the following
+ *   disclaimer in the documentation and/or other materials provided
+ *   with the distribution.
  *
  * - Neither the name of the Eclipse Foundation, Inc. nor the
- *	 names of its contributors may be used to endorse or promote
- *	 products derived from this software without specific prior
- *	 written permission.
+ *   names of its contributors may be used to endorse or promote
+ *   products derived from this software without specific prior
+ *   written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
  * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
@@ -42,35 +43,32 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertEquals;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
-/** Tests for base receive-pack utilities. */
-public class BaseReceivePackTest {
-	private static final String CMD_STRING =
-			"0000000000000000000000000000000000000000"
-			+ " deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-			+ " refs/heads/master";
-
-	@Test
-	public void parseCommand() {
-		String input = CMD_STRING;
-		ReceiveCommand cmd = BaseReceivePack.parseCommand(input);
-		assertEquals(ObjectId.zeroId(), cmd.getOldId());
-		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-				cmd.getNewId().name());
-		assertEquals("refs/heads/master", cmd.getRefName());
-	}
-
-	@Test
-	public void parseCommandWithTrailingNewline() {
-		String input = CMD_STRING + '\n';
-		ReceiveCommand cmd = BaseReceivePack.parseCommand(input);
-		assertEquals(ObjectId.zeroId(), cmd.getOldId());
-		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-				cmd.getNewId().name());
-		assertEquals("refs/heads/master", cmd.getRefName());
-	}
+/**
+ * A callback to tell caller the count of objects ASAP.
+ *
+ * @since 4.1
+ */
+public interface ObjectCountCallback {
+	/**
+	 * Invoked when the {@link PackWriter} has counted the objects to be
+	 * written to pack.
+	 * <p>
+	 * An {@code ObjectCountCallback} can use this information to decide
+	 * whether the
+	 * {@link PackWriter#writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
+	 * operation should be aborted.
+	 * <p>
+	 * This callback will be called exactly once.
+	 *
+	 * @param objectCount
+	 *            the count of the objects.
+	 * @throws WriteAbortedException
+	 *             to indicate that the write operation should be aborted.
+	 */
+	void setObjectCount(long objectCount) throws WriteAbortedException;
 }
