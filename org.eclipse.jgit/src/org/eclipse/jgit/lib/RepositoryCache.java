@@ -298,7 +298,7 @@ public class RepositoryCache {
 	}
 
 	private boolean isExpired(Repository db) {
-		return db != null && db.useCnt.get() == 0
+		return db != null && db.useCnt.get() <= 0
 			&& (System.currentTimeMillis() - db.closedAt.get() > expireAfter);
 	}
 
@@ -326,10 +326,15 @@ public class RepositoryCache {
 	}
 
 	private void clearAll() {
-		for (Iterator<Map.Entry<Key, Reference<Repository>>> i = cacheMap
-				.entrySet().iterator(); i.hasNext();) {
-			final Map.Entry<Key, Reference<Repository>> e = i.next();
-			unregisterAndCloseRepository(e.getKey(), null);
+		for (int stage = 0; stage < 2; stage++) {
+			for (Iterator<Map.Entry<Key, Reference<Repository>>> i = cacheMap
+					.entrySet().iterator(); i.hasNext();) {
+				final Map.Entry<Key, Reference<Repository>> e = i.next();
+				final Repository db = e.getValue().get();
+				if (db != null)
+					db.close();
+				i.remove();
+			}
 		}
 	}
 
