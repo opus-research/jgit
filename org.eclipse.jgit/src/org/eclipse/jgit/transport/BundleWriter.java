@@ -53,8 +53,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -63,6 +62,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.storage.pack.PackWriter;
 
 /**
  * Creates a Git bundle file, for sneaker-net transport to another system.
@@ -88,8 +88,6 @@ public class BundleWriter {
 
 	private final Set<RevCommit> assume;
 
-	private final Set<ObjectId> tagTargets;
-
 	private PackConfig packConfig;
 
 	/**
@@ -102,7 +100,6 @@ public class BundleWriter {
 		db = repo;
 		include = new TreeMap<String, ObjectId>();
 		assume = new HashSet<RevCommit>();
-		tagTargets = new HashSet<ObjectId>();
 	}
 
 	/**
@@ -128,8 +125,7 @@ public class BundleWriter {
 	 *            object to pack. Multiple refs may point to the same object.
 	 */
 	public void include(final String name, final AnyObjectId id) {
-		boolean validRefName = Repository.isValidRefName(name) || Constants.HEAD.equals(name);
-		if (!validRefName)
+		if (!Repository.isValidRefName(name))
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidRefName, name));
 		if (include.containsKey(name))
 			throw new IllegalStateException(JGitText.get().duplicateRef + name);
@@ -147,13 +143,6 @@ public class BundleWriter {
 	 */
 	public void include(final Ref r) {
 		include(r.getName(), r.getObjectId());
-
-		if (r.getPeeledObjectId() != null)
-			tagTargets.add(r.getPeeledObjectId());
-
-		else if (r.getObjectId() != null
-				&& r.getName().startsWith(Constants.R_HEADS))
-			tagTargets.add(r.getObjectId());
 	}
 
 	/**
@@ -201,12 +190,7 @@ public class BundleWriter {
 			inc.addAll(include.values());
 			for (final RevCommit r : assume)
 				exc.add(r.getId());
-			packWriter.setIndexDisabled(true);
-			packWriter.setDeltaBaseAsOffset(true);
 			packWriter.setThin(exc.size() > 0);
-			packWriter.setReuseValidatingObjects(false);
-			if (exc.size() == 0)
-				packWriter.setTagTargets(tagTargets);
 			packWriter.preparePack(monitor, inc, exc);
 
 			final Writer w = new OutputStreamWriter(os, Constants.CHARSET);

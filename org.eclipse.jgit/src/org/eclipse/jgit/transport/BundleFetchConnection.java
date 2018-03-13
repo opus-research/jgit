@@ -47,8 +47,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,23 +60,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -100,7 +96,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	BundleFetchConnection(Transport transportBundle, final InputStream src) throws TransportException {
 		transport = transportBundle;
-		bin = new BufferedInputStream(src);
+		bin = new BufferedInputStream(src, IndexPack.BUFFER_SIZE);
 		try {
 			switch (readSignature()) {
 			case 2:
@@ -183,17 +179,9 @@ class BundleFetchConnection extends BaseFetchConnection {
 			throws TransportException {
 		verifyPrerequisites();
 		try {
-			ObjectInserter ins = transport.local.newObjectInserter();
-			try {
-				PackParser parser = ins.newPackParser(bin);
-				parser.setAllowThin(true);
-				parser.setObjectChecker(transport.getObjectChecker());
-				parser.setLockMessage(lockMessage);
-				packLock = parser.parse(NullProgressMonitor.INSTANCE);
-				ins.flush();
-			} finally {
-				ins.release();
-			}
+			final IndexPack ip = newIndexPack();
+			ip.index(monitor);
+			packLock = ip.renameAndOpenPack(lockMessage);
 		} catch (IOException err) {
 			close();
 			throw new TransportException(transport.uri, err.getMessage(), err);
@@ -213,14 +201,21 @@ class BundleFetchConnection extends BaseFetchConnection {
 		return Collections.<PackLock> emptyList();
 	}
 
+	private IndexPack newIndexPack() throws IOException {
+		final IndexPack ip = IndexPack.create(transport.local, bin);
+		ip.setFixThin(true);
+		ip.setObjectChecking(transport.isCheckFetchedObjects());
+		return ip;
+	}
+
 	private void verifyPrerequisites() throws TransportException {
 		if (prereqs.isEmpty())
 			return;
 
 		final RevWalk rw = new RevWalk(transport.local);
 		try {
-			final RevFlag PREREQ = rw.newFlag("PREREQ"); //$NON-NLS-1$
-			final RevFlag SEEN = rw.newFlag("SEEN"); //$NON-NLS-1$
+			final RevFlag PREREQ = rw.newFlag("PREREQ");
+			final RevFlag SEEN = rw.newFlag("SEEN");
 
 			final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
 			final List<RevObject> commits = new ArrayList<RevObject>();
@@ -244,13 +239,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 				throw new MissingBundlePrerequisiteException(transport.uri,
 						missing);
 
-			Map<String, Ref> localRefs;
-			try {
-				localRefs = transport.local.getRefDatabase().getRefs(ALL);
-			} catch (IOException e) {
-				throw new TransportException(transport.uri, e.getMessage(), e);
-			}
-			for (final Ref r : localRefs.values()) {
+			for (final Ref r : transport.local.getAllRefs().values()) {
 				try {
 					rw.markStart(rw.parseCommit(r.getObjectId()));
 				} catch (IOException readError) {

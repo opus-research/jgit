@@ -49,19 +49,13 @@ import org.eclipse.jgit.lib.Repository;
  * A three-way merge strategy performing a content-merge if necessary
  */
 public class StrategyResolve extends ThreeWayMergeStrategy {
-
 	@Override
 	public ThreeWayMerger newMerger(Repository db) {
-		return new ResolveMerger(db, false);
-	}
-
-	@Override
-	public ThreeWayMerger newMerger(Repository db, boolean inCore) {
-		return new ResolveMerger(db, inCore);
+		return new ResolveMerger(db);
 	}
 
 	@Override
 	public String getName() {
-		return "resolve"; //$NON-NLS-1$
+		return "resolve";
 	}
 }

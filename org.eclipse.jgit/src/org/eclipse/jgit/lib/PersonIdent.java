@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -59,9 +58,7 @@ import org.eclipse.jgit.util.SystemReader;
  * Git combines Name + email + time + time zone to specify who wrote or
  * committed something.
  */
-public class PersonIdent implements Serializable {
-	private static final long serialVersionUID = 1L;
-
+public class PersonIdent {
 	private final String name;
 
 	private final String emailAddress;
@@ -78,7 +75,11 @@ public class PersonIdent implements Serializable {
 	 * @param repo
 	 */
 	public PersonIdent(final Repository repo) {
-		this(repo.getConfig().get(UserConfig.KEY));
+		final UserConfig config = repo.getConfig().get(UserConfig.KEY);
+		name = config.getCommitterName();
+		emailAddress = config.getCommitterEmail();
+		when = SystemReader.getInstance().getCurrentTime();
+		tzOffset = SystemReader.getInstance().getTimezone(when);
 	}
 
 	/**
@@ -98,7 +99,10 @@ public class PersonIdent implements Serializable {
 	 * @param aEmailAddress
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress) {
-		this(aName, aEmailAddress, SystemReader.getInstance().getCurrentTime());
+		name = aName;
+		emailAddress = aEmailAddress;
+		when = SystemReader.getInstance().getCurrentTime();
+		tzOffset = SystemReader.getInstance().getTimezone(when);
 	}
 
 	/**
@@ -124,7 +128,10 @@ public class PersonIdent implements Serializable {
 	 *            local time
 	 */
 	public PersonIdent(final PersonIdent pi, final Date aWhen) {
-		this(pi.getName(), pi.getEmailAddress(), aWhen.getTime(), pi.tzOffset);
+		name = pi.getName();
+		emailAddress = pi.getEmailAddress();
+		when = aWhen.getTime();
+		tzOffset = pi.tzOffset;
 	}
 
 	/**
@@ -139,32 +146,10 @@ public class PersonIdent implements Serializable {
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress,
 			final Date aWhen, final TimeZone aTZ) {
-		this(aName, aEmailAddress, aWhen.getTime(), aTZ.getOffset(aWhen
-				.getTime()) / (60 * 1000));
-	}
-
-	/**
-	 * Copy a PersonIdent, but alter the clone's time stamp
-	 *
-	 * @param pi
-	 *            original {@link PersonIdent}
-	 * @param aWhen
-	 *            local time stamp
-	 * @param aTZ
-	 *            time zone
-	 */
-	public PersonIdent(final PersonIdent pi, final long aWhen, final int aTZ) {
-		this(pi.getName(), pi.getEmailAddress(), aWhen, aTZ);
-	}
-
-	private PersonIdent(final String aName, final String aEmailAddress,
-			long when) {
-		this(aName, aEmailAddress, when, SystemReader.getInstance()
-				.getTimezone(when));
-	}
-
-	private PersonIdent(final UserConfig config) {
-		this(config.getCommitterName(), config.getCommitterEmail());
+		name = aName;
+		emailAddress = aEmailAddress;
+		when = aWhen.getTime();
+		tzOffset = aTZ.getOffset(when) / (60 * 1000);
 	}
 
 	/**
@@ -179,14 +164,25 @@ public class PersonIdent implements Serializable {
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress,
 			final long aWhen, final int aTZ) {
-		if (aName == null)
-			throw new IllegalArgumentException(
-					"Name of PersonIdent must not be null.");
-		if (aEmailAddress == null)
-			throw new IllegalArgumentException(
-					"E-mail address of PersonIdent must not be null.");
 		name = aName;
 		emailAddress = aEmailAddress;
+		when = aWhen;
+		tzOffset = aTZ;
+	}
+
+	/**
+	 * Copy a PersonIdent, but alter the clone's time stamp
+	 *
+	 * @param pi
+	 *            original {@link PersonIdent}
+	 * @param aWhen
+	 *            local time stamp
+	 * @param aTZ
+	 *            time zone
+	 */
+	public PersonIdent(final PersonIdent pi, final long aWhen, final int aTZ) {
+		name = pi.getName();
+		emailAddress = pi.getEmailAddress();
 		when = aWhen;
 		tzOffset = aTZ;
 	}
@@ -217,7 +213,7 @@ public class PersonIdent implements Serializable {
 	 */
 	public TimeZone getTimeZone() {
 		StringBuilder tzId = new StringBuilder(8);
-		tzId.append("GMT"); //$NON-NLS-1$
+		tzId.append("GMT");
 		appendTimezone(tzId);
 		return TimeZone.getTimeZone(tzId.toString());
 	}
@@ -254,10 +250,10 @@ public class PersonIdent implements Serializable {
 	 */
 	public String toExternalString() {
 		final StringBuilder r = new StringBuilder();
-		r.append(getName().trim());
-		r.append(" <"); //$NON-NLS-1$
-		r.append(getEmailAddress().trim());
-		r.append("> "); //$NON-NLS-1$
+		r.append(getName());
+		r.append(" <");
+		r.append(getEmailAddress());
+		r.append("> ");
 		r.append(when / 1000);
 		r.append(' ');
 		appendTimezone(r);
@@ -291,7 +287,6 @@ public class PersonIdent implements Serializable {
 		r.append(offsetMins);
 	}
 
-	@SuppressWarnings("nls")
 	public String toString() {
 		final StringBuilder r = new StringBuilder();
 		final SimpleDateFormat dtfmt;

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -51,12 +51,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
 
 /** Misc. constants used throughout JGit. */
-@SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git for all objects. */
 	private static final String HASH_FUNCTION = "SHA-1";
@@ -79,9 +78,6 @@ public final class Constants {
 
 	/** Special name for the "HEAD" symbolic-ref. */
 	public static final String HEAD = "HEAD";
-
-	/** Special name for the "FETCH_HEAD" symbolic-ref. */
-	public static final String FETCH_HEAD = "FETCH_HEAD";
 
 	/**
 	 * Text string that identifies an object as a commit.
@@ -232,9 +228,6 @@ public final class Constants {
 	/** Default main branch name */
 	public static final String MASTER = "master";
 
-	/** Default stash branch name */
-	public static final String STASH = "stash";
-
 	/** Prefix for branch refs */
 	public static final String R_HEADS = "refs/heads/";
 
@@ -244,17 +237,8 @@ public final class Constants {
 	/** Prefix for tag refs */
 	public static final String R_TAGS = "refs/tags/";
 
-	/** Prefix for notes refs */
-	public static final String R_NOTES = "refs/notes/";
-
-	/** Standard notes ref */
-	public static final String R_NOTES_COMMITS = R_NOTES + "commits";
-
 	/** Prefix for any ref */
 	public static final String R_REFS = "refs/";
-
-	/** Standard stash ref */
-	public static final String R_STASH = R_REFS + STASH;
 
 	/** Logs folder name */
 	public static final String LOGS = "logs";
@@ -265,21 +249,7 @@ public final class Constants {
 	/** Packed refs file */
 	public static final String PACKED_REFS = "packed-refs";
 
-	/**
-	 * Excludes-file
-	 *
-	 * @since 3.0
-	 */
-	public static final String INFO_EXCLUDE = "info/exclude";
-
-	/**
-	 * The system property that contains the system user name
-	 *
-	 * @since 3.6
-	 */
-	public static final String OS_USER_DIR = "user.dir";
-
-	/** The system property that contains the system user name */
+	/** The environment variable that contains the system user name */
 	public static final String OS_USER_NAME_KEY = "user.name";
 
 	/** The environment variable that contains the author's name */
@@ -293,13 +263,6 @@ public final class Constants {
 
 	/** The environment variable that contains the commiter's email */
 	public static final String GIT_COMMITTER_EMAIL_KEY = "GIT_COMMITTER_EMAIL";
-
-	/**
-	 * The environment variable that blocks use of the system config file
-	 *
-	 * @since 3.3
-	 */
-	public static final String GIT_CONFIG_NOSYSTEM_KEY = "GIT_CONFIG_NOSYSTEM";
 
 	/**
 	 * The environment variable that limits how close to the root of the file
@@ -322,7 +285,7 @@ public final class Constants {
 	/**
 	 * The environment variable that tells us which file holds the Git index.
 	 */
-	public static final String GIT_INDEX_FILE_KEY = "GIT_INDEX_FILE";
+	public static final String GIT_INDEX_KEY = "GIT_INDEX";
 
 	/**
 	 * The environment variable that tells us where objects are stored
@@ -350,41 +313,11 @@ public final class Constants {
 	/** Default name for the Git repository directory */
 	public static final String DOT_GIT = ".git";
 
-	/** Default name for the Git repository configuration */
-	public static final String CONFIG = "config";
-
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
 
-	/**
-	 * Name of the attributes file
-	 *
-	 * @since 3.7
-	 */
-	public static final String DOT_GIT_ATTRIBUTES = ".gitattributes";
-
 	/** Name of the ignore file */
 	public static final String DOT_GIT_IGNORE = ".gitignore";
-
-	/** Name of the submodules file */
-	public static final String DOT_GIT_MODULES = ".gitmodules";
-
-	/** Name of the .git/shallow file */
-	public static final String SHALLOW = "shallow";
-
-	/**
-	 * Prefix of the first line in a ".git" file
-	 *
-	 * @since 3.6
-	 */
-	public static final String GITDIR = "gitdir: ";
-
-	/**
-	 * Name of the folder (inside gitDir) where submodules are stored
-	 *
-	 * @since 3.6
-	 */
-	public static final String MODULES = "modules";
 
 	/**
 	 * Create a new digest function for objects.
@@ -421,8 +354,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
 		}
 	}
 
@@ -446,8 +378,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return ENCODED_TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
 		}
 	}
 
@@ -595,21 +526,6 @@ public final class Constants {
 
 	/** name of the file containing the IDs of the parents of a merge commit */
 	public static final String MERGE_HEAD = "MERGE_HEAD";
-
-	/** name of the file containing the ID of a cherry pick commit in case of conflicts */
-	public static final String CHERRY_PICK_HEAD = "CHERRY_PICK_HEAD";
-
-	/** name of the file containing the commit msg for a squash commit */
-	public static final String SQUASH_MSG = "SQUASH_MSG";
-
-	/** name of the file containing the ID of a revert commit in case of conflicts */
-	public static final String REVERT_HEAD = "REVERT_HEAD";
-
-	/**
-	 * name of the ref ORIG_HEAD used by certain commands to store the original
-	 * value of HEAD
-	 */
-	public static final String ORIG_HEAD = "ORIG_HEAD";
 
 	/** objectid for the empty blob */
 	public static final ObjectId EMPTY_BLOB_ID = ObjectId

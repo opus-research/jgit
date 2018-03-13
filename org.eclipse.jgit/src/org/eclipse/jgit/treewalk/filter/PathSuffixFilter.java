@@ -45,32 +45,24 @@ package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
 /**
- * Includes tree entries only if they end with the configured path (suffix
- * match).
- * <p>
- * For example, <code>PathSuffixFilter.create(".txt")</code> will match all
- * paths ending in <code>.txt</code>.
- * <p>
- * Using this filter is recommended instead of filtering the entries using
- * {@link TreeWalk#getPathString()} and <code>endsWith</code> or some other type
- * of string match function.
+ * Includes tree entries only if they match the configured path.
  */
 public class PathSuffixFilter extends TreeFilter {
 
 	/**
-	 * Create a new tree filter for a user supplied path suffix.
+	 * Create a new tree filter for a user supplied path.
 	 * <p>
 	 * Path strings use '/' to delimit directories on all platforms.
 	 *
 	 * @param path
-	 *            the path suffix to filter on. Must not be the empty string.
+	 *            the path (suffix) to filter on. Must not be the empty string.
 	 * @return a new filter for the requested path.
 	 * @throws IllegalArgumentException
 	 *             the path supplied was the empty string.

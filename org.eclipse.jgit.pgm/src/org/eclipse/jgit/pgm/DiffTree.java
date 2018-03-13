@@ -56,7 +56,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
-@Command(usage = "usage_ShowDiffTree")
 class DiffTree extends TextBuiltin {
 	@Option(name = "--recursive", usage = "usage_recurseIntoSubtrees", aliases = { "-r" })
 	private boolean recursive;
@@ -75,6 +74,7 @@ class DiffTree extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		final TreeWalk walk = new TreeWalk(db);
+		walk.reset();
 		walk.setRecursive(recursive);
 		for (final AbstractTreeIterator i : trees)
 			walk.addTree(i);
@@ -83,19 +83,19 @@ class DiffTree extends TextBuiltin {
 		final int nTree = walk.getTreeCount();
 		while (walk.next()) {
 			for (int i = 1; i < nTree; i++)
-				outw.print(':');
+				out.print(':');
 			for (int i = 0; i < nTree; i++) {
 				final FileMode m = walk.getFileMode(i);
 				final String s = m.toString();
 				for (int pad = 6 - s.length(); pad > 0; pad--)
-					outw.print('0');
-				outw.print(s);
-				outw.print(' ');
+					out.print('0');
+				out.print(s);
+				out.print(' ');
 			}
 
 			for (int i = 0; i < nTree; i++) {
-				outw.print(walk.getObjectId(i).name());
-				outw.print(' ');
+				out.print(walk.getObjectId(i).name());
+				out.print(' ');
 			}
 
 			char chg = 'M';
@@ -109,11 +109,11 @@ class DiffTree extends TextBuiltin {
 				else if (m0 != m1 && walk.idEqual(0, 1))
 					chg = 'T';
 			}
-			outw.print(chg);
+			out.print(chg);
 
-			outw.print('\t');
-			outw.print(walk.getPathString());
-			outw.println();
+			out.print('\t');
+			out.print(walk.getPathString());
+			out.println();
 		}
 	}
 }

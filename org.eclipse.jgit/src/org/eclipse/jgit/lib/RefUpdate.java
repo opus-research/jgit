@@ -47,8 +47,8 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -168,19 +168,6 @@ public abstract class RefUpdate {
 	private final Ref ref;
 
 	/**
-	 * Is this RefUpdate detaching a symbolic ref?
-	 *
-	 * We need this info since this.ref will normally be peeled of in case of
-	 * detaching a symbolic ref (HEAD for example).
-	 *
-	 * Without this flag we cannot decide whether the ref has to be updated or
-	 * not in case when it was a symbolic ref and the newValue == oldValue.
-	 */
-	private boolean detachingSymbolicRef;
-
-	private boolean checkConflicting = true;
-
-	/**
 	 * Construct a new update operation for the reference.
 	 * <p>
 	 * {@code ref.getObjectId()} will be used to seed {@link #getOldObjectId()},
@@ -192,7 +179,7 @@ public abstract class RefUpdate {
 	protected RefUpdate(final Ref ref) {
 		this.ref = ref;
 		oldValue = ref.getObjectId();
-		refLogMessage = ""; //$NON-NLS-1$
+		refLogMessage = "";
 	}
 
 	/** @return the reference database this update modifies. */
@@ -264,13 +251,6 @@ public abstract class RefUpdate {
 	 */
 	public ObjectId getNewObjectId() {
 		return newValue;
-	}
-
-	/**
-	 * Tells this RefUpdate that it is actually detaching a symbolic ref.
-	 */
-	public void setDetachingSymbolicRef() {
-		detachingSymbolicRef = true;
 	}
 
 	/**
@@ -374,7 +354,7 @@ public abstract class RefUpdate {
 		if (msg == null && !appendStatus)
 			disableRefLog();
 		else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
+			refLogMessage = "";
 			refLogIncludeResult = true;
 		} else {
 			refLogMessage = msg;
@@ -531,7 +511,7 @@ public abstract class RefUpdate {
 		final String myName = getRef().getLeaf().getName();
 		if (myName.startsWith(Constants.R_HEADS)) {
 			Ref head = getRefDatabase().getRef(Constants.HEAD);
-			while (head != null && head.isSymbolic()) {
+			while (head.isSymbolic()) {
 				head = head.getTarget();
 				if (myName.equals(head.getName()))
 					return result = Result.REJECTED_CURRENT_BRANCH;
@@ -566,7 +546,7 @@ public abstract class RefUpdate {
 	public Result link(String target) throws IOException {
 		if (!target.startsWith(Constants.R_REFS))
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().illegalArgumentNotA, Constants.R_REFS));
-		if (checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(false))
@@ -600,8 +580,7 @@ public abstract class RefUpdate {
 		RevObject newObj;
 		RevObject oldObj;
 
-		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(true))
@@ -617,32 +596,20 @@ public abstract class RefUpdate {
 
 			newObj = safeParse(walk, newValue);
 			oldObj = safeParse(walk, oldValue);
-			if (newObj == oldObj && !detachingSymbolicRef)
+			if (newObj == oldObj)
 				return store.execute(Result.NO_CHANGE);
-
-			if (isForceUpdate())
-				return store.execute(Result.FORCED);
 
 			if (newObj instanceof RevCommit && oldObj instanceof RevCommit) {
 				if (walk.isMergedInto((RevCommit) oldObj, (RevCommit) newObj))
 					return store.execute(Result.FAST_FORWARD);
 			}
 
+			if (isForceUpdate())
+				return store.execute(Result.FORCED);
 			return Result.REJECTED;
 		} finally {
 			unlock();
 		}
-	}
-
-	/**
-	 * Enable/disable the check for conflicting ref names. By default conflicts
-	 * are checked explicitly.
-	 *
-	 * @param check
-	 * @since 3.0
-	 */
-	public void setCheckConflicting(boolean check) {
-		checkConflicting = check;
 	}
 
 	private static RevObject safeParse(final RevWalk rw, final AnyObjectId id)

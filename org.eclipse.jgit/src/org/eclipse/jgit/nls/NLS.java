@@ -69,7 +69,7 @@ import org.eclipse.jgit.errors.TranslationStringMissingException;
  */
 public class NLS {
 	/** The root locale constant. It is defined here because the Locale.ROOT is not defined in Java 5 */
-	public static final Locale ROOT_LOCALE = new Locale("", "", ""); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+	public static final Locale ROOT_LOCALE = new Locale("", "", "");
 
 	private static final InheritableThreadLocal<NLS> local = new InheritableThreadLocal<NLS>() {
 		protected NLS initialValue() {
@@ -125,16 +125,11 @@ public class NLS {
 		this.locale = locale;
 	}
 
-	@SuppressWarnings("unchecked")
 	private <T extends TranslationBundle> T get(Class<T> type) {
 		TranslationBundle bundle = map.get(type);
 		if (bundle == null) {
 			bundle = GlobalBundleCache.lookupBundle(locale, type);
-			// There is a small opportunity for a race, which we may
-			// lose. Accept defeat and return the winner's instance.
-			TranslationBundle old = map.putIfAbsent(type, bundle);
-			if (old != null)
-				bundle = old;
+			map.putIfAbsent(type, bundle);
 		}
 		return (T) bundle;
 	}

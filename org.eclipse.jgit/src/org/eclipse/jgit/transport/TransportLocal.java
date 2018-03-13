@@ -48,26 +48,22 @@
 package org.eclipse.jgit.transport;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
 
-import org.eclipse.jgit.errors.NoRemoteRepositoryException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
-import org.eclipse.jgit.lib.RepositoryCache;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.io.MessageWriter;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.eclipse.jgit.util.io.StreamCopyThread;
 
 /**
@@ -94,70 +90,27 @@ import org.eclipse.jgit.util.io.StreamCopyThread;
  * system pipe to transfer data.
  */
 class TransportLocal extends Transport implements PackTransport {
-	static final TransportProtocol PROTO_LOCAL = new TransportProtocol() {
-		@Override
-		public String getName() {
-			return JGitText.get().transportProtoLocal;
-		}
+	private static final String PWD = ".";
 
-		public Set<String> getSchemes() {
-			return Collections.singleton("file"); //$NON-NLS-1$
-		}
+	static boolean canHandle(final URIish uri, FS fs) {
+		if (uri.getHost() != null || uri.getPort() > 0 || uri.getUser() != null
+				|| uri.getPass() != null || uri.getPath() == null)
+			return false;
 
-		@Override
-		public boolean canHandle(URIish uri, Repository local, String remoteName) {
-			if (uri.getPath() == null
-					|| uri.getPort() > 0
-					|| uri.getUser() != null
-					|| uri.getPass() != null
-					|| uri.getHost() != null
-					|| (uri.getScheme() != null && !getSchemes().contains(uri.getScheme())))
-				return false;
-			return true;
-		}
-
-		@Override
-		public Transport open(URIish uri, Repository local, String remoteName)
-				throws NoRemoteRepositoryException {
-			File localPath = local.isBare() ? local.getDirectory() : local.getWorkTree();
-			File path = local.getFS().resolve(localPath, uri.getPath());
-			// If the reference is to a local file, C Git behavior says
-			// assume this is a bundle, since repositories are directories.
-			if (path.isFile())
-				return new TransportBundleFile(local, uri, path);
-
-			File gitDir = RepositoryCache.FileKey.resolve(path, local.getFS());
-			if (gitDir == null)
-				throw new NoRemoteRepositoryException(uri, JGitText.get().notFound);
-			return new TransportLocal(local, uri, gitDir);
-		}
-
-		public Transport open(URIish uri) throws NotSupportedException,
-				TransportException {
-			File path = FS.DETECTED.resolve(new File("."), uri.getPath()); //$NON-NLS-1$
-			// If the reference is to a local file, C Git behavior says
-			// assume this is a bundle, since repositories are directories.
-			if (path.isFile())
-				return new TransportBundleFile(uri, path);
-
-			File gitDir = RepositoryCache.FileKey.resolve(path, FS.DETECTED);
-			if (gitDir == null)
-				throw new NoRemoteRepositoryException(uri,
-						JGitText.get().notFound);
-			return new TransportLocal(uri, gitDir);
-		}
-	};
+		if ("file".equals(uri.getScheme()) || uri.getScheme() == null)
+			return fs.resolve(new File(PWD), uri.getPath()).isDirectory();
+		return false;
+	}
 
 	private final File remoteGitDir;
 
-	TransportLocal(Repository local, URIish uri, File gitDir) {
+	TransportLocal(final Repository local, final URIish uri) {
 		super(local, uri);
-		remoteGitDir = gitDir;
-	}
 
-	TransportLocal(URIish uri, File gitDir) {
-		super(uri);
-		remoteGitDir = gitDir;
+		File d = local.getFS().resolve(new File(PWD), uri.getPath()).getAbsoluteFile();
+		if (new File(d, Constants.DOT_GIT).isDirectory())
+			d = new File(d, Constants.DOT_GIT);
+		remoteGitDir = d;
 	}
 
 	UploadPack createUploadPack(final Repository dst) {
@@ -171,7 +124,7 @@ class TransportLocal extends Transport implements PackTransport {
 	@Override
 	public FetchConnection openFetch() throws TransportException {
 		final String up = getOptionUploadPack();
-		if ("git-upload-pack".equals(up) || "git upload-pack".equals(up)) //$NON-NLS-1$ //$NON-NLS-2$
+		if ("git-upload-pack".equals(up) || "git upload-pack".equals(up))
 			return new InternalLocalFetchConnection();
 		return new ForkLocalFetchConnection();
 	}
@@ -180,7 +133,7 @@ class TransportLocal extends Transport implements PackTransport {
 	public PushConnection openPush() throws NotSupportedException,
 			TransportException {
 		final String rp = getOptionReceivePack();
-		if ("git-receive-pack".equals(rp) || "git receive-pack".equals(rp)) //$NON-NLS-1$ //$NON-NLS-2$
+		if ("git-receive-pack".equals(rp) || "git receive-pack".equals(rp))
 			return new InternalLocalPushConnection();
 		return new ForkLocalPushConnection();
 	}
@@ -193,22 +146,22 @@ class TransportLocal extends Transport implements PackTransport {
 	protected Process spawn(final String cmd)
 			throws TransportException {
 		try {
-			String[] args = { "." }; //$NON-NLS-1$
-			ProcessBuilder proc = local.getFS().runInShell(cmd, args);
-			proc.directory(remoteGitDir);
+			final String[] args;
 
-			// Remove the same variables CGit does.
-			Map<String, String> env = proc.environment();
-			env.remove("GIT_ALTERNATE_OBJECT_DIRECTORIES"); //$NON-NLS-1$
-			env.remove("GIT_CONFIG"); //$NON-NLS-1$
-			env.remove("GIT_CONFIG_PARAMETERS"); //$NON-NLS-1$
-			env.remove("GIT_DIR"); //$NON-NLS-1$
-			env.remove("GIT_WORK_TREE"); //$NON-NLS-1$
-			env.remove("GIT_GRAFT_FILE"); //$NON-NLS-1$
-			env.remove("GIT_INDEX_FILE"); //$NON-NLS-1$
-			env.remove("GIT_NO_REPLACE_OBJECTS"); //$NON-NLS-1$
+			if (cmd.startsWith("git-")) {
+				args = new String[] { "git", cmd.substring(4), PWD };
+			} else {
+				final int gitspace = cmd.indexOf("git ");
+				if (gitspace >= 0) {
+					final String git = cmd.substring(0, gitspace + 3);
+					final String subcmd = cmd.substring(gitspace + 4);
+					args = new String[] { git, subcmd, PWD };
+				} else {
+					args = new String[] { cmd, PWD };
+				}
+			}
 
-			return proc.start();
+			return Runtime.getRuntime().exec(args, null, remoteGitDir);
 		} catch (IOException err) {
 			throw new TransportException(uri, err.getMessage(), err);
 		}
@@ -222,7 +175,7 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new RepositoryBuilder().setGitDir(remoteGitDir).build();
+				dst = new FileRepository(remoteGitDir);
 			} catch (IOException err) {
 				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
@@ -251,7 +204,7 @@ class TransportLocal extends Transport implements PackTransport {
 				throw new TransportException(uri, JGitText.get().cannotConnectPipes, err);
 			}
 
-			worker = new Thread("JGit-Upload-Pack") { //$NON-NLS-1$
+			worker = new Thread("JGit-Upload-Pack") {
 				public void run() {
 					try {
 						final UploadPack rp = createUploadPack(dst);
@@ -322,7 +275,7 @@ class TransportLocal extends Transport implements PackTransport {
 			OutputStream upOut = uploadPack.getOutputStream();
 
 			upIn = new BufferedInputStream(upIn);
-			upOut = new SafeBufferedOutputStream(upOut);
+			upOut = new BufferedOutputStream(upOut);
 
 			init(upIn, upOut);
 			readAdvertisedRefs();
@@ -362,7 +315,7 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new RepositoryBuilder().setGitDir(remoteGitDir).build();
+				dst = new FileRepository(remoteGitDir);
 			} catch (IOException err) {
 				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
@@ -383,7 +336,7 @@ class TransportLocal extends Transport implements PackTransport {
 				throw new TransportException(uri, JGitText.get().cannotConnectPipes, err);
 			}
 
-			worker = new Thread("JGit-Receive-Pack") { //$NON-NLS-1$
+			worker = new Thread("JGit-Receive-Pack") {
 				public void run() {
 					try {
 						final ReceivePack rp = createReceivePack(dst);
@@ -452,7 +405,7 @@ class TransportLocal extends Transport implements PackTransport {
 			OutputStream rpOut = receivePack.getOutputStream();
 
 			rpIn = new BufferedInputStream(rpIn);
-			rpOut = new SafeBufferedOutputStream(rpOut);
+			rpOut = new BufferedOutputStream(rpOut);
 
 			init(rpIn, rpOut);
 			readAdvertisedRefs();

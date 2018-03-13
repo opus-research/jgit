@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,20 +44,12 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.junit.Test;
 
-public class RefSpecTest {
-	@Test
+public class RefSpecTest extends TestCase {
 	public void testMasterMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec(sn + ":" + sn);
@@ -79,7 +70,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testSplitLastColon() {
 		final String lhs = ":m:a:i:n:t";
 		final String rhs = "refs/heads/maint";
@@ -92,7 +82,6 @@ public class RefSpecTest {
 		assertEquals(rs, new RefSpec(rs.toString()));
 	}
 
-	@Test
 	public void testForceMasterMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec("+" + sn + ":" + sn);
@@ -113,7 +102,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec(sn);
@@ -134,7 +122,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testForceMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec("+" + sn);
@@ -155,7 +142,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testDeleteMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec(":" + sn);
@@ -176,7 +162,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testForceRemotesOrigin() {
 		final String srcn = "refs/heads/*";
 		final String dstn = "refs/remotes/origin/*";
@@ -210,7 +195,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testCreateEmpty() {
 		final RefSpec rs = new RefSpec();
 		assertFalse(rs.isForceUpdate());
@@ -220,7 +204,6 @@ public class RefSpecTest {
 		assertEquals("HEAD", rs.toString());
 	}
 
-	@Test
 	public void testSetForceUpdate() {
 		final String s = "refs/heads/*:refs/remotes/origin/*";
 		final RefSpec a = new RefSpec(s);
@@ -233,7 +216,6 @@ public class RefSpecTest {
 		assertEquals("+" + s, b.toString());
 	}
 
-	@Test
 	public void testSetSource() {
 		final RefSpec a = new RefSpec();
 		final RefSpec b = a.setSource("refs/heads/master");
@@ -242,7 +224,6 @@ public class RefSpecTest {
 		assertEquals("refs/heads/master", b.toString());
 	}
 
-	@Test
 	public void testSetDestination() {
 		final RefSpec a = new RefSpec();
 		final RefSpec b = a.setDestination("refs/heads/master");
@@ -251,7 +232,6 @@ public class RefSpecTest {
 		assertEquals("HEAD:refs/heads/master", b.toString());
 	}
 
-	@Test
 	public void testSetDestination_SourceNull() {
 		final RefSpec a = new RefSpec();
 		RefSpec b;
@@ -263,7 +243,6 @@ public class RefSpecTest {
 		assertEquals(":refs/heads/master", b.toString());
 	}
 
-	@Test
 	public void testSetSourceDestination() {
 		final RefSpec a = new RefSpec();
 		final RefSpec b;
@@ -273,7 +252,6 @@ public class RefSpecTest {
 		assertEquals("refs/heads/*:refs/remotes/origin/*", b.toString());
 	}
 
-	@Test
 	public void testExpandFromDestination_NonWildcard() {
 		final String src = "refs/heads/master";
 		final String dst = "refs/remotes/origin/master";
@@ -285,7 +263,6 @@ public class RefSpecTest {
 		assertEquals(dst, r.getDestination());
 	}
 
-	@Test
 	public void testExpandFromDestination_Wildcard() {
 		final String src = "refs/heads/master";
 		final String dst = "refs/remotes/origin/master";
@@ -295,153 +272,5 @@ public class RefSpecTest {
 		assertFalse(r.isWildcard());
 		assertEquals(src, r.getSource());
 		assertEquals(dst, r.getDestination());
-	}
-
-	@Test
-	public void isWildcardShouldWorkForWildcardSuffixAndComponent() {
-		assertTrue(RefSpec.isWildcard("refs/heads/*"));
-		assertTrue(RefSpec.isWildcard("refs/pull/*/head"));
-		assertFalse(RefSpec.isWildcard("refs/heads/a"));
-	}
-
-	@Test
-	public void testWildcardInMiddleOfSource() {
-		RefSpec a = new RefSpec("+refs/pull/*/head:refs/remotes/origin/pr/*");
-		assertTrue(a.isWildcard());
-		assertTrue(a.matchSource("refs/pull/a/head"));
-		assertTrue(a.matchSource("refs/pull/foo/head"));
-		assertTrue(a.matchSource("refs/pull/foo/bar/head"));
-		assertFalse(a.matchSource("refs/pull/foo"));
-		assertFalse(a.matchSource("refs/pull/head"));
-		assertFalse(a.matchSource("refs/pull/foo/head/more"));
-		assertFalse(a.matchSource("refs/pullx/head"));
-
-		RefSpec b = a.expandFromSource("refs/pull/foo/head");
-		assertEquals("refs/remotes/origin/pr/foo", b.getDestination());
-		RefSpec c = a.expandFromDestination("refs/remotes/origin/pr/foo");
-		assertEquals("refs/pull/foo/head", c.getSource());
-	}
-
-	@Test
-	public void testWildcardInMiddleOfDestionation() {
-		RefSpec a = new RefSpec("+refs/heads/*:refs/remotes/origin/*/head");
-		assertTrue(a.isWildcard());
-		assertTrue(a.matchDestination("refs/remotes/origin/a/head"));
-		assertTrue(a.matchDestination("refs/remotes/origin/foo/head"));
-		assertTrue(a.matchDestination("refs/remotes/origin/foo/bar/head"));
-		assertFalse(a.matchDestination("refs/remotes/origin/foo"));
-		assertFalse(a.matchDestination("refs/remotes/origin/head"));
-		assertFalse(a.matchDestination("refs/remotes/origin/foo/head/more"));
-		assertFalse(a.matchDestination("refs/remotes/originx/head"));
-
-		RefSpec b = a.expandFromSource("refs/heads/foo");
-		assertEquals("refs/remotes/origin/foo/head", b.getDestination());
-		RefSpec c = a.expandFromDestination("refs/remotes/origin/foo/head");
-		assertEquals("refs/heads/foo", c.getSource());
-	}
-
-	@Test
-	public void testWildcardMirror() {
-		RefSpec a = new RefSpec("*:*");
-		assertTrue(a.isWildcard());
-		assertTrue(a.matchSource("a"));
-		assertTrue(a.matchSource("foo"));
-		assertTrue(a.matchSource("foo/bar"));
-		assertTrue(a.matchDestination("a"));
-		assertTrue(a.matchDestination("foo"));
-		assertTrue(a.matchDestination("foo/bar"));
-
-		RefSpec b = a.expandFromSource("refs/heads/foo");
-		assertEquals("refs/heads/foo", b.getDestination());
-		RefSpec c = a.expandFromDestination("refs/heads/foo");
-		assertEquals("refs/heads/foo", c.getSource());
-	}
-
-	@Test
-	public void testWildcardAtStart() {
-		RefSpec a = new RefSpec("*/head:refs/heads/*");
-		assertTrue(a.isWildcard());
-		assertTrue(a.matchSource("a/head"));
-		assertTrue(a.matchSource("foo/head"));
-		assertTrue(a.matchSource("foo/bar/head"));
-		assertFalse(a.matchSource("/head"));
-		assertFalse(a.matchSource("a/head/extra"));
-
-		RefSpec b = a.expandFromSource("foo/head");
-		assertEquals("refs/heads/foo", b.getDestination());
-		RefSpec c = a.expandFromDestination("refs/heads/foo");
-		assertEquals("foo/head", c.getSource());
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenSourceOnlyAndWildcard() {
-		assertNotNull(new RefSpec("refs/heads/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenDestinationOnlyAndWildcard() {
-		assertNotNull(new RefSpec(":refs/heads/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenOnlySourceWildcard() {
-		assertNotNull(new RefSpec("refs/heads/*:refs/heads/foo"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenOnlyDestinationWildcard() {
-		assertNotNull(new RefSpec("refs/heads/foo:refs/heads/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenMoreThanOneWildcardInSource() {
-		assertNotNull(new RefSpec("refs/heads/*/*:refs/heads/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenMoreThanOneWildcardInDestination() {
-		assertNotNull(new RefSpec("refs/heads/*:refs/heads/*/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenWildcardAfterText() {
-		assertNotNull(new RefSpec("refs/heads/wrong*:refs/heads/right/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenWildcardBeforeText() {
-		assertNotNull(new RefSpec("*wrong:right/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidWhenWildcardBeforeTextAtEnd() {
-		assertNotNull(new RefSpec("refs/heads/*wrong:right/*"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidSourceDoubleSlashes() {
-		assertNotNull(new RefSpec("refs/heads//wrong"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidSlashAtStart() {
-		assertNotNull(new RefSpec("/foo:/foo"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidDestinationDoubleSlashes() {
-		assertNotNull(new RefSpec(":refs/heads//wrong"));
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidSetSource() {
-		RefSpec a = new RefSpec("refs/heads/*:refs/remotes/origin/*");
-		a.setSource("refs/heads/*/*");
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void invalidSetDestination() {
-		RefSpec a = new RefSpec("refs/heads/*:refs/remotes/origin/*");
-		a.setDestination("refs/remotes/origin/*/*");
 	}
 }

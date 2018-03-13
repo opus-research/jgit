@@ -51,23 +51,21 @@ import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
-import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
-import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
-import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.pack.BinaryDelta;
+import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
+import org.eclipse.jgit.storage.pack.ObjectToPack;
+import org.eclipse.jgit.storage.pack.PackOutputStream;
+import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.kohsuke.args4j.Argument;
 
-@Command(usage = "usage_ShowPackDelta")
 class ShowPackDelta extends TextBuiltin {
 	@Argument(index = 0)
 	private ObjectId objectId;
@@ -89,14 +87,14 @@ class ShowPackDelta extends TextBuiltin {
 			throw die("Object " + obj.name() + " is not a delta");
 		}
 
-		outw.println(BinaryDelta.format(delta));
+		out.println(BinaryDelta.format(delta));
 	}
 
-	private static byte[] getDelta(ObjectReader reader, RevObject obj)
+	private byte[] getDelta(ObjectReader reader, RevObject obj)
 			throws IOException, MissingObjectException,
 			StoredObjectRepresentationNotAvailableException {
 		ObjectReuseAsIs asis = (ObjectReuseAsIs) reader;
-		ObjectToPack target = asis.newObjectToPack(obj, obj.getType());
+		ObjectToPack target = asis.newObjectToPack(obj);
 
 		PackWriter pw = new PackWriter(reader) {
 			@Override
@@ -109,7 +107,7 @@ class ShowPackDelta extends TextBuiltin {
 		asis.selectObjectRepresentation(pw, NullProgressMonitor.INSTANCE,
 				Collections.singleton(target));
 		asis.copyObjectAsIs(new PackOutputStream(NullProgressMonitor.INSTANCE,
-				buf, pw), target, true);
+				buf, pw), target);
 
 		// At this point the object header has no delta information,
 		// because it was output as though it were a whole object.
@@ -121,7 +119,6 @@ class ShowPackDelta extends TextBuiltin {
 			ptr++;
 		ptr++;
 
-		@SuppressWarnings("resource" /* java 7 */)
 		TemporaryBuffer.Heap raw = new TemporaryBuffer.Heap(bufArray.length);
 		InflaterInputStream inf = new InflaterInputStream(
 				new ByteArrayInputStream(bufArray, ptr, bufArray.length));

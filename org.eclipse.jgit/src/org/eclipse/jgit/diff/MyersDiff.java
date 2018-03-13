@@ -46,107 +46,103 @@ package org.eclipse.jgit.diff;
 
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.LongList;
 
 /**
- * Diff algorithm, based on "An O(ND) Difference Algorithm and its Variations",
- * by Eugene Myers.
- * <p>
+ * Diff algorithm, based on "An O(ND) Difference Algorithm and its
+ * Variations", by Eugene Myers.
+ *
  * The basic idea is to put the line numbers of text A as columns ("x") and the
- * lines of text B as rows ("y"). Now you try to find the shortest "edit path"
- * from the upper left corner to the lower right corner, where you can always go
- * horizontally or vertically, but diagonally from (x,y) to (x+1,y+1) only if
- * line x in text A is identical to line y in text B.
- * <p>
- * Myers' fundamental concept is the "furthest reaching D-path on diagonal k": a
- * D-path is an edit path starting at the upper left corner and containing
- * exactly D non-diagonal elements ("differences"). The furthest reaching D-path
- * on diagonal k is the one that contains the most (diagonal) elements which
- * ends on diagonal k (where k = y - x).
- * <p>
+ * lines of text B as rows ("y").  Now you try to find the shortest "edit path"
+ * from the upper left corner to the lower right corner, where you can
+ * always go horizontally or vertically, but diagonally from (x,y) to
+ * (x+1,y+1) only if line x in text A is identical to line y in text B.
+ *
+ * Myers' fundamental concept is the "furthest reaching D-path on diagonal k":
+ * a D-path is an edit path starting at the upper left corner and containing
+ * exactly D non-diagonal elements ("differences").  The furthest reaching
+ * D-path on diagonal k is the one that contains the most (diagonal) elements
+ * which ends on diagonal k (where k = y - x).
+ *
  * Example:
  *
- * <pre>
  *    H E L L O   W O R L D
  *    ____
  *  L     \___
  *  O         \___
  *  W             \________
- * </pre>
- * <p>
- * Since every D-path has exactly D horizontal or vertical elements, it can only
- * end on the diagonals -D, -D+2, ..., D-2, D.
- * <p>
- * Since every furthest reaching D-path contains at least one furthest reaching
- * (D-1)-path (except for D=0), we can construct them recursively.
- * <p>
+ *
+ * Since every D-path has exactly D horizontal or vertical elements, it can
+ * only end on the diagonals -D, -D+2, ..., D-2, D.
+ *
+ * Since every furthest reaching D-path contains at least one furthest
+ * reaching (D-1)-path (except for D=0), we can construct them recursively.
+ *
  * Since we are really interested in the shortest edit path, we can start
  * looking for a 0-path, then a 1-path, and so on, until we find a path that
  * ends in the lower right corner.
- * <p>
- * To save space, we do not need to store all paths (which has quadratic space
- * requirements), but generate the D-paths simultaneously from both sides. When
- * the ends meet, we will have found "the middle" of the path. From the end
- * points of that diagonal part, we can generate the rest recursively.
- * <p>
- * This only requires linear space.
- * <p>
- * The overall (runtime) complexity is:
  *
- * <pre>
- *     O(N * D^2 + 2 * N/2 * (D/2)^2 + 4 * N/4 * (D/4)^2 + ...)
- *     = O(N * D^2 * 5 / 4) = O(N * D^2),
- * </pre>
- * <p>
- * (With each step, we have to find the middle parts of twice as many regions as
- * before, but the regions (as well as the D) are halved.)
- * <p>
- * So the overall runtime complexity stays the same with linear space, albeit
- * with a larger constant factor.
+ * To save space, we do not need to store all paths (which has quadratic space
+ * requirements), but generate the D-paths simultaneously from both sides.
+ * When the ends meet, we will have found "the middle" of the path.  From the
+ * end points of that diagonal part, we can generate the rest recursively.
+ *
+ * This only requires linear space.
+ *
+ * The overall (runtime) complexity is
+ *
+ *	O(N * D^2 + 2 * N/2 * (D/2)^2 + 4 * N/4 * (D/4)^2 + ...)
+ *	= O(N * D^2 * 5 / 4) = O(N * D^2),
+ *
+ * (With each step, we have to find the middle parts of twice as many regions
+ * as before, but the regions (as well as the D) are halved.)
+ *
+ * So the overall runtime complexity stays the same with linear space,
+ * albeit with a larger constant factor.
  *
  * @param <S>
  *            type of sequence.
  */
-@SuppressWarnings("hiding")
 public class MyersDiff<S extends Sequence> {
-	/** Singleton instance of MyersDiff. */
-	public static final DiffAlgorithm INSTANCE = new LowLevelDiffAlgorithm() {
-		@Override
-		public <S extends Sequence> void diffNonCommon(EditList edits,
-				HashedSequenceComparator<S> cmp, HashedSequence<S> a,
-				HashedSequence<S> b, Edit region) {
-			new MyersDiff<S>(edits, cmp, a, b, region);
-		}
-	};
-
 	/**
-	 * The list of edits found during the last call to
-	 * {@link #calculateEdits(Edit)}
+	 * The list of edits found during the last call to {@link #calculateEdits()}
 	 */
 	protected EditList edits;
 
 	/** Comparison function for sequences. */
-	protected HashedSequenceComparator<S> cmp;
+	protected SequenceComparator<S> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected HashedSequence<S> a;
+	protected S a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected HashedSequence<S> b;
+	protected S b;
 
-	private MyersDiff(EditList edits, HashedSequenceComparator<S> cmp,
-			HashedSequence<S> a, HashedSequence<S> b, Edit region) {
-		this.edits = edits;
+	/**
+	 * The only constructor
+	 *
+	 * @param cmp comparison method for this execution.
+	 * @param a   the text A which should be compared
+	 * @param b   the text B which should be compared
+	 */
+	public MyersDiff(SequenceComparator<S> cmp, S a, S b) {
 		this.cmp = cmp;
 		this.a = a;
 		this.b = b;
-		calculateEdits(region);
+		calculateEdits();
+	}
+
+	/**
+	 * @return the list of edits found during the last call to {@link #calculateEdits()}
+	 */
+	public EditList getEdits() {
+		return edits;
 	}
 
 	// TODO: use ThreadLocal for future multi-threaded operations
@@ -155,10 +151,11 @@ public class MyersDiff<S extends Sequence> {
 	/**
 	 * Entrypoint into the algorithm this class is all about. This method triggers that the
 	 * differences between A and B are calculated in form of a list of edits.
-	 * @param r portion of the sequences to examine.
 	 */
-	private void calculateEdits(Edit r) {
-		middle.initialize(r.beginA, r.endA, r.beginB, r.endB);
+	protected void calculateEdits() {
+		edits = new EditList();
+
+		middle.initialize(0, a.size(), 0, b.size());
 		if (middle.beginA >= middle.endA &&
 				middle.beginB >= middle.endB)
 			return;
@@ -168,21 +165,11 @@ public class MyersDiff<S extends Sequence> {
 	}
 
 	/**
-	 * Calculates the differences between a given part of A against another
-	 * given part of B
-	 *
-	 * @param beginA
-	 *            start of the part of A which should be compared
-	 *            (0&lt;=beginA&lt;sizeof(A))
-	 * @param endA
-	 *            end of the part of A which should be compared
-	 *            (beginA&lt;=endA&lt;sizeof(A))
-	 * @param beginB
-	 *            start of the part of B which should be compared
-	 *            (0&lt;=beginB&lt;sizeof(B))
-	 * @param endB
-	 *            end of the part of B which should be compared
-	 *            (beginB&lt;=endB&lt;sizeof(B))
+	 * Calculates the differences between a given part of A against another given part of B
+	 * @param beginA start of the part of A which should be compared (0<=beginA<sizeof(A))
+	 * @param endA end of the part of A which should be compared (beginA<=endA<sizeof(A))
+	 * @param beginB start of the part of B which should be compared (0<=beginB<sizeof(B))
+	 * @param endB end of the part of B which should be compared (beginB<=endB<sizeof(B))
 	 */
 	protected void calculateEdits(int beginA, int endA,
 			int beginB, int endB) {
@@ -315,22 +302,22 @@ public class MyersDiff<S extends Sequence> {
 
 			final int getIndex(int d, int k) {
 // TODO: remove
-if (((d + k - middleK) % 2) != 0)
-	throw new RuntimeException(MessageFormat.format(JGitText.get().unexpectedOddResult, Integer.valueOf(d), Integer.valueOf(k), Integer.valueOf(middleK)));
+if (((d + k - middleK) % 2) == 1)
+	throw new RuntimeException(MessageFormat.format(JGitText.get().unexpectedOddResult, d, k, middleK));
 				return (d + k - middleK) / 2;
 			}
 
 			final int getX(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
-	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, Integer.valueOf(k), Integer.valueOf(beginK), Integer.valueOf(endK)));
+	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, k, beginK, endK));
 				return x.get(getIndex(d, k));
 			}
 
 			final long getSnake(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
-	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, Integer.valueOf(k), Integer.valueOf(beginK), Integer.valueOf(endK)));
+	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, k, beginK, endK));
 				return snake.get(getIndex(d, k));
 			}
 
@@ -487,7 +474,7 @@ if (k < beginK || k > endK)
 				if (k < backward.beginK || k > backward.endK)
 					return false;
 				// TODO: move out of loop
-				if (((d - 1 + k - backward.middleK) % 2) != 0)
+				if (((d - 1 + k - backward.middleK) % 2) == 1)
 					return false;
 				if (x < backward.getX(d - 1, k))
 					return false;
@@ -529,7 +516,7 @@ if (k < beginK || k > endK)
 				if (k < forward.beginK || k > forward.endK)
 					return false;
 				// TODO: move out of loop
-				if (((d + k - forward.middleK) % 2) != 0)
+				if (((d + k - forward.middleK) % 2) == 1)
 					return false;
 				if (x > forward.getX(d, k))
 					return false;
@@ -550,8 +537,8 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			EditList r = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
-			System.out.println(r.toString());
+			MyersDiff diff = new MyersDiff(RawTextComparator.DEFAULT, a, b);
+			System.out.println(diff.getEdits().toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

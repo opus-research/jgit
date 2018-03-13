@@ -44,6 +44,7 @@
 
 package org.eclipse.jgit.util;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -52,10 +53,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * A fully buffered output stream.
@@ -309,7 +309,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 			overflow.write(b.buffer, 0, b.count);
 		blocks = null;
 
-		overflow = new SafeBufferedOutputStream(overflow, Block.SZ);
+		overflow = new BufferedOutputStream(overflow, Block.SZ);
 		overflow.write(last.buffer, 0, last.count);
 	}
 
@@ -361,12 +361,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 */
 		private File onDiskFile;
 
-		/**
-		 * Create a new temporary buffer.
-		 *
-		 * @deprecated Use the {@code File} overload to supply a directory.
-		 */
-		@Deprecated
+		/** Create a new temporary buffer. */
 		public LocalFile() {
 			this(null, DEFAULT_IN_CORE_LIMIT);
 		}
@@ -377,9 +372,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 * @param inCoreLimit
 		 *            maximum number of bytes to store in memory. Storage beyond
 		 *            this limit will use the local file.
-		 * @deprecated Use the {@code File,int} overload to supply a directory.
 		 */
-		@Deprecated
 		public LocalFile(final int inCoreLimit) {
 			this(null, inCoreLimit);
 		}
@@ -415,7 +408,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		}
 
 		protected OutputStream overflow() throws IOException {
-			onDiskFile = File.createTempFile("jgit_", ".buf", directory); //$NON-NLS-1$ //$NON-NLS-2$
+			onDiskFile = File.createTempFile("jgit_", ".buf", directory);
 			return new FileOutputStream(onDiskFile);
 		}
 
@@ -555,7 +548,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 			long skipped = 0;
 			while (0 < cnt) {
 				int n = (int) Math.min(block.count - blockPos, cnt);
-				if (0 < n) {
+				if (n < 0) {
 					blockPos += n;
 					skipped += n;
 					cnt -= n;
@@ -574,12 +567,11 @@ public abstract class TemporaryBuffer extends OutputStream {
 			int copied = 0;
 			while (0 < len) {
 				int c = Math.min(block.count - blockPos, len);
-				if (0 < c) {
+				if (c < 0) {
 					System.arraycopy(block.buffer, blockPos, b, off, c);
 					blockPos += c;
 					off += c;
 					len -= c;
-					copied += c;
 				} else if (nextBlock())
 					continue;
 				else

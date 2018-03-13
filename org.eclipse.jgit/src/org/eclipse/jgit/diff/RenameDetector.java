@@ -55,9 +55,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.diff.SimilarityIndex.TableFullException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -111,7 +110,7 @@ public class RenameDetector {
 
 	private boolean done;
 
-	private final ObjectReader objectReader;
+	private final Repository repo;
 
 	/** Similarity score required to pair an add/delete as a rename. */
 	private int renameScore = 60;
@@ -136,21 +135,11 @@ public class RenameDetector {
 	 *            the repository to use for rename detection
 	 */
 	public RenameDetector(Repository repo) {
-		this(repo.newObjectReader(), repo.getConfig().get(DiffConfig.KEY));
-	}
+		this.repo = repo;
 
-	/**
-	 * Create a new rename detector with a specified reader and diff config.
-	 *
-	 * @param reader
-	 *            reader to obtain objects from the repository with.
-	 * @param cfg
-	 *            diff config specifying rename detection options.
-	 * @since 3.0
-	 */
-	public RenameDetector(ObjectReader reader, DiffConfig cfg) {
-		objectReader = reader.newReader();
+		DiffConfig cfg = repo.getConfig().get(DiffConfig.KEY);
 		renameLimit = cfg.getRenameLimit();
+
 		reset();
 	}
 
@@ -277,7 +266,7 @@ public class RenameDetector {
 			case COPY:
 			case RENAME:
 			default:
-				entries.add(entry);
+				entriesToAdd.add(entry);
 			}
 		}
 	}
@@ -320,10 +309,11 @@ public class RenameDetector {
 	 */
 	public List<DiffEntry> compute(ProgressMonitor pm) throws IOException {
 		if (!done) {
+			ObjectReader reader = repo.newObjectReader();
 			try {
-				return compute(objectReader, pm);
+				return compute(reader, pm);
 			} finally {
-				objectReader.release();
+				reader.release();
 			}
 		}
 		return Collections.unmodifiableList(entries);
@@ -366,17 +356,9 @@ public class RenameDetector {
 
 			if (pm == null)
 				pm = NullProgressMonitor.INSTANCE;
-
-			if (0 < breakScore)
 				breakModifies(reader, pm);
-
-			if (!added.isEmpty() && !deleted.isEmpty())
 				findExactRenames(pm);
-
-			if (!added.isEmpty() && !deleted.isEmpty())
 				findContentRenames(reader, pm);
-
-			if (0 < breakScore && !added.isEmpty() && !deleted.isEmpty())
 				rejoinModifies(pm);
 
 			entries.addAll(added);
@@ -400,6 +382,9 @@ public class RenameDetector {
 
 	private void breakModifies(ContentSource.Pair reader, ProgressMonitor pm)
 			throws IOException {
+		if (breakScore <= 0)
+			return;
+
 		ArrayList<DiffEntry> newEntries = new ArrayList<DiffEntry>(entries.size());
 
 		pm.beginTask(JGitText.get().renamesBreakingModifies, entries.size());
@@ -460,36 +445,29 @@ public class RenameDetector {
 
 	private int calculateModifyScore(ContentSource.Pair reader, DiffEntry d)
 			throws IOException {
-		try {
-			SimilarityIndex src = new SimilarityIndex();
-			src.hash(reader.open(OLD, d));
-			src.sort();
+		SimilarityIndex src = new SimilarityIndex();
+		src.hash(reader.open(OLD, d));
+		src.sort();
 
-			SimilarityIndex dst = new SimilarityIndex();
-			dst.hash(reader.open(NEW, d));
-			dst.sort();
-			return src.score(dst, 100);
-		} catch (TableFullException tableFull) {
-			// If either table overflowed while being constructed, don't allow
-			// the pair to be broken. Returning 1 higher than breakScore will
-			// ensure its not similar, but not quite dissimilar enough to break.
-			//
-			overRenameLimit = true;
-			return breakScore + 1;
-		}
+		SimilarityIndex dst = new SimilarityIndex();
+		dst.hash(reader.open(NEW, d));
+		dst.sort();
+		return src.score(dst, 100);
 	}
 
 	private void findContentRenames(ContentSource.Pair reader,
 			ProgressMonitor pm)
 			throws IOException {
 		int cnt = Math.max(added.size(), deleted.size());
+		if (cnt == 0)
+			return;
+
 		if (getRenameLimit() == 0 || cnt <= getRenameLimit()) {
 			SimilarityRenameDetector d;
 
 			d = new SimilarityRenameDetector(reader, deleted, added);
 			d.setRenameScore(getRenameScore());
 			d.compute(pm);
-			overRenameLimit |= d.isTableOverflow();
 			deleted = d.getLeftOverSources();
 			added = d.getLeftOverDestinations();
 			entries.addAll(d.getMatches());
@@ -500,6 +478,9 @@ public class RenameDetector {
 
 	@SuppressWarnings("unchecked")
 	private void findExactRenames(ProgressMonitor pm) {
+		if (added.isEmpty() || deleted.isEmpty())
+			return;
+
 		pm.beginTask(JGitText.get().renamesFindingExact, //
 				added.size() + added.size() + deleted.size()
 						+ added.size() * deleted.size());

@@ -43,70 +43,23 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.junit.Assert.assertEquals;
+import junit.framework.TestCase;
 
-import org.eclipse.jgit.junit.MockSystemReader;
-import org.eclipse.jgit.util.SystemReader;
-import org.junit.Test;
-
-public class ValidRefNameTest {
+public class ValidRefNameTest extends TestCase {
 	private static void assertValid(final boolean exp, final String name) {
-		SystemReader instance = SystemReader.getInstance();
-		try {
-			setUnixSystemReader();
-			assertEquals("\"" + name + "\"", exp,
-					Repository.isValidRefName(name));
-			setWindowsSystemReader();
-			assertEquals("\"" + name + "\"", exp,
-					Repository.isValidRefName(name));
-		} finally {
-			SystemReader.setInstance(instance);
-		}
+		assertEquals("\"" + name + "\"", exp, Repository.isValidRefName(name));
 	}
 
-	private static void setWindowsSystemReader() {
-		SystemReader.setInstance(new MockSystemReader() {
-			{
-				setWindows();
-			}
-		});
-	}
-
-	private static void setUnixSystemReader() {
-		SystemReader.setInstance(new MockSystemReader() {
-			{
-				setUnix();
-			}
-		});
-	}
-
-	private static void assertInvalidOnWindows(final String name) {
-		SystemReader instance = SystemReader.getInstance();
-		try {
-			setUnixSystemReader();
-			assertEquals("\"" + name + "\"", true,
-					Repository.isValidRefName(name));
-			setWindowsSystemReader();
-			assertEquals("\"" + name + "\"", false,
-					Repository.isValidRefName(name));
-		} finally {
-			SystemReader.setInstance(instance);
-		}
-	}
-
-	@Test
 	public void testEmptyString() {
 		assertValid(false, "");
 		assertValid(false, "/");
 	}
 
-	@Test
 	public void testMustHaveTwoComponents() {
 		assertValid(false, "master");
 		assertValid(true, "heads/master");
 	}
 
-	@Test
 	public void testValidHead() {
 		assertValid(true, "refs/heads/master");
 		assertValid(true, "refs/heads/pu");
@@ -114,33 +67,27 @@ public class ValidRefNameTest {
 		assertValid(true, "refs/heads/FoO");
 	}
 
-	@Test
 	public void testValidTag() {
 		assertValid(true, "refs/tags/v1.0");
 	}
 
-	@Test
 	public void testNoLockSuffix() {
 		assertValid(false, "refs/heads/master.lock");
 	}
 
-	@Test
 	public void testNoDirectorySuffix() {
 		assertValid(false, "refs/heads/master/");
 	}
 
-	@Test
 	public void testNoSpace() {
 		assertValid(false, "refs/heads/i haz space");
 	}
 
-	@Test
 	public void testNoAsciiControlCharacters() {
 		for (char c = '\0'; c < ' '; c++)
 			assertValid(false, "refs/heads/mast" + c + "er");
 	}
 
-	@Test
 	public void testNoBareDot() {
 		assertValid(false, "refs/heads/.");
 		assertValid(false, "refs/heads/..");
@@ -148,7 +95,6 @@ public class ValidRefNameTest {
 		assertValid(false, "refs/heads/../master");
 	}
 
-	@Test
 	public void testNoLeadingOrTrailingDot() {
 		assertValid(false, ".");
 		assertValid(false, "refs/heads/.bar");
@@ -156,13 +102,11 @@ public class ValidRefNameTest {
 		assertValid(false, "refs/heads/bar.");
 	}
 
-	@Test
 	public void testContainsDot() {
 		assertValid(true, "refs/heads/m.a.s.t.e.r");
 		assertValid(false, "refs/heads/master..pu");
 	}
 
-	@Test
 	public void testNoMagicRefCharacters() {
 		assertValid(false, "refs/heads/master^");
 		assertValid(false, "refs/heads/^master");
@@ -177,7 +121,6 @@ public class ValidRefNameTest {
 		assertValid(false, ":refs/heads/master");
 	}
 
-	@Test
 	public void testShellGlob() {
 		assertValid(false, "refs/heads/master?");
 		assertValid(false, "refs/heads/?master");
@@ -192,9 +135,9 @@ public class ValidRefNameTest {
 		assertValid(false, "*refs/heads/master");
 	}
 
-	@Test
-	public void testValidSpecialCharacterUnixs() {
+	public void testValidSpecialCharacters() {
 		assertValid(true, "refs/heads/!");
+		assertValid(true, "refs/heads/\"");
 		assertValid(true, "refs/heads/#");
 		assertValid(true, "refs/heads/$");
 		assertValid(true, "refs/heads/%");
@@ -206,45 +149,29 @@ public class ValidRefNameTest {
 		assertValid(true, "refs/heads/,");
 		assertValid(true, "refs/heads/-");
 		assertValid(true, "refs/heads/;");
+		assertValid(true, "refs/heads/<");
 		assertValid(true, "refs/heads/=");
+		assertValid(true, "refs/heads/>");
 		assertValid(true, "refs/heads/@");
 		assertValid(true, "refs/heads/]");
 		assertValid(true, "refs/heads/_");
 		assertValid(true, "refs/heads/`");
 		assertValid(true, "refs/heads/{");
+		assertValid(true, "refs/heads/|");
 		assertValid(true, "refs/heads/}");
 
 		// This is valid on UNIX, but not on Windows
 		// hence we make in invalid due to non-portability
 		//
 		assertValid(false, "refs/heads/\\");
-
-		// More invalid characters on Windows, but we allow them
-		assertInvalidOnWindows("refs/heads/\"");
-		assertInvalidOnWindows("refs/heads/<");
-		assertInvalidOnWindows("refs/heads/>");
-		assertInvalidOnWindows("refs/heads/|");
 	}
 
-	@Test
 	public void testUnicodeNames() {
 		assertValid(true, "refs/heads/\u00e5ngstr\u00f6m");
 	}
 
-	@Test
 	public void testRefLogQueryIsValidRef() {
 		assertValid(false, "refs/heads/master@{1}");
 		assertValid(false, "refs/heads/master@{1.hour.ago}");
-	}
-
-	@Test
-	public void testWindowsReservedNames() {
-		// re-using code from DirCacheCheckoutTest, hence
-		// only testing for one of the special names.
-		assertInvalidOnWindows("refs/heads/con");
-		assertInvalidOnWindows("refs/con/x");
-		assertInvalidOnWindows("con/heads/x");
-		assertValid(true, "refs/heads/conx");
-		assertValid(true, "refs/heads/xcon");
 	}
 }

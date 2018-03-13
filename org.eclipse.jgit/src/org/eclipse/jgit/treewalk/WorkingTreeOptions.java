@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,77 +43,60 @@
 package org.eclipse.jgit.treewalk;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
-import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 
-/** Options used by the {@link WorkingTreeIterator}. */
+/**
+ * Contains options used by the WorkingTreeIterator.
+ */
 public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
-		}
-	};
 
-	private final boolean fileMode;
+	/**
+	 * Creates default options which reflect the original configuration of Git
+	 * on Unix systems.
+	 *
+	 * @return created working tree options
+	 */
+	public static WorkingTreeOptions createDefaultInstance() {
+		return new WorkingTreeOptions(AutoCRLF.FALSE);
+	}
 
+	/**
+	 * Creates options based on the specified repository configuration.
+	 *
+	 * @param config
+	 *            repository configuration to create options for
+	 *
+	 * @return created working tree options
+	 */
+	public static WorkingTreeOptions createConfigurationInstance(Config config) {
+		return new WorkingTreeOptions(config.get(CoreConfig.KEY).getAutoCRLF());
+	}
+
+	/**
+	 * Indicates whether EOLs of text files should be converted to '\n' before
+	 * calculating the blob ID.
+	 **/
 	private final AutoCRLF autoCRLF;
 
-	private final CheckStat checkStat;
-
-	private final SymLinks symlinks;
-
-	private final HideDotFiles hideDotFiles;
-
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_FILEMODE, true);
-		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
-		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
-		symlinks = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_SYMLINKS, SymLinks.TRUE);
-		hideDotFiles = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
-				HideDotFiles.DOTGITONLY);
+	/**
+	 * Creates new options.
+	 *
+	 * @param autoCRLF
+	 *            indicates whether EOLs of text files should be converted to
+	 *            '\n' before calculating the blob ID.
+	 */
+	public WorkingTreeOptions(AutoCRLF autoCRLF) {
+		this.autoCRLF = autoCRLF;
 	}
 
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
-	}
-
-	/** @return how automatic CRLF conversion has been configured. */
+	/**
+	 * Indicates whether EOLs of text files should be converted to '\n' before
+	 * calculating the blob ID.
+	 *
+	 * @return true if EOLs should be canonicalized.
+	 */
 	public AutoCRLF getAutoCRLF() {
 		return autoCRLF;
-	}
-
-	/**
-	 * @return how stat data is compared
-	 * @since 3.0
-	 */
-	public CheckStat getCheckStat() {
-		return checkStat;
-	}
-
-	/**
-	 * @return how we handle symbolic links
-	 * @since 3.3
-	 */
-	public SymLinks getSymLinks() {
-		return symlinks;
-	}
-
-	/**
-	 * @return how we create '.'-files (on Windows)
-	 * @since 3.5
-	 */
-	public HideDotFiles getHideDotFiles() {
-		return hideDotFiles;
 	}
 }

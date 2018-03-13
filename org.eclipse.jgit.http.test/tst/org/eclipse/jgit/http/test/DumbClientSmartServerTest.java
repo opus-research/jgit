@@ -47,16 +47,8 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -67,9 +59,11 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.GitServlet;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.http.test.util.AccessEvent;
+import org.eclipse.jgit.http.test.util.HttpTestCase;
 import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.junit.http.AccessEvent;
-import org.eclipse.jgit.junit.http.HttpTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
@@ -81,18 +75,7 @@ import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.http.HttpConnectionFactory;
-import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
-import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(Parameterized.class)
 public class DumbClientSmartServerTest extends HttpTestCase {
 	private Repository remoteRepository;
 
@@ -102,28 +85,15 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 	private RevCommit A, B;
 
-	@Parameters
-	public static Collection<Object[]> data() {
-		// run all tests with both connection factories we have
-		return Arrays.asList(new Object[][] {
-				{ new JDKHttpConnectionFactory() },
-				{ new HttpClientConnectionFactory() } });
-	}
-
-	public DumbClientSmartServerTest(HttpConnectionFactory cf) {
-		HttpTransport.setConnectionFactory(cf);
-	}
-
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<Repository> src = createTestRepository();
+		final TestRepository src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
+		gs.setRepositoryResolver(new RepositoryResolver() {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -148,7 +118,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		src.update(master, B);
 	}
 
-	@Test
 	public void testListRemote() throws IOException {
 		Repository dst = createBareRepository();
 
@@ -210,7 +179,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		assertEquals("text/plain", head.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testInitialClone_Small() throws Exception {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -236,9 +204,8 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<Repository>(remoteRepository).packAndPrune();
+		new TestRepository(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -272,7 +239,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 				HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testPushNotSupported() throws Exception {
 		final TestRepository src = createTestRepository();
 		final RevCommit Q = src.commit().create();

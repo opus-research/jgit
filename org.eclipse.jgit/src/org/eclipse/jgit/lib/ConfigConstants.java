@@ -1,7 +1,5 @@
 /*
  * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,77 +46,15 @@ package org.eclipse.jgit.lib;
  * Constants for use with the Configuration classes: section names,
  * configuration keys
  */
-@SuppressWarnings("nls")
 public class ConfigConstants {
 	/** The "core" section */
 	public static final String CONFIG_CORE_SECTION = "core";
-
-	/** The "branch" section */
-	public static final String CONFIG_BRANCH_SECTION = "branch";
-
-	/** The "remote" section */
-	public static final String CONFIG_REMOTE_SECTION = "remote";
-
-	/** The "diff" section */
-	public static final String CONFIG_DIFF_SECTION = "diff";
-
-	/** The "dfs" section */
-	public static final String CONFIG_DFS_SECTION = "dfs";
-
-	/** The "user" section */
-	public static final String CONFIG_USER_SECTION = "user";
-
-	/** The "gerrit" section */
-	public static final String CONFIG_GERRIT_SECTION = "gerrit";
-
-	/** The "workflow" section */
-	public static final String CONFIG_WORKFLOW_SECTION = "workflow";
-
-	/** The "submodule" section */
-	public static final String CONFIG_SUBMODULE_SECTION = "submodule";
-
-	/**
-	 * The "rebase" section
-	 * @since 3.2
-	 */
-	public static final String CONFIG_REBASE_SECTION = "rebase";
-
-	/** The "gc" section */
-	public static final String CONFIG_GC_SECTION = "gc";
-
-	/** The "pack" section */
-	public static final String CONFIG_PACK_SECTION = "pack";
-
-	/**
-	 * The "fetch" section
-	 * @since 3.3
-	 */
-	public static final String CONFIG_FETCH_SECTION = "fetch";
-
-	/**
-	 * The "pull" section
-	 * @since 3.5
-	 */
-	public static final String CONFIG_PULL_SECTION = "pull";
-
-	/** The "algorithm" key */
-	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
 	/** The "bare" key */
 	public static final String CONFIG_KEY_BARE = "bare";
-
-	/** The "excludesfile" key */
-	public static final String CONFIG_KEY_EXCLUDESFILE = "excludesfile";
-
-	/**
-	 * The "attributesfile" key
-	 *
-	 * @since 3.7
-	 */
-	public static final String CONFIG_KEY_ATTRIBUTESFILE = "attributesfile";
 
 	/** The "filemode" key */
 	public static final String CONFIG_KEY_FILEMODE = "filemode";
@@ -131,172 +67,4 @@ public class ConfigConstants {
 
 	/** The "worktree" key */
 	public static final String CONFIG_KEY_WORKTREE = "worktree";
-
-	/** The "blockLimit" key */
-	public static final String CONFIG_KEY_BLOCK_LIMIT = "blockLimit";
-
-	/** The "blockSize" key */
-	public static final String CONFIG_KEY_BLOCK_SIZE = "blockSize";
-
-	/** The "deltaBaseCacheLimit" key */
-	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
-
-	/**
-	 * The "symlinks" key
-	 * @since 3.3
-	 */
-	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
-
-	/** The "streamFileThreshold" key */
-	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
-
-	/** The "remote" key */
-	public static final String CONFIG_KEY_REMOTE = "remote";
-
-	/** The "merge" key */
-	public static final String CONFIG_KEY_MERGE = "merge";
-
-	/** The "rebase" key */
-	public static final String CONFIG_KEY_REBASE = "rebase";
-
-	/** The "url" key */
-	public static final String CONFIG_KEY_URL = "url";
-
-	/** The "autosetupmerge" key */
-	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
-
-	/** The "autosetuprebase" key */
-	public static final String CONFIG_KEY_AUTOSETUPREBASE = "autosetuprebase";
-
-	/**
-	 * The "autostash" key
-	 * @since 3.2
-	 */
-	public static final String CONFIG_KEY_AUTOSTASH = "autostash";
-
-	/** The "name" key */
-	public static final String CONFIG_KEY_NAME = "name";
-
-	/** The "email" key */
-	public static final String CONFIG_KEY_EMAIL = "email";
-
-	/** The "false" key (used to configure {@link #CONFIG_KEY_AUTOSETUPMERGE} */
-	public static final String CONFIG_KEY_FALSE = "false";
-
-	/** The "true" key (used to configure {@link #CONFIG_KEY_AUTOSETUPMERGE} */
-	public static final String CONFIG_KEY_TRUE = "true";
-
-	/**
-	 * The "always" key (used to configure {@link #CONFIG_KEY_AUTOSETUPREBASE}
-	 * and {@link #CONFIG_KEY_AUTOSETUPMERGE}
-	 */
-	public static final String CONFIG_KEY_ALWAYS = "always";
-
-	/** The "never" key (used to configure {@link #CONFIG_KEY_AUTOSETUPREBASE} */
-	public static final String CONFIG_KEY_NEVER = "never";
-
-	/** The "local" key (used to configure {@link #CONFIG_KEY_AUTOSETUPREBASE} */
-	public static final String CONFIG_KEY_LOCAL = "local";
-
-	/** The "createchangeid" key */
-	public static final String CONFIG_KEY_CREATECHANGEID = "createchangeid";
-
-	/** The "defaultsourceref" key */
-	public static final String CONFIG_KEY_DEFBRANCHSTARTPOINT = "defbranchstartpoint";
-
-	/** The "path" key */
-	public static final String CONFIG_KEY_PATH = "path";
-
-	/** The "update" key */
-	public static final String CONFIG_KEY_UPDATE = "update";
-
-	/**
-	 * The "ignore" key
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_IGNORE = "ignore";
-
-	/** The "compression" key */
-	public static final String CONFIG_KEY_COMPRESSION = "compression";
-
-	/** The "indexversion" key */
-	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
-
-	/**
-	 * The "hidedotfiles" key
-	 * @since 3.5
-	 */
-	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
-
-	/** The "precomposeunicode" key */
-	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
-
-	/** The "pruneexpire" key */
-	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
-
-	/**
-	 * The "aggressiveDepth" key
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_AGGRESSIVE_DEPTH = "aggressiveDepth";
-
-	/**
-	 * The "aggressiveWindow" key
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_AGGRESSIVE_WINDOW = "aggressiveWindow";
-
-	/** The "mergeoptions" key */
-	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
-
-	/** The "ff" key */
-	public static final String CONFIG_KEY_FF = "ff";
-
-	/**
-	 * The "checkstat" key
-	 * @since 3.0
-	 */
-	public static final String CONFIG_KEY_CHECKSTAT = "checkstat";
-
-	/**
-	 * The "renamelimit" key in the "diff section"
-	 * @since 3.0
-	 */
-	public static final String CONFIG_KEY_RENAMELIMIT = "renamelimit";
-
-	/**
-	 * The "trustfolderstat" key in the "core section"
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_TRUSTFOLDERSTAT = "trustfolderstat";
-
-	/**
-	 * The "noprefix" key in the "diff section"
-	 * @since 3.0
-	 */
-	public static final String CONFIG_KEY_NOPREFIX = "noprefix";
-
-	/**
-	 * A "renamelimit" value in the "diff section"
-	 * @since 3.0
-	 */
-	public static final String CONFIG_RENAMELIMIT_COPY = "copy";
-
-	/**
-	 * A "renamelimit" value in the "diff section"
-	 * @since 3.0
-	 */
-	public static final String CONFIG_RENAMELIMIT_COPIES = "copies";
-
-	/**
-	 * The "renames" key in the "diff section"
-	 * @since 3.0
-	 */
-	public static final String CONFIG_KEY_RENAMES = "renames";
-
-	/**
-	 * The "prune" key
-	 * @since 3.3
-	 */
-	public static final String CONFIG_KEY_PRUNE = "prune";
 }

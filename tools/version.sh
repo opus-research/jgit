@@ -82,7 +82,7 @@ case "$V" in
 *-[1-9]*-g[0-9a-f]*)
 	POM_V=$(echo "$V" | perl -pe 's/-(\d+-g.*)$/.$1/')
 	OSGI_V=$(perl -e '
-		die unless $ARGV[0] =~ /^(\d+)(?:\.(\d+)(?:\.(\d+))?(?:\.\d{12}-r)?)?-(\d+)-g(.*)$/;
+		$ARGV[0] =~ /^(\d+)(?:\.(\d+)(?:\.(\d+))?)?-(\d+)-g(.*)$/;
 		my ($a, $b, $c, $p, $r) = ($1, $2, $3, $4, $5);
 		$b = '0' unless defined $b;
 		$c = '0' unless defined $c;
@@ -116,13 +116,6 @@ perl -pi~ -e '
 	' $(git ls-files | grep META-INF/MANIFEST.MF)
 
 perl -pi~ -e '
-	s/^(Bundle-Version:\s*).*$/${1}'"$OSGI_V"'/;
-	s/(org.eclipse.jgit.*;version=")[^"[(]*(")/${1}'"$API_V"'${2}/;
-	s/(org.eclipse.jgit.*;version="\[)[^"]*(\)")/${1}'"$API_V,$API_N"'${2}/;
-	s/^(Eclipse-SourceBundle:\s*org.eclipse.jgit.*;version=\").*(\";roots=\"\.\")$/${1}'"$OSGI_V"'${2}/;
-	' $(git ls-files | grep META-INF/SOURCE-MANIFEST.MF)
-
-perl -pi~ -e '
 	if ($ARGV ne $old_argv) {
 		$seen_version = 0;
 		$old_argv = $ARGV;
@@ -134,14 +127,7 @@ perl -pi~ -e '
 	' org.eclipse.jgit.packaging/org.*.feature/feature.xml
 
 perl -pi~ -e '
-	if ($ARGV ne $old_argv) {
-		$seen_version = 0;
-		$old_argv = $ARGV;
-	}
-	if (!$seen_version) {
-		$seen_version = 1 if
-		s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
-	}
+	s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
 	' org.eclipse.jgit.packaging/org.*.feature/pom.xml
 
 perl -pi~ -e '
@@ -149,22 +135,11 @@ perl -pi~ -e '
 		$seen_version = 0;
 		$old_argv = $ARGV;
 	}
-	if ($seen_version < 5) {
+	if ($seen_version < 4) {
 		$seen_version++ if
 		s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
 	}
 	' org.eclipse.jgit.packaging/org.eclipse.jgit.updatesite/pom.xml
-
-perl -pi~ -e '
-	if ($ARGV ne $old_argv) {
-		$seen_version = 0;
-		$old_argv = $ARGV;
-	}
-	if (!$seen_version) {
-		$seen_version = 1 if
-		s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
-	}
-	' org.eclipse.jgit.packaging/pom.xml
 
 perl -pi~ -e '
 	if ($ARGV ne $old_argv) {

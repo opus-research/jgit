@@ -1,46 +1,3 @@
-/*
- * Copyright (C) 2010, Google Inc.
- * and other copyright owners as documented in the project's IP log.
- *
- * This program and the accompanying materials are made available
- * under the terms of the Eclipse Distribution License v1.0 which
- * accompanies this distribution, is reproduced below, and is
- * available at http://www.eclipse.org/org/documents/edl-v10.php
- *
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or
- * without modification, are permitted provided that the following
- * conditions are met:
- *
- * - Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
- *
- * - Redistributions in binary form must reproduce the above
- *   copyright notice, this list of conditions and the following
- *   disclaimer in the documentation and/or other materials provided
- *   with the distribution.
- *
- * - Neither the name of the Eclipse Foundation, Inc. nor the
- *   names of its contributors may be used to endorse or promote
- *   products derived from this software without specific prior
- *   written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
- * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 package org.eclipse.jgit.lib;
 
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_CORE_SECTION;
@@ -50,7 +7,7 @@ import static org.eclipse.jgit.lib.Constants.DOT_GIT;
 import static org.eclipse.jgit.lib.Constants.GIT_ALTERNATE_OBJECT_DIRECTORIES_KEY;
 import static org.eclipse.jgit.lib.Constants.GIT_CEILING_DIRECTORIES_KEY;
 import static org.eclipse.jgit.lib.Constants.GIT_DIR_KEY;
-import static org.eclipse.jgit.lib.Constants.GIT_INDEX_FILE_KEY;
+import static org.eclipse.jgit.lib.Constants.GIT_INDEX_KEY;
 import static org.eclipse.jgit.lib.Constants.GIT_OBJECT_DIRECTORY_KEY;
 import static org.eclipse.jgit.lib.Constants.GIT_WORK_TREE_KEY;
 
@@ -61,16 +18,13 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -87,42 +41,6 @@ import org.eclipse.jgit.util.SystemReader;
  * @see FileRepositoryBuilder
  */
 public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Repository> {
-	private static boolean isSymRef(byte[] ref) {
-		if (ref.length < 9)
-			return false;
-		return /**/ref[0] == 'g' //
-				&& ref[1] == 'i' //
-				&& ref[2] == 't' //
-				&& ref[3] == 'd' //
-				&& ref[4] == 'i' //
-				&& ref[5] == 'r' //
-				&& ref[6] == ':' //
-				&& ref[7] == ' ';
-	}
-
-	private static File getSymRef(File workTree, File dotGit, FS fs)
-			throws IOException {
-		byte[] content = IO.readFully(dotGit);
-		if (!isSymRef(content))
-			throw new IOException(MessageFormat.format(
-					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
-
-		int pathStart = 8;
-		int lineEnd = RawParseUtils.nextLF(content, pathStart);
-		if (content[lineEnd - 1] == '\n')
-			lineEnd--;
-		if (lineEnd == pathStart)
-			throw new IOException(MessageFormat.format(
-					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
-
-		String gitdirPath = RawParseUtils.decode(content, pathStart, lineEnd);
-		File gitdirFile = fs.resolve(workTree, gitdirPath);
-		if (gitdirFile.isAbsolute())
-			return gitdirFile;
-		else
-			return new File(workTree, gitdirPath).getCanonicalFile();
-	}
-
 	private FS fs;
 
 	private File gitDir;
@@ -140,9 +58,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 
 	/** True only if the caller wants to force bare behavior. */
 	private boolean bare;
-
-	/** True if the caller requires the repository to exist. */
-	private boolean mustExist;
 
 	/** Configuration file of target repository, lazily loaded if required. */
 	private Config config;
@@ -290,24 +205,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	}
 
 	/**
-	 * Require the repository to exist before it can be opened.
-	 *
-	 * @param mustExist
-	 *            true if it must exist; false if it can be missing and created
-	 *            after being built.
-	 * @return {@code this} (for chaining calls).
-	 */
-	public B setMustExist(boolean mustExist) {
-		this.mustExist = mustExist;
-		return self();
-	}
-
-	/** @return true if the repository must exist before being opened. */
-	public boolean isMustExist() {
-		return mustExist;
-	}
-
-	/**
 	 * Set the top level directory of the working files.
 	 *
 	 * @param workTree
@@ -399,7 +296,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 		}
 
 		if (getIndexFile() == null) {
-			String val = sr.getenv(GIT_INDEX_FILE_KEY);
+			String val = sr.getenv(GIT_INDEX_KEY);
 			if (val != null)
 				setIndexFile(new File(val));
 		}
@@ -487,7 +384,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	public B findGitDir() {
 		if (getGitDir() == null)
-			findGitDir(new File("").getAbsoluteFile()); //$NON-NLS-1$
+			findGitDir(new File("").getAbsoluteFile());
 		return self();
 	}
 
@@ -514,21 +411,10 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 				if (FileKey.isGitRepository(dir, tryFS)) {
 					setGitDir(dir);
 					break;
-				} else if (dir.isFile()) {
-					try {
-						setGitDir(getSymRef(current, dir, tryFS));
-						break;
-					} catch (IOException ignored) {
-						// Continue searching if gitdir ref isn't found
-					}
-				} else if (FileKey.isGitRepository(current, tryFS)) {
-					setGitDir(current);
-					break;
 				}
 
 				current = current.getParentFile();
-				if (current != null && ceilingDirectories != null
-						&& ceilingDirectories.contains(current))
+				if (current != null && ceilingDirectories.contains(current))
 					break;
 			}
 		}
@@ -574,10 +460,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	@SuppressWarnings("unchecked")
 	public R build() throws IOException {
-		R repo = (R) new FileRepository(setup());
-		if (isMustExist() && !repo.getObjectDatabase().exists())
-			throw new RepositoryNotFoundException(getGitDir());
-		return repo;
+		return (R) new FileRepository(setup());
 	}
 
 	/** Require either {@code gitDir} or {@code workTree} to be set. */
@@ -594,15 +477,10 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 *             the repository could not be accessed
 	 */
 	protected void setupGitDir() throws IOException {
-		// No gitDir? Try to assume its under the workTree or a ref to another
-		// location
-		if (getGitDir() == null && getWorkTree() != null) {
-			File dotGit = new File(getWorkTree(), DOT_GIT);
-			if (!dotGit.isFile())
-				setGitDir(dotGit);
-			else
-				setGitDir(getSymRef(getWorkTree(), dotGit, safeFS()));
-		}
+		// No gitDir? Try to assume its under the workTree.
+		//
+		if (getGitDir() == null && getWorkTree() != null)
+			setGitDir(new File(getWorkTree(), DOT_GIT));
 	}
 
 	/**
@@ -632,7 +510,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			if (getGitDir() == null)
 				setGitDir(getWorkTree().getParentFile());
 			if (getIndexFile() == null)
-				setIndexFile(new File(getGitDir(), "index")); //$NON-NLS-1$
+				setIndexFile(new File(getGitDir(), "index"));
 		}
 	}
 
@@ -644,7 +522,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	protected void setupInternals() throws IOException {
 		if (getObjectDirectory() == null && getGitDir() != null)
-			setObjectDirectory(safeFS().resolve(getGitDir(), "objects")); //$NON-NLS-1$
+			setObjectDirectory(safeFS().resolve(getGitDir(), "objects"));
 	}
 
 	/**
@@ -676,7 +554,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			// the user file, as these parameters must be unique to this
 			// repository and not inherited from other files.
 			//
-			File path = safeFS().resolve(getGitDir(), Constants.CONFIG);
+			File path = safeFS().resolve(getGitDir(), "config");
 			FileBasedConfig cfg = new FileBasedConfig(path, safeFS());
 			try {
 				cfg.load();
@@ -699,7 +577,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 		String path = cfg.getString(CONFIG_CORE_SECTION, null,
 				CONFIG_KEY_WORKTREE);
 		if (path != null)
-			return safeFS().resolve(getGitDir(), path).getCanonicalFile();
+			return safeFS().resolve(getGitDir(), path);
 
 		// If core.bare is set, honor its value. Assume workTree is
 		// the parent directory of the repository.

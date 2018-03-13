@@ -46,7 +46,7 @@ package org.eclipse.jgit.util;
 
 import java.util.Arrays;
 
-/** A more efficient List&lt;Long&gt; using a primitive long array. */
+/** A more efficient List<Long> using a primitive long array. */
 public class LongList {
 	private long[] entries;
 
@@ -164,7 +164,7 @@ public class LongList {
 		r.append('[');
 		for (int i = 0; i < count; i++) {
 			if (i > 0)
-				r.append(", "); //$NON-NLS-1$
+				r.append(", ");
 			r.append(entries[i]);
 		}
 		r.append(']');

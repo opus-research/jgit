@@ -44,21 +44,17 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Test;
 
-public class RawTextIgnoreTrailingWhitespaceTest {
+import junit.framework.TestCase;
+
+public class RawTextIgnoreTrailingWhitespaceTest extends TestCase {
 	private final RawTextComparator cmp = RawTextComparator.WS_IGNORE_TRAILING;
 
-	@Test
 	public void testEqualsWithoutWhitespace() {
-		final RawText a = new RawText(Constants
+		final RawText a = new RawText(cmp, Constants
 				.encodeASCII("foo-a\nfoo-b\nfoo\n"));
-		final RawText b = new RawText(Constants
+		final RawText b = new RawText(cmp, Constants
 				.encodeASCII("foo-b\nfoo-c\nf\n"));
 
 		assertEquals(3, a.size());
@@ -77,11 +73,10 @@ public class RawTextIgnoreTrailingWhitespaceTest {
 		assertFalse(cmp.equals(b, 2, a, 2));
 	}
 
-	@Test
 	public void testEqualsWithWhitespace() {
-		final RawText a = new RawText(Constants
+		final RawText a = new RawText(cmp, Constants
 				.encodeASCII("foo-a\n         \n a b c\na      \n    b\n"));
-		final RawText b = new RawText(Constants
+		final RawText b = new RawText(cmp, Constants
 				.encodeASCII("foo-a        b\n\nab  c\na\nb\n"));
 
 		// "foo-a" != "foo-a        b"

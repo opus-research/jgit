@@ -43,11 +43,10 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.Serializable;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -62,9 +61,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * This class converts the hex string into a binary form, to make it more
  * efficient for matching against an object.
  */
-public final class AbbreviatedObjectId implements Serializable {
-	private static final long serialVersionUID = 1L;
-
+public final class AbbreviatedObjectId {
 	/**
 	 * Test a string of characters to verify it is a hex format.
 	 * <p>
@@ -101,10 +98,8 @@ public final class AbbreviatedObjectId implements Serializable {
 	public static final AbbreviatedObjectId fromString(final byte[] buf,
 			final int offset, final int end) {
 		if (end - offset > Constants.OBJECT_ID_STRING_LENGTH)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidIdLength,
-					Integer.valueOf(end - offset),
-					Integer.valueOf(Constants.OBJECT_ID_STRING_LENGTH)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidIdLength
+					, end - offset, Constants.OBJECT_ID_STRING_LENGTH));
 		return fromHexString(buf, offset, end);
 	}
 
@@ -325,7 +320,7 @@ public final class AbbreviatedObjectId implements Serializable {
 		return NB.compareUInt32(w5, mask(5, bs[p + 4]));
 	}
 
-	/** @return value for a fan-out style map, only valid of length &gt;= 2. */
+	/** @return value for a fan-out style map, only valid of length >= 2. */
 	public final int getFirstByte() {
 		return w1 >>> 24;
 	}
@@ -375,9 +370,8 @@ public final class AbbreviatedObjectId implements Serializable {
 		return new String(b, 0, nibbles);
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
-		return "AbbreviatedObjectId[" + name() + "]"; //$NON-NLS-1$
+		return "AbbreviatedObjectId[" + name() + "]";
 	}
 }

@@ -66,9 +66,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  * they are converting from "line number" to "element index".
  */
 public class RawText extends Sequence {
-	/** A Rawtext of length 0 */
-	public static final RawText EMPTY_TEXT = new RawText(new byte[0]);
-
 	/** Number of bytes to check for heuristics in {@link #isBinary(byte[])} */
 	private static final int FIRST_FEW_BYTES = 8000;
 
@@ -77,6 +74,9 @@ public class RawText extends Sequence {
 
 	/** Map of line number to starting position within {@link #content}. */
 	protected final IntList lines;
+
+	/** Hash code for each line, for fast equality elimination. */
+	protected final int[] hashes;
 
 	/**
 	 * Create a new sequence from an existing content byte array.
@@ -88,8 +88,24 @@ public class RawText extends Sequence {
 	 *            through cached arrays is safe.
 	 */
 	public RawText(final byte[] input) {
+		this(RawTextComparator.DEFAULT, input);
+	}
+
+	/**
+	 * Create a new sequence from an existing content byte array.
+	 *
+	 * The entire array (indexes 0 through length-1) is used as the content.
+	 *
+	 * @param cmp
+	 *            comparator that will later be used to compare texts.
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
+	 */
+	public RawText(RawTextComparator cmp, byte[] input) {
 		content = input;
 		lines = RawParseUtils.lineMap(content, 0, content.length);
+		hashes = computeHashes(cmp);
 	}
 
 	/**
@@ -135,8 +151,8 @@ public class RawText extends Sequence {
 	 */
 	public void writeLine(final OutputStream out, final int i)
 			throws IOException {
-		int start = getStart(i);
-		int end = getEnd(i);
+		final int start = lines.get(i + 1);
+		int end = lines.get(i + 2);
 		if (content[end - 1] == '\n')
 			end--;
 		out.write(content, start, end - start);
@@ -154,65 +170,14 @@ public class RawText extends Sequence {
 		return content[end - 1] != '\n';
 	}
 
-	/**
-	 * Get the text for a single line.
-	 *
-	 * @param i
-	 *            index of the line to extract. Note this is 0-based, so line
-	 *            number 1 is actually index 0.
-	 * @return the text for the line, without a trailing LF.
-	 */
-	public String getString(int i) {
-		return getString(i, i + 1, true);
-	}
-
-	/**
-	 * Get the text for a region of lines.
-	 *
-	 * @param begin
-	 *            index of the first line to extract. Note this is 0-based, so
-	 *            line number 1 is actually index 0.
-	 * @param end
-	 *            index of one past the last line to extract.
-	 * @param dropLF
-	 *            if true the trailing LF ('\n') of the last returned line is
-	 *            dropped, if present.
-	 * @return the text for lines {@code [begin, end)}.
-	 */
-	public String getString(int begin, int end, boolean dropLF) {
-		if (begin == end)
-			return ""; //$NON-NLS-1$
-
-		int s = getStart(begin);
-		int e = getEnd(end - 1);
-		if (dropLF && content[e - 1] == '\n')
-			e--;
-		return decode(s, e);
-	}
-
-	/**
-	 * Decode a region of the text into a String.
-	 *
-	 * The default implementation of this method tries to guess the character
-	 * set by considering UTF-8, the platform default, and falling back on
-	 * ISO-8859-1 if neither of those can correctly decode the region given.
-	 *
-	 * @param start
-	 *            first byte of the content to decode.
-	 * @param end
-	 *            one past the last byte of the content to decode.
-	 * @return the region {@code [start, end)} decoded as a String.
-	 */
-	protected String decode(int start, int end) {
-		return RawParseUtils.decode(content, start, end);
-	}
-
-	private int getStart(final int i) {
-		return lines.get(i + 1);
-	}
-
-	private int getEnd(final int i) {
-		return lines.get(i + 2);
+	private int[] computeHashes(RawTextComparator cmp) {
+		final int[] r = new int[lines.size()];
+		for (int lno = 1; lno < lines.size() - 1; lno++) {
+			final int ptr = lines.get(lno);
+			final int end = lines.get(lno + 1);
+			r[lno] = cmp.hashRegion(content, ptr, end);
+		}
+		return r;
 	}
 
 	/**
@@ -275,23 +240,5 @@ public class RawText extends Sequence {
 				return true;
 
 		return false;
-	}
-
-	/**
-	 * Get the line delimiter for the first line.
-	 *
-	 * @since 2.0
-	 * @return the line delimiter or <code>null</code>
-	 */
-	public String getLineDelimiter() {
-		if (size() == 0)
-			return null;
-		int e = getEnd(0);
-		if (content[e - 1] != '\n')
-			return null;
-		if (content.length > 1 && content[e - 2] == '\r')
-			return "\r\n"; //$NON-NLS-1$
-		else
-			return "\n"; //$NON-NLS-1$
 	}
 }

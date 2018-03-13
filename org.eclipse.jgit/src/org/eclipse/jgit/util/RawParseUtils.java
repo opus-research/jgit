@@ -54,36 +54,20 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
-import java.nio.charset.IllegalCharsetNameException;
-import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 
 /** Handy utility functions to parse raw object contents. */
 public final class RawParseUtils {
-	/**
-	 * UTF-8 charset constant.
-	 *
-	 * @since 2.2
-	 */
-	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8"); //$NON-NLS-1$
-
 	private static final byte[] digits10;
 
 	private static final byte[] digits16;
 
 	private static final byte[] footerLineKeyChars;
 
-	private static final Map<String, Charset> encodingAliases;
-
 	static {
-		encodingAliases = new HashMap<String, Charset>();
-		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1")); //$NON-NLS-1$ //$NON-NLS-2$
-
 		digits10 = new byte['9' + 1];
 		Arrays.fill(digits10, (byte) -1);
 		for (char i = '0'; i <= '9'; i++)
@@ -667,20 +651,7 @@ public final class RawParseUtils {
 		if (enc < 0)
 			return Constants.CHARSET;
 		final int lf = nextLF(b, enc);
-		String decoded = decode(Constants.CHARSET, b, enc, lf - 1);
-		try {
-			return Charset.forName(decoded);
-		} catch (IllegalCharsetNameException badName) {
-			Charset aliased = charsetForAlias(decoded);
-			if (aliased != null)
-				return aliased;
-			throw badName;
-		} catch (UnsupportedCharsetException badName) {
-			Charset aliased = charsetForAlias(decoded);
-			if (aliased != null)
-				return aliased;
-			throw badName;
-		}
+		return Charset.forName(decode(Constants.CHARSET, b, enc, lf - 1));
 	}
 
 	/**
@@ -724,8 +695,8 @@ public final class RawParseUtils {
 				(emailE >= raw.length - 1 && raw[emailE - 1] != '>'))
 			return null;
 
-		final int nameEnd = emailB - 2 >= nameB && raw[emailB - 2] == ' ' ?
-				emailB - 2 : emailB - 1;
+		final int nameEnd = emailB - 2 >= 0 && raw[emailB - 2] == ' ' ? emailB - 2
+				: emailB - 1;
 		final String name = decode(cs, raw, nameB, nameEnd);
 		final String email = decode(cs, raw, emailB, emailE - 1);
 
@@ -779,7 +750,7 @@ public final class RawParseUtils {
 		if (emailE < stop) {
 			email = decode(raw, emailB, emailE - 1);
 		} else {
-			email = "invalid"; //$NON-NLS-1$
+			email = "invalid";
 		}
 		if (emailB < stop)
 			name = decode(raw, nameB, emailB - 2);
@@ -982,7 +953,7 @@ public final class RawParseUtils {
 	 * Decode a region of the buffer under the ISO-8859-1 encoding.
 	 *
 	 * Each byte is treated as a single character in the 8859-1 character
-	 * encoding, performing a raw binary-&gt;char conversion.
+	 * encoding, performing a raw binary->char conversion.
 	 *
 	 * @param buffer
 	 *            buffer to pull raw bytes from.
@@ -1058,7 +1029,7 @@ public final class RawParseUtils {
 	/**
 	 * Locate the end of a paragraph.
 	 * <p>
-	 * A paragraph is ended by two consecutive LF bytes or CRLF pairs
+	 * A paragraph is ended by two consecutive LF bytes.
 	 *
 	 * @param b
 	 *            buffer to scan.
@@ -1072,13 +1043,39 @@ public final class RawParseUtils {
 	public static final int endOfParagraph(final byte[] b, final int start) {
 		int ptr = start;
 		final int sz = b.length;
-		while (ptr < sz && (b[ptr] != '\n' && b[ptr] != '\r'))
+		while (ptr < sz && b[ptr] != '\n')
 			ptr = nextLF(b, ptr);
-		if (ptr > start && b[ptr - 1] == '\n')
-			ptr--;
-		if (ptr > start && b[ptr - 1] == '\r')
+		while (0 < ptr && start < ptr && b[ptr - 1] == '\n')
 			ptr--;
 		return ptr;
+	}
+
+	/**
+	 * @param path
+	 * @return ...
+	 */
+	public static String pathTail(String path) {
+		final int slash = path.lastIndexOf('/');
+		return slash >= 0 ? path.substring(slash + 1) : path;
+	}
+
+	/**
+	 * @param path
+	 * @return ...
+	 */
+	public static String pathTrimLeadingSlash(String path) {
+		return path.length() > 0 && path.charAt(0) == '/' ? path.substring(1)
+				: path;
+	}
+
+	/**
+	 * @param path
+	 * @return ...
+	 */
+	public static String pathAddTrailingSlash(String path) {
+		return path.length() == 0 || path.charAt(path.length() - 1) != '/' ? path
+				+ "/"
+				: path;
 	}
 
 	private static int lastIndexOfTrim(byte[] raw, char ch, int pos) {
@@ -1089,10 +1086,6 @@ public final class RawParseUtils {
 			pos--;
 
 		return pos;
-	}
-
-	private static Charset charsetForAlias(String name) {
-		return encodingAliases.get(StringUtils.toLowerCase(name));
 	}
 
 	private RawParseUtils() {

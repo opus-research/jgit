@@ -42,34 +42,20 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.revwalk.filter.AndRevFilter;
-import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
-import org.eclipse.jgit.revwalk.filter.SkipRevFilter;
-import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
  * A class used to execute a {@code Log} command. It has setters for all
@@ -77,24 +63,10 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * to finally execute the command. Each instance of this class should only be
  * used for one invocation of the command (means: one call to {@link #call()})
  * <p>
- * Examples (<code>git</code> is a {@link Git} instance):
- * <p>
- * Get newest 10 commits, starting from the current branch:
+ * This is currently a very basic implementation which takes only one starting
+ * revision as option.
  *
- * <pre>
- * ObjectId head = repository.resolve(Constants.HEAD);
- *
- * Iterable&lt;RevCommit&gt; commits = git.log().add(head).setMaxCount(10).call();
- * </pre>
- * <p>
- *
- * <p>
- * Get commits only for a specific file:
- *
- * <pre>
- * git.log().add(head).addPath(&quot;dir/filename.txt&quot;).call();
- * </pre>
- * <p>
+ * TODO: add more options (revision ranges, sorting, ...)
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-log.html"
  *      >Git documentation about Log</a>
@@ -103,12 +75,6 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	private RevWalk walk;
 
 	private boolean startSpecified = false;
-
-	private final List<PathFilter> pathFilters = new ArrayList<PathFilter>();
-
-	private int maxCount = -1;
-
-	private int skip = -1;
 
 	/**
 	 * @param repo
@@ -126,21 +92,10 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 * method twice on an instance.
 	 *
 	 * @return an iteration over RevCommits
-	 * @throws NoHeadException
-	 *             of the references ref cannot be resolved
 	 */
-	public Iterable<RevCommit> call() throws GitAPIException, NoHeadException {
+	public Iterable<RevCommit> call() throws NoHeadException,
+			JGitInternalException {
 		checkCallable();
-		if (pathFilters.size() > 0)
-			walk.setTreeFilter(AndTreeFilter.create(
-					PathFilterGroup.create(pathFilters), TreeFilter.ANY_DIFF));
-		if (skip > -1 && maxCount > -1)
-			walk.setRevFilter(AndRevFilter.create(SkipRevFilter.create(skip),
-					MaxCountRevFilter.create(maxCount)));
-		else if (skip > -1)
-			walk.setRevFilter(SkipRevFilter.create(skip));
-		else if (maxCount > -1)
-			walk.setRevFilter(MaxCountRevFilter.create(maxCount));
 		if (!startSpecified) {
 			try {
 				ObjectId headId = repo.resolve(Constants.HEAD);
@@ -185,7 +140,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand add(AnyObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException {
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(true, start);
 	}
 
@@ -213,7 +168,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand not(AnyObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException {
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(false, start);
 	}
 
@@ -242,83 +197,9 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand addRange(AnyObjectId since, AnyObjectId until)
-			throws MissingObjectException, IncorrectObjectTypeException {
+			throws MissingObjectException, IncorrectObjectTypeException,
+			JGitInternalException {
 		return not(since).add(until);
-	}
-
-	/**
-	 * Add all refs as commits to start the graph traversal from.
-	 *
-	 * @see #add(AnyObjectId)
-	 * @return {@code this}
-	 * @throws IOException
-	 *             the references could not be accessed
-	 */
-	public LogCommand all() throws IOException {
-		Map<String, Ref> refs = getRepository().getRefDatabase().getRefs(ALL);
-		for (Ref ref : refs.values()) {
-			if(!ref.isPeeled())
-				ref = getRepository().peel(ref);
-
-			ObjectId objectId = ref.getPeeledObjectId();
-			if (objectId == null)
-				objectId = ref.getObjectId();
-			RevCommit commit = null;
-			try {
-				commit = walk.parseCommit(objectId);
-			} catch (MissingObjectException e) {
-				// ignore: the ref points to an object that does not exist;
-				// it should be ignored as traversal starting point.
-			} catch (IncorrectObjectTypeException e) {
-				// ignore: the ref points to an object that is not a commit
-				// (e.g. a tree or a blob);
-				// it should be ignored as traversal starting point.
-			}
-			if (commit != null)
-				add(commit);
-		}
-		return this;
-	}
-
-	/**
-	 * Show only commits that affect any of the specified paths. The path must
-	 * either name a file or a directory exactly and use <code>/</code> (slash)
-	 * as separator. Note that regex expressions or wildcards are not supported.
-	 *
-	 * @param path
-	 *            a repository-relative path (with <code>/</code> as separator)
-	 * @return {@code this}
-	 */
-	public LogCommand addPath(String path) {
-		checkCallable();
-		pathFilters.add(PathFilter.create(path));
-		return this;
-	}
-
-	/**
-	 * Skip the number of commits before starting to show the commit output.
-	 *
-	 * @param skip
-	 *            the number of commits to skip
-	 * @return {@code this}
-	 */
-	public LogCommand setSkip(int skip) {
-		checkCallable();
-		this.skip = skip;
-		return this;
-	}
-
-	/**
-	 * Limit the number of commits to output.
-	 *
-	 * @param maxCount
-	 *            the limit
-	 * @return {@code this}
-	 */
-	public LogCommand setMaxCount(int maxCount) {
-		checkCallable();
-		this.maxCount = maxCount;
-		return this;
 	}
 
 	private LogCommand add(boolean include, AnyObjectId start)
@@ -338,7 +219,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 			throw e;
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionOccurredDuringAddingOfOptionToALogCommand
+					JGitText.get().exceptionOccuredDuringAddingOfOptionToALogCommand
 					, start), e);
 		}
 	}

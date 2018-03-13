@@ -43,18 +43,12 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import junit.framework.TestCase;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
 
-public class DirCacheEntryTest {
-	@Test
+public class DirCacheEntryTest extends TestCase {
 	public void testIsValidPath() {
 		assertTrue(isValidPath("a"));
 		assertTrue(isValidPath("a/b"));
@@ -70,15 +64,9 @@ public class DirCacheEntryTest {
 	}
 
 	private static boolean isValidPath(final String path) {
-		try {
-			DirCacheCheckout.checkValidPath(path);
-			return true;
-		} catch (InvalidPathException e) {
-			return false;
-		}
+		return DirCacheEntry.isValidPath(Constants.encode(path));
 	}
 
-	@Test
 	public void testCreate_ByStringPath() {
 		assertEquals("a", new DirCacheEntry("a").getPathString());
 		assertEquals("a/b", new DirCacheEntry("a/b").getPathString());
@@ -91,7 +79,6 @@ public class DirCacheEntryTest {
 		}
 	}
 
-	@Test
 	public void testCreate_ByStringPathAndStage() {
 		DirCacheEntry e;
 
@@ -133,7 +120,6 @@ public class DirCacheEntryTest {
 		}
 	}
 
-	@Test
 	public void testSetFileMode() {
 		final DirCacheEntry e = new DirCacheEntry("a");
 
@@ -168,54 +154,5 @@ public class DirCacheEntryTest {
 		} catch (IllegalArgumentException err) {
 			assertEquals("Invalid mode 40000 for path a", err.getMessage());
 		}
-	}
-
-	@Test
-	public void testCopyMetaDataWithStage() {
-		copyMetaDataHelper(false);
-	}
-
-	@Test
-	public void testCopyMetaDataWithoutStage() {
-		copyMetaDataHelper(true);
-	}
-
-	private static void copyMetaDataHelper(final boolean keepStage) {
-		DirCacheEntry e = new DirCacheEntry("some/path", DirCacheEntry.STAGE_2);
-		e.setAssumeValid(false);
-		e.setCreationTime(2L);
-		e.setFileMode(FileMode.EXECUTABLE_FILE);
-		e.setLastModified(3L);
-		e.setLength(100L);
-		e.setObjectId(ObjectId
-				.fromString("0123456789012345678901234567890123456789"));
-		e.setUpdateNeeded(true);
-
-		DirCacheEntry f = new DirCacheEntry("someother/path",
-				DirCacheEntry.STAGE_1);
-		f.setAssumeValid(true);
-		f.setCreationTime(10L);
-		f.setFileMode(FileMode.SYMLINK);
-		f.setLastModified(20L);
-		f.setLength(100000000L);
-		f.setObjectId(ObjectId
-				.fromString("1234567890123456789012345678901234567890"));
-		f.setUpdateNeeded(true);
-
-		e.copyMetaData(f, keepStage);
-		assertTrue(e.isAssumeValid());
-		assertEquals(10L, e.getCreationTime());
-		assertEquals(
-				ObjectId.fromString("1234567890123456789012345678901234567890"),
-				e.getObjectId());
-		assertEquals(FileMode.SYMLINK, e.getFileMode());
-		assertEquals(20L, e.getLastModified());
-		assertEquals(100000000L, e.getLength());
-		if (keepStage)
-			assertEquals(DirCacheEntry.STAGE_2, e.getStage());
-		else
-			assertEquals(DirCacheEntry.STAGE_1, e.getStage());
-		assertTrue(e.isUpdateNeeded());
-		assertEquals("some/path", e.getPathString());
 	}
 }

@@ -52,7 +52,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>3.7.0-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.test</artifactId>
@@ -62,34 +62,11 @@
     JUnit tests for the core library.
   </description>
 
-  <profiles>
-    <profile>
-      <id>jgit.java7</id>
-      <activation>
-	<jdk>[1.7,)</jdk>
-      </activation>
-      <dependencies>
-	<dependency>
-	  <groupId>org.eclipse.jgit</groupId>
-	  <artifactId>org.eclipse.jgit.java7</artifactId>
-	  <version>${project.version}</version>
-	</dependency>
-      </dependencies>
-    </profile>
-  </profiles>
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-library</artifactId>
-      <scope>test</scope>
-      <version>[1.1.0,2.0.0)</version>
     </dependency>
 
     <dependency>
@@ -118,6 +95,18 @@
 
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.http.server</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.iplog</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit.pgm</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -134,20 +123,15 @@
 
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.4.2</version>
         <configuration>
-          <argLine>-Xmx256m -Dfile.encoding=UTF-8 -Djava.io.tmpdir=${project.build.directory}</argLine>
+          <argLine>-Xmx256m -Dfile.encoding=UTF-8</argLine>
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*TestCase.java</include>
+            <include>**/T000*.java</include>
+          </includes>
         </configuration>
       </plugin>
     </plugins>

@@ -43,27 +43,13 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 
 public class TransportTest extends SampleDataRepositoryTestCase {
 	private Transport transport;
@@ -71,7 +57,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	private RemoteConfig remoteConfig;
 
 	@Override
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		final Config config = db.getConfig();
@@ -81,8 +66,7 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Override
-	@After
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		if (transport != null) {
 			transport.close();
 			transport = null;
@@ -96,7 +80,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testFindRemoteRefUpdatesNoWildcardNoTracking()
 			throws IOException {
 		transport = Transport.open(db, remoteConfig);
@@ -119,7 +102,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testFindRemoteRefUpdatesNoWildcardNoDestination()
 			throws IOException {
 		transport = Transport.open(db, remoteConfig);
@@ -141,7 +123,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testFindRemoteRefUpdatesWildcardNoTracking() throws IOException {
 		transport = Transport.open(db, remoteConfig);
 		final Collection<RemoteRefUpdate> result = transport
@@ -169,7 +150,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testFindRemoteRefUpdatesTwoRefSpecs() throws IOException {
 		transport = Transport.open(db, remoteConfig);
 		final RefSpec specA = new RefSpec("+refs/heads/a:refs/heads/b");
@@ -198,7 +178,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testFindRemoteRefUpdatesTrackingRef() throws IOException {
 		remoteConfig.addFetchRefSpec(new RefSpec(
 				"refs/heads/*:refs/remotes/test/*"));
@@ -213,46 +192,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 		assertEquals("refs/remotes/test/a", tru.getLocalName());
 		assertEquals("refs/heads/a", tru.getRemoteName());
 		assertEquals(db.resolve("refs/heads/a"), tru.getNewObjectId());
-		assertEquals(ObjectId.zeroId(), tru.getOldObjectId());
-	}
-
-	@Test
-	public void testLocalTransportWithRelativePath() throws Exception {
-		Repository other = createWorkRepository();
-		String otherDir = other.getWorkTree().getName();
-
-		RemoteConfig config = new RemoteConfig(db.getConfig(), "other");
-		config.addURI(new URIish("../" + otherDir));
-
-		// Should not throw NoRemoteRepositoryException
-		transport = Transport.open(db, config);
-	}
-
-	@Test
-	public void testLocalTransportFetchWithoutLocalRepository()
-			throws Exception {
-		URIish uri = new URIish("file://" + db.getWorkTree().getAbsolutePath());
-		transport = Transport.open(uri);
-		FetchConnection fetchConnection = transport.openFetch();
-		try {
-			Ref head = fetchConnection.getRef(Constants.HEAD);
-			assertNotNull(head);
-		} finally {
-			fetchConnection.close();
-		}
-	}
-
-	@Test
-	public void testSpi() {
-		List<TransportProtocol> protocols = Transport.getTransportProtocols();
-		assertNotNull(protocols);
-		assertFalse(protocols.isEmpty());
-		TransportProtocol found = null;
-		for (TransportProtocol protocol : protocols)
-			if (protocol.getSchemes().contains(SpiTransport.SCHEME)) {
-				found = protocol;
-				break;
-			}
-		assertEquals(SpiTransport.PROTO, found);
+		assertNull(tru.getOldObjectId());
 	}
 }

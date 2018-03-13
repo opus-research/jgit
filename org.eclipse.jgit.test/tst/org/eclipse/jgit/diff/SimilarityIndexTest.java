@@ -43,19 +43,15 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
-import org.eclipse.jgit.diff.SimilarityIndex.TableFullException;
-import org.eclipse.jgit.lib.Constants;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class SimilarityIndexTest {
-	@Test
-	public void testIndexingSmallObject() throws TableFullException {
+import org.eclipse.jgit.lib.Constants;
+
+public class SimilarityIndexTest extends TestCase {
+	public void testIndexingSmallObject() {
 		SimilarityIndex si = hash("" //
 				+ "A\n" //
 				+ "B\n" //
@@ -74,21 +70,18 @@ public class SimilarityIndexTest {
 		assertEquals(2, si.count(si.findIndex(key_D)));
 	}
 
-	@Test
-	public void testIndexingLargeObject() throws IOException,
-			TableFullException {
+	public void testIndexingLargeObject() throws IOException {
 		byte[] in = ("" //
 				+ "A\n" //
 				+ "B\n" //
 				+ "B\n" //
 				+ "B\n").getBytes("UTF-8");
 		SimilarityIndex si = new SimilarityIndex();
-		si.hash(new ByteArrayInputStream(in), in.length, false);
+		si.hash(new ByteArrayInputStream(in), in.length);
 		assertEquals(2, si.size());
 	}
 
-	@Test
-	public void testCommonScore_SameFiles() throws TableFullException {
+	public void testCommonScore_SameFiles() {
 		String text = "" //
 				+ "A\n" //
 				+ "B\n" //
@@ -103,67 +96,21 @@ public class SimilarityIndexTest {
 		assertEquals(100, dst.score(src, 100));
 	}
 
-	@Test
-	public void testCommonScore_SameFiles_CR_canonicalization()
-			throws TableFullException {
-		String text = "" //
-				+ "A\r\n" //
-				+ "B\r\n" //
-				+ "D\r\n" //
-				+ "B\r\n";
-		SimilarityIndex src = hash(text);
-		SimilarityIndex dst = hash(text.replace("\r", ""));
-		assertEquals(8, src.common(dst));
-		assertEquals(8, dst.common(src));
-
-		assertEquals(100, src.score(dst, 100));
-		assertEquals(100, dst.score(src, 100));
-	}
-
-	@Test
-	public void testCommonScoreLargeObject_SameFiles_CR_canonicalization()
-			throws TableFullException, IOException {
-		String text = "" //
-				+ "A\r\n" //
-				+ "B\r\n" //
-				+ "D\r\n" //
-				+ "B\r\n";
-		SimilarityIndex src = new SimilarityIndex();
-		byte[] bytes1 = text.getBytes("UTF-8");
-		src.hash(new ByteArrayInputStream(bytes1), bytes1.length, true);
-		src.sort();
-
-		SimilarityIndex dst = new SimilarityIndex();
-		byte[] bytes2 = text.replace("\r", "").getBytes("UTF-8");
-		dst.hash(new ByteArrayInputStream(bytes2), bytes2.length, true);
-		dst.sort();
-
-		assertEquals(8, src.common(dst));
-		assertEquals(8, dst.common(src));
-
-		assertEquals(100, src.score(dst, 100));
-		assertEquals(100, dst.score(src, 100));
-	}
-
-	@Test
-	public void testCommonScore_EmptyFiles() throws TableFullException {
+	public void testCommonScore_EmptyFiles() {
 		SimilarityIndex src = hash("");
 		SimilarityIndex dst = hash("");
 		assertEquals(0, src.common(dst));
 		assertEquals(0, dst.common(src));
 	}
 
-	@Test
-	public void testCommonScore_TotallyDifferentFiles()
-			throws TableFullException {
+	public void testCommonScore_TotallyDifferentFiles() {
 		SimilarityIndex src = hash("A\n");
 		SimilarityIndex dst = hash("D\n");
 		assertEquals(0, src.common(dst));
 		assertEquals(0, dst.common(src));
 	}
 
-	@Test
-	public void testCommonScore_SimiliarBy75() throws TableFullException {
+	public void testCommonScore_SimiliarBy75() {
 		SimilarityIndex src = hash("A\nB\nC\nD\n");
 		SimilarityIndex dst = hash("A\nB\nC\nQ\n");
 		assertEquals(6, src.common(dst));
@@ -173,15 +120,30 @@ public class SimilarityIndexTest {
 		assertEquals(75, dst.score(src, 100));
 	}
 
-	private static SimilarityIndex hash(String text) throws TableFullException {
-		SimilarityIndex src = new SimilarityIndex();
+	private static SimilarityIndex hash(String text) {
+		SimilarityIndex src = new SimilarityIndex() {
+			@Override
+			void hash(byte[] raw, int ptr, final int end) {
+				while (ptr < end) {
+					int hash = raw[ptr] & 0xff;
+					int start = ptr;
+					do {
+						int c = raw[ptr++] & 0xff;
+						if (c == '\n')
+							break;
+					} while (ptr < end && ptr - start < 64);
+					add(hash, ptr - start);
+				}
+			}
+		};
 		byte[] raw = Constants.encode(text);
+		src.setFileSize(raw.length);
 		src.hash(raw, 0, raw.length);
 		src.sort();
 		return src;
 	}
 
-	private static int keyFor(String line) throws TableFullException {
+	private static int keyFor(String line) {
 		SimilarityIndex si = hash(line);
 		assertEquals("single line scored", 1, si.size());
 		return si.key(0);

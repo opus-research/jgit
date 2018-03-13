@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2012, Research In Motion Limited
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,18 +48,13 @@ import java.io.IOException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 
 /** A merge of 2 trees, using a common base ancestor tree. */
 public abstract class ThreeWayMerger extends Merger {
 	private RevTree baseTree;
-
-	private ObjectId baseCommitId;
 
 	/**
 	 * Create a new merge instance for a repository.
@@ -73,24 +67,12 @@ public abstract class ThreeWayMerger extends Merger {
 	}
 
 	/**
-	 * Create a new merge instance for a repository.
-	 *
-	 * @param local
-	 *            the repository this merger will read and write data on.
-	 * @param inCore
-	 *            perform the merge in core with no working folder involved
-	 */
-	protected ThreeWayMerger(final Repository local, boolean inCore) {
-		this(local);
-	}
-
-	/**
 	 * Set the common ancestor tree.
 	 *
 	 * @param id
 	 *            common base treeish; null to automatically compute the common
 	 *            base from the input commits during
-	 *            {@link #merge(AnyObjectId...)}.
+	 *            {@link #merge(AnyObjectId, AnyObjectId)}.
 	 * @throws IncorrectObjectTypeException
 	 *             the object is not a treeish.
 	 * @throws MissingObjectException
@@ -107,16 +89,36 @@ public abstract class ThreeWayMerger extends Merger {
 		}
 	}
 
-	@Override
-	public boolean merge(final AnyObjectId... tips) throws IOException {
-		if (tips.length != 2)
-			return false;
-		return super.merge(tips);
+	/**
+	 * Merge together two tree-ish objects.
+	 * <p>
+	 * Any tree-ish may be supplied as inputs. Commits and/or tags pointing at
+	 * trees or commits may be passed as input objects.
+	 *
+	 * @param a
+	 *            source tree to be combined together.
+	 * @param b
+	 *            source tree to be combined together.
+	 * @return true if the merge was completed without conflicts; false if the
+	 *         merge strategy cannot handle this merge or there were conflicts
+	 *         preventing it from automatically resolving all paths.
+	 * @throws IncorrectObjectTypeException
+	 *             one of the input objects is not a commit, but the strategy
+	 *             requires it to be a commit.
+	 * @throws IOException
+	 *             one or more sources could not be read, or outputs could not
+	 *             be written to the Repository.
+	 */
+	public boolean merge(final AnyObjectId a, final AnyObjectId b)
+			throws IOException {
+		return merge(new AnyObjectId[] { a, b });
 	}
 
 	@Override
-	public ObjectId getBaseCommitId() {
-		return baseCommitId;
+	public boolean merge(final AnyObjectId[] tips) throws IOException {
+		if (tips.length != 2)
+			return false;
+		return super.merge(tips);
 	}
 
 	/**
@@ -129,15 +131,6 @@ public abstract class ThreeWayMerger extends Merger {
 	protected AbstractTreeIterator mergeBase() throws IOException {
 		if (baseTree != null)
 			return openTree(baseTree);
-		RevCommit baseCommit = (baseCommitId != null) ? walk
-				.parseCommit(baseCommitId) : getBaseCommit(sourceCommits[0],
-				sourceCommits[1]);
-		if (baseCommit == null) {
-			baseCommitId = null;
-			return new EmptyTreeIterator();
-		} else {
-			baseCommitId = baseCommit.toObjectId();
-			return openTree(baseCommit.getTree());
-		}
+		return mergeBase(0, 1);
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2014 Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -59,13 +59,7 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 
 	static final PlotLane[] NO_LANES = {};
 
-	static final Ref[] NO_REFS = {};
-
-	PlotLane[] forkingOffLanes;
-
 	PlotLane[] passingLanes;
-
-	PlotLane[] mergingLanes;
 
 	PlotLane lane;
 
@@ -81,51 +75,31 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 	 */
 	protected PlotCommit(final AnyObjectId id) {
 		super(id);
-		forkingOffLanes = NO_LANES;
 		passingLanes = NO_LANES;
-		mergingLanes = NO_LANES;
 		children = NO_CHILDREN;
-		refs = NO_REFS;
-	}
-
-	void addForkingOffLane(final PlotLane f) {
-		forkingOffLanes = addLane(f, forkingOffLanes);
 	}
 
 	void addPassingLane(final PlotLane c) {
-		passingLanes = addLane(c, passingLanes);
-	}
-
-	void addMergingLane(final PlotLane m) {
-		mergingLanes = addLane(m, mergingLanes);
-	}
-
-	private static PlotLane[] addLane(final PlotLane l, PlotLane[] lanes) {
-		final int cnt = lanes.length;
+		final int cnt = passingLanes.length;
 		if (cnt == 0)
-			lanes = new PlotLane[] { l };
+			passingLanes = new PlotLane[] { c };
 		else if (cnt == 1)
-			lanes = new PlotLane[] { lanes[0], l };
+			passingLanes = new PlotLane[] { passingLanes[0], c };
 		else {
 			final PlotLane[] n = new PlotLane[cnt + 1];
-			System.arraycopy(lanes, 0, n, 0, cnt);
-			n[cnt] = l;
-			lanes = n;
+			System.arraycopy(passingLanes, 0, n, 0, cnt);
+			n[cnt] = c;
+			passingLanes = n;
 		}
-		return lanes;
 	}
 
 	void addChild(final PlotCommit c) {
 		final int cnt = children.length;
 		if (cnt == 0)
 			children = new PlotCommit[] { c };
-		else if (cnt == 1) {
-			if (!c.getId().equals(children[0].getId()))
-				children = new PlotCommit[] { children[0], c };
-		} else {
-			for (PlotCommit pc : children)
-				if (c.getId().equals(pc.getId()))
-					return;
+		else if (cnt == 1)
+			children = new PlotCommit[] { children[0], c };
+		else {
 			final PlotCommit[] n = new PlotCommit[cnt + 1];
 			System.arraycopy(children, 0, n, 0, cnt);
 			n[cnt] = c;
@@ -171,43 +145,17 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 	}
 
 	/**
-	 * Get the number of refs for this commit.
-	 *
-	 * @return number of refs; always a positive value but can be 0.
-	 */
-	public final int getRefCount() {
-		return refs.length;
-	}
-
-	/**
-	 * Get the nth Ref from this commit's ref list.
-	 *
-	 * @param nth
-	 *            ref index to obtain. Must be in the range 0 through
-	 *            {@link #getRefCount()}-1.
-	 * @return the specified ref.
-	 * @throws ArrayIndexOutOfBoundsException
-	 *             an invalid ref index was specified.
-	 */
-	public final Ref getRef(final int nth) {
-		return refs[nth];
-	}
-
-	/**
 	 * Obtain the lane this commit has been plotted into.
 	 *
 	 * @return the assigned lane for this commit.
 	 */
-	@SuppressWarnings("unchecked")
 	public final L getLane() {
 		return (L) lane;
 	}
 
 	@Override
 	public void reset() {
-		forkingOffLanes = NO_LANES;
 		passingLanes = NO_LANES;
-		mergingLanes = NO_LANES;
 		children = NO_CHILDREN;
 		lane = null;
 		super.reset();

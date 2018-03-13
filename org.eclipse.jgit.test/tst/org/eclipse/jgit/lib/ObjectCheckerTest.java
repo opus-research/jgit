@@ -44,41 +44,31 @@
 
 package org.eclipse.jgit.lib;
 
-import static java.lang.Integer.valueOf;
-import static java.lang.Long.valueOf;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import java.io.UnsupportedEncodingException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
-import org.junit.Before;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class ObjectCheckerTest {
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.CorruptObjectException;
+
+public class ObjectCheckerTest extends TestCase {
 	private ObjectChecker checker;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		checker = new ObjectChecker();
 	}
 
-	@Test
 	public void testInvalidType() {
 		try {
 			checker.check(Constants.OBJ_BAD, new byte[0]);
 			fail("Did not throw CorruptObjectException");
 		} catch (CorruptObjectException e) {
 			final String m = e.getMessage();
-			assertEquals(MessageFormat.format(
-					JGitText.get().corruptObjectInvalidType2,
-					valueOf(Constants.OBJ_BAD)), m);
+			assertEquals(MessageFormat.format(JGitText.get().corruptObjectInvalidType2, Constants.OBJ_BAD), m);
 		}
 	}
 
-	@Test
 	public void testCheckBlob() throws CorruptObjectException {
 		// Any blob should pass...
 		checker.checkBlob(new byte[0]);
@@ -88,7 +78,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_BLOB, new byte[1]);
 	}
 
-	@Test
 	public void testValidCommitNoParent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -104,7 +93,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommitBlankAuthor() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -120,7 +108,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommit1Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -140,7 +127,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommit2Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -164,7 +150,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommit128Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -186,7 +171,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommitNormalTime() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		final String when = "1222757360 -0730";
@@ -203,7 +187,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testInvalidCommitNoTree1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -220,7 +203,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoTree2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -237,7 +219,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoTree3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -254,7 +235,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoTree4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -271,7 +251,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -288,7 +267,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -305,7 +283,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -322,7 +299,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -339,7 +315,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -359,7 +334,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -380,7 +354,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -401,7 +374,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -422,7 +394,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent5() {
 		final StringBuilder b = new StringBuilder();
 
@@ -445,7 +416,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoAuthor() {
 		final StringBuilder b = new StringBuilder();
 
@@ -466,7 +436,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoCommitter1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -487,7 +456,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoCommitter2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -509,7 +477,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -530,7 +497,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -551,7 +517,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -572,7 +537,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -593,7 +557,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor5() {
 		final StringBuilder b = new StringBuilder();
 
@@ -614,7 +577,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor6() {
 		final StringBuilder b = new StringBuilder();
 
@@ -635,7 +597,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor7() {
 		final StringBuilder b = new StringBuilder();
 
@@ -656,7 +617,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidCommitter() {
 		final StringBuilder b = new StringBuilder();
 
@@ -678,7 +638,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testValidTag() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -695,7 +654,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_TAG, data);
 	}
 
-	@Test
 	public void testInvalidTagNoObject1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -708,7 +666,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -725,7 +682,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -742,7 +698,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -759,7 +714,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject5() {
 		final StringBuilder b = new StringBuilder();
 
@@ -776,7 +730,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject6() {
 		final StringBuilder b = new StringBuilder();
 
@@ -792,7 +745,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -809,7 +761,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -828,7 +779,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -847,7 +797,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -866,7 +815,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoTagHeader1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -885,7 +833,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoTagHeader2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -905,7 +852,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoTagHeader3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -925,7 +871,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testValidTagHasNoTaggerHeader() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -939,7 +884,6 @@ public class ObjectCheckerTest {
 		checker.checkTag(Constants.encodeASCII(b.toString()));
 	}
 
-	@Test
 	public void testInvalidTagInvalidTaggerHeader1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -960,7 +904,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagInvalidTaggerHeader3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -981,13 +924,11 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testValidEmptyTree() throws CorruptObjectException {
 		checker.checkTree(new byte[0]);
 		checker.check(Constants.OBJ_TREE, new byte[0]);
 	}
 
-	@Test
 	public void testValidTree1() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 regular-file");
@@ -995,7 +936,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree2() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100755 executable");
@@ -1003,7 +943,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree3() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 tree");
@@ -1011,7 +950,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree4() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "120000 symlink");
@@ -1019,7 +957,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree5() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "160000 git link");
@@ -1027,7 +964,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree6() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 .a");
@@ -1035,15 +971,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
-	public void testValidPosixTree() throws CorruptObjectException {
-		checkOneName("a<b>c:d|e");
-		checkOneName("test ");
-		checkOneName("test.");
-		checkOneName("NUL");
-	}
-
-	@Test
 	public void testValidTreeSorting1() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 fooaaa");
@@ -1052,7 +979,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting2() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100755 fooaaa");
@@ -1061,7 +987,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting3() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 a");
@@ -1070,7 +995,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting4() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1079,7 +1003,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting5() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a.c");
@@ -1089,7 +1012,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting6() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 a");
@@ -1098,7 +1020,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting7() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 an orang");
@@ -1107,7 +1028,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting8() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1117,15 +1037,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
-	public void testAcceptTreeModeWithZero() throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "040000 a");
-		checker.setAllowLeadingZeroFileMode(true);
-		checker.checkTree(Constants.encodeASCII(b.toString()));
-	}
-
-	@Test
 	public void testInvalidTreeModeStartsWithZero1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "0 a");
@@ -1138,7 +1049,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeStartsWithZero2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "0100644 a");
@@ -1151,7 +1061,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeStartsWithZero3() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "040000 a");
@@ -1164,7 +1073,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotOctal1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "8 a");
@@ -1177,7 +1085,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotOctal2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "Z a");
@@ -1190,7 +1097,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotSupportedMode1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "1 a");
@@ -1203,7 +1109,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotSupportedMode2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "170000 a");
@@ -1216,7 +1121,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeMissingName() {
 		final StringBuilder b = new StringBuilder();
 		b.append("100644");
@@ -1229,7 +1133,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameContainsSlash() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a/b");
@@ -1242,7 +1145,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameIsEmpty() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 ");
@@ -1255,7 +1157,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameIsDot() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 .");
@@ -1268,7 +1169,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameIsDotDot() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 ..");
@@ -1281,283 +1181,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
-	public void testInvalidTreeNameIsGit() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMixedCaseGit() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .GiT");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.GiT'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGit() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gi\u200Ct");
-		byte[] data = Constants.encode(b.toString());
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name '.gi\u200Ct' contains ignorable Unicode characters",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGit2() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 \u206B.git");
-		byte[] data = Constants.encode(b.toString());
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name '\u206B.git' contains ignorable Unicode characters",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGit3() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git\uFEFF");
-		byte[] data = Constants.encode(b.toString());
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name '.git\uFEFF' contains ignorable Unicode characters",
-					e.getMessage());
-		}
-	}
-
-	private static byte[] concat(byte[] b1, byte[] b2) {
-		byte[] data = new byte[b1.length + b2.length];
-		System.arraycopy(b1, 0, data, 0, b1.length);
-		System.arraycopy(b2, 0, data, b1.length, b2.length);
-		return data;
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGitCorruptUTF8AtEnd() {
-		byte[] data = concat(Constants.encode("100644 .git"),
-				new byte[] { (byte) 0xef });
-		StringBuilder b = new StringBuilder();
-		entry(b, "");
-		data = concat(data, Constants.encode(b.toString()));
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name contains byte sequence '0xef' which is not a valid UTF-8 character",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGitCorruptUTF8AtEnd2() {
-		byte[] data = concat(Constants.encode("100644 .git"), new byte[] {
-				(byte) 0xe2, (byte) 0xab });
-		StringBuilder b = new StringBuilder();
-		entry(b, "");
-		data = concat(data, Constants.encode(b.toString()));
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name contains byte sequence '0xe2ab' which is not a valid UTF-8 character",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsNotMacHFSGit()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git\u200Cx");
-		byte[] data = Constants.encode(b.toString());
-		checker.setSafeForMacOS(true);
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsNotMacHFSGit2()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .kit\u200C");
-		byte[] data = Constants.encode(b.toString());
-		checker.setSafeForMacOS(true);
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsNotMacHFSGitOtherPlatform()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git\u200C");
-		byte[] data = Constants.encode(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitDot() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git.");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git.'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testValidTreeNameIsDotGitDotDot()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git..");
-		checker.checkTree(Constants.encodeASCII(b.toString()));
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSpace() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git ");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomething()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoobar");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomethingSpaceSomething()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoo bar");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomethingDot()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoobar.");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomethingDotDot()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoobar..");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitDotSpace() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git. ");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git. '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSpaceDot() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git . ");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git . '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsGITTilde1() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 GIT~1");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name 'GIT~1'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsGiTTilde1() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 GiT~1");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name 'GiT~1'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testValidTreeNameIsGitTilde11() throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 GIT~11");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
 	public void testInvalidTreeTruncatedInName() {
 		final StringBuilder b = new StringBuilder();
 		b.append("100644 b");
@@ -1570,7 +1193,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeTruncatedInObjectId() {
 		final StringBuilder b = new StringBuilder();
 		b.append("100644 b\0\1\2");
@@ -1583,7 +1205,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeBadSorting1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 foobar");
@@ -1597,7 +1218,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeBadSorting2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 a");
@@ -1611,7 +1231,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeBadSorting3() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a0c");
@@ -1625,7 +1244,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1639,7 +1257,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1653,7 +1270,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames3() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1667,7 +1283,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames4() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1683,167 +1298,6 @@ public class ObjectCheckerTest {
 		} catch (CorruptObjectException e) {
 			assertEquals("duplicate entry names", e.getMessage());
 		}
-	}
-
-	@Test
-	public void testInvalidTreeDuplicateNames5()
-			throws UnsupportedEncodingException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 a");
-		entry(b, "100644 A");
-		byte[] data = b.toString().getBytes("UTF-8");
-		try {
-			checker.setSafeForWindows(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("duplicate entry names", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeDuplicateNames6()
-			throws UnsupportedEncodingException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 a");
-		entry(b, "100644 A");
-		byte[] data = b.toString().getBytes("UTF-8");
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("duplicate entry names", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeDuplicateNames7()
-			throws UnsupportedEncodingException {
-		try {
-			Class.forName("java.text.Normalizer");
-		} catch (ClassNotFoundException e) {
-			// Ignore this test on Java 5 platform.
-			return;
-		}
-
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 \u0065\u0301");
-		entry(b, "100644 \u00e9");
-		byte[] data = b.toString().getBytes("UTF-8");
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("duplicate entry names", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeDuplicateNames8()
-			throws UnsupportedEncodingException, CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 A");
-		checker.setSafeForMacOS(true);
-		checker.checkTree(b.toString().getBytes("UTF-8"));
-	}
-
-	@Test
-	public void testRejectNulInPathSegment() {
-		try {
-			checker.checkPathSegment(Constants.encodeASCII("a\u0000b"), 0, 3);
-			fail("incorrectly accepted NUL in middle of name");
-		} catch (CorruptObjectException e) {
-			assertEquals("name contains byte 0x00", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testRejectSpaceAtEndOnWindows() {
-		checker.setSafeForWindows(true);
-		try {
-			checkOneName("test ");
-			fail("incorrectly accepted space at end");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name ends with ' '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testRejectDotAtEndOnWindows() {
-		checker.setSafeForWindows(true);
-		try {
-			checkOneName("test.");
-			fail("incorrectly accepted dot at end");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name ends with '.'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testRejectDevicesOnWindows() {
-		checker.setSafeForWindows(true);
-
-		String[] bad = { "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3",
-				"COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2",
-				"LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9" };
-		for (String b : bad) {
-			try {
-				checkOneName(b);
-				fail("incorrectly accepted " + b);
-			} catch (CorruptObjectException e) {
-				assertEquals("invalid name '" + b + "'", e.getMessage());
-			}
-			try {
-				checkOneName(b + ".txt");
-				fail("incorrectly accepted " + b + ".txt");
-			} catch (CorruptObjectException e) {
-				assertEquals("invalid name '" + b + "'", e.getMessage());
-			}
-		}
-	}
-
-	@Test
-	public void testRejectInvalidWindowsCharacters() {
-		checker.setSafeForWindows(true);
-		rejectName('<');
-		rejectName('>');
-		rejectName(':');
-		rejectName('"');
-		rejectName('/');
-		rejectName('\\');
-		rejectName('|');
-		rejectName('?');
-		rejectName('*');
-
-		for (int i = 1; i <= 31; i++)
-			rejectName((byte) i);
-	}
-
-	private void rejectName(char c) {
-		try {
-			checkOneName("te" + c + "st");
-			fail("incorrectly accepted with " + c);
-		} catch (CorruptObjectException e) {
-			assertEquals("name contains '" + c + "'", e.getMessage());
-		}
-	}
-
-	private void rejectName(byte c) {
-		String h = Integer.toHexString(c);
-		try {
-			checkOneName("te" + ((char) c) + "st");
-			fail("incorrectly accepted with 0x" + h);
-		} catch (CorruptObjectException e) {
-			assertEquals("name contains byte 0x" + h, e.getMessage());
-		}
-	}
-
-	private void checkOneName(String name) throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 " + name);
-		checker.checkTree(Constants.encodeASCII(b.toString()));
 	}
 
 	private static void entry(final StringBuilder b, final String modeName) {

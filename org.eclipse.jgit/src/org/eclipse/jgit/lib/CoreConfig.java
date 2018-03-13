@@ -1,6 +1,4 @@
 /*
- * Copyright (C) 2013, Gunnar Wagenknecht
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
@@ -65,33 +63,14 @@ public class CoreConfig {
 
 	/** Permissible values for {@code core.autocrlf}. */
 	public static enum AutoCRLF {
-		/** Automatic CRLF-&gt;LF conversion is disabled. */
+		/** Automatic CRLF->LF conversion is disabled. */
 		FALSE,
 
-		/** Automatic CRLF-&gt;LF conversion is enabled. */
+		/** Automatic CRLF->LF conversion is enabled. */
 		TRUE,
 
-		/** CRLF-&gt;LF performed, but no LF-&gt;CRLF. */
+		/** CRLF->LF performed, but no LF->CRLF. */
 		INPUT;
-	}
-
-	/**
-	 * Permissible values for {@code core.checkstat}
-	 *
-	 * @since 3.0
-	 */
-	public static enum CheckStat {
-		/**
-		 * Only check the size and whole second part of time stamp when
-		 * comparing the stat info in the dircache with actual file stat info.
-		 */
-		MINIMAL,
-
-		/**
-		 * Check as much of the dircache stat info as possible. Implementation
-		 * limits may apply.
-		 */
-		DEFAULT
 	}
 
 	private final int compression;
@@ -100,47 +79,13 @@ public class CoreConfig {
 
 	private final boolean logAllRefUpdates;
 
-	private final String excludesfile;
-
-	private final String attributesfile;
-
-	/**
-	 * Options for symlink handling
-	 *
-	 * @since 3.3
-	 */
-	public static enum SymLinks {
-		/** Checkout symbolic links as plain files */
-		FALSE,
-		/** Checkout symbolic links as links */
-		TRUE
-	}
-
-	/**
-	 * Options for hiding files whose names start with a period
-	 *
-	 * @since 3.5
-	 */
-	public static enum HideDotFiles {
-		/** Do not hide .files */
-		FALSE,
-		/** Hide add .files */
-		TRUE,
-		/** Hide only .git */
-		DOTGITONLY
-	}
+	private final AutoCRLF autoCRLF;
 
 	private CoreConfig(final Config rc) {
-		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_COMPRESSION, DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
-				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
-		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
-		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
-		attributesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION,
-				null, ConfigConstants.CONFIG_KEY_ATTRIBUTESFILE);
+		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
+		packIndexVersion = rc.getInt("pack", "indexversion", 2);
+		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
+		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
 	}
 
 	/**
@@ -152,6 +97,7 @@ public class CoreConfig {
 
 	/**
 	 * @return the preferred pack index file format; 0 for oldest possible.
+	 * @see org.eclipse.jgit.transport.IndexPack
 	 */
 	public int getPackIndexVersion() {
 		return packIndexVersion;
@@ -165,17 +111,9 @@ public class CoreConfig {
 	}
 
 	/**
-	 * @return path of excludesfile
+	 * @return whether automatic CRLF conversion has been configured
 	 */
-	public String getExcludesFile() {
-		return excludesfile;
-	}
-
-	/**
-	 * @return path of attributesfile
-	 * @since 3.7
-	 */
-	public String getAttributesFile() {
-		return attributesfile;
+	public AutoCRLF getAutoCRLF() {
+		return autoCRLF;
 	}
 }

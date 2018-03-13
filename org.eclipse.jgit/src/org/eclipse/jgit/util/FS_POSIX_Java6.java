@@ -49,27 +49,17 @@ import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-
-/**
- * FS implementation for POSIX systems using Java6
- *
- * @since 3.0
- */
-public class FS_POSIX_Java6 extends FS_POSIX {
+class FS_POSIX_Java6 extends FS {
 	private static final Method canExecute;
 
 	private static final Method setExecute;
 
 	static {
-		canExecute = needMethod(File.class, "canExecute"); //$NON-NLS-1$
-		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE); //$NON-NLS-1$
+		canExecute = needMethod(File.class, "canExecute");
+		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE);
 	}
 
-	/**
-	 * @return true if Java has the ability to set and get the executable flag
-	 *         on files
-	 */
-	public static boolean hasExecute() {
+	static boolean detect() {
 		return canExecute != null && setExecute != null;
 	}
 
@@ -82,28 +72,6 @@ public class FS_POSIX_Java6 extends FS_POSIX {
 		} catch (NoSuchMethodException e) {
 			return null;
 		}
-	}
-
-	/**
-	 * Constructor
-	 */
-	public FS_POSIX_Java6() {
-		super();
-	}
-
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            instance whose attributes to copy
-	 */
-	public FS_POSIX_Java6(FS src) {
-		super(src);
-	}
-
-	@Override
-	public FS newInstance() {
-		return new FS_POSIX_Java6(this);
 	}
 
 	public boolean supportsExecute() {

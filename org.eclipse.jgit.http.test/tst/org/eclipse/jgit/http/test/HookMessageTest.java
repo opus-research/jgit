@@ -43,12 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -60,16 +54,20 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.http.test.util.AccessEvent;
+import org.eclipse.jgit.http.test.util.HttpTestCase;
 import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.junit.http.AccessEvent;
-import org.eclipse.jgit.junit.http.HttpTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.PreReceiveHook;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.ReceiveCommand;
@@ -77,27 +75,21 @@ import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.junit.Before;
-import org.junit.Test;
 
 public class HookMessageTest extends HttpTestCase {
-	private Repository remoteRepository;
+	private FileRepository remoteRepository;
 
 	private URIish remoteURI;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<Repository> src = createTestRepository();
+		final TestRepository<FileRepository> src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
+		gs.setRepositoryResolver(new RepositoryResolver() {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -133,12 +125,11 @@ public class HookMessageTest extends HttpTestCase {
 		remoteRepository = src.getRepository();
 		remoteURI = toURIish(app, srcName);
 
-		StoredConfig cfg = remoteRepository.getConfig();
+		FileBasedConfig cfg = remoteRepository.getConfig();
 		cfg.setBoolean("http", null, "receivepack", true);
 		cfg.save();
 	}
 
-	@Test
 	public void testPush_CreateBranch() throws Exception {
 		final TestRepository src = createTestRepository();
 		final RevBlob Q_txt = src.blob("new text");
@@ -181,40 +172,4 @@ public class HookMessageTest extends HttpTestCase {
 				+ "come back next year!\n", //
 				result.getMessages());
 	}
-
-	@Test
-	public void testPush_HookMessagesToOutputStream() throws Exception {
-		final TestRepository src = createTestRepository();
-		final RevBlob Q_txt = src.blob("new text");
-		final RevCommit Q = src.commit().add("Q", Q_txt).create();
-		final Repository db = src.getRepository();
-		final String dstName = Constants.R_HEADS + "new.branch";
-		Transport t;
-		PushResult result;
-
-		t = Transport.open(db, remoteURI);
-		OutputStream out = new ByteArrayOutputStream();
-		try {
-			final String srcExpr = Q.name();
-			final boolean forceUpdate = false;
-			final String localName = null;
-			final ObjectId oldId = null;
-
-			RemoteRefUpdate update = new RemoteRefUpdate(src.getRepository(),
-					srcExpr, dstName, forceUpdate, localName, oldId);
-			result = t.push(NullProgressMonitor.INSTANCE,
-					Collections.singleton(update), out);
-		} finally {
-			t.close();
-		}
-
-		String expectedMessage = "message line 1\n" //
-				+ "error: no soup for you!\n" //
-				+ "come back next year!\n";
-		assertEquals(expectedMessage, //
-				result.getMessages());
-
-		assertEquals(expectedMessage, out.toString());
-	}
-
 }

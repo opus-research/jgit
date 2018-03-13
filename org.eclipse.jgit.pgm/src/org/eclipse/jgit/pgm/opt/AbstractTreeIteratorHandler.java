@@ -60,7 +60,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -97,10 +97,7 @@ public class AbstractTreeIteratorHandler extends
 		final String name = params.getParameter(0);
 
 		if (new File(name).isDirectory()) {
-			setter.addValue(new FileTreeIterator(
-				new File(name),
-				FS.DETECTED,
-				clp.getRepository().getConfig().get(WorkingTreeOptions.KEY)));
+			setter.addValue(new FileTreeIterator(new File(name), FS.DETECTED, WorkingTreeOptions.createDefaultInstance()));
 			return 1;
 		}
 

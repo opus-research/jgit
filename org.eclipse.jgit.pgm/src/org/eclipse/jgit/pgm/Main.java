@@ -45,7 +45,6 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
@@ -55,11 +54,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
-import org.eclipse.jgit.awtui.AwtCredentialsProvider;
+import org.eclipse.jgit.awtui.AwtSshSessionFactory;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.pgm.opt.SubcommandHandler;
 import org.eclipse.jgit.util.CachedAuthenticator;
@@ -73,14 +70,11 @@ public class Main {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
-	@Option(name = "--version", usage = "usage_displayVersion")
-	private boolean version;
-
 	@Option(name = "--show-stack-trace", usage = "usage_displayThejavaStackTraceOnExceptions")
 	private boolean showStackTrace;
 
 	@Option(name = "--git-dir", metaVar = "metaVar_gitDir", usage = "usage_setTheGitRepositoryToOperateOn")
-	private String gitdir;
+	private File gitdir;
 
 	@Argument(index = 0, metaVar = "metaVar_command", required = true, handler = SubcommandHandler.class)
 	private TextBuiltin subcommand;
@@ -95,73 +89,31 @@ public class Main {
 	 *            arguments.
 	 */
 	public static void main(final String[] argv) {
-		new Main().run(argv);
-	}
-
-	/**
-	 * Parse the command line and execute the requested action.
-	 *
-	 * Subclasses should allocate themselves and then invoke this method:
-	 *
-	 * <pre>
-	 * class ExtMain {
-	 * 	public static void main(String[] argv) {
-	 * 		new ExtMain().run(argv);
-	 * 	}
-	 * }
-	 * </pre>
-	 *
-	 * @param argv
-	 *            arguments.
-	 */
-	protected void run(final String[] argv) {
+		final Main me = new Main();
 		try {
 			if (!installConsole()) {
 				AwtAuthenticator.install();
-				AwtCredentialsProvider.install();
+				AwtSshSessionFactory.install();
 			}
 			configureHttpProxy();
-			execute(argv);
+			me.execute(argv);
 		} catch (Die err) {
-			if (err.isAborted())
-				System.exit(1);
 			System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
-			if (showStackTrace)
+			if (me.showStackTrace)
 				err.printStackTrace();
 			System.exit(128);
 		} catch (Exception err) {
-			// Try to detect errno == EPIPE and exit normally if that happens
-			// There may be issues with operating system versions and locale,
-			// but we can probably assume that these messages will not be thrown
-			// under other circumstances.
-			if (err.getClass() == IOException.class) {
-				// Linux, OS X
-				if (err.getMessage().equals("Broken pipe")) //$NON-NLS-1$
-					System.exit(0);
-				// Windows
-				if (err.getMessage().equals("The pipe is being closed")) //$NON-NLS-1$
-					System.exit(0);
-			}
-			if (!showStackTrace && err.getCause() != null
+			if (!me.showStackTrace && err.getCause() != null
 					&& err instanceof TransportException)
 				System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getCause().getMessage()));
 
-			if (err.getClass().getName().startsWith("org.eclipse.jgit.errors.")) { //$NON-NLS-1$
+			if (err.getClass().getName().startsWith("org.eclipse.jgit.errors.")) {
 				System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
-				if (showStackTrace)
+				if (me.showStackTrace)
 					err.printStackTrace();
 				System.exit(128);
 			}
 			err.printStackTrace();
-			System.exit(1);
-		}
-		if (System.out.checkError()) {
-			System.err.println(CLIText.get().unknownIoErrorStdout);
-			System.exit(1);
-		}
-		if (System.err.checkError()) {
-			// No idea how to present an error here, most likely disk full or
-			// broken pipe
 			System.exit(1);
 		}
 	}
@@ -172,7 +124,7 @@ public class Main {
 		try {
 			clp.parseArgument(argv);
 		} catch (CmdLineException err) {
-			if (argv.length > 0 && !help && !version) {
+			if (argv.length > 0 && !help) {
 				writer.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 				writer.flush();
 				System.exit(1);
@@ -181,7 +133,7 @@ public class Main {
 
 		if (argv.length == 0 || help) {
 			final String ex = clp.printExample(ExampleMode.ALL, CLIText.get().resourceBundle());
-			writer.println("jgit" + ex + " command [ARG ...]"); //$NON-NLS-1$
+			writer.println("jgit" + ex + " command [ARG ...]");
 			if (help) {
 				writer.println();
 				clp.printUsage(writer, CLIText.get().resourceBundle());
@@ -209,50 +161,34 @@ public class Main {
 			System.exit(1);
 		}
 
-		if (version) {
-			String cmdId = Version.class.getSimpleName().toLowerCase();
-			subcommand = CommandCatalog.get(cmdId).create();
-		}
-
 		final TextBuiltin cmd = subcommand;
-		if (cmd.requiresRepository())
-			cmd.init(openGitDir(gitdir), null);
-		else
+		if (cmd.requiresRepository()) {
+			RepositoryBuilder rb = new RepositoryBuilder() //
+					.setGitDir(gitdir) //
+					.readEnvironment() //
+					.findGitDir();
+			if (rb.getGitDir() == null) {
+				writer.println(CLIText.get().cantFindGitDirectory);
+				writer.flush();
+				System.exit(1);
+			}
+
+			cmd.init(rb.build(), null);
+		} else {
 			cmd.init(null, gitdir);
+		}
 		try {
 			cmd.execute(arguments.toArray(new String[arguments.size()]));
 		} finally {
-			if (cmd.outw != null)
-				cmd.outw.flush();
-			if (cmd.errw != null)
-				cmd.errw.flush();
+			if (cmd.out != null)
+				cmd.out.flush();
 		}
-	}
-
-	/**
-	 * Evaluate the {@code --git-dir} option and open the repository.
-	 *
-	 * @param aGitdir
-	 *            the {@code --git-dir} option given on the command line. May be
-	 *            null if it was not supplied.
-	 * @return the repository to operate on.
-	 * @throws IOException
-	 *             the repository cannot be opened.
-	 */
-	protected Repository openGitDir(String aGitdir) throws IOException {
-		RepositoryBuilder rb = new RepositoryBuilder() //
-				.setGitDir(aGitdir != null ? new File(aGitdir) : null) //
-				.readEnvironment() //
-				.findGitDir();
-		if (rb.getGitDir() == null)
-			throw new Die(CLIText.get().cantFindGitDirectory);
-		return rb.build();
 	}
 
 	private static boolean installConsole() {
 		try {
-			install("org.eclipse.jgit.console.ConsoleAuthenticator"); //$NON-NLS-1$
-			install("org.eclipse.jgit.console.ConsoleCredentialsProvider"); //$NON-NLS-1$
+			install("org.eclipse.jgit.console.ConsoleAuthenticator");
+			install("org.eclipse.jgit.console.ConsoleSshSessionFactory");
 			return true;
 		} catch (ClassNotFoundException e) {
 			return false;
@@ -278,7 +214,7 @@ public class Main {
 			throws IllegalAccessException, InvocationTargetException,
 			NoSuchMethodException, ClassNotFoundException {
 		try {
-		Class.forName(name).getMethod("install").invoke(null); //$NON-NLS-1$
+		Class.forName(name).getMethod("install").invoke(null);
 		} catch (InvocationTargetException e) {
 			if (e.getCause() instanceof RuntimeException)
 				throw (RuntimeException) e.getCause();
@@ -301,23 +237,23 @@ public class Main {
 	 *             the value in <code>http_proxy</code> is unsupportable.
 	 */
 	private static void configureHttpProxy() throws MalformedURLException {
-		final String s = System.getenv("http_proxy"); //$NON-NLS-1$
-		if (s == null || s.equals("")) //$NON-NLS-1$
+		final String s = System.getenv("http_proxy");
+		if (s == null || s.equals(""))
 			return;
 
-		final URL u = new URL((s.indexOf("://") == -1) ? "http://" + s : s); //$NON-NLS-1$ //$NON-NLS-2$
-		if (!"http".equals(u.getProtocol())) //$NON-NLS-1$
+		final URL u = new URL((s.indexOf("://") == -1) ? "http://" + s : s);
+		if (!"http".equals(u.getProtocol()))
 			throw new MalformedURLException(MessageFormat.format(CLIText.get().invalidHttpProxyOnlyHttpSupported, s));
 
 		final String proxyHost = u.getHost();
 		final int proxyPort = u.getPort();
 
-		System.setProperty("http.proxyHost", proxyHost); //$NON-NLS-1$
+		System.setProperty("http.proxyHost", proxyHost);
 		if (proxyPort > 0)
-			System.setProperty("http.proxyPort", String.valueOf(proxyPort)); //$NON-NLS-1$
+			System.setProperty("http.proxyPort", String.valueOf(proxyPort));
 
 		final String userpass = u.getUserInfo();
-		if (userpass != null && userpass.contains(":")) { //$NON-NLS-1$
+		if (userpass != null && userpass.contains(":")) {
 			final int c = userpass.indexOf(':');
 			final String user = userpass.substring(0, c);
 			final String pass = userpass.substring(c + 1);

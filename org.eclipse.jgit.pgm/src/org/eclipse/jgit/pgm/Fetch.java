@@ -47,15 +47,13 @@ package org.eclipse.jgit.pgm;
 
 import java.util.List;
 
-import org.eclipse.jgit.api.FetchCommand;
-import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.TagOpt;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.transport.Transport;
 
 @Command(common = true, usage = "usage_updateRemoteRefsFromAnotherRepository")
 class Fetch extends AbstractFetchCommand {
@@ -66,7 +64,7 @@ class Fetch extends AbstractFetchCommand {
 	private Boolean fsck;
 
 	@Option(name = "--no-fsck")
-	void nofsck(@SuppressWarnings("unused") final boolean ignored) {
+	void nofsck(final boolean ignored) {
 		fsck = Boolean.FALSE;
 	}
 
@@ -80,20 +78,8 @@ class Fetch extends AbstractFetchCommand {
 	private Boolean thin;
 
 	@Option(name = "--no-thin")
-	void nothin(@SuppressWarnings("unused") final boolean ignored) {
+	void nothin(final boolean ignored) {
 		thin = Boolean.FALSE;
-	}
-
-	@Option(name = "--quiet", usage = "usage_quiet")
-	private Boolean quiet;
-
-	@Option(name = "--tags", usage="usage_tags", aliases = { "-t" })
-	private Boolean tags;
-
-	@Option(name = "--no-tags", usage = "usage_notags", aliases = { "-n" })
-	void notags(@SuppressWarnings("unused")
-	final boolean ignored) {
-		tags = Boolean.FALSE;
 	}
 
 	@Argument(index = 0, metaVar = "metaVar_uriish")
@@ -104,31 +90,24 @@ class Fetch extends AbstractFetchCommand {
 
 	@Override
 	protected void run() throws Exception {
-		Git git = new Git(db);
-		FetchCommand fetch = git.fetch();
+		final Transport tn = Transport.open(db, remote);
 		if (fsck != null)
-			fetch.setCheckFetchedObjects(fsck.booleanValue());
+			tn.setCheckFetchedObjects(fsck.booleanValue());
 		if (prune != null)
-			fetch.setRemoveDeletedRefs(prune.booleanValue());
-		if (toget != null)
-			fetch.setRefSpecs(toget);
-		if (tags != null) {
-			fetch.setTagOpt(tags.booleanValue() ? TagOpt.FETCH_TAGS
-					: TagOpt.NO_TAGS);
-		}
-		if (0 <= timeout)
-			fetch.setTimeout(timeout);
-		fetch.setDryRun(dryRun);
-		fetch.setRemote(remote);
+			tn.setRemoveDeletedRefs(prune.booleanValue());
+		tn.setDryRun(dryRun);
 		if (thin != null)
-			fetch.setThin(thin.booleanValue());
-		if (quiet == null || !quiet.booleanValue())
-			fetch.setProgressMonitor(new TextProgressMonitor());
-
-		FetchResult result = fetch.call();
-		if (result.getTrackingRefUpdates().isEmpty())
-			return;
-
-		showFetchResult(result);
+			tn.setFetchThin(thin.booleanValue());
+		if (0 <= timeout)
+			tn.setTimeout(timeout);
+		final FetchResult r;
+		try {
+			r = tn.fetch(new TextProgressMonitor(), toget);
+			if (r.getTrackingRefUpdates().isEmpty())
+				return;
+		} finally {
+			tn.close();
+		}
+		showFetchResult(tn, r);
 	}
 }

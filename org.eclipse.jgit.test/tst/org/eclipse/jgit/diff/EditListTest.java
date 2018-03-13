@@ -43,30 +43,23 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-
 import java.util.Iterator;
 
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class EditListTest {
-	@Test
+public class EditListTest extends TestCase {
 	public void testEmpty() {
 		final EditList l = new EditList();
 		assertEquals(0, l.size());
 		assertTrue(l.isEmpty());
 		assertEquals("EditList[]", l.toString());
 
-		assertEquals(l, l);
-		assertEquals(new EditList(), l);
+		assertTrue(l.equals(l));
+		assertTrue(l.equals(new EditList()));
 		assertFalse(l.equals(""));
 		assertEquals(l.hashCode(), new EditList().hashCode());
 	}
 
-	@Test
 	public void testAddOne() {
 		final Edit e = new Edit(1, 2, 1, 1);
 		final EditList l = new EditList();
@@ -76,17 +69,16 @@ public class EditListTest {
 		assertSame(e, l.get(0));
 		assertSame(e, l.iterator().next());
 
-		assertEquals(l, l);
+		assertTrue(l.equals(l));
 		assertFalse(l.equals(new EditList()));
 
 		final EditList l2 = new EditList();
 		l2.add(e);
-		assertEquals(l2, l);
-		assertEquals(l, l2);
+		assertTrue(l.equals(l2));
+		assertTrue(l2.equals(l));
 		assertEquals(l.hashCode(), l2.hashCode());
 	}
 
-	@Test
 	public void testAddTwo() {
 		final Edit e1 = new Edit(1, 2, 1, 1);
 		final Edit e2 = new Edit(8, 8, 8, 12);
@@ -101,18 +93,17 @@ public class EditListTest {
 		assertSame(e1, i.next());
 		assertSame(e2, i.next());
 
-		assertEquals(l, l);
+		assertTrue(l.equals(l));
 		assertFalse(l.equals(new EditList()));
 
 		final EditList l2 = new EditList();
 		l2.add(e1);
 		l2.add(e2);
-		assertEquals(l2, l);
-		assertEquals(l, l2);
+		assertTrue(l.equals(l2));
+		assertTrue(l2.equals(l));
 		assertEquals(l.hashCode(), l2.hashCode());
 	}
 
-	@Test
 	public void testSet() {
 		final Edit e1 = new Edit(1, 2, 1, 1);
 		final Edit e2 = new Edit(3, 4, 3, 3);
@@ -123,7 +114,6 @@ public class EditListTest {
 		assertSame(e2, l.get(0));
 	}
 
-	@Test
 	public void testRemove() {
 		final Edit e1 = new Edit(1, 2, 1, 1);
 		final Edit e2 = new Edit(8, 8, 8, 12);

@@ -43,74 +43,62 @@
 
 package org.eclipse.jgit.transport;
 
-import static java.lang.Integer.valueOf;
-import static java.lang.Long.valueOf;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.HDR_SIZE;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 import static org.eclipse.jgit.transport.SideBandOutputStream.SMALL_BUF;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import junit.framework.TestCase;
+
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Before;
-import org.junit.Test;
 
 // Note, test vectors created with:
 //
 // perl -e 'printf "%4.4x%s\n", 4+length($ARGV[0]),$ARGV[0]'
 
-public class SideBandOutputStreamTest {
+public class SideBandOutputStreamTest extends TestCase {
 	private ByteArrayOutputStream rawOut;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		rawOut = new ByteArrayOutputStream();
 	}
 
-	@Test
 	public void testWrite_CH_DATA() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_DATA,
-				SMALL_BUF, rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_DATA, SMALL_BUF, rawOut);
 		out.write(new byte[] { 'a', 'b', 'c' });
 		out.flush();
 		assertBuffer("0008\001abc");
 	}
 
-	@Test
 	public void testWrite_CH_PROGRESS() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_PROGRESS,
-				SMALL_BUF, rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_PROGRESS, SMALL_BUF, rawOut);
 		out.write(new byte[] { 'a', 'b', 'c' });
 		out.flush();
 		assertBuffer("0008\002abc");
 	}
 
-	@Test
 	public void testWrite_CH_ERROR() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_ERROR,
-				SMALL_BUF, rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_ERROR, SMALL_BUF, rawOut);
 		out.write(new byte[] { 'a', 'b', 'c' });
 		out.flush();
 		assertBuffer("0008\003abc");
 	}
 
-	@Test
 	public void testWrite_Small() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_DATA,
-				SMALL_BUF, rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_DATA, SMALL_BUF, rawOut);
 		out.write('a');
 		out.write('b');
 		out.write('c');
@@ -118,11 +106,9 @@ public class SideBandOutputStreamTest {
 		assertBuffer("0008\001abc");
 	}
 
-	@Test
 	public void testWrite_SmallBlocks1() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_DATA, 6,
-				rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_DATA, 6, rawOut);
 		out.write('a');
 		out.write('b');
 		out.write('c');
@@ -130,28 +116,23 @@ public class SideBandOutputStreamTest {
 		assertBuffer("0006\001a0006\001b0006\001c");
 	}
 
-	@Test
 	public void testWrite_SmallBlocks2() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_DATA, 6,
-				rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_DATA, 6, rawOut);
 		out.write(new byte[] { 'a', 'b', 'c' });
 		out.flush();
 		assertBuffer("0006\001a0006\001b0006\001c");
 	}
 
-	@Test
 	public void testWrite_SmallBlocks3() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_DATA, 7,
-				rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_DATA, 7, rawOut);
 		out.write('a');
 		out.write(new byte[] { 'b', 'c' });
 		out.flush();
 		assertBuffer("0007\001ab0006\001c");
 	}
 
-	@Test
 	public void testWrite_Large() throws IOException {
 		final int buflen = MAX_BUF - HDR_SIZE;
 		final byte[] buf = new byte[buflen];
@@ -159,9 +140,8 @@ public class SideBandOutputStreamTest {
 			buf[i] = (byte) i;
 		}
 
-		@SuppressWarnings("resource" /* java 7 */)
-		final SideBandOutputStream out = new SideBandOutputStream(CH_DATA,
-				MAX_BUF, rawOut);
+		final SideBandOutputStream out;
+		out = new SideBandOutputStream(CH_DATA, MAX_BUF, rawOut);
 		out.write(buf);
 		out.flush();
 
@@ -175,8 +155,6 @@ public class SideBandOutputStreamTest {
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
-	@Test
 	public void testFlush() throws IOException {
 		final int[] flushCnt = new int[1];
 		final OutputStream mockout = new OutputStream() {
@@ -195,32 +173,30 @@ public class SideBandOutputStreamTest {
 		assertEquals(1, flushCnt[0]);
 	}
 
-	@Test
 	public void testConstructor_RejectsBadChannel() {
 		try {
 			new SideBandOutputStream(-1, MAX_BUF, rawOut);
 			fail("Accepted -1 channel number");
 		} catch (IllegalArgumentException e) {
-			assertEquals("channel -1 must be in range [1, 255]", e.getMessage());
+			assertEquals("channel -1 must be in range [0, 255]", e.getMessage());
 		}
 
 		try {
 			new SideBandOutputStream(0, MAX_BUF, rawOut);
 			fail("Accepted 0 channel number");
 		} catch (IllegalArgumentException e) {
-			assertEquals("channel 0 must be in range [1, 255]", e.getMessage());
+			assertEquals("channel 0 must be in range [0, 255]", e.getMessage());
 		}
 
 		try {
 			new SideBandOutputStream(256, MAX_BUF, rawOut);
 			fail("Accepted 256 channel number");
 		} catch (IllegalArgumentException e) {
-			assertEquals("channel 256 must be in range [1, 255]", e
+			assertEquals("channel 256 must be in range [0, 255]", e
 					.getMessage());
 		}
 	}
 
-	@Test
 	public void testConstructor_RejectsBadBufferSize() {
 		try {
 			new SideBandOutputStream(CH_DATA, -1, rawOut);
@@ -247,9 +223,7 @@ public class SideBandOutputStreamTest {
 			new SideBandOutputStream(CH_DATA, Integer.MAX_VALUE, rawOut);
 			fail("Accepted " + Integer.MAX_VALUE + " for buffer size");
 		} catch (IllegalArgumentException e) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().packetSizeMustBeAtMost,
-					valueOf(Integer.MAX_VALUE), valueOf(65520)), e.getMessage());
+			assertEquals(MessageFormat.format(JGitText.get().packetSizeMustBeAtMost, Integer.MAX_VALUE, 65520), e.getMessage());
 		}
 	}
 

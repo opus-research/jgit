@@ -39,7 +39,7 @@ package org.eclipse.jgit.errors;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Cannot write a modified index. This is a serious error that users need to be

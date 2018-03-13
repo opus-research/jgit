@@ -57,7 +57,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
  * commit that matched the revision walker's filters.
  * <p>
  * This generator is the second phase of a path limited revision walk and
- * assumes it is receiving RevCommits from {@link TreeRevFilter},
+ * assumes it is receiving RevCommits from {@link RewriteTreeFilter},
  * after they have been fully buffered by {@link AbstractRevQueue}. The full
  * buffering is necessary to allow the simple loop used within our own
  * {@link #rewrite(RevCommit)} to pull completely through a strand of
@@ -66,7 +66,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
  * this loop to abort early, due to commits not being parsed and colored
  * correctly.
  *
- * @see TreeRevFilter
+ * @see RewriteTreeFilter
  */
 class RewriteGenerator extends Generator {
 	private static final int REWRITE = RevWalk.REWRITE;

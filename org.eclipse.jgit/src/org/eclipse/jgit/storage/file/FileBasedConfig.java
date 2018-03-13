@@ -49,20 +49,15 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileSnapshot;
-import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -73,14 +68,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
-
+	private volatile long lastModified;
 	private final FS fs;
-
-	private boolean utf8Bom;
-
-	private volatile FileSnapshot snapshot;
-
-	private volatile ObjectId hash;
 
 	/**
 	 * Create a configuration with no default fallback.
@@ -110,8 +99,6 @@ public class FileBasedConfig extends StoredConfig {
 		super(base);
 		configFile = cfgLocation;
 		this.fs = fs;
-		this.snapshot = FileSnapshot.DIRTY;
-		this.hash = ObjectId.zeroId();
 	}
 
 	@Override
@@ -138,33 +125,11 @@ public class FileBasedConfig extends StoredConfig {
 	 */
 	@Override
 	public void load() throws IOException, ConfigInvalidException {
-		final FileSnapshot oldSnapshot = snapshot;
-		final FileSnapshot newSnapshot = FileSnapshot.save(getFile());
+		lastModified = getFile().lastModified();
 		try {
-			final byte[] in = IO.readFully(getFile());
-			final ObjectId newHash = hash(in);
-			if (hash.equals(newHash)) {
-				if (oldSnapshot.equals(newSnapshot))
-					oldSnapshot.setClean(newSnapshot);
-				else
-					snapshot = newSnapshot;
-			} else {
-				final String decoded;
-				if (in.length >= 3 && in[0] == (byte) 0xEF
-						&& in[1] == (byte) 0xBB && in[2] == (byte) 0xBF) {
-					decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
-							in, 3, in.length);
-					utf8Bom = true;
-				} else {
-					decoded = RawParseUtils.decode(in);
-				}
-				fromText(decoded);
-				snapshot = newSnapshot;
-				hash = newHash;
-			}
+			fromText(RawParseUtils.decode(IO.readFully(getFile())));
 		} catch (FileNotFoundException noFile) {
 			clear();
-			snapshot = newSnapshot;
 		} catch (IOException e) {
 			final IOException e2 = new IOException(MessageFormat.format(JGitText.get().cannotReadFile, getFile()));
 			e2.initCause(e);
@@ -187,47 +152,23 @@ public class FileBasedConfig extends StoredConfig {
 	 *             the file could not be written.
 	 */
 	public void save() throws IOException {
-		final byte[] out;
-		final String text = toText();
-		if (utf8Bom) {
-			final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			bos.write(0xEF);
-			bos.write(0xBB);
-			bos.write(0xBF);
-			bos.write(text.getBytes(RawParseUtils.UTF8_CHARSET.name()));
-			out = bos.toByteArray();
-		} else {
-			out = Constants.encode(text);
-		}
-
+		final byte[] out = Constants.encode(toText());
 		final LockFile lf = new LockFile(getFile(), fs);
 		if (!lf.lock())
-			throw new LockFailedException(getFile());
+			throw new IOException(MessageFormat.format(JGitText.get().cannotLockFile, getFile()));
 		try {
-			lf.setNeedSnapshot(true);
+			lf.setNeedStatInformation(true);
 			lf.write(out);
 			if (!lf.commit())
 				throw new IOException(MessageFormat.format(JGitText.get().cannotCommitWriteTo, getFile()));
 		} finally {
 			lf.unlock();
 		}
-		snapshot = lf.getCommitSnapshot();
-		hash = hash(out);
+		lastModified = lf.getCommitLastModified();
 		// notify the listeners
 		fireConfigChangedEvent();
 	}
 
-	@Override
-	public void clear() {
-		hash = hash(new byte[0]);
-		super.clear();
-	}
-
-	private static ObjectId hash(final byte[] rawText) {
-		return ObjectId.fromRaw(Constants.newMessageDigest().digest(rawText));
-	}
-
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + "[" + getFile().getPath() + "]";
@@ -238,6 +179,6 @@ public class FileBasedConfig extends StoredConfig {
 	 * than the file on disk
 	 */
 	public boolean isOutdated() {
-		return snapshot.isModified(getFile());
+		return getFile().lastModified() != lastModified;
 	}
 }

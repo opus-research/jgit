@@ -48,7 +48,7 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -56,9 +56,7 @@ import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -93,15 +91,11 @@ public class AddCommand extends GitCommand<DirCache> {
 	}
 
 	/**
-	 * Add a path to a file/directory whose content should be added.
-	 * <p>
-	 * A directory name (e.g. <code>dir</code> to add <code>dir/file1</code> and
-	 * <code>dir/file2</code>) can also be given to add all files in the
-	 * directory, recursively. Fileglobs (e.g. *.c) are not yet supported.
-	 *
 	 * @param filepattern
-	 *            repository-relative path of file/directory to add (with
-	 *            <code>/</code> as separator)
+	 *            File to add content from. Also a leading directory name (e.g.
+	 *            dir to add dir/file1 and dir/file2) can be given to add all
+	 *            files in the directory, recursively. Fileglobs (e.g. *.c) are
+	 *            not yet supported.
 	 * @return {@code this}
 	 */
 	public AddCommand addFilepattern(String filepattern) {
@@ -127,14 +121,14 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
-	public DirCache call() throws GitAPIException, NoFilepatternException {
+	public DirCache call() throws NoFilepatternException {
 
 		if (filepatterns.isEmpty())
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
 		checkCallable();
 		DirCache dc = null;
 		boolean addAll = false;
-		if (filepatterns.contains(".")) //$NON-NLS-1$
+		if (filepatterns.contains("."))
 			addAll = true;
 
 		ObjectInserter inserter = repo.newObjectInserter();
@@ -144,6 +138,7 @@ public class AddCommand extends GitCommand<DirCache> {
 
 			DirCacheBuilder builder = dc.builder();
 			final TreeWalk tw = new TreeWalk(repo);
+			tw.reset();
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (workingTreeIterator == null)
 				workingTreeIterator = new FileTreeIterator(repo);
@@ -168,40 +163,27 @@ public class AddCommand extends GitCommand<DirCache> {
 				// new DirCacheEntry per path.
 				else if (!(path.equals(lastAddedFile))) {
 					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
-						c = tw.getTree(0, DirCacheIterator.class);
 						if (f != null) { // the file exists
 							long sz = f.getEntryLength();
 							DirCacheEntry entry = new DirCacheEntry(path);
-							if (c == null || c.getDirCacheEntry() == null
-									|| !c.getDirCacheEntry().isAssumeValid()) {
-								FileMode mode = f.getIndexFileMode(c);
-								entry.setFileMode(mode);
+							entry.setLength(sz);
+							entry.setLastModified(f.getEntryLastModified());
+							entry.setFileMode(f.getEntryFileMode());
 
-								if (FileMode.GITLINK != mode) {
-									entry.setLength(sz);
-									entry.setLastModified(f
-											.getEntryLastModified());
-									long contentSize = f
-											.getEntryContentLength();
-									InputStream in = f.openEntryStream();
-									try {
-										entry.setObjectId(inserter.insert(
-												Constants.OBJ_BLOB, contentSize, in));
-									} finally {
-										in.close();
-									}
-								} else
-									entry.setObjectId(f.getEntryObjectId());
-								builder.add(entry);
-								lastAddedFile = path;
-							} else {
-								builder.add(c.getDirCacheEntry());
+							InputStream in = f.openEntryStream();
+							try {
+								entry.setObjectId(inserter.insert(
+										Constants.OBJ_BLOB, sz, in));
+							} finally {
+								in.close();
 							}
 
-						} else if (c != null
-								&& (!update || FileMode.GITLINK == c
-										.getEntryFileMode()))
+							builder.add(entry);
+							lastAddedFile = path;
+						} else if (!update){
+							c = tw.getTree(0, DirCacheIterator.class);
 							builder.add(c.getDirCacheEntry());
+						}
 					}
 				}
 			}

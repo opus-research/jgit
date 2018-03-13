@@ -56,8 +56,7 @@ import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -87,7 +86,7 @@ public class DirCacheEntry {
 	/** The second tree revision (usually called "theirs"). */
 	public static final int STAGE_3 = 3;
 
-	private static final int P_CTIME = 0;
+	// private static final int P_CTIME = 0;
 
 	// private static final int P_CTIME_NSEC = 4;
 
@@ -141,8 +140,7 @@ public class DirCacheEntry {
 	private byte inCoreFlags;
 
 	DirCacheEntry(final byte[] sharedInfo, final MutableInteger infoAt,
-			final InputStream in, final MessageDigest md, final int smudge_s,
-			final int smudge_ns) throws IOException {
+			final InputStream in, final MessageDigest md) throws IOException {
 		info = sharedInfo;
 		infoOffset = infoAt.value;
 
@@ -190,16 +188,6 @@ public class DirCacheEntry {
 			md.update((byte) 0);
 		}
 
-		try {
-			DirCacheCheckout.checkValidPath(toString(path));
-		} catch (InvalidPathException e) {
-			CorruptObjectException p =
-				new CorruptObjectException(e.getMessage());
-			if (e.getCause() != null)
-				p.initCause(e.getCause());
-			throw p;
-		}
-
 		// Index records are padded out to the next 8 byte alignment
 		// for historical reasons related to how C Git read the files.
 		//
@@ -210,9 +198,6 @@ public class DirCacheEntry {
 			IO.skipFully(in, padLen);
 			md.update(nullpad, 0, padLen);
 		}
-
-		if (mightBeRacilyClean(smudge_s, smudge_ns))
-			smudgeRacilyClean();
 	}
 
 	/**
@@ -226,7 +211,7 @@ public class DirCacheEntry {
 	 *             or DirCache file.
 	 */
 	public DirCacheEntry(final String newPath) {
-		this(Constants.encode(newPath), STAGE_0);
+		this(Constants.encode(newPath));
 	}
 
 	/**
@@ -273,13 +258,13 @@ public class DirCacheEntry {
 	 *             or DirCache file.  Or if {@code stage} is outside of the
 	 *             range 0..3, inclusive.
 	 */
-	@SuppressWarnings("boxing")
 	public DirCacheEntry(final byte[] newPath, final int stage) {
-		DirCacheCheckout.checkValidPath(toString(newPath));
+		if (!isValidPath(newPath))
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
+					, toString(newPath)));
 		if (stage < 0 || 3 < stage)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidStageForPath,
-					stage, toString(newPath)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
+					, stage, toString(newPath)));
 
 		info = new byte[INFO_LEN];
 		infoOffset = 0;
@@ -456,16 +441,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Returns whether this entry is in the fully-merged stage (0).
-	 *
-	 * @return true if this entry is merged
-	 * @since 2.2
-	 */
-	public boolean isMerged() {
-		return getStage() == STAGE_0;
-	}
-
-	/**
 	 * Obtain the raw {@link FileMode} bits for this entry.
 	 *
 	 * @return mode bits for the entry.
@@ -505,26 +480,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get the cached creation time of this file, in milliseconds.
-	 *
-	 * @return cached creation time of this file, in milliseconds since the
-	 *         Java epoch (midnight Jan 1, 1970 UTC).
-	 */
-	public long getCreationTime() {
-		return decodeTS(P_CTIME);
-	}
-
-	/**
-	 * Set the cached creation time of this file, using milliseconds.
-	 *
-	 * @param when
-	 *            new cached creation time of the file, in milliseconds.
-	 */
-	public void setCreationTime(final long when) {
-		encodeTS(P_CTIME, when);
-	}
-
-	/**
 	 * Get the cached last modification date of this file, in milliseconds.
 	 * <p>
 	 * One of the indicators that the file has been modified by an application
@@ -549,7 +504,7 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get the cached size (mod 4 GB) (in bytes) of this file.
+	 * Get the cached size (in bytes) of this file.
 	 * <p>
 	 * One of the indicators that the file has been modified by an application
 	 * changing the working tree is if the size of the file (in bytes) differs
@@ -557,11 +512,7 @@ public class DirCacheEntry {
 	 * <p>
 	 * Note that this is the length of the file in the working directory, which
 	 * may differ from the size of the decompressed blob if work tree filters
-	 * are being used, such as LF&lt;-&gt;CRLF conversion.
-	 * <p>
-	 * Note also that for very large files, this is the size of the on-disk file
-	 * truncated to 32 bits, i.e. modulo 4294967296. If that value is larger
-	 * than 2GB, it will appear negative.
+	 * are being used, such as LF<->CRLF conversion.
 	 *
 	 * @return cached size of the working directory file, in bytes.
 	 */
@@ -573,8 +524,7 @@ public class DirCacheEntry {
 	 * Set the cached size (in bytes) of this file.
 	 *
 	 * @param sz
-	 *            new cached size of the file, as bytes. If the file is larger
-	 *            than 2G, cast it to (int) before calling this method.
+	 *            new cached size of the file, as bytes.
 	 */
 	public void setLength(final int sz) {
 		NB.encodeInt32(info, infoOffset + P_SIZE, sz);
@@ -585,8 +535,14 @@ public class DirCacheEntry {
 	 *
 	 * @param sz
 	 *            new cached size of the file, as bytes.
+	 * @throws IllegalArgumentException
+	 *             if the size exceeds the 2 GiB barrier imposed by current file
+	 *             format limitations.
 	 */
 	public void setLength(final long sz) {
+		if (Integer.MAX_VALUE <= sz)
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().sizeExceeds2GB, getPathString(), sz));
 		setLength((int) sz);
 	}
 
@@ -644,27 +600,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get a copy of the entry's raw path bytes.
-	 *
-	 * @return raw path bytes.
-	 * @since 3.4
-	 */
-	public byte[] getRawPath() {
-		return path.clone();
-	}
-
-	/**
-	 * Use for debugging only !
-	 */
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return getFileMode() + " " + getLength() + " " + getLastModified()
-				+ " " + getObjectId() + " " + getStage() + " "
-				+ getPathString() + "\n";
-	}
-
-	/**
 	 * Copy the ObjectId and other meta fields from an existing entry.
 	 * <p>
 	 * This method copies everything except the path from one entry to another,
@@ -674,33 +609,10 @@ public class DirCacheEntry {
 	 *            the entry to copy ObjectId and meta fields from.
 	 */
 	public void copyMetaData(final DirCacheEntry src) {
-		copyMetaData(src, false);
-	}
-
-	/**
-	 * Copy the ObjectId and other meta fields from an existing entry.
-	 * <p>
-	 * This method copies everything except the path and possibly stage from one
-	 * entry to another, supporting renaming.
-	 *
-	 * @param src
-	 *            the entry to copy ObjectId and meta fields from.
-	 * @param keepStage
-	 *            if true, the stage attribute will not be copied
-	 */
-	void copyMetaData(final DirCacheEntry src, boolean keepStage) {
-		int origflags = NB.decodeUInt16(info, infoOffset + P_FLAGS);
-		int newflags = NB.decodeUInt16(src.info, src.infoOffset + P_FLAGS);
+		final int pLen = NB.decodeUInt16(info, infoOffset + P_FLAGS) & NAME_MASK;
 		System.arraycopy(src.info, src.infoOffset, info, infoOffset, INFO_LEN);
-		final int pLen = origflags & NAME_MASK;
-		final int SHIFTED_STAGE_MASK = 0x3 << 12;
-		final int pStageShifted;
-		if (keepStage)
-			pStageShifted = origflags & SHIFTED_STAGE_MASK;
-		else
-			pStageShifted = newflags & SHIFTED_STAGE_MASK;
-		NB.encodeInt16(info, infoOffset + P_FLAGS, pStageShifted | pLen
-				| (newflags & ~NAME_MASK & ~SHIFTED_STAGE_MASK));
+		NB.encodeInt16(info, infoOffset + P_FLAGS, pLen
+				| NB.decodeUInt16(info, infoOffset + P_FLAGS) & ~NAME_MASK);
 	}
 
 	/**
@@ -732,6 +644,30 @@ public class DirCacheEntry {
 
 	private static String toString(final byte[] path) {
 		return Constants.CHARSET.decode(ByteBuffer.wrap(path)).toString();
+	}
+
+	static boolean isValidPath(final byte[] path) {
+		if (path.length == 0)
+			return false; // empty path is not permitted.
+
+		boolean componentHasChars = false;
+		for (final byte c : path) {
+			switch (c) {
+			case 0:
+				return false; // NUL is never allowed within the path.
+
+			case '/':
+				if (componentHasChars)
+					componentHasChars = false;
+				else
+					return false;
+				break;
+
+			default:
+				componentHasChars = true;
+			}
+		}
+		return componentHasChars;
 	}
 
 	static int getMaximumInfoLength(boolean extended) {
