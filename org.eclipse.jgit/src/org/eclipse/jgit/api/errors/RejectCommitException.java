@@ -40,51 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.hooks;
-
-import java.io.IOException;
-import java.io.PrintStream;
-
-import org.eclipse.jgit.api.errors.HookFailureException;
+package org.eclipse.jgit.api.errors;
 
 /**
- * A hook can be executed at certain points of git commands execution.
+ * Exception thrown when a commit is rejected by a hook (either
+ * {@link org.eclipse.jgit.util.Hook#PRE_COMMIT pre-commit} or
+ * {@link org.eclipse.jgit.util.Hook#COMMIT_MSG commit-msg}).
  *
- * @author ldelaigue
- * @since 4.0
+ * @since 3.7
  */
-public interface IHook {
+public class RejectCommitException extends GitAPIException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param outputStream
-	 *            stdout that the hook must use
-	 * @return this for convenience.
+	 * @param message
 	 */
-	public abstract IHook setOutputStream(PrintStream outputStream);
-
-	/**
-	 * @param parameters
-	 *            Parameters to invoke the hook
-	 * @return this for convenience.
-	 */
-	public abstract IHook setParameters(String... parameters);
-
-	/**
-	 * @param stdinArgs
-	 *            Arguments to pass to the hook via stdin
-	 * @return this for convenience.
-	 */
-	public abstract IHook setStdInArg(String stdinArgs);
-
-	/**
-	 * Run the hook.
-	 *
-	 * @throws IOException
-	 *             if IO goes wrong.
-	 * @throws HookFailureException
-	 *             If the hook has been run and a returned an exit code
-	 *             different from zero.
-	 */
-	public abstract void run() throws IOException, HookFailureException;
-
+	public RejectCommitException(String message) {
+		super(message);
+	}
 }

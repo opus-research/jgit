@@ -52,10 +52,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.HookFailureException;
+import org.eclipse.jgit.api.errors.RejectCommitException;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Assume;
 import org.junit.Test;
 
@@ -74,76 +73,18 @@ public class HookTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testFailedCommitMsgHookBlocksCommit() throws Exception {
-		assumeSupportedPlatform();
-
-		Hook h = Hook.COMMIT_MSG;
-		writeHookFile(h.getName(),
-				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 1");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		try {
-			git.commit().setMessage("commit")
-					.setHookOutputStream(new PrintStream(out)).call();
-			fail("expected commit-msg hook to abort commit");
-		} catch (HookFailureException e) {
-			assertEquals("unexpected error message from commit-msg hook",
-					"Rejected by \"commit-msg\" hook.\nstderr\n",
-					e.getMessage());
-			assertEquals("unexpected output from commit-msg hook", "test\n",
-					out.toString());
-		}
-	}
-
-	@Test
-	public void testCommitMsgHook() throws Exception {
-		assumeSupportedPlatform();
-
-		Hook h = Hook.COMMIT_MSG;
-		writeHookFile(h.getName(),
-				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 0");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		git.commit().setMessage("commit")
-				.setHookOutputStream(new PrintStream(out)).call();
-		assertEquals("test\n", out.toString("UTF-8"));
-	}
-
-	@Test
-	public void testCommitMsgHookCanModifyCommitMessage() throws Exception {
-		assumeSupportedPlatform();
-
-		Hook h = Hook.COMMIT_MSG;
-		writeHookFile(h.getName(),
-				"#!/bin/sh\necho \"new message\" > $1\nexit 0");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		RevCommit revCommit = git.commit().setMessage("commit")
-				.setHookOutputStream(new PrintStream(out)).call();
-		assertEquals("new message", revCommit.getFullMessage());
-	}
-
-	@Test
 	public void testRunHook() throws Exception {
 		assumeSupportedPlatform();
 
 		Hook h = Hook.PRE_COMMIT;
-		writeHookFile(h.getName(),
+		writeHookFile(
+				h.getName(),
 				"#!/bin/sh\necho \"test $1 $2\"\nread INPUT\necho $INPUT\necho 1>&2 \"stderr\"");
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ByteArrayOutputStream err = new ByteArrayOutputStream();
 		ProcessResult res = FS.DETECTED.runIfPresent(db, h, new String[] {
-				"arg1", "arg2" }, new PrintStream(out), new PrintStream(err),
-				"stdin");
+				"arg1", "arg2" },
+				new PrintStream(out), new PrintStream(err), "stdin");
 		assertEquals("unexpected hook output", "test arg1 arg2\nstdin\n",
 				out.toString("UTF-8"));
 		assertEquals("unexpected output on stderr stream", "stderr\n",
@@ -154,7 +95,7 @@ public class HookTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testFailedPreCommitHookBlockCommit() throws Exception {
+	public void testPreCommitHook() throws Exception {
 		assumeSupportedPlatform();
 
 		Hook h = Hook.PRE_COMMIT;
@@ -169,12 +110,14 @@ public class HookTest extends RepositoryTestCase {
 			git.commit().setMessage("commit")
 					.setHookOutputStream(new PrintStream(out)).call();
 			fail("expected pre-commit hook to abort commit");
-		} catch (HookFailureException e) {
+		} catch (RejectCommitException e) {
 			assertEquals("unexpected error message from pre-commit hook",
-					"Rejected by \"pre-commit\" hook.\nstderr\n",
+					"Commit rejected by \"pre-commit\" hook.\nstderr\n",
 					e.getMessage());
 			assertEquals("unexpected output from pre-commit hook", "test\n",
 					out.toString());
+		} catch (Throwable e) {
+			fail("unexpected exception thrown by pre-commit hook: " + e);
 		}
 	}
 
