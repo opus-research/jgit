@@ -46,7 +46,6 @@ package org.eclipse.jgit.internal.storage.file;
 import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
-import static org.eclipse.jgit.lib.ObjectId.zeroId;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.junit.Assert.assertEquals;
@@ -61,8 +60,6 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -73,17 +70,12 @@ import org.eclipse.jgit.events.RefsChangedListener;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.BatchRefUpdate;
-import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTag;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.ReceiveCommand;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -1292,123 +1284,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(1, changeCount.get());
 	}
 
-	@Test
-	public void testBatchRefUpdateSimpleNoForce() throws IOException {
-		writeLooseRef("refs/heads/master", A);
-		writeLooseRef("refs/heads/masters", B);
-		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
-						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(B, A, "refs/heads/masters",
-						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
-		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
-		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
-		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
-		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
-		assertEquals(ReceiveCommand.Result.REJECTED_NONFASTFORWARD, commands
-				.get(1).getResult());
-		assertEquals("[HEAD, refs/heads/master, refs/heads/masters]", refs
-				.keySet().toString());
-		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
-		assertEquals(B.getId(), refs.get("refs/heads/masters").getObjectId());
-	}
-
-	@Test
-	public void testBatchRefUpdateSimpleForce() throws IOException {
-		writeLooseRef("refs/heads/master", A);
-		writeLooseRef("refs/heads/masters", B);
-		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
-						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(B, A, "refs/heads/masters",
-						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
-		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
-		batchUpdate.setAllowNonFastForwards(true);
-		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
-		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
-		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
-		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
-		assertEquals("[HEAD, refs/heads/master, refs/heads/masters]", refs
-				.keySet().toString());
-		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
-		assertEquals(A.getId(), refs.get("refs/heads/masters").getObjectId());
-	}
-
-	@Test
-	public void testBatchRefUpdateNonFastForwardDoesNotDoExpensiveMergeCheck()
-			throws IOException {
-		writeLooseRef("refs/heads/master", B);
-		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(B, A, "refs/heads/master",
-						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
-		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
-		batchUpdate.setAllowNonFastForwards(true);
-		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo) {
-			@Override
-			public boolean isMergedInto(RevCommit base, RevCommit tip) {
-				throw new AssertionError("isMergedInto() should not be called");
-			}
-		}, new StrictWorkMonitor());
-		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
-		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
-		assertEquals(A.getId(), refs.get("refs/heads/master").getObjectId());
-	}
-
-	@Test
-	public void testBatchRefUpdateConflict() throws IOException {
-		writeLooseRef("refs/heads/master", A);
-		writeLooseRef("refs/heads/masters", B);
-		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
-						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(zeroId(), A, "refs/heads/master/x",
-						ReceiveCommand.Type.CREATE),
-				new ReceiveCommand(zeroId(), A, "refs/heads",
-						ReceiveCommand.Type.CREATE));
-		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
-		batchUpdate.setAllowNonFastForwards(true);
-		batchUpdate.addCommand(commands);
-		batchUpdate
-				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
-		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
-		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
-		assertEquals(ReceiveCommand.Result.LOCK_FAILURE, commands.get(1)
-				.getResult());
-		assertEquals(ReceiveCommand.Result.LOCK_FAILURE, commands.get(2)
-				.getResult());
-		assertEquals("[HEAD, refs/heads/master, refs/heads/masters]", refs
-				.keySet().toString());
-		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
-		assertEquals(B.getId(), refs.get("refs/heads/masters").getObjectId());
-	}
-
-	@Test
-	public void testBatchRefUpdateConflictThanksToDelete() throws IOException {
-		writeLooseRef("refs/heads/master", A);
-		writeLooseRef("refs/heads/masters", B);
-		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
-						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(zeroId(), A, "refs/heads/masters/x",
-						ReceiveCommand.Type.CREATE),
-				new ReceiveCommand(B, zeroId(), "refs/heads/masters",
-						ReceiveCommand.Type.DELETE));
-		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
-		batchUpdate.setAllowNonFastForwards(true);
-		batchUpdate.addCommand(commands);
-		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
-		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
-		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
-		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
-		assertEquals(ReceiveCommand.Result.OK, commands.get(2).getResult());
-		assertEquals("[HEAD, refs/heads/master, refs/heads/masters/x]", refs
-				.keySet().toString());
-		assertEquals(A.getId(), refs.get("refs/heads/masters/x").getObjectId());
-	}
-
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
 		writeLooseRef(name, id.name() + "\n");
 	}
@@ -1433,35 +1308,5 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private void deleteLooseRef(String name) {
 		File path = new File(diskRepo.getDirectory(), name);
 		assertTrue("deleted " + name, path.delete());
-	}
-
-	private static final class StrictWorkMonitor implements ProgressMonitor {
-		private int lastWork, totalWork;
-
-		@Override
-		public void start(int totalTasks) {
-			// empty
-		}
-
-		@Override
-		public void beginTask(String title, int total) {
-			this.totalWork = total;
-			lastWork = 0;
-		}
-
-		@Override
-		public void update(int completed) {
-			lastWork += completed;
-		}
-
-		@Override
-		public void endTask() {
-			assertEquals("Units of work recorded", totalWork, lastWork);
-		}
-
-		@Override
-		public boolean isCancelled() {
-			return false;
-		}
 	}
 }

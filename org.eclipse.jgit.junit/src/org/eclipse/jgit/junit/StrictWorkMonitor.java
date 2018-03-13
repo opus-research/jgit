@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,54 +41,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.junit;
 
-import org.eclipse.jgit.annotations.Nullable;
+import static org.junit.Assert.assertEquals;
 
-/**
- * Exception thrown when encounters a corrupt pack index file.
- *
- * @since 4.9
- */
-public class CorruptPackIndexException extends Exception {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
-	/** The error type of a corrupt index file. */
-	public enum ErrorType {
-		/** Offset does not match index in pack file. */
-		MISMATCH_OFFSET,
-		/** CRC does not match CRC of the object data in pack file. */
-		MISMATCH_CRC,
-		/** CRC is not present in index file. */
-		MISSING_CRC,
-		/** Object in pack is not present in index file. */
-		MISSING_OBJ,
-		/** Object in index file is not present in pack file. */
-		UNKNOWN_OBJ,
+public final class StrictWorkMonitor implements ProgressMonitor {
+	private int lastWork, totalWork;
+
+	@Override
+	public void start(int totalTasks) {
+		// empty
 	}
 
-	private ErrorType errorType;
-
-	/**
-	 * Report a specific error condition discovered in an index file.
-	 *
-	 * @param message
-	 *            the error message.
-	 * @param errorType
-	 *            the error type of corruption.
-	 */
-	public CorruptPackIndexException(String message, ErrorType errorType) {
-		super(message);
-		this.errorType = errorType;
+	@Override
+	public void beginTask(String title, int total) {
+		this.totalWork = total;
+		lastWork = 0;
 	}
 
-	/**
-	 * Specific the reason of the corrupt index file.
-	 *
-	 * @return error condition or null.
-	 */
-	@Nullable
-	public ErrorType getErrorType() {
-		return errorType;
+	@Override
+	public void update(int completed) {
+		lastWork += completed;
+	}
+
+	@Override
+	public void endTask() {
+		assertEquals("Units of work recorded", totalWork, lastWork);
+	}
+
+	@Override
+	public boolean isCancelled() {
+		return false;
 	}
 }
