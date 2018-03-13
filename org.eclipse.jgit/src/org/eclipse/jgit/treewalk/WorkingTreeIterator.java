@@ -72,6 +72,7 @@ import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -127,9 +128,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
-
-	/** Cached canonical length, initialized from {@link #idBuffer()} */
-	private long canonLen = -1;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -322,8 +320,33 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				state.initializeDigestAndReadBuffer();
 
 				final long len = e.getLength();
-				InputStream filteredIs = possiblyFilteredInputStream(e, is, len);
-				return computeHash(filteredIs, canonLen);
+				if (!mightNeedCleaning())
+					return computeHash(is, len);
+
+				if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
+					ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
+					byte[] raw = rawbuf.array();
+					int n = rawbuf.limit();
+					if (!isBinary(raw, n)) {
+						rawbuf = filterClean(raw, n);
+						raw = rawbuf.array();
+						n = rawbuf.limit();
+					}
+					return computeHash(new ByteArrayInputStream(raw, 0, n), n);
+				}
+
+				if (isBinary(e))
+					return computeHash(is, len);
+
+				final long canonLen;
+				final InputStream lenIs = filterClean(e.openInputStream());
+				try {
+					canonLen = computeLength(lenIs);
+				} finally {
+					safeClose(lenIs);
+				}
+
+				return computeHash(filterClean(is), canonLen);
 			} finally {
 				safeClose(is);
 			}
@@ -331,43 +354,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Can't read the file? Don't report the failure either.
 			return zeroid;
 		}
-	}
-
-	private InputStream possiblyFilteredInputStream(final Entry e,
-			final InputStream is, final long len) throws IOException {
-		InputStream filteredIs;
-		if (!mightNeedCleaning()) {
-			filteredIs = is;
-			canonLen = len;
-		} else {
-			if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
-				ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-				byte[] raw = rawbuf.array();
-				int n = rawbuf.limit();
-				if (!isBinary(raw, n)) {
-					rawbuf = filterClean(raw, n);
-					raw = rawbuf.array();
-					n = rawbuf.limit();
-				}
-				filteredIs = new ByteArrayInputStream(raw, 0, n);
-				canonLen = n;
-			} else {
-				if (isBinary(e)) {
-					filteredIs = is;
-					canonLen = len;
-				} else {
-					final InputStream lenIs = filterClean(e
-							.openInputStream());
-					try {
-						canonLen = computeLength(lenIs);
-					} finally {
-						safeClose(lenIs);
-					}
-					filteredIs = filterClean(is);
-				}
-			}
-		}
-		return filteredIs;
 	}
 
 	private static void safeClose(final InputStream in) {
@@ -455,10 +441,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	@Override
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
-		if (!eof()) {
-			canonLen = -1;
+		if (!eof())
 			parseEntry();
-		}
 	}
 
 	@Override
@@ -478,38 +462,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * Get the raw byte length of this entry.
+	 * Get the byte length of this entry.
 	 *
 	 * @return size of this file, in bytes.
 	 */
 	public long getEntryLength() {
 		return current().getLength();
-	}
-
-	/**
-	 * Get the filtered input length of this entry
-	 *
-	 * @return size of the content, in bytes
-	 * @throws IOException
-	 */
-	public long getEntryContentLength() throws IOException {
-		if (canonLen == -1) {
-			long rawLen = getEntryLength();
-			if (rawLen == 0)
-				canonLen = 0;
-			if (getEntryLastModified() == 0)
-				System.out.println("W0?");
-			// else {
-				InputStream is = current().openInputStream();
-				try {
-					possiblyFilteredInputStream(current(), is, current()
-							.getLength());
-				} finally {
-					safeClose(is);
-				}
-			}
-		// }
-		return canonLen;
 	}
 
 	/**
@@ -540,10 +498,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 */
 	public InputStream openEntryStream() throws IOException {
 		InputStream rawis = current().openInputStream();
-		if (mightNeedCleaning())
-			return filterClean(rawis);
+		InputStream is;
+		if (getOptions().getAutoCRLF() != AutoCRLF.FALSE)
+			is = new EolCanonicalizingInputStream(rawis, true);
 		else
-			return rawis;
+			is = rawis;
+		return is;
 	}
 
 	/**
