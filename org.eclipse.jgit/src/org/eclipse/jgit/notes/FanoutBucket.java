@@ -260,8 +260,8 @@ class FanoutBucket extends InMemoryNoteBucket {
 	}
 
 	ObjectId getTreeId() {
-		try (ObjectInserter.Formatter f = new ObjectInserter.Formatter()) {
-			return f.idFor(build(false, null));
+		try {
+			return new ObjectInserter.Formatter().idFor(build(false, null));
 		} catch (IOException e) {
 			// should never happen as we are not inserting
 			throw new RuntimeException(e);
