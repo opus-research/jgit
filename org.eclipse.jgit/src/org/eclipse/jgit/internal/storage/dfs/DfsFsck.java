@@ -43,11 +43,8 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
-import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
-
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptPackIndexException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -55,6 +52,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.fsck.FsckError;
 import org.eclipse.jgit.internal.fsck.FsckError.CorruptIndex;
 import org.eclipse.jgit.internal.fsck.FsckPackParser;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -62,11 +60,16 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.transport.PackedObjectInfo;
 
 /** Verify the validity and connectivity of a DFS repository. */
 public class DfsFsck {
 	private final DfsRepository repo;
+
 	private final DfsObjDatabase objdb;
+
+	private final DfsReader ctx;
+
 	private ObjectChecker objChecker = new ObjectChecker();
 
 	/**
@@ -78,7 +81,9 @@ public class DfsFsck {
 	public DfsFsck(DfsRepository repository) {
 		repo = repository;
 		objdb = repo.getObjectDatabase();
+		ctx = objdb.newReader();
 	}
+
 
 	/**
 	 * Verify the integrity and connectivity of all objects in the object
@@ -96,45 +101,42 @@ public class DfsFsck {
 		}
 
 		FsckError errors = new FsckError();
-		checkPacks(pm, errors);
-		checkConnectivity(pm, errors);
-		return errors;
-	}
-
-	private void checkPacks(ProgressMonitor pm, FsckError errors)
-			throws IOException, FileNotFoundException {
-		try (DfsReader ctx = objdb.newReader()) {
+		try {
 			for (DfsPackFile pack : objdb.getPacks()) {
 				DfsPackDescription packDesc = pack.getPackDescription();
-				try (ReadableChannel rc = objdb.openFile(packDesc, PACK)) {
-					verifyPack(pm, errors, ctx, pack, rc);
+				try (ReadableChannel channel = repo.getObjectDatabase()
+						.openFile(packDesc, PackExt.PACK)) {
+					List<PackedObjectInfo> objectsInPack;
+					FsckPackParser parser = new FsckPackParser(
+							repo.getObjectDatabase(), channel);
+					parser.setObjectChecker(objChecker);
+					parser.overwriteObjectCount(packDesc.getObjectCount());
+					parser.parse(pm);
+					errors.getCorruptObjects()
+							.addAll(parser.getCorruptObjects());
+					objectsInPack = parser.getSortedObjectList(null);
+					parser.verifyIndex(objectsInPack, pack.getPackIndex(ctx));
 				} catch (MissingObjectException e) {
 					errors.getMissingObjects().add(e.getObjectId());
 				} catch (CorruptPackIndexException e) {
 					errors.getCorruptIndices().add(new CorruptIndex(
-							pack.getPackDescription().getFileName(INDEX),
+							pack.getPackDescription()
+									.getFileName(PackExt.INDEX),
 							e.getErrorType()));
 				}
 			}
+
+			checkConnectivity(pm, errors);
+		} finally {
+			ctx.close();
 		}
-	}
-
-	private void verifyPack(ProgressMonitor pm, FsckError errors, DfsReader ctx,
-			DfsPackFile pack, ReadableChannel ch)
-					throws IOException, CorruptPackIndexException {
-		FsckPackParser fpp = new FsckPackParser(objdb, ch);
-		fpp.setObjectChecker(objChecker);
-		fpp.overwriteObjectCount(pack.getPackDescription().getObjectCount());
-		fpp.parse(pm);
-		errors.getCorruptObjects().addAll(fpp.getCorruptObjects());
-
-		fpp.verifyIndex(fpp.getSortedObjectList(null), pack.getPackIndex(ctx));
+		return errors;
 	}
 
 	private void checkConnectivity(ProgressMonitor pm, FsckError errors)
 			throws IOException {
 		pm.beginTask(JGitText.get().countingObjects, ProgressMonitor.UNKNOWN);
-		try (ObjectWalk ow = new ObjectWalk(repo)) {
+		try (ObjectWalk ow = new ObjectWalk(ctx)) {
 			for (Ref r : repo.getAllRefs().values()) {
 				RevObject tip;
 				try {
