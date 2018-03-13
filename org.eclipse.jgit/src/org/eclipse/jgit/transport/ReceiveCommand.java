@@ -288,7 +288,7 @@ public class ReceiveCommand {
 			}
 			break;
 		default:
-			throw new IllegalStateException(JGitText.get().enumValueNotSupported0);
+			throw new IllegalStateException();
 		}
 		this.type = type;
 	}
