@@ -53,6 +53,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.DataFormatException;
@@ -168,7 +169,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
 		PackList packList = db.getPackList();
 		resolveImpl(packList, id, noGarbage, matches);
-		if (MAX_RESOLVE_MATCHES > matches.size() && packList.dirty()) {
+		if (matches.size() <= MAX_RESOLVE_MATCHES && packList.dirty()) {
 			resolveImpl(db.scanPacks(packList), id, noGarbage, matches);
 		}
 		return matches;
@@ -176,9 +177,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private void resolveImpl(PackList packList, AbbreviatedObjectId id,
 			boolean noGarbage, HashSet<ObjectId> matches) throws IOException {
-		if (MAX_RESOLVE_MATCHES <= matches.size()) {
-			return;
-		}
 		for (DfsPackFile pack : packList.packs) {
 			if (noGarbage && pack.isGarbage()) {
 				continue;
@@ -299,7 +297,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private <T extends ObjectId> Iterable<FoundObject<T>> findAll(
 			Iterable<T> objectIds) throws IOException {
-		Set<T> pending = new HashSet<>();
+		Collection<T> pending = new LinkedList<>();
 		for (T id : objectIds) {
 			pending.add(id);
 		}
@@ -310,20 +308,16 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (packList.dirty()) {
 			findAllImpl(db.scanPacks(packList), pending, r);
 		}
+		for (T t : pending) {
+			r.add(new FoundObject<T>(t));
+		}
+		Collections.sort(r, FOUND_OBJECT_SORT);
 		return r;
 	}
 
 	private <T extends ObjectId> void findAllImpl(PackList packList,
-			Set<T> pending, List<FoundObject<T>> r) {
+			Collection<T> pending, List<FoundObject<T>> r) {
 		DfsPackFile[] packs = packList.packs;
-		if (packs.length == 0) {
-			for (Iterator<T> it = pending.iterator(); it.hasNext();) {
-				r.add(new FoundObject<T>(it.next()));
-				it.remove();
-			}
-			return;
-		}
-
 		int lastIdx = 0;
 		DfsPackFile lastPack = packs[lastIdx];
 		boolean noGarbage = avoidUnreachable;
@@ -360,11 +354,8 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 					// Examine other packs.
 				}
 			}
-
-			r.add(new FoundObject<T>(t));
 		}
 
-		Collections.sort(r, FOUND_OBJECT_SORT);
 		last = lastPack;
 	}
 
