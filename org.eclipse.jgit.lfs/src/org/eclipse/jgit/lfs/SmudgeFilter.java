@@ -303,15 +303,14 @@ public class SmudgeFilter extends FilterCommand {
 
 	@Override
 	public int run() throws IOException {
-		int length = 0;
+		int b;
 		if (in != null) {
-			byte[] buf = new byte[8192];
-			while ((length = in.read(buf)) != -1) {
-				out.write(buf, 0, length);
+			while ((b = in.read()) != -1) {
+				out.write(b);
 			}
 			in.close();
 		}
 		out.close();
-		return length;
+		return -1;
 	}
 }
