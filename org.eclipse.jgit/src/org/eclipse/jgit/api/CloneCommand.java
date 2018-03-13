@@ -331,10 +331,13 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param uri
-	 *            the uri to clone from
+	 *            the uri to clone from.  Must be non-{@code null}.
 	 * @return this instance
 	 */
 	public CloneCommand setURI(String uri) {
+		if (uri == null) {
+			throw new NullPointerException();
+		}
 		this.uri = uri;
 		return this;
 	}
@@ -406,6 +409,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {
+		if (remote == null) {
+			throw new NullPointerException();
+		}
 		this.remote = remote;
 		return this;
 	}
@@ -418,6 +424,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return this instance
 	 */
 	public CloneCommand setBranch(String branch) {
+		if (branch == null) {
+			throw new NullPointerException();
+		}
 		this.branch = branch;
 		return this;
 	}
