@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2009-2010, Google Inc.
  * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,42 +44,68 @@
 
 package org.eclipse.jgit.diff;
 
+import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
+
 /**
- * Arbitrary sequence of elements with fast comparison support.
- * <p>
- * A sequence of elements is defined to contain elements in the index range
- * <code>[0, {@link #size()})</code>, like a standard Java List implementation.
- * Unlike a List, the members of the sequence are not directly obtainable, but
- * element equality can be tested if two Sequences are the same implementation.
- * <p>
- * An implementation may chose to implement the equals semantic as necessary,
- * including fuzzy matching rules such as ignoring insignificant sub-elements,
- * e.g. ignoring whitespace differences in text.
- * <p>
- * Implementations of Sequence are primarily intended for use in content
- * difference detection algorithms, to produce an {@link EditList} of
- * {@link Edit} instances describing how two Sequence instances differ.
+ * A version of {@link RawText} that ignores leading whitespace.
  */
-public interface Sequence {
-	/** @return total number of items in the sequence. */
-	public int size();
+public class RawTextIgnoreLeadingWhitespace extends RawText {
+	/** Creates RawText that ignores only leading whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreLeadingWhitespace(input);
+		}
+	};
 
 	/**
-	 * Determine if the i-th member is equal to the j-th member.
+	 * Create a new sequence from an existing content byte array.
 	 * <p>
-	 * Implementations must ensure <code>equals(thisIdx,other,otherIdx)</code>
-	 * returns the same as <code>other.equals(otherIdx,this,thisIdx)</code>.
+	 * The entire array (indexes 0 through length-1) is used as the content.
 	 *
-	 * @param thisIdx
-	 *            index within <code>this</code> sequence; must be in the range
-	 *            <code>[ 0, this.size() )</code>.
-	 * @param other
-	 *            another sequence; must be the same implementation class, that
-	 *            is <code>this.getClass() == other.getClass()</code>.
-	 * @param otherIdx
-	 *            index within <code>other</code> sequence; must be in the range
-	 *            <code>[ 0, other.size() )</code>.
-	 * @return true if the elements are equal; false if they are not equal.
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
 	 */
-	public boolean equals(int thisIdx, Sequence other, int otherIdx);
+	public RawTextIgnoreLeadingWhitespace(byte[] input) {
+		super(input);
+	}
+
+	@Override
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
+
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes[ai] != b.hashes[bi])
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		as = trimLeadingWhitespace(a.content, as, ae);
+		bs = trimLeadingWhitespace(b.content, bs, be);
+
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		ptr = trimLeadingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
+	}
 }

@@ -63,12 +63,9 @@ import org.eclipse.jgit.util.IntList;
  * This class does not know anything about how to present the merge result to
  * the end-user. MergeFormatters have to be used to construct something human
  * readable.
- *
- * @param <S>
- *            type of sequence.
  */
-public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
-	private final List<S> sequences;
+public class MergeResult implements Iterable<MergeChunk> {
+	private final List<Sequence> sequences;
 
 	private final IntList chunks = new IntList();
 
@@ -82,7 +79,7 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 	 *            followed by the merged sequences. This list should not be
 	 *            modified anymore during the lifetime of this {@link MergeResult}.
 	 */
-	public MergeResult(List<S> sequences) {
+	public MergeResult(List<Sequence> sequences) {
 		this.sequences = sequences;
 	}
 
@@ -123,7 +120,7 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 	 * @return the common predecessor at position 0 followed by the merged
 	 *         sequences.
 	 */
-	public List<S> getSequences() {
+	public List<Sequence> getSequences() {
 		return sequences;
 	}
 
