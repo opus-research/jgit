@@ -56,6 +56,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
@@ -64,11 +65,11 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.MessageWriter;
 import org.eclipse.jgit.util.io.StreamCopyThread;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Transport through an SSH tunnel.
@@ -217,11 +218,12 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		public Process exec(String command, int timeout)
 				throws TransportException {
 			String ssh = SystemReader.getInstance().getenv("GIT_SSH"); //$NON-NLS-1$
-			boolean putty = ssh.toLowerCase().contains("plink"); //$NON-NLS-1$
+			boolean putty = ssh.toLowerCase(Locale.ROOT).contains("plink"); //$NON-NLS-1$
 
 			List<String> args = new ArrayList<String>();
 			args.add(ssh);
-			if (putty && !ssh.toLowerCase().contains("tortoiseplink")) //$NON-NLS-1$
+			if (putty
+					&& !ssh.toLowerCase(Locale.ROOT).contains("tortoiseplink")) //$NON-NLS-1$
 				args.add("-batch"); //$NON-NLS-1$
 			if (0 < getURI().getPort()) {
 				args.add(putty ? "-P" : "-p"); //$NON-NLS-1$ //$NON-NLS-2$

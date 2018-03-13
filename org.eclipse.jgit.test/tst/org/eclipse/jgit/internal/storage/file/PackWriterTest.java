@@ -43,13 +43,13 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
+import static org.eclipse.jgit.internal.storage.pack.PackWriter.NONE;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.eclipse.jgit.internal.storage.pack.PackWriter.NONE;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -75,8 +75,8 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.Sets;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Sets;
 import org.eclipse.jgit.revwalk.DepthWalk;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevBlob;
@@ -110,6 +110,26 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private ObjectInserter inserter;
 
 	private FileRepository dst;
+
+	private RevBlob contentA;
+
+	private RevBlob contentB;
+
+	private RevBlob contentC;
+
+	private RevBlob contentD;
+
+	private RevBlob contentE;
+
+	private RevCommit c1;
+
+	private RevCommit c2;
+
+	private RevCommit c3;
+
+	private RevCommit c4;
+
+	private RevCommit c5;
 
 	@Before
 	public void setUp() throws Exception {
@@ -517,16 +537,16 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		TestRepository<FileRepository> testRepo = new TestRepository<FileRepository>(
 				repo);
 		BranchBuilder bb = testRepo.branch("refs/heads/master");
-		RevBlob contentA = testRepo.blob("A");
-		RevCommit c1 = bb.commit().add("f", contentA).create();
+		contentA = testRepo.blob("A");
+		c1 = bb.commit().add("f", contentA).create();
 		testRepo.getRevWalk().parseHeaders(c1);
 		PackIndex pf1 = writePack(repo, wants(c1), EMPTY_ID_SET);
 		assertContent(
 				pf1,
 				Arrays.asList(c1.getId(), c1.getTree().getId(),
 						contentA.getId()));
-		RevBlob contentB = testRepo.blob("B");
-		RevCommit c2 = bb.commit().add("f", contentB).create();
+		contentB = testRepo.blob("B");
+		c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
 		PackIndex pf2 = writePack(repo, wants(c2), Sets.of((ObjectIdSet) pf1));
 		assertContent(
@@ -546,38 +566,113 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
-	public void testShallowIsMinimal() throws Exception {
-		FileRepository repo = createBareRepository();
-		TestRepository<Repository> r = new TestRepository<Repository>(repo);
-		BranchBuilder bb = r.branch("refs/heads/master");
-		RevBlob contentA = r.blob("A");
-		RevBlob contentB = r.blob("B");
-		RevBlob contentC = r.blob("C");
-		RevBlob contentD = r.blob("D");
-		RevBlob contentE = r.blob("E");
-		RevCommit c1 = bb.commit().add("a", contentA).create();
-		RevCommit c2 = bb.commit().add("b", contentB).create();
-		RevCommit c3 = bb.commit().add("c", contentC).create();
-		RevCommit c4 = bb.commit().add("d", contentD).create();
-		RevCommit c5 = bb.commit().add("e", contentE).create();
-		r.getRevWalk().parseHeaders(c1);
-		r.getRevWalk().parseHeaders(c2);
-		r.getRevWalk().parseHeaders(c3);
-		r.getRevWalk().parseHeaders(c4);
-		r.getRevWalk().parseHeaders(c5);
+	public void testShallowIsMinimalDepth1() throws Exception {
+		FileRepository repo = setupRepoForShallowFetch();
 
 		PackIndex idx = writeShallowPack(repo, 1, wants(c2), NONE, NONE);
+		assertContent(idx, Arrays.asList(c2.getId(), c2.getTree().getId(),
+				contentA.getId(), contentB.getId()));
+
+		// Client already has blobs A and B, verify those are not packed.
+		idx = writeShallowPack(repo, 1, wants(c5), haves(c2), shallows(c2));
+		assertContent(idx, Arrays.asList(c5.getId(), c5.getTree().getId(),
+				contentC.getId(), contentD.getId(), contentE.getId()));
+	}
+
+	@Test
+	public void testShallowIsMinimalDepth2() throws Exception {
+		FileRepository repo = setupRepoForShallowFetch();
+
+		PackIndex idx = writeShallowPack(repo, 2, wants(c2), NONE, NONE);
 		assertContent(idx,
 				Arrays.asList(c1.getId(), c2.getId(), c1.getTree().getId(),
 						c2.getTree().getId(), contentA.getId(),
 						contentB.getId()));
 
 		// Client already has blobs A and B, verify those are not packed.
-		idx = writeShallowPack(repo, 1, wants(c5), haves(c1, c2), shallows(c1));
+		idx = writeShallowPack(repo, 2, wants(c5), haves(c1, c2), shallows(c1));
 		assertContent(idx,
 				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
 						c5.getTree().getId(), contentC.getId(),
 						contentD.getId(), contentE.getId()));
+	}
+
+	@Test
+	public void testShallowFetchShallowParentDepth1() throws Exception {
+		FileRepository repo = setupRepoForShallowFetch();
+
+		PackIndex idx = writeShallowPack(repo, 1, wants(c5), NONE, NONE);
+		assertContent(idx,
+				Arrays.asList(c5.getId(), c5.getTree().getId(),
+						contentA.getId(), contentB.getId(), contentC.getId(),
+						contentD.getId(), contentE.getId()));
+
+		idx = writeShallowPack(repo, 1, wants(c4), haves(c5), shallows(c5));
+		assertContent(idx, Arrays.asList(c4.getId(), c4.getTree().getId()));
+	}
+
+	@Test
+	public void testShallowFetchShallowParentDepth2() throws Exception {
+		FileRepository repo = setupRepoForShallowFetch();
+
+		PackIndex idx = writeShallowPack(repo, 2, wants(c5), NONE, NONE);
+		assertContent(idx,
+				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
+						c5.getTree().getId(), contentA.getId(),
+						contentB.getId(), contentC.getId(), contentD.getId(),
+						contentE.getId()));
+
+		idx = writeShallowPack(repo, 2, wants(c3), haves(c4, c5), shallows(c4));
+		assertContent(idx, Arrays.asList(c2.getId(), c3.getId(),
+				c2.getTree().getId(), c3.getTree().getId()));
+	}
+
+	@Test
+	public void testShallowFetchShallowAncestorDepth1() throws Exception {
+		FileRepository repo = setupRepoForShallowFetch();
+
+		PackIndex idx = writeShallowPack(repo, 1, wants(c5), NONE, NONE);
+		assertContent(idx,
+				Arrays.asList(c5.getId(), c5.getTree().getId(),
+						contentA.getId(), contentB.getId(), contentC.getId(),
+						contentD.getId(), contentE.getId()));
+
+		idx = writeShallowPack(repo, 1, wants(c3), haves(c5), shallows(c5));
+		assertContent(idx, Arrays.asList(c3.getId(), c3.getTree().getId()));
+	}
+
+	@Test
+	public void testShallowFetchShallowAncestorDepth2() throws Exception {
+		FileRepository repo = setupRepoForShallowFetch();
+
+		PackIndex idx = writeShallowPack(repo, 2, wants(c5), NONE, NONE);
+		assertContent(idx,
+				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
+						c5.getTree().getId(), contentA.getId(),
+						contentB.getId(), contentC.getId(), contentD.getId(),
+						contentE.getId()));
+
+		idx = writeShallowPack(repo, 2, wants(c2), haves(c4, c5), shallows(c4));
+		assertContent(idx, Arrays.asList(c1.getId(), c2.getId(),
+				c1.getTree().getId(), c2.getTree().getId()));
+	}
+
+	private FileRepository setupRepoForShallowFetch() throws Exception {
+		FileRepository repo = createBareRepository();
+		TestRepository<Repository> r = new TestRepository<Repository>(repo);
+		BranchBuilder bb = r.branch("refs/heads/master");
+		contentA = r.blob("A");
+		contentB = r.blob("B");
+		contentC = r.blob("C");
+		contentD = r.blob("D");
+		contentE = r.blob("E");
+		c1 = bb.commit().add("a", contentA).create();
+		c2 = bb.commit().add("b", contentB).create();
+		c3 = bb.commit().add("c", contentC).create();
+		c4 = bb.commit().add("d", contentD).create();
+		c5 = bb.commit().add("e", contentE).create();
+		r.getRevWalk().parseHeaders(c5); // fully initialize the tip RevCommit
+		return repo;
 	}
 
 	private static PackIndex writePack(FileRepository repo,
@@ -592,7 +687,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 			Set<? extends ObjectId> shallow) throws IOException {
 		// During negotiation, UploadPack would have set up a DepthWalk and
 		// marked the client's "shallow" commits. Emulate that here.
-		DepthWalk.RevWalk walk = new DepthWalk.RevWalk(repo, depth);
+		DepthWalk.RevWalk walk = new DepthWalk.RevWalk(repo, depth - 1);
 		walk.assumeShallow(shallow);
 		return writePack(repo, walk, depth, want, have, EMPTY_ID_SET);
 	}
