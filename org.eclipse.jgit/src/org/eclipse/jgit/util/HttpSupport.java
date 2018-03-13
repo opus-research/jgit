@@ -110,6 +110,9 @@ public class HttpSupport {
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_GZIP = "gzip";
 
+	/** The standard {@code text/plain} MIME type. */
+	public static final String TEXT_PLAIN = "text/plain";
+
 	/**
 	 * URL encode a value string into an output buffer.
 	 *

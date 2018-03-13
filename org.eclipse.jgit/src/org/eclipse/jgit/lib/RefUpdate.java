@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2008, Charles O'Farrell <charleso@charleso.org>
+ * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -44,17 +45,19 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * Creates, updates or deletes any reference.
+ * Updates any locally stored ref.
  */
-public abstract class RefUpdate {
+public class RefUpdate {
 	/** Status of an update request. */
 	public static enum Result {
 		/** The ref update/delete has not been attempted by the caller. */
@@ -139,6 +142,12 @@ public abstract class RefUpdate {
 		RENAMED
 	}
 
+	/** Repository the ref is stored in. */
+	final RefDatabase db;
+
+	/** Location of the loose file holding the value of this ref. */
+	final File looseFile;
+
 	/** New value the caller wants this ref to have. */
 	private ObjectId newValue;
 
@@ -161,52 +170,22 @@ public abstract class RefUpdate {
 	private ObjectId expValue;
 
 	/** Result of the update operation. */
-	private Result result = Result.NOT_ATTEMPTED;
+	Result result = Result.NOT_ATTEMPTED;
 
 	private final Ref ref;
 
-	RefUpdate(final Ref ref) {
+	RefUpdate(final RefDatabase r, final Ref ref, final File f) {
+		db = r;
 		this.ref = ref;
 		oldValue = ref.getObjectId();
+		looseFile = f;
 		refLogMessage = "";
 	}
 
-	/** @return the reference database this update modifies. */
-	protected abstract RefDatabase getRefDatabase();
-
-	/** @return the repository storing the database's objects. */
-	protected abstract Repository getRepository();
-
-	/**
-	 * Try to acquire the lock on the reference.
-	 * <p>
-	 * If the locking was successful the implementor must set the current
-	 * identity value by calling {@link #setOldObjectId(ObjectId)}.
-	 *
-	 * @return true if the lock was acquired and the reference is likely
-	 *         protected from concurrent modification; false if it failed.
-	 * @throws IOException
-	 *             the lock couldn't be taken due to an unexpected storage
-	 *             failure, and not because of a concurrent update.
-	 */
-	protected abstract boolean tryLock() throws IOException;
-
-	/** Releases the lock taken by {@link #tryLock} if it succeeded. */
-	protected abstract void unlock();
-
-	/**
-	 * @param desiredResult
-	 * @return {@code result}
-	 * @throws IOException
-	 */
-	protected abstract Result doUpdate(Result desiredResult) throws IOException;
-
-	/**
-	 * @param desiredResult
-	 * @return {@code result}
-	 * @throws IOException
-	 */
-	protected abstract Result doDelete(Result desiredResult) throws IOException;
+	/** @return the repository the updated ref resides in */
+	public Repository getRepository() {
+		return db.getRepository();
+	}
 
 	/**
 	 * Get the name of the ref this update will operate on.
@@ -214,12 +193,16 @@ public abstract class RefUpdate {
 	 * @return name of underlying ref.
 	 */
 	public String getName() {
-		return getRef().getName();
+		return ref.getName();
 	}
 
-	/** @return the reference this update will create or modify. */
-	public Ref getRef() {
-		return ref;
+	/**
+	 * Get the requested name of the ref thit update will operate on
+	 *
+	 * @return original (requested) name of the underlying ref.
+	 */
+	public String getOrigName() {
+		return ref.getOrigName();
 	}
 
 	/**
@@ -312,17 +295,12 @@ public abstract class RefUpdate {
 		return refLogMessage;
 	}
 
-	/** @return {@code true} if the ref log message should show the result. */
-	protected boolean isRefLogIncludingResult() {
-		return refLogIncludeResult;
-	}
-
 	/**
 	 * Set the message to include in the reflog.
 	 *
 	 * @param msg
-	 *            the message to describe this change. It may be null if
-	 *            appendStatus is null in order not to append to the reflog
+	 *            the message to describe this change. It may be null
+	 *            if appendStatus is null in order not to append to the reflog
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
 	 *            forced-update) should be appended to the user supplied
@@ -359,16 +337,6 @@ public abstract class RefUpdate {
 	 */
 	public ObjectId getOldObjectId() {
 		return oldValue;
-	}
-
-	/**
-	 * Set the old value of the ref.
-	 *
-	 * @param old
-	 *            the old value.
-	 */
-	protected void setOldObjectId(ObjectId old) {
-		oldValue = old;
 	}
 
 	/**
@@ -410,7 +378,7 @@ public abstract class RefUpdate {
 	 * This is the same as:
 	 *
 	 * <pre>
-	 * return update(new RevWalk(getRepository()));
+	 * return update(new RevWalk(repository));
 	 * </pre>
 	 *
 	 * @return the result status of the update.
@@ -418,7 +386,7 @@ public abstract class RefUpdate {
 	 *             an unexpected IO error occurred while writing changes.
 	 */
 	public Result update() throws IOException {
-		return update(new RevWalk(getRepository()));
+		return update(new RevWalk(db.getRepository()));
 	}
 
 	/**
@@ -436,14 +404,7 @@ public abstract class RefUpdate {
 	public Result update(final RevWalk walk) throws IOException {
 		requireCanDoUpdate();
 		try {
-			return result = updateImpl(walk, new Store() {
-				@Override
-				Result execute(Result status) throws IOException {
-					if (status == Result.NO_CHANGE)
-						return status;
-					return doUpdate(status);
-				}
-			});
+			return result = updateImpl(walk, new UpdateStore());
 		} catch (IOException x) {
 			result = Result.IO_FAILURE;
 			throw x;
@@ -456,14 +417,14 @@ public abstract class RefUpdate {
 	 * This is the same as:
 	 *
 	 * <pre>
-	 * return delete(new RevWalk(getRepository()));
+	 * return delete(new RevWalk(repository));
 	 * </pre>
 	 *
 	 * @return the result status of the delete.
 	 * @throws IOException
 	 */
 	public Result delete() throws IOException {
-		return delete(new RevWalk(getRepository()));
+		return delete(new RevWalk(db.getRepository()));
 	}
 
 	/**
@@ -476,23 +437,14 @@ public abstract class RefUpdate {
 	 * @throws IOException
 	 */
 	public Result delete(final RevWalk walk) throws IOException {
-		final String myName = getRef().getLeaf().getName();
-		if (myName.startsWith(Constants.R_HEADS)) {
-			Ref head = getRefDatabase().getRef(Constants.HEAD);
-			while (head instanceof SymbolicRef) {
-				head = ((SymbolicRef) head).getTarget();
-				if (myName.equals(head.getName()))
-					return result = Result.REJECTED_CURRENT_BRANCH;
-			}
+		if (getName().startsWith(Constants.R_HEADS)) {
+			final Ref head = db.readRef(Constants.HEAD);
+			if (head != null && getName().equals(head.getName()))
+				return result = Result.REJECTED_CURRENT_BRANCH;
 		}
 
 		try {
-			return result = updateImpl(walk, new Store() {
-				@Override
-				Result execute(Result status) throws IOException {
-					return doDelete(status);
-				}
-			});
+			return result = updateImpl(walk, new DeleteStore());
 		} catch (IOException x) {
 			result = Result.IO_FAILURE;
 			throw x;
@@ -501,14 +453,17 @@ public abstract class RefUpdate {
 
 	private Result updateImpl(final RevWalk walk, final Store store)
 			throws IOException {
+		final LockFile lock;
 		RevObject newObj;
 		RevObject oldObj;
 
-		if (getRefDatabase().isNameConflicting(getName()))
+		if (isNameConflicting())
+			return Result.LOCK_FAILURE;
+		lock = new LockFile(looseFile);
+		if (!lock.lock())
 			return Result.LOCK_FAILURE;
 		try {
-			if (!tryLock())
-				return Result.LOCK_FAILURE;
+			oldValue = db.idOf(getName());
 			if (expValue != null) {
 				final ObjectId o;
 				o = oldValue != null ? oldValue : ObjectId.zeroId();
@@ -516,24 +471,39 @@ public abstract class RefUpdate {
 					return Result.LOCK_FAILURE;
 			}
 			if (oldValue == null)
-				return store.execute(Result.NEW);
+				return store.store(lock, Result.NEW);
 
 			newObj = safeParse(walk, newValue);
 			oldObj = safeParse(walk, oldValue);
 			if (newObj == oldObj)
-				return store.execute(Result.NO_CHANGE);
+				return store.store(lock, Result.NO_CHANGE);
 
 			if (newObj instanceof RevCommit && oldObj instanceof RevCommit) {
 				if (walk.isMergedInto((RevCommit) oldObj, (RevCommit) newObj))
-					return store.execute(Result.FAST_FORWARD);
+					return store.store(lock, Result.FAST_FORWARD);
 			}
 
 			if (isForceUpdate())
-				return store.execute(Result.FORCED);
+				return store.store(lock, Result.FORCED);
 			return Result.REJECTED;
 		} finally {
-			unlock();
+			lock.unlock();
 		}
+	}
+
+	private boolean isNameConflicting() throws IOException {
+		final String myName = getName();
+		final int lastSlash = myName.lastIndexOf('/');
+		if (lastSlash > 0)
+			if (db.getRepository().getRef(myName.substring(0, lastSlash)) != null)
+				return true;
+
+		final String rName = myName + "/";
+		for (Ref r : db.getAllRefs().values()) {
+			if (r.getName().startsWith(rName))
+				return true;
+		}
+		return false;
 	}
 
 	private static RevObject safeParse(final RevWalk rw, final AnyObjectId id)
@@ -550,11 +520,123 @@ public abstract class RefUpdate {
 		}
 	}
 
+	private Result updateStore(final LockFile lock, final Result status)
+			throws IOException {
+		if (status == Result.NO_CHANGE)
+			return status;
+		lock.setNeedStatInformation(true);
+		lock.write(newValue);
+		String msg = getRefLogMessage();
+		if (msg != null) {
+			if (refLogIncludeResult) {
+				String strResult = toResultString(status);
+				if (strResult != null) {
+					if (msg.length() > 0)
+						msg = msg + ": " + strResult;
+					else
+						msg = strResult;
+				}
+			}
+			RefLogWriter.append(this, msg);
+		}
+		if (!lock.commit())
+			return Result.LOCK_FAILURE;
+		db.stored(this.ref.getOrigName(),  ref.getName(), newValue, lock.getCommitLastModified());
+		return status;
+	}
+
+	private static String toResultString(final Result status) {
+		switch (status) {
+		case FORCED:
+			return "forced-update";
+		case FAST_FORWARD:
+			return "fast forward";
+		case NEW:
+			return "created";
+		default:
+			return null;
+		}
+	}
+
 	/**
 	 * Handle the abstraction of storing a ref update. This is because both
 	 * updating and deleting of a ref have merge testing in common.
 	 */
 	private abstract class Store {
-		abstract Result execute(Result status) throws IOException;
+		abstract Result store(final LockFile lock, final Result status)
+				throws IOException;
+	}
+
+	class UpdateStore extends Store {
+
+		@Override
+		Result store(final LockFile lock, final Result status)
+				throws IOException {
+			return updateStore(lock, status);
+		}
+	}
+
+	class DeleteStore extends Store {
+
+		@Override
+		Result store(LockFile lock, Result status) throws IOException {
+			Storage storage = ref.getStorage();
+			if (storage == Storage.NEW)
+				return status;
+			if (storage.isPacked())
+				db.removePackedRef(ref.getName());
+
+			final int levels = count(ref.getName(), '/') - 2;
+
+			// Delete logs _before_ unlocking
+			final File gitDir = db.getRepository().getDirectory();
+			final File logDir = new File(gitDir, Constants.LOGS);
+			deleteFileAndEmptyDir(new File(logDir, ref.getName()), levels);
+
+			// We have to unlock before (maybe) deleting the parent directories
+			lock.unlock();
+			if (storage.isLoose())
+				deleteFileAndEmptyDir(looseFile, levels);
+			db.uncacheRef(ref.getName());
+			return status;
+		}
+
+		private void deleteFileAndEmptyDir(final File file, final int depth)
+				throws IOException {
+			if (file.isFile()) {
+				if (!file.delete())
+					throw new IOException("File cannot be deleted: " + file);
+				File dir = file.getParentFile();
+				for  (int i = 0; i < depth; ++i) {
+					if (!dir.delete())
+						break; // ignore problem here
+					dir = dir.getParentFile();
+				}
+			}
+		}
+	}
+
+	UpdateStore newUpdateStore() {
+		return new UpdateStore();
+	}
+
+	DeleteStore newDeleteStore() {
+		return new DeleteStore();
+	}
+
+	static void deleteEmptyDir(File dir, int depth) {
+		for (; depth > 0 && dir != null; depth--) {
+			if (dir.exists() && !dir.delete())
+				break;
+			dir = dir.getParentFile();
+		}
+	}
+
+	static int count(final String s, final char c) {
+		int count = 0;
+		for (int p = s.indexOf(c); p >= 0; p = s.indexOf(c, p + 1)) {
+			count++;
+		}
+		return count;
 	}
 }

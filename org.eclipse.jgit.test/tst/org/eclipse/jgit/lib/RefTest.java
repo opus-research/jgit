@@ -75,7 +75,7 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		Ref refHEAD = allRefs.get("refs/remotes/origin/HEAD");
 		assertNotNull(refHEAD);
 		assertEquals(masterId, refHEAD.getObjectId());
-		assertFalse(refHEAD.isPeeled());
+		assertTrue(refHEAD.isPeeled());
 		assertNull(refHEAD.getPeeledObjectId());
 
 		Ref refmaster = allRefs.get("refs/remotes/origin/master");
@@ -87,11 +87,7 @@ public class RefTest extends SampleDataRepositoryTestCase {
 	public void testReadSymRefToPacked() throws IOException {
 		db.writeSymref("HEAD", "refs/heads/b");
 		Ref ref = db.getRef("HEAD");
-		assertEquals(Ref.Storage.LOOSE, ref.getStorage());
-		assertTrue("is symref", ref instanceof SymbolicRef);
-		ref = ((SymbolicRef) ref).getTarget();
-		assertEquals("refs/heads/b", ref.getName());
-		assertEquals(Ref.Storage.PACKED, ref.getStorage());
+		assertEquals(Ref.Storage.LOOSE_PACKED, ref.getStorage());
 	}
 
 	public void testReadSymRefToLoosePacked() throws IOException {
@@ -104,9 +100,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 
 		db.writeSymref("HEAD", "refs/heads/master");
 		Ref ref = db.getRef("HEAD");
-		assertEquals(Ref.Storage.LOOSE, ref.getStorage());
-		ref = ((SymbolicRef)ref).getTarget();
-		assertEquals("refs/heads/master", ref.getName());
 		assertEquals(Ref.Storage.LOOSE_PACKED, ref.getStorage());
 	}
 
@@ -159,23 +152,15 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertEquals(Storage.LOOSE_PACKED, ref.getStorage());
 	}
 
-	public void testResolvedNamesBranch() throws IOException {
+	public void testOrigResolvedNamesBranch() throws IOException {
 		Ref ref = db.getRef("a");
 		assertEquals("refs/heads/a", ref.getName());
+		assertEquals("refs/heads/a", ref.getOrigName());
 	}
 
-	public void testResolvedSymRef() throws IOException {
-		Ref ref = db.getRef(Constants.HEAD);
-		assertEquals(Constants.HEAD, ref.getName());
-		assertTrue("is symbolic ref", ref instanceof SymbolicRef);
-		assertSame(Ref.Storage.LOOSE, ref.getStorage());
-
-		Ref dst = ((SymbolicRef) ref).getTarget();
-		assertNotNull("has target", dst);
-		assertEquals("refs/heads/master", dst.getName());
-
-		assertSame(dst.getObjectId(), ref.getObjectId());
-		assertSame(dst.getPeeledObjectId(), ref.getPeeledObjectId());
-		assertEquals(dst.isPeeled(), ref.isPeeled());
+	public void testOrigResolvedNamesSymRef() throws IOException {
+		Ref ref = db.getRef("HEAD");
+		assertEquals("refs/heads/master", ref.getName());
+		assertEquals("HEAD", ref.getOrigName());
 	}
 }

@@ -85,7 +85,7 @@ public abstract class RefWriter {
 		final StringWriter w = new StringWriter();
 		final char[] tmp = new char[Constants.OBJECT_ID_STRING_LENGTH];
 		for (final Ref r : refs) {
-			if (Constants.HEAD.equals(r.getName())) {
+			if (Constants.HEAD.equals(r.getOrigName())) {
 				// Historically HEAD has never been published through
 				// the INFO_REFS file. This is a mistake, but its the
 				// way things are.
@@ -121,11 +121,12 @@ public abstract class RefWriter {
 	 */
 	public void writePackedRefs() throws IOException {
 		boolean peeled = false;
+
 		for (final Ref r : refs) {
-			if (r.getStorage().isPacked() && r.isPeeled()) {
+			if (r.getStorage() != Ref.Storage.PACKED)
+				continue;
+			if (r.getPeeledObjectId() != null)
 				peeled = true;
-				break;
-			}
 		}
 
 		final StringWriter w = new StringWriter();

@@ -43,6 +43,7 @@
 
 package org.eclipse.jgit.http.test;
 
+import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
 
 import java.io.IOException;
@@ -159,6 +160,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		A = src.commit().add("A_txt", A_txt).create();
 		B = src.commit().parent(A).add("A_txt", "C").add("B", "B").create();
 		src.update(master, B);
+
+		src.update("refs/garbage/a/very/long/ref/name/to/compress", B);
 	}
 
 	public void testListRemote() throws IOException {
@@ -187,7 +190,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertNotNull("have map of refs", map);
-		assertEquals(2, map.size());
+		assertEquals(3, map.size());
 
 		assertNotNull("has " + master, map.get(master));
 		assertEquals(B, map.get(master).getObjectId());
@@ -206,6 +209,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(200, info.getStatus());
 		assertEquals("application/x-git-upload-pack-advertisement", info
 				.getResponseHeader(HDR_CONTENT_TYPE));
+		assertEquals("gzip", info.getResponseHeader(HDR_CONTENT_ENCODING));
 	}
 
 	public void testInitialClone_Small() throws Exception {
@@ -234,6 +238,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(200, info.getStatus());
 		assertEquals("application/x-git-upload-pack-advertisement", info
 				.getResponseHeader(HDR_CONTENT_TYPE));
+		assertEquals("gzip", info.getResponseHeader(HDR_CONTENT_ENCODING));
 
 		AccessEvent service = requests.get(1);
 		assertEquals("POST", service.getMethod());
@@ -243,10 +248,14 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				.getRequestHeader(HDR_CONTENT_LENGTH));
 		assertNull("not chunked", service
 				.getRequestHeader(HDR_TRANSFER_ENCODING));
+		assertNull("no compression (too small)", service
+				.getRequestHeader(HDR_CONTENT_ENCODING));
 
 		assertEquals(200, service.getStatus());
 		assertEquals("application/x-git-upload-pack-result", service
 				.getResponseHeader(HDR_CONTENT_TYPE));
+		assertNull("no compression (never compressed)", service
+				.getResponseHeader(HDR_CONTENT_ENCODING));
 	}
 
 	public void testFetchUpdateExisting() throws Exception {
