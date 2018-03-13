@@ -1348,10 +1348,9 @@ public class UploadPack {
 				RevObject obj;
 				while ((obj = q.next()) != null) {
 					if (!(obj instanceof RevCommit)) {
-						// At least one non-commit needs to be checked, so
-						// use bitmaps if possible. (Bitmaps are not used
-						// when only commits are checked in order to avoid
-						// the overhead of loading them.)
+						// If unadvertized non-commits are requested, use
+						// bitmaps, and if there are no bitmaps, throw
+						// WantNotValidException.
 						BitmapIndex bitmapIndex = reader.getBitmapIndex();
 						if (bitmapIndex != null) {
 							checkNotAdvertisedWantsUsingBitmap(

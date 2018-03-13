@@ -2,7 +2,6 @@ package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.util.Collections;
 import org.eclipse.jgit.errors.TransportException;
@@ -116,7 +115,7 @@ public class UploadPackTest {
 	@Test
 	public void testFetchUnreachableBlobWithBitmap() throws Exception {
 		RevBlob blob = remote.blob("foo");
-		RevCommit commit = remote.commit(remote.tree(remote.file("foo", blob)));
+		remote.commit(remote.tree(remote.file("foo", blob)));
 		generateBitmaps(server);
 
 		testProtocol = generateReachableCommitUploadPackProtocol();
