@@ -297,8 +297,7 @@ public abstract class FS {
 	public File gitPrefix() {
 		Holder<File> p = gitPrefix;
 		if (p == null) {
-			String overrideGitPrefix = SystemReader.getInstance().getProperty(
-					"jgit.gitprefix");
+			String overrideGitPrefix = System.getProperty("jgit.gitprefix");
 			if (overrideGitPrefix != null)
 				p = new Holder<File>(new File(overrideGitPrefix));
 			else
