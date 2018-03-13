@@ -296,17 +296,16 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			final HttpConnection c = connect(service);
 			final InputStream in = openInputStream(c);
 			try {
-				BaseConnection f;
 				if (isSmartHttp(c, service)) {
 					readSmartHeaders(in, service);
-					f = new SmartHttpFetchConnection(in);
+					return new SmartHttpFetchConnection(in);
+
 				} else {
 					// Assume this server doesn't support smart HTTP fetch
 					// and fall back on dumb object walking.
-					f = newDumbConnection(in);
+					//
+					return newDumbConnection(in);
 				}
-				f.setPeerUserAgent(c.getHeaderField(HttpSupport.HDR_SERVER));
-				return (FetchConnection) f;
 			} finally {
 				in.close();
 			}
@@ -319,7 +318,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	private WalkFetchConnection newDumbConnection(InputStream in)
+	private FetchConnection newDumbConnection(InputStream in)
 			throws IOException, PackProtocolException {
 		HttpObjectDB d = new HttpObjectDB(objectsUrl);
 		BufferedReader br = toBufferedReader(in);
@@ -388,7 +387,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			final InputStream in = openInputStream(c);
 			try {
 				if (isSmartHttp(c, service)) {
-					return smartPush(service, c, in);
+					readSmartHeaders(in, service);
+					return new SmartHttpPushConnection(in);
+
 				} else if (!useSmartHttp) {
 					final String msg = JGitText.get().smartHTTPPushDisabled;
 					throw new NotSupportedException(msg);
@@ -407,14 +408,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (IOException err) {
 			throw new TransportException(uri, JGitText.get().errorReadingInfoRefs, err);
 		}
-	}
-
-	private PushConnection smartPush(String service, HttpConnection c,
-			InputStream in) throws IOException, TransportException {
-		readSmartHeaders(in, service);
-		SmartHttpPushConnection p = new SmartHttpPushConnection(in);
-		p.setPeerUserAgent(c.getHeaderField(HttpSupport.HDR_SERVER));
-		return p;
 	}
 
 	@Override
@@ -545,9 +538,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		conn.setUseCaches(false);
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache"); //$NON-NLS-1$
-		if (UserAgent.get() != null) {
-			conn.setRequestProperty(HDR_USER_AGENT, UserAgent.get());
-		}
+		conn.setRequestProperty(HDR_USER_AGENT, UserAgent.get());
 		int timeOut = getTimeout();
 		if (timeOut != -1) {
 			int effTimeOut = timeOut * 1000;

@@ -43,12 +43,12 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.transport.GitProtocolConstants.AGENT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
@@ -747,16 +747,19 @@ public abstract class BaseReceivePack {
 	 * will be returned. Older HTTP clients may also supply their version using
 	 * the HTTP {@code User-Agent} header. The capability overrides the HTTP
 	 * header if both are available.
-	 * <p>
-	 * When an HTTP request has been received this method returns the HTTP
-	 * {@code User-Agent} header value until capabilities have been parsed.
 	 *
 	 * @return user agent supplied by the client. Available only if the client
 	 *         is new enough to advertise its user agent.
 	 * @since 4.0
 	 */
 	public String getPeerUserAgent() {
-		return UserAgent.getAgent(enabledCapabilities, userAgent);
+		if (enabledCapabilities == null)
+			return userAgent;
+		for (String o : enabledCapabilities) {
+			if (o.startsWith(AGENT))
+				return o.substring(AGENT.length());
+		}
+		return userAgent;
 	}
 
 	/** @return all of the command received by the current request. */
@@ -976,7 +979,7 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
+		adv.advertiseCapability(AGENT + UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
 			adv.advertiseHave(obj);
@@ -1461,11 +1464,9 @@ public abstract class BaseReceivePack {
 			case REJECTED_MISSING_OBJECT:
 				if (cmd.getMessage() == null)
 					r.append("missing object(s)"); //$NON-NLS-1$
-				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH) {
-					r.append("object "); //$NON-NLS-1$
-					r.append(cmd.getMessage());
-					r.append(" missing"); //$NON-NLS-1$
-				} else
+				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH)
+					r.append("object " + cmd.getMessage() + " missing"); //$NON-NLS-1$ //$NON-NLS-2$
+				else
 					r.append(cmd.getMessage());
 				break;
 
