@@ -69,11 +69,23 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the root of the repository.
 	 */
 	protected final File directory;
+
 	/**
 	 *  the file system abstraction which will be necessary to
 	 *            perform certain file system operations.
 	 */
 	protected final FS fs;
+
+	/**
+	 * Create a new iterator to traverse the work tree and its children.
+	 *
+	 * @param repo
+	 *            the repository whose working tree will be scanned.
+	 */
+	public FileTreeIterator(Repository repo) {
+		this(repo.getWorkDir(), repo.getFS());
+		initRootIterator(repo);
+	}
 
 	/**
 	 * Create a new iterator to traverse the given directory and its children.
@@ -117,16 +129,12 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	}
 
 	private Entry[] entries() {
-		gitIgnoreTimeStamp = 0l;
 		final File[] all = directory.listFiles();
 		if (all == null)
 			return EOF;
 		final Entry[] r = new Entry[all.length];
-		for (int i = 0; i < r.length; i++) {
+		for (int i = 0; i < r.length; i++)
 			r[i] = new FileEntry(all[i], fs);
-			if (all[i].getName().equals(Constants.DOT_GIT_IGNORE))
-				gitIgnoreTimeStamp = r[i].getLastModified();
-		}
 		return r;
 	}
 

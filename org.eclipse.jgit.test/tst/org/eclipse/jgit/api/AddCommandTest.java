@@ -354,7 +354,8 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		dc = git.add().addFilepattern("sub").call();
 		// change in sub/a.txt is staged
-		assertTrue(dc.getEntry("sub/a.txt").getLength() == 16);
+		assertTrue(dc.getEntry("sub/a.txt").getLastModified() ==
+			file.lastModified());
 		// sub/c.txt is staged
 		assertNotNull(dc.getEntry("sub/c.txt"));
 		// deletion of sub/b.txt is not staged
@@ -404,8 +405,8 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		dc = git.add().addFilepattern("sub").setUpdate(true).call();
 		// change in sub/a.txt is staged
-		assertTrue(dc.getEntry("sub/a.txt").getLength() == 16);
-		// sub/c.txt is not staged
+		assertTrue(dc.getEntry("sub/a.txt").getLastModified() ==
+			file.lastModified());
 		assertNull(dc.getEntry("sub/c.txt"));
 		// deletion of sub/b.txt is staged
 		assertNull(dc.getEntry("sub/b.txt"));
