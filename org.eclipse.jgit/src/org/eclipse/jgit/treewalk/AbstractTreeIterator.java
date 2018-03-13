@@ -90,12 +90,6 @@ public abstract class AbstractTreeIterator {
 	/** Iterator for the parent tree; null if we are the root iterator. */
 	final AbstractTreeIterator parent;
 
-	/**
-	 * Fast access to the root of the iterator. Used for attributes macro
-	 * expander.
-	 */
-	final AbstractTreeIterator root;
-
 	/** The iterator this current entry is path equal to. */
 	AbstractTreeIterator matches;
 
@@ -155,7 +149,6 @@ public abstract class AbstractTreeIterator {
 	/** Create a new iterator with no parent. */
 	protected AbstractTreeIterator() {
 		parent = null;
-		root = this;
 		path = new byte[DEFAULT_PATH_SIZE];
 		pathOffset = 0;
 	}
@@ -177,7 +170,6 @@ public abstract class AbstractTreeIterator {
 	 */
 	protected AbstractTreeIterator(final String prefix) {
 		parent = null;
-		root = this;
 
 		if (prefix != null && prefix.length() > 0) {
 			final ByteBuffer b;
@@ -212,7 +204,6 @@ public abstract class AbstractTreeIterator {
 	 */
 	protected AbstractTreeIterator(final byte[] prefix) {
 		parent = null;
-		root = this;
 
 		if (prefix != null && prefix.length > 0) {
 			pathLen = prefix.length;
@@ -235,7 +226,6 @@ public abstract class AbstractTreeIterator {
 	 */
 	protected AbstractTreeIterator(final AbstractTreeIterator p) {
 		parent = p;
-		root = p.root;
 		path = p.path;
 		pathOffset = p.pathLen + 1;
 
@@ -266,7 +256,6 @@ public abstract class AbstractTreeIterator {
 	protected AbstractTreeIterator(final AbstractTreeIterator p,
 			final byte[] childPath, final int childPathOffset) {
 		parent = p;
-		root = p.root;
 		path = childPath;
 		pathOffset = childPathOffset;
 	}
