@@ -195,7 +195,13 @@ abstract class BasePackConnection extends BaseConnection {
 		for (;;) {
 			String line;
 
-			line = pckIn.readString();
+			try {
+				line = pckIn.readString();
+			} catch (EOFException eof) {
+				if (avail.isEmpty())
+					throw noRepository();
+				throw eof;
+			}
 			if (line == PacketLineIn.END)
 				break;
 
@@ -246,6 +252,19 @@ abstract class BasePackConnection extends BaseConnection {
 			}
 		}
 		available(avail);
+	}
+
+	/**
+	 * Create an exception to indicate problems finding a remote repository. The
+	 * caller is expected to throw the returned exception.
+	 *
+	 * Subclasses may override this method to provide better diagnostics.
+	 *
+	 * @return a TransportException saying a repository cannot be found and
+	 *         possibly why.
+	 */
+	protected TransportException noRepository() {
+		return new NoRemoteRepositoryException(uri, JGitText.get().notFound);
 	}
 
 	protected boolean isCapableOf(final String option) {
