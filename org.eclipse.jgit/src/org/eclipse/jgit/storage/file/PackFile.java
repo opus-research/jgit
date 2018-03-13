@@ -688,8 +688,10 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// that implies the resulting object is going to be massive.
 			// Use only the large delta format here.
 			//
-			return new LargePackedDeltaObject(posSelf, posBase, hdrLen, //
-					this, curs.db);
+			byte[] hdr = getDeltaHeader(posSelf + hdrLen, curs);
+			return new LargePackedDeltaObject(getObjectType(curs, posBase), //
+					BinaryDelta.getResultSize(hdr), //
+					posSelf, posBase, hdrLen, this, curs.db);
 		}
 
 		byte[] data;
@@ -705,8 +707,10 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				// The base itself is large. We have to produce a large
 				// delta stream as we don't want to build the whole base.
 				//
-				return new LargePackedDeltaObject(posSelf, posBase, hdrLen,
-						this, curs.db);
+				byte[] hdr = getDeltaHeader(posSelf + hdrLen, curs);
+				return new LargePackedDeltaObject(getObjectType(curs, posBase),
+						BinaryDelta.getResultSize(hdr), //
+						posSelf, posBase, hdrLen, this, curs.db);
 			}
 			data = p.getCachedBytes();
 			type = p.getType();
@@ -723,7 +727,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return new ObjectLoader.SmallObject(type, data);
 	}
 
-	byte[] getDeltaHeader(WindowCursor wc, long pos)
+	private byte[] getDeltaHeader(long pos, WindowCursor wc)
 			throws IOException, DataFormatException {
 		// The delta stream starts as two variable length integers. If we
 		// assume they are 64 bits each, we need 16 bytes to encode them,
@@ -735,7 +739,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return hdr;
 	}
 
-	int getObjectType(final WindowCursor curs, long pos) throws IOException {
+	private int getObjectType(final WindowCursor curs, long pos)
+			throws IOException {
 		final byte[] ib = curs.tempId;
 		for (;;) {
 			readFully(pos, ib, 0, 20, curs);
