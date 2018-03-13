@@ -1119,9 +1119,6 @@ public abstract class BaseReceivePack {
 				certParser.addCommand(cmd, rawLine);
 			}
 		}
-		if (certParser.build() == null && signedPushConfig.isRequired()) {
-			throw new PackProtocolException(JGitText.get().pushCertificateRequired);
-		}
 	}
 
 	static String chomp(String line) {
