@@ -97,7 +97,7 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
 /**
  * Implements the server side of a push connection, receiving objects.
  */
-public class ReceivePack {
+public class ReceivePack implements ReceiveSession {
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -156,8 +156,6 @@ public class ReceivePack {
 	private OutputStream rawOut;
 
 	private OutputStream msgOut;
-
-	private final MessageOutputWrapper msgOutWrapper = new MessageOutputWrapper();
 
 	private PacketLineIn pckIn;
 
@@ -248,63 +246,14 @@ public class ReceivePack {
 		}
 	}
 
-	/**
-	 * Output stream that wraps the current {@link #msgOut}.
-	 * <p>
-	 * We don't want to expose {@link #msgOut} directly because it can change
-	 * several times over the course of a session.
-	 */
-	private class MessageOutputWrapper extends OutputStream {
-		@Override
-		public void write(int ch) {
-			if (msgOut != null) {
-				try {
-					msgOut.write(ch);
-				} catch (IOException e) {
-					// Ignore write failures.
-				}
-			}
-		}
-
-		@Override
-		public void write(byte[] b, int off, int len) {
-			if (msgOut != null) {
-				try {
-					msgOut.write(b, off, len);
-				} catch (IOException e) {
-					// Ignore write failures.
-				}
-			}
-		}
-
-		@Override
-		public void write(byte[] b) {
-			write(b, 0, b.length);
-		}
-
-		@Override
-		public void flush() {
-			if (msgOut != null) {
-				try {
-					msgOut.flush();
-				} catch (IOException e) {
-					// Ignore write failures.
-				}
-			}
-		}
-	}
-
-	/** @return the repository this receive completes into. */
 	public final Repository getRepository() {
 		return db;
 	}
 
-	/** @return the RevWalk instance used by this connection. */
 	public final RevWalk getRevWalk() {
 		return walk;
 	}
 
-	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		if (refs == null) {
 			refs = refFilter.filter(db.getAllRefs());
@@ -322,17 +271,11 @@ public class ReceivePack {
 		return refs;
 	}
 
-	/** @return the set of objects advertised as present in this repository. */
 	public final Set<ObjectId> getAdvertisedObjects() {
 		getAdvertisedRefs();
 		return advertisedHaves;
 	}
 
-	/**
-	 * @return true if this instance will validate all referenced, but not
-	 *         supplied by the client, objects are reachable from another
-	 *         reference.
-	 */
 	public boolean isCheckReferencedObjectsAreReachable() {
 		return checkReferencedIsReachable;
 	}
@@ -361,10 +304,6 @@ public class ReceivePack {
 		this.checkReferencedIsReachable = b;
 	}
 
-	/**
-	 * @return true if this class expects a bi-directional pipe opened between
-	 *         the client and itself. The default is true.
-	 */
 	public boolean isBiDirectionalPipe() {
 		return biDirectionalPipe;
 	}
@@ -382,11 +321,6 @@ public class ReceivePack {
 		biDirectionalPipe = twoWay;
 	}
 
-	/**
-	 * @return true if this instance will verify received objects are formatted
-	 *         correctly. Validating objects requires more CPU time on this side
-	 *         of the connection.
-	 */
 	public boolean isCheckReceivedObjects() {
 		return checkReceivedObjects;
 	}
@@ -400,7 +334,6 @@ public class ReceivePack {
 		checkReceivedObjects = check;
 	}
 
-	/** @return true if the client can request refs to be created. */
 	public boolean isAllowCreates() {
 		return allowCreates;
 	}
@@ -413,7 +346,6 @@ public class ReceivePack {
 		allowCreates = canCreate;
 	}
 
-	/** @return true if the client can request refs to be deleted. */
 	public boolean isAllowDeletes() {
 		return allowDeletes;
 	}
@@ -426,10 +358,6 @@ public class ReceivePack {
 		allowDeletes = canDelete;
 	}
 
-	/**
-	 * @return true if the client can request non-fast-forward updates of a ref,
-	 *         possibly making objects unreachable.
-	 */
 	public boolean isAllowNonFastForwards() {
 		return allowNonFastForwards;
 	}
@@ -443,7 +371,6 @@ public class ReceivePack {
 		allowNonFastForwards = canRewind;
 	}
 
-	/** @return identity of the user making the changes in the reflog. */
 	public PersonIdent getRefLogIdent() {
 		return refLogIdent;
 	}
@@ -464,7 +391,6 @@ public class ReceivePack {
 		refLogIdent = pi;
 	}
 
-	/** @return the filter used while advertising the refs to the client */
 	public RefFilter getRefFilter() {
 		return refFilter;
 	}
@@ -484,7 +410,6 @@ public class ReceivePack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -507,7 +432,6 @@ public class ReceivePack {
 		preReceive = h != null ? h : PreReceiveHook.NULL;
 	}
 
-	/** @return the hook invoked after updates occur. */
 	public PostReceiveHook getPostReceiveHook() {
 		return postReceive;
 	}
@@ -526,7 +450,6 @@ public class ReceivePack {
 		postReceive = h != null ? h : PostReceiveHook.NULL;
 	}
 
-	/** @return timeout (in seconds) before aborting an IO operation. */
 	public int getTimeout() {
 		return timeout;
 	}
@@ -556,61 +479,40 @@ public class ReceivePack {
 		maxObjectSizeLimit = limit;
 	}
 
-	/** @return all of the command received by the current request. */
 	public List<ReceiveCommand> getAllCommands() {
 		return Collections.unmodifiableList(commands);
 	}
 
-	/**
-	 * Send an error message to the client.
-	 * <p>
-	 * If any error messages are sent before the references are advertised to
-	 * the client, the errors will be sent instead of the advertisement and the
-	 * receive operation will be aborted. All clients should receive and display
-	 * such early stage errors.
-	 * <p>
-	 * If the reference advertisements have already been sent, messages are sent
-	 * in a side channel. If the client doesn't support receiving messages, the
-	 * message will be discarded, with no other indication to the caller or to
-	 * the client.
-	 * <p>
-	 * {@link PreReceiveHook}s should always try to use
-	 * {@link ReceiveCommand#setResult(Result, String)} with a result status of
-	 * {@link Result#REJECTED_OTHER_REASON} to indicate any reasons for
-	 * rejecting an update. Messages attached to a command are much more likely
-	 * to be returned to the client.
-	 *
-	 * @param what
-	 *            string describing the problem identified by the hook. The
-	 *            string must not end with an LF, and must not contain an LF.
-	 */
 	public void sendError(final String what) {
 		if (refs == null) {
 			if (advertiseError == null)
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			msgOutWrapper.write(Constants.encode("error: " + what + "\n"));
+			try {
+				if (msgOut != null)
+					msgOut.write(Constants.encode("error: " + what + "\n"));
+			} catch (IOException e) {
+				// Ignore write failures.
+			}
 		}
 	}
 
-	/**
-	 * Send a message to the client, if it supports receiving them.
-	 * <p>
-	 * If the client doesn't support receiving messages, the message will be
-	 * discarded, with no other indication to the caller or to the client.
-	 *
-	 * @param what
-	 *            string describing the problem identified by the hook. The
-	 *            string must not end with an LF, and must not contain an LF.
-	 */
 	public void sendMessage(final String what) {
-		msgOutWrapper.write(Constants.encode(what + "\n"));
+		try {
+			if (msgOut != null)
+				msgOut.write(Constants.encode(what + "\n"));
+		} catch (IOException e) {
+			// Ignore write failures.
+		}
 	}
 
-	/** @return an underlying stream for sending messages to the client. */
-	public OutputStream getMessageOutputStream() {
-		return msgOutWrapper;
+	public void onPostReceive() {
+		postReceive.onPostReceive(this, filterCommands(Result.OK));
+	}
+
+	public void onPreReceive() {
+		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
 	}
 
 	/**
@@ -755,7 +657,7 @@ public class ReceivePack {
 				});
 			}
 
-			postReceive.onPostReceive(this, filterCommands(Result.OK));
+			onPostReceive();
 
 			if (unpackError != null)
 				throw new UnpackException(unpackError);
@@ -1086,7 +988,7 @@ public class ReceivePack {
 	}
 
 	private void executeCommands() {
-		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
+		onPreReceive();
 
 		List<ReceiveCommand> toApply = filterCommands(Result.NOT_ATTEMPTED);
 		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
