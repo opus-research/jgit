@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -375,16 +377,16 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * more stat fields than we have accessible in Java.
 	 *
 	 * @param entry
-	 *            the entry from the dircache we to compare against
+	 *            the entry from the dircache we want to compare against
 	 * @param forceContentCheck
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
 	 * @param checkFilemode
-	 *            whether filemodes should be checked to detect modifications
+	 *            whether the executable-bit in the filemode should be checked
+	 *            to detect modifications
 	 * @param fs
 	 *            The filesystem this repo uses. Needed to find out whether the
 	 *            executable-bits are supported
-	 *
 	 *
 	 * @return true if content is most likely different.
 	 */
@@ -393,37 +395,44 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isAssumeValid())
 			return false;
 
-		// updateNeeded flag currently not handled
+		if (entry.isUpdateNeeded())
+			return true;
+
 		if (getEntryLength() != entry.getLength())
 			return true;
 
-		if (checkFilemode) {
-			// for mode comparision there is one special rule: if the current FS
-			// doesn't suppport the executable-bit then a cache entry of type
-			// EXECUTABLE_FILE has to have a corresponding file of type
-			// REGULAR_FILE - otherwise this method will report a modification
-			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())
-					&& !fs.supportsExecute()) {
-				if (!FileMode.REGULAR_FILE.equals(getEntryRawMode()))
-					return true;
-			} else {
-				if (entry.getRawMode() != getEntryRawMode())
-					return true;
-			}
-		}
+		// determine difference in mode-bits of file and index-entry. In the
+		// bitwise presentation of modeDiff we'll have a '1' when the two modes
+		// differ at this position.
+		int modeDiff = getEntryRawMode() ^ entry.getRawMode();
+		// ignore the executable file bits if checkFilemode tells me to do so.
+		// Ignoring is done by setting the bits representing a EXECUTABLE_FILE
+		// to '0' in modeDiff
+		if (!checkFilemode)
+			modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
+		if (modeDiff != 0)
+			// report a modification if the modes still (after potentially
+			// ignoring EXECUTABLE_FILE bits) differ
+			return true;
 
 		// Git under windows only stores seconds so we round the timestamp
 		// Java gives us if it looks like the timestamp in index is seconds
-		// only. Otherwise we compare the timestamp at millisecond prevision.
+		// only. Otherwise we compare the timestamp at millisecond precision.
 		long cacheLastModified = entry.getLastModified();
 		long fileLastModified = getEntryLastModified();
 		if (cacheLastModified % 1000 == 0)
 			fileLastModified = fileLastModified - fileLastModified % 1000;
 		if ((fileLastModified != cacheLastModified) && !forceContentCheck)
 			return true;
-
-		// everything equal up to now - now we have to do content comparison
-		return (!getEntryObjectId().equals(entry.getObjectId()));
+		if (forceContentCheck) {
+			if (fileLastModified == cacheLastModified)
+				return false; // Same time, don't check content.
+			else
+				return !getEntryObjectId().equals(entry.getObjectId());
+		} else {
+			// No content check forced, assume dirty if stat differs.
+			return fileLastModified != cacheLastModified;
+		}
 	}
 
 	/** A single entry within a working directory tree. */

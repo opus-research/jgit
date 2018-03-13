@@ -47,8 +47,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Test cases for ReadTree operations as implemented in
- * {@link WorkDirCheckout}
+ * Test cases for ReadTree operations as implemented in WorkDirCheckout
  */
 public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
 	private WorkDirCheckout wdc;
