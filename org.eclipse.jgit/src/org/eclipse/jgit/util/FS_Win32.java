@@ -71,9 +71,4 @@ class FS_Win32 extends FS {
 	public boolean setExecute(final File f, final boolean canExec) {
 		return false;
 	}
-
-	@Override
-	public boolean retryFailedLockFileCommit() {
-		return true;
-	}
 }
