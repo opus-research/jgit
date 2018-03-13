@@ -70,6 +70,8 @@ import org.eclipse.jgit.pgm.opt.UntrackedFilesHandler;
 @Command(usage = "usage_Status", common = true)
 class Status extends TextBuiltin {
 
+	protected final String lineFormat = CLIText.get().lineFormat;
+
 	protected final String statusFileListFormat = CLIText.get().statusFileListFormat;
 
 	protected final String statusFileListFormatWithPrefix = CLIText.get().statusFileListFormatWithPrefix;
@@ -202,7 +204,7 @@ class Status extends TextBuiltin {
 	private void printLongStatus(org.eclipse.jgit.api.Status status)
 			throws IOException {
 		// Print current branch name
-		final Ref head = db.exactRef(Constants.HEAD);
+		final Ref head = db.getRef(Constants.HEAD);
 		if (head != null && head.isSymbolic()) {
 			String branch = Repository.shortenRefName(head.getLeaf().getName());
 			outw.println(CLIText.formatLine(MessageFormat.format(

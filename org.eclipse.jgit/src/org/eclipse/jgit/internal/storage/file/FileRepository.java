@@ -53,11 +53,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.text.ParseException;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.errors.ConfigInvalidException;
@@ -65,16 +63,15 @@ import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateRepository;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -82,7 +79,6 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
-import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.StringUtils;
@@ -495,7 +491,7 @@ public class FileRepository extends Repository {
 	 * @throws IOException the ref could not be accessed.
 	 */
 	public ReflogReader getReflogReader(String refName) throws IOException {
-		Ref ref = findRef(refName);
+		Ref ref = getRef(refName);
 		if (ref != null)
 			return new ReflogReaderImpl(this, ref.getName());
 		return null;
@@ -557,19 +553,6 @@ public class FileRepository extends Repository {
 			}
 		}
 
-	}
-
-	@Override
-	public void autoGC(ProgressMonitor monitor) {
-		GC gc = new GC(this);
-		gc.setPackConfig(new PackConfig(this));
-		gc.setProgressMonitor(monitor);
-		gc.setAuto(true);
-		try {
-			gc.gc();
-		} catch (ParseException | IOException e) {
-			throw new JGitInternalException(JGitText.get().gcFailed, e);
-		}
 	}
 
 }

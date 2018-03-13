@@ -172,7 +172,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	ObjectIdOwnerMap<RevObject> objects;
 
-	int freeFlags = APP_FLAGS;
+	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
 

@@ -231,7 +231,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		RevWalk revWalk = null;
 		DirCacheCheckout dco = null;
 		try {
-			Ref head = repo.exactRef(Constants.HEAD);
+			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
@@ -381,7 +381,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 									.call().getId();
 						}
 						mergeStatus = MergeStatus.MERGED;
-						getRepository().autoGC(monitor);
 					}
 					if (commit && squash) {
 						msg = JGitText.get().squashCommitNotUpdatingHEAD;

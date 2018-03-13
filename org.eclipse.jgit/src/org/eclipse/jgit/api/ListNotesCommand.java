@@ -82,7 +82,7 @@ public class ListNotesCommand extends GitCommand<List<Note>> {
 		List<Note> notes = new ArrayList<Note>();
 		NoteMap map = NoteMap.newEmptyMap();
 		try (RevWalk walk = new RevWalk(repo)) {
-			Ref ref = repo.findRef(notesRef);
+			Ref ref = repo.getRef(notesRef);
 			// if we have a notes ref, use it
 			if (ref != null) {
 				RevCommit notesCommit = walk.parseCommit(ref.getObjectId());

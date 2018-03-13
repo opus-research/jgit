@@ -98,12 +98,8 @@ class RefTreeBatch extends BatchRefUpdate {
 				}
 				if (c.getType() == UPDATE_NONFASTFORWARD) {
 					c.setResult(REJECTED_NONFASTFORWARD);
-					if (isAtomic()) {
-						ReceiveCommand.abort(getCommands());
-						return;
-					} else {
-						continue;
-					}
+					ReceiveCommand.abort(getCommands());
+					return;
 				}
 			}
 			todo.add(new Command(rw, c));
