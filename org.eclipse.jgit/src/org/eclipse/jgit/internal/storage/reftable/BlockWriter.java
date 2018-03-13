@@ -392,6 +392,36 @@ class BlockWriter {
 		}
 	}
 
+	static class TextEntry extends Entry {
+		final byte[] value;
+
+		TextEntry(String name, String value) {
+			super(name.getBytes(UTF_8));
+			this.value = value.getBytes(UTF_8);
+		}
+
+		@Override
+		byte blockType() {
+			return REF_BLOCK_TYPE;
+		}
+
+		@Override
+		int valueType() {
+			return VALUE_TEXT;
+		}
+
+		@Override
+		int valueSize() {
+			return computeVarintSize(value.length) + value.length;
+		}
+
+		@Override
+		void writeValue(ReftableOutputStream os) throws IOException {
+			os.writeVarint(value.length);
+			os.write(value);
+		}
+	}
+
 	static class ObjEntry extends Entry {
 		final IntList blocks;
 

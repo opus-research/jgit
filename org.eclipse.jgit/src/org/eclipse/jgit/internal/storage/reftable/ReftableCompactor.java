@@ -49,6 +49,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ReflogEntry;
 
 /**
@@ -71,6 +72,7 @@ public class ReftableCompactor {
 	private long bytesToCompact;
 	private boolean includeDeletes;
 	private long oldestReflogTimeUsec;
+	private Stats stats;
 
 	/**
 	 * @param cfg
@@ -174,6 +176,12 @@ public class ReftableCompactor {
 		mergeRefs(mr);
 		mergeLogs(mr);
 		writer.finish();
+		stats = writer.getStats();
+	}
+
+	/** @return statistics of the last written reftable. */
+	public Stats getStats() {
+		return stats;
 	}
 
 	private void mergeRefs(MergedReftable mr) throws IOException {

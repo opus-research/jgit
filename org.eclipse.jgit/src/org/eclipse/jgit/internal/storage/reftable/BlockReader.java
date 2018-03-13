@@ -53,11 +53,12 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_B
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
+import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
@@ -182,8 +183,14 @@ class BlockReader {
 			String val = readValueString();
 			if (val.startsWith("ref: ")) { //$NON-NLS-1$
 				return new SymbolicRef(name, newRef(val.substring(5)));
+			} else if (val.length() >= OBJECT_ID_STRING_LENGTH) {
+				String idStr = val.substring(0, OBJECT_ID_STRING_LENGTH);
+				if (ObjectId.isId(idStr)) {
+					ObjectId id = ObjectId.fromString(idStr);
+					return new ObjectIdRef.Unpeeled(PACKED, name, id);
+				}
 			}
-			throw invalidBlock();
+			return newRef(name);
 		}
 
 		default:

@@ -226,35 +226,57 @@ public class ReftableTest {
 	}
 
 	@Test
-	public void resolveSymbolicRef() throws IOException {
-		Reftable t = read(write(
-				sym(HEAD, "refs/heads/tmp"),
-				sym("refs/heads/tmp", MASTER),
-				ref(MASTER, 1)));
+	public void oneTextRef() throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		ReftableWriter writer = new ReftableWriter().begin(buffer);
+		writer.writeText(
+				"MERGE_HEAD",
+				id(1).name() + '\n' + id(2).name() + '\n');
+		writer.finish();
+		byte[] table = buffer.toByteArray();
 
-		Ref head = t.exactRef(HEAD);
-		assertNull(head.getObjectId());
-		assertEquals("refs/heads/tmp", head.getTarget().getName());
+		assertEquals(
+				8 + 4 + 2 + "MERGE_HEAD".length() + 1 + 82 + 6 + 52,
+				table.length);
 
-		head = t.resolve(head);
-		assertNotNull(head);
-		assertEquals(id(1), head.getObjectId());
+		ReftableReader t = read(table);
+		try (RefCursor rc = t.allRefs()) {
+			assertTrue(rc.next());
+			Ref act = rc.getRef();
+			assertNotNull(act);
+			assertFalse(act.isSymbolic());
+			assertEquals("MERGE_HEAD", act.getName());
+			assertEquals(id(1), act.getObjectId());
+			assertFalse(rc.next());
+		}
 	}
 
 	@Test
-	public void failChainOfSymbolicRef() throws IOException {
-		Reftable t = read(write(
-				sym(HEAD, "refs/heads/1"),
-				sym("refs/heads/1", "refs/heads/2"),
-				sym("refs/heads/2", "refs/heads/3"),
-				sym("refs/heads/3", "refs/heads/4"),
-				sym("refs/heads/4", "refs/heads/5"),
-				sym("refs/heads/5", MASTER),
-				ref(MASTER, 1)));
+	public void oneNonRefTextFile() throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		ReftableWriter writer = new ReftableWriter().begin(buffer);
+		writer.writeText("SAVE", "content");
+		writer.finish();
+		byte[] table = buffer.toByteArray();
 
-		Ref head = t.exactRef(HEAD);
-		assertNull(head.getObjectId());
-		assertNull(t.resolve(head));
+		assertEquals(
+				8 + 4 + 2 + "SAVE".length() + 1 + "content".length() + 6 + 52,
+				table.length);
+
+		ReftableReader t = read(table);
+		assertFalse(t.hasRef("SAVE")); // behaves as deleted.
+
+		t.setIncludeDeletes(true);
+		try (RefCursor rc = t.allRefs()) {
+			assertTrue(rc.next());
+			Ref act = rc.getRef();
+			assertNotNull(act);
+			assertFalse(act.isSymbolic());
+			assertEquals(NEW, act.getStorage());
+			assertEquals("SAVE", act.getName());
+			assertNull(act.getObjectId());
+			assertFalse(rc.next());
+		}
 	}
 
 	@Test
