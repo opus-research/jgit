@@ -53,7 +53,6 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.junit.Test;
 
@@ -230,15 +229,6 @@ public class RepositoryResolveTest extends SampleDataRepositoryTestCase {
 		assertNull("no b/FOO", db.resolve("b:b/FOO"));
 		assertNull("no b/FOO", db.resolve(":b/FOO"));
 		assertNull("no not-a-branch:", db.resolve("not-a-branch:"));
-	}
-
-	@Test
-	public void resolveExprSimple() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		git.commit().setMessage("create file").call();
-		assertEquals("master", db.simplify("master"));
 	}
 
 	private static ObjectId id(String name) {
