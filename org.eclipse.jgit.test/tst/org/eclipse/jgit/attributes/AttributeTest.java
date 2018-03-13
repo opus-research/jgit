@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2013, Gunnar Wagenknecht
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,40 +41,37 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.attributes;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
-import java.io.BufferedInputStream;
+import org.eclipse.jgit.attributes.Attribute.State;
+import org.junit.Test;
 
-import org.eclipse.jgit.internal.storage.file.ObjectDirectoryPackParser;
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.transport.PackParser;
-import org.kohsuke.args4j.Option;
+/**
+ * Tests {@link Attribute}
+ */
+public class AttributeTest {
 
-@Command(usage = "usage_IndexPack")
-class IndexPack extends TextBuiltin {
-	@Option(name = "--fix-thin", usage = "usage_fixAThinPackToBeComplete")
-	private boolean fixThin;
+	@Test
+	public void testBasic() {
+		Attribute a = new Attribute("delta", State.SET);
+		assertEquals(a.getKey(), "delta");
+		assertEquals(a.getState(), State.SET);
+		assertNull(a.getValue());
+		assertEquals(a.toString(), "delta");
 
-	@Option(name = "--index-version", usage = "usage_indexFileFormatToCreate")
-	private int indexVersion = -1;
+		a = new Attribute("delta", State.UNSET);
+		assertEquals(a.getKey(), "delta");
+		assertEquals(a.getState(), State.UNSET);
+		assertNull(a.getValue());
+		assertEquals(a.toString(), "-delta");
 
-	@Override
-	protected void run() throws Exception {
-		BufferedInputStream in = new BufferedInputStream(ins);
-		ObjectInserter inserter = db.newObjectInserter();
-		try {
-			PackParser p = inserter.newPackParser(in);
-			p.setAllowThin(fixThin);
-			if (indexVersion != -1 && p instanceof ObjectDirectoryPackParser) {
-				ObjectDirectoryPackParser imp = (ObjectDirectoryPackParser) p;
-				imp.setIndexVersion(indexVersion);
-			}
-			p.parse(new TextProgressMonitor(errw));
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
+		a = new Attribute("delta", "value");
+		assertEquals(a.getKey(), "delta");
+		assertEquals(a.getState(), State.CUSTOM);
+		assertEquals(a.getValue(), "value");
+		assertEquals(a.toString(), "delta=value");
 	}
 }
