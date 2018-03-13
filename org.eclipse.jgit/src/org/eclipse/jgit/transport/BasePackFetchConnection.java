@@ -612,7 +612,7 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 
 		InputStream input = in;
 		if (sideband)
-			input = new SideBandInputStream(input, monitor, getMessageWriter());
+			input = new SideBandInputStream(input, monitor);
 
 		ip = IndexPack.create(local, input);
 		ip.setFixThin(thinPack);
