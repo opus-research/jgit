@@ -59,7 +59,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 /**
@@ -165,7 +164,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 	public void testExceptionThrown_BareRepoGetIndex() throws Exception {
 		File gitDir = getFile("workdir");
 		try {
-			new FileRepository(gitDir).readDirCache();
+			new FileRepository(gitDir).getIndex();
 			fail("Expected NoWorkTreeException missing");
 		} catch (NoWorkTreeException e) {
 			// expected
@@ -183,12 +182,12 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	private File getFile(String... pathComponents) throws IOException {
+	private File getFile(String... pathComponents) {
 		String rootPath = new File(new File("target"), "trash").getPath();
 		for (String pathComponent : pathComponents)
 			rootPath = rootPath + File.separatorChar + pathComponent;
 		File result = new File(rootPath);
-		FileUtils.mkdirs(result, true);
+		result.mkdir();
 		return result;
 	}
 
@@ -211,7 +210,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 
 	private FileBasedConfig configFor(File gitDir) throws IOException,
 			ConfigInvalidException {
-		File configPath = new File(gitDir, Constants.CONFIG);
+		File configPath = new File(gitDir, "config");
 		FileBasedConfig cfg = new FileBasedConfig(configPath, FS.DETECTED);
 		cfg.load();
 		return cfg;

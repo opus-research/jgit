@@ -43,7 +43,6 @@
 package org.eclipse.jgit.treewalk;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 
@@ -61,10 +60,8 @@ public class WorkingTreeOptions {
 	private final AutoCRLF autoCRLF;
 
 	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_FILEMODE, true);
-		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
+		fileMode = rc.getBoolean("core", "filemode", true);
+		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
 	}
 
 	/** @return true if the execute bit on working files should be trusted. */

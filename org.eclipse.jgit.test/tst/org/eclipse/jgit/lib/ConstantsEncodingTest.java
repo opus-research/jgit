@@ -43,11 +43,13 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
+
 import org.junit.Test;
 
 public class ConstantsEncodingTest {
@@ -57,7 +59,7 @@ public class ConstantsEncodingTest {
 		final String src = "abc";
 		final byte[] exp = { 'a', 'b', 'c' };
 		final byte[] res = Constants.encodeASCII(src);
-		assertArrayEquals(exp, res);
+		assertTrue(Arrays.equals(exp, res));
 		assertEquals(src, new String(res, 0, res.length, "UTF-8"));
 	}
 
@@ -77,7 +79,7 @@ public class ConstantsEncodingTest {
 		final long src = 13;
 		final byte[] exp = { '1', '3' };
 		final byte[] res = Constants.encodeASCII(src);
-		assertArrayEquals(exp, res);
+		assertTrue(Arrays.equals(exp, res));
 	}
 
 	@Test
@@ -85,7 +87,7 @@ public class ConstantsEncodingTest {
 		final String src = "abc";
 		final byte[] exp = { 'a', 'b', 'c' };
 		final byte[] res = Constants.encode(src);
-		assertArrayEquals(exp, res);
+		assertTrue(Arrays.equals(exp, res));
 		assertEquals(src, new String(res, 0, res.length, "UTF-8"));
 	}
 
@@ -96,7 +98,7 @@ public class ConstantsEncodingTest {
 				(byte) 0xAD, 0x63, (byte) 0xC5, (byte) 0x8D, 0x64, 0x65,
 				(byte) 0xCC, (byte) 0xBD };
 		final byte[] res = Constants.encode(src);
-		assertArrayEquals(exp, res);
+		assertTrue(Arrays.equals(exp, res));
 		assertEquals(src, new String(res, 0, res.length, "UTF-8"));
 	}
 }

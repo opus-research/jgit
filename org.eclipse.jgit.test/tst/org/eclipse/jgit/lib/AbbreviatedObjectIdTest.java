@@ -221,8 +221,8 @@ public class AbbreviatedObjectIdTest {
 		final AbbreviatedObjectId b = AbbreviatedObjectId.fromString(s);
 		assertNotSame(a, b);
 		assertTrue(a.hashCode() == b.hashCode());
-		assertEquals(b, a);
-		assertEquals(a, b);
+		assertTrue(a.equals(b));
+		assertTrue(b.equals(a));
 	}
 
 	@Test
@@ -232,8 +232,8 @@ public class AbbreviatedObjectIdTest {
 		final AbbreviatedObjectId b = AbbreviatedObjectId.fromString(s);
 		assertNotSame(a, b);
 		assertTrue(a.hashCode() == b.hashCode());
-		assertEquals(b, a);
-		assertEquals(a, b);
+		assertTrue(a.equals(b));
+		assertTrue(b.equals(a));
 	}
 
 	@Test

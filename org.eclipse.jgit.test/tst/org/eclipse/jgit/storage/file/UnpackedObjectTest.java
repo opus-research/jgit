@@ -60,9 +60,9 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.zip.DeflaterOutputStream;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRng;
@@ -71,7 +71,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.junit.After;
 import org.junit.Before;
@@ -568,7 +567,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 
 	private void write(ObjectId id, byte[] data) throws IOException {
 		File path = path(id);
-		FileUtils.mkdirs(path.getParentFile());
+		path.getParentFile().mkdirs();
 		FileOutputStream out = new FileOutputStream(path);
 		try {
 			out.write(data);

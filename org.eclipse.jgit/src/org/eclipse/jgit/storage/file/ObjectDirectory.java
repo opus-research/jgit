@@ -61,8 +61,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackMismatchException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
@@ -70,17 +70,12 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.Replacements;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.lib.RepositoryDelegator;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
-import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Traditional file system based {@link ObjectDatabase}.
@@ -117,19 +112,13 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final File alternatesFile;
 
-	private final File cachedPacksFile;
-
 	private final AtomicReference<PackList> packList;
-
-	private final AtomicReference<CachedPackList> cachedPacks;
 
 	private final FS fs;
 
 	private final AtomicReference<AlternateHandle[]> alternates;
 
 	private final UnpackedObjectCache unpackedObjectCache;
-
-	private Replacements replacements;
 
 	/**
 	 * Initialize a reference to an on-disk object directory.
@@ -143,23 +132,17 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param replacements
-	 *            rules for replacements of objects
 	 * @throws IOException
 	 *             an alternate object cannot be opened.
 	 */
 	public ObjectDirectory(final Config cfg, final File dir,
-			File[] alternatePaths, FS fs, Replacements replacements)
-			throws IOException {
+			File[] alternatePaths, FS fs) throws IOException {
 		config = cfg;
 		objects = dir;
-		this.replacements = replacements;
 		infoDirectory = new File(objects, "info");
 		packDirectory = new File(objects, "pack");
 		alternatesFile = new File(infoDirectory, "alternates");
-		cachedPacksFile = new File(infoDirectory, "cached-packs");
 		packList = new AtomicReference<PackList>(NO_PACKS);
-		cachedPacks = new AtomicReference<CachedPackList>();
 		unpackedObjectCache = new UnpackedObjectCache();
 		this.fs = fs;
 
@@ -188,9 +171,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public void create() throws IOException {
-		FileUtils.mkdirs(objects);
-		FileUtils.mkdir(infoDirectory);
-		FileUtils.mkdir(packDirectory);
+		objects.mkdirs();
+		infoDirectory.mkdir();
+		packDirectory.mkdir();
 	}
 
 	@Override
@@ -243,83 +226,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return Collections.unmodifiableCollection(Arrays.asList(packs));
 	}
 
-	@Override
-	Collection<? extends CachedPack> getCachedPacks() throws IOException {
-		CachedPackList list = cachedPacks.get();
-		if (list == null || list.snapshot.isModified(cachedPacksFile))
-			list = scanCachedPacks(list);
-
-		Collection<CachedPack> result = list.getCachedPacks();
-		boolean resultIsCopy = false;
-
-		for (AlternateHandle h : myAlternates()) {
-			Collection<CachedPack> altPacks = h.getCachedPacks();
-			if (altPacks.isEmpty())
-				continue;
-
-			if (result.isEmpty()) {
-				result = altPacks;
-				continue;
-			}
-
-			if (!resultIsCopy) {
-				result = new ArrayList<CachedPack>(result);
-				resultIsCopy = true;
-			}
-			result.addAll(altPacks);
-		}
-		return result;
-	}
-
-	private CachedPackList scanCachedPacks(CachedPackList old)
-			throws IOException {
-		FileSnapshot s = FileSnapshot.save(cachedPacksFile);
-		byte[] buf;
-		try {
-			buf = IO.readFully(cachedPacksFile);
-		} catch (FileNotFoundException e) {
-			buf = new byte[0];
-		}
-
-		if (old != null && old.snapshot.equals(s)
-				&& Arrays.equals(old.raw, buf)) {
-			old.snapshot.setClean(s);
-			return old;
-		}
-
-		ArrayList<LocalCachedPack> list = new ArrayList<LocalCachedPack>(4);
-		Set<ObjectId> tips = new HashSet<ObjectId>();
-		int ptr = 0;
-		while (ptr < buf.length) {
-			if (buf[ptr] == '#' || buf[ptr] == '\n') {
-				ptr = RawParseUtils.nextLF(buf, ptr);
-				continue;
-			}
-
-			if (buf[ptr] == '+') {
-				tips.add(ObjectId.fromString(buf, ptr + 2));
-				ptr = RawParseUtils.nextLF(buf, ptr + 2);
-				continue;
-			}
-
-			List<String> names = new ArrayList<String>(4);
-			while (ptr < buf.length && buf[ptr] == 'P') {
-				int end = RawParseUtils.nextLF(buf, ptr);
-				if (buf[end - 1] == '\n')
-					end--;
-				names.add(RawParseUtils.decode(buf, ptr + 2, end));
-				ptr = RawParseUtils.nextLF(buf, end);
-			}
-
-			if (!tips.isEmpty() && !names.isEmpty()) {
-				list.add(new LocalCachedPack(this, tips, names));
-				tips = new HashSet<ObjectId>();
-			}
-		}
-		list.trimToSize();
-		return new CachedPackList(s, Collections.unmodifiableList(list), buf);
-	}
-
 	/**
 	 * Add a single existing pack to the list of available pack files.
 	 *
@@ -327,13 +233,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *            path of the pack file to open.
 	 * @param idx
 	 *            path of the corresponding index file.
-	 * @return the pack that was opened and added to the database.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public PackFile openPack(final File pack, final File idx)
-			throws IOException {
+	public void openPack(final File pack, final File idx) throws IOException {
 		final String p = pack.getName();
 		final String i = idx.getName();
 
@@ -346,9 +250,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		if (!p.substring(0, 45).equals(i.substring(0, 45)))
 			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
 
-		PackFile res = new PackFile(idx, pack);
-		insertPack(res);
-		return res;
+		insertPack(new PackFile(idx, pack));
 	}
 
 	@Override
@@ -566,6 +468,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
 
+		tmp.setReadOnly();
+
 		final File dst = fileFor(id);
 		if (dst.exists()) {
 			// We want to be extra careful and avoid replacing an object
@@ -576,7 +480,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (tmp.renameTo(dst)) {
-			dst.setReadOnly();
 			unpackedObjectCache.add(id);
 			return InsertLooseObjectResult.INSERTED;
 		}
@@ -585,9 +488,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
-		FileUtils.mkdir(dst.getParentFile());
+		dst.getParentFile().mkdir();
 		if (tmp.renameTo(dst)) {
-			dst.setReadOnly();
 			unpackedObjectCache.add(id);
 			return InsertLooseObjectResult.INSERTED;
 		}
@@ -615,11 +517,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	Config getConfig() {
 		return config;
-	}
-
-	@Override
-	FS getFS() {
-		return fs;
 	}
 
 	private void insertPack(final PackFile pf) {
@@ -829,29 +726,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return openAlternate(objdir);
 	}
 
-	static Replacements NULLREPLACEMENTS = new Replacements() {
-
-		public Map<AnyObjectId, List<ObjectId>> getGrafts() throws IOException {
-			return Collections.<AnyObjectId, List<ObjectId>> emptyMap();
-		}
-
-		public Map<AnyObjectId, ObjectId> getReplacements() throws IOException {
-			return Collections.<AnyObjectId, ObjectId> emptyMap();
-		}
-	};
-
 	private AlternateHandle openAlternate(File objdir) throws IOException {
 		final File parent = objdir.getParentFile();
 		if (FileKey.isGitRepository(parent, fs)) {
 			FileKey key = FileKey.exact(parent, fs);
 			FileRepository db = (FileRepository) RepositoryCache.open(key);
-			getReplacements().putAll(db.getReplacements());
-			getGrafts().putAll(db.getGrafts());
-			return new AlternateRepository(new RepositoryDelegator(db));
+			return new AlternateRepository(db);
 		}
 
-		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs,
-				NULLREPLACEMENTS);
+		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs);
 		return new AlternateHandle(db);
 	}
 
@@ -868,26 +751,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	private static final class CachedPackList {
-		final FileSnapshot snapshot;
-
-		final Collection<LocalCachedPack> packs;
-
-		final byte[] raw;
-
-		CachedPackList(FileSnapshot sn, List<LocalCachedPack> list, byte[] buf) {
-			snapshot = sn;
-			packs = list;
-			raw = buf;
-		}
-
-		@SuppressWarnings("unchecked")
-		Collection<CachedPack> getCachedPacks() {
-			Collection p = packs;
-			return p;
-		}
-	}
-
 	@Override
 	public ObjectDatabase newCachedDatabase() {
 		return newCachedFileObjectDatabase();
@@ -895,13 +758,5 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	FileObjectDatabase newCachedFileObjectDatabase() {
 		return new CachedObjectDirectory(this);
-	}
-
-	public Map<AnyObjectId, List<ObjectId>> getGrafts() throws IOException {
-		return replacements.getGrafts();
-	}
-
-	public Map<AnyObjectId, ObjectId> getReplacements() throws IOException {
-		return replacements.getReplacements();
 	}
 }

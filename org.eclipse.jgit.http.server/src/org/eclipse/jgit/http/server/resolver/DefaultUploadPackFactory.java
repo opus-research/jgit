@@ -49,9 +49,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 
 /**
  * Create and configure {@link UploadPack} service instance.
@@ -59,8 +56,7 @@ import org.eclipse.jgit.transport.resolver.UploadPackFactory;
  * Reading by upload-pack is permitted unless {@code http.uploadpack} is
  * explicitly set to false.
  */
-public class DefaultUploadPackFactory implements
-		UploadPackFactory<HttpServletRequest> {
+public class DefaultUploadPackFactory implements UploadPackFactory {
 	private static final SectionParser<ServiceConfig> CONFIG = new SectionParser<ServiceConfig>() {
 		public ServiceConfig parse(final Config cfg) {
 			return new ServiceConfig(cfg);

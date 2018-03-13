@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2010, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -99,8 +99,8 @@ public class MergeMessageFormatter {
 			listings.add(joinNames(branches, "branch", "branches"));
 
 		if (!remoteBranches.isEmpty())
-			listings.add(joinNames(remoteBranches, "remote-tracking branch",
-					"remote-tracking branches"));
+			listings.add(joinNames(remoteBranches, "remote branch",
+					"remote branches"));
 
 		if (!tags.isEmpty())
 			listings.add(joinNames(tags, "tag", "tags"));
@@ -113,33 +113,12 @@ public class MergeMessageFormatter {
 
 		sb.append(StringUtils.join(listings, ", "));
 
-		String targetName = target.getLeaf().getName();
-		if (!targetName.equals(Constants.R_HEADS + Constants.MASTER)) {
-			String targetShortName = Repository.shortenRefName(targetName);
+		if (!target.getName().equals(Constants.R_HEADS + Constants.MASTER)) {
+			String targetShortName = Repository
+					.shortenRefName(target.getName());
 			sb.append(" into " + targetShortName);
 		}
 
-		return sb.toString();
-	}
-
-	/**
-	 * Add section with conflicting paths to merge message.
-	 *
-	 * @param message
-	 *            the original merge message
-	 * @param conflictingPaths
-	 *            the paths with conflicts
-	 * @return merge message with conflicting paths added
-	 */
-	public String formatWithConflicts(String message,
-			List<String> conflictingPaths) {
-		StringBuilder sb = new StringBuilder(message);
-		if (!message.endsWith("\n") && message.length() != 0)
-			sb.append("\n");
-		sb.append("\n");
-		sb.append("Conflicts:\n");
-		for (String conflictingPath : conflictingPaths)
-			sb.append('\t').append(conflictingPath).append('\n');
 		return sb.toString();
 	}
 

@@ -266,7 +266,7 @@ class TextHashFunctions extends TextBuiltin {
 	protected void run() throws Exception {
 		if (gitDirs.isEmpty()) {
 			RepositoryBuilder rb = new RepositoryBuilder() //
-					.setGitDir(new File(gitdir)) //
+					.setGitDir(gitdir) //
 					.readEnvironment() //
 					.findGitDir();
 			if (rb.getGitDir() == null)
@@ -342,7 +342,7 @@ class TextHashFunctions extends TextBuiltin {
 		if (db.getDirectory() != null) {
 			String name = db.getDirectory().getName();
 			File parent = db.getDirectory().getParentFile();
-			if (name.equals(Constants.DOT_GIT) && parent != null)
+			if (name.equals(Constants.DOT_GIT_EXT) && parent != null)
 				name = parent.getName();
 			out.println(name + ":");
 		}

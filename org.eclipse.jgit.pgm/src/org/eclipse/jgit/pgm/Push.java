@@ -77,10 +77,14 @@ class Push extends TextBuiltin {
 	private final List<RefSpec> refSpecs = new ArrayList<RefSpec>();
 
 	@Option(name = "--all")
-	private boolean all;
+	void addAll(final boolean ignored) {
+		refSpecs.add(Transport.REFSPEC_PUSH_ALL);
+	}
 
 	@Option(name = "--tags")
-	private boolean tags;
+	void addTags(final boolean ignored) {
+		refSpecs.add(Transport.REFSPEC_TAGS);
+	}
 
 	@Option(name = "--verbose", aliases = { "-v" })
 	private boolean verbose = false;
@@ -89,7 +93,7 @@ class Push extends TextBuiltin {
 	private boolean thin = Transport.DEFAULT_PUSH_THIN;
 
 	@Option(name = "--no-thin")
-	void nothin(@SuppressWarnings("unused") final boolean ignored) {
+	void nothin(final boolean ignored) {
 		thin = false;
 	}
 
@@ -113,10 +117,6 @@ class Push extends TextBuiltin {
 		push.setProgressMonitor(new TextProgressMonitor());
 		push.setReceivePack(receivePack);
 		push.setRefSpecs(refSpecs);
-		if (all)
-			push.setPushAll();
-		if (tags)
-			push.setPushTags();
 		push.setRemote(remote);
 		push.setThin(thin);
 		push.setTimeout(timeout);

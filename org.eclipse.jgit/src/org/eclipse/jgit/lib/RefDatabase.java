@@ -147,17 +147,6 @@ public abstract class RefDatabase {
 			throws IOException;
 
 	/**
-	 * Create a new batch update to attempt on this database.
-	 * <p>
-	 * The default implementation performs a sequential update of each command.
-	 *
-	 * @return a new batch update object.
-	 */
-	public BatchRefUpdate newBatchUpdate() {
-		return new BatchRefUpdate(this);
-	}
-
-	/**
 	 * Read a single reference.
 	 * <p>
 	 * Aside from taking advantage of {@link #SEARCH_PATH}, this method may be
@@ -220,16 +209,4 @@ public abstract class RefDatabase {
 	 *             the reference space or object space cannot be accessed.
 	 */
 	public abstract Ref peel(Ref ref) throws IOException;
-
-	/**
-	 * Triggers a refresh of all internal data structures.
-	 * <p>
-	 * In case the RefDatabase implementation has internal caches this method
-	 * will trigger that all these caches are cleared.
-	 * <p>
-	 * Implementors should overwrite this method if they use any kind of caches.
-	 */
-	public void refresh() {
-		// nothing
-	}
 }

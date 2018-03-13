@@ -52,20 +52,17 @@ import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
-import org.eclipse.jgit.events.IndexChangedEvent;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.GraftsDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.AbstractRepository;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateHandle;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateRepository;
@@ -97,7 +94,7 @@ import org.eclipse.jgit.util.SystemReader;
  * This implementation only handles a subtly undocumented subset of git features.
  *
  */
-public class FileRepository extends AbstractRepository {
+public class FileRepository extends Repository {
 	private final FileBasedConfig systemConfig;
 
 	private final FileBasedConfig userConfig;
@@ -107,10 +104,6 @@ public class FileRepository extends AbstractRepository {
 	private final RefDatabase refs;
 
 	private final ObjectDirectory objectDatabase;
-
-	private FileSnapshot snapshot;
-
-	private final FileGraftsDataBase graftsDb;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -164,8 +157,8 @@ public class FileRepository extends AbstractRepository {
 		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
-		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
-				getDirectory(), Constants.CONFIG),
+		repoConfig = new FileBasedConfig(userConfig, //
+				getFS().resolve(getDirectory(), "config"), //
 				getFS());
 
 		loadSystemConfig();
@@ -185,19 +178,15 @@ public class FileRepository extends AbstractRepository {
 				getFS());
 
 		if (objectDatabase.exists()) {
-			final long repositoryFormatVersion = getConfig().getLong(
+			final String repositoryFormatVersion = getConfig().getString(
 					ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
-			if (repositoryFormatVersion > 0)
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION);
+			if (!"0".equals(repositoryFormatVersion)) {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
-						Long.valueOf(repositoryFormatVersion)));
+						repositoryFormatVersion));
+			}
 		}
-
-		if (!isBare())
-			snapshot = FileSnapshot.save(getIndexFile());
-
-		graftsDb = new FileGraftsDataBase(getGraftsFile());
 	}
 
 	private void loadSystemConfig() throws IOException {
@@ -250,12 +239,11 @@ public class FileRepository extends AbstractRepository {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
-		FileUtils.mkdirs(getDirectory(), true);
+		getDirectory().mkdirs();
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getDirectory(), "branches"));
-		FileUtils.mkdir(new File(getDirectory(), "hooks"));
+		new File(getDirectory(), "branches").mkdir();
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -286,10 +274,8 @@ public class FileRepository extends AbstractRepository {
 					ConfigConstants.CONFIG_KEY_BARE, true);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
-		if (SystemReader.getInstance().isMacOS())
-			// Java has no other way
-			cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRECOMPOSEUNICODE, true);
+		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOCRLF, false);
 		cfg.save();
 	}
 
@@ -357,12 +343,8 @@ public class FileRepository extends AbstractRepository {
 				Repository repo;
 
 				repo = ((AlternateRepository) d).repository;
-				for (Ref ref : repo.getAllRefs().values()) {
-					if (ref.getObjectId() != null)
-						r.add(ref.getObjectId());
-					if (ref.getPeeledObjectId() != null)
-						r.add(ref.getPeeledObjectId());
-				}
+				for (Ref ref : repo.getAllRefs().values())
+					r.add(ref.getObjectId());
 				r.addAll(repo.getAdditionalHaves());
 			}
 		}
@@ -384,30 +366,15 @@ public class FileRepository extends AbstractRepository {
 		objectDatabase.openPack(pack, idx);
 	}
 
-	@Override
+	/**
+	 * Force a scan for changed refs.
+	 *
+	 * @throws IOException
+	 */
 	public void scanForRepoChanges() throws IOException {
 		getAllRefs(); // This will look for changes to refs
-		detectIndexChanges();
-	}
-
-	/**
-	 * Detect index changes.
-	 */
-	private void detectIndexChanges() {
-		if (isBare())
-			return;
-
-		File indexFile = getIndexFile();
-		if (snapshot == null)
-			snapshot = FileSnapshot.save(indexFile);
-		else if (snapshot.isModified(indexFile))
-			notifyIndexChanged();
-	}
-
-	@Override
-	public void notifyIndexChanged() {
-		snapshot = FileSnapshot.save(getIndexFile());
-		fireEvent(new IndexChangedEvent());
+		if (!isBare())
+			getIndex(); // This will detect changes in the index
 	}
 
 	/**
@@ -421,16 +388,5 @@ public class FileRepository extends AbstractRepository {
 		if (ref != null)
 			return new ReflogReader(this, ref.getName());
 		return null;
-	}
-
-	public GraftsDatabase getGraftsDatabase() {
-		return graftsDb;
-	}
-
-	/**
-	 * @return the grafts file
-	 */
-	public File getGraftsFile() {
-		return new File(getDirectory(), "info/grafts");
 	}
 }

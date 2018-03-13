@@ -48,12 +48,10 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -78,14 +76,13 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * <li>removed files</li>
  * <li>missing files</li>
  * <li>modified files</li>
- * <li>conflicting files</li>
  * <li>untracked files</li>
  * <li>files with assume-unchanged flag</li>
  * </ul>
  */
 public class IndexDiff {
 
-	private static final class ProgressReportingFilter extends TreeFilter {
+	private final class ProgressReportingFilter extends TreeFilter {
 
 		private final ProgressMonitor monitor;
 
@@ -156,15 +153,9 @@ public class IndexDiff {
 
 	private Set<String> untracked = new HashSet<String>();
 
-	private Set<String> conflicts = new HashSet<String>();
-
-	private Set<String> ignored;
-
 	private Set<String> assumeUnchanged;
 
 	private DirCache dirCache;
-
-	private IndexDiffFilter indexDiffFilter;
 
 	/**
 	 * Construct an IndexDiff
@@ -281,8 +272,7 @@ public class IndexDiff {
 		if (filter != null)
 			filters.add(filter);
 		filters.add(new SkipWorkTreeFilter(INDEX));
-		indexDiffFilter = new IndexDiffFilter(INDEX, WORKDIR);
-		filters.add(indexDiffFilter);
+		filters.add(new IndexDiffFilter(INDEX, WORKDIR));
 		treeWalk.setFilter(AndTreeFilter.create(filters));
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
@@ -291,15 +281,6 @@ public class IndexDiff {
 					DirCacheIterator.class);
 			WorkingTreeIterator workingTreeIterator = treeWalk.getTree(WORKDIR,
 					WorkingTreeIterator.class);
-
-			if (dirCacheIterator != null) {
-				final DirCacheEntry dirCacheEntry = dirCacheIterator
-						.getDirCacheEntry();
-				if (dirCacheEntry != null && dirCacheEntry.getStage() > 0) {
-					conflicts.add(treeWalk.getPathString());
-					continue;
-				}
-			}
 
 			if (treeIterator != null) {
 				if (dirCacheIterator != null) {
@@ -346,7 +327,6 @@ public class IndexDiff {
 		if (monitor != null)
 			monitor.endTask();
 
-		ignored = indexDiffFilter.getIgnoredPaths();
 		if (added.isEmpty() && changed.isEmpty() && removed.isEmpty()
 				&& missing.isEmpty() && modified.isEmpty()
 				&& untracked.isEmpty())
@@ -384,7 +364,7 @@ public class IndexDiff {
 	}
 
 	/**
-	 * @return list of files modified on disk relative to the index
+	 * @return list of files on modified on disk relative to the index
 	 */
 	public Set<String> getModified() {
 		return modified;
@@ -395,26 +375,6 @@ public class IndexDiff {
 	 */
 	public Set<String> getUntracked() {
 		return untracked;
-	}
-
-	/**
-	 * @return list of files that are in conflict
-	 */
-	public Set<String> getConflicting() {
-		return conflicts;
-	}
-
-	/**
-	 * The method returns the list of ignored files and folders. Only the root
-	 * folder of an ignored folder hierarchy is reported. If a/b/c is listed in
-	 * the .gitignore then you should not expect a/b/c/d/e/f to be reported
-	 * here. Only a/b/c will be reported. Furthermore only ignored files /
-	 * folders are returned that are NOT in the index.
-	 *
-	 * @return list of files / folders that are ignored
-	 */
-	public Set<String> getIgnoredNotInIndex() {
-		return ignored;
 	}
 
 	/**
@@ -429,24 +389,5 @@ public class IndexDiff {
 			assumeUnchanged = unchanged;
 		}
 		return assumeUnchanged;
-	}
-
-	/**
-	 * @return list of folders containing only untracked files/folders
-	 */
-	public Set<String> getUntrackedFolders() {
-		return ((indexDiffFilter == null) ? Collections.<String> emptySet()
-				: new HashSet<String>(indexDiffFilter.getUntrackedFolders()));
-	}
-
-	/**
-	 * Get the file mode of the given path in the index
-	 *
-	 * @param path
-	 * @return file mode
-	 */
-	public FileMode getIndexMode(final String path) {
-		final DirCacheEntry entry = dirCache.getEntry(path);
-		return entry != null ? entry.getFileMode() : FileMode.MISSING;
 	}
 }

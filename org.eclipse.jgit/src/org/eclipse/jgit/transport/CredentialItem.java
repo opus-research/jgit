@@ -45,7 +45,7 @@ package org.eclipse.jgit.transport;
 
 import java.util.Arrays;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * A credential requested from a {@link CredentialsProvider}.
@@ -278,16 +278,6 @@ public abstract class CredentialItem {
 		/** Initialize a new password item, with a default password prompt. */
 		public Password() {
 			super(JGitText.get().credentialPassword, true);
-		}
-
-		/**
-		 * Initialize a new password item, with given prompt.
-		 *
-		 * @param msg
-		 *            prompt message
-		 */
-		public Password(String msg) {
-			super(msg, true);
 		}
 	}
 }

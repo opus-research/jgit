@@ -46,8 +46,8 @@ package org.eclipse.jgit.storage.file;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 
@@ -61,7 +61,7 @@ import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
  * @see PackIndex
  * @see PackFile
  */
-public class PackReverseIndex {
+class PackReverseIndex {
 	/** Index we were created from, and that has our ObjectId data. */
 	private final PackIndex index;
 
@@ -88,7 +88,7 @@ public class PackReverseIndex {
 	 * @param packIndex
 	 *            forward index - entries to (reverse) index.
 	 */
-	public PackReverseIndex(final PackIndex packIndex) {
+	PackReverseIndex(final PackIndex packIndex) {
 		index = packIndex;
 
 		final long cnt = index.getObjectCount();
@@ -135,7 +135,7 @@ public class PackReverseIndex {
 	 *            start offset of object to find.
 	 * @return object id for this offset, or null if no object was found.
 	 */
-	public ObjectId findObject(final long offset) {
+	ObjectId findObject(final long offset) {
 		if (offset <= Integer.MAX_VALUE) {
 			final int i32 = Arrays.binarySearch(offsets32, (int) offset);
 			if (i32 < 0)
@@ -164,15 +164,14 @@ public class PackReverseIndex {
 	 * @throws CorruptObjectException
 	 *             when there is no object with the provided offset.
 	 */
-	public long findNextOffset(final long offset, final long maxOffset)
+	long findNextOffset(final long offset, final long maxOffset)
 			throws CorruptObjectException {
 		if (offset <= Integer.MAX_VALUE) {
 			final int i32 = Arrays.binarySearch(offsets32, (int) offset);
 			if (i32 < 0)
-				throw new CorruptObjectException(
-						MessageFormat.format(
-								JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset,
-								Long.valueOf(offset)));
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset
+						, offset));
 
 			if (i32 + 1 == offsets32.length) {
 				if (offsets64.length > 0)
@@ -183,10 +182,9 @@ public class PackReverseIndex {
 		} else {
 			final int i64 = Arrays.binarySearch(offsets64, offset);
 			if (i64 < 0)
-				throw new CorruptObjectException(
-						MessageFormat.format(
-								JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset,
-								Long.valueOf(offset)));
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset
+						, offset));
 
 			if (i64 + 1 == offsets64.length)
 				return maxOffset;

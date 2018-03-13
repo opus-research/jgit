@@ -52,8 +52,6 @@ public class PullResult {
 
 	private final MergeResult mergeResult;
 
-	private final RebaseResult rebaseResult;
-
 	private final String fetchedFrom;
 
 	PullResult(FetchResult fetchResult, String fetchedFrom,
@@ -61,15 +59,6 @@ public class PullResult {
 		this.fetchResult = fetchResult;
 		this.fetchedFrom = fetchedFrom;
 		this.mergeResult = mergeResult;
-		this.rebaseResult = null;
-	}
-
-	PullResult(FetchResult fetchResult, String fetchedFrom,
-			RebaseResult rebaseResult) {
-		this.fetchResult = fetchResult;
-		this.fetchedFrom = fetchedFrom;
-		this.mergeResult = null;
-		this.rebaseResult = rebaseResult;
 	}
 
 	/**
@@ -87,29 +76,11 @@ public class PullResult {
 	}
 
 	/**
-	 * @return the rebase result, or <code>null</code>
-	 */
-	public RebaseResult getRebaseResult() {
-		return this.rebaseResult;
-	}
-
-	/**
 	 * @return the name of the remote configuration from which fetch was tried,
 	 *         or <code>null</code>
 	 */
 	public String getFetchedFrom() {
 		return this.fetchedFrom;
-	}
-
-	/**
-	 * @return whether the pull was successful
-	 */
-	public boolean isSuccessful() {
-		if (mergeResult != null)
-			return mergeResult.getMergeStatus().isSuccessful();
-		else if (rebaseResult != null)
-			return rebaseResult.getStatus().isSuccessful();
-		return true;
 	}
 
 	@Override
@@ -122,10 +93,8 @@ public class PullResult {
 		sb.append("\n");
 		if (mergeResult != null)
 			sb.append(mergeResult.toString());
-		else if (rebaseResult != null)
-			sb.append(rebaseResult.toString());
 		else
-			sb.append("No update result");
+			sb.append("No merge result");
 		return sb.toString();
 	}
 }

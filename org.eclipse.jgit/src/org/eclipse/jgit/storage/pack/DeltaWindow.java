@@ -129,6 +129,8 @@ class DeltaWindow {
 			int cnt) throws IOException {
 		try {
 			for (int end = off + cnt; off < end; off++) {
+				monitor.update(1);
+
 				res = window[resSlot];
 				if (0 < maxMemory) {
 					clear(res);
@@ -141,7 +143,7 @@ class DeltaWindow {
 				}
 				res.set(toSearch[off]);
 
-				if (res.object.isEdge() || res.object.doNotAttemptDelta()) {
+				if (res.object.isEdge()) {
 					// We don't actually want to make a delta for
 					// them, just need to push them into the window
 					// so they can be read by other objects.
@@ -150,7 +152,6 @@ class DeltaWindow {
 				} else {
 					// Search for a delta for the current window slot.
 					//
-					monitor.update(1);
 					search();
 				}
 			}

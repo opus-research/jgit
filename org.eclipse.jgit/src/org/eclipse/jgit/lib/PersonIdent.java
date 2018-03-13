@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -59,9 +58,7 @@ import org.eclipse.jgit.util.SystemReader;
  * Git combines Name + email + time + time zone to specify who wrote or
  * committed something.
  */
-public class PersonIdent implements Serializable {
-	private static final long serialVersionUID = 1L;
-
+public class PersonIdent {
 	private final String name;
 
 	private final String emailAddress;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Christian Halstrick <christian.halstrick@sap.com> and
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -37,9 +37,6 @@
  */
 package org.eclipse.jgit.pgm;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.eclipse.jgit.api.CommitCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -50,7 +47,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_recordChangesToRepository")
@@ -58,23 +54,11 @@ class Commit extends TextBuiltin {
 	// I don't support setting the committer, because also the native git
 	// command doesn't allow this.
 
-	@Option(name = "--author", metaVar = "metaVar_author", usage = "usage_CommitAuthor")
+	@Option(name = "--author", metaVar="metaVar_author", usage = "usage_CommitAuthor")
 	private String author;
 
-	@Option(name = "--message", aliases = { "-m" }, metaVar = "metaVar_message", usage = "usage_CommitMessage", required = true)
+	@Option(name = "--message", aliases = { "-m" }, metaVar="metaVar_message", usage="usage_CommitMessage", required=true)
 	private String message;
-
-	@Option(name = "--only", aliases = { "-o" }, usage = "usage_CommitOnly")
-	private boolean only;
-
-	@Option(name = "--all", aliases = { "-a" }, usage = "usage_CommitAll")
-	private boolean all;
-
-	@Option(name = "--amend", usage = "usage_CommitAmend")
-	private boolean amend;
-
-	@Argument(metaVar = "metaVar_commitPaths", usage = "usage_CommitPaths")
-	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws NoHeadException, NoMessageException,
@@ -84,22 +68,8 @@ class Commit extends TextBuiltin {
 			commitCmd.setAuthor(RawParseUtils.parsePersonIdent(author));
 		if (message != null)
 			commitCmd.setMessage(message);
-		if (only && paths.isEmpty())
-			throw die(CLIText.get().pathsRequired);
-		if (only && all)
-			throw die(CLIText.get().onlyOneOfIncludeOnlyAllInteractiveCanBeUsed);
-		if (!paths.isEmpty())
-			for (String p : paths)
-				commitCmd.setOnly(p);
-		commitCmd.setAmend(amend);
-		commitCmd.setAll(all);
 		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit;
-		try {
-			commit = commitCmd.call();
-		} catch (JGitInternalException e) {
-			throw die(e.getMessage());
-		}
+		RevCommit commit = commitCmd.call();
 
 		String branchName;
 		if (!head.isSymbolic())

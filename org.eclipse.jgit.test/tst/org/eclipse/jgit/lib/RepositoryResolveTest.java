@@ -48,14 +48,11 @@ package org.eclipse.jgit.lib;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
 public class RepositoryResolveTest extends SampleDataRepositoryTestCase {
@@ -113,11 +110,6 @@ public class RepositoryResolveTest extends SampleDataRepositoryTestCase {
 		assertEquals("1203b03dc816ccbb67773f28b3c19318654b0bc8",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~2").name());
 		assertEquals("bab66b48f836ed950c99134ef666436fb07a09a0",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~3").name());
 		assertEquals("bab66b48f836ed950c99134ef666436fb07a09a0",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~03").name());
-		assertEquals("6e1475206e57110fcef4b92320436c1e9872a322",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~").name());
-		assertEquals("1203b03dc816ccbb67773f28b3c19318654b0bc8",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~~").name());
-		assertEquals("bab66b48f836ed950c99134ef666436fb07a09a0",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~~~").name());
-		assertEquals("1203b03dc816ccbb67773f28b3c19318654b0bc8",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~~1").name());
-		assertEquals("1203b03dc816ccbb67773f28b3c19318654b0bc8",db.resolve("49322bb17d3acc9146f98c97d078513228bbf3c0~~~0").name());
 	}
 
 	@Test
@@ -190,28 +182,6 @@ public class RepositoryResolveTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
-	public void testParseNonGitDescribe() throws IOException {
-		ObjectId id = id("49322bb17d3acc9146f98c97d078513228bbf3c0");
-		RefUpdate ru = db.updateRef("refs/heads/foo-g032c");
-		ru.setNewObjectId(id);
-		assertSame(RefUpdate.Result.NEW, ru.update());
-
-		assertEquals(id, db.resolve("refs/heads/foo-g032c"));
-		assertEquals(id, db.resolve("foo-g032c"));
-		assertNull(db.resolve("foo-g032"));
-		assertNull(db.resolve("foo-g03"));
-		assertNull(db.resolve("foo-g0"));
-		assertNull(db.resolve("foo-g"));
-
-		ru = db.updateRef("refs/heads/foo-g032c-dev");
-		ru.setNewObjectId(id);
-		assertSame(RefUpdate.Result.NEW, ru.update());
-
-		assertEquals(id, db.resolve("refs/heads/foo-g032c-dev"));
-		assertEquals(id, db.resolve("foo-g032c-dev"));
-	}
-
-	@Test
 	public void testParseLookupPath() throws IOException {
 		ObjectId b2_txt = id("10da5895682013006950e7da534b705252b03be6");
 		ObjectId b3_b2_txt = id("e6bfff5c1d0f0ecd501552b43a1e13d8008abc31");
@@ -220,10 +190,6 @@ public class RepositoryResolveTest extends SampleDataRepositoryTestCase {
 
 		assertEquals(b2_txt, db.resolve("b:b/b2.txt"));
 		assertEquals(b_root, db.resolve("b:"));
-		assertEquals(id("6020a3b8d5d636e549ccbd0c53e2764684bb3125"),
-				db.resolve("master:"));
-		assertEquals(id("10da5895682013006950e7da534b705252b03be6"),
-				db.resolve("master:b/b2.txt"));
 		assertEquals(master_txt, db.resolve(":master.txt"));
 		assertEquals(b3_b2_txt, db.resolve("b~3:b/b2.txt"));
 
@@ -231,39 +197,6 @@ public class RepositoryResolveTest extends SampleDataRepositoryTestCase {
 		assertNull("no b/FOO", db.resolve("b:b/FOO"));
 		assertNull("no b/FOO", db.resolve(":b/FOO"));
 		assertNull("no not-a-branch:", db.resolve("not-a-branch:"));
-	}
-
-	@Test
-	public void resolveExprSimple() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		git.commit().setMessage("create file").call();
-		assertEquals("master", db.simplify("master"));
-		assertEquals("refs/heads/master", db.simplify("refs/heads/master"));
-		assertEquals("HEAD", db.simplify("HEAD"));
-	}
-
-	@Test
-	public void resolveUpstream() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		RevCommit c1 = git.commit().setMessage("create file").call();
-		writeTrashFile("file2.txt", "content");
-		RefUpdate updateRemoteRef = db.updateRef("refs/remotes/origin/main");
-		updateRemoteRef.setNewObjectId(c1);
-		updateRemoteRef.update();
-		db.getConfig().setString("branch", "master", "remote", "origin");
-		db.getConfig()
-				.setString("branch", "master", "merge", "refs/heads/main");
-		db.getConfig().setString("remote", "origin", "url",
-				"git://example.com/here");
-		db.getConfig().setString("remote", "origin", "fetch",
-				"+refs/heads/*:refs/remotes/origin/*");
-		git.add().addFilepattern("file2.txt").call();
-		git.commit().setMessage("create file").call();
-		assertEquals("refs/remotes/origin/main", db.simplify("@{upstream}"));
 	}
 
 	private static ObjectId id(String name) {

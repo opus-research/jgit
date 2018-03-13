@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -58,8 +57,8 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.zip.Deflater;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
@@ -72,7 +71,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.storage.pack.DeltaEncoder;
-import org.eclipse.jgit.transport.PackParser;
+import org.eclipse.jgit.transport.IndexPack;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -213,9 +212,11 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		deflate(pack, delta3);
 
 		digest(pack);
-		PackParser ip = index(pack.toByteArray());
-		ip.setAllowThin(true);
-		ip.parse(NullProgressMonitor.INSTANCE);
+		final byte[] raw = pack.toByteArray();
+		IndexPack ip = IndexPack.create(repo, new ByteArrayInputStream(raw));
+		ip.setFixThin(true);
+		ip.index(NullProgressMonitor.INSTANCE);
+		ip.renameAndOpenPack();
 
 		assertTrue("has blob", wc.has(id3));
 
@@ -225,7 +226,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		assertEquals(data3.length, ol.getSize());
 		assertFalse("is large", ol.isLarge());
 		assertNotNull(ol.getCachedBytes());
-		assertArrayEquals(data3, ol.getCachedBytes());
+		assertTrue(Arrays.equals(data3, ol.getCachedBytes()));
 
 		ObjectStream in = ol.openStream();
 		assertNotNull("have stream", in);
@@ -272,9 +273,11 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		deflate(pack, delta3);
 
 		digest(pack);
-		PackParser ip = index(pack.toByteArray());
-		ip.setAllowThin(true);
-		ip.parse(NullProgressMonitor.INSTANCE);
+		final byte[] raw = pack.toByteArray();
+		IndexPack ip = IndexPack.create(repo, new ByteArrayInputStream(raw));
+		ip.setFixThin(true);
+		ip.index(NullProgressMonitor.INSTANCE);
+		ip.renameAndOpenPack();
 
 		assertTrue("has blob", wc.has(id3));
 
@@ -360,19 +363,5 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		MessageDigest md = Constants.newMessageDigest();
 		md.update(buf.toByteArray());
 		buf.write(md.digest());
-	}
-
-	private ObjectInserter inserter;
-
-	@After
-	public void release() {
-		if (inserter != null)
-			inserter.release();
-	}
-
-	private PackParser index(byte[] raw) throws IOException {
-		if (inserter == null)
-			inserter = repo.newObjectInserter();
-		return inserter.newPackParser(new ByteArrayInputStream(raw));
 	}
 }

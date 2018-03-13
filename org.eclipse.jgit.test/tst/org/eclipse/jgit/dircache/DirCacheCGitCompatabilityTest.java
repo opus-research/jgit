@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -55,6 +54,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -215,7 +215,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		dc.writeTo(bos);
 		final byte[] indexBytes = bos.toByteArray();
 		final byte[] expectedBytes = IO.readFully(file);
-		assertArrayEquals(expectedBytes, indexBytes);
+		assertTrue(Arrays.equals(expectedBytes, indexBytes));
 	}
 
 	private static void assertV3TreeEntry(int indexPosition, String path,
