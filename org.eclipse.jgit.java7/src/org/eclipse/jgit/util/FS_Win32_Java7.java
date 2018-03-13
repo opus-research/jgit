@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -159,10 +158,5 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	@Override
 	public Attributes getAttributes(File path) {
 		return FileUtil.getFileAttributesBasic(this, path);
-	}
-
-	@Override
-	public PathMatcher getPathMatcher(String globPattern) {
-		return new PathMatcher_Java7(globPattern);
 	}
 }

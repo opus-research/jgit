@@ -1,5 +1,5 @@
-/*******************************************************************************
- * Copyright (C) 2014, Obeo
+/*
+ * Copyright (C) 2014, Sasa Zivkov <sasa.zivkov@sap.com>, SAP AG
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,21 +39,31 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *******************************************************************************/
-package org.eclipse.jgit.util;
+ */
+
+package org.eclipse.jgit.errors;
+
+import java.io.IOException;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.JGitText;
 
 /**
- * Interface that can be implemented to perform matching operations against
- * paths.
+ * Thrown when a pack exceeds a given size limit
+ *
+ * @since 3.3
  */
-public interface PathMatcher {
+public class TooLargePackException extends IOException {
+	private static final long serialVersionUID = 1L;
+
 	/**
-	 * Checks whether the given path matches this matcher's pattern.
+	 * Construct a too large pack exception.
 	 *
-	 * @param path
-	 *            The path to match.
-	 * @return <code>true</code> if <code>path</code> matches this matcher's
-	 *         pattern, <code>false</code> otherwise.
+	 * @param packSizeLimit
+	 *            the pack size limit (in bytes) that was exceeded
 	 */
-	boolean matches(String path);
+	public TooLargePackException(long packSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackTooLarge,
+				Long.valueOf(packSizeLimit)));
+	}
 }
