@@ -144,7 +144,7 @@ public class LsRemoteCommand extends
 	 *             {@link Exception#getCause()}.
 	 */
 	public Collection<Ref> call() throws GitAPIException,
-			org.eclipse.jgit.api.errors.JGitInternalException {
+			JGitInternalException {
 		checkCallable();
 
 		Transport transport = null;

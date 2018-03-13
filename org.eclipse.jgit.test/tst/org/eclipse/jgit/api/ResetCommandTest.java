@@ -53,8 +53,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 
 import org.eclipse.jgit.api.ResetCommand.ResetType;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
@@ -82,8 +86,9 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	private DirCacheEntry prestage;
 
-	public void setupRepository() throws IOException, JGitInternalException,
-			GitAPIException {
+	public void setupRepository() throws IOException, NoFilepatternException,
+			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 
 		// create initial commit
 		git = new Git(db);
@@ -132,7 +137,9 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testHardReset() throws JGitInternalException,
-			AmbiguousObjectException, IOException, GitAPIException {
+			AmbiguousObjectException, IOException, NoFilepatternException,
+			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.HARD).setRef(initialCommit.getName())
@@ -152,7 +159,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testResetToNonexistingHEAD() throws JGitInternalException,
-			AmbiguousObjectException, IOException, GitAPIException {
+			AmbiguousObjectException, IOException {
 
 		// create a file in the working tree of a fresh repo
 		git = new Git(db);
@@ -168,7 +175,9 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testSoftReset() throws JGitInternalException,
-			AmbiguousObjectException, IOException, GitAPIException {
+			AmbiguousObjectException, IOException, NoFilepatternException,
+			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.SOFT).setRef(initialCommit.getName())
@@ -188,7 +197,9 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testMixedReset() throws JGitInternalException,
-			AmbiguousObjectException, IOException, GitAPIException {
+			AmbiguousObjectException, IOException, NoFilepatternException,
+			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.MIXED).setRef(initialCommit.getName())
