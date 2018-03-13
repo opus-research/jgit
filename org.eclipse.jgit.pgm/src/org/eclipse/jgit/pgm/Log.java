@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Google Inc.
  * Copyright (C) 2006-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -93,7 +92,7 @@ class Log extends RevWalkTextBuiltin {
 			if (list != null) {
 				out.print(" (");
 				for (Iterator<Ref> i = list.iterator(); i.hasNext(); ) {
-					out.print(i.next().getName());
+					out.print(i.next().getOrigName());
 					if (i.hasNext())
 						out.print(" ");
 				}

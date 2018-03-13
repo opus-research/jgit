@@ -80,12 +80,9 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDirectory;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
@@ -243,17 +240,16 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				br = toBufferedReader(openInputStream(conn));
 				try {
 					String line = br.readLine();
-					if (line != null && line.startsWith(RefDirectory.SYMREF)) {
-						String target = line.substring(RefDirectory.SYMREF.length());
-						Ref r = refs.get(target);
-						if (r == null)
-							r = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, target, null);
-						r = new SymbolicRef(Constants.HEAD, r);
-						refs.put(r.getName(), r);
+					if (line != null && line.startsWith("ref: ")) {
+						Ref src = refs.get(line.substring(5));
+						if (src != null) {
+							refs.put(Constants.HEAD, new Ref(
+									Ref.Storage.NETWORK, Constants.HEAD, src
+											.getName(), src.getObjectId()));
+						}
 					} else if (line != null && ObjectId.isId(line)) {
-						Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.NETWORK,
-								Constants.HEAD, ObjectId.fromString(line));
-						refs.put(r.getName(), r);
+						refs.put(Constants.HEAD, new Ref(Ref.Storage.NETWORK,
+								Constants.HEAD, ObjectId.fromString(line)));
 					}
 				} finally {
 					br.close();
@@ -531,11 +527,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					if (prior.getPeeledObjectId() != null)
 						throw duplicateAdvertisement(name + "^{}");
 
-					avail.put(name, new ObjectIdRef.PeeledTag(
-							Ref.Storage.NETWORK, name,
-							prior.getObjectId(), id));
+					avail.put(name, new Ref(Ref.Storage.NETWORK, name, prior
+							.getObjectId(), id, true));
 				} else {
-					Ref prior = avail.put(name, new ObjectIdRef.PeeledNonTag(
+					final Ref prior = avail.put(name, new Ref(
 							Ref.Storage.NETWORK, name, id));
 					if (prior != null)
 						throw duplicateAdvertisement(name);

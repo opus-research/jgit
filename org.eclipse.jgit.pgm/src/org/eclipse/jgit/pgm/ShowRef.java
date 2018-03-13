@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Google Inc.
  * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -45,30 +44,19 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.util.Map;
-import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefComparator;
-import org.eclipse.jgit.util.RefMap;
 
 class ShowRef extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
-		for (final Ref r : getSortedRefs()) {
+		for (final Ref r : new TreeMap<String, Ref>(db.getAllRefs()).values()) {
 			show(r.getObjectId(), r.getName());
 			if (r.getPeeledObjectId() != null)
 				show(r.getPeeledObjectId(), r.getName() + "^{}");
 		}
-	}
-
-	private Iterable<Ref> getSortedRefs() {
-		Map<String, Ref> all = db.getAllRefs();
-		if (all instanceof RefMap
-				|| (all instanceof SortedMap && ((SortedMap) all).comparator() == null))
-			return all.values();
-		return RefComparator.sort(all.values());
 	}
 
 	private void show(final AnyObjectId id, final String name) {
