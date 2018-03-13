@@ -415,7 +415,7 @@ public class RefSpecTest {
 
 	@Test(expected = IllegalArgumentException.class)
 	public void invalidWhenDestinationEndsWithSlash() {
-		assertNotNull(new RefSpec("refs/heads/*:refs/heads/"));
+		assertNotNull(new RefSpec("refs/heads/master:refs/heads/"));
 	}
 
 	@Test(expected = IllegalArgumentException.class)
@@ -473,27 +473,5 @@ public class RefSpecTest {
 	public void invalidSetDestination() {
 		RefSpec a = new RefSpec("refs/heads/*:refs/remotes/origin/*");
 		a.setDestination("refs/remotes/origin/*/*");
-	}
-
-	@Test
-	public void sourceOnlywithWildcard() {
-		RefSpec a = new RefSpec("refs/heads/*", true);
-		assertTrue(a.matchSource("refs/heads/master"));
-		assertTrue(a.matchDestination("refs/heads/master"));
-	}
-
-	@Test
-	public void destinationWithWildcard() {
-		RefSpec a = new RefSpec("refs/heads/master:refs/heads/*", true);
-		assertTrue(a.matchSource("refs/heads/master"));
-		assertTrue(a.matchDestination("refs/heads/master"));
-		assertTrue(a.matchDestination("refs/heads/foo"));
-	}
-
-	@Test
-	public void onlyWildCard() {
-		RefSpec a = new RefSpec("*", true);
-		assertTrue(a.matchSource("refs/heads/master"));
-		assertTrue(a.matchDestination("refs/heads/master"));
 	}
 }
