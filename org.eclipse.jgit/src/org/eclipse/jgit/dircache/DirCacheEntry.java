@@ -635,16 +635,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get a copy of the entry's raw path bytes.
-	 *
-	 * @return raw path bytes.
-	 * @since 3.3
-	 */
-	public byte[] getRawPath() {
-		return path.clone();
-	}
-
-	/**
 	 * Use for debugging only !
 	 */
 	@SuppressWarnings("nls")

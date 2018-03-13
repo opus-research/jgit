@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -85,11 +84,6 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 	}
 
 	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -127,21 +121,5 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 	@Override
 	public void createSymLink(File path, String target) throws IOException {
 		FileUtil.createSymLink(path, target);
-	}
-
-	/**
-	 * @since 3.3
-	 */
-	@Override
-	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributesBasic(this, path);
-	}
-
-	/**
-	 * @since 3.4
-	 */
-	@Override
-	public PathMatcher getPathMatcher(String globPattern) {
-		return new PathMatcher_Java7(globPattern);
 	}
 }
