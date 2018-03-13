@@ -40,30 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.errors;
+package org.eclipse.jgit.attributes;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+import org.eclipse.jgit.lib.Repository;
 
 /**
- * Something went wrong while transporting lfs objects
+ * The factory responsible for creating instances of {@link FilterCommand}.
  *
  * @since 4.5
  */
-public class LfsTransportException extends IOException {
-	private static final long serialVersionUID = 1L;
-
+public interface FilterCommandFactory {
 	/**
-	 * @param message
-	 * @param cause
+	 * Create a new {@link FilterCommand}.
+	 *
+	 * @param db
+	 *            the repository this command should work on
+	 * @param in
+	 *            the {@link InputStream} this command should read from
+	 * @param out
+	 *            the {@link OutputStream} this command should write to
+	 * @return the created {@link FilterCommand}
+	 * @throws IOException
+	 *             thrown when the command constructor throws an IOException
 	 */
-	public LfsTransportException(String message, Throwable cause) {
-		super(message, cause);
-	}
+	public FilterCommand create(Repository db, InputStream in,
+			OutputStream out) throws IOException;
 
-	/**
-	 * @param message
-	 */
-	public LfsTransportException(String message) {
-		super(message);
-	}
 }

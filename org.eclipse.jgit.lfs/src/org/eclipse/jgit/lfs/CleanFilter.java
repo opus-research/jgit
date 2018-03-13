@@ -50,13 +50,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.DigestOutputStream;
 
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandFactory;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.lfs.errors.CorruptMediaFile;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.FilterCommand;
-import org.eclipse.jgit.util.FilterCommandFactory;
 
 /**
  * Built-in LFS clean filter
@@ -65,7 +66,7 @@ import org.eclipse.jgit.util.FilterCommandFactory;
  * is configured for that content, then this filter will replace the original
  * content with content of a so-called LFS pointer file. The pointer file
  * content will then be added to the git repository. Additionally this filter
- * writes the original content in a so-called 'media file' at '.git/lfs/objects/
+ * writes the original content in a so-called 'media file' to '.git/lfs/objects/
  * <first-two-characters-of-contentid>/<rest-of-contentid>'
  *
  * @see <a href="https://github.com/github/git-lfs/blob/master/docs/spec.md">Git
@@ -87,10 +88,10 @@ public class CleanFilter extends FilterCommand {
 
 	/**
 	 * Registers this filter by calling
-	 * {@link Repository#registerFilterCommand(String, FilterCommandFactory)}
+	 * {@link FilterCommandRegistry#register(String, FilterCommandFactory)}
 	 */
 	public final static void register() {
-		Repository.registerFilterCommand(
+		FilterCommandRegistry.register(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
 						+ "lfs/clean", //$NON-NLS-1$
 				FACTORY);

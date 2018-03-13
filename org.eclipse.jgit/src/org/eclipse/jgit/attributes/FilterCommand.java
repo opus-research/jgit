@@ -40,64 +40,55 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server.fs;
+package org.eclipse.jgit.attributes;
 
-import static org.junit.Assert.assertEquals;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import java.io.File;
-import java.nio.file.Path;
+/**
+ * An abstraction for JGit's builtin implementations for hooks and filters.
+ * Instead of spawning an external processes to start a filter/hook and to pump
+ * data from/to stdin/stdout these builtin commmands may be used. They are
+ * constructed by {@link FilterCommandFactory}.
+ *
+ * @since 4.5
+ */
+public abstract class FilterCommand {
+	/**
+	 * The {@link InputStream} this command should read from
+	 */
+	protected InputStream in;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.lfs.CleanFilter;
-import org.eclipse.jgit.lfs.SmudgeFilter;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
+	/**
+	 * The {@link OutputStream} this command should write to
+	 */
+	protected OutputStream out;
 
-public class CheckoutTest extends LfsServerTest {
-
-	@Override
-	public void setup() throws Exception {
-		CleanFilter.register();
-		SmudgeFilter.register();
-		super.setup();
-
+	/**
+	 * @param in
+	 *            The {@link InputStream} this command should read from
+	 * @param out
+	 *            The {@link OutputStream} this command should write to
+	 */
+	public FilterCommand(InputStream in, OutputStream out) {
+		this.in = in;
+		this.out = out;
 	}
 
-	@Test
-	public void testCheckout() throws Exception {
-		Path tempDirectory = getTempDirectory();
-		Path repoPath = tempDirectory.resolve("client");
-		try (Git git = Git.init().setDirectory(repoPath.toFile()).setBare(false)
-				.call()) {
-			StoredConfig config = git.getRepository().getConfig();
-			config.setString("lfs", null, "url", server.getURI().toString());
-			config.setBoolean("filter", "lfs", "useJGitBuiltin", true);
-			config.save();
-			JGitTestUtil.writeTrashFile(git.getRepository(), ".gitattributes",
-					"*.txt filter=lfs");
-			git.add().addFilepattern(".gitattributes").call();
-			git.commit().setMessage("initial").call();
-
-			JGitTestUtil.writeTrashFile(git.getRepository(), "a.txt", "foo");
-			git.add().addFilepattern("a.txt").call();
-			RevCommit commit = git.commit().setMessage("add a").call();
-			putContent(repoPath.resolve("a.txt"));
-
-			JGitTestUtil.writeTrashFile(git.getRepository(), "a.txt", "bar");
-			git.add().addFilepattern("a.txt").call();
-			git.commit().setMessage("modify a").call();
-
-			FileUtils.delete(new File(repoPath.toFile(), ".git/lfs/objects"),
-					FileUtils.RECURSIVE);
-
-			git.checkout().setName(commit.getName()).call();
-			assertEquals("foo",
-					JGitTestUtil.read(git.getRepository(), "a.txt"));
-
-		}
-
-	}
+	/**
+	 * Execute the command. The command is supposed to read data from
+	 * {@link #in} and to write the result to {@link #out}. It returns the
+	 * number of bytes it read from {@link #in}. It should be called in a loop
+	 * until it returns -1 signaling that the {@link InputStream} is completely
+	 * processed.
+	 *
+	 * @return the number of bytes read from the {@link InputStream} or -1. -1
+	 *         means that the {@link InputStream} is completely processed.
+	 * @throws IOException
+	 *             when {@link IOException} occured while reading from
+	 *             {@link #in} or writing to {@link #out}
+	 *
+	 */
+	public abstract int run() throws IOException;
 }
