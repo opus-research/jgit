@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2014, Gustaf Lundh <gustaf.lundh@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -95,7 +94,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * the same RevWalk at the same time. The Iterator may buffer RevCommits, while
  * {@link #next()} does not.
  */
-public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
+public class RevWalk implements Iterable<RevCommit> {
 	private static final int MB = 1 << 20;
 
 	/**
@@ -166,17 +165,13 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	final ObjectReader reader;
 
-	private final boolean closeReader;
-
 	final MutableObjectId idBuffer;
 
 	ObjectIdOwnerMap<RevObject> objects;
 
-	int freeFlags = APP_FLAGS;
+	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
-
-	private int retainOnReset;
 
 	int carryFlags = UNINTERESTING;
 
@@ -192,9 +187,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	private TreeFilter treeFilter;
 
-	private boolean retainBody = true;
-
-	private boolean rewriteParents = true;
+	private boolean retainBody;
 
 	boolean shallowCommitsInitialized;
 
@@ -203,37 +196,32 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 *
 	 * @param repo
 	 *            the repository the walker will obtain data from. An
-	 *            ObjectReader will be created by the walker, and will be closed
-	 *            when the walker is closed.
+	 *            ObjectReader will be created by the walker, and must be
+	 *            released by the caller.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo.newObjectReader(), true);
+		this(repo.newObjectReader());
 	}
 
 	/**
 	 * Create a new revision walker for a given repository.
-	 * <p>
 	 *
 	 * @param or
-	 *            the reader the walker will obtain data from. The reader is not
-	 *            closed when the walker is closed (but is closed by {@link
-	 *            #dispose()}.
+	 *            the reader the walker will obtain data from. The reader should
+	 *            be released by the caller when the walker is no longer
+	 *            required.
 	 */
 	public RevWalk(ObjectReader or) {
-		this(or, false);
-	}
-
-	private RevWalk(ObjectReader or, boolean closeReader) {
 		reader = or;
 		idBuffer = new MutableObjectId();
-		objects = new ObjectIdOwnerMap<>();
-		roots = new ArrayList<>();
+		objects = new ObjectIdOwnerMap<RevObject>();
+		roots = new ArrayList<RevCommit>();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
 		sorting = EnumSet.of(RevSort.NONE);
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
-		this.closeReader = closeReader;
+		retainBody = true;
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -246,14 +234,9 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * <p>
 	 * A walker that has been released can be used again, but may need to be
 	 * released after the subsequent usage.
-	 *
-	 * @since 4.0
 	 */
-	@Override
-	public void close() {
-		if (closeReader) {
-			reader.close();
-		}
+	public void release() {
+		reader.release();
 	}
 
 	/**
@@ -405,11 +388,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 			treeFilter = TreeFilter.ALL;
 			markStart(tip);
 			markStart(base);
-			RevCommit mergeBase;
-			while ((mergeBase = next()) != null)
-				if (mergeBase == base)
-					return true;
-			return false;
+			return next() == base;
 		} finally {
 			filter = oldRF;
 			treeFilter = oldTF;
@@ -549,9 +528,8 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * will not be simplified.
 	 * <p>
 	 * If non-null and not {@link TreeFilter#ALL} then the tree filter will be
-	 * installed. Commits will have their ancestry simplified to hide commits that
-	 * do not contain tree entries matched by the filter, unless
-	 * {@code setRewriteParents(false)} is called.
+	 * installed and commits will have their ancestry simplified to hide commits
+	 * that do not contain tree entries matched by the filter.
 	 * <p>
 	 * Usually callers should be inserting a filter graph including
 	 * {@link TreeFilter#ANY_DIFF} along with one or more
@@ -568,36 +546,11 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	}
 
 	/**
-	 * Set whether to rewrite parent pointers when filtering by modified paths.
-	 * <p>
-	 * By default, when {@link #setTreeFilter(TreeFilter)} is called with non-
-	 * null and non-{@link TreeFilter#ALL} filter, commits will have their
-	 * ancestry simplified and parents rewritten to hide commits that do not match
-	 * the filter.
-	 * <p>
-	 * This behavior can be bypassed by passing false to this method.
-	 *
-	 * @param rewrite
-	 *            whether to rewrite parents; defaults to true.
-	 * @since 3.4
-	 */
-	public void setRewriteParents(boolean rewrite) {
-		rewriteParents = rewrite;
-	}
-
-	boolean getRewriteParents() {
-		return rewriteParents;
-	}
-
-	/**
 	 * Should the body of a commit or tag be retained after parsing its headers?
 	 * <p>
 	 * Usually the body is always retained, but some application code might not
 	 * care and would prefer to discard the body of a commit as early as
 	 * possible, to reduce memory usage.
-	 * <p>
-	 * True by default on {@link RevWalk} and false by default for
-	 * {@link ObjectWalk}.
 	 *
 	 * @return true if the body should be retained; false it is discarded.
 	 */
@@ -611,9 +564,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * If a body of a commit or tag is not retained, the application must
 	 * call {@link #parseBody(RevObject)} before the body can be safely
 	 * accessed through the type specific access methods.
-	 * <p>
-	 * True by default on {@link RevWalk} and false by default for
-	 * {@link ObjectWalk}.
 	 *
 	 * @param retain true to retain bodies; false to discard them early.
 	 */
@@ -931,8 +881,8 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	public <T extends ObjectId> AsyncRevObjectQueue parseAny(
 			Iterable<T> objectIds, boolean reportMissing) {
-		List<T> need = new ArrayList<>();
-		List<RevObject> have = new ArrayList<>();
+		List<T> need = new ArrayList<T>();
+		List<RevObject> have = new ArrayList<RevObject>();
 		for (T id : objectIds) {
 			RevObject r = objects.get(id);
 			if (r != null && (r.flags & PARSED) != 0)
@@ -944,17 +894,14 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		final Iterator<RevObject> objItr = have.iterator();
 		if (need.isEmpty()) {
 			return new AsyncRevObjectQueue() {
-				@Override
 				public RevObject next() {
 					return objItr.hasNext() ? objItr.next() : null;
 				}
 
-				@Override
 				public boolean cancel(boolean mayInterruptIfRunning) {
 					return true;
 				}
 
-				@Override
 				public void release() {
 					// In-memory only, no action required.
 				}
@@ -963,7 +910,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 		final AsyncObjectLoaderQueue<T> lItr = reader.open(need, reportMissing);
 		return new AsyncRevObjectQueue() {
-			@Override
 			public RevObject next() throws MissingObjectException,
 					IncorrectObjectTypeException, IOException {
 				if (objItr.hasNext())
@@ -987,12 +933,10 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 				return r;
 			}
 
-			@Override
 			public boolean cancel(boolean mayInterruptIfRunning) {
 				return lItr.cancel(mayInterruptIfRunning);
 			}
 
-			@Override
 			public void release() {
 				lItr.release();
 			}
@@ -1119,47 +1063,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	}
 
 	/**
-	 * Preserve a RevFlag during all {@code reset} methods.
-	 * <p>
-	 * Calling {@code retainOnReset(flag)} avoids needing to pass the flag
-	 * during each {@code resetRetain()} invocation on this instance.
-	 * <p>
-	 * Clearing flags marked retainOnReset requires disposing of the flag with
-	 * {@code #disposeFlag(RevFlag)} or disposing of the entire RevWalk by
-	 * {@code #dispose()}.
-	 *
-	 * @param flag
-	 *            the flag to retain during all resets.
-	 * @since 3.6
-	 */
-	public final void retainOnReset(RevFlag flag) {
-		if ((freeFlags & flag.mask) != 0)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().flagIsDisposed, flag.name));
-		if (flag.walker != this)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().flagNotFromThis, flag.name));
-		retainOnReset |= flag.mask;
-	}
-
-	/**
-	 * Preserve a set of RevFlags during all {@code reset} methods.
-	 * <p>
-	 * Calling {@code retainOnReset(set)} avoids needing to pass the flags
-	 * during each {@code resetRetain()} invocation on this instance.
-	 * <p>
-	 * Clearing flags marked retainOnReset requires disposing of the flag with
-	 * {@code #disposeFlag(RevFlag)} or disposing of the entire RevWalk by
-	 * {@code #dispose()}.
-	 *
-	 * @param flags
-	 *            the flags to retain during all resets.
-	 * @since 3.6
-	 */
-	public final void retainOnReset(Collection<RevFlag> flags) {
-		for (RevFlag f : flags)
-			retainOnReset(f);
-	}
-
-	/**
 	 * Allow a flag to be recycled for a different use.
 	 * <p>
 	 * Recycled flags always come back as a different Java object instance when
@@ -1177,7 +1080,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	}
 
 	void freeFlag(final int mask) {
-		retainOnReset &= ~mask;
 		if (isNotStarted()) {
 			freeFlags |= mask;
 			carryFlags &= ~mask;
@@ -1226,9 +1128,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * Unlike {@link #dispose()} previously acquired RevObject (and RevCommit)
 	 * instances are not invalidated. RevFlag instances are not invalidated, but
 	 * are removed from all RevObjects.
-	 * <p>
-	 * See {@link #retainOnReset(RevFlag)} for an alternative that does not
-	 * require passing the flags during each reset.
 	 *
 	 * @param retainFlags
 	 *            application flags that should <b>not</b> be cleared from
@@ -1254,7 +1153,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	protected void reset(int retainFlags) {
 		finishDelayedFreeFlags();
-		retainFlags |= PARSED | retainOnReset;
+		retainFlags |= PARSED;
 		final int clearFlags = ~retainFlags;
 
 		final FIFORevQueue q = new FIFORevQueue();
@@ -1295,12 +1194,12 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * All RevFlag instances are also invalidated, and must not be reused.
 	 */
 	public void dispose() {
-		reader.close();
+		reader.release();
 		freeFlags = APP_FLAGS;
 		delayFreeFlags = 0;
-		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
+		reader.release();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -1322,7 +1221,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * @return an iterator over this walker's commits.
 	 * @see RevWalkException
 	 */
-	@Override
 	public Iterator<RevCommit> iterator() {
 		final RevCommit first;
 		try {
@@ -1338,12 +1236,10 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		return new Iterator<RevCommit>() {
 			RevCommit next = first;
 
-			@Override
 			public boolean hasNext() {
 				return next != null;
 			}
 
-			@Override
 			public RevCommit next() {
 				try {
 					final RevCommit r = next;
@@ -1358,7 +1254,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 				}
 			}
 
-			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}
@@ -1411,21 +1306,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		final int carry = c.flags & carryFlags;
 		if (carry != 0)
 			RevCommit.carryFlags(c, carry);
-	}
-
-	/**
-	 * Assume additional commits are shallow (have no parents).
-	 * <p>
-	 * This method is a No-op if the collection is empty.
-	 *
-	 * @param ids
-	 *            commits that should be treated as shallow commits, in addition
-	 *            to any commits already known to be shallow by the repository.
-	 * @since 3.3
-	 */
-	public void assumeShallow(Collection<? extends ObjectId> ids) {
-		for (ObjectId id : ids)
-			lookupCommit(id).parents = RevCommit.NO_PARENTS;
 	}
 
 	void initializeShallowCommits() throws IOException {

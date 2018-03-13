@@ -60,7 +60,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.filter.ObjectFilter;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -100,7 +99,9 @@ public class ObjectWalk extends RevWalk {
 
 	private BlockObjQueue pendingObjects;
 
-	private ObjectFilter objectFilter;
+	private RevCommit firstCommit;
+
+	private RevCommit lastCommit;
 
 	private TreeVisit freeVisit;
 
@@ -132,10 +133,8 @@ public class ObjectWalk extends RevWalk {
 	 */
 	public ObjectWalk(ObjectReader or) {
 		super(or);
-		setRetainBody(false);
-		rootObjects = new ArrayList<>();
+		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
-		objectFilter = ObjectFilter.ALL;
 		pathBuf = new byte[256];
 	}
 
@@ -255,59 +254,26 @@ public class ObjectWalk extends RevWalk {
 		boundary = hasRevSort(RevSort.BOUNDARY);
 	}
 
-	/**
-	 * Get the currently configured object filter.
-	 *
-	 * @return the current filter. Never null as a filter is always needed.
-	 *
-	 * @since 4.0
-	 */
-	public ObjectFilter getObjectFilter() {
-		return objectFilter;
-	}
-
-	/**
-	 * Set the object filter for this walker.  This filter affects the objects
-	 * visited by {@link #nextObject()}.  It does not affect the commits
-	 * listed by {@link #next()}.
-	 * <p>
-	 * If the filter returns false for an object, then that object is skipped
-	 * and objects reachable from it are not enqueued to be walked recursively.
-	 * This can be used to speed up the object walk by skipping subtrees that
-	 * are known to be uninteresting.
-	 *
-	 * @param newFilter
-	 *            the new filter. If null the special {@link ObjectFilter#ALL}
-	 *            filter will be used instead, as it matches every object.
-	 *
-	 * @since 4.0
-	 */
-	public void setObjectFilter(ObjectFilter newFilter) {
-		assertNotStarted();
-		objectFilter = newFilter != null ? newFilter : ObjectFilter.ALL;
-	}
-
 	@Override
 	public RevCommit next() throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		for (;;) {
 			final RevCommit r = super.next();
 			if (r == null) {
+				if (firstCommit != null)
+					reader.walkAdviceBeginTrees(this, firstCommit, lastCommit);
 				return null;
 			}
-			final RevTree t = r.getTree();
 			if ((r.flags & UNINTERESTING) != 0) {
-				if (objectFilter.include(this, t)) {
-					markTreeUninteresting(t);
-				}
-				if (boundary) {
+				markTreeUninteresting(r.getTree());
+				if (boundary)
 					return r;
-				}
 				continue;
 			}
-			if (objectFilter.include(this, t)) {
-				pendingObjects.add(t);
-			}
+			if (firstCommit == null)
+				firstCommit = r;
+			lastCommit = r;
+			pendingObjects.add(r.getTree());
 			return r;
 		}
 	}
@@ -338,10 +304,6 @@ public class ObjectWalk extends RevWalk {
 				ptr = findObjectId(buf, ptr);
 				idBuffer.fromRaw(buf, ptr);
 				ptr += ID_SZ;
-
-				if (!objectFilter.include(this, idBuffer)) {
-					continue;
-				}
 
 				RevObject obj = objects.get(idBuffer);
 				if (obj != null && (obj.flags & SEEN) != 0)
@@ -404,6 +366,7 @@ public class ObjectWalk extends RevWalk {
 		for (;;) {
 			RevObject o = pendingObjects.next();
 			if (o == null) {
+				reader.walkAdviceEnd();
 				return null;
 			}
 			int flags = o.flags;
@@ -671,6 +634,8 @@ public class ObjectWalk extends RevWalk {
 	public void dispose() {
 		super.dispose();
 		pendingObjects = new BlockObjQueue();
+		firstCommit = null;
+		lastCommit = null;
 		currVisit = null;
 		freeVisit = null;
 	}
@@ -682,8 +647,10 @@ public class ObjectWalk extends RevWalk {
 		for (RevObject obj : rootObjects)
 			obj.flags &= ~IN_PENDING;
 
-		rootObjects = new ArrayList<>();
+		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
+		firstCommit = null;
+		lastCommit = null;
 		currVisit = null;
 		freeVisit = null;
 	}

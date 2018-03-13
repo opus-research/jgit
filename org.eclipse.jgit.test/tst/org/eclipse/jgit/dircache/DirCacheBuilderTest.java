@@ -211,7 +211,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		DirCache dc = db.lockDirCache();
 		IndexChangedListener listener = new IndexChangedListener() {
 
-			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				throw new ReceivedEventMarkerException();
 			}
@@ -239,7 +238,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		dc = db.lockDirCache();
 		listener = new IndexChangedListener() {
 
-			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				throw new ReceivedEventMarkerException();
 			}
@@ -292,7 +290,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 	public void testAdd_InGitSortOrder() throws Exception {
 		final DirCache dc = db.readDirCache();
 
-		final String[] paths = { "a-", "a.b", "a/b", "a0b" };
+		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);
@@ -317,7 +315,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 	public void testAdd_ReverseGitSortOrder() throws Exception {
 		final DirCache dc = db.readDirCache();
 
-		final String[] paths = { "a-", "a.b", "a/b", "a0b" };
+		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);
@@ -342,7 +340,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 	public void testBuilderClear() throws Exception {
 		final DirCache dc = db.readDirCache();
 
-		final String[] paths = { "a-", "a.b", "a/b", "a0b" };
+		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);

@@ -64,11 +64,9 @@ public abstract class OperationResult {
 
 	URIish uri;
 
-	final SortedMap<String, TrackingRefUpdate> updates = new TreeMap<>();
+	final SortedMap<String, TrackingRefUpdate> updates = new TreeMap<String, TrackingRefUpdate>();
 
 	StringBuilder messageBuffer;
-
-	String peerUserAgent;
 
 	/**
 	 * Get the URI this result came from.
@@ -166,16 +164,5 @@ public abstract class OperationResult {
 			if (!msg.endsWith("\n")) //$NON-NLS-1$
 				messageBuffer.append('\n');
 		}
-	}
-
-	/**
-	 * Get the user agent advertised by the peer server, if available.
-	 *
-	 * @return advertised user agent, e.g. {@code "JGit/4.0"}. Null if the peer
-	 *         did not advertise version information.
-	 * @since 4.0
-	 */
-	public String getPeerUserAgent() {
-		return peerUserAgent;
 	}
 }

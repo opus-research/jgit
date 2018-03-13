@@ -75,7 +75,7 @@ public class DefaultNoteMergerTest extends RepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		tr = new TestRepository<>(db);
+		tr = new TestRepository<Repository>(db);
 		reader = db.newObjectReader();
 		inserter = db.newObjectInserter();
 		merger = new DefaultNoteMerger();
@@ -86,8 +86,8 @@ public class DefaultNoteMergerTest extends RepositoryTestCase {
 	@Override
 	@After
 	public void tearDown() throws Exception {
-		reader.close();
-		inserter.close();
+		reader.release();
+		inserter.release();
 		super.tearDown();
 	}
 

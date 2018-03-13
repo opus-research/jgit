@@ -85,7 +85,7 @@ public class BlameResult {
 		String path = gen.getResultPath();
 		RawText contents = gen.getResultContents();
 		if (contents == null) {
-			gen.close();
+			gen.release();
 			return null;
 		}
 		return new BlameResult(gen, path, contents);
@@ -239,7 +239,7 @@ public class BlameResult {
 			while (gen.next())
 				loadFrom(gen);
 		} finally {
-			gen.close();
+			gen.release();
 			generator = null;
 		}
 	}
@@ -265,7 +265,7 @@ public class BlameResult {
 			lastLength = gen.getRegionLength();
 			return gen.getResultStart();
 		} else {
-			gen.close();
+			gen.release();
 			generator = null;
 			return -1;
 		}
@@ -280,9 +280,9 @@ public class BlameResult {
 	 * Compute until the entire range has been populated.
 	 *
 	 * @param start
-	 *            first index to examine (inclusive).
+	 *            first index to examine.
 	 * @param end
-	 *            end index (exclusive).
+	 *            last index to examine.
 	 * @throws IOException
 	 *             the repository cannot be read.
 	 */
@@ -290,17 +290,13 @@ public class BlameResult {
 		BlameGenerator gen = generator;
 		if (gen == null)
 			return;
-		if (start == 0 && end == resultContents.size()) {
-			computeAll();
-			return;
-		}
 
 		while (start < end) {
 			if (hasSourceData(start, end))
 				return;
 
 			if (!gen.next()) {
-				gen.close();
+				gen.release();
 				generator = null;
 				return;
 			}

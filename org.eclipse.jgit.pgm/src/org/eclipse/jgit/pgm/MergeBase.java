@@ -47,12 +47,11 @@ package org.eclipse.jgit.pgm;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
 
-@Command(usage = "usage_MergeBase")
 class MergeBase extends TextBuiltin {
 	@Option(name = "--all", usage = "usage_displayAllPossibleMergeBases")
 	private boolean all;
@@ -63,7 +62,7 @@ class MergeBase extends TextBuiltin {
 	}
 
 	@Argument(index = 1, metaVar = "metaVar_commitish", required = true)
-	private final List<RevCommit> commits = new ArrayList<>();
+	private final List<RevCommit> commits = new ArrayList<RevCommit>();
 
 	@Override
 	protected void run() throws Exception {

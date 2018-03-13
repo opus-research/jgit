@@ -47,14 +47,14 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import javaewah.EWAHCompressedBitmap;
+import javaewah.IntIterator;
+
 import org.eclipse.jgit.internal.storage.file.BasePackBitmapIndex.StoredBitmap;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
-
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-import com.googlecode.javaewah.IntIterator;
 
 /**
  * A PackBitmapIndex that remaps the bitmaps in the previous index to the
@@ -66,7 +66,7 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 		implements Iterable<PackBitmapIndexRemapper.Entry> {
 
 	private final BasePackBitmapIndex oldPackIndex;
-	final PackBitmapIndex newPackIndex;
+	private final PackBitmapIndex newPackIndex;
 	private final ObjectIdOwnerMap<StoredBitmap> convertedBitmaps;
 	private final BitSet inflated;
 	private final int[] prevToNewMapping;
@@ -107,7 +107,7 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 			BasePackBitmapIndex oldPackIndex, PackBitmapIndex newPackIndex) {
 		this.oldPackIndex = oldPackIndex;
 		this.newPackIndex = newPackIndex;
-		convertedBitmaps = new ObjectIdOwnerMap<>();
+		convertedBitmaps = new ObjectIdOwnerMap<StoredBitmap>();
 		inflated = new BitSet(newPackIndex.getObjectCount());
 
 		prevToNewMapping = new int[oldPackIndex.getObjectCount()];
@@ -137,7 +137,6 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 		return newPackIndex.ofObjectType(bitmap, type);
 	}
 
-	@Override
 	public Iterator<Entry> iterator() {
 		if (oldPackIndex == null)
 			return Collections.<Entry> emptyList().iterator();
@@ -146,7 +145,6 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 		return new Iterator<Entry>() {
 			private Entry entry;
 
-			@Override
 			public boolean hasNext() {
 				while (entry == null && it.hasNext()) {
 					StoredBitmap sb = it.next();
@@ -156,7 +154,6 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 				return entry != null;
 			}
 
-			@Override
 			public Entry next() {
 				if (!hasNext())
 					throw new NoSuchElementException();
@@ -166,7 +163,6 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 				return res;
 			}
 
-			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}
@@ -203,7 +199,7 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 	public final class Entry extends ObjectId {
 		private final int flags;
 
-		Entry(AnyObjectId src, int flags) {
+		private Entry(AnyObjectId src, int flags) {
 			super(src);
 			this.flags = flags;
 		}
@@ -212,11 +208,5 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex
 		public int getFlags() {
 			return flags;
 		}
-	}
-
-	@Override
-	public int getBitmapCount() {
-		// The count is only useful for the end index, not the remapper.
-		return 0;
 	}
 }

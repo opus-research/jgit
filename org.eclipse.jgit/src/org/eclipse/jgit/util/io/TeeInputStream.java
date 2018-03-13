@@ -115,7 +115,6 @@ public class TeeInputStream extends InputStream {
 		return n;
 	}
 
-	@Override
 	public void close() throws IOException {
 		byte[] b = skipBuffer();
 		for (;;) {

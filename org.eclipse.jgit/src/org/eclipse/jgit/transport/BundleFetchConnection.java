@@ -47,8 +47,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,7 +90,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	InputStream bin;
 
-	final Map<ObjectId, String> prereqs = new HashMap<>();
+	final Map<ObjectId, String> prereqs = new HashMap<ObjectId, String>();
 
 	private String lockMessage;
 
@@ -130,7 +128,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	private void readBundleV2() throws IOException {
 		final byte[] hdrbuf = new byte[1024];
-		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<>();
+		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<String, Ref>();
 		for (;;) {
 			String line = readLine(hdrbuf);
 			if (line.length() == 0)
@@ -161,26 +159,18 @@ class BundleFetchConnection extends BaseFetchConnection {
 	}
 
 	private String readLine(final byte[] hdrbuf) throws IOException {
-		StringBuilder line = new StringBuilder();
-		boolean done = false;
-		while (!done) {
-			bin.mark(hdrbuf.length);
-			final int cnt = bin.read(hdrbuf);
-			int lf = 0;
-			while (lf < cnt && hdrbuf[lf] != '\n')
-				lf++;
-			bin.reset();
-			IO.skipFully(bin, lf);
-			if (lf < cnt && hdrbuf[lf] == '\n') {
-				IO.skipFully(bin, 1);
-				done = true;
-			}
-			line.append(RawParseUtils.decode(Constants.CHARSET, hdrbuf, 0, lf));
-		}
-		return line.toString();
+		bin.mark(hdrbuf.length);
+		final int cnt = bin.read(hdrbuf);
+		int lf = 0;
+		while (lf < cnt && hdrbuf[lf] != '\n')
+			lf++;
+		bin.reset();
+		IO.skipFully(bin, lf);
+		if (lf < cnt && hdrbuf[lf] == '\n')
+			IO.skipFully(bin, 1);
+		return RawParseUtils.decode(Constants.CHARSET, hdrbuf, 0, lf);
 	}
 
-	@Override
 	public boolean didFetchTestConnectivity() {
 		return false;
 	}
@@ -191,13 +181,16 @@ class BundleFetchConnection extends BaseFetchConnection {
 			throws TransportException {
 		verifyPrerequisites();
 		try {
-			try (ObjectInserter ins = transport.local.newObjectInserter()) {
+			ObjectInserter ins = transport.local.newObjectInserter();
+			try {
 				PackParser parser = ins.newPackParser(bin);
 				parser.setAllowThin(true);
-				parser.setObjectChecker(transport.getObjectChecker());
+				parser.setObjectChecking(transport.isCheckFetchedObjects());
 				parser.setLockMessage(lockMessage);
 				packLock = parser.parse(NullProgressMonitor.INSTANCE);
 				ins.flush();
+			} finally {
+				ins.release();
 			}
 		} catch (IOException err) {
 			close();
@@ -208,12 +201,10 @@ class BundleFetchConnection extends BaseFetchConnection {
 		}
 	}
 
-	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
 
-	@Override
 	public Collection<PackLock> getPackLocks() {
 		if (packLock != null)
 			return Collections.singleton(packLock);
@@ -224,12 +215,13 @@ class BundleFetchConnection extends BaseFetchConnection {
 		if (prereqs.isEmpty())
 			return;
 
-		try (final RevWalk rw = new RevWalk(transport.local)) {
+		final RevWalk rw = new RevWalk(transport.local);
+		try {
 			final RevFlag PREREQ = rw.newFlag("PREREQ"); //$NON-NLS-1$
 			final RevFlag SEEN = rw.newFlag("SEEN"); //$NON-NLS-1$
 
-			final Map<ObjectId, String> missing = new HashMap<>();
-			final List<RevObject> commits = new ArrayList<>();
+			final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
+			final List<RevObject> commits = new ArrayList<RevObject>();
 			for (final Map.Entry<ObjectId, String> e : prereqs.entrySet()) {
 				ObjectId p = e.getKey();
 				try {
@@ -250,13 +242,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 				throw new MissingBundlePrerequisiteException(transport.uri,
 						missing);
 
-			Map<String, Ref> localRefs;
-			try {
-				localRefs = transport.local.getRefDatabase().getRefs(ALL);
-			} catch (IOException e) {
-				throw new TransportException(transport.uri, e.getMessage(), e);
-			}
-			for (final Ref r : localRefs.values()) {
+			for (final Ref r : transport.local.getAllRefs().values()) {
 				try {
 					rw.markStart(rw.parseCommit(r.getObjectId()));
 				} catch (IOException readError) {
@@ -287,6 +273,8 @@ class BundleFetchConnection extends BaseFetchConnection {
 				throw new MissingBundlePrerequisiteException(transport.uri,
 						missing);
 			}
+		} finally {
+			rw.release();
 		}
 	}
 

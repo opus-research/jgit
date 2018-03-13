@@ -44,6 +44,7 @@
 package org.eclipse.jgit.transport;
 
 import static java.lang.Integer.valueOf;
+import static java.lang.Long.valueOf;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
@@ -194,63 +195,56 @@ public class SideBandOutputStreamTest {
 		assertEquals(1, flushCnt[0]);
 	}
 
-	private void createSideBandOutputStream(int chan, int sz, OutputStream os)
-			throws Exception {
-		try (SideBandOutputStream s = new SideBandOutputStream(chan, sz, os)) {
-			// Unused
-		}
-	}
-
 	@Test
-	public void testConstructor_RejectsBadChannel() throws Exception {
+	public void testConstructor_RejectsBadChannel() {
 		try {
-			createSideBandOutputStream(-1, MAX_BUF, rawOut);
+			new SideBandOutputStream(-1, MAX_BUF, rawOut);
 			fail("Accepted -1 channel number");
 		} catch (IllegalArgumentException e) {
-			assertEquals("channel -1 must be in range [1, 255]", e.getMessage());
+			assertEquals("channel -1 must be in range [0, 255]", e.getMessage());
 		}
 
 		try {
-			createSideBandOutputStream(0, MAX_BUF, rawOut);
+			new SideBandOutputStream(0, MAX_BUF, rawOut);
 			fail("Accepted 0 channel number");
 		} catch (IllegalArgumentException e) {
-			assertEquals("channel 0 must be in range [1, 255]", e.getMessage());
+			assertEquals("channel 0 must be in range [0, 255]", e.getMessage());
 		}
 
 		try {
-			createSideBandOutputStream(256, MAX_BUF, rawOut);
+			new SideBandOutputStream(256, MAX_BUF, rawOut);
 			fail("Accepted 256 channel number");
 		} catch (IllegalArgumentException e) {
-			assertEquals("channel 256 must be in range [1, 255]", e
+			assertEquals("channel 256 must be in range [0, 255]", e
 					.getMessage());
 		}
 	}
 
 	@Test
-	public void testConstructor_RejectsBadBufferSize() throws Exception {
+	public void testConstructor_RejectsBadBufferSize() {
 		try {
-			createSideBandOutputStream(CH_DATA, -1, rawOut);
+			new SideBandOutputStream(CH_DATA, -1, rawOut);
 			fail("Accepted -1 for buffer size");
 		} catch (IllegalArgumentException e) {
 			assertEquals("packet size -1 must be >= 5", e.getMessage());
 		}
 
 		try {
-			createSideBandOutputStream(CH_DATA, 0, rawOut);
+			new SideBandOutputStream(CH_DATA, 0, rawOut);
 			fail("Accepted 0 for buffer size");
 		} catch (IllegalArgumentException e) {
 			assertEquals("packet size 0 must be >= 5", e.getMessage());
 		}
 
 		try {
-			createSideBandOutputStream(CH_DATA, 1, rawOut);
+			new SideBandOutputStream(CH_DATA, 1, rawOut);
 			fail("Accepted 1 for buffer size");
 		} catch (IllegalArgumentException e) {
 			assertEquals("packet size 1 must be >= 5", e.getMessage());
 		}
 
 		try {
-			createSideBandOutputStream(CH_DATA, Integer.MAX_VALUE, rawOut);
+			new SideBandOutputStream(CH_DATA, Integer.MAX_VALUE, rawOut);
 			fail("Accepted " + Integer.MAX_VALUE + " for buffer size");
 		} catch (IllegalArgumentException e) {
 			assertEquals(MessageFormat.format(

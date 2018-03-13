@@ -47,72 +47,36 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 
 /**
  * gzip-compressed tarball (tar.gz) format.
  */
-public final class TgzFormat extends BaseFormat implements
-		ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".tar.gz", ".tgz")); //$NON-NLS-1$ //$NON-NLS-2$
+public class TgzFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	private static final List<String> SUFFIXES =
+			Collections.unmodifiableList(Arrays.asList(
+				".tar.gz", ".tgz"));
 
 	private final ArchiveCommand.Format<ArchiveOutputStream> tarFormat = new TarFormat();
 
-	@Override
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s)
 			throws IOException {
-		return createArchiveOutputStream(s,
-				Collections.<String, Object> emptyMap());
-	}
-
-	/**
-	 * @since 4.0
-	 */
-	@Override
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s,
-			Map<String, Object> o) throws IOException {
 		GzipCompressorOutputStream out = new GzipCompressorOutputStream(s);
-		return tarFormat.createArchiveOutputStream(out, o);
+		return tarFormat.createArchiveOutputStream(out);
 	}
 
-	@Deprecated
-	@Override
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		putEntry(out, null, path, mode,loader);
+		tarFormat.putEntry(out, path, mode, loader);
 	}
 
-	/**
-	 * @since 4.7
-	 */
-	@Override
-	public void putEntry(ArchiveOutputStream out,
-			ObjectId tree, String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		tarFormat.putEntry(out, tree, path, mode, loader);
-	}
-
-	@Override
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		return (other instanceof TgzFormat);
-	}
-
-	@Override
-	public int hashCode() {
-		return getClass().hashCode();
 	}
 }

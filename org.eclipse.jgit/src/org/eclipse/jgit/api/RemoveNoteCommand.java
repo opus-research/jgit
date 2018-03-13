@@ -79,14 +79,14 @@ public class RemoveNoteCommand extends GitCommand<Note> {
 		super(repo);
 	}
 
-	@Override
 	public Note call() throws GitAPIException {
 		checkCallable();
-		try (RevWalk walk = new RevWalk(repo);
-				ObjectInserter inserter = repo.newObjectInserter()) {
-			NoteMap map = NoteMap.newEmptyMap();
-			RevCommit notesCommit = null;
-			Ref ref = repo.exactRef(notesRef);
+		RevWalk walk = new RevWalk(repo);
+		ObjectInserter inserter = repo.newObjectInserter();
+		NoteMap map = NoteMap.newEmptyMap();
+		RevCommit notesCommit = null;
+		try {
+			Ref ref = repo.getRef(notesRef);
 			// if we have a notes ref, use it
 			if (ref != null) {
 				notesCommit = walk.parseCommit(ref.getObjectId());
@@ -94,10 +94,13 @@ public class RemoveNoteCommand extends GitCommand<Note> {
 			}
 			map.set(id, null, inserter);
 			commitNoteMap(walk, map, notesCommit, inserter,
-					"Notes removed by 'git notes remove'"); //$NON-NLS-1$
+					"Notes removed by 'git notes remove'");
 			return map.getNote(id);
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			inserter.release();
+			walk.release();
 		}
 	}
 

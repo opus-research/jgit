@@ -94,7 +94,7 @@ public class DfsPackParser extends PackParser {
 	private DfsPackDescription packDsc;
 
 	/** Key used during delta resolution reading delta chains. */
-	private DfsStreamKey packKey;
+	private DfsPackKey packKey;
 
 	/** If the index was small enough, the entire index after writing. */
 	private PackIndex packIndex;
@@ -150,13 +150,12 @@ public class DfsPackParser extends PackParser {
 			readBlock = null;
 			packDsc.addFileExt(PACK);
 			packDsc.setFileSize(PACK, packEnd);
-			packDsc.setBlockSize(PACK, blockSize);
 
 			writePackIndex();
 			objdb.commitPack(Collections.singletonList(packDsc), null);
 			rollback = false;
 
-			DfsPackFile p = new DfsPackFile(blockCache, packDsc);
+			DfsPackFile p = blockCache.getOrCreate(packDsc, packKey);
 			p.setBlockSize(blockSize);
 			if (packIndex != null)
 				p.setPackIndex(packIndex);
@@ -207,9 +206,9 @@ public class DfsPackParser extends PackParser {
 		}
 
 		packDsc = objdb.newPack(DfsObjDatabase.PackSource.RECEIVE);
-		out = objdb.writeFile(packDsc, PACK);
-		packKey = packDsc.getStreamKey(PACK);
+		packKey = new DfsPackKey();
 
+		out = objdb.writeFile(packDsc, PACK);
 		int size = out.blockSize();
 		if (size <= 0)
 			size = blockCache.getBlockSize();

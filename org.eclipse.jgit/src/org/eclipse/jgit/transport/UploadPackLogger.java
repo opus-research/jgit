@@ -52,14 +52,10 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
  * thread to a particular connection, if they need to also include connection
  * information. One method is to use a {@link java.lang.ThreadLocal} to remember
  * the connection information before invoking UploadPack.
- *
- * @deprecated use {@link PostUploadHook} instead
  */
-@Deprecated
-public interface UploadPackLogger { // TODO remove in JGit 5.0
+public interface UploadPackLogger {
 	/** A simple no-op logger. */
 	public static final UploadPackLogger NULL = new UploadPackLogger() {
-		@Override
 		public void onPackStatistics(PackWriter.Statistics stats) {
 			// Do nothing.
 		}

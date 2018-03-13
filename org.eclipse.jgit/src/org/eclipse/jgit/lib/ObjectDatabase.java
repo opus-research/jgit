@@ -120,8 +120,11 @@ public abstract class ObjectDatabase {
 	 *             the object store cannot be accessed.
 	 */
 	public boolean has(final AnyObjectId objectId) throws IOException {
-		try (final ObjectReader or = newReader()) {
+		final ObjectReader or = newReader();
+		try {
 			return or.has(objectId);
+		} finally {
+			or.release();
 		}
 	}
 
@@ -153,10 +156,9 @@ public abstract class ObjectDatabase {
 	 * @param objectId
 	 *            identity of the object to open.
 	 * @param typeHint
-	 *            hint about the type of object being requested, e.g.
-	 *            {@link Constants#OBJ_BLOB}; {@link ObjectReader#OBJ_ANY} if
-	 *            the object type is not known, or does not matter to the
-	 *            caller.
+	 *            hint about the type of object being requested;
+	 *            {@link ObjectReader#OBJ_ANY} if the object type is not known,
+	 *            or does not matter to the caller.
 	 * @return a {@link ObjectLoader} for accessing the object.
 	 * @throws MissingObjectException
 	 *             the object does not exist.
@@ -169,8 +171,11 @@ public abstract class ObjectDatabase {
 	public ObjectLoader open(AnyObjectId objectId, int typeHint)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		try (final ObjectReader or = newReader()) {
+		final ObjectReader or = newReader();
+		try {
 			return or.open(objectId, typeHint);
+		} finally {
+			or.release();
 		}
 	}
 

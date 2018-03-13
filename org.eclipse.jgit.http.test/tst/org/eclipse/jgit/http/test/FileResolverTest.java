@@ -83,7 +83,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 
 	private static void assertUnreasonable(String name)
 			throws ServiceNotEnabledException {
-		FileResolver<RepositoryResolver> r = new FileResolver<>(
+		FileResolver<RepositoryResolver> r = new FileResolver<RepositoryResolver>(
 				new File("."), false);
 		try {
 			r.open(null, name);
@@ -103,7 +103,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 		FileResolver<RepositoryResolver> resolver;
 
 		assertFalse("no git-daemon-export-ok", export.exists());
-		resolver = new FileResolver<>(base, false /*
+		resolver = new FileResolver<RepositoryResolver>(base, false /*
 																	 * require
 																	 * flag
 																	 */);
@@ -114,7 +114,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 			assertEquals("Service not enabled", e.getMessage());
 		}
 
-		resolver = new FileResolver<>(base, true /*
+		resolver = new FileResolver<RepositoryResolver>(base, true /*
 																	 * export
 																	 * all
 																	 */);
@@ -125,7 +125,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 		}
 
 		FileUtils.createNewFile(export);
-		resolver = new FileResolver<>(base, false /*
+		resolver = new FileResolver<RepositoryResolver>(base, false /*
 																	 * require
 																	 * flag
 																	 */);
@@ -142,7 +142,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 		final Repository a = createBareRepository();
 		final String name = a.getDirectory().getName() + "-not-a-git";
 		final File base = a.getDirectory().getParentFile();
-		FileResolver<RepositoryResolver> resolver = new FileResolver<>(
+		FileResolver<RepositoryResolver> resolver = new FileResolver<RepositoryResolver>(
 				base, false);
 
 		try {
@@ -153,7 +153,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 			Throwable why = e.getCause();
 			assertNotNull("has cause", why);
 			assertEquals("repository not found: "
-					+ new File(base, name).getPath(), why.getMessage());
+					+ new File(base, name).getAbsolutePath(), why.getMessage());
 		}
 	}
 }

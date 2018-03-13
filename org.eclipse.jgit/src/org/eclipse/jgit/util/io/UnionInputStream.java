@@ -67,7 +67,7 @@ public class UnionInputStream extends InputStream {
 		}
 	};
 
-	private final LinkedList<InputStream> streams = new LinkedList<>();
+	private final LinkedList<InputStream> streams = new LinkedList<InputStream>();
 
 	/** Create an empty InputStream that is currently at EOF state. */
 	public UnionInputStream() {

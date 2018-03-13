@@ -69,7 +69,7 @@ public class FileNameMatcherTest {
 			final boolean appendCanMatchExpected)
 			throws InvalidPatternException {
 		final FileNameMatcher matcher = new FileNameMatcher(pattern,
-				Character.valueOf(excludedCharacter));
+				new Character(excludedCharacter));
 		matcher.append(input);
 		assertEquals(matchExpected, matcher.isMatch());
 		assertEquals(appendCanMatchExpected, matcher.canAppendMatch());
@@ -799,46 +799,6 @@ public class FileNameMatcherTest {
 		} catch (InvalidPatternException e) {
 			assertTrue(e.getMessage().contains("[.a.]"));
 		}
-	}
-
-	@Test
-	public void testEscapedBracket1() throws Exception {
-		assertMatch("\\[", "[", true, false);
-	}
-
-	@Test
-	public void testEscapedBracket2() throws Exception {
-		assertMatch("\\[[a]", "[", false, true);
-	}
-
-	@Test
-	public void testEscapedBracket3() throws Exception {
-		assertMatch("\\[[a]", "a", false, false);
-	}
-
-	@Test
-	public void testEscapedBracket4() throws Exception {
-		assertMatch("\\[[a]", "[a", true, false);
-	}
-
-	@Test
-	public void testEscapedBracket5() throws Exception {
-		assertMatch("[a\\]]", "]", true, false);
-	}
-
-	@Test
-	public void testEscapedBracket6() throws Exception {
-		assertMatch("[a\\]]", "a", true, false);
-	}
-
-	@Test
-	public void testEscapedBackslash() throws Exception {
-		assertMatch("a\\\\b", "a\\b", true, false);
-	}
-
-	@Test
-	public void testMultipleEscapedCharacters1() throws Exception {
-		assertMatch("\\]a?c\\*\\[d\\?\\]", "]abc*[d?]", true, false);
 	}
 
 	@Test

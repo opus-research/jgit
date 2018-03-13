@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
- * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -68,35 +67,21 @@ public class CLIText extends TranslationBundle {
 	 * @param line
 	 *            the line to format
 	 * @return the formatted line
+	 * @since 2.2
 	 */
 	public static String formatLine(String line) {
 		return MessageFormat.format(get().lineFormat, line);
 	}
 
-	/**
-	 * Format the given argument as fatal error using the format defined by
-	 * {@link #fatalError} ("fatal: " by default).
-	 *
-	 * @param message
-	 *            the message to format
-	 * @return the formatted line
-	 */
-	public static String fatalError(String message) {
-		return MessageFormat.format(get().fatalError, message);
-	}
-
 	// @formatter:off
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
-	/***/ public String answerNo;
-	/***/ public String answerYes;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
 	/***/ public String branchCreatedFrom;
 	/***/ public String branchDetachedHEAD;
 	/***/ public String branchIsNotAnAncestorOfYourCurrentHEAD;
-	/***/ public String branchNameRequired;
 	/***/ public String branchNotFound;
 	/***/ public String cacheTreePathInfo;
 	/***/ public String configFileNotFound;
@@ -121,12 +106,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cantWrite;
 	/***/ public String changesNotStagedForCommit;
 	/***/ public String changesToBeCommitted;
-	/***/ public String checkingOut;
-	/***/ public String checkoutConflict;
-	/***/ public String checkoutConflictPathLine;
-	/***/ public String cleanRequireForce;
-	/***/ public String clonedEmptyRepository;
-	/***/ public String cloningInto;
 	/***/ public String commitLabel;
 	/***/ public String conflictingUsageOf_git_dir_andArguments;
 	/***/ public String couldNotCreateBranch;
@@ -143,21 +122,13 @@ public class CLIText extends TranslationBundle {
 	/***/ public String failedToLockTag;
 	/***/ public String fatalError;
 	/***/ public String fatalThisProgramWillDestroyTheRepository;
-	/***/ public String fetchingSubmodule;
 	/***/ public String fileIsRequired;
 	/***/ public String ffNotPossibleAborting;
 	/***/ public String forcedUpdate;
 	/***/ public String fromURI;
 	/***/ public String initializedEmptyGitRepositoryIn;
 	/***/ public String invalidHttpProxyOnlyHttpSupported;
-	/***/ public String invalidRecurseSubmodulesMode;
 	/***/ public String jgitVersion;
-	/***/ public String lfsNoAccessKey;
-	/***/ public String lfsNoSecretKey;
-	/***/ public String lfsProtocolUrl;
-	/***/ public String lfsStoreDirectory;
-	/***/ public String lfsStoreUrl;
-	/***/ public String lfsUnknownStoreType;
 	/***/ public String lineFormat;
 	/***/ public String listeningOn;
 	/***/ public String mergeCheckoutConflict;
@@ -169,7 +140,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String mergeWentWellStoppedBeforeCommitting;
 	/***/ public String metaVar_KEY;
 	/***/ public String metaVar_archiveFormat;
-	/***/ public String metaVar_archivePrefix;
 	/***/ public String metaVar_arg;
 	/***/ public String metaVar_author;
 	/***/ public String metaVar_bucket;
@@ -186,7 +156,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String metaVar_filepattern;
 	/***/ public String metaVar_gitDir;
 	/***/ public String metaVar_hostName;
-	/***/ public String metaVar_lfsStorage;
 	/***/ public String metaVar_linesOfContext;
 	/***/ public String metaVar_message;
 	/***/ public String metaVar_n;
@@ -196,33 +165,25 @@ public class CLIText extends TranslationBundle {
 	/***/ public String metaVar_pass;
 	/***/ public String metaVar_path;
 	/***/ public String metaVar_paths;
-	/***/ public String metaVar_pattern;
 	/***/ public String metaVar_port;
 	/***/ public String metaVar_ref;
 	/***/ public String metaVar_refs;
 	/***/ public String metaVar_refspec;
 	/***/ public String metaVar_remoteName;
-	/***/ public String metaVar_s3Bucket;
-	/***/ public String metaVar_s3Region;
-	/***/ public String metaVar_s3StorageClass;
 	/***/ public String metaVar_seconds;
 	/***/ public String metaVar_service;
 	/***/ public String metaVar_treeish;
 	/***/ public String metaVar_uriish;
 	/***/ public String metaVar_url;
 	/***/ public String metaVar_user;
-	/***/ public String metaVar_values;
 	/***/ public String metaVar_version;
 	/***/ public String mostCommonlyUsedCommandsAre;
 	/***/ public String needApprovalToDestroyCurrentRepository;
-	/***/ public String needSingleRevision;
 	/***/ public String noGitRepositoryConfigured;
-	/***/ public String noNamesFound;
 	/***/ public String noSuchFile;
 	/***/ public String noSuchRemoteRef;
 	/***/ public String noTREESectionInIndex;
 	/***/ public String nonFastForward;
-	/***/ public String noSystemConsoleAvailable;
 	/***/ public String notABranch;
 	/***/ public String notACommit;
 	/***/ public String notAGitRepository;
@@ -230,7 +191,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notARevision;
 	/***/ public String notATree;
 	/***/ public String notAValidRefName;
-	/***/ public String notAValidCommitName;
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;
@@ -241,7 +201,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String onBranch;
 	/***/ public String onlyOneMetaVarExpectedIn;
 	/***/ public String onlyOneOfIncludeOnlyAllInteractiveCanBeUsed;
-	/***/ public String password;
 	/***/ public String pathspecDidNotMatch;
 	/***/ public String pushTo;
 	/***/ public String pathsRequired;
@@ -249,9 +208,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String remoteMessage;
 	/***/ public String remoteRefObjectChangedIsNotExpectedOne;
 	/***/ public String remoteSideDoesNotSupportDeletingRefs;
-	/***/ public String removing;
 	/***/ public String repaint;
-	/***/ public String s3InvalidBucket;
 	/***/ public String serviceNotSupported;
 	/***/ public String skippingObject;
 	/***/ public String statusFileListFormat;
@@ -267,22 +224,18 @@ public class CLIText extends TranslationBundle {
 	/***/ public String statusDeletedByUs;
 	/***/ public String statusBothAdded;
 	/***/ public String statusBothModified;
-	/***/ public String submoduleRegistered;
 	/***/ public String switchedToNewBranch;
 	/***/ public String switchedToBranch;
 	/***/ public String tagAlreadyExists;
 	/***/ public String tagLabel;
-	/***/ public String tagNotFound;
 	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
 	/***/ public String treeIsRequired;
 	/***/ public char[] unknownIoErrorStdout;
 	/***/ public String unknownMergeStrategy;
-	/***/ public String unknownSubcommand;
 	/***/ public String unmergedPaths;
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
 	/***/ public String updating;
-	/***/ public String usernameFor;
 }

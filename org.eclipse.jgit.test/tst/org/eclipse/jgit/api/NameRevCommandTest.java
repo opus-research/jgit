@@ -44,7 +44,6 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.util.Map;
 
@@ -64,7 +63,7 @@ public class NameRevCommandTest extends RepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		tr = new TestRepository<>(db);
+		tr = new TestRepository<Repository>(db);
 		git = new Git(db);
 	}
 
@@ -95,9 +94,9 @@ public class NameRevCommandTest extends RepositoryTestCase {
 		tr.update("refs/heads/master", c);
 		tr.update("refs/tags/tag", c);
 		assertOneResult("master",
-				git.nameRev().addRef(db.exactRef("refs/heads/master")), c);
+				git.nameRev().addRef(db.getRef("refs/heads/master")), c);
 		assertOneResult("tag",
-				git.nameRev().addRef(db.exactRef("refs/tags/tag")), c);
+				git.nameRev().addRef(db.getRef("refs/tags/tag")), c);
 	}
 
 	@Test
@@ -107,19 +106,6 @@ public class NameRevCommandTest extends RepositoryTestCase {
 		tr.update("refs/tags/tag1", c);
 		tr.update("refs/tags/tag2", tr.tag("tag2", c));
 		assertOneResult("tag2", git.nameRev().addAnnotatedTags(), c);
-	}
-
-	@Test
-	public void annotatedTagsNoResult() throws Exception {
-		RevCommit c = tr.commit().create();
-		tr.update("refs/heads/master", c);
-		tr.update("refs/tags/tag1", c);
-		tr.update("refs/tags/tag2", c);
-		Map<ObjectId, String> result = git.nameRev()
-				.add(c)
-				.addAnnotatedTags()
-				.call();
-		assertTrue(result.toString(), result.isEmpty());
 	}
 
 	@Test

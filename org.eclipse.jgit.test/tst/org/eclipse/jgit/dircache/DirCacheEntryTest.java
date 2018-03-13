@@ -49,6 +49,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.junit.Test;
@@ -69,17 +70,10 @@ public class DirCacheEntryTest {
 		assertFalse(isValidPath("a\u0000b"));
 	}
 
-	@SuppressWarnings("unused")
-	private static boolean isValidPath(String path) {
-		try {
-			new DirCacheEntry(path);
-			return true;
-		} catch (InvalidPathException e) {
-			return false;
-		}
+	private static boolean isValidPath(final String path) {
+		return DirCacheEntry.isValidPath(Constants.encode(path));
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void testCreate_ByStringPath() {
 		assertEquals("a", new DirCacheEntry("a").getPathString());
@@ -93,7 +87,6 @@ public class DirCacheEntryTest {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void testCreate_ByStringPathAndStage() {
 		DirCacheEntry e;

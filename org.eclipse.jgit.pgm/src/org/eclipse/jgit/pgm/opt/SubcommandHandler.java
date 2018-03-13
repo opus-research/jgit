@@ -45,16 +45,16 @@ package org.eclipse.jgit.pgm.opt;
 
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.pgm.CommandCatalog;
-import org.eclipse.jgit.pgm.CommandRef;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.OptionDef;
 import org.kohsuke.args4j.spi.OptionHandler;
 import org.kohsuke.args4j.spi.Parameters;
 import org.kohsuke.args4j.spi.Setter;
+import org.eclipse.jgit.pgm.CommandCatalog;
+import org.eclipse.jgit.pgm.CommandRef;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.pgm.internal.CLIText;
 
 /**
  * Custom Argument handler for jgit command selection.
@@ -63,8 +63,6 @@ import org.kohsuke.args4j.spi.Setter;
  * we can execute at runtime with the remaining arguments of the parser.
  */
 public class SubcommandHandler extends OptionHandler<TextBuiltin> {
-	private final org.eclipse.jgit.pgm.opt.CmdLineParser clp;
-
 	/**
 	 * Create a new handler for the command name.
 	 * <p>
@@ -77,7 +75,6 @@ public class SubcommandHandler extends OptionHandler<TextBuiltin> {
 	public SubcommandHandler(final CmdLineParser parser,
 			final OptionDef option, final Setter<? super TextBuiltin> setter) {
 		super(parser, option, setter);
-		clp = (org.eclipse.jgit.pgm.opt.CmdLineParser) parser;
 	}
 
 	@Override
@@ -85,7 +82,7 @@ public class SubcommandHandler extends OptionHandler<TextBuiltin> {
 		final String name = params.getParameter(0);
 		final CommandRef cr = CommandCatalog.get(name);
 		if (cr == null)
-			throw new CmdLineException(clp, MessageFormat.format(
+			throw new CmdLineException(MessageFormat.format(
 					CLIText.get().notAJgitCommand, name));
 
 		// Force option parsing to stop. Everything after us should

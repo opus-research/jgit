@@ -65,7 +65,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 
-@Command(usage = "usage_Glog")
 class Glog extends RevWalkTextBuiltin {
 	final JFrame frame;
 
@@ -88,7 +87,6 @@ class Glog extends RevWalkTextBuiltin {
 		final JButton repaint = new JButton();
 		repaint.setText(CLIText.get().repaint);
 		repaint.addActionListener(new ActionListener() {
-			@Override
 			public void actionPerformed(ActionEvent e) {
 				graphPane.repaint();
 			}

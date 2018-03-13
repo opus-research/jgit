@@ -69,7 +69,6 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 
 	private HashMap<RevCommit, String> byName;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -95,7 +94,7 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 		h = commit(f.getTree(), g, f);
 		i = commit(tree(file(pA, zS), file(pE, zY), file(pF, zF)), h);
 
-		byName = new HashMap<>();
+		byName = new HashMap<RevCommit, String>();
 		for (Field z : RevWalkPathFilter6012Test.class.getDeclaredFields()) {
 			if (z.getType() == RevCommit.class)
 				byName.put((RevCommit) z.get(this), z.getName());

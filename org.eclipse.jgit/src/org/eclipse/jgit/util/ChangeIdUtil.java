@@ -42,11 +42,12 @@
  */
 package org.eclipse.jgit.util;
 
+import java.io.IOException;
 import java.util.regex.Pattern;
 
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 
 /**
@@ -89,10 +90,12 @@ public class ChangeIdUtil {
 	 *            The commit message
 	 * @return the change id SHA1 string (without the 'I') or null if the
 	 *         message is not complete enough
+	 * @throws IOException
 	 */
 	public static ObjectId computeChangeId(final ObjectId treeId,
 			final ObjectId firstParentId, final PersonIdent author,
-			final PersonIdent committer, final String message) {
+			final PersonIdent committer, final String message)
+			throws IOException {
 		String cleanMessage = clean(message);
 		if (cleanMessage.length() == 0)
 			return null;
@@ -112,9 +115,8 @@ public class ChangeIdUtil {
 		b.append(committer.toExternalString());
 		b.append("\n\n"); //$NON-NLS-1$
 		b.append(cleanMessage);
-		try (ObjectInserter f = new ObjectInserter.Formatter()) {
-			return f.idFor(Constants.OBJ_COMMIT, Constants.encode(b.toString()));
-		}
+		return new ObjectInserter.Formatter().idFor(Constants.OBJ_COMMIT, //
+				b.toString().getBytes(Constants.CHARACTER_ENCODING));
 	}
 
 	private static final Pattern issuePattern = Pattern
@@ -129,7 +131,7 @@ public class ChangeIdUtil {
 	private static final Pattern includeInFooterPattern = Pattern
 			.compile("^[ \\[].*$"); //$NON-NLS-1$
 
-	private static final Pattern trailingWhitespace = Pattern.compile("\\s+$"); //$NON-NLS-1$
+	private static final Pattern trailingWhitespace = Pattern.compile("\\s+$");
 
 	/**
 	 * Find the right place to insert a Change-Id and return it.
@@ -227,8 +229,6 @@ public class ChangeIdUtil {
 	 */
 	public static int indexOfChangeId(String message, String delimiter) {
 		String[] lines = message.split(delimiter);
-		if (lines.length == 0)
-			return -1;
 		int indexOfChangeIdLine = 0;
 		boolean inFooter = false;
 		for (int i = lines.length - 1; i >= 0; --i) {

@@ -112,8 +112,8 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 
 	private final RevWalk walk;
 	private final List<String> prefixes;
+	private final List<Ref> refs;
 	private final List<ObjectId> revs;
-	private List<Ref> refs;
 	private int mergeCost;
 
 	/**
@@ -124,8 +124,9 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	protected NameRevCommand(Repository repo) {
 		super(repo);
 		mergeCost = MERGE_COST;
-		prefixes = new ArrayList<>(2);
-		revs = new ArrayList<>(2);
+		prefixes = new ArrayList<String>(2);
+		refs = new ArrayList<Ref>();
+		revs = new ArrayList<ObjectId>(2);
 		walk = new RevWalk(repo) {
 			@Override
 			public NameRevCommit createCommit(AnyObjectId id) {
@@ -137,12 +138,10 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	@Override
 	public Map<ObjectId, String> call() throws GitAPIException {
 		try {
-			Map<ObjectId, String> nonCommits = new HashMap<>();
+			Map<ObjectId, String> nonCommits = new HashMap<ObjectId, String>();
 			FIFORevQueue pending = new FIFORevQueue();
-			if (refs != null) {
-				for (Ref ref : refs)
-					addRef(ref, nonCommits, pending);
-			}
+			for (Ref ref : refs)
+				addRef(ref, nonCommits, pending);
 			addPrefixes(nonCommits, pending);
 			int cutoff = minCommitTime() - COMMIT_TIME_SLOP;
 
@@ -170,7 +169,7 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 			}
 
 			Map<ObjectId, String> result =
-				new LinkedHashMap<>(revs.size());
+				new LinkedHashMap<ObjectId, String>(revs.size());
 			for (ObjectId id : revs) {
 				RevObject o = walk.parseAny(id);
 				if (o instanceof NameRevCommit) {
@@ -185,11 +184,11 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 			}
 
 			setCallable(false);
+			walk.release();
 			return result;
 		} catch (IOException e) {
+			walk.reset();
 			throw new JGitInternalException(e.getMessage(), e);
-		} finally {
-			walk.close();
 		}
 	}
 
@@ -274,8 +273,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	 */
 	public NameRevCommand addAnnotatedTags() {
 		checkCallable();
-		if (refs == null)
-			refs = new ArrayList<>();
 		try {
 			for (Ref ref : repo.getRefDatabase().getRefs(Constants.R_TAGS).values()) {
 				ObjectId id = ref.getObjectId();
@@ -301,8 +298,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	 */
 	public NameRevCommand addRef(Ref ref) {
 		checkCallable();
-		if (refs == null)
-			refs = new ArrayList<>();
 		refs.add(ref);
 		return this;
 	}
@@ -317,7 +312,7 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 		if (!prefixes.isEmpty()) {
 			for (String prefix : prefixes)
 				addPrefix(prefix, nonCommits, pending);
-		} else if (refs == null)
+		} else if (refs.isEmpty())
 			addPrefix(Constants.R_REFS, nonCommits, pending);
 	}
 

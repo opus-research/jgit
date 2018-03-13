@@ -44,21 +44,12 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.io.PrintStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.CommandFailedException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * FS implementation for Cygwin on Windows
@@ -66,9 +57,6 @@ import org.slf4j.LoggerFactory;
  * @since 3.0
  */
 public class FS_Win32_Cygwin extends FS_Win32 {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(FS_Win32_Cygwin.class);
-
 	private static String cygpath;
 
 	/**
@@ -77,7 +65,6 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	public static boolean isCygwin() {
 		final String path = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getProperty("java.library.path"); //$NON-NLS-1$
 					}
@@ -107,27 +94,18 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		super(src);
 	}
 
-	@Override
 	public FS newInstance() {
 		return new FS_Win32_Cygwin(this);
 	}
 
-	@Override
 	public File resolve(final File dir, final String pn) {
 		String useCygPath = System.getProperty("jgit.usecygpath"); //$NON-NLS-1$
 		if (useCygPath != null && useCygPath.equals("true")) { //$NON-NLS-1$
-			String w;
-			try {
-				w = readPipe(dir, //
+			String w = readPipe(dir, //
 					new String[] { cygpath, "--windows", "--absolute", pn }, // //$NON-NLS-1$ //$NON-NLS-2$
 					"UTF-8"); //$NON-NLS-1$
-			} catch (CommandFailedException e) {
-				LOG.warn(e.getMessage());
-				return null;
-			}
-			if (!StringUtils.isEmptyOrNull(w)) {
+			if (w != null)
 				return new File(w);
-			}
 		}
 		return super.resolve(dir, pn);
 	}
@@ -136,7 +114,6 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getenv("HOME"); //$NON-NLS-1$
 					}
@@ -148,7 +125,7 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<>(4 + args.length);
+		List<String> argv = new ArrayList<String>(4 + args.length);
 		argv.add("sh.exe"); //$NON-NLS-1$
 		argv.add("-c"); //$NON-NLS-1$
 		argv.add(cmd + " \"$@\""); //$NON-NLS-1$
@@ -157,41 +134,5 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		ProcessBuilder proc = new ProcessBuilder();
 		proc.command(argv);
 		return proc;
-	}
-
-	/**
-	 * @since 3.7
-	 */
-	@Override
-	public String relativize(String base, String other) {
-		final String relativized = super.relativize(base, other);
-		return relativized.replace(File.separatorChar, '/');
-	}
-
-	/**
-	 * @since 4.0
-	 */
-	@Override
-	public ProcessResult runHookIfPresent(Repository repository, String hookName,
-			String[] args, PrintStream outRedirect, PrintStream errRedirect,
-			String stdinArgs) throws JGitInternalException {
-		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
-				errRedirect, stdinArgs);
-	}
-
-	/**
-	 * @since 3.7
-	 */
-	@Override
-	public File findHook(Repository repository, String hookName) {
-		final File gitdir = repository.getDirectory();
-		if (gitdir == null) {
-			return null;
-		}
-		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
-				.resolve(hookName);
-		if (Files.isExecutable(hookPath))
-			return hookPath.toFile();
-		return null;
 	}
 }

@@ -52,24 +52,22 @@ package org.eclipse.jgit.merge;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
@@ -92,6 +90,8 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	public final int MAX_BASES = 200;
 
+	private PersonIdent ident = new PersonIdent(db);
+
 	/**
 	 * Normal recursive merge when you want a choice of DirCache placement
 	 * inCore
@@ -110,17 +110,6 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	protected RecursiveMerger(Repository local) {
 		this(local, false);
-	}
-
-	/**
-	 * Normal recursive merge, implies inCore.
-	 *
-	 * @param inserter
-	 * @param config
-	 * @since 4.8
-	 */
-	protected RecursiveMerger(ObjectInserter inserter, Config config) {
-		super(inserter, config);
 	}
 
 	/**
@@ -148,9 +137,7 @@ public class RecursiveMerger extends ResolveMerger {
 	 *            the second commit to be merged
 	 * @param callDepth
 	 *            the callDepth when this method is called recursively
-	 * @return the merge base of two commits. If a criss-cross merge required a
-	 *         synthetic merge base this commit is visible only the merger's
-	 *         RevWalk and will not be in the repository.
+	 * @return the merge base of two commits
 	 * @throws IOException
 	 * @throws IncorrectObjectTypeException
 	 *             one of the input objects is not a commit.
@@ -160,7 +147,7 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	protected RevCommit getBaseCommit(RevCommit a, RevCommit b, int callDepth)
 			throws IOException {
-		ArrayList<RevCommit> baseCommits = new ArrayList<>();
+		ArrayList<RevCommit> baseCommits = new ArrayList<RevCommit>();
 		walk.reset();
 		walk.setRevFilter(RevFilter.MERGE_BASE);
 		walk.markStart(a);
@@ -191,10 +178,10 @@ public class RecursiveMerger extends ResolveMerger {
 		WorkingTreeIterator oldWTreeIt = workingTreeIterator;
 		workingTreeIterator = null;
 		try {
-			dircache = DirCache.read(reader, currentBase.getTree());
+			dircache = dircacheFromTree(currentBase.getTree());
 			inCore = true;
 
-			List<RevCommit> parents = new ArrayList<>();
+			List<RevCommit> parents = new ArrayList<RevCommit>();
 			parents.add(currentBase);
 			for (int commitIdx = 1; commitIdx < baseCommits.size(); commitIdx++) {
 				RevCommit nextBase = baseCommits.get(commitIdx);
@@ -206,30 +193,25 @@ public class RecursiveMerger extends ResolveMerger {
 							Integer.valueOf(MAX_BASES), a.name(), b.name(),
 									Integer.valueOf(baseCommits.size())));
 				parents.add(nextBase);
-				RevCommit bc = getBaseCommit(currentBase, nextBase,
-						callDepth + 1);
-				AbstractTreeIterator bcTree = (bc == null) ? new EmptyTreeIterator()
-						: openTree(bc.getTree());
-				if (mergeTrees(bcTree, currentBase.getTree(),
-						nextBase.getTree(), true))
+				if (mergeTrees(
+						openTree(getBaseCommit(currentBase, nextBase,
+								callDepth + 1).getTree()),
+						currentBase.getTree(),
+						nextBase.getTree()))
 					currentBase = createCommitForTree(resultTree, parents);
 				else
 					throw new NoMergeBaseException(
 							NoMergeBaseException.MergeBaseFailureReason.CONFLICTS_DURING_MERGE_BASE_CALCULATION,
 							MessageFormat.format(
-									JGitText.get().mergeRecursiveConflictsWhenMergingCommonAncestors,
-									currentBase.getName(), nextBase.getName()));
+									JGitText.get().mergeRecursiveTooManyMergeBasesFor,
+									Integer.valueOf(MAX_BASES), a.name(),
+									b.name(),
+									Integer.valueOf(baseCommits.size())));
 			}
 		} finally {
 			inCore = oldIncore;
 			dircache = oldDircache;
 			workingTreeIterator = oldWTreeIt;
-			toBeCheckedOut.clear();
-			toBeDeleted.clear();
-			modifiedFiles.clear();
-			unmergedPaths.clear();
-			mergeResults.clear();
-			failingPaths.clear();
 		}
 		return currentBase;
 	}
@@ -243,27 +225,46 @@ public class RecursiveMerger extends ResolveMerger {
 	 *            the tree this commit should capture
 	 * @param parents
 	 *            the list of parent commits
-	 * @return a new commit visible only within this merger's RevWalk.
+	 * @return a new (persisted) commit
 	 * @throws IOException
 	 */
 	private RevCommit createCommitForTree(ObjectId tree, List<RevCommit> parents)
 			throws IOException {
 		CommitBuilder c = new CommitBuilder();
-		c.setTreeId(tree);
 		c.setParentIds(parents);
-		c.setAuthor(mockAuthor(parents));
-		c.setCommitter(c.getAuthor());
-		return RevCommit.parse(walk, c.build());
+		c.setTreeId(tree);
+		c.setAuthor(ident);
+		c.setCommitter(ident);
+		ObjectInserter odi = db.newObjectInserter();
+		ObjectId newCommitId = odi.insert(c);
+		odi.flush();
+		RevCommit ret = walk.lookupCommit(newCommitId);
+		walk.parseHeaders(ret);
+		return ret;
 	}
 
-	private static PersonIdent mockAuthor(List<RevCommit> parents) {
-		String name = RecursiveMerger.class.getSimpleName();
-		int time = 0;
-		for (RevCommit p : parents)
-			time = Math.max(time, p.getCommitTime());
-		return new PersonIdent(
-				name, name + "@JGit", //$NON-NLS-1$
-				new Date((time + 1) * 1000L),
-				TimeZone.getTimeZone("GMT+0000")); //$NON-NLS-1$
+	/**
+	 * Create a new in memory dircache which has the same content as a given
+	 * tree.
+	 *
+	 * @param treeId
+	 *            the tree which should be used to fill the dircache
+	 * @return a new in memory dircache
+	 * @throws IOException
+	 */
+	private DirCache dircacheFromTree(ObjectId treeId) throws IOException {
+		DirCache ret = DirCache.newInCore();
+		DirCacheBuilder builder = ret.builder();
+		TreeWalk tw = new TreeWalk(db);
+		tw.addTree(treeId);
+		tw.setRecursive(true);
+		while (tw.next()) {
+			DirCacheEntry e = new DirCacheEntry(tw.getRawPath());
+			e.setFileMode(tw.getFileMode(0));
+			e.setObjectId(tw.getObjectId(0));
+			builder.add(e);
+		}
+		builder.finish();
+		return ret;
 	}
 }

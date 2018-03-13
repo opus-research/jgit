@@ -54,7 +54,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -67,7 +66,7 @@ class PackIndexV1 extends PackIndex {
 
 	private final long[] idxHeader;
 
-	byte[][] idxdata;
+	private byte[][] idxdata;
 
 	private long objectCnt;
 
@@ -89,11 +88,7 @@ class PackIndexV1 extends PackIndex {
 				n = (int) (idxHeader[k] - idxHeader[k - 1]);
 			}
 			if (n > 0) {
-				final long len = n * (Constants.OBJECT_ID_LENGTH + 4);
-				if (len > Integer.MAX_VALUE - 8) // http://stackoverflow.com/a/8381338
-					throw new IOException(JGitText.get().indexFileIsTooLargeForJgit);
-
-				idxdata[k] = new byte[(int) len];
+				idxdata[k] = new byte[n * (Constants.OBJECT_ID_LENGTH + 4)];
 				IO.readFully(fd, idxdata[k], 0, idxdata[k].length);
 			}
 		}
@@ -233,14 +228,13 @@ class PackIndexV1 extends PackIndex {
 	}
 
 	private class IndexV1Iterator extends EntriesIterator {
-		int levelOne;
+		private int levelOne;
 
-		int levelTwo;
+		private int levelTwo;
 
 		@Override
 		protected MutableEntry initEntry() {
 			return new MutableEntry() {
-				@Override
 				protected void ensureId() {
 					idBuffer.fromRaw(idxdata[levelOne], levelTwo
 							- Constants.OBJECT_ID_LENGTH);
@@ -248,7 +242,6 @@ class PackIndexV1 extends PackIndex {
 			};
 		}
 
-		@Override
 		public MutableEntry next() {
 			for (; levelOne < idxdata.length; levelOne++) {
 				if (idxdata[levelOne] == null)

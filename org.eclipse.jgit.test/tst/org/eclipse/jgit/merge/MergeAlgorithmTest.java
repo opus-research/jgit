@@ -51,24 +51,10 @@ import java.io.IOException;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Assume;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.runner.RunWith;
 
-@RunWith(Theories.class)
 public class MergeAlgorithmTest {
 	MergeFormatter fmt=new MergeFormatter();
-
-	private final boolean newlineAtEnd;
-
-	@DataPoints
-	public static boolean[] newlineAtEndDataPoints = { false, true };
-
-	public MergeAlgorithmTest(boolean newlineAtEnd) {
-		this.newlineAtEnd = newlineAtEnd;
-	}
 
 	/**
 	 * Check for a conflict where the second text was changed similar to the
@@ -132,45 +118,6 @@ public class MergeAlgorithmTest {
 	}
 
 	/**
-	 * Merge two modifications with a shared delete at the end. The underlying
-	 * diff algorithm has to provide consistent edit results to get the expected
-	 * merge result.
-	 *
-	 * @throws IOException
-	 */
-	@Test
-	public void testTwoModificationsWithSharedDelete() throws IOException {
-		assertEquals(t("Cb}n}"),
-				merge("ab}n}n}", "ab}n}", "Cb}n}"));
-	}
-
-	/**
-	 * Merge modifications with a shared insert in the middle. The
-	 * underlying diff algorithm has to provide consistent edit
-	 * results to get the expected merge result.
-	 *
-	 * @throws IOException
-	 */
-	@Test
-	public void testModificationsWithMiddleInsert() throws IOException {
-		assertEquals(t("aBcd123123uvwxPq"),
-				merge("abcd123uvwxpq", "aBcd123123uvwxPq", "abcd123123uvwxpq"));
-	}
-
-	/**
-	 * Merge modifications with a shared delete in the middle. The
-	 * underlying diff algorithm has to provide consistent edit
-	 * results to get the expected merge result.
-	 *
-	 * @throws IOException
-	 */
-	@Test
-	public void testModificationsWithMiddleDelete() throws IOException {
-		assertEquals(t("Abz}z123Q"),
-				merge("abz}z}z123q", "Abz}z123Q", "abz}z123q"));
-	}
-
-	/**
 	 * Test a conflicting region at the very start of the text.
 	 *
 	 * @throws IOException
@@ -227,55 +174,28 @@ public class MergeAlgorithmTest {
 	}
 
 	@Test
-	public void testSeparateModifications() throws IOException {
+	public void testSeperateModifications() throws IOException {
 		assertEquals(t("aZcYe"), merge("abcde", "aZcde", "abcYe"));
-	}
-
-	@Test
-	public void testBlankLines() throws IOException {
-		assertEquals(t("aZc\nYe"), merge("abc\nde", "aZc\nde", "abc\nYe"));
 	}
 
 	/**
 	 * Test merging two contents which do one similar modification and one
-	 * insertion is only done by one side, in the middle. Between modification
-	 * and insertion is a block which is common between the two contents and the
-	 * common base
+	 * insertion is only done by one side. Between modification and insertion is
+	 * a block which is common between the two contents and the common base
 	 *
 	 * @throws IOException
 	 */
 	@Test
 	public void testTwoSimilarModsAndOneInsert() throws IOException {
+		assertEquals(t("IAAJ"), merge("iA", "IA", "IAAJ"));
 		assertEquals(t("aBcDde"), merge("abcde", "aBcde", "aBcDde"));
+		assertEquals(t("IAJ"), merge("iA", "IA", "IAJ"));
+		assertEquals(t("IAAAJ"), merge("iA", "IA", "IAAAJ"));
 		assertEquals(t("IAAAJCAB"), merge("iACAB", "IACAB", "IAAAJCAB"));
 		assertEquals(t("HIAAAJCAB"), merge("HiACAB", "HIACAB", "HIAAAJCAB"));
 		assertEquals(t("AGADEFHIAAAJCAB"),
 				merge("AGADEFHiACAB", "AGADEFHIACAB", "AGADEFHIAAAJCAB"));
-	}
 
-	/**
-	 * Test merging two contents which do one similar modification and one
-	 * insertion is only done by one side, at the end. Between modification and
-	 * insertion is a block which is common between the two contents and the
-	 * common base
-	 *
-	 * @throws IOException
-	 */
-	@Test
-	public void testTwoSimilarModsAndOneInsertAtEnd() throws IOException {
-		Assume.assumeTrue(newlineAtEnd);
-		assertEquals(t("IAAJ"), merge("iA", "IA", "IAAJ"));
-		assertEquals(t("IAJ"), merge("iA", "IA", "IAJ"));
-		assertEquals(t("IAAAJ"), merge("iA", "IA", "IAAAJ"));
-	}
-
-	@Test
-	public void testTwoSimilarModsAndOneInsertAtEndNoNewlineAtEnd()
-			throws IOException {
-		Assume.assumeFalse(newlineAtEnd);
-		assertEquals(t("I<A=AAJ>"), merge("iA", "IA", "IAAJ"));
-		assertEquals(t("I<A=AJ>"), merge("iA", "IA", "IAJ"));
-		assertEquals(t("I<A=AAAJ>"), merge("iA", "IA", "IAAAJ"));
 	}
 
 	/**
@@ -305,7 +225,7 @@ public class MergeAlgorithmTest {
 		return new String(bo.toByteArray(), Constants.CHARACTER_ENCODING);
 	}
 
-	public String t(String text) {
+	public static String t(String text) {
 		StringBuilder r = new StringBuilder();
 		for (int i = 0; i < text.length(); i++) {
 			char c = text.charAt(i);
@@ -321,14 +241,13 @@ public class MergeAlgorithmTest {
 				break;
 			default:
 				r.append(c);
-				if (newlineAtEnd || i < text.length() - 1)
-					r.append('\n');
+				r.append('\n');
 			}
 		}
 		return r.toString();
 	}
 
-	public RawText T(String text) {
+	public static RawText T(String text) {
 		return new RawText(Constants.encode(t(text)));
 	}
 }

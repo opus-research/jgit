@@ -56,11 +56,11 @@ import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.util.MutableInteger;
 import org.junit.Before;
 import org.junit.Test;
@@ -73,7 +73,7 @@ public class WindowCacheGetTest extends SampleDataRepositoryTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		toLoad = new ArrayList<>();
+		toLoad = new ArrayList<TestObject>();
 		final BufferedReader br = new BufferedReader(new InputStreamReader(
 				new FileInputStream(JGitTestUtil
 						.getTestResourceFile("all_packed_objects.txt")),

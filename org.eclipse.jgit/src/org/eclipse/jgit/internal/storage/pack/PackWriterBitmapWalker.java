@@ -44,16 +44,16 @@
 package org.eclipse.jgit.internal.storage.pack;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.Set;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.BitmapIndex;
-import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
-import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -71,8 +71,6 @@ final class PackWriterBitmapWalker {
 
 	private final ProgressMonitor pm;
 
-	private long countOfBitmapIndexMisses;
-
 	PackWriterBitmapWalker(
 			ObjectWalk walker, BitmapIndex bitmapIndex, ProgressMonitor pm) {
 		this.walker = walker;
@@ -80,64 +78,9 @@ final class PackWriterBitmapWalker {
 		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
 	}
 
-	long getCountOfBitmapIndexMisses() {
-		return countOfBitmapIndexMisses;
-	}
-
-	BitmapBuilder findObjects(Iterable<? extends ObjectId> start, BitmapBuilder seen,
-			boolean ignoreMissing)
-			throws MissingObjectException, IncorrectObjectTypeException,
-				   IOException {
-		if (!ignoreMissing) {
-			return findObjectsWalk(start, seen, false);
-		}
-
-		try {
-			return findObjectsWalk(start, seen, true);
-		} catch (MissingObjectException ignore) {
-			// An object reachable from one of the "start"s is missing.
-			// Walk from the "start"s one at a time so it can be excluded.
-		}
-
-		final BitmapBuilder result = bitmapIndex.newBitmapBuilder();
-		for (ObjectId obj : start) {
-			Bitmap bitmap = bitmapIndex.getBitmap(obj);
-			if (bitmap != null) {
-				result.or(bitmap);
-			}
-		}
-
-		for (ObjectId obj : start) {
-			if (result.contains(obj)) {
-				continue;
-			}
-			try {
-				result.or(findObjectsWalk(Arrays.asList(obj), result, false));
-			} catch (MissingObjectException ignore) {
-				// An object reachable from this "start" is missing.
-				//
-				// This can happen when the client specified a "have" line
-				// pointing to an object that is present but unreachable:
-				// "git prune" and "git fsck" only guarantee that the object
-				// database will continue to contain all objects reachable
-				// from a ref and does not guarantee connectivity for other
-				// objects in the object database.
-				//
-				// In this situation, skip the relevant "start" and move on
-				// to the next one.
-				//
-				// TODO(czhen): Make findObjectsWalk resume the walk instead
-				// once RevWalk and ObjectWalk support that.
-			}
-		}
-		return result;
-	}
-
-	private BitmapBuilder findObjectsWalk(Iterable<? extends ObjectId> start, BitmapBuilder seen,
-			boolean ignoreMissingStart)
+	BitmapBuilder findObjects(Set<? extends ObjectId> start, BitmapBuilder seen)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		walker.reset();
 		final BitmapBuilder bitmapResult = bitmapIndex.newBitmapBuilder();
 
 		for (ObjectId obj : start) {
@@ -148,43 +91,24 @@ final class PackWriterBitmapWalker {
 
 		boolean marked = false;
 		for (ObjectId obj : start) {
-			try {
-				if (!bitmapResult.contains(obj)) {
-					walker.markStart(walker.parseAny(obj));
-					marked = true;
-				}
-			} catch (MissingObjectException e) {
-				if (ignoreMissingStart)
-					continue;
-				throw e;
+			if (!bitmapResult.contains(obj)) {
+				walker.markStart(walker.parseAny(obj));
+				marked = true;
 			}
 		}
 
 		if (marked) {
-			if (seen == null) {
-				walker.setRevFilter(new AddToBitmapFilter(bitmapResult));
-			} else {
-				walker.setRevFilter(
-						new AddUnseenToBitmapFilter(seen, bitmapResult));
-			}
+			walker.setRevFilter(newRevFilter(seen, bitmapResult));
 
 			while (walker.next() != null) {
 				// Iterate through all of the commits. The BitmapRevFilter does
 				// the work.
-				//
-				// filter.include returns true for commits that do not have
-				// a bitmap in bitmapIndex and are not reachable from a
-				// bitmap in bitmapIndex encountered earlier in the walk.
-				// Thus the number of commits returned by next() measures how
-				// much history was traversed without being able to make use
-				// of bitmaps.
 				pm.update(1);
-				countOfBitmapIndexMisses++;
 			}
 
 			RevObject ro;
 			while ((ro = walker.nextObject()) != null) {
-				bitmapResult.addObject(ro, ro.getType());
+				bitmapResult.add(ro, ro.getType());
 				pm.update(1);
 			}
 		}
@@ -192,100 +116,44 @@ final class PackWriterBitmapWalker {
 		return bitmapResult;
 	}
 
-	/**
-	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
-	 * effect.
-	 * <p>
-	 * When the walk hits a commit that is part of {@code bitmap}'s
-	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
-	 * commit and its parents are marked as SEEN so that the walk does not
-	 * have to visit its ancestors.  This ensures the walk is very short if
-	 * there is good bitmap coverage.
-	 */
-	static class AddToBitmapFilter extends RevFilter {
-		private final BitmapBuilder bitmap;
-
-		AddToBitmapFilter(BitmapBuilder bitmap) {
-			this.bitmap = bitmap;
-		}
-
-		@Override
-		public final boolean include(RevWalk walker, RevCommit cmit) {
-			Bitmap visitedBitmap;
-
-			if (bitmap.contains(cmit)) {
-				// already included
-			} else if ((visitedBitmap = bitmap.getBitmapIndex()
-					.getBitmap(cmit)) != null) {
-				bitmap.or(visitedBitmap);
-			} else {
-				bitmap.addObject(cmit, Constants.OBJ_COMMIT);
-				return true;
-			}
-
-			for (RevCommit p : cmit.getParents()) {
-				p.add(RevFlag.SEEN);
-			}
-			return false;
-		}
-
-		@Override
-		public final RevFilter clone() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public final boolean requiresCommitBody() {
-			return false;
-		}
+	void reset() {
+		walker.reset();
 	}
 
-	/**
-	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
-	 * effect.
-	 * <p>
-	 * When the walk hits a commit that is part of {@code bitmap}'s
-	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
-	 * commit and its parents are marked as SEEN so that the walk does not
-	 * have to visit its ancestors.  This ensures the walk is very short if
-	 * there is good bitmap coverage.
-	 * <p>
-	 * Commits named in {@code seen} are considered already seen.  If one is
-	 * encountered, that commit and its parents will be marked with the SEEN
-	 * flag to prevent the walk from visiting its ancestors.
-	 */
-	static class AddUnseenToBitmapFilter extends RevFilter {
-		private final BitmapBuilder seen;
-		private final BitmapBuilder bitmap;
-
-		AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
-			this.seen = seen;
-			this.bitmap = bitmapResult;
+	static RevFilter newRevFilter(
+			final BitmapBuilder seen, final BitmapBuilder bitmapResult) {
+		if (seen != null) {
+			return new BitmapRevFilter() {
+				protected boolean load(RevCommit cmit) {
+					if (seen.contains(cmit))
+						return false;
+					return bitmapResult.add(cmit, Constants.OBJ_COMMIT);
+				}
+			};
 		}
+		return new BitmapRevFilter() {
+			@Override
+			protected boolean load(RevCommit cmit) {
+				return bitmapResult.add(cmit, Constants.OBJ_COMMIT);
+			}
+		};
+	}
+
+	static abstract class BitmapRevFilter extends RevFilter {
+		protected abstract boolean load(RevCommit cmit);
 
 		@Override
 		public final boolean include(RevWalk walker, RevCommit cmit) {
-			Bitmap visitedBitmap;
-
-			if (seen.contains(cmit) || bitmap.contains(cmit)) {
-				// already seen or included
-			} else if ((visitedBitmap = bitmap.getBitmapIndex()
-					.getBitmap(cmit)) != null) {
-				bitmap.or(visitedBitmap);
-			} else {
-				bitmap.addObject(cmit, Constants.OBJ_COMMIT);
+			if (load(cmit))
 				return true;
-			}
-
-			for (RevCommit p : cmit.getParents()) {
+			for (RevCommit p : cmit.getParents())
 				p.add(RevFlag.SEEN);
-			}
 			return false;
 		}
 
 		@Override
 		public final RevFilter clone() {
-			throw new UnsupportedOperationException();
+			return this;
 		}
 
 		@Override

@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -91,7 +90,6 @@ import org.kohsuke.args4j.Option;
  * type {@link Fold} and implement the logic. The test suite will automatically
  * pick up the new function through reflection.
  */
-@Command(usage = "usage_TextHashFunctions")
 class TextHashFunctions extends TextBuiltin {
 
 	/** Standard SHA-1 on the line, using the first 4 bytes as the hash code. */
@@ -250,17 +248,17 @@ class TextHashFunctions extends TextBuiltin {
 	//
 	//
 
-	@Option(name = "--hash", metaVar = "NAME", usage = "Enable hash function(s)")
-	List<String> hashFunctions = new ArrayList<>();
+	@Option(name = "--hash", multiValued = true, metaVar = "NAME", usage = "Enable hash function(s)")
+	List<String> hashFunctions = new ArrayList<String>();
 
-	@Option(name = "--fold", metaVar = "NAME", usage = "Enable fold function(s)")
-	List<String> foldFunctions = new ArrayList<>();
+	@Option(name = "--fold", multiValued = true, metaVar = "NAME", usage = "Enable fold function(s)")
+	List<String> foldFunctions = new ArrayList<String>();
 
 	@Option(name = "--text-limit", metaVar = "LIMIT", usage = "Maximum size in KiB to scan")
 	int textLimit = 15 * 1024; // 15 MiB as later we do * 1024.
 
-	@Option(name = "--repository", aliases = { "-r" }, metaVar = "GIT_DIR", usage = "Repository to scan")
-	List<File> gitDirs = new ArrayList<>();
+	@Option(name = "--repository", aliases = { "-r" }, multiValued = true, metaVar = "GIT_DIR", usage = "Repository to scan")
+	List<File> gitDirs = new ArrayList<File>();
 
 	@Override
 	protected boolean requiresRepository() {
@@ -286,25 +284,26 @@ class TextHashFunctions extends TextBuiltin {
 			else
 				rb.findGitDir(dir);
 
-			Repository repo = rb.build();
+			Repository db = rb.build();
 			try {
-				run(repo);
+				run(db);
 			} finally {
-				repo.close();
+				db.close();
 			}
 		}
 	}
 
-	private void run(Repository repo) throws Exception {
+	private void run(Repository db) throws Exception {
 		List<Function> all = init();
 
 		long fileCnt = 0;
 		long lineCnt = 0;
-		try (ObjectReader or = repo.newObjectReader();
-			RevWalk rw = new RevWalk(or);
-			TreeWalk tw = new TreeWalk(or)) {
+		ObjectReader or = db.newObjectReader();
+		try {
 			final MutableObjectId id = new MutableObjectId();
-			tw.reset(rw.parseTree(repo.resolve(Constants.HEAD)));
+			RevWalk rw = new RevWalk(or);
+			TreeWalk tw = new TreeWalk(or);
+			tw.reset(rw.parseTree(db.resolve(Constants.HEAD)));
 			tw.setRecursive(true);
 
 			while (tw.next()) {
@@ -327,7 +326,7 @@ class TextHashFunctions extends TextBuiltin {
 				RawText txt = new RawText(raw);
 				int[] lines = new int[txt.size()];
 				int cnt = 0;
-				HashSet<Line> u = new HashSet<>();
+				HashSet<Line> u = new HashSet<Line>();
 				for (int i = 0; i < txt.size(); i++) {
 					if (u.add(new Line(txt, i)))
 						lines[cnt++] = i;
@@ -339,20 +338,21 @@ class TextHashFunctions extends TextBuiltin {
 				for (Function fun : all)
 					testOne(fun, txt, lines, cnt);
 			}
+		} finally {
+			or.release();
 		}
 
-		File directory = repo.getDirectory();
-		if (directory != null) {
-			String name = directory.getName();
-			File parent = directory.getParentFile();
+		if (db.getDirectory() != null) {
+			String name = db.getDirectory().getName();
+			File parent = db.getDirectory().getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
 			outw.println(name + ":"); //$NON-NLS-1$
 		}
-		outw.format("  %6d files; %5d avg. unique lines/file\n", //$NON-NLS-1$
+		outw.format("  %6d files; %5d avg. unique lines/file\n", //
 				valueOf(fileCnt), //
 				valueOf(lineCnt / fileCnt));
-		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len");
 		outw.println("-----------------------------------------------"); //$NON-NLS-1$
 		String lastHashName = null;
 		for (Function fun : all) {
@@ -386,8 +386,8 @@ class TextHashFunctions extends TextBuiltin {
 	}
 
 	private List<Function> init() {
-		List<Hash> hashes = new ArrayList<>();
-		List<Fold> folds = new ArrayList<>();
+		List<Hash> hashes = new ArrayList<Hash>();
+		List<Fold> folds = new ArrayList<Fold>();
 
 		try {
 			for (Field f : TextHashFunctions.class.getDeclaredFields()) {
@@ -405,12 +405,12 @@ class TextHashFunctions extends TextBuiltin {
 				}
 			}
 		} catch (IllegalArgumentException e) {
-			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
+			throw new RuntimeException("Cannot determine names", e);
 		} catch (IllegalAccessException e) {
-			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
+			throw new RuntimeException("Cannot determine names", e);
 		}
 
-		List<Function> all = new ArrayList<>();
+		List<Function> all = new ArrayList<Function>();
 		for (Hash cmp : hashes) {
 			if (include(cmp.name, hashFunctions)) {
 				for (Fold f : folds) {

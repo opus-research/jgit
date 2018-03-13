@@ -54,7 +54,6 @@ import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
-
 	protected ObjectId theHead;
 	protected ObjectId theMerge;
 
@@ -186,7 +185,10 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 
 	@Test
 	public void testMaliciousGitPathEndSpaceUnixOk() throws Exception {
-		testMaliciousPathBadFirstCheckout(".git ", "konfig");
+		if (File.separatorChar == '\\')
+			return; // cannot emulate Unix on Windows for this test
+		((MockSystemReader) SystemReader.getInstance()).setUnix();
+		testMaliciousPathGoodFirstCheckout(".git ", "konfig");
 	}
 
 	@Test
@@ -209,7 +211,10 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 
 	@Test
 	public void testMaliciousGitPathEndDotUnixOk() throws Exception {
-		testMaliciousPathBadFirstCheckout(".git.", "konfig");
+		if (File.separatorChar == '\\')
+			return; // cannot emulate Unix on Windows for this test
+		((MockSystemReader) SystemReader.getInstance()).setUnix();
+		testMaliciousPathGoodFirstCheckout(".git.", "konfig");
 	}
 
 	@Test
@@ -225,14 +230,8 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testMaliciousPathEmptyUnix() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setUnix();
-		testMaliciousPathBadFirstCheckout("", "no");
-	}
-
-	@Test
-	public void testMaliciousPathEmptyWindows() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setWindows();
+	public void testMaliciousPathEmpty() throws Exception {
+		((MockSystemReader) SystemReader.getInstance()).setCurrentPlatform();
 		testMaliciousPathBadFirstCheckout("", "no");
 	}
 
@@ -338,71 +337,68 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 	 */
 	private void testMaliciousPath(boolean good, boolean secondCheckout,
 			String... path) throws GitAPIException, IOException {
-		try (Git git = new Git(db);
-				RevWalk revWalk = new RevWalk(git.getRepository())) {
-			ObjectInserter newObjectInserter;
-			newObjectInserter = git.getRepository().newObjectInserter();
-			ObjectId blobId = newObjectInserter.insert(Constants.OBJ_BLOB,
-					"data".getBytes());
-			newObjectInserter = git.getRepository().newObjectInserter();
-			FileMode mode = FileMode.REGULAR_FILE;
-			ObjectId insertId = blobId;
-			for (int i = path.length - 1; i >= 0; --i) {
-				TreeFormatter treeFormatter = new TreeFormatter();
-				treeFormatter.append("goodpath", mode, insertId);
-				insertId = newObjectInserter.insert(treeFormatter);
-				mode = FileMode.TREE;
-			}
-			newObjectInserter = git.getRepository().newObjectInserter();
-			CommitBuilder commitBuilder = new CommitBuilder();
-			commitBuilder.setAuthor(author);
-			commitBuilder.setCommitter(committer);
-			commitBuilder.setMessage("foo#1");
-			commitBuilder.setTreeId(insertId);
-			ObjectId firstCommitId = newObjectInserter.insert(commitBuilder);
+		Git git = new Git(db);
+		ObjectInserter newObjectInserter;
+		newObjectInserter = git.getRepository().newObjectInserter();
+		ObjectId blobId = newObjectInserter.insert(Constants.OBJ_BLOB,
+				"data".getBytes());
+		newObjectInserter = git.getRepository().newObjectInserter();
+		FileMode mode = FileMode.REGULAR_FILE;
+		ObjectId insertId = blobId;
+		for (int i = path.length - 1; i >= 0; --i) {
+			TreeFormatter treeFormatter = new TreeFormatter();
+			treeFormatter.append("goodpath", mode, insertId);
+			insertId = newObjectInserter.insert(treeFormatter);
+			mode = FileMode.TREE;
+		}
+		newObjectInserter = git.getRepository().newObjectInserter();
+		CommitBuilder commitBuilder = new CommitBuilder();
+		commitBuilder.setAuthor(author);
+		commitBuilder.setCommitter(committer);
+		commitBuilder.setMessage("foo#1");
+		commitBuilder.setTreeId(insertId);
+		ObjectId firstCommitId = newObjectInserter.insert(commitBuilder);
 
-			newObjectInserter = git.getRepository().newObjectInserter();
-			mode = FileMode.REGULAR_FILE;
-			insertId = blobId;
-			for (int i = path.length - 1; i >= 0; --i) {
-				TreeFormatter treeFormatter = new TreeFormatter();
-				treeFormatter.append(path[i].getBytes(), 0,
-							path[i].getBytes().length,
-							mode, insertId, true);
-				insertId = newObjectInserter.insert(treeFormatter);
-				mode = FileMode.TREE;
-			}
+		newObjectInserter = git.getRepository().newObjectInserter();
+		mode = FileMode.REGULAR_FILE;
+		insertId = blobId;
+		for (int i = path.length - 1; i >= 0; --i) {
+			TreeFormatter treeFormatter = new TreeFormatter();
+			treeFormatter.append(path[i], mode, insertId);
+			insertId = newObjectInserter.insert(treeFormatter);
+			mode = FileMode.TREE;
+		}
 
-			// Create another commit
-			commitBuilder = new CommitBuilder();
-			commitBuilder.setAuthor(author);
-			commitBuilder.setCommitter(committer);
-			commitBuilder.setMessage("foo#2");
-			commitBuilder.setTreeId(insertId);
-			commitBuilder.setParentId(firstCommitId);
-			ObjectId commitId = newObjectInserter.insert(commitBuilder);
+		// Create another commit
+		commitBuilder = new CommitBuilder();
+		commitBuilder.setAuthor(author);
+		commitBuilder.setCommitter(committer);
+		commitBuilder.setMessage("foo#2");
+		commitBuilder.setTreeId(insertId);
+		commitBuilder.setParentId(firstCommitId);
+		ObjectId commitId = newObjectInserter.insert(commitBuilder);
 
-			if (!secondCheckout)
-				git.checkout().setStartPoint(revWalk.parseCommit(firstCommitId))
-						.setName("refs/heads/master").setCreateBranch(true).call();
-			try {
-				if (secondCheckout) {
-					git.checkout().setStartPoint(revWalk.parseCommit(commitId))
-							.setName("refs/heads/master").setCreateBranch(true)
-							.call();
-				} else {
-					git.branchCreate().setName("refs/heads/next")
-							.setStartPoint(commitId.name()).call();
-					git.checkout().setName("refs/heads/next")
-							.call();
-				}
-				if (!good)
-					fail("Checkout of Tree " + Arrays.asList(path) + " should fail");
-			} catch (InvalidPathException e) {
-				if (good)
-					throw e;
-				assertTrue(e.getMessage().startsWith("Invalid path"));
+		RevWalk revWalk = new RevWalk(git.getRepository());
+		if (!secondCheckout)
+			git.checkout().setStartPoint(revWalk.parseCommit(firstCommitId))
+					.setName("refs/heads/master").setCreateBranch(true).call();
+		try {
+			if (secondCheckout) {
+				git.checkout().setStartPoint(revWalk.parseCommit(commitId))
+						.setName("refs/heads/master").setCreateBranch(true)
+						.call();
+			} else {
+				git.branchCreate().setName("refs/heads/next")
+						.setStartPoint(commitId.name()).call();
+				git.checkout().setName("refs/heads/next")
+						.call();
 			}
+			if (!good)
+				fail("Checkout of Tree " + Arrays.asList(path) + " should fail");
+		} catch (InvalidPathException e) {
+			if (good)
+				throw e;
+			assertTrue(e.getMessage().startsWith("Invalid path: "));
 		}
 	}
 

@@ -91,8 +91,11 @@ public class UnpackedObject {
 	 */
 	public static ObjectLoader parse(byte[] raw, AnyObjectId id)
 			throws IOException {
-		try (WindowCursor wc = new WindowCursor(null)) {
+		WindowCursor wc = new WindowCursor(null);
+		try {
 			return open(new ByteArrayInputStream(raw), null, id, wc);
+		} finally {
+			wc.release();
 		}
 	}
 
@@ -232,7 +235,7 @@ public class UnpackedObject {
 		}
 	}
 
-	static void checkValidEndOfStream(InputStream in, Inflater inf,
+	private static void checkValidEndOfStream(InputStream in, Inflater inf,
 			AnyObjectId id, final byte[] buf) throws IOException,
 			CorruptObjectException {
 		for (;;) {
@@ -266,7 +269,7 @@ public class UnpackedObject {
 		}
 	}
 
-	static boolean isStandardFormat(final byte[] hdr) {
+	private static boolean isStandardFormat(final byte[] hdr) {
 		/*
 		 * We must determine if the buffer contains the standard
 		 * zlib-deflated stream or the experimental format based
@@ -298,7 +301,7 @@ public class UnpackedObject {
 		return (fb & 0x8f) == 0x08 && (((fb << 8) | hdr[1] & 0xff) % 31) == 0;
 	}
 
-	static InputStream inflate(final InputStream in, final long size,
+	private static InputStream inflate(final InputStream in, final long size,
 			final ObjectId id) {
 		final Inflater inf = InflaterCache.get();
 		return new InflaterInputStream(in, inf) {
@@ -334,11 +337,11 @@ public class UnpackedObject {
 		return new InflaterInputStream(in, inf, BUFFER_SIZE);
 	}
 
-	static BufferedInputStream buffer(InputStream in) {
+	private static BufferedInputStream buffer(InputStream in) {
 		return new BufferedInputStream(in, BUFFER_SIZE);
 	}
 
-	static int readSome(InputStream in, final byte[] hdr, int off,
+	private static int readSome(InputStream in, final byte[] hdr, int off,
 			int cnt) throws IOException {
 		int avail = 0;
 		while (0 < cnt) {
@@ -363,7 +366,7 @@ public class UnpackedObject {
 
 		private final FileObjectDatabase source;
 
-		LargeObject(int type, long size, File path, AnyObjectId id,
+		private LargeObject(int type, long size, File path, AnyObjectId id,
 				FileObjectDatabase db) {
 			this.type = type;
 			this.size = size;
@@ -399,9 +402,6 @@ public class UnpackedObject {
 			try {
 				in = buffer(new FileInputStream(path));
 			} catch (FileNotFoundException gone) {
-				if (path.exists()) {
-					throw gone;
-				}
 				// If the loose file no longer exists, it may have been
 				// moved into a pack file in the mean time. Try again
 				// to locate the object.

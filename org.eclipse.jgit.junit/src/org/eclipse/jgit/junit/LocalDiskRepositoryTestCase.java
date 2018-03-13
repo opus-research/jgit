@@ -53,18 +53,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
@@ -103,14 +97,10 @@ public abstract class LocalDiskRepositoryTestCase {
 	/** A fake (but stable) identity for committer fields in the test. */
 	protected PersonIdent committer;
 
-	/**
-	 * A {@link SystemReader} used to coordinate time, envars, etc.
-	 * @since 4.2
-	 */
-	protected MockSystemReader mockSystemReader;
-
-	private final Set<Repository> toClose = new HashSet<>();
+	private final List<Repository> toClose = new ArrayList<Repository>();
 	private File tmp;
+
+	private MockSystemReader mockSystemReader;
 
 	@Before
 	public void setUp() throws Exception {
@@ -122,17 +112,16 @@ public abstract class LocalDiskRepositoryTestCase {
 		mockSystemReader = new MockSystemReader();
 		mockSystemReader.userGitConfig = new FileBasedConfig(new File(tmp,
 				"usergitconfig"), FS.DETECTED);
-		// We have to set autoDetach to false for tests, because tests expect to be able
-		// to clean up by recursively removing the repository, and background GC might be
-		// in the middle of writing or deleting files, which would disrupt this.
-		mockSystemReader.userGitConfig.setBoolean(ConfigConstants.CONFIG_GC_SECTION,
-				null, ConfigConstants.CONFIG_KEY_AUTODETACH, false);
-		mockSystemReader.userGitConfig.save();
 		ceilTestDirectories(getCeilings());
 		SystemReader.setInstance(mockSystemReader);
 
+		final long now = mockSystemReader.getCurrentTime();
+		final int tz = mockSystemReader.getTimezone(now);
 		author = new PersonIdent("J. Author", "jauthor@example.com");
+		author = new PersonIdent(author, now, tz);
+
 		committer = new PersonIdent("J. Committer", "jcommitter@example.com");
+		committer = new PersonIdent(committer, now, tz);
 
 		final WindowCacheConfig c = new WindowCacheConfig();
 		c.setPackedGitLimit(128 * WindowCacheConfig.KB);
@@ -181,14 +170,13 @@ public abstract class LocalDiskRepositoryTestCase {
 			recursiveDelete(tmp, false, true);
 		if (tmp != null && !tmp.exists())
 			CleanupThread.removed(tmp);
-
-		SystemReader.setInstance(null);
 	}
 
 	/** Increment the {@link #author} and {@link #committer} times. */
 	protected void tick() {
-		mockSystemReader.tick(5 * 60);
-		final long now = mockSystemReader.getCurrentTime();
+		final long delta = TimeUnit.MILLISECONDS.convert(5 * 60,
+				TimeUnit.SECONDS);
+		final long now = author.getWhen().getTime() + delta;
 		final int tz = mockSystemReader.getTimezone(now);
 
 		author = new PersonIdent(author, now, tz);
@@ -239,101 +227,6 @@ public abstract class LocalDiskRepositoryTestCase {
 			System.err.println(msg);
 	}
 
-	public static final int MOD_TIME = 1;
-
-	public static final int SMUDGE = 2;
-
-	public static final int LENGTH = 4;
-
-	public static final int CONTENT_ID = 8;
-
-	public static final int CONTENT = 16;
-
-	public static final int ASSUME_UNCHANGED = 32;
-
-	/**
-	 * Represent the state of the index in one String. This representation is
-	 * useful when writing tests which do assertions on the state of the index.
-	 * By default information about path, mode, stage (if different from 0) is
-	 * included. A bitmask controls which additional info about
-	 * modificationTimes, smudge state and length is included.
-	 * <p>
-	 * The format of the returned string is described with this BNF:
-	 *
-	 * <pre>
-	 * result = ( "[" path mode stage? time? smudge? length? sha1? content? "]" )* .
-	 * mode = ", mode:" number .
-	 * stage = ", stage:" number .
-	 * time = ", time:t" timestamp-index .
-	 * smudge = "" | ", smudged" .
-	 * length = ", length:" number .
-	 * sha1 = ", sha1:" hex-sha1 .
-	 * content = ", content:" blob-data .
-	 * </pre>
-	 *
-	 * 'stage' is only presented when the stage is different from 0. All
-	 * reported time stamps are mapped to strings like "t0", "t1", ... "tn". The
-	 * smallest reported time-stamp will be called "t0". This allows to write
-	 * assertions against the string although the concrete value of the time
-	 * stamps is unknown.
-	 *
-	 * @param repo
-	 *            the repository the index state should be determined for
-	 *
-	 * @param includedOptions
-	 *            a bitmask constructed out of the constants {@link #MOD_TIME},
-	 *            {@link #SMUDGE}, {@link #LENGTH}, {@link #CONTENT_ID} and
-	 *            {@link #CONTENT} controlling which info is present in the
-	 *            resulting string.
-	 * @return a string encoding the index state
-	 * @throws IllegalStateException
-	 * @throws IOException
-	 */
-	public static String indexState(Repository repo, int includedOptions)
-			throws IllegalStateException, IOException {
-		DirCache dc = repo.readDirCache();
-		StringBuilder sb = new StringBuilder();
-		TreeSet<Long> timeStamps = new TreeSet<>();
-
-		// iterate once over the dircache just to collect all time stamps
-		if (0 != (includedOptions & MOD_TIME)) {
-			for (int i=0; i<dc.getEntryCount(); ++i)
-				timeStamps.add(Long.valueOf(dc.getEntry(i).getLastModified()));
-		}
-
-		// iterate again, now produce the result string
-		for (int i=0; i<dc.getEntryCount(); ++i) {
-			DirCacheEntry entry = dc.getEntry(i);
-			sb.append("["+entry.getPathString()+", mode:" + entry.getFileMode());
-			int stage = entry.getStage();
-			if (stage != 0)
-				sb.append(", stage:" + stage);
-			if (0 != (includedOptions & MOD_TIME)) {
-				sb.append(", time:t"+
-						timeStamps.headSet(Long.valueOf(entry.getLastModified())).size());
-			}
-			if (0 != (includedOptions & SMUDGE))
-				if (entry.isSmudged())
-					sb.append(", smudged");
-			if (0 != (includedOptions & LENGTH))
-				sb.append(", length:"
-						+ Integer.toString(entry.getLength()));
-			if (0 != (includedOptions & CONTENT_ID))
-				sb.append(", sha1:" + ObjectId.toString(entry.getObjectId()));
-			if (0 != (includedOptions & CONTENT)) {
-				sb.append(", content:"
-						+ new String(repo.open(entry.getObjectId(),
-						Constants.OBJ_BLOB).getCachedBytes(), "UTF-8"));
-			}
-			if (0 != (includedOptions & ASSUME_UNCHANGED))
-				sb.append(", assume-unchanged:"
-						+ Boolean.toString(entry.isAssumeValid()));
-			sb.append("]");
-		}
-		return sb.toString();
-	}
-
-
 	/**
 	 * Creates a new empty bare repository.
 	 *
@@ -366,32 +259,12 @@ public abstract class LocalDiskRepositoryTestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	private FileRepository createRepository(boolean bare)
-			throws IOException {
-		return createRepository(bare, true /* auto close */);
-	}
-
-	/**
-	 * Creates a new empty repository.
-	 *
-	 * @param bare
-	 *            true to create a bare repository; false to make a repository
-	 *            within its working directory
-	 * @param autoClose
-	 *            auto close the repository in #tearDown
-	 * @return the newly created repository, opened for access
-	 * @throws IOException
-	 *             the repository could not be created in the temporary area
-	 */
-	public FileRepository createRepository(boolean bare, boolean autoClose)
-			throws IOException {
+	private FileRepository createRepository(boolean bare) throws IOException {
 		File gitdir = createUniqueTestGitDir(bare);
 		FileRepository db = new FileRepository(gitdir);
 		assertFalse(gitdir.exists());
-		db.create(bare);
-		if (autoClose) {
-			addRepoToClose(db);
-		}
+		db.create();
+		toClose.add(db);
 		return db;
 	}
 
@@ -559,7 +432,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	}
 
 	private static HashMap<String, String> cloneEnv() {
-		return new HashMap<>(System.getenv());
+		return new HashMap<String, String>(System.getenv());
 	}
 
 	private static final class CleanupThread extends Thread {
@@ -581,7 +454,7 @@ public abstract class LocalDiskRepositoryTestCase {
 			}
 		}
 
-		private final List<File> toDelete = new ArrayList<>();
+		private final List<File> toDelete = new ArrayList<File>();
 
 		@Override
 		public void run() {

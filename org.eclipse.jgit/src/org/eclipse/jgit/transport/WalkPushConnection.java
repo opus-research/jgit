@@ -45,7 +45,6 @@ package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.transport.WalkRemoteObjectDatabase.ROOT_DIR;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -70,6 +69,7 @@ import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Generic push support for dumb transport protocols.
@@ -103,7 +103,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 	private final URIish uri;
 
 	/** Database connection to the remote repository. */
-	final WalkRemoteObjectDatabase dest;
+	private final WalkRemoteObjectDatabase dest;
 
 	/** The configured transport we were constructed by. */
 	private final Transport transport;
@@ -134,27 +134,25 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		dest = w;
 	}
 
-	@Override
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
 		push(monitor, refUpdates, null);
 	}
 
-	@Override
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates, OutputStream out)
 			throws TransportException {
 		markStartedOperation();
 		packNames = null;
-		newRefs = new TreeMap<>(getRefsMap());
-		packedRefUpdates = new ArrayList<>(refUpdates.size());
+		newRefs = new TreeMap<String, Ref>(getRefsMap());
+		packedRefUpdates = new ArrayList<RemoteRefUpdate>(refUpdates.size());
 
 		// Filter the commands and issue all deletes first. This way we
 		// can correctly handle a directory being cleared out and a new
 		// ref using the directory name being created.
 		//
-		final List<RemoteRefUpdate> updates = new ArrayList<>();
+		final List<RemoteRefUpdate> updates = new ArrayList<RemoteRefUpdate>();
 		for (final RemoteRefUpdate u : refUpdates.values()) {
 			final String n = u.getRemoteName();
 			if (!n.startsWith("refs/") || !Repository.isValidRefName(n)) { //$NON-NLS-1$
@@ -222,11 +220,11 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		String pathPack = null;
 		String pathIdx = null;
 
-		try (final PackWriter writer = new PackWriter(transport.getPackConfig(),
-				local.newObjectReader())) {
-
-			final Set<ObjectId> need = new HashSet<>();
-			final Set<ObjectId> have = new HashSet<>();
+		final PackWriter writer = new PackWriter(transport.getPackConfig(),
+				local.newObjectReader());
+		try {
+			final Set<ObjectId> need = new HashSet<ObjectId>();
+			final Set<ObjectId> have = new HashSet<ObjectId>();
 			for (final RemoteRefUpdate r : updates)
 				need.add(r.getNewObjectId());
 			for (final Ref r : getRefs()) {
@@ -243,7 +241,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			if (writer.getObjectCount() == 0)
 				return;
 
-			packNames = new LinkedHashMap<>();
+			packNames = new LinkedHashMap<String, String>();
 			for (final String n : dest.getPackNames())
 				packNames.put(n, n);
 
@@ -264,22 +262,28 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			// Write the pack file, then the index, as readers look the
 			// other direction (index, then pack file).
 			//
-			String wt = "Put " + base.substring(0, 12); //$NON-NLS-1$
-			try (OutputStream os = new BufferedOutputStream(
-					dest.writeFile(pathPack, monitor, wt + "..pack"))) { //$NON-NLS-1$
+			final String wt = "Put " + base.substring(0, 12); //$NON-NLS-1$
+			OutputStream os = dest.writeFile(pathPack, monitor, wt + "..pack"); //$NON-NLS-1$
+			try {
+				os = new SafeBufferedOutputStream(os);
 				writer.writePack(monitor, monitor, os);
+			} finally {
+				os.close();
 			}
 
-			try (OutputStream os = new BufferedOutputStream(
-					dest.writeFile(pathIdx, monitor, wt + "..idx"))) { //$NON-NLS-1$
+			os = dest.writeFile(pathIdx, monitor, wt + "..idx"); //$NON-NLS-1$
+			try {
+				os = new SafeBufferedOutputStream(os);
 				writer.writeIndex(os);
+			} finally {
+				os.close();
 			}
 
 			// Record the pack at the start of the pack info list. This
 			// way clients are likely to consult the newest pack first,
 			// and discover the most recent objects there.
 			//
-			final ArrayList<String> infoPacks = new ArrayList<>();
+			final ArrayList<String> infoPacks = new ArrayList<String>();
 			infoPacks.add(packName);
 			infoPacks.addAll(packNames.keySet());
 			dest.writeInfoPacks(infoPacks);
@@ -289,6 +293,8 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			safeDelete(pathPack);
 
 			throw new TransportException(uri, JGitText.get().cannotStoreObjects, err);
+		} finally {
+			writer.release();
 		}
 	}
 

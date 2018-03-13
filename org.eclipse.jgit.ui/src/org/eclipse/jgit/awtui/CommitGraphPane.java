@@ -74,7 +74,7 @@ import org.eclipse.jgit.revplot.PlotCommitList;
  * <li>Commit graph and short message</li>
  * <li>Author name and email address</li>
  * <li>Author date and time</li>
- * </ol>
+ * </ul>
  */
 public class CommitGraphPane extends JTable {
 	private static final long serialVersionUID = 1L;
@@ -146,17 +146,14 @@ public class CommitGraphPane extends JTable {
 
 		PersonIdent lastAuthor;
 
-		@Override
 		public int getColumnCount() {
 			return 3;
 		}
 
-		@Override
 		public int getRowCount() {
 			return allCommits != null ? allCommits.size() : 0;
 		}
 
-		@Override
 		public Object getValueAt(final int rowIndex, final int columnIndex) {
 			final PlotCommit<SwingLane> c = allCommits.get(rowIndex);
 			switch (columnIndex) {
@@ -183,7 +180,6 @@ public class CommitGraphPane extends JTable {
 	static class NameCellRender extends DefaultTableCellRenderer {
 		private static final long serialVersionUID = 1L;
 
-		@Override
 		public Component getTableCellRendererComponent(final JTable table,
 				final Object value, final boolean isSelected,
 				final boolean hasFocus, final int row, final int column) {
@@ -205,7 +201,6 @@ public class CommitGraphPane extends JTable {
 		private final DateFormat fmt = new SimpleDateFormat(
 				"yyyy-MM-dd HH:mm:ss"); //$NON-NLS-1$
 
-		@Override
 		public Component getTableCellRendererComponent(final JTable table,
 				final Object value, final boolean isSelected,
 				final boolean hasFocus, final int row, final int column) {
@@ -228,7 +223,6 @@ public class CommitGraphPane extends JTable {
 
 		PlotCommit<SwingLane> commit;
 
-		@Override
 		@SuppressWarnings("unchecked")
 		public Component getTableCellRendererComponent(final JTable table,
 				final Object value, final boolean isSelected,

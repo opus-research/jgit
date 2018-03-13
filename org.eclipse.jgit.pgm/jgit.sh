@@ -61,18 +61,14 @@ this_script=`which "$0" 2>/dev/null`
 [ $? -gt 0 -a -f "$0" ] && this_script="$0"
 cp=$this_script
 
-platform="`uname`"
 if [ -n "$JGIT_CLASSPATH" ]
 then
-	cp_sep=:
-	# On Windows & MingW use ";" to separate classpath entries
-	[ "${platform#MINGW}" != "$platform" ] && cp_sep=";"
-	cp="$cp$cp_sep$JGIT_CLASSPATH"
+	cp="$cp:$JGIT_CLASSPATH"
 fi
 
 # Cleanup paths for Cygwin.
 #
-case "$platform" in
+case "`uname`" in
 CYGWIN*)
 	cp=`cygpath --windows --mixed --path "$cp"`
 	;;

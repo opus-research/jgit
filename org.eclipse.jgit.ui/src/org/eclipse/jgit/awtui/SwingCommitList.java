@@ -53,7 +53,7 @@ class SwingCommitList extends PlotCommitList<SwingCommitList.SwingLane> {
 	final LinkedList<Color> colors;
 
 	SwingCommitList() {
-		colors = new LinkedList<>();
+		colors = new LinkedList<Color>();
 		repackColors();
 	}
 
@@ -82,7 +82,15 @@ class SwingCommitList extends PlotCommitList<SwingCommitList.SwingLane> {
 	}
 
 	static class SwingLane extends PlotLane {
-		private static final long serialVersionUID = 1L;
 		Color color;
+		@Override
+		public boolean equals(Object o) {
+			return super.equals(o) && color.equals(((SwingLane)o).color);
+		}
+
+		@Override
+		public int hashCode() {
+			return super.hashCode() ^ color.hashCode();
+		}
 	}
 }

@@ -45,8 +45,12 @@ package org.eclipse.jgit.api;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Collection;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -70,7 +74,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 	private Git remoteGit;
 
 	@Before
-	public void setupRemoteRepository() throws Exception {
+	public void setupRemoteRepository() throws IOException, URISyntaxException {
 		git = new Git(db);
 
 		// create other repository
@@ -87,7 +91,8 @@ public class FetchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testFetch() throws Exception {
+	public void testFetch() throws JGitInternalException, IOException,
+			GitAPIException {
 
 		// create some refs via commits and tag
 		RevCommit commit = remoteGit.commit().setMessage("initial commit").call();

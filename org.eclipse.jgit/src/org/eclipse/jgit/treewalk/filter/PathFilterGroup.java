@@ -173,7 +173,6 @@ public class PathFilterGroup {
 			return this;
 		}
 
-		@Override
 		public String toString() {
 			return "FAST_" + path.toString(); //$NON-NLS-1$
 		}
@@ -246,9 +245,9 @@ public class PathFilterGroup {
 				int hash = hasher.nextHash();
 				if (fullpaths.contains(rp, hasher.length(), hash))
 					return true;
-				if (!hasher.hasNext() && walker.isSubtree()
-						&& prefixes.contains(rp, hasher.length(), hash))
-					return true;
+				if (!hasher.hasNext())
+					if (prefixes.contains(rp, hasher.length(), hash))
+						return true;
 			}
 
 			final int cmp = walker.isPathPrefix(max, max.length);
@@ -268,7 +267,6 @@ public class PathFilterGroup {
 			return this;
 		}
 
-		@Override
 		public String toString() {
 			final StringBuilder r = new StringBuilder();
 			r.append("FAST("); //$NON-NLS-1$

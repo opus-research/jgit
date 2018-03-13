@@ -50,7 +50,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
@@ -167,21 +166,6 @@ public class ObjectDirectoryPackParser extends PackParser {
 	 */
 	public PackFile getPackFile() {
 		return newPack;
-	}
-
-	@Override
-	public long getPackSize() {
-		if (newPack == null)
-			return super.getPackSize();
-
-		File pack = newPack.getPackFile();
-		long size = pack.length();
-		String p = pack.getAbsolutePath();
-		String i = p.substring(0, p.length() - ".pack".length()) + ".idx"; //$NON-NLS-1$ //$NON-NLS-2$
-		File idx = new File(i);
-		if (idx.exists() && idx.isFile())
-			size += idx.length();
-		return size;
 	}
 
 	@Override
@@ -367,10 +351,11 @@ public class ObjectDirectoryPackParser extends PackParser {
 
 	@Override
 	protected void onEndThinPack() throws IOException {
+		final byte[] tailHash = this.tailDigest.digest();
 		final byte[] buf = buffer();
 
 		final MessageDigest origDigest = Constants.newMessageDigest();
-		final MessageDigest tailDigest2 = Constants.newMessageDigest();
+		final MessageDigest tailDigest = Constants.newMessageDigest();
 		final MessageDigest packDigest = Constants.newMessageDigest();
 
 		long origRemaining = origEnd;
@@ -393,15 +378,15 @@ public class ObjectDirectoryPackParser extends PackParser {
 				origDigest.update(buf, 0, origCnt);
 				origRemaining -= origCnt;
 				if (origRemaining == 0)
-					tailDigest2.update(buf, origCnt, n - origCnt);
+					tailDigest.update(buf, origCnt, n - origCnt);
 			} else
-				tailDigest2.update(buf, 0, n);
+				tailDigest.update(buf, 0, n);
 
 			packDigest.update(buf, 0, n);
 		}
 
-		if (!Arrays.equals(origDigest.digest(), origHash) || !Arrays
-				.equals(tailDigest2.digest(), this.tailDigest.digest()))
+		if (!Arrays.equals(origDigest.digest(), origHash)
+				|| !Arrays.equals(tailDigest.digest(), tailHash))
 			throw new IOException(
 					JGitText.get().packCorruptedWhileWritingToFilesystem);
 
@@ -477,25 +462,20 @@ public class ObjectDirectoryPackParser extends PackParser {
 			}
 		}
 
-		try {
-			FileUtils.rename(tmpPack, finalPack,
-					StandardCopyOption.ATOMIC_MOVE);
-		} catch (IOException e) {
+		if (!tmpPack.renameTo(finalPack)) {
 			cleanupTemporaryFiles();
 			keep.unlock();
 			throw new IOException(MessageFormat.format(
-					JGitText.get().cannotMovePackTo, finalPack), e);
+					JGitText.get().cannotMovePackTo, finalPack));
 		}
 
-		try {
-			FileUtils.rename(tmpIdx, finalIdx, StandardCopyOption.ATOMIC_MOVE);
-		} catch (IOException e) {
+		if (!tmpIdx.renameTo(finalIdx)) {
 			cleanupTemporaryFiles();
 			keep.unlock();
 			if (!finalPack.delete())
 				finalPack.deleteOnExit();
 			throw new IOException(MessageFormat.format(
-					JGitText.get().cannotMoveIndexTo, finalIdx), e);
+					JGitText.get().cannotMoveIndexTo, finalIdx));
 		}
 
 		try {

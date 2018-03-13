@@ -56,16 +56,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Config;
@@ -87,11 +82,10 @@ import org.junit.Test;
 public class SubmoduleWalkTest extends RepositoryTestCase {
 	private TestRepository<Repository> testDb;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		testDb = new TestRepository<>(db);
+		testDb = new TestRepository<Repository>(db);
 	}
 
 	@Test
@@ -103,15 +97,8 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void bareRepositoryWithNoSubmodules() throws IOException {
-		FileRepository bareRepo = createBareRepository();
-		boolean result = SubmoduleWalk.containsGitModulesFile(bareRepo);
-		assertFalse(result);
-	}
-
-	@Test
 	public void repositoryWithRootLevelSubmodule() throws IOException,
-			ConfigInvalidException, NoWorkTreeException, GitAPIException {
+			ConfigInvalidException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";
@@ -119,7 +106,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);
@@ -138,8 +124,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		assertNull(gen.getRepository());
-		Status status = Git.wrap(db).status().call();
-		assertTrue(!status.isClean());
 		assertFalse(gen.next());
 	}
 
@@ -167,7 +151,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);
@@ -186,12 +169,10 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		Repository subRepo = gen.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
-		assertEquals(modulesGitDir.getAbsolutePath(),
-				subRepo.getDirectory().getAbsolutePath());
-		assertEquals(new File(db.getWorkTree(), path).getAbsolutePath(),
-				subRepo.getWorkTree().getAbsolutePath());
-		subRepo.close();
+		assertEquals(modulesGitDir, subRepo.getDirectory());
+		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
 		assertFalse(gen.next());
 	}
 
@@ -220,7 +201,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);
@@ -239,11 +219,10 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		Repository subRepo = gen.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
-		assertEqualsFile(modulesGitDir, subRepo.getDirectory());
-		assertEqualsFile(new File(db.getWorkTree(), path),
-				subRepo.getWorkTree());
-		subRepo.close();
+		assertEquals(modulesGitDir, subRepo.getDirectory());
+		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
 		assertFalse(gen.next());
 	}
 
@@ -257,7 +236,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);
@@ -291,7 +269,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path1) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id1);
@@ -299,7 +276,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		});
 		editor.add(new PathEdit(path2) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id2);
@@ -337,7 +313,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(subId);
@@ -345,7 +320,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		});
 		editor.add(new PathEdit(DOT_GIT_MODULES) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.REGULAR_FILE);
 				ent.setObjectId(gitmodulesBlob);
@@ -384,7 +358,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 				.add(DOT_GIT_MODULES, gitmodules.toText())
 				.edit(new PathEdit(path) {
 
-							@Override
 							public void apply(DirCacheEntry ent) {
 								ent.setFileMode(FileMode.GITLINK);
 								ent.setObjectId(subId);
@@ -422,7 +395,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 				.add(DOT_GIT_MODULES, gitmodules.toText())
 				.edit(new PathEdit(path) {
 
-							@Override
 							public void apply(DirCacheEntry ent) {
 								ent.setFileMode(FileMode.GITLINK);
 								ent.setObjectId(subId);

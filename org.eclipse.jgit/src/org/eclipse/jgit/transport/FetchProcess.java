@@ -74,7 +74,6 @@ import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -89,18 +88,18 @@ class FetchProcess {
 	private final Collection<RefSpec> toFetch;
 
 	/** Set of refs we will actually wind up asking to obtain. */
-	private final HashMap<ObjectId, Ref> askFor = new HashMap<>();
+	private final HashMap<ObjectId, Ref> askFor = new HashMap<ObjectId, Ref>();
 
 	/** Objects we know we have locally. */
-	private final HashSet<ObjectId> have = new HashSet<>();
+	private final HashSet<ObjectId> have = new HashSet<ObjectId>();
 
 	/** Updates to local tracking branches (if any). */
-	private final ArrayList<TrackingRefUpdate> localUpdates = new ArrayList<>();
+	private final ArrayList<TrackingRefUpdate> localUpdates = new ArrayList<TrackingRefUpdate>();
 
 	/** Records to be recorded into FETCH_HEAD. */
-	private final ArrayList<FetchHeadRecord> fetchHeadUpdates = new ArrayList<>();
+	private final ArrayList<FetchHeadRecord> fetchHeadUpdates = new ArrayList<FetchHeadRecord>();
 
-	private final ArrayList<PackLock> packLocks = new ArrayList<>();
+	private final ArrayList<PackLock> packLocks = new ArrayList<PackLock>();
 
 	private FetchConnection conn;
 
@@ -137,8 +136,7 @@ class FetchProcess {
 		conn = transport.openFetch();
 		try {
 			result.setAdvertisedRefs(transport.getURI(), conn.getRefsMap());
-			result.peerUserAgent = conn.getPeerUserAgent();
-			final Set<Ref> matched = new HashSet<>();
+			final Set<Ref> matched = new HashSet<Ref>();
 			for (final RefSpec spec : toFetch) {
 				if (spec.getSource() == null)
 					throw new TransportException(MessageFormat.format(
@@ -198,7 +196,8 @@ class FetchProcess {
 				.newBatchUpdate()
 				.setAllowNonFastForwards(true)
 				.setRefLogMessage("fetch", true); //$NON-NLS-1$
-		try (final RevWalk walk = new RevWalk(transport.local)) {
+		final RevWalk walk = new RevWalk(transport.local);
+		try {
 			if (monitor instanceof BatchingProgressMonitor) {
 				((BatchingProgressMonitor) monitor).setDelayStart(
 						250, TimeUnit.MILLISECONDS);
@@ -227,6 +226,8 @@ class FetchProcess {
 			throw new TransportException(MessageFormat.format(
 					JGitText.get().failureUpdatingTrackingRef,
 					getFirstFailedRefName(batch), err.getMessage()), err);
+		} finally {
+			walk.release();
 		}
 
 		if (!fetchHeadUpdates.isEmpty()) {
@@ -276,11 +277,11 @@ class FetchProcess {
 		// We rebuild our askFor list using only the refs that the
 		// new connection has offered to us.
 		//
-		final HashMap<ObjectId, Ref> avail = new HashMap<>();
+		final HashMap<ObjectId, Ref> avail = new HashMap<ObjectId, Ref>();
 		for (final Ref r : conn.getRefs())
 			avail.put(r.getObjectId(), r);
 
-		final Collection<Ref> wants = new ArrayList<>(askFor.values());
+		final Collection<Ref> wants = new ArrayList<Ref>(askFor.values());
 		askFor.clear();
 		for (final Ref want : wants) {
 			final Ref newRef = avail.get(want.getObjectId());
@@ -315,7 +316,8 @@ class FetchProcess {
 		File meta = transport.local.getDirectory();
 		if (meta == null)
 			return;
-		final LockFile lock = new LockFile(new File(meta, "FETCH_HEAD")); //$NON-NLS-1$
+		final LockFile lock = new LockFile(new File(meta, "FETCH_HEAD"), //$NON-NLS-1$
+				transport.local.getFS());
 		try {
 			if (lock.lock()) {
 				final Writer w = new OutputStreamWriter(lock.getOutputStream());
@@ -336,12 +338,15 @@ class FetchProcess {
 
 	private boolean askForIsComplete() throws TransportException {
 		try {
-			try (final ObjectWalk ow = new ObjectWalk(transport.local)) {
+			final ObjectWalk ow = new ObjectWalk(transport.local);
+			try {
 				for (final ObjectId want : askFor.keySet())
 					ow.markStart(ow.parseAny(want));
 				for (final Ref ref : localRefs().values())
 					ow.markUninteresting(ow.parseAny(ref.getObjectId()));
 				ow.checkConnectivity();
+			} finally {
+				ow.release();
 			}
 			return true;
 		} catch (MissingObjectException e) {
@@ -361,23 +366,16 @@ class FetchProcess {
 
 	private void expandSingle(final RefSpec spec, final Set<Ref> matched)
 			throws TransportException {
-		String want = spec.getSource();
-		if (ObjectId.isId(want)) {
-			want(ObjectId.fromString(want));
-			return;
-		}
-
-		Ref src = conn.getRef(want);
+		final Ref src = conn.getRef(spec.getSource());
 		if (src == null) {
-			throw new TransportException(MessageFormat.format(JGitText.get().remoteDoesNotHaveSpec, want));
+			throw new TransportException(MessageFormat.format(JGitText.get().remoteDoesNotHaveSpec, spec.getSource()));
 		}
-		if (matched.add(src)) {
+		if (matched.add(src))
 			want(src, spec);
-		}
 	}
 
 	private Collection<Ref> expandAutoFollowTags() throws TransportException {
-		final Collection<Ref> additionalTags = new ArrayList<>();
+		final Collection<Ref> additionalTags = new ArrayList<Ref>();
 		final Map<String, Ref> haveRefs = localRefs();
 		for (final Ref r : conn.getRefs()) {
 			if (!isTag(r))
@@ -404,17 +402,11 @@ class FetchProcess {
 	private void expandFetchTags() throws TransportException {
 		final Map<String, Ref> haveRefs = localRefs();
 		for (final Ref r : conn.getRefs()) {
-			if (!isTag(r)) {
+			if (!isTag(r))
 				continue;
-			}
-			ObjectId id = r.getObjectId();
-			if (id == null) {
-				continue;
-			}
 			final Ref local = haveRefs.get(r.getName());
-			if (local == null || !id.equals(local.getObjectId())) {
+			if (local == null || !r.getObjectId().equals(local.getObjectId()))
 				wantTag(r);
-			}
 		}
 	}
 
@@ -426,11 +418,6 @@ class FetchProcess {
 	private void want(final Ref src, final RefSpec spec)
 			throws TransportException {
 		final ObjectId newId = src.getObjectId();
-		if (newId == null) {
-			throw new NullPointerException(MessageFormat.format(
-					JGitText.get().transportProvidedRefWithNoObjectId,
-					src.getName()));
-		}
 		if (spec.getDestination() != null) {
 			final TrackingRefUpdate tru = createUpdate(spec, newId);
 			if (newId.equals(tru.getOldObjectId()))
@@ -446,11 +433,6 @@ class FetchProcess {
 		fhr.sourceName = src.getName();
 		fhr.sourceURI = transport.getURI();
 		fetchHeadUpdates.add(fhr);
-	}
-
-	private void want(ObjectId id) {
-		askFor.put(id,
-				new ObjectIdRef.Unpeeled(Ref.Storage.NETWORK, id.name(), id));
 	}
 
 	private TrackingRefUpdate createUpdate(RefSpec spec, ObjectId newId)

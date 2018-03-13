@@ -64,7 +64,6 @@ public class FIFORevQueue extends BlockRevQueue {
 		super(s);
 	}
 
-	@Override
 	public void add(final RevCommit c) {
 		Block b = tail;
 		if (b == null) {
@@ -108,7 +107,6 @@ public class FIFORevQueue extends BlockRevQueue {
 		head = b;
 	}
 
-	@Override
 	public RevCommit next() {
 		final Block b = head;
 		if (b == null)
@@ -124,14 +122,12 @@ public class FIFORevQueue extends BlockRevQueue {
 		return c;
 	}
 
-	@Override
 	public void clear() {
 		head = null;
 		tail = null;
 		free.clear();
 	}
 
-	@Override
 	boolean everbodyHasFlag(final int f) {
 		for (Block b = head; b != null; b = b.next) {
 			for (int i = b.headIndex; i < b.tailIndex; i++)
@@ -141,7 +137,6 @@ public class FIFORevQueue extends BlockRevQueue {
 		return true;
 	}
 
-	@Override
 	boolean anybodyHasFlag(final int f) {
 		for (Block b = head; b != null; b = b.next) {
 			for (int i = b.headIndex; i < b.tailIndex; i++)
@@ -159,7 +154,6 @@ public class FIFORevQueue extends BlockRevQueue {
 		}
 	}
 
-	@Override
 	public String toString() {
 		final StringBuilder s = new StringBuilder();
 		for (Block q = head; q != null; q = q.next) {

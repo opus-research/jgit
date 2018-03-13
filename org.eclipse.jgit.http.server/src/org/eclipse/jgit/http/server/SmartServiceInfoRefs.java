@@ -80,17 +80,14 @@ abstract class SmartServiceInfoRefs implements Filter {
 		this.filters = filters.toArray(new Filter[filters.size()]);
 	}
 
-	@Override
 	public void init(FilterConfig config) throws ServletException {
 		// Do nothing.
 	}
 
-	@Override
 	public void destroy() {
 		// Do nothing.
 	}
 
-	@Override
 	public void doFilter(ServletRequest request, ServletResponse response,
 			FilterChain chain) throws IOException, ServletException {
 		final HttpServletRequest req = (HttpServletRequest) request;
@@ -101,10 +98,10 @@ abstract class SmartServiceInfoRefs implements Filter {
 			try {
 				begin(req, db);
 			} catch (ServiceNotAuthorizedException e) {
-				res.sendError(SC_UNAUTHORIZED, e.getMessage());
+				res.sendError(SC_UNAUTHORIZED);
 				return;
 			} catch (ServiceNotEnabledException e) {
-				sendError(req, res, SC_FORBIDDEN, e.getMessage());
+				sendError(req, res, SC_FORBIDDEN);
 				return;
 			}
 
@@ -135,14 +132,16 @@ abstract class SmartServiceInfoRefs implements Filter {
 			advertise(req, new PacketLineOutRefAdvertiser(out));
 			buf.close();
 		} catch (ServiceNotAuthorizedException e) {
-			res.sendError(SC_UNAUTHORIZED, e.getMessage());
+			res.sendError(SC_UNAUTHORIZED);
+
 		} catch (ServiceNotEnabledException e) {
-			sendError(req, res, SC_FORBIDDEN, e.getMessage());
+			sendError(req, res, SC_FORBIDDEN);
+
 		} catch (ServiceMayNotContinueException e) {
 			if (e.isOutput())
 				buf.close();
 			else
-				sendError(req, res, e.getStatusCode(), e.getMessage());
+				sendError(req, res, SC_FORBIDDEN, e.getMessage());
 		}
 	}
 
@@ -157,7 +156,6 @@ abstract class SmartServiceInfoRefs implements Filter {
 	private class Chain implements FilterChain {
 		private int filterIdx;
 
-		@Override
 		public void doFilter(ServletRequest req, ServletResponse rsp)
 				throws IOException, ServletException {
 			if (filterIdx < filters.length)

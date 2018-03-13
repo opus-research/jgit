@@ -43,16 +43,11 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
-import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
-
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -132,31 +127,6 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Filter a collection of commands according to result.
-	 *
-	 * @param in
-	 *            commands to filter.
-	 * @param want
-	 *            desired status to filter by.
-	 * @return a copy of the command list containing only those commands with
-	 *         the desired status.
-	 * @since 4.2
-	 */
-	public static List<ReceiveCommand> filter(Iterable<ReceiveCommand> in,
-			Result want) {
-		List<ReceiveCommand> r;
-		if (in instanceof Collection)
-			r = new ArrayList<>(((Collection<?>) in).size());
-		else
-			r = new ArrayList<>();
-		for (ReceiveCommand cmd : in) {
-			if (cmd.getResult() == want)
-				r.add(cmd);
-		}
-		return r;
-	}
-
-	/**
 	 * Filter a list of commands according to result.
 	 *
 	 * @param commands
@@ -168,41 +138,13 @@ public class ReceiveCommand {
 	 * @since 2.0
 	 */
 	public static List<ReceiveCommand> filter(List<ReceiveCommand> commands,
-			Result want) {
-		return filter((Iterable<ReceiveCommand>) commands, want);
-	}
-
-	/**
-	 * Set unprocessed commands as failed due to transaction aborted.
-	 * <p>
-	 * If a command is still {@link Result#NOT_ATTEMPTED} it will be set to
-	 * {@link Result#REJECTED_OTHER_REASON}.
-	 *
-	 * @param commands
-	 *            commands to mark as failed.
-	 * @since 4.2
-	 */
-	public static void abort(Iterable<ReceiveCommand> commands) {
-		for (ReceiveCommand c : commands) {
-			if (c.getResult() == NOT_ATTEMPTED) {
-				c.setResult(REJECTED_OTHER_REASON,
-						JGitText.get().transactionAborted);
-			}
+			final Result want) {
+		List<ReceiveCommand> r = new ArrayList<ReceiveCommand>(commands.size());
+		for (final ReceiveCommand cmd : commands) {
+			if (cmd.getResult() == want)
+				r.add(cmd);
 		}
-	}
-
-	/**
-	 * Check whether a command failed due to transaction aborted.
-	 *
-	 * @param cmd
-	 *            command.
-	 * @return whether the command failed due to transaction aborted, as in {@link
-	 *         #abort(Iterable)}.
-	 * @since 4.9
-	 */
-	public static boolean isTransactionAborted(ReceiveCommand cmd) {
-		return cmd.getResult() == REJECTED_OTHER_REASON
-				&& cmd.getMessage().equals(JGitText.get().transactionAborted);
+		return r;
 	}
 
 	private final ObjectId oldId;
@@ -215,15 +157,9 @@ public class ReceiveCommand {
 
 	private Ref ref;
 
-	private Result status = Result.NOT_ATTEMPTED;
+	private Result status;
 
 	private String message;
-
-	private boolean customRefLog;
-
-	private String refLogMessage;
-
-	private boolean refLogIncludeResult;
 
 	private boolean typeIsCorrect;
 
@@ -231,7 +167,7 @@ public class ReceiveCommand {
 	 * Create a new command for {@link BaseReceivePack}.
 	 *
 	 * @param oldId
-	 *            the expected old object id; must not be null. Use
+	 *            the old object id; must not be null. Use
 	 *            {@link ObjectId#zeroId()} to indicate a ref creation.
 	 * @param newId
 	 *            the new object id; must not be null. Use
@@ -241,23 +177,16 @@ public class ReceiveCommand {
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
-		}
-		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
-		}
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;
 
 		type = Type.UPDATE;
-		if (ObjectId.zeroId().equals(oldId)) {
+		if (ObjectId.zeroId().equals(oldId))
 			type = Type.CREATE;
-		}
-		if (ObjectId.zeroId().equals(newId)) {
+		if (ObjectId.zeroId().equals(newId))
 			type = Type.DELETE;
-		}
+		status = Result.NOT_ATTEMPTED;
 	}
 
 	/**
@@ -272,45 +201,14 @@ public class ReceiveCommand {
 	 * @param name
 	 *            name of the ref being affected.
 	 * @param type
-	 *            type of the command. Must be {@link Type#CREATE} if {@code
-	 *            oldId} is zero, or {@link Type#DELETE} if {@code newId} is zero.
+	 *            type of the command.
 	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
-		}
-		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
-		}
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;
-		switch (type) {
-		case CREATE:
-			if (!ObjectId.zeroId().equals(oldId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().createRequiresZeroOldId);
-			}
-			break;
-		case DELETE:
-			if (!ObjectId.zeroId().equals(newId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().deleteRequiresZeroNewId);
-			}
-			break;
-		case UPDATE:
-		case UPDATE_NONFASTFORWARD:
-			if (ObjectId.zeroId().equals(newId)
-					|| ObjectId.zeroId().equals(oldId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().updateRequiresOldIdAndNewId);
-			}
-			break;
-		default:
-			throw new IllegalStateException(JGitText.get().enumValueNotSupported0);
-		}
 		this.type = type;
 	}
 
@@ -347,90 +245,6 @@ public class ReceiveCommand {
 	/** @return the message associated with a failure status. */
 	public String getMessage() {
 		return message;
-	}
-
-	/**
-	 * Set the message to include in the reflog.
-	 * <p>
-	 * Overrides the default set by {@code setRefLogMessage} on any containing
-	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
-	 *
-	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
-	 * @param appendStatus
-	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
-	 * @since 4.9
-	 */
-	public void setRefLogMessage(String msg, boolean appendStatus) {
-		customRefLog = true;
-		if (msg == null && !appendStatus) {
-			disableRefLog();
-		} else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
-			refLogIncludeResult = true;
-		} else {
-			refLogMessage = msg;
-			refLogIncludeResult = appendStatus;
-		}
-	}
-
-	/**
-	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
-	 *
-	 * @since 4.9
-	 */
-	public void disableRefLog() {
-		customRefLog = true;
-		refLogMessage = null;
-		refLogIncludeResult = false;
-	}
-
-	/**
-	 * Check whether this command has a custom reflog setting that should override
-	 * defaults in any containing {@link org.eclipse.jgit.lib.BatchRefUpdate}.
-	 *
-	 * @return whether a custom reflog is set.
-	 * @since 4.9
-	 */
-	public boolean hasCustomRefLog() {
-		return customRefLog;
-	}
-
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 * @since 4.9
-	 */
-	public boolean isRefLogDisabled() {
-		return refLogMessage == null;
-	}
-
-	/**
-	 * Get the message to include in the reflog.
-	 *
-	 * @return message the caller wants to include in the reflog; null if the
-	 *         update should not be logged.
-	 * @since 4.9
-	 */
-	@Nullable
-	public String getRefLogMessage() {
-		return refLogMessage;
-	}
-
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 *
-	 * @return true if the message should include the result.
-	 * @since 4.9
-	 */
-	public boolean isRefLogIncludingResult() {
-		return refLogIncludeResult;
 	}
 
 	/**
@@ -499,7 +313,6 @@ public class ReceiveCommand {
 		try {
 			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
 			ru.setRefLogIdent(rp.getRefLogIdent());
-			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
 			switch (getType()) {
 			case DELETE:
 				if (!ObjectId.zeroId().equals(getOldId())) {
@@ -571,14 +384,6 @@ public class ReceiveCommand {
 
 		case REJECTED_CURRENT_BRANCH:
 			setResult(Result.REJECTED_CURRENT_BRANCH);
-			break;
-
-		case REJECTED_MISSING_OBJECT:
-			setResult(Result.REJECTED_MISSING_OBJECT);
-			break;
-
-		case REJECTED_OTHER_REASON:
-			setResult(Result.REJECTED_OTHER_REASON);
 			break;
 
 		default:

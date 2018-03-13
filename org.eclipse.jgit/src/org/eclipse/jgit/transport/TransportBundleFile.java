@@ -59,14 +59,13 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
 
 class TransportBundleFile extends Transport implements TransportBundle {
 	static final TransportProtocol PROTO_BUNDLE = new TransportProtocol() {
 		private final String[] schemeNames = { "bundle", "file" }; //$NON-NLS-1$ //$NON-NLS-2$
 
 		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<>(Arrays
+				.unmodifiableSet(new LinkedHashSet<String>(Arrays
 						.asList(schemeNames)));
 
 		@Override
@@ -74,7 +73,6 @@ class TransportBundleFile extends Transport implements TransportBundle {
 			return JGitText.get().transportProtoBundleFile;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return schemeSet;
 		}
@@ -95,7 +93,7 @@ class TransportBundleFile extends Transport implements TransportBundle {
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException, TransportException {
 			if ("bundle".equals(uri.getScheme())) { //$NON-NLS-1$
-				File path = FS.DETECTED.resolve(new File("."), uri.getPath()); //$NON-NLS-1$
+				File path = local.getFS().resolve(new File("."), uri.getPath()); //$NON-NLS-1$
 				return new TransportBundleFile(local, uri, path);
 			}
 
@@ -106,27 +104,12 @@ class TransportBundleFile extends Transport implements TransportBundle {
 			//
 			return TransportLocal.PROTO_LOCAL.open(uri, local, remoteName);
 		}
-
-		@Override
-		public Transport open(URIish uri) throws NotSupportedException,
-				TransportException {
-			if ("bundle".equals(uri.getScheme())) { //$NON-NLS-1$
-				File path = FS.DETECTED.resolve(new File("."), uri.getPath()); //$NON-NLS-1$
-				return new TransportBundleFile(uri, path);
-			}
-			return TransportLocal.PROTO_LOCAL.open(uri);
-		}
 	};
 
 	private final File bundle;
 
 	TransportBundleFile(Repository local, URIish uri, File bundlePath) {
 		super(local, uri);
-		bundle = bundlePath;
-	}
-
-	public TransportBundleFile(URIish uri, File bundlePath) {
-		super(uri);
 		bundle = bundlePath;
 	}
 

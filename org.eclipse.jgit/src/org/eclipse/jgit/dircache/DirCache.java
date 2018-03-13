@@ -46,7 +46,6 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -64,7 +63,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IndexReadException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
@@ -72,21 +70,19 @@ import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.FileSnapshot;
 import org.eclipse.jgit.internal.storage.file.LockFile;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Support for the Git dircache (aka index file).
@@ -111,7 +107,6 @@ public class DirCache {
 	private static final byte[] NO_CHECKSUM = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
-		@Override
 		public int compare(final DirCacheEntry o1, final DirCacheEntry o2) {
 			final int cr = cmp(o1, o2);
 			if (cr != 0)
@@ -147,28 +142,6 @@ public class DirCache {
 	 */
 	public static DirCache newInCore() {
 		return new DirCache(null, null);
-	}
-
-	/**
-	 * Create a new in memory index read from the contents of a tree.
-	 *
-	 * @param reader
-	 *            reader to access the tree objects from a repository.
-	 * @param treeId
-	 *            tree to read. Must identify a tree, not a tree-ish.
-	 * @return a new cache which has no backing store file, but contains the
-	 *         contents of {@code treeId}.
-	 * @throws IOException
-	 *             one or more trees not available from the ObjectReader.
-	 * @since 4.2
-	 */
-	public static DirCache read(ObjectReader reader, AnyObjectId treeId)
-			throws IOException {
-		DirCache d = newInCore();
-		DirCacheBuilder b = d.builder();
-		b.addTree(null, DirCacheEntry.STAGE_0, reader, treeId);
-		b.finish();
-		return d;
 	}
 
 	/**
@@ -345,6 +318,9 @@ public class DirCache {
 	/** Our active lock (if we hold it); null if we don't have it locked. */
 	private LockFile myLock;
 
+	/** file system abstraction **/
+	private final FS fs;
+
 	/** Keep track of whether the index has changed or not */
 	private FileSnapshot snapshot;
 
@@ -374,6 +350,7 @@ public class DirCache {
 	 */
 	public DirCache(final File indexLocation, final FS fs) {
 		liveFile = indexLocation;
+		this.fs = fs;
 		clear();
 	}
 
@@ -440,12 +417,6 @@ public class DirCache {
 					}
 				}
 			} catch (FileNotFoundException fnfe) {
-				if (liveFile.exists()) {
-					// Panic: the index file exists but we can't read it
-					throw new IndexReadException(
-							MessageFormat.format(JGitText.get().cannotReadIndex,
-									liveFile.getAbsolutePath(), fnfe));
-				}
 				// Someone must have deleted it between our exists test
 				// and actually opening the path. That's fine, its empty.
 				//
@@ -608,7 +579,7 @@ public class DirCache {
 	public boolean lock() throws IOException {
 		if (liveFile == null)
 			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
-		final LockFile tmp = new LockFile(liveFile);
+		final LockFile tmp = new LockFile(liveFile, fs);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
 			myLock = tmp;
@@ -635,9 +606,8 @@ public class DirCache {
 	public void write() throws IOException {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
-		try (OutputStream o = tmp.getOutputStream();
-				OutputStream bo = new BufferedOutputStream(o)) {
-			writeTo(liveFile.getParentFile(), bo);
+		try {
+			writeTo(new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -650,7 +620,7 @@ public class DirCache {
 		}
 	}
 
-	void writeTo(File dir, final OutputStream os) throws IOException {
+	void writeTo(final OutputStream os) throws IOException {
 		final MessageDigest foot = Constants.newMessageDigest();
 		final DigestOutputStream dos = new DigestOutputStream(os, foot);
 
@@ -700,18 +670,14 @@ public class DirCache {
 		}
 
 		if (writeTree) {
-			TemporaryBuffer bb = new TemporaryBuffer.LocalFile(dir, 5 << 20);
-			try {
-				tree.write(tmp, bb);
-				bb.close();
+			final TemporaryBuffer bb = new TemporaryBuffer.LocalFile();
+			tree.write(tmp, bb);
+			bb.close();
 
-				NB.encodeInt32(tmp, 0, EXT_TREE);
-				NB.encodeInt32(tmp, 4, (int) bb.length());
-				dos.write(tmp, 0, 8);
-				bb.writeTo(dos, null);
-			} finally {
-				bb.destroy();
-			}
+			NB.encodeInt32(tmp, 0, EXT_TREE);
+			NB.encodeInt32(tmp, 4, (int) bb.length());
+			dos.write(tmp, 0, 8);
+			bb.writeTo(dos, null);
 		}
 		writeIndexChecksum = foot.digest();
 		os.write(writeIndexChecksum);
@@ -764,21 +730,6 @@ public class DirCache {
 	}
 
 	/**
-	 * Locate the position a path's entry is at in the index. For details refer
-	 * to #findEntry(byte[], int).
-	 *
-	 * @param path
-	 *            the path to search for.
-	 * @return if &gt;= 0 then the return value is the position of the entry in
-	 *         the index; pass to {@link #getEntry(int)} to obtain the entry
-	 *         information. If &lt; 0 the entry does not exist in the index.
-	 */
-	public int findEntry(final String path) {
-		final byte[] p = Constants.encode(path);
-		return findEntry(p, p.length);
-	}
-
-	/**
 	 * Locate the position a path's entry is at in the index.
 	 * <p>
 	 * If there is at least one entry in the index for this path the position of
@@ -788,20 +739,19 @@ public class DirCache {
 	 * If no path matches the entry -(position+1) is returned, where position is
 	 * the location it would have gone within the index.
 	 *
-	 * @param p
-	 *            the byte array starting with the path to search for.
-	 * @param pLen
-	 *            the length of the path in bytes
-	 * @return if &gt;= 0 then the return value is the position of the entry in
-	 *         the index; pass to {@link #getEntry(int)} to obtain the entry
-	 *         information. If &lt; 0 the entry does not exist in the index.
-	 * @since 3.4
+	 * @param path
+	 *            the path to search for.
+	 * @return if >= 0 then the return value is the position of the entry in the
+	 *         index; pass to {@link #getEntry(int)} to obtain the entry
+	 *         information. If < 0 the entry does not exist in the index.
 	 */
-	public int findEntry(byte[] p, int pLen) {
-		return findEntry(0, p, pLen);
+	public int findEntry(final String path) {
+		final byte[] p = Constants.encode(path);
+		return findEntry(p, p.length);
 	}
 
-	int findEntry(int low, byte[] p, int pLen) {
+	int findEntry(final byte[] p, final int pLen) {
+		int low = 0;
 		int high = entryCnt;
 		while (low < high) {
 			int mid = (low + high) >>> 1;
@@ -901,8 +851,8 @@ public class DirCache {
 	 */
 	public DirCacheEntry[] getEntriesWithin(String path) {
 		if (path.length() == 0) {
-			DirCacheEntry[] r = new DirCacheEntry[entryCnt];
-			System.arraycopy(sortedEntries, 0, r, 0, entryCnt);
+			final DirCacheEntry[] r = new DirCacheEntry[sortedEntries.length];
+			System.arraycopy(sortedEntries, 0, r, 0, sortedEntries.length);
 			return r;
 		}
 		if (!path.endsWith("/")) //$NON-NLS-1$
@@ -954,7 +904,7 @@ public class DirCache {
 	 *            returned tree identity.
 	 * @return identity for the root tree.
 	 * @throws UnmergedPathException
-	 *             one or more paths contain higher-order stages (stage &gt; 0),
+	 *             one or more paths contain higher-order stages (stage > 0),
 	 *             which cannot be stored in a tree object.
 	 * @throws IllegalStateException
 	 *             one or more paths contain an invalid mode which should never
@@ -993,9 +943,9 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
-		List<String> paths = new ArrayList<>(128);
-		try (TreeWalk walk = new TreeWalk(repository)) {
-			walk.setOperationType(OperationType.CHECKIN_OP);
+		TreeWalk walk = new TreeWalk(repository);
+		List<String> paths = new ArrayList<String>(128);
+		try {
 			for (int i = 0; i < entryCnt; i++)
 				if (sortedEntries[i].isSmudged())
 					paths.add(sortedEntries[i].getPathString());
@@ -1007,7 +957,6 @@ public class DirCache {
 			FileTreeIterator fIter = new FileTreeIterator(repository);
 			walk.addTree(iIter);
 			walk.addTree(fIter);
-			fIter.setDirCacheIterator(walk, 0);
 			walk.setRecursive(true);
 			while (walk.next()) {
 				iIter = walk.getTree(0, DirCacheIterator.class);
@@ -1022,6 +971,8 @@ public class DirCache {
 					entry.setLastModified(fIter.getEntryLastModified());
 				}
 			}
+		} finally {
+			walk.release();
 		}
 	}
 }

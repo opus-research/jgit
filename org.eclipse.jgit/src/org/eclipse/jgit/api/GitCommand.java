@@ -39,7 +39,6 @@ package org.eclipse.jgit.api;
 
 import java.text.MessageFormat;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.internal.JGitText;
@@ -72,7 +71,7 @@ public abstract class GitCommand<T> implements Callable<T> {
 	 * a state which tells whether it is allowed to call {@link #call()} on this
 	 * instance.
 	 */
-	private AtomicBoolean callable = new AtomicBoolean(true);
+	private boolean callable = true;
 
 	/**
 	 * Creates a new command which interacts with a single repository
@@ -101,7 +100,7 @@ public abstract class GitCommand<T> implements Callable<T> {
 	 *            this instance.
 	 */
 	protected void setCallable(boolean callable) {
-		this.callable.set(callable);
+		this.callable = callable;
 	}
 
 	/**
@@ -113,7 +112,7 @@ public abstract class GitCommand<T> implements Callable<T> {
 	 *             is {@code false}
 	 */
 	protected void checkCallable() {
-		if (!callable.get())
+		if (!callable)
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().commandWasCalledInTheWrongState
 					, this.getClass().getName()));
@@ -126,6 +125,5 @@ public abstract class GitCommand<T> implements Callable<T> {
 	 * @throws GitAPIException
 	 *             or subclass thereof when an error occurs
 	 */
-	@Override
 	public abstract T call() throws GitAPIException;
 }

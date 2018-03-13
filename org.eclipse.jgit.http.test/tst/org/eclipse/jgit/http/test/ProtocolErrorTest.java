@@ -84,7 +84,6 @@ public class ProtocolErrorTest extends HttpTestCase {
 
 	private RevBlob a_blob;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -95,7 +94,6 @@ public class ProtocolErrorTest extends HttpTestCase {
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			@Override
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -164,7 +162,7 @@ public class ProtocolErrorTest extends HttpTestCase {
 			try {
 				PacketLineIn pckin = new PacketLineIn(rawin);
 				assertEquals("unpack error "
-						+ JGitText.get().packfileIsTruncatedNoParam,
+						+ JGitText.get().packfileIsTruncated,
 						pckin.readString());
 				assertEquals("ng refs/objects/A n/a (unpacker error)",
 						pckin.readString());

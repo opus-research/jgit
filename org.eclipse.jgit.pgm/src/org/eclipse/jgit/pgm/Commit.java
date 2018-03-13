@@ -75,47 +75,42 @@ class Commit extends TextBuiltin {
 	private boolean amend;
 
 	@Argument(metaVar = "metaVar_commitPaths", usage = "usage_CommitPaths")
-	private List<String> paths = new ArrayList<>();
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws NoHeadException, NoMessageException,
 			ConcurrentRefUpdateException, JGitInternalException, Exception {
-		try (Git git = new Git(db)) {
-			CommitCommand commitCmd = git.commit();
-			if (author != null)
-				commitCmd.setAuthor(RawParseUtils.parsePersonIdent(author));
-			if (message != null)
-				commitCmd.setMessage(message);
-			if (only && paths.isEmpty())
-				throw die(CLIText.get().pathsRequired);
-			if (only && all)
-				throw die(CLIText.get().onlyOneOfIncludeOnlyAllInteractiveCanBeUsed);
-			if (!paths.isEmpty())
-				for (String p : paths)
-					commitCmd.setOnly(p);
-			commitCmd.setAmend(amend);
-			commitCmd.setAll(all);
-			Ref head = db.exactRef(Constants.HEAD);
-			if (head == null) {
-				throw die(CLIText.get().onBranchToBeBorn);
-			}
-			RevCommit commit;
-			try {
-				commit = commitCmd.call();
-			} catch (JGitInternalException e) {
-				throw die(e.getMessage());
-			}
-
-			String branchName;
-			if (!head.isSymbolic())
-				branchName = CLIText.get().branchDetachedHEAD;
-			else {
-				branchName = head.getTarget().getName();
-				if (branchName.startsWith(Constants.R_HEADS))
-					branchName = branchName.substring(Constants.R_HEADS.length());
-			}
-			outw.println("[" + branchName + " " + commit.name() + "] " //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-					+ commit.getShortMessage());
+		CommitCommand commitCmd = new Git(db).commit();
+		if (author != null)
+			commitCmd.setAuthor(RawParseUtils.parsePersonIdent(author));
+		if (message != null)
+			commitCmd.setMessage(message);
+		if (only && paths.isEmpty())
+			throw die(CLIText.get().pathsRequired);
+		if (only && all)
+			throw die(CLIText.get().onlyOneOfIncludeOnlyAllInteractiveCanBeUsed);
+		if (!paths.isEmpty())
+			for (String p : paths)
+				commitCmd.setOnly(p);
+		commitCmd.setAmend(amend);
+		commitCmd.setAll(all);
+		Ref head = db.getRef(Constants.HEAD);
+		RevCommit commit;
+		try {
+			commit = commitCmd.call();
+		} catch (JGitInternalException e) {
+			throw die(e.getMessage());
 		}
+
+		String branchName;
+		if (!head.isSymbolic())
+			branchName = CLIText.get().branchDetachedHEAD;
+		else {
+			branchName = head.getTarget().getName();
+			if (branchName.startsWith(Constants.R_HEADS))
+				branchName = branchName.substring(Constants.R_HEADS.length());
+		}
+		outw.println("[" + branchName + " " + commit.name() + "] " //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+				+ commit.getShortMessage());
 	}
 }

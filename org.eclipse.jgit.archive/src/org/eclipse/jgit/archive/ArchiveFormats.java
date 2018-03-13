@@ -55,7 +55,7 @@ import org.eclipse.jgit.api.ArchiveCommand;
  * that performs the same registration automatically.
  */
 public class ArchiveFormats {
-	private static final List<String> myFormats = new ArrayList<>();
+	private static final List<String> myFormats = new ArrayList<String>();
 
 	private static final void register(String name, ArchiveCommand.Format<?> fmt) {
 		myFormats.add(name);
@@ -66,14 +66,15 @@ public class ArchiveFormats {
 	 * Register all included archive formats so they can be used
 	 * as arguments to the ArchiveCommand.setFormat() method.
 	 *
+	 * Should not be called twice without a call to stop() in between.
 	 * Not thread-safe.
 	 */
 	public static void registerAll() {
-		register("tar", new TarFormat()); //$NON-NLS-1$
-		register("tgz", new TgzFormat()); //$NON-NLS-1$
-		register("tbz2", new Tbz2Format()); //$NON-NLS-1$
-		register("txz", new TxzFormat()); //$NON-NLS-1$
-		register("zip", new ZipFormat()); //$NON-NLS-1$
+		register("tar", new TarFormat());
+		register("tgz", new TgzFormat());
+		register("tbz2", new Tbz2Format());
+		register("txz", new TxzFormat());
+		register("zip", new ZipFormat());
 	}
 
 	/**

@@ -93,7 +93,6 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(commit);
@@ -122,9 +121,9 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
 		Repository subRepo = generator.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(commit, subRepo.resolve(Constants.HEAD));
-		subRepo.close();
 	}
 
 	@Test
@@ -137,7 +136,6 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);
@@ -173,7 +171,6 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);

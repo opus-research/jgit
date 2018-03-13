@@ -47,7 +47,6 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -99,34 +98,28 @@ import com.jcraft.jsch.SftpException;
  */
 public class TransportSftp extends SshTransport implements WalkTransport {
 	static final TransportProtocol PROTO_SFTP = new TransportProtocol() {
-		@Override
 		public String getName() {
 			return JGitText.get().transportProtoSFTP;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("sftp"); //$NON-NLS-1$
 		}
 
-		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
-		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
-		@Override
 		public int getDefaultPort() {
 			return 22;
 		}
 
-		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportSftp(local, uri);
@@ -186,9 +179,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				close();
 				throw err;
 			} catch (SftpException je) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotEnterObjectsPath, path,
-						je.getMessage()), je);
+				throw new TransportException("Can't enter " + path + "/objects"
+						+ ": " + je.getMessage(), je);
 			}
 		}
 
@@ -203,9 +195,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				close();
 				throw err;
 			} catch (SftpException je) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotEnterPathFromParent, p,
-						parent.objectsPath, je.getMessage()), je);
+				throw new TransportException("Can't enter " + p + " from "
+						+ parent.objectsPath + ": " + je.getMessage(), je);
 			}
 		}
 
@@ -231,21 +222,20 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 
 		@Override
 		Collection<String> getPackNames() throws IOException {
-			final List<String> packs = new ArrayList<>();
+			final List<String> packs = new ArrayList<String>();
 			try {
-				@SuppressWarnings("unchecked")
 				final Collection<ChannelSftp.LsEntry> list = ftp.ls("pack"); //$NON-NLS-1$
 				final HashMap<String, ChannelSftp.LsEntry> files;
 				final HashMap<String, Integer> mtimes;
 
-				files = new HashMap<>();
-				mtimes = new HashMap<>();
+				files = new HashMap<String, ChannelSftp.LsEntry>();
+				mtimes = new HashMap<String, Integer>();
 
 				for (final ChannelSftp.LsEntry ent : list)
 					files.put(ent.getFilename(), ent);
 				for (final ChannelSftp.LsEntry ent : list) {
 					final String n = ent.getFilename();
-					if (!n.startsWith("pack-") || !n.endsWith(".pack")) //$NON-NLS-1$ //$NON-NLS-2$
+					if (!n.startsWith("pack-") || !n.endsWith(".pack")) //$NON-NLS-1$
 						continue;
 
 					final String in = n.substring(0, n.length() - 5) + ".idx"; //$NON-NLS-1$
@@ -257,17 +247,14 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				}
 
 				Collections.sort(packs, new Comparator<String>() {
-					@Override
 					public int compare(final String o1, final String o2) {
 						return mtimes.get(o2).intValue()
 								- mtimes.get(o1).intValue();
 					}
 				});
 			} catch (SftpException je) {
-				throw new TransportException(
-						MessageFormat.format(JGitText.get().cannotListPackPath,
-								objectsPath, je.getMessage()),
-						je);
+				throw new TransportException("Can't ls " + objectsPath
+						+ "/pack: " + je.getMessage(), je);
 			}
 			return packs;
 		}
@@ -280,9 +267,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 			} catch (SftpException je) {
 				if (je.id == ChannelSftp.SSH_FX_NO_SUCH_FILE)
 					throw new FileNotFoundException(path);
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotGetObjectsPath, objectsPath, path,
-						je.getMessage()), je);
+				throw new TransportException("Can't get " + objectsPath + "/"
+						+ path + ": " + je.getMessage(), je);
 			}
 		}
 
@@ -293,9 +279,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 			} catch (SftpException je) {
 				if (je.id == ChannelSftp.SSH_FX_NO_SUCH_FILE)
 					return;
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotDeleteObjectsPath, objectsPath,
-						path, je.getMessage()), je);
+				throw new TransportException("Can't delete " + objectsPath
+						+ "/" + path + ": " + je.getMessage(), je);
 			}
 
 			// Prune any now empty directories.
@@ -333,9 +318,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 					}
 				}
 
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotWriteObjectsPath, objectsPath,
-						path, je.getMessage()), je);
+				throw new TransportException("Can't write " + objectsPath + "/"
+						+ path + ": " + je.getMessage(), je);
 			}
 		}
 
@@ -347,9 +331,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				try {
 					ftp.rename(lock, path);
 				} catch (SftpException je) {
-					throw new TransportException(MessageFormat.format(
-							JGitText.get().cannotWriteObjectsPath, objectsPath,
-							path, je.getMessage()), je);
+					throw new TransportException("Can't write " + objectsPath
+							+ "/" + path + ": " + je.getMessage(), je);
 				}
 			} catch (IOException err) {
 				try {
@@ -381,21 +364,19 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 					}
 				}
 
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotMkdirObjectPath, objectsPath, path,
-						je.getMessage()), je);
+				throw new TransportException("Can't mkdir " + objectsPath + "/"
+						+ path + ": " + je.getMessage(), je);
 			}
 		}
 
 		Map<String, Ref> readAdvertisedRefs() throws TransportException {
-			final TreeMap<String, Ref> avail = new TreeMap<>();
+			final TreeMap<String, Ref> avail = new TreeMap<String, Ref>();
 			readPackedRefs(avail);
 			readRef(avail, ROOT_DIR + Constants.HEAD, Constants.HEAD);
 			readLooseRefs(avail, ROOT_DIR + "refs", "refs/"); //$NON-NLS-1$ //$NON-NLS-2$
 			return avail;
 		}
 
-		@SuppressWarnings("unchecked")
 		private void readLooseRefs(final TreeMap<String, Ref> avail,
 				final String dir, final String prefix)
 				throws TransportException {
@@ -403,9 +384,8 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 			try {
 				list = ftp.ls(dir);
 			} catch (SftpException je) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotListObjectsPath, objectsPath, dir,
-						je.getMessage()), je);
+				throw new TransportException("Can't ls " + objectsPath + "/"
+						+ dir + ": " + je.getMessage(), je);
 			}
 
 			for (final ChannelSftp.LsEntry ent : list) {
@@ -434,14 +414,12 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 			} catch (FileNotFoundException noRef) {
 				return null;
 			} catch (IOException err) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().cannotReadObjectsPath, objectsPath, path,
-						err.getMessage()), err);
+				throw new TransportException("Cannot read " + objectsPath + "/"
+						+ path + ": " + err.getMessage(), err);
 			}
 
 			if (line == null)
-				throw new TransportException(
-						MessageFormat.format(JGitText.get().emptyRef, name));
+				throw new TransportException("Empty ref: " + name);
 
 			if (line.startsWith("ref: ")) { //$NON-NLS-1$
 				final String target = line.substring("ref: ".length()); //$NON-NLS-1$
@@ -462,8 +440,7 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				return r;
 			}
 
-			throw new TransportException(
-					MessageFormat.format(JGitText.get().badRef, name, line));
+			throw new TransportException("Bad ref: " + name + ": " + line);
 		}
 
 		private Storage loose(final Ref r) {

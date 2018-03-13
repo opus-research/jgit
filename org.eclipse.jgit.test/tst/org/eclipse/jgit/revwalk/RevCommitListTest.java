@@ -57,15 +57,14 @@ public class RevCommitListTest extends RepositoryTestCase {
 	private RevCommitList<RevCommit> list;
 
 	public void setup(int count) throws Exception {
-		try (Git git = new Git(db);
-				RevWalk w = new RevWalk(db);) {
-			for (int i = 0; i < count; i++)
-				git.commit().setCommitter(committer).setAuthor(author)
-						.setMessage("commit " + i).call();
-			list = new RevCommitList<>();
-			w.markStart(w.lookupCommit(db.resolve(Constants.HEAD)));
-			list.source(w);
-		}
+		Git git = new Git(db);
+		for (int i = 0; i < count; i++)
+			git.commit().setCommitter(committer).setAuthor(author)
+					.setMessage("commit " + i).call();
+		list = new RevCommitList<RevCommit>();
+		RevWalk w = new RevWalk(db);
+		w.markStart(w.lookupCommit(db.resolve(Constants.HEAD)));
+		list.source(w);
 	}
 
 	@Test
@@ -108,18 +107,17 @@ public class RevCommitListTest extends RepositoryTestCase {
 	public void testFillToCommit() throws Exception {
 		setup(3);
 
-		try (RevWalk w = new RevWalk(db)) {
-			w.markStart(w.lookupCommit(db.resolve(Constants.HEAD)));
+		RevWalk w = new RevWalk(db);
+		w.markStart(w.lookupCommit(db.resolve(Constants.HEAD)));
 
-			w.next();
-			RevCommit c = w.next();
-			assertNotNull("should have found 2. commit", c);
+		w.next();
+		RevCommit c = w.next();
+		assertNotNull("should have found 2. commit", c);
 
-			list.fillTo(c, 5);
-			assertEquals(2, list.size());
-			assertEquals("commit 1", list.get(1).getFullMessage());
-			assertNull(list.get(3));
-		}
+		list.fillTo(c, 5);
+		assertEquals(2, list.size());
+		assertEquals("commit 1", list.get(1).getFullMessage());
+		assertNull(list.get(3));
 	}
 
 	@Test

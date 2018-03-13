@@ -174,22 +174,18 @@ public class GitServlet extends MetaServlet {
 	@Override
 	public void init(final ServletConfig config) throws ServletException {
 		gitFilter.init(new FilterConfig() {
-			@Override
 			public String getFilterName() {
 				return gitFilter.getClass().getName();
 			}
 
-			@Override
 			public String getInitParameter(String name) {
 				return config.getInitParameter(name);
 			}
 
-			@Override
 			public Enumeration<String> getInitParameterNames() {
 				return config.getInitParameterNames();
 			}
 
-			@Override
 			public ServletContext getServletContext() {
 				return config.getServletContext();
 			}

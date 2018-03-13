@@ -98,18 +98,17 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		assertEquals(ls.size(), dc.getEntryCount());
 		{
 			final Iterator<CGitIndexRecord> rItr = ls.values().iterator();
-			try (final TreeWalk tw = new TreeWalk(db)) {
-				tw.setRecursive(true);
-				tw.addTree(new DirCacheIterator(dc));
-				while (rItr.hasNext()) {
-					final DirCacheIterator dcItr;
+			final TreeWalk tw = new TreeWalk(db);
+			tw.setRecursive(true);
+			tw.addTree(new DirCacheIterator(dc));
+			while (rItr.hasNext()) {
+				final DirCacheIterator dcItr;
 
-					assertTrue(tw.next());
-					dcItr = tw.getTree(0, DirCacheIterator.class);
-					assertNotNull(dcItr);
+				assertTrue(tw.next());
+				dcItr = tw.getTree(0, DirCacheIterator.class);
+				assertNotNull(dcItr);
 
-					assertEqual(rItr.next(), dcItr.getDirCacheEntry());
-				}
+				assertEqual(rItr.next(), dcItr.getDirCacheEntry());
 			}
 		}
 	}
@@ -178,7 +177,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 				.getObjectId());
 		assertEquals(cList.size(), jTree.getEntrySpan());
 
-		final ArrayList<CGitLsTreeRecord> subtrees = new ArrayList<>();
+		final ArrayList<CGitLsTreeRecord> subtrees = new ArrayList<CGitLsTreeRecord>();
 		for (final CGitLsTreeRecord r : cTree.values()) {
 			if (FileMode.TREE.equals(r.mode))
 				subtrees.add(r);
@@ -214,7 +213,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		assertV3TreeEntry(9, "newfile.txt", false, true, dc);
 
 		final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		dc.writeTo(null, bos);
+		dc.writeTo(bos);
 		final byte[] indexBytes = bos.toByteArray();
 		final byte[] expectedBytes = IO.readFully(file);
 		assertArrayEquals(expectedBytes, indexBytes);
@@ -233,7 +232,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	}
 
 	private static Map<String, CGitIndexRecord> readLsFiles() throws Exception {
-		final LinkedHashMap<String, CGitIndexRecord> r = new LinkedHashMap<>();
+		final LinkedHashMap<String, CGitIndexRecord> r = new LinkedHashMap<String, CGitIndexRecord>();
 		final BufferedReader br = new BufferedReader(new InputStreamReader(
 				new FileInputStream(pathOf("gitgit.lsfiles")), "UTF-8"));
 		try {
@@ -249,7 +248,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	}
 
 	private static Map<String, CGitLsTreeRecord> readLsTree() throws Exception {
-		final LinkedHashMap<String, CGitLsTreeRecord> r = new LinkedHashMap<>();
+		final LinkedHashMap<String, CGitLsTreeRecord> r = new LinkedHashMap<String, CGitLsTreeRecord>();
 		final BufferedReader br = new BufferedReader(new InputStreamReader(
 				new FileInputStream(pathOf("gitgit.lstree")), "UTF-8"));
 		try {

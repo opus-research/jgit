@@ -61,22 +61,21 @@ public class PatchIdDiffFormatterTest extends RepositoryTestCase {
 		File folder = new File(db.getDirectory().getParent(), "folder");
 		folder.mkdir();
 		write(new File(folder, "folder.txt"), "folder");
-		try (Git git = new Git(db);
-				PatchIdDiffFormatter df = new PatchIdDiffFormatter()) {
-			git.add().addFilepattern(".").call();
-			git.commit().setMessage("Initial commit").call();
-			write(new File(folder, "folder.txt"), "folder change");
+		Git git = new Git(db);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "folder change");
 
-			df.setRepository(db);
-			df.setPathFilter(PathFilter.create("folder"));
-			DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
-			FileTreeIterator newTree = new FileTreeIterator(db);
-			df.format(oldTree, newTree);
-			df.flush();
+		PatchIdDiffFormatter df = new PatchIdDiffFormatter();
+		df.setRepository(db);
+		df.setPathFilter(PathFilter.create("folder"));
+		DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
+		FileTreeIterator newTree = new FileTreeIterator(db);
+		df.format(oldTree, newTree);
+		df.flush();
 
-			assertEquals("1ff64e0f9333e9b81967c3e8d7a81362b14d5441", df
-					.getCalulatedPatchId().name());
-		}
+		assertEquals("1ff64e0f9333e9b81967c3e8d7a81362b14d5441", df
+				.getCalulatedPatchId().name());
 	}
 
 	@Test
@@ -85,40 +84,37 @@ public class PatchIdDiffFormatterTest extends RepositoryTestCase {
 		File folder = new File(db.getDirectory().getParent(), "folder");
 		folder.mkdir();
 		write(new File(folder, "folder.txt"), "\n\n\n\nfolder");
-		try (Git git = new Git(db)) {
-			git.add().addFilepattern(".").call();
-			git.commit().setMessage("Initial commit").call();
-			write(new File(folder, "folder.txt"), "\n\n\n\nfolder change");
+		Git git = new Git(db);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "\n\n\n\nfolder change");
 
-			try (PatchIdDiffFormatter df = new PatchIdDiffFormatter()) {
-				df.setRepository(db);
-				df.setPathFilter(PathFilter.create("folder"));
-				DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
-				FileTreeIterator newTree = new FileTreeIterator(db);
-				df.format(oldTree, newTree);
-				df.flush();
+		PatchIdDiffFormatter df = new PatchIdDiffFormatter();
+		df.setRepository(db);
+		df.setPathFilter(PathFilter.create("folder"));
+		DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
+		FileTreeIterator newTree = new FileTreeIterator(db);
+		df.format(oldTree, newTree);
+		df.flush();
 
-				assertEquals("08fca5ac531383eb1da8bf6b6f7cf44411281407", df
-						.getCalulatedPatchId().name());
-			}
+		assertEquals("08fca5ac531383eb1da8bf6b6f7cf44411281407", df
+				.getCalulatedPatchId().name());
 
-			write(new File(folder, "folder.txt"), "a\n\n\n\nfolder");
-			git.add().addFilepattern(".").call();
-			git.commit().setMessage("Initial commit").call();
-			write(new File(folder, "folder.txt"), "a\n\n\n\nfolder change");
+		write(new File(folder, "folder.txt"), "a\n\n\n\nfolder");
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "a\n\n\n\nfolder change");
 
-			try (PatchIdDiffFormatter df = new PatchIdDiffFormatter()) {
-				df.setRepository(db);
-				df.setPathFilter(PathFilter.create("folder"));
-				DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
-				FileTreeIterator newTree = new FileTreeIterator(db);
-				df.format(oldTree, newTree);
-				df.flush();
+		df = new PatchIdDiffFormatter();
+		df.setRepository(db);
+		df.setPathFilter(PathFilter.create("folder"));
+		oldTree = new DirCacheIterator(db.readDirCache());
+		newTree = new FileTreeIterator(db);
+		df.format(oldTree, newTree);
+		df.flush();
 
-				assertEquals("08fca5ac531383eb1da8bf6b6f7cf44411281407", df
-						.getCalulatedPatchId().name());
-			}
-		}
+		assertEquals("08fca5ac531383eb1da8bf6b6f7cf44411281407", df
+				.getCalulatedPatchId().name());
 	}
 
 }

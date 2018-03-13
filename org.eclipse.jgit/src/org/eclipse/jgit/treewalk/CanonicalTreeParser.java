@@ -44,23 +44,13 @@
 
 package org.eclipse.jgit.treewalk;
 
-import static org.eclipse.jgit.lib.Constants.DOT_GIT_ATTRIBUTES;
-import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
-import static org.eclipse.jgit.lib.Constants.TYPE_TREE;
-import static org.eclipse.jgit.lib.Constants.encode;
-
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
-import java.util.Collections;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.AttributesRule;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -69,7 +59,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 /** Parses raw Git trees from the canonical semi-text/semi-binary format. */
 public class CanonicalTreeParser extends AbstractTreeIterator {
 	private static final byte[] EMPTY = {};
-	private static final byte[] ATTRS = encode(DOT_GIT_ATTRIBUTES);
 
 	private byte[] raw;
 
@@ -121,9 +110,8 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 
 	/**
 	 * @return the parent of this tree parser
-	 * @deprecated internal use only
+	 * @internal
 	 */
-	@Deprecated
 	public CanonicalTreeParser getParent() {
 		return (CanonicalTreeParser) parent;
 	}
@@ -135,7 +123,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 *            the raw tree content.
 	 */
 	public void reset(final byte[] treeData) {
-		attributesNode = null;
 		raw = treeData;
 		prevPtr = -1;
 		currPtr = 0;
@@ -211,7 +198,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 */
 	public void reset(final ObjectReader reader, final AnyObjectId id)
 			throws IncorrectObjectTypeException, IOException {
-		reset(reader.open(id, OBJ_TREE).getCachedBytes());
+		reset(reader.open(id, Constants.OBJ_TREE).getCachedBytes());
 	}
 
 	@Override
@@ -221,7 +208,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		idBuffer.fromRaw(idBuffer(), idOffset());
 		if (!FileMode.TREE.equals(mode)) {
 			final ObjectId me = idBuffer.toObjectId();
-			throw new IncorrectObjectTypeException(me, TYPE_TREE);
+			throw new IncorrectObjectTypeException(me, Constants.TYPE_TREE);
 		}
 		return createSubtreeIterator0(reader, idBuffer);
 	}
@@ -249,7 +236,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		return p;
 	}
 
-	@Override
 	public CanonicalTreeParser createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
 		return createSubtreeIterator(reader, new MutableObjectId());
@@ -267,7 +253,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 
 	@Override
 	public int idOffset() {
-		return nextPtr - OBJECT_ID_LENGTH;
+		return nextPtr - Constants.OBJECT_ID_LENGTH;
 	}
 
 	@Override
@@ -281,7 +267,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		return currPtr == 0;
 	}
 
-	@Override
 	public boolean eof() {
 		return currPtr == raw.length;
 	}
@@ -306,7 +291,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 			prevPtr = ptr;
 			while (raw[ptr] != 0)
 				ptr++;
-			ptr += OBJECT_ID_LENGTH + 1;
+			ptr += Constants.OBJECT_ID_LENGTH + 1;
 		}
 		if (delta != 0)
 			throw new ArrayIndexOutOfBoundsException(delta);
@@ -342,7 +327,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 			trace[delta] = ptr;
 			while (raw[ptr] != 0)
 				ptr++;
-			ptr += OBJECT_ID_LENGTH + 1;
+			ptr += Constants.OBJECT_ID_LENGTH + 1;
 		}
 		if (trace[1] == -1)
 			throw new ArrayIndexOutOfBoundsException(delta);
@@ -377,46 +362,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 			}
 		}
 		pathLen = tmp;
-		nextPtr = ptr + OBJECT_ID_LENGTH;
-	}
-
-	/**
-	 * Retrieve the {@link AttributesNode} for the current entry.
-	 *
-	 * @param reader
-	 *            {@link ObjectReader} used to parse the .gitattributes entry.
-	 * @return {@link AttributesNode} for the current entry.
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public AttributesNode getEntryAttributesNode(ObjectReader reader)
-			throws IOException {
-		if (attributesNode == null) {
-			attributesNode = findAttributes(reader);
-		}
-		return attributesNode.getRules().isEmpty() ? null : attributesNode;
-	}
-
-	private AttributesNode findAttributes(ObjectReader reader)
-			throws IOException {
-		CanonicalTreeParser itr = new CanonicalTreeParser();
-		itr.reset(raw);
-		if (itr.findFile(ATTRS)) {
-			return loadAttributes(reader, itr.getEntryObjectId());
-		}
-		return noAttributes();
-	}
-
-	private static AttributesNode loadAttributes(ObjectReader reader,
-			AnyObjectId id) throws IOException {
-		AttributesNode r = new AttributesNode();
-		try (InputStream in = reader.open(id, OBJ_BLOB).openStream()) {
-			r.parse(in);
-		}
-		return r.getRules().isEmpty() ? noAttributes() : r;
-	}
-
-	private static AttributesNode noAttributes() {
-		return new AttributesNode(Collections.<AttributesRule> emptyList());
+		nextPtr = ptr + Constants.OBJECT_ID_LENGTH;
 	}
 }

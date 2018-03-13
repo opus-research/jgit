@@ -47,25 +47,24 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.StringUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_getAndSetOptions")
 class Config extends TextBuiltin {
-	@Option(name = "--system", usage = "usage_configSystem")
+	@Option(name = "--system")
 	private boolean system;
 
-	@Option(name = "--global", usage = "usage_configGlobal")
+	@Option(name = "--global")
 	private boolean global;
 
-	@Option(name = "--local", usage = "usage_configLocal")
+	@Option(name = "--local")
 	private boolean local;
 
-	@Option(name = "--list", aliases = { "-l" }, usage = "usage_configList")
+	@Option(name = "--list", aliases = { "-l" })
 	private boolean list;
 
-	@Option(name = "--file", aliases = { "-f" }, metaVar = "metaVar_file", usage = "usage_configFile")
+	@Option(name = "--file", aliases = { "-f" })
 	private File configFile;
 
 	@Override
@@ -74,7 +73,7 @@ class Config extends TextBuiltin {
 			list();
 		else
 			throw new NotSupportedException(
-					"only --list option is currently supported"); //$NON-NLS-1$
+					"only --list option is currently supported");
 	}
 
 	private void list() throws IOException, ConfigInvalidException {
@@ -83,10 +82,7 @@ class Config extends TextBuiltin {
 			list(new FileBasedConfig(configFile, fs));
 			return;
 		}
-		if (system
-				|| (isListAll() && StringUtils.isEmptyOrNull(SystemReader
-						.getInstance()
-						.getenv(Constants.GIT_CONFIG_NOSYSTEM_KEY))))
+		if (system || isListAll())
 			list(SystemReader.getInstance().openSystemConfig(null, fs));
 		if (global || isListAll())
 			list(SystemReader.getInstance().openUserConfig(null, fs));

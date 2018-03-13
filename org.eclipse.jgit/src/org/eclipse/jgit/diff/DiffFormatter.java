@@ -67,13 +67,11 @@ import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -91,7 +89,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
@@ -105,7 +102,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 /**
  * Format a Git style patch script.
  */
-public class DiffFormatter implements AutoCloseable {
+public class DiffFormatter {
 	private static final int DEFAULT_BINARY_FILE_THRESHOLD = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 
 	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
@@ -118,9 +115,9 @@ public class DiffFormatter implements AutoCloseable {
 
 	private final OutputStream out;
 
-	private ObjectReader reader;
+	private Repository db;
 
-	private boolean closeReader;
+	private ObjectReader reader;
 
 	private DiffConfig diffCfg;
 
@@ -173,42 +170,28 @@ public class DiffFormatter implements AutoCloseable {
 	 *            source repository holding referenced objects.
 	 */
 	public void setRepository(Repository repository) {
-		setReader(repository.newObjectReader(), repository.getConfig(), true);
-	}
+		if (reader != null)
+			reader.release();
 
-	/**
-	 * Set the repository the formatter can load object contents from.
-	 *
-	 * @param reader
-	 *            source reader holding referenced objects. Caller is responsible
-	 *            for closing the reader.
-	 * @param cfg
-	 *            config specifying diff algorithm and rename detection options.
-	 * @since 4.5
-	 */
-	public void setReader(ObjectReader reader, Config cfg) {
-		setReader(reader, cfg, false);
-	}
-
-	private void setReader(ObjectReader reader, Config cfg, boolean closeReader) {
-		close();
-		this.closeReader = closeReader;
-		this.reader = reader;
-		this.diffCfg = cfg.get(DiffConfig.KEY);
+		db = repository;
+		reader = db.newObjectReader();
+		diffCfg = db.getConfig().get(DiffConfig.KEY);
 
 		ContentSource cs = ContentSource.create(reader);
 		source = new ContentSource.Pair(cs, cs);
 
-		if (diffCfg.isNoPrefix()) {
+		DiffConfig dc = db.getConfig().get(DiffConfig.KEY);
+		if (dc.isNoPrefix()) {
 			setOldPrefix(""); //$NON-NLS-1$
 			setNewPrefix(""); //$NON-NLS-1$
 		}
-		setDetectRenames(diffCfg.isRenameDetectionEnabled());
+		setDetectRenames(dc.isRenameDetectionEnabled());
 
-		diffAlgorithm = DiffAlgorithm.getAlgorithm(cfg.getEnum(
+		diffAlgorithm = DiffAlgorithm.getAlgorithm(db.getConfig().getEnum(
 				ConfigConstants.CONFIG_DIFF_SECTION, null,
 				ConfigConstants.CONFIG_KEY_ALGORITHM,
 				SupportedAlgorithm.HISTOGRAM));
+
 	}
 
 	/**
@@ -345,8 +328,8 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public void setDetectRenames(boolean on) {
 		if (on && renameDetector == null) {
-			assertHaveReader();
-			renameDetector = new RenameDetector(reader, diffCfg);
+			assertHaveRepository();
+			renameDetector = new RenameDetector(db);
 		} else if (!on)
 			renameDetector = null;
 	}
@@ -395,16 +378,10 @@ public class DiffFormatter implements AutoCloseable {
 		out.flush();
 	}
 
-	/**
-	 * Release the internal ObjectReader state.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
-		if (reader != null && closeReader) {
-			reader.close();
-		}
+	/** Release the internal ObjectReader state. */
+	public void release() {
+		if (reader != null)
+			reader.release();
 	}
 
 	/**
@@ -414,27 +391,21 @@ public class DiffFormatter implements AutoCloseable {
 	 * returned. Callers may choose to format these paths themselves, or convert
 	 * them into {@link FileHeader} instances with a complete edit list by
 	 * calling {@link #toFileHeader(DiffEntry)}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @return the paths that are different.
 	 * @throws IOException
 	 *             trees cannot be read or file contents cannot be read.
 	 */
 	public List<DiffEntry> scan(AnyObjectId a, AnyObjectId b)
 			throws IOException {
-		assertHaveReader();
+		assertHaveRepository();
 
-		try (RevWalk rw = new RevWalk(reader)) {
-			RevTree aTree = a != null ? rw.parseTree(a) : null;
-			RevTree bTree = b != null ? rw.parseTree(b) : null;
-			return scan(aTree, bTree);
-		}
+		RevWalk rw = new RevWalk(reader);
+		return scan(rw.parseTree(a), rw.parseTree(b));
 	}
 
 	/**
@@ -444,34 +415,25 @@ public class DiffFormatter implements AutoCloseable {
 	 * returned. Callers may choose to format these paths themselves, or convert
 	 * them into {@link FileHeader} instances with a complete edit list by
 	 * calling {@link #toFileHeader(DiffEntry)}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @return the paths that are different.
 	 * @throws IOException
 	 *             trees cannot be read or file contents cannot be read.
 	 */
 	public List<DiffEntry> scan(RevTree a, RevTree b) throws IOException {
-		assertHaveReader();
+		assertHaveRepository();
 
-		AbstractTreeIterator aIterator = makeIteratorFromTreeOrNull(a);
-		AbstractTreeIterator bIterator = makeIteratorFromTreeOrNull(b);
-		return scan(aIterator, bIterator);
-	}
+		CanonicalTreeParser aParser = new CanonicalTreeParser();
+		CanonicalTreeParser bParser = new CanonicalTreeParser();
 
-	private AbstractTreeIterator makeIteratorFromTreeOrNull(RevTree tree)
-			throws IncorrectObjectTypeException, IOException {
-		if (tree != null) {
-			CanonicalTreeParser parser = new CanonicalTreeParser();
-			parser.reset(reader, tree);
-			return parser;
-		} else
-			return new EmptyTreeIterator();
+		aParser.reset(reader, a);
+		bParser.reset(reader, b);
+
+		return scan(aParser, bParser);
 	}
 
 	/**
@@ -492,7 +454,7 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public List<DiffEntry> scan(AbstractTreeIterator a, AbstractTreeIterator b)
 			throws IOException {
-		assertHaveReader();
+		assertHaveRepository();
 
 		TreeWalk walk = new TreeWalk(reader);
 		walk.addTree(a);
@@ -591,14 +553,11 @@ public class DiffFormatter implements AutoCloseable {
 	 *
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -613,14 +572,10 @@ public class DiffFormatter implements AutoCloseable {
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
 	 *
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
-	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -634,14 +589,11 @@ public class DiffFormatter implements AutoCloseable {
 	 *
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -681,16 +633,20 @@ public class DiffFormatter implements AutoCloseable {
 		format(res.header, res.a, res.b);
 	}
 
-	private static byte[] writeGitLinkText(AbbreviatedObjectId id) {
-		if (ObjectId.zeroId().equals(id.toObjectId())) {
-			return EMPTY;
+	private void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
+			throws IOException {
+		if (ent.getOldMode() == GITLINK) {
+			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name() //$NON-NLS-1$
+					+ "\n")); //$NON-NLS-1$
 		}
-		return encodeASCII("Subproject commit " + id.name() //$NON-NLS-1$
-				+ "\n"); //$NON-NLS-1$
+		if (ent.getNewMode() == GITLINK) {
+			o.write(encodeASCII("+Subproject commit " + ent.getNewId().name() //$NON-NLS-1$
+					+ "\n")); //$NON-NLS-1$
+		}
 	}
 
 	private String format(AbbreviatedObjectId id) {
-		if (id.isComplete() && reader != null) {
+		if (id.isComplete() && db != null) {
 			try {
 				id = reader.abbreviate(id.toObjectId(), abbreviationLength);
 			} catch (IOException cannotAbbreviate) {
@@ -755,10 +711,10 @@ public class DiffFormatter implements AutoCloseable {
 			final int endIdx = findCombinedEnd(edits, curIdx);
 			final Edit endEdit = edits.get(endIdx);
 
-			int aCur = (int) Math.max(0, (long) curEdit.getBeginA() - context);
-			int bCur = (int) Math.max(0, (long) curEdit.getBeginB() - context);
-			final int aEnd = (int) Math.min(a.size(), (long) endEdit.getEndA() + context);
-			final int bEnd = (int) Math.min(b.size(), (long) endEdit.getEndB() + context);
+			int aCur = Math.max(0, curEdit.getBeginA() - context);
+			int bCur = Math.max(0, curEdit.getBeginB() - context);
+			final int aEnd = Math.min(a.size(), endEdit.getEndA() + context);
+			final int bEnd = Math.min(b.size(), endEdit.getEndB() + context);
 
 			writeHunkHeader(aCur, aEnd, bCur, bEnd);
 
@@ -801,7 +757,7 @@ public class DiffFormatter implements AutoCloseable {
 		writeLine(' ', text, line);
 	}
 
-	private static boolean isEndOfLineMissing(final RawText text, final int line) {
+	private boolean isEndOfLineMissing(final RawText text, final int line) {
 		return line + 1 == text.size() && text.isMissingNewlineAtEnd();
 	}
 
@@ -950,23 +906,22 @@ public class DiffFormatter implements AutoCloseable {
 
 		formatHeader(buf, ent);
 
-		if (ent.getOldId() == null || ent.getNewId() == null) {
+		if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
+			formatOldNewPaths(buf, ent);
+			writeGitLinkDiffText(buf, ent);
+			editList = new EditList();
+			type = PatchType.UNIFIED;
+
+		} else if (ent.getOldId() == null || ent.getNewId() == null) {
 			// Content not changed (e.g. only mode, pure rename)
 			editList = new EditList();
 			type = PatchType.UNIFIED;
 
 		} else {
-			assertHaveReader();
+			assertHaveRepository();
 
-			byte[] aRaw, bRaw;
-
-			if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
-				aRaw = writeGitLinkText(ent.getOldId());
-				bRaw = writeGitLinkText(ent.getNewId());
-			} else {
-				aRaw = open(OLD, ent);
-				bRaw = open(NEW, ent);
-			}
+			byte[] aRaw = open(OLD, ent);
+			byte[] bRaw = open(NEW, ent);
 
 			if (aRaw == BINARY || bRaw == BINARY //
 					|| RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
@@ -1003,10 +958,9 @@ public class DiffFormatter implements AutoCloseable {
 		return diffAlgorithm.diff(comparator, a, b);
 	}
 
-	private void assertHaveReader() {
-		if (reader == null) {
-			throw new IllegalStateException(JGitText.get().readerIsRequired);
-		}
+	private void assertHaveRepository() {
+		if (db == null)
+			throw new IllegalStateException(JGitText.get().repositoryIsRequired);
 	}
 
 	private byte[] open(DiffEntry.Side side, DiffEntry entry)
@@ -1016,6 +970,9 @@ public class DiffFormatter implements AutoCloseable {
 
 		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
+
+		if (isBinary())
+			return BINARY;
 
 		AbbreviatedObjectId id = entry.getId(side);
 		if (!id.isComplete()) {
@@ -1055,6 +1012,10 @@ public class DiffFormatter implements AutoCloseable {
 		}
 	}
 
+	private boolean isBinary() {
+		return false;
+	}
+
 	/**
 	 * Output the first header line
 	 *
@@ -1090,17 +1051,6 @@ public class DiffFormatter implements AutoCloseable {
 
 		formatGitDiffFirstHeaderLine(o, type, oldp, newp);
 
-		if ((type == MODIFY || type == COPY || type == RENAME)
-				&& !oldMode.equals(newMode)) {
-			o.write(encodeASCII("old mode ")); //$NON-NLS-1$
-			oldMode.copyTo(o);
-			o.write('\n');
-
-			o.write(encodeASCII("new mode ")); //$NON-NLS-1$
-			newMode.copyTo(o);
-			o.write('\n');
-		}
-
 		switch (type) {
 		case ADD:
 			o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
@@ -1134,6 +1084,12 @@ public class DiffFormatter implements AutoCloseable {
 
 			o.write(encode("copy to " + quotePath(newp))); //$NON-NLS-1$
 			o.write('\n');
+
+			if (!oldMode.equals(newMode)) {
+				o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
+				newMode.copyTo(o);
+				o.write('\n');
+			}
 			break;
 
 		case MODIFY:
@@ -1143,6 +1099,16 @@ public class DiffFormatter implements AutoCloseable {
 				o.write('\n');
 			}
 			break;
+		}
+
+		if ((type == MODIFY || type == RENAME) && !oldMode.equals(newMode)) {
+			o.write(encodeASCII("old mode ")); //$NON-NLS-1$
+			oldMode.copyTo(o);
+			o.write('\n');
+
+			o.write(encodeASCII("new mode ")); //$NON-NLS-1$
+			newMode.copyTo(o);
+			o.write('\n');
 		}
 
 		if (ent.getOldId() != null && !ent.getOldId().equals(ent.getNewId())) {

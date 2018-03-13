@@ -100,17 +100,14 @@ public class RepositoryFilter implements Filter {
 		this.resolver = resolver;
 	}
 
-	@Override
 	public void init(final FilterConfig config) throws ServletException {
 		context = config.getServletContext();
 	}
 
-	@Override
 	public void destroy() {
 		context = null;
 	}
 
-	@Override
 	public void doFilter(final ServletRequest request,
 			final ServletResponse response, final FilterChain chain)
 			throws IOException, ServletException {
@@ -140,13 +137,13 @@ public class RepositoryFilter implements Filter {
 			sendError(req, res, SC_NOT_FOUND);
 			return;
 		} catch (ServiceNotEnabledException e) {
-			sendError(req, res, SC_FORBIDDEN, e.getMessage());
+			sendError(req, res, SC_FORBIDDEN);
 			return;
 		} catch (ServiceNotAuthorizedException e) {
-			res.sendError(SC_UNAUTHORIZED, e.getMessage());
+			res.sendError(SC_UNAUTHORIZED);
 			return;
 		} catch (ServiceMayNotContinueException e) {
-			sendError(req, res, e.getStatusCode(), e.getMessage());
+			sendError(req, res, SC_FORBIDDEN, e.getMessage());
 			return;
 		}
 		try {

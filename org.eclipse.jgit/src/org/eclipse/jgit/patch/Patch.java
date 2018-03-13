@@ -44,9 +44,9 @@
 package org.eclipse.jgit.patch;
 
 import static org.eclipse.jgit.lib.Constants.encodeASCII;
+import static org.eclipse.jgit.patch.FileHeader.isHunkHdr;
 import static org.eclipse.jgit.patch.FileHeader.NEW_NAME;
 import static org.eclipse.jgit.patch.FileHeader.OLD_NAME;
-import static org.eclipse.jgit.patch.FileHeader.isHunkHdr;
 import static org.eclipse.jgit.util.RawParseUtils.match;
 import static org.eclipse.jgit.util.RawParseUtils.nextLF;
 
@@ -83,8 +83,8 @@ public class Patch {
 
 	/** Create an empty patch. */
 	public Patch() {
-		files = new ArrayList<>();
-		errors = new ArrayList<>(0);
+		files = new ArrayList<FileHeader>();
+		errors = new ArrayList<FormatError>(0);
 	}
 
 	/**
@@ -139,10 +139,14 @@ public class Patch {
 	}
 
 	private static byte[] readFully(final InputStream is) throws IOException {
-		TemporaryBuffer b = new TemporaryBuffer.Heap(Integer.MAX_VALUE);
-		b.copy(is);
-		b.close();
-		return b.toByteArray();
+		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
+		try {
+			b.copy(is);
+			b.close();
+			return b.toByteArray();
+		} finally {
+			b.destroy();
+		}
 	}
 
 	/**

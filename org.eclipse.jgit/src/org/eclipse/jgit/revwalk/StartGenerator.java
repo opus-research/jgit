@@ -85,6 +85,8 @@ class StartGenerator extends Generator {
 		final TreeFilter tf = w.getTreeFilter();
 		AbstractRevQueue q = walker.queue;
 
+		w.reader.walkAdviceBeginCommits(w, w.roots);
+
 		if (rf == RevFilter.MERGE_BASE) {
 			// Computing for merge bases is a special case and does not
 			// use the bulk of the generator pipeline.
@@ -125,13 +127,8 @@ class StartGenerator extends Generator {
 		else
 			pending = new DateRevQueue(q);
 		if (tf != TreeFilter.ALL) {
-			int rewriteFlag;
-			if (w.getRewriteParents()) {
-				pendingOutputType |= HAS_REWRITE | NEEDS_REWRITE;
-				rewriteFlag = RevWalk.REWRITE;
-			} else
-				rewriteFlag = 0;
-			rf = AndRevFilter.create(new TreeRevFilter(w, tf, rewriteFlag), rf);
+			rf = AndRevFilter.create(new RewriteTreeFilter(w, tf), rf);
+			pendingOutputType |= HAS_REWRITE | NEEDS_REWRITE;
 		}
 
 		walker.queue = q;
@@ -142,7 +139,7 @@ class StartGenerator extends Generator {
 		} else {
 			g = new PendingGenerator(w, pending, rf, pendingOutputType);
 
-			if (walker.hasRevSort(RevSort.BOUNDARY)) {
+			if (boundary) {
 				// Because the boundary generator may produce uninteresting
 				// commits we cannot allow the pending generator to dispose
 				// of them early.

@@ -1043,6 +1043,7 @@ public class CommitOnlyTest extends RepositoryTestCase {
 		return f1;
 	}
 
+	@SuppressWarnings("null")
 	private void executeAndCheck_f1_1(final Git git, final int state)
 			throws Exception {
 		JGitInternalException exception = null;
@@ -1058,6 +1059,7 @@ public class CommitOnlyTest extends RepositoryTestCase {
 		assertEquals(expected_f3_idx(state), indexState(CONTENT));
 	}
 
+	@SuppressWarnings("null")
 	private void executeAndCheck_f1_1_f2_f14(final Git git, final int state)
 			throws Exception {
 		JGitInternalException exception = null;
@@ -1075,6 +1077,7 @@ public class CommitOnlyTest extends RepositoryTestCase {
 				+ expected_f3_idx(state), indexState(CONTENT));
 	}
 
+	@SuppressWarnings("null")
 	private void executeAndCheck_f1_2(final Git git, final int state)
 			throws Exception {
 		JGitInternalException exception = null;
@@ -1126,6 +1129,7 @@ public class CommitOnlyTest extends RepositoryTestCase {
 		executeAndCheck_f1_3(git, state);
 	}
 
+	@SuppressWarnings("null")
 	private void executeAndCheck_f1_6(final Git git, final int state)
 			throws Exception {
 		JGitInternalException exception = null;
@@ -1188,6 +1192,7 @@ public class CommitOnlyTest extends RepositoryTestCase {
 		executeAndCheck_f1_8(git, state);
 	}
 
+	@SuppressWarnings("null")
 	private void executeAndCheck_f1_12(final Git git, final int state)
 			throws Exception {
 		JGitInternalException exception = null;
@@ -1294,12 +1299,10 @@ public class CommitOnlyTest extends RepositoryTestCase {
 		try {
 			final Repository repo = git.getRepository();
 			final ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
-			try (RevWalk rw = new RevWalk(repo)) {
-				final TreeWalk tw = TreeWalk.forPath(repo, path,
-						rw.parseTree(headId));
-				return new String(tw.getObjectReader().open(tw.getObjectId(0))
-						.getBytes());
-			}
+			final TreeWalk tw = TreeWalk.forPath(repo, path,
+					new RevWalk(repo).parseTree(headId));
+			return new String(tw.getObjectReader().open(tw.getObjectId(0))
+					.getBytes());
 		} catch (Exception e) {
 			return "";
 		}

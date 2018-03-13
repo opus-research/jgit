@@ -47,10 +47,8 @@ package org.eclipse.jgit.internal.storage.file;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -74,11 +72,11 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	 * The set that contains unpacked objects identifiers, it is created when
 	 * the cached instance is created.
 	 */
-	private ObjectIdOwnerMap<UnpackedObjectId> unpackedObjects;
+	private final ObjectIdOwnerMap<UnpackedObjectId> unpackedObjects = new ObjectIdOwnerMap<UnpackedObjectId>();
 
 	private final ObjectDirectory wrapped;
 
-	private CachedObjectDirectory[] alts;
+	private AlternateHandle[] alts;
 
 	/**
 	 * The constructor
@@ -88,15 +86,11 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	 */
 	CachedObjectDirectory(ObjectDirectory wrapped) {
 		this.wrapped = wrapped;
-		this.unpackedObjects = scanLoose();
-	}
 
-	private ObjectIdOwnerMap<UnpackedObjectId> scanLoose() {
-		ObjectIdOwnerMap<UnpackedObjectId> m = new ObjectIdOwnerMap<>();
 		File objects = wrapped.getDirectory();
 		String[] fanout = objects.list();
 		if (fanout == null)
-			return m;
+			fanout = new String[0];
 		for (String d : fanout) {
 			if (d.length() != 2)
 				continue;
@@ -108,13 +102,12 @@ class CachedObjectDirectory extends FileObjectDatabase {
 					continue;
 				try {
 					ObjectId id = ObjectId.fromString(d + e);
-					m.add(new UnpackedObjectId(id));
+					unpackedObjects.add(new UnpackedObjectId(id));
 				} catch (IllegalArgumentException notAnObject) {
 					// ignoring the file that does not represent loose object
 				}
 			}
 		}
-		return m;
 	}
 
 	@Override
@@ -128,13 +121,13 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	File getDirectory() {
-		return wrapped.getDirectory();
+	FileObjectDatabase newCachedFileObjectDatabase() {
+		return this;
 	}
 
 	@Override
-	File fileFor(AnyObjectId id) {
-		return wrapped.fileFor(id);
+	File getDirectory() {
+		return wrapped.getDirectory();
 	}
 
 	@Override
@@ -152,102 +145,86 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		return wrapped.getShallowCommits();
 	}
 
-	private CachedObjectDirectory[] myAlternates() {
+	@Override
+	AlternateHandle[] myAlternates() {
 		if (alts == null) {
-			ObjectDirectory.AlternateHandle[] src = wrapped.myAlternates();
-			alts = new CachedObjectDirectory[src.length];
-			for (int i = 0; i < alts.length; i++)
-				alts[i] = src[i].db.newCachedFileObjectDatabase();
+			AlternateHandle[] src = wrapped.myAlternates();
+			alts = new AlternateHandle[src.length];
+			for (int i = 0; i < alts.length; i++) {
+				FileObjectDatabase s = src[i].db;
+				alts[i] = new AlternateHandle(s.newCachedFileObjectDatabase());
+			}
 		}
 		return alts;
-	}
-
-	private Set<AlternateHandle.Id> skipMe(Set<AlternateHandle.Id> skips) {
-		Set<AlternateHandle.Id> withMe = new HashSet<>();
-		if (skips != null) {
-			withMe.addAll(skips);
-		}
-		withMe.add(getAlternateId());
-		return withMe;
 	}
 
 	@Override
 	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
 			throws IOException {
+		// In theory we could accelerate the loose object scan using our
+		// unpackedObjects map, but its not worth the huge code complexity.
+		// Scanning a single loose directory is fast enough, and this is
+		// unlikely to be called anyway.
+		//
 		wrapped.resolve(matches, id);
 	}
 
 	@Override
-	public boolean has(final AnyObjectId objectId) throws IOException {
-		return has(objectId, null);
-	}
-
-	private boolean has(final AnyObjectId objectId, Set<AlternateHandle.Id> skips)
-			throws IOException {
-		if (unpackedObjects.contains(objectId)) {
-			return true;
-		}
-		if (wrapped.hasPackedObject(objectId)) {
-			return true;
-		}
-		skips = skipMe(skips);
-		for (CachedObjectDirectory alt : myAlternates()) {
-			if (!skips.contains(alt.getAlternateId())) {
-				if (alt.has(objectId, skips)) {
-					return true;
-				}
-			}
-		}
-		return false;
+	boolean tryAgain1() {
+		return wrapped.tryAgain1();
 	}
 
 	@Override
-	ObjectLoader openObject(final WindowCursor curs, final AnyObjectId objectId)
-			throws IOException {
-		return openObject(curs, objectId, null);
+	public boolean has(final AnyObjectId objectId) {
+		return hasObjectImpl1(objectId);
 	}
 
-	private ObjectLoader openObject(final WindowCursor curs,
-			final AnyObjectId objectId, Set<AlternateHandle.Id> skips)
+	@Override
+	boolean hasObject1(AnyObjectId objectId) {
+		return unpackedObjects.contains(objectId)
+				|| wrapped.hasObject1(objectId);
+	}
+
+	@Override
+	ObjectLoader openObject(final WindowCursor curs,
+			final AnyObjectId objectId) throws IOException {
+		return openObjectImpl1(curs, objectId);
+	}
+
+	@Override
+	ObjectLoader openObject1(WindowCursor curs, AnyObjectId objectId)
 			throws IOException {
-		ObjectLoader ldr = openLooseObject(curs, objectId);
-		if (ldr != null) {
-			return ldr;
-		}
-		ldr = wrapped.openPackedObject(curs, objectId);
-		if (ldr != null) {
-			return ldr;
-		}
-		skips = skipMe(skips);
-		for (CachedObjectDirectory alt : myAlternates()) {
-			if (!skips.contains(alt.getAlternateId())) {
-				ldr = alt.openObject(curs, objectId, skips);
-				if (ldr != null) {
-					return ldr;
-				}
-			}
-		}
+		if (unpackedObjects.contains(objectId))
+			return wrapped.openObject2(curs, objectId.name(), objectId);
+		return wrapped.openObject1(curs, objectId);
+	}
+
+	@Override
+	boolean hasObject2(String objectId) {
+		return unpackedObjects.contains(ObjectId.fromString(objectId));
+	}
+
+	@Override
+	ObjectLoader openObject2(WindowCursor curs, String objectName,
+			AnyObjectId objectId) throws IOException {
+		if (unpackedObjects.contains(objectId))
+			return wrapped.openObject2(curs, objectName, objectId);
 		return null;
 	}
 
 	@Override
-	long getObjectSize(WindowCursor curs, AnyObjectId objectId)
-			throws IOException {
-		// Object size is unlikely to be requested from contexts using
-		// this type. Don't bother trying to accelerate the lookup.
-		return wrapped.getObjectSize(curs, objectId);
+	long getObjectSize1(WindowCursor curs, AnyObjectId objectId) throws IOException {
+		if (unpackedObjects.contains(objectId))
+			return wrapped.getObjectSize2(curs, objectId.name(), objectId);
+		return wrapped.getObjectSize1(curs, objectId);
 	}
 
 	@Override
-	ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
+	long getObjectSize2(WindowCursor curs, String objectName, AnyObjectId objectId)
 			throws IOException {
-		if (unpackedObjects.contains(id)) {
-			ObjectLoader ldr = wrapped.openLooseObject(curs, id);
-			if (ldr != null)
-				return ldr;
-			unpackedObjects = scanLoose();
-		}
-		return null;
+		if (unpackedObjects.contains(objectId))
+			return wrapped.getObjectSize2(curs, objectName, objectId);
+		return -1;
 	}
 
 	@Override
@@ -288,9 +265,5 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		UnpackedObjectId(AnyObjectId id) {
 			super(id);
 		}
-	}
-
-	private AlternateHandle.Id getAlternateId() {
-		return wrapped.getAlternateId();
 	}
 }

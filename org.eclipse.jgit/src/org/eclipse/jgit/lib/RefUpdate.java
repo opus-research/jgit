@@ -52,19 +52,12 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.PushCertificate;
 
 /**
  * Creates, updates or deletes any reference.
  */
 public abstract class RefUpdate {
-	/**
-	 * Status of an update request.
-	 * <p>
-	 * New values may be added to this enum in the future. Callers may assume that
-	 * unknown values are failures, and may generally treat them the same as
-	 * {@link #REJECTED_OTHER_REASON}.
-	 */
+	/** Status of an update request. */
 	public static enum Result {
 		/** The ref update/delete has not been attempted by the caller. */
 		NOT_ATTEMPTED,
@@ -120,10 +113,6 @@ public abstract class RefUpdate {
 		 * merged into the new value. The configuration did not allow a forced
 		 * update/delete to take place, so ref still contains the old value. No
 		 * previous history was lost.
-		 * <p>
-		 * <em>Note:</em> Despite the general name, this result only refers to the
-		 * non-fast-forward case. For more general errors, see {@link
-		 * #REJECTED_OTHER_REASON}.
 		 */
 		REJECTED,
 
@@ -149,25 +138,7 @@ public abstract class RefUpdate {
 		 * The ref was renamed from another name
 		 * <p>
 		 */
-		RENAMED,
-
-		/**
-		 * One or more objects aren't in the repository.
-		 * <p>
-		 * This is severe indication of either repository corruption on the
-		 * server side, or a bug in the client wherein the client did not supply
-		 * all required objects during the pack transfer.
-		 *
-		 * @since 4.9
-		 */
-		REJECTED_MISSING_OBJECT,
-
-		/**
-		 * Rejected for some other reason not covered by another enum value.
-		 *
-		 * @since 4.9
-		 */
-		REJECTED_OTHER_REASON;
+		RENAMED
 	}
 
 	/** New value the caller wants this ref to have. */
@@ -193,9 +164,6 @@ public abstract class RefUpdate {
 
 	/** Result of the update operation. */
 	private Result result = Result.NOT_ATTEMPTED;
-
-	/** Push certificate associated with this update. */
-	private PushCertificate pushCert;
 
 	private final Ref ref;
 
@@ -303,16 +271,6 @@ public abstract class RefUpdate {
 	 */
 	public void setDetachingSymbolicRef() {
 		detachingSymbolicRef = true;
-	}
-
-	/**
-	 * Return whether this update is actually detaching a symbolic ref.
-	 *
-	 * @return true if detaching a symref.
-	 * @since 4.9
-	 */
-	public boolean isDetachingSymbolicRef() {
-		return detachingSymbolicRef;
 	}
 
 	/**
@@ -456,31 +414,6 @@ public abstract class RefUpdate {
 	}
 
 	/**
-	 * Set a push certificate associated with this update.
-	 * <p>
-	 * This usually includes a command to update this ref, but is not required to.
-	 *
-	 * @param cert
-	 *            push certificate, may be null.
-	 * @since 4.1
-	 */
-	public void setPushCertificate(PushCertificate cert) {
-		pushCert = cert;
-	}
-
-	/**
-	 * Set the push certificate associated with this update.
-	 * <p>
-	 * This usually includes a command to update this ref, but is not required to.
-	 *
-	 * @return push certificate, may be null.
-	 * @since 4.1
-	 */
-	protected PushCertificate getPushCertificate() {
-		return pushCert;
-	}
-
-	/**
 	 * Get the status of this update.
 	 * <p>
 	 * The same value that was previously returned from an update method.
@@ -527,8 +460,11 @@ public abstract class RefUpdate {
 	 *             an unexpected IO error occurred while writing changes.
 	 */
 	public Result update() throws IOException {
-		try (RevWalk rw = new RevWalk(getRepository())) {
+		RevWalk rw = new RevWalk(getRepository());
+		try {
 			return update(rw);
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -574,8 +510,11 @@ public abstract class RefUpdate {
 	 * @throws IOException
 	 */
 	public Result delete() throws IOException {
-		try (RevWalk rw = new RevWalk(getRepository())) {
+		RevWalk rw = new RevWalk(getRepository());
+		try {
 			return delete(rw);
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -589,11 +528,8 @@ public abstract class RefUpdate {
 	 * @throws IOException
 	 */
 	public Result delete(final RevWalk walk) throws IOException {
-		final String myName = detachingSymbolicRef
-				? getRef().getName()
-				: getRef().getLeaf().getName();
-		if (myName.startsWith(Constants.R_HEADS) && !getRepository().isBare()) {
-			// Don't allow the currently checked out branch to be deleted.
+		final String myName = getRef().getLeaf().getName();
+		if (myName.startsWith(Constants.R_HEADS)) {
 			Ref head = getRefDatabase().getRef(Constants.HEAD);
 			while (head != null && head.isSymbolic()) {
 				head = head.getTarget();
@@ -665,49 +601,32 @@ public abstract class RefUpdate {
 		RevObject oldObj;
 
 		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && checkConflicting
-				&& getRefDatabase().isNameConflicting(getName())) {
+		if (oldValue == null && checkConflicting && getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
-		}
 		try {
-			// If we're detaching a symbolic reference, we should update the reference
-			// itself. Otherwise, we will update the leaf reference, which should be
-			// an ObjectIdRef.
-			if (!tryLock(!detachingSymbolicRef)) {
+			if (!tryLock(true))
 				return Result.LOCK_FAILURE;
-			}
 			if (expValue != null) {
 				final ObjectId o;
 				o = oldValue != null ? oldValue : ObjectId.zeroId();
-				if (!AnyObjectId.equals(expValue, o)) {
+				if (!AnyObjectId.equals(expValue, o))
 					return Result.LOCK_FAILURE;
-				}
 			}
-			try {
-				newObj = safeParseNew(walk, newValue);
-			} catch (MissingObjectException e) {
-				return Result.REJECTED_MISSING_OBJECT;
-			}
-
-			if (oldValue == null) {
+			if (oldValue == null)
 				return store.execute(Result.NEW);
-			}
 
-			oldObj = safeParseOld(walk, oldValue);
-			if (newObj == oldObj && !detachingSymbolicRef) {
+			newObj = safeParse(walk, newValue);
+			oldObj = safeParse(walk, oldValue);
+			if (newObj == oldObj && !detachingSymbolicRef)
 				return store.execute(Result.NO_CHANGE);
-			}
-
-			if (isForceUpdate()) {
-				return store.execute(Result.FORCED);
-			}
 
 			if (newObj instanceof RevCommit && oldObj instanceof RevCommit) {
-				if (walk.isMergedInto((RevCommit) oldObj, (RevCommit) newObj)) {
+				if (walk.isMergedInto((RevCommit) oldObj, (RevCommit) newObj))
 					return store.execute(Result.FAST_FORWARD);
-				}
 			}
 
+			if (isForceUpdate())
+				return store.execute(Result.FORCED);
 			return Result.REJECTED;
 		} finally {
 			unlock();
@@ -725,23 +644,16 @@ public abstract class RefUpdate {
 		checkConflicting = check;
 	}
 
-	private static RevObject safeParseNew(RevWalk rw, AnyObjectId newId)
-			throws IOException {
-		if (newId == null || ObjectId.zeroId().equals(newId)) {
-			return null;
-		}
-		return rw.parseAny(newId);
-	}
-
-	private static RevObject safeParseOld(RevWalk rw, AnyObjectId oldId)
+	private static RevObject safeParse(final RevWalk rw, final AnyObjectId id)
 			throws IOException {
 		try {
-			return oldId != null ? rw.parseAny(oldId) : null;
+			return id != null ? rw.parseAny(id) : null;
 		} catch (MissingObjectException e) {
-			// We can expect some old objects to be missing, like if we are trying to
-			// force a deletion of a branch and the object it points to has been
-			// pruned from the database due to freak corruption accidents (it happens
-			// with 'git new-work-dir').
+			// We can expect some objects to be missing, like if we are
+			// trying to force a deletion of a branch and the object it
+			// points to has been pruned from the database due to freak
+			// corruption accidents (it happens with 'git new-work-dir').
+			//
 			return null;
 		}
 	}

@@ -49,6 +49,8 @@ import java.io.InputStream;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
+import javaewah.EWAHCompressedBitmap;
+
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -57,10 +59,9 @@ import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
 /**
- * Support for the pack bitmap index v1 format.
+ * Support for the pack bitmap index v1 format, which contains experimental
+ * support for bitmaps.
  *
  * @see PackBitmapIndex
  */
@@ -109,10 +110,15 @@ class PackBitmapIndexV1 extends BasePackBitmapIndex {
 
 		// Read the options (2 bytes)
 		final int opts = NB.decodeUInt16(scratch, 6);
-		if ((opts & OPT_FULL) == 0)
+		switch (opts) {
+		case OPT_FULL:
+			// Bitmaps are self contained within this file.
+			break;
+		default:
 			throw new IOException(MessageFormat.format(
 					JGitText.get().expectedGot, Integer.valueOf(OPT_FULL),
 					Integer.valueOf(opts)));
+		}
 
 		// Read the number of entries (1 int32)
 		long numEntries = NB.decodeUInt32(scratch, 8);
@@ -210,11 +216,6 @@ class PackBitmapIndexV1 extends BasePackBitmapIndex {
 			return tags.and(bitmap);
 		}
 		throw new IllegalArgumentException();
-	}
-
-	@Override
-	public int getBitmapCount() {
-		return bitmaps.size();
 	}
 
 	@Override

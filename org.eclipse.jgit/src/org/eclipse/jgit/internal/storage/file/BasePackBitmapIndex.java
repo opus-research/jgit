@@ -43,10 +43,10 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
+import javaewah.EWAHCompressedBitmap;
+
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
-
-import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 /**
  * Base implementation of the PackBitmapIndex.
@@ -58,7 +58,6 @@ abstract class BasePackBitmapIndex extends PackBitmapIndex {
 		this.bitmaps = bitmaps;
 	}
 
-	@Override
 	public EWAHCompressedBitmap getBitmap(AnyObjectId objectId) {
 		StoredBitmap sb = bitmaps.get(objectId);
 		return sb != null ? sb.getBitmap() : null;

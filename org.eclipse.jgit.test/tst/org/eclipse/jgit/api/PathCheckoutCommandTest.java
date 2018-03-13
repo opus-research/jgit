@@ -43,12 +43,9 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 
 import org.eclipse.jgit.api.CheckoutCommand.Stage;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -61,9 +58,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -77,8 +71,6 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 	private static final String FILE2 = "Test2.txt";
 
 	private static final String FILE3 = "Test3.txt";
-
-	private static final String LINK = "link";
 
 	Git git;
 
@@ -103,64 +95,6 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 		writeTrashFile(FILE2, "c");
 		git.add().addFilepattern(FILE1).addFilepattern(FILE2).call();
 		git.commit().setMessage("Third commit").call();
-	}
-
-	@Test
-	public void testUpdateSymLink() throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
-
-		Path path = writeLink(LINK, FILE1);
-		git.add().addFilepattern(LINK).call();
-		git.commit().setMessage("Added link").call();
-		assertEquals("3", read(path.toFile()));
-
-		writeLink(LINK, FILE2);
-		assertEquals("c", read(path.toFile()));
-
-		CheckoutCommand co = git.checkout();
-		co.addPath(LINK).call();
-
-		assertEquals("3", read(path.toFile()));
-	}
-
-	@Test
-	public void testUpdateBrokenSymLinkToDirectory() throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
-
-		Path path = writeLink(LINK, "f");
-		git.add().addFilepattern(LINK).call();
-		git.commit().setMessage("Added link").call();
-		assertEquals("f", FileUtils.readSymLink(path.toFile()));
-		assertTrue(path.toFile().exists());
-
-		writeLink(LINK, "link_to_nowhere");
-		assertFalse(path.toFile().exists());
-		assertEquals("link_to_nowhere", FileUtils.readSymLink(path.toFile()));
-
-		CheckoutCommand co = git.checkout();
-		co.addPath(LINK).call();
-
-		assertEquals("f", FileUtils.readSymLink(path.toFile()));
-	}
-
-	@Test
-	public void testUpdateBrokenSymLink() throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
-
-		Path path = writeLink(LINK, FILE1);
-		git.add().addFilepattern(LINK).call();
-		git.commit().setMessage("Added link").call();
-		assertEquals("3", read(path.toFile()));
-		assertEquals(FILE1, FileUtils.readSymLink(path.toFile()));
-
-		writeLink(LINK, "link_to_nowhere");
-		assertFalse(path.toFile().exists());
-		assertEquals("link_to_nowhere", FileUtils.readSymLink(path.toFile()));
-
-		CheckoutCommand co = git.checkout();
-		co.addPath(LINK).call();
-
-		assertEquals("3", read(path.toFile()));
 	}
 
 	@Test
@@ -258,8 +192,8 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 	public static void validateIndex(Git git) throws NoWorkTreeException,
 			IOException {
 		DirCache dc = git.getRepository().lockDirCache();
-		try (ObjectReader r = git.getRepository().getObjectDatabase()
-				.newReader()) {
+		ObjectReader r = git.getRepository().getObjectDatabase().newReader();
+		try {
 			for (int i = 0; i < dc.getEntryCount(); ++i) {
 				DirCacheEntry entry = dc.getEntry(i);
 				if (entry.getLength() > 0)
@@ -268,10 +202,10 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 			}
 		} finally {
 			dc.unlock();
+			r.release();
 		}
 	}
 
-	@Test
 	public void testCheckoutMixedNewlines() throws Exception {
 		// "git config core.autocrlf true"
 		StoredConfig config = git.getRepository().getConfig();
@@ -340,39 +274,6 @@ public class PathCheckoutCommandTest extends RepositoryTestCase {
 
 		assertEquals("Conflicting", read(FILE1));
 		assertStageOneToThree(FILE1);
-	}
-
-	@Test
-	public void testCheckoutOursWhenNoBase() throws Exception {
-		String file = "added.txt";
-
-		git.checkout().setCreateBranch(true).setName("side")
-				.setStartPoint(initialCommit).call();
-		writeTrashFile(file, "Added on side");
-		git.add().addFilepattern(file).call();
-		RevCommit side = git.commit().setMessage("Commit on side").call();
-
-		git.checkout().setName("master").call();
-		writeTrashFile(file, "Added on master");
-		git.add().addFilepattern(file).call();
-		git.commit().setMessage("Commit on master").call();
-
-		git.merge().include(side).call();
-		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
-
-		DirCache cache = DirCache.read(db.getIndexFile(), db.getFS());
-		assertEquals("Expected add/add file to not have base stage",
-				DirCacheEntry.STAGE_2, cache.getEntry(file).getStage());
-
-		assertTrue(read(file).startsWith("<<<<<<< HEAD"));
-
-		git.checkout().setStage(Stage.OURS).addPath(file).call();
-
-		assertEquals("Added on master", read(file));
-
-		cache = DirCache.read(db.getIndexFile(), db.getFS());
-		assertEquals("Expected conflict stages to still exist after checkout",
-				DirCacheEntry.STAGE_2, cache.getEntry(file).getStage());
 	}
 
 	@Test(expected = IllegalStateException.class)

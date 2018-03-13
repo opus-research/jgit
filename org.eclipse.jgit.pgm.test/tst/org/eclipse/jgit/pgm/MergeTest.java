@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2014 IBM Corporation and others.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,13 +45,9 @@ package org.eclipse.jgit.pgm;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
-import java.util.Iterator;
-
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.eclipse.jgit.merge.MergeStrategy;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -195,9 +191,8 @@ public class MergeTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testNoFastForwardAndSquash() throws Exception {
-		assertEquals(
-				CLIText.fatalError(CLIText.get().cannotCombineSquashWithNoff),
-				executeUnchecked("git merge master --no-ff --squash")[0]);
+		assertEquals("fatal: You cannot combine --squash with --no-ff.",
+				execute("git merge master --no-ff --squash")[0]);
 	}
 
 	@Test
@@ -211,27 +206,7 @@ public class MergeTest extends CLIRepositoryTestCase {
 		git.add().addFilepattern("file").call();
 		git.commit().setMessage("commit#2").call();
 
-		assertEquals(CLIText.fatalError(CLIText.get().ffNotPossibleAborting),
-				executeUnchecked("git merge master --ff-only")[0]);
-	}
-
-	@Test
-	public void testMergeWithUserMessage() throws Exception {
-		git.branchCreate().setName("side").call();
-		writeTrashFile("master", "content");
-		git.add().addFilepattern("master").call();
-		git.commit().setMessage("master commit").call();
-		git.checkout().setName("side").call();
-		writeTrashFile("side", "content");
-		git.add().addFilepattern("side").call();
-		git.commit().setMessage("side commit").call();
-
-		assertEquals("Merge made by the '" + MergeStrategy.RECURSIVE.getName()
-				+ "' strategy.",
-				execute("git merge master -m \"user message\"")[0]);
-
-		Iterator<RevCommit> it = git.log().call().iterator();
-		RevCommit newHead = it.next();
-		assertEquals("user message", newHead.getFullMessage());
+		assertEquals("fatal: Not possible to fast-forward, aborting.",
+				execute("git merge master --ff-only")[0]);
 	}
 }

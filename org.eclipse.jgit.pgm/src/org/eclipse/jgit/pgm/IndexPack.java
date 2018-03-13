@@ -52,7 +52,6 @@ import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.PackParser;
 import org.kohsuke.args4j.Option;
 
-@Command(usage = "usage_IndexPack")
 class IndexPack extends TextBuiltin {
 	@Option(name = "--fix-thin", usage = "usage_fixAThinPackToBeComplete")
 	private boolean fixThin;
@@ -62,16 +61,19 @@ class IndexPack extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		BufferedInputStream in = new BufferedInputStream(ins);
-		try (ObjectInserter inserter = db.newObjectInserter()) {
+		BufferedInputStream in = new BufferedInputStream(System.in);
+		ObjectInserter inserter = db.newObjectInserter();
+		try {
 			PackParser p = inserter.newPackParser(in);
 			p.setAllowThin(fixThin);
 			if (indexVersion != -1 && p instanceof ObjectDirectoryPackParser) {
 				ObjectDirectoryPackParser imp = (ObjectDirectoryPackParser) p;
 				imp.setIndexVersion(indexVersion);
 			}
-			p.parse(new TextProgressMonitor(errw));
+			p.parse(new TextProgressMonitor());
 			inserter.flush();
+		} finally {
+			inserter.release();
 		}
 	}
 }

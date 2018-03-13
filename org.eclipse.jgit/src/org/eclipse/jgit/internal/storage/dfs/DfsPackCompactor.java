@@ -62,13 +62,11 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
@@ -92,11 +90,11 @@ public class DfsPackCompactor {
 
 	private final List<DfsPackFile> srcPacks;
 
-	private final List<ObjectIdSet> exclude;
+	private final List<PackWriter.ObjectIdSet> exclude;
 
 	private final List<DfsPackDescription> newPacks;
 
-	private final List<PackStatistics> newStats;
+	private final List<PackWriter.Statistics> newStats;
 
 	private int autoAddSize;
 
@@ -113,10 +111,10 @@ public class DfsPackCompactor {
 	public DfsPackCompactor(DfsRepository repository) {
 		repo = repository;
 		autoAddSize = 5 * 1024 * 1024; // 5 MiB
-		srcPacks = new ArrayList<>();
-		exclude = new ArrayList<>(4);
-		newPacks = new ArrayList<>(1);
-		newStats = new ArrayList<>(1);
+		srcPacks = new ArrayList<DfsPackFile>();
+		exclude = new ArrayList<PackWriter.ObjectIdSet>(4);
+		newPacks = new ArrayList<DfsPackDescription>(1);
+		newStats = new ArrayList<PackWriter.Statistics>(1);
 	}
 
 	/**
@@ -165,7 +163,7 @@ public class DfsPackCompactor {
 	 *            objects to not include.
 	 * @return {@code this}.
 	 */
-	public DfsPackCompactor exclude(ObjectIdSet set) {
+	public DfsPackCompactor exclude(PackWriter.ObjectIdSet set) {
 		exclude.add(set);
 		return this;
 	}
@@ -181,10 +179,17 @@ public class DfsPackCompactor {
 	 */
 	public DfsPackCompactor exclude(DfsPackFile pack) throws IOException {
 		final PackIndex idx;
-		try (DfsReader ctx = (DfsReader) repo.newObjectReader()) {
+		DfsReader ctx = (DfsReader) repo.newObjectReader();
+		try {
 			idx = pack.getPackIndex(ctx);
+		} finally {
+			ctx.release();
 		}
-		return exclude(idx);
+		return exclude(new PackWriter.ObjectIdSet() {
+			public boolean contains(AnyObjectId id) {
+				return idx.hasObject(id);
+			}
+		});
 	}
 
 	/**
@@ -201,7 +206,8 @@ public class DfsPackCompactor {
 			pm = NullProgressMonitor.INSTANCE;
 
 		DfsObjDatabase objdb = repo.getObjectDatabase();
-		try (DfsReader ctx = objdb.newReader()) {
+		DfsReader ctx = (DfsReader) objdb.newReader();
+		try {
 			PackConfig pc = new PackConfig(repo);
 			pc.setIndexVersion(2);
 			pc.setDeltaCompress(false);
@@ -214,24 +220,17 @@ public class DfsPackCompactor {
 				pw.setReuseDeltaCommits(false);
 
 				addObjectsToPack(pw, ctx, pm);
-				if (pw.getObjectCount() == 0) {
-					List<DfsPackDescription> remove = toPrune();
-					if (remove.size() > 0)
-						objdb.commitPack(
-								Collections.<DfsPackDescription>emptyList(),
-								remove);
+				if (pw.getObjectCount() == 0)
 					return;
-				}
 
 				boolean rollback = true;
-				DfsPackDescription pack = objdb.newPack(COMPACT,
-						estimatePackSize());
+				DfsPackDescription pack = objdb.newPack(COMPACT);
 				try {
 					writePack(objdb, pack, pw, pm);
 					writeIndex(objdb, pack, pw);
 
-					PackStatistics stats = pw.getStatistics();
-					pw.close();
+					PackWriter.Statistics stats = pw.getStatistics();
+					pw.release();
 					pw = null;
 
 					pack.setPackStats(stats);
@@ -245,22 +244,12 @@ public class DfsPackCompactor {
 				}
 			} finally {
 				if (pw != null)
-					pw.close();
+					pw.release();
 			}
 		} finally {
 			rw = null;
+			ctx.release();
 		}
-	}
-
-	private long estimatePackSize() {
-		// Every pack file contains 12 bytes of header and 20 bytes of trailer.
-		// Include the final pack file header and trailer size here and ignore
-		// the same from individual pack files.
-		long size = 32;
-		for (DfsPackFile pack : srcPacks) {
-			size += pack.getPackDescription().getFileSize(PACK) - 32;
-		}
-		return size;
 	}
 
 	/** @return all of the source packs that fed into this compaction. */
@@ -274,13 +263,13 @@ public class DfsPackCompactor {
 	}
 
 	/** @return statistics corresponding to the {@link #getNewPacks()}. */
-	public List<PackStatistics> getNewPackStatistics() {
+	public List<PackWriter.Statistics> getNewPackStatistics() {
 		return newStats;
 	}
 
 	private List<DfsPackDescription> toPrune() {
 		int cnt = srcPacks.size();
-		List<DfsPackDescription> all = new ArrayList<>(cnt);
+		List<DfsPackDescription> all = new ArrayList<DfsPackDescription>(cnt);
 		for (DfsPackFile pack : srcPacks)
 			all.add(pack.getPackDescription());
 		return all;
@@ -293,7 +282,6 @@ public class DfsPackCompactor {
 		// older packs, allowing the PackWriter to be handed newer objects
 		// first and older objects last.
 		Collections.sort(srcPacks, new Comparator<DfsPackFile>() {
-			@Override
 			public int compare(DfsPackFile a, DfsPackFile b) {
 				return a.getPackDescription().compareTo(b.getPackDescription());
 			}
@@ -302,7 +290,7 @@ public class DfsPackCompactor {
 		rw = new RevWalk(ctx);
 		added = rw.newFlag("ADDED"); //$NON-NLS-1$
 		isBase = rw.newFlag("IS_BASE"); //$NON-NLS-1$
-		List<RevObject> baseObjects = new BlockList<>();
+		List<RevObject> baseObjects = new BlockList<RevObject>();
 
 		pm.beginTask(JGitText.get().countingObjects, ProgressMonitor.UNKNOWN);
 		for (DfsPackFile src : srcPacks) {
@@ -346,20 +334,19 @@ public class DfsPackCompactor {
 	private List<ObjectIdWithOffset> toInclude(DfsPackFile src, DfsReader ctx)
 			throws IOException {
 		PackIndex srcIdx = src.getPackIndex(ctx);
-		List<ObjectIdWithOffset> want = new BlockList<>(
+		List<ObjectIdWithOffset> want = new BlockList<ObjectIdWithOffset>(
 				(int) srcIdx.getObjectCount());
 		SCAN: for (PackIndex.MutableEntry ent : srcIdx) {
 			ObjectId id = ent.toObjectId();
 			RevObject obj = rw.lookupOrNull(id);
 			if (obj != null && (obj.has(added) || obj.has(isBase)))
 				continue;
-			for (ObjectIdSet e : exclude)
+			for (PackWriter.ObjectIdSet e : exclude)
 				if (e.contains(id))
 					continue SCAN;
 			want.add(new ObjectIdWithOffset(id, ent.getOffset()));
 		}
 		Collections.sort(want, new Comparator<ObjectIdWithOffset>() {
-			@Override
 			public int compare(ObjectIdWithOffset a, ObjectIdWithOffset b) {
 				return Long.signum(a.offset - b.offset);
 			}
@@ -370,23 +357,27 @@ public class DfsPackCompactor {
 	private static void writePack(DfsObjDatabase objdb,
 			DfsPackDescription pack,
 			PackWriter pw, ProgressMonitor pm) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {
+		DfsOutputStream out = objdb.writeFile(pack, PACK);
+		try {
 			pw.writePack(pm, pm, out);
 			pack.addFileExt(PACK);
-			pack.setBlockSize(PACK, out.blockSize());
+		} finally {
+			out.close();
 		}
 	}
 
 	private static void writeIndex(DfsObjDatabase objdb,
 			DfsPackDescription pack,
 			PackWriter pw) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, INDEX)) {
+		DfsOutputStream out = objdb.writeFile(pack, INDEX);
+		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
 			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
-			pack.setBlockSize(INDEX, out.blockSize());
 			pack.setIndexVersion(pw.getIndexVersion());
+		} finally {
+			out.close();
 		}
 	}
 

@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.util;
 
-import static java.nio.charset.StandardCharsets.ISO_8859_1;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.eclipse.jgit.lib.ObjectChecker.author;
 import static org.eclipse.jgit.lib.ObjectChecker.committer;
 import static org.eclipse.jgit.lib.ObjectChecker.encoding;
@@ -62,7 +60,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 
@@ -73,7 +70,7 @@ public final class RawParseUtils {
 	 *
 	 * @since 2.2
 	 */
-	public static final Charset UTF8_CHARSET = UTF_8;
+	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8"); //$NON-NLS-1$
 
 	private static final byte[] digits10;
 
@@ -84,9 +81,8 @@ public final class RawParseUtils {
 	private static final Map<String, Charset> encodingAliases;
 
 	static {
-		encodingAliases = new HashMap<>();
-		encodingAliases.put("latin-1", ISO_8859_1); //$NON-NLS-1$
-		encodingAliases.put("iso-latin-1", ISO_8859_1); //$NON-NLS-1$
+		encodingAliases = new HashMap<String, Charset>();
+		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1")); //$NON-NLS-1$ //$NON-NLS-2$
 
 		digits10 = new byte['9' + 1];
 		Arrays.fill(digits10, (byte) -1);
@@ -366,72 +362,6 @@ public final class RawParseUtils {
 	}
 
 	/**
-	 * Parse 16 character base 16 (hex) formatted string to unsigned long.
-	 * <p>
-	 * The number is read in network byte order, that is, most significant
-	 * nibble first.
-	 *
-	 * @param bs
-	 *            buffer to parse digits from; positions {@code [p, p+16)} will
-	 *            be parsed.
-	 * @param p
-	 *            first position within the buffer to parse.
-	 * @return the integer value.
-	 * @throws ArrayIndexOutOfBoundsException
-	 *             if the string is not hex formatted.
-	 * @since 4.3
-	 */
-	public static final long parseHexInt64(final byte[] bs, final int p) {
-		long r = digits16[bs[p]] << 4;
-
-		r |= digits16[bs[p + 1]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 2]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 3]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 4]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 5]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 6]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 7]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 8]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 9]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 10]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 11]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 12]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 13]];
-		r <<= 4;
-
-		r |= digits16[bs[p + 14]];
-
-		final int last = digits16[bs[p + 15]];
-		if (r < 0 || last < 0)
-			throw new ArrayIndexOutOfBoundsException();
-		return (r << 4) | last;
-	}
-
-	/**
 	 * Parse a single hex digit to its numeric value (0-15).
 	 *
 	 * @param digit
@@ -460,28 +390,7 @@ public final class RawParseUtils {
 	 * @return the timezone at this location, expressed in minutes.
 	 */
 	public static final int parseTimeZoneOffset(final byte[] b, int ptr) {
-		return parseTimeZoneOffset(b, ptr, null);
-	}
-
-	/**
-	 * Parse a Git style timezone string.
-	 * <p>
-	 * The sequence "-0315" will be parsed as the numeric value -195, as the
-	 * lower two positions count minutes, not 100ths of an hour.
-	 *
-	 * @param b
-	 *            buffer to scan.
-	 * @param ptr
-	 *            position within buffer to start parsing digits at.
-	 * @param ptrResult
-	 *            optional location to return the new ptr value through. If null
-	 *            the ptr value will be discarded.
-	 * @return the timezone at this location, expressed in minutes.
-	 * @since 4.1
-	 */
-	public static final int parseTimeZoneOffset(final byte[] b, int ptr,
-			MutableInteger ptrResult) {
-		final int v = parseBase10(b, ptr, ptrResult);
+		final int v = parseBase10(b, ptr, null);
 		final int tzMins = v % 100;
 		final int tzHours = v / 100;
 		return tzHours * 60 + tzMins;
@@ -618,10 +527,6 @@ public final class RawParseUtils {
 	 * <p>
 	 * The last element (index <code>map.size()-1</code>) always contains
 	 * <code>end</code>.
-	 * <p>
-	 * If the data contains a '\0' anywhere, the whole region is considered binary
-	 * and a LineMap corresponding to a single line is returned.
-	 * </p>
 	 *
 	 * @param buf
 	 *            buffer to scan.
@@ -633,29 +538,14 @@ public final class RawParseUtils {
 	 * @return a line map indexing the start position of each line.
 	 */
 	public static final IntList lineMap(final byte[] buf, int ptr, int end) {
-		int start = ptr;
-
 		// Experimentally derived from multiple source repositories
 		// the average number of bytes/line is 36. Its a rough guess
 		// to initially size our map close to the target.
-		IntList map = new IntList((end - ptr) / 36);
-		map.add(Integer.MIN_VALUE);
-		boolean foundLF = true;
-		for (; ptr < end; ptr++) {
-			if (foundLF) {
-				map.add(ptr);
-			}
-
-			if (buf[ptr] == '\0') {
-				// binary data.
-				map = new IntList(3);
-				map.add(Integer.MIN_VALUE);
-				map.add(start);
-				break;
-			}
-
-			foundLF = (buf[ptr] == '\n');
-		}
+		//
+		final IntList map = new IntList((end - ptr) / 36);
+		map.fillTo(1, Integer.MIN_VALUE);
+		for (; ptr < end; ptr = nextLF(buf, ptr))
+			map.add(ptr);
 		map.add(end);
 		return map;
 	}
@@ -760,60 +650,35 @@ public final class RawParseUtils {
 	}
 
 	/**
-	 * Parse the "encoding " header as a string.
-	 * <p>
-	 * Locates the "encoding " header (if present) and returns its value.
-	 *
-	 * @param b
-	 *            buffer to scan.
-	 * @return the encoding header as specified in the commit; null if the
-	 *         header was not present and should be assumed.
-	 * @since 4.2
-	 */
-	@Nullable
-	public static String parseEncodingName(final byte[] b) {
-		int enc = encoding(b, 0);
-		if (enc < 0) {
-			return null;
-		}
-		int lf = nextLF(b, enc);
-		return decode(UTF_8, b, enc, lf - 1);
-	}
-
-	/**
 	 * Parse the "encoding " header into a character set reference.
 	 * <p>
 	 * Locates the "encoding " header (if present) by first calling
 	 * {@link #encoding(byte[], int)} and then returns the proper character set
 	 * to apply to this buffer to evaluate its contents as character data.
 	 * <p>
-	 * If no encoding header is present {@code UTF-8} is assumed.
+	 * If no encoding header is present, {@link Constants#CHARSET} is assumed.
 	 *
 	 * @param b
 	 *            buffer to scan.
 	 * @return the Java character set representation. Never null.
-	 * @throws IllegalCharsetNameException
-	 *             if the character set requested by the encoding header is
-	 *             malformed and unsupportable.
-	 * @throws UnsupportedCharsetException
-	 *             if the JRE does not support the character set requested by
-	 *             the encoding header.
 	 */
 	public static Charset parseEncoding(final byte[] b) {
-		String enc = parseEncodingName(b);
-		if (enc == null) {
-			return UTF_8;
-		}
-
-		String name = enc.trim();
+		final int enc = encoding(b, 0);
+		if (enc < 0)
+			return Constants.CHARSET;
+		final int lf = nextLF(b, enc);
+		String decoded = decode(Constants.CHARSET, b, enc, lf - 1);
 		try {
-			return Charset.forName(name);
-		} catch (IllegalCharsetNameException
-				| UnsupportedCharsetException badName) {
-			Charset aliased = charsetForAlias(name);
-			if (aliased != null) {
+			return Charset.forName(decoded);
+		} catch (IllegalCharsetNameException badName) {
+			Charset aliased = charsetForAlias(decoded);
+			if (aliased != null)
 				return aliased;
-			}
+			throw badName;
+		} catch (UnsupportedCharsetException badName) {
+			Charset aliased = charsetForAlias(decoded);
+			if (aliased != null)
+				return aliased;
 			throw badName;
 		}
 	}
@@ -852,15 +717,7 @@ public final class RawParseUtils {
 	 *         parsed.
 	 */
 	public static PersonIdent parsePersonIdent(final byte[] raw, final int nameB) {
-		Charset cs;
-		try {
-			cs = parseEncoding(raw);
-		} catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
-			// Assume UTF-8 for person identities, usually this is correct.
-			// If not decode() will fall back to the ISO-8859-1 encoding.
-			cs = UTF_8;
-		}
-
+		final Charset cs = parseEncoding(raw);
 		final int emailB = nextLF(raw, nameB, '<');
 		final int emailE = nextLF(raw, emailB, '>');
 		if (emailB >= raw.length || raw[emailB] == '\n' ||
@@ -1008,7 +865,7 @@ public final class RawParseUtils {
 	 */
 	public static String decode(final byte[] buffer, final int start,
 			final int end) {
-		return decode(UTF_8, buffer, start, end);
+		return decode(Constants.CHARSET, buffer, start, end);
 	}
 
 	/**
@@ -1082,21 +939,23 @@ public final class RawParseUtils {
 	public static String decodeNoFallback(final Charset cs,
 			final byte[] buffer, final int start, final int end)
 			throws CharacterCodingException {
-		ByteBuffer b = ByteBuffer.wrap(buffer, start, end - start);
+		final ByteBuffer b = ByteBuffer.wrap(buffer, start, end - start);
 		b.mark();
 
 		// Try our built-in favorite. The assumption here is that
 		// decoding will fail if the data is not actually encoded
 		// using that encoder.
+		//
 		try {
-			return decode(b, UTF_8);
+			return decode(b, Constants.CHARSET);
 		} catch (CharacterCodingException e) {
 			b.reset();
 		}
 
-		if (!cs.equals(UTF_8)) {
+		if (!cs.equals(Constants.CHARSET)) {
 			// Try the suggested encoding, it might be right since it was
 			// provided by the caller.
+			//
 			try {
 				return decode(b, cs);
 			} catch (CharacterCodingException e) {
@@ -1106,8 +965,9 @@ public final class RawParseUtils {
 
 		// Try the default character set. A small group of people
 		// might actually use the same (or very similar) locale.
-		Charset defcs = Charset.defaultCharset();
-		if (!defcs.equals(cs) && !defcs.equals(UTF_8)) {
+		//
+		final Charset defcs = Charset.defaultCharset();
+		if (!defcs.equals(cs) && !defcs.equals(Constants.CHARSET)) {
 			try {
 				return decode(b, defcs);
 			} catch (CharacterCodingException e) {
@@ -1122,7 +982,7 @@ public final class RawParseUtils {
 	 * Decode a region of the buffer under the ISO-8859-1 encoding.
 	 *
 	 * Each byte is treated as a single character in the 8859-1 character
-	 * encoding, performing a raw binary-&gt;char conversion.
+	 * encoding, performing a raw binary->char conversion.
 	 *
 	 * @param buffer
 	 *            buffer to pull raw bytes from.
@@ -1198,7 +1058,7 @@ public final class RawParseUtils {
 	/**
 	 * Locate the end of a paragraph.
 	 * <p>
-	 * A paragraph is ended by two consecutive LF bytes or CRLF pairs
+	 * A paragraph is ended by two consecutive LF bytes.
 	 *
 	 * @param b
 	 *            buffer to scan.
@@ -1212,26 +1072,14 @@ public final class RawParseUtils {
 	public static final int endOfParagraph(final byte[] b, final int start) {
 		int ptr = start;
 		final int sz = b.length;
-		while (ptr < sz && (b[ptr] != '\n' && b[ptr] != '\r'))
+		while (ptr < sz && b[ptr] != '\n')
 			ptr = nextLF(b, ptr);
-		if (ptr > start && b[ptr - 1] == '\n')
-			ptr--;
-		if (ptr > start && b[ptr - 1] == '\r')
+		while (0 < ptr && start < ptr && b[ptr - 1] == '\n')
 			ptr--;
 		return ptr;
 	}
 
-	/**
-	 * @param raw
-	 *            buffer to scan.
-	 * @param ch
-	 *            character to find.
-	 * @param pos
-	 *            starting position.
-	 * @return last index of ch in raw, trimming spaces.
-	 * @since 4.1
-	 */
-	public static int lastIndexOfTrim(byte[] raw, char ch, int pos) {
+	private static int lastIndexOfTrim(byte[] raw, char ch, int pos) {
 		while (pos >= 0 && raw[pos] == ' ')
 			pos--;
 

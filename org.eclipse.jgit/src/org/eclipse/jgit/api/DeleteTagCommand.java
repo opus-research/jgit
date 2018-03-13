@@ -68,7 +68,7 @@ import org.eclipse.jgit.lib.Repository;
  */
 public class DeleteTagCommand extends GitCommand<List<String>> {
 
-	private final Set<String> tags = new HashSet<>();
+	private final Set<String> tags = new HashSet<String>();
 
 	/**
 	 * @param repo
@@ -80,10 +80,9 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 	/**
 	 * @return the list with the full names of the deleted tags
 	 */
-	@Override
 	public List<String> call() throws GitAPIException {
 		checkCallable();
-		List<String> result = new ArrayList<>();
+		List<String> result = new ArrayList<String>();
 		if (tags.isEmpty())
 			return result;
 		try {
@@ -91,7 +90,7 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 			for (String tagName : tags) {
 				if (tagName == null)
 					continue;
-				Ref currentRef = repo.findRef(tagName);
+				Ref currentRef = repo.getRef(tagName);
 				if (currentRef == null)
 					continue;
 				String fullName = currentRef.getName();

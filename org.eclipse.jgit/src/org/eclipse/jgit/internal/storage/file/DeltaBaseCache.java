@@ -50,7 +50,7 @@ import org.eclipse.jgit.storage.file.WindowCacheConfig;
 class DeltaBaseCache {
 	private static final int CACHE_SZ = 1024;
 
-	static final SoftReference<Entry> DEAD;
+	private static final SoftReference<Entry> DEAD;
 
 	private static int hash(final long position) {
 		return (((int) position) << 22) >>> 22;
@@ -69,7 +69,7 @@ class DeltaBaseCache {
 	private int openByteCount;
 
 	static {
-		DEAD = new SoftReference<>(null);
+		DEAD = new SoftReference<Entry>(null);
 		reconfigure(new WindowCacheConfig());
 	}
 
@@ -115,7 +115,7 @@ class DeltaBaseCache {
 		e.provider = pack;
 		e.position = position;
 		e.sz = data.length;
-		e.data = new SoftReference<>(new Entry(data, objectType));
+		e.data = new SoftReference<Entry>(new Entry(data, objectType));
 		moveToHead(e);
 	}
 

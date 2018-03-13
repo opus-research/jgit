@@ -48,7 +48,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.List;
 
@@ -361,10 +360,10 @@ public class FooterLineTest extends RepositoryTestCase {
 		buf.append("\n");
 		buf.append(msg);
 
-		try (RevWalk walk = new RevWalk(db)) {
-			RevCommit c = new RevCommit(ObjectId.zeroId());
-			c.parseCanonical(walk, Constants.encode(buf.toString()));
-			return c;
-		}
+		final RevWalk walk = new RevWalk(db);
+		walk.setRetainBody(true);
+		final RevCommit c = new RevCommit(ObjectId.zeroId());
+		c.parseCanonical(walk, Constants.encode(buf.toString()));
+		return c;
 	}
 }

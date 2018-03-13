@@ -76,7 +76,7 @@ public class RevFlag {
 	 *
 	 * @since 3.0
 	 */
-	public static final RevFlag SEEN = new StaticRevFlag("SEEN", RevWalk.SEEN); //$NON-NLS-1$
+	public static final RevFlag SEEN = new StaticRevFlag("SEEN", RevWalk.SEEN);
 
 	final RevWalk walker;
 
@@ -99,7 +99,6 @@ public class RevFlag {
 		return walker;
 	}
 
-	@Override
 	public String toString() {
 		return name;
 	}

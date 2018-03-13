@@ -123,7 +123,6 @@ public class NLSTest {
 				this.locale = locale;
 			}
 
-			@Override
 			public TranslationBundle call() throws Exception {
 				NLS.setLocale(locale);
 				barrier.await(); // wait for the other thread to set its locale

@@ -61,27 +61,32 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.events.RefsChangedEvent;
 import org.eclipse.jgit.events.RefsChangedListener;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.BatchRefUpdate;
+import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.ReceiveCommand;
+import org.eclipse.jgit.transport.ReceiveCommand.Type;
 import org.junit.Before;
 import org.junit.Test;
 
-@SuppressWarnings("boxing")
 public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private Repository diskRepo;
 
@@ -95,7 +100,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 	private RevTag v1_0;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -103,7 +107,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		diskRepo = createBareRepository();
 		refdir = (RefDirectory) diskRepo.getRefDatabase();
 
-		repo = new TestRepository<>(diskRepo);
+		repo = new TestRepository<Repository>(diskRepo);
 		A = repo.commit().create();
 		B = repo.commit(repo.getRevWalk().parseCommit(A));
 		v1_0 = repo.tag("v1_0", B);
@@ -355,33 +359,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testFirstExactRef_IgnoresGarbageRef() throws IOException {
-		writeLooseRef("refs/heads/A", A);
-		write(new File(diskRepo.getDirectory(), "refs/heads/bad"), "FAIL\n");
-
-		Ref a = refdir.firstExactRef("refs/heads/bad", "refs/heads/A");
-		assertEquals("refs/heads/A", a.getName());
-		assertEquals(A, a.getObjectId());
-	}
-
-	@Test
-	public void testExactRef_IgnoresGarbageRef() throws IOException {
-		writeLooseRef("refs/heads/A", A);
-		write(new File(diskRepo.getDirectory(), "refs/heads/bad"), "FAIL\n");
-
-		Map<String, Ref> refs =
-				refdir.exactRef("refs/heads/bad", "refs/heads/A");
-
-		assertNull("no refs/heads/bad", refs.get("refs/heads/bad"));
-
-		Ref a = refs.get("refs/heads/A");
-		assertEquals("refs/heads/A", a.getName());
-		assertEquals(A, a.getObjectId());
-
-		assertEquals(1, refs.size());
-	}
-
-	@Test
 	public void testGetRefs_InvalidName() throws IOException {
 		writeLooseRef("refs/heads/A", A);
 
@@ -487,21 +464,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testFirstExactRef_Mixed() throws IOException {
-		writeLooseRef("refs/heads/A", A);
-		writePackedRef("refs/tags/v1.0", v1_0);
-
-		Ref a = refdir.firstExactRef("refs/heads/A", "refs/tags/v1.0");
-		Ref one = refdir.firstExactRef("refs/tags/v1.0", "refs/heads/A");
-
-		assertEquals("refs/heads/A", a.getName());
-		assertEquals("refs/tags/v1.0", one.getName());
-
-		assertEquals(A, a.getObjectId());
-		assertEquals(v1_0, one.getObjectId());
-	}
-
-	@Test
 	public void testGetRefs_TagsOnly_AllLoose() throws IOException {
 		Map<String, Ref> tags;
 		Ref a;
@@ -543,7 +505,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		ListenerHandle listener = Repository.getGlobalListenerList()
 				.addRefsChangedListener(new RefsChangedListener() {
 
-					@Override
 					public void onRefsChanged(RefsChangedEvent event) {
 						count[0]++;
 					}
@@ -855,36 +816,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testGetRef_CycleInSymbolicRef() throws IOException {
-		Ref r;
-
-		writeLooseRef("refs/1", "ref: refs/2\n");
-		writeLooseRef("refs/2", "ref: refs/3\n");
-		writeLooseRef("refs/3", "ref: refs/4\n");
-		writeLooseRef("refs/4", "ref: refs/5\n");
-		writeLooseRef("refs/5", "ref: refs/end\n");
-		writeLooseRef("refs/end", A);
-
-		r = refdir.getRef("1");
-		assertEquals("refs/1", r.getName());
-		assertEquals(A, r.getObjectId());
-		assertTrue(r.isSymbolic());
-
-		writeLooseRef("refs/5", "ref: refs/6\n");
-		writeLooseRef("refs/6", "ref: refs/end\n");
-
-		r = refdir.getRef("1");
-		assertNull("missing 1 due to cycle", r);
-
-		writeLooseRef("refs/heads/1", B);
-
-		r = refdir.getRef("1");
-		assertEquals("refs/heads/1", r.getName());
-		assertEquals(B, r.getObjectId());
-		assertFalse(r.isSymbolic());
-	}
-
-	@Test
 	public void testGetRefs_PackedNotPeeled_Sorted() throws IOException {
 		Map<String, Ref> all;
 
@@ -1018,7 +949,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(v0_1.getId(), all.get("refs/tags/v0.1").getObjectId());
 
 		all = refdir.getRefs(RefDatabase.ALL);
-		refdir.pack(new ArrayList<>(all.keySet()));
+		refdir.pack(new ArrayList<String>(all.keySet()));
 
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(5, all.size());
@@ -1052,25 +983,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testExactRef_EmptyDatabase() throws IOException {
-		Ref r;
-
-		r = refdir.exactRef(HEAD);
-		assertTrue(r.isSymbolic());
-		assertSame(LOOSE, r.getStorage());
-		assertEquals("refs/heads/master", r.getTarget().getName());
-		assertSame(NEW, r.getTarget().getStorage());
-		assertNull(r.getTarget().getObjectId());
-
-		assertNull(refdir.exactRef("refs/heads/master"));
-		assertNull(refdir.exactRef("refs/tags/v1.0"));
-		assertNull(refdir.exactRef("FETCH_HEAD"));
-		assertNull(refdir.exactRef("NOT.A.REF.NAME"));
-		assertNull(refdir.exactRef("master"));
-		assertNull(refdir.exactRef("v1.0"));
-	}
-
-	@Test
 	public void testGetRef_FetchHead() throws IOException {
 		// This is an odd special case where we need to make sure we read
 		// exactly the first 40 bytes of the file and nothing further on
@@ -1080,23 +992,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 				+ "\tbranch 'master' of git://egit.eclipse.org/jgit\n");
 
 		Ref r = refdir.getRef("FETCH_HEAD");
-		assertFalse(r.isSymbolic());
-		assertEquals(A, r.getObjectId());
-		assertEquals("FETCH_HEAD", r.getName());
-		assertFalse(r.isPeeled());
-		assertNull(r.getPeeledObjectId());
-	}
-
-	@Test
-	public void testExactRef_FetchHead() throws IOException {
-		// This is an odd special case where we need to make sure we read
-		// exactly the first 40 bytes of the file and nothing further on
-		// that line, or the remainder of the file.
-		write(new File(diskRepo.getDirectory(), "FETCH_HEAD"), A.name()
-				+ "\tnot-for-merge"
-				+ "\tbranch 'master' of git://egit.eclipse.org/jgit\n");
-
-		Ref r = refdir.exactRef("FETCH_HEAD");
 		assertFalse(r.isSymbolic());
 		assertEquals(A, r.getObjectId());
 		assertEquals("FETCH_HEAD", r.getName());
@@ -1262,13 +1157,12 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		final RefDatabase refDb = newRepo.getRefDatabase();
 		File packedRefs = new File(newRepo.getDirectory(), "packed-refs");
 		assertTrue(packedRefs.createNewFile());
-		final AtomicReference<StackOverflowError> error = new AtomicReference<>();
-		final AtomicReference<IOException> exception = new AtomicReference<>();
+		final AtomicReference<StackOverflowError> error = new AtomicReference<StackOverflowError>();
+		final AtomicReference<IOException> exception = new AtomicReference<IOException>();
 		final AtomicInteger changeCount = new AtomicInteger();
 		newRepo.getListenerList().addRefsChangedListener(
 				new RefsChangedListener() {
 
-					@Override
 					public void onRefsChanged(RefsChangedEvent event) {
 						try {
 							refDb.getRefs("ref");
@@ -1288,20 +1182,106 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testPackedRefsLockFailure() throws Exception {
+	public void testBatchRefUpdateSimpleNoForce() throws IOException {
 		writeLooseRef("refs/heads/master", A);
-		refdir.setRetrySleepMs(Arrays.asList(0, 0));
-		LockFile myLock = refdir.lockPackedRefs();
-		try {
-			refdir.pack(Arrays.asList("refs/heads/master"));
-			fail("expected LockFailedException");
-		} catch (LockFailedException e) {
-			assertEquals(refdir.packedRefsFile.getPath(), e.getFile().getPath());
-		} finally {
-			myLock.unlock();
-		}
-		Ref ref = refdir.getRef("refs/heads/master");
-		assertEquals(Storage.LOOSE, ref.getStorage());
+		writeLooseRef("refs/heads/masters", B);
+		List<ReceiveCommand> commands = Arrays.asList(
+				newCommand(A, B, "refs/heads/master",
+						ReceiveCommand.Type.UPDATE),
+				newCommand(B, A, "refs/heads/masters",
+						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
+		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
+		batchUpdate.addCommand(commands);
+		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
+		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
+		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
+		assertEquals(ReceiveCommand.Result.REJECTED_NONFASTFORWARD, commands
+				.get(1).getResult());
+		assertEquals("[HEAD, refs/heads/master, refs/heads/masters]", refs
+				.keySet().toString());
+		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
+		assertEquals(B.getId(), refs.get("refs/heads/masters").getObjectId());
+	}
+
+	@Test
+	public void testBatchRefUpdateSimpleForce() throws IOException {
+		writeLooseRef("refs/heads/master", A);
+		writeLooseRef("refs/heads/masters", B);
+		List<ReceiveCommand> commands = Arrays.asList(
+				newCommand(A, B, "refs/heads/master",
+						ReceiveCommand.Type.UPDATE),
+				newCommand(B, A, "refs/heads/masters",
+						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
+		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
+		batchUpdate.setAllowNonFastForwards(true);
+		batchUpdate.addCommand(commands);
+		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
+		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
+		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
+		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
+		assertEquals("[HEAD, refs/heads/master, refs/heads/masters]", refs
+				.keySet().toString());
+		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
+		assertEquals(A.getId(), refs.get("refs/heads/masters").getObjectId());
+	}
+
+	@Test
+	public void testBatchRefUpdateConflict() throws IOException {
+		writeLooseRef("refs/heads/master", A);
+		writeLooseRef("refs/heads/masters", B);
+		List<ReceiveCommand> commands = Arrays.asList(
+				newCommand(A, B, "refs/heads/master",
+						ReceiveCommand.Type.UPDATE),
+				newCommand(null, A, "refs/heads/master/x",
+						ReceiveCommand.Type.CREATE),
+				newCommand(null, A, "refs/heads", ReceiveCommand.Type.CREATE));
+		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
+		batchUpdate.setAllowNonFastForwards(true);
+		batchUpdate.addCommand(commands);
+		batchUpdate
+				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
+		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
+		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
+		assertEquals(ReceiveCommand.Result.LOCK_FAILURE, commands.get(1)
+				.getResult());
+		assertEquals(ReceiveCommand.Result.LOCK_FAILURE, commands.get(2)
+				.getResult());
+		assertEquals("[HEAD, refs/heads/master, refs/heads/masters]", refs
+				.keySet().toString());
+		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
+		assertEquals(B.getId(), refs.get("refs/heads/masters").getObjectId());
+	}
+
+	@Test
+	public void testBatchRefUpdateConflictThanksToDelete() throws IOException {
+		writeLooseRef("refs/heads/master", A);
+		writeLooseRef("refs/heads/masters", B);
+		List<ReceiveCommand> commands = Arrays.asList(
+				newCommand(A, B, "refs/heads/master",
+						ReceiveCommand.Type.UPDATE),
+				newCommand(null, A, "refs/heads/masters/x",
+						ReceiveCommand.Type.CREATE),
+				newCommand(B, null, "refs/heads/masters",
+						ReceiveCommand.Type.DELETE));
+		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
+		batchUpdate.setAllowNonFastForwards(true);
+		batchUpdate.addCommand(commands);
+		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
+		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
+		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
+		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
+		assertEquals(ReceiveCommand.Result.OK, commands.get(2).getResult());
+		assertEquals("[HEAD, refs/heads/master, refs/heads/masters/x]", refs
+				.keySet().toString());
+		assertEquals(A.getId(), refs.get("refs/heads/masters/x").getObjectId());
+	}
+
+	private static ReceiveCommand newCommand(RevCommit a, RevCommit b,
+			String string, Type update) {
+		ReceiveCommand ret = new ReceiveCommand(a != null ? a.getId() : null,
+				b != null ? b.getId() : null, string, update);
+		ret.setResult(ReceiveCommand.Result.NOT_ATTEMPTED);
+		return ret;
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
@@ -1328,5 +1308,30 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private void deleteLooseRef(String name) {
 		File path = new File(diskRepo.getDirectory(), name);
 		assertTrue("deleted " + name, path.delete());
+	}
+
+	private static final class StrictWorkMonitor implements ProgressMonitor {
+		private int lastWork, totalWork;
+
+		public void start(int totalTasks) {
+			// empty
+		}
+
+		public void beginTask(String title, int totalWork) {
+			this.totalWork = totalWork;
+			lastWork = 0;
+		}
+
+		public void update(int completed) {
+			lastWork += completed;
+		}
+
+		public void endTask() {
+			assertEquals("Units of work recorded", totalWork, lastWork);
+		}
+
+		public boolean isCancelled() {
+			return false;
+		}
 	}
 }

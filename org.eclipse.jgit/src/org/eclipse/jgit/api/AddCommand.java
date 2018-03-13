@@ -43,17 +43,11 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.FileMode.GITLINK;
-import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
-import static org.eclipse.jgit.lib.FileMode.TYPE_TREE;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -63,13 +57,12 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
@@ -96,19 +89,15 @@ public class AddCommand extends GitCommand<DirCache> {
 	 */
 	public AddCommand(Repository repo) {
 		super(repo);
-		filepatterns = new LinkedList<>();
+		filepatterns = new LinkedList<String>();
 	}
 
 	/**
-	 * Add a path to a file/directory whose content should be added.
-	 * <p>
-	 * A directory name (e.g. <code>dir</code> to add <code>dir/file1</code> and
-	 * <code>dir/file2</code>) can also be given to add all files in the
-	 * directory, recursively. Fileglobs (e.g. *.c) are not yet supported.
-	 *
 	 * @param filepattern
-	 *            repository-relative path of file/directory to add (with
-	 *            <code>/</code> as separator)
+	 *            File to add content from. Also a leading directory name (e.g.
+	 *            dir to add dir/file1 and dir/file2) can be given to add all
+	 *            files in the directory, recursively. Fileglobs (e.g. *.c) are
+	 *            not yet supported.
 	 * @return {@code this}
 	 */
 	public AddCommand addFilepattern(String filepattern) {
@@ -134,124 +123,92 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
-	@Override
 	public DirCache call() throws GitAPIException, NoFilepatternException {
 
 		if (filepatterns.isEmpty())
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
 		checkCallable();
 		DirCache dc = null;
-		boolean addAll = filepatterns.contains("."); //$NON-NLS-1$
+		boolean addAll = false;
+		if (filepatterns.contains(".")) //$NON-NLS-1$
+			addAll = true;
 
-		try (ObjectInserter inserter = repo.newObjectInserter();
-				NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
-			tw.setOperationType(OperationType.CHECKIN_OP);
+		ObjectInserter inserter = repo.newObjectInserter();
+		try {
 			dc = repo.lockDirCache();
+			DirCacheIterator c;
 
 			DirCacheBuilder builder = dc.builder();
+			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (workingTreeIterator == null)
 				workingTreeIterator = new FileTreeIterator(repo);
-			workingTreeIterator.setDirCacheIterator(tw, 0);
 			tw.addTree(workingTreeIterator);
+			tw.setRecursive(true);
 			if (!addAll)
 				tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
 
-			byte[] lastAdded = null;
+			String lastAddedFile = null;
 
 			while (tw.next()) {
-				DirCacheIterator c = tw.getTree(0, DirCacheIterator.class);
+				String path = tw.getPathString();
+
 				WorkingTreeIterator f = tw.getTree(1, WorkingTreeIterator.class);
-				if (c == null && f != null && f.isEntryIgnored()) {
+				if (tw.getTree(0, DirCacheIterator.class) == null &&
+						f != null && f.isEntryIgnored()) {
 					// file is not in index but is ignored, do nothing
-					continue;
-				} else if (c == null && update) {
-					// Only update of existing entries was requested.
-					continue;
 				}
+				// In case of an existing merge conflict the
+				// DirCacheBuildIterator iterates over all stages of
+				// this path, we however want to add only one
+				// new DirCacheEntry per path.
+				else if (!(path.equals(lastAddedFile))) {
+					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
+						c = tw.getTree(0, DirCacheIterator.class);
+						if (f != null) { // the file exists
+							long sz = f.getEntryLength();
+							DirCacheEntry entry = new DirCacheEntry(path);
+							if (c == null || c.getDirCacheEntry() == null
+									|| !c.getDirCacheEntry().isAssumeValid()) {
+								FileMode mode = f.getIndexFileMode(c);
+								entry.setFileMode(mode);
 
-				DirCacheEntry entry = c != null ? c.getDirCacheEntry() : null;
-				if (entry != null && entry.getStage() > 0
-						&& lastAdded != null
-						&& lastAdded.length == tw.getPathLength()
-						&& tw.isPathPrefix(lastAdded, lastAdded.length) == 0) {
-					// In case of an existing merge conflict the
-					// DirCacheBuildIterator iterates over all stages of
-					// this path, we however want to add only one
-					// new DirCacheEntry per path.
-					continue;
-				}
+								if (FileMode.GITLINK != mode) {
+									entry.setLength(sz);
+									entry.setLastModified(f
+											.getEntryLastModified());
+									long contentSize = f
+											.getEntryContentLength();
+									InputStream in = f.openEntryStream();
+									try {
+										entry.setObjectId(inserter.insert(
+												Constants.OBJ_BLOB, contentSize, in));
+									} finally {
+										in.close();
+									}
+								} else
+									entry.setObjectId(f.getEntryObjectId());
+								builder.add(entry);
+								lastAddedFile = path;
+							} else {
+								builder.add(c.getDirCacheEntry());
+							}
 
-				if (tw.isSubtree() && !tw.isDirectoryFileConflict()) {
-					tw.enterSubtree();
-					continue;
-				}
-
-				if (f == null) { // working tree file does not exist
-					if (entry != null
-							&& (!update || GITLINK == entry.getFileMode())) {
-						builder.add(entry);
+						} else if (c != null
+								&& (!update || FileMode.GITLINK == c
+										.getEntryFileMode()))
+							builder.add(c.getDirCacheEntry());
 					}
-					continue;
 				}
-
-				if (entry != null && entry.isAssumeValid()) {
-					// Index entry is marked assume valid. Even though
-					// the user specified the file to be added JGit does
-					// not consider the file for addition.
-					builder.add(entry);
-					continue;
-				}
-
-				if ((f.getEntryRawMode() == TYPE_TREE
-						&& f.getIndexFileMode(c) != FileMode.GITLINK) ||
-						(f.getEntryRawMode() == TYPE_GITLINK
-								&& f.getIndexFileMode(c) == FileMode.TREE)) {
-					// Index entry exists and is symlink, gitlink or file,
-					// otherwise the tree would have been entered above.
-					// Replace the index entry by diving into tree of files.
-					tw.enterSubtree();
-					continue;
-				}
-
-				byte[] path = tw.getRawPath();
-				if (entry == null || entry.getStage() > 0) {
-					entry = new DirCacheEntry(path);
-				}
-				FileMode mode = f.getIndexFileMode(c);
-				entry.setFileMode(mode);
-
-				if (GITLINK != mode) {
-					entry.setLength(f.getEntryLength());
-					entry.setLastModified(f.getEntryLastModified());
-					long len = f.getEntryContentLength();
-					// We read and filter the content multiple times.
-					// f.getEntryContentLength() reads and filters the input and
-					// inserter.insert(...) does it again. That's because an
-					// ObjectInserter needs to know the length before it starts
-					// inserting. TODO: Fix this by using Buffers.
-					try (InputStream in = f.openEntryStream()) {
-						ObjectId id = inserter.insert(OBJ_BLOB, len, in);
-						entry.setObjectId(id);
-					}
-				} else {
-					entry.setLength(0);
-					entry.setLastModified(0);
-					entry.setObjectId(f.getEntryObjectId());
-				}
-				builder.add(entry);
-				lastAdded = path;
 			}
 			inserter.flush();
 			builder.commit();
 			setCallable(false);
 		} catch (IOException e) {
-			Throwable cause = e.getCause();
-			if (cause != null && cause instanceof FilterFailedException)
-				throw (FilterFailedException) cause;
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfAddCommand, e);
 		} finally {
+			inserter.release();
 			if (dc != null)
 				dc.unlock();
 		}

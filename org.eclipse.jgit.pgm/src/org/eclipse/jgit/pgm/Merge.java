@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2014 Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,8 +49,8 @@ import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeCommand;
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.api.MergeResult;
+import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -78,28 +78,21 @@ class Merge extends TextBuiltin {
 
 	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
-	@Argument(required = true, metaVar = "metaVar_ref", usage = "usage_mergeRef")
+	@Argument(required = true)
 	private String ref;
 
+	@Option(name = "--ff")
 	private FastForwardMode ff = FastForwardMode.FF;
 
-	@Option(name = "--ff", usage = "usage_mergeFf")
-	void ff(@SuppressWarnings("unused") final boolean ignored) {
-		ff = FastForwardMode.FF;
-	}
-
-	@Option(name = "--no-ff", usage = "usage_mergeNoFf")
+	@Option(name = "--no-ff")
 	void noff(@SuppressWarnings("unused") final boolean ignored) {
 		ff = FastForwardMode.NO_FF;
 	}
 
-	@Option(name = "--ff-only", usage = "usage_mergeFfOnly")
+	@Option(name = "--ff-only")
 	void ffonly(@SuppressWarnings("unused") final boolean ignored) {
 		ff = FastForwardMode.FF_ONLY;
 	}
-
-	@Option(name = "-m", usage = "usage_message")
-	private String message;
 
 	@Override
 	protected void run() throws Exception {
@@ -114,30 +107,25 @@ class Merge extends TextBuiltin {
 		}
 
 		// determine the other revision we want to merge with HEAD
-		final Ref srcRef = db.findRef(ref);
+		final Ref srcRef = db.getRef(ref);
 		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
 		if (src == null)
 			throw die(MessageFormat.format(
 					CLIText.get().refDoesNotExistOrNoCommit, ref));
 
-		Ref oldHead = getOldHead();
+		Ref oldHead = db.getRef(Constants.HEAD);
+		Git git = new Git(db);
+		MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
+				.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
+		if (srcRef != null)
+			mergeCmd.include(srcRef);
+		else
+			mergeCmd.include(src);
 		MergeResult result;
-		try (Git git = new Git(db)) {
-			MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
-					.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
-			if (srcRef != null)
-				mergeCmd.include(srcRef);
-			else
-				mergeCmd.include(src);
-
-			if (message != null)
-				mergeCmd.setMessage(message);
-
-			try {
-				result = mergeCmd.call();
-			} catch (CheckoutConflictException e) {
-				result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
-			}
+		try {
+			result = mergeCmd.call();
+		} catch (CheckoutConflictException e) {
+			result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
 		}
 
 		switch (result.getMergeStatus()) {
@@ -148,12 +136,9 @@ class Merge extends TextBuiltin {
 			break;
 		case FAST_FORWARD:
 			ObjectId oldHeadId = oldHead.getObjectId();
-			if (oldHeadId != null) {
-				String oldId = oldHeadId.abbreviate(7).name();
-				String newId = result.getNewHead().abbreviate(7).name();
-				outw.println(MessageFormat.format(CLIText.get().updating, oldId,
-						newId));
-			}
+			outw.println(MessageFormat.format(CLIText.get().updating, oldHeadId
+					.abbreviate(7).name(), result.getNewHead().abbreviate(7)
+					.name()));
 			outw.println(result.getMergeStatus().toString());
 			break;
 		case CHECKOUT_CONFLICT:
@@ -208,23 +193,14 @@ class Merge extends TextBuiltin {
 		}
 	}
 
-	private Ref getOldHead() throws IOException {
-		Ref oldHead = db.exactRef(Constants.HEAD);
-		if (oldHead == null) {
-			throw die(CLIText.get().onBranchToBeBorn);
-		}
-		return oldHead;
-	}
-
 	private boolean isMergedInto(Ref oldHead, AnyObjectId src)
 			throws IOException {
-		try (RevWalk revWalk = new RevWalk(db)) {
-			ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
-			if (oldHeadObjectId == null)
-				oldHeadObjectId = oldHead.getObjectId();
-			RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
-			RevCommit srcCommit = revWalk.lookupCommit(src);
-			return revWalk.isMergedInto(oldHeadCommit, srcCommit);
-		}
+		RevWalk revWalk = new RevWalk(db);
+		ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
+		if (oldHeadObjectId == null)
+			oldHeadObjectId = oldHead.getObjectId();
+		RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
+		RevCommit srcCommit = revWalk.lookupCommit(src);
+		return revWalk.isMergedInto(oldHeadCommit, srcCommit);
 	}
 }

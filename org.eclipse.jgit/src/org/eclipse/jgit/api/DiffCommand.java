@@ -109,7 +109,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 *
 	 * @return a DiffEntry for each path which is different
 	 */
-	@Override
 	public List<DiffEntry> call() throws GitAPIException {
 		final DiffFormatter diffFmt;
 		if (out != null && !showNameAndStatusOnly)
@@ -125,8 +124,11 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 					if (head == null)
 						throw new NoHeadException(JGitText.get().cannotReadTree);
 					CanonicalTreeParser p = new CanonicalTreeParser();
-					try (ObjectReader reader = repo.newObjectReader()) {
+					ObjectReader reader = repo.newObjectReader();
+					try {
 						p.reset(reader, head);
+					} finally {
+						reader.release();
 					}
 					oldTree = p;
 				}
@@ -157,7 +159,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		} finally {
-			diffFmt.close();
+			diffFmt.release();
 		}
 	}
 
@@ -269,9 +271,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return this instance
 	 */
 	public DiffCommand setProgressMonitor(ProgressMonitor monitor) {
-		if (monitor == null) {
-			monitor = NullProgressMonitor.INSTANCE;
-		}
 		this.monitor = monitor;
 		return this;
 	}

@@ -52,13 +52,12 @@ import org.eclipse.jgit.lib.RefUpdate;
 /** Update of a locally stored tracking branch. */
 public class TrackingRefUpdate {
 	private final String remoteName;
-	final String localName;
-	boolean forceUpdate;
-	ObjectId oldObjectId;
-	ObjectId newObjectId;
+	private final String localName;
+	private boolean forceUpdate;
+	private ObjectId oldObjectId;
+	private ObjectId newObjectId;
 
 	private RefUpdate.Result result;
-	private ReceiveCommand cmd;
 
 	TrackingRefUpdate(
 			boolean canForceUpdate,
@@ -131,18 +130,12 @@ public class TrackingRefUpdate {
 		this.result = result;
 	}
 
-	/**
-	 * @return this update wrapped by a ReceiveCommand.
-	 * @since 3.4
-	 */
-	public ReceiveCommand asReceiveCommand() {
-		if (cmd == null)
-			cmd = new Command();
-		return cmd;
+	ReceiveCommand asReceiveCommand() {
+		return new Command();
 	}
 
 	final class Command extends ReceiveCommand {
-		Command() {
+		private Command() {
 			super(oldObjectId, newObjectId, localName);
 		}
 

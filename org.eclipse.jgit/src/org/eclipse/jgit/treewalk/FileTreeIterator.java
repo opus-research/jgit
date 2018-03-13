@@ -46,7 +46,6 @@
 
 package org.eclipse.jgit.treewalk;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -67,8 +66,8 @@ import org.eclipse.jgit.util.FS;
  */
 public class FileTreeIterator extends WorkingTreeIterator {
 	/**
-	 * the starting directory of this Iterator. All entries are located directly
-	 * in this directory.
+	 * the starting directory. This directory should correspond to the root of
+	 * the repository.
 	 */
 	protected final File directory;
 
@@ -79,42 +78,14 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	protected final FS fs;
 
 	/**
-	 * the strategy used to compute the FileMode for a FileEntry. Can be used to
-	 * control things such as whether to recurse into a directory or create a
-	 * gitlink.
-	 *
-	 * @since 4.3
-	 */
-	protected final FileModeStrategy fileModeStrategy;
-
-	/**
 	 * Create a new iterator to traverse the work tree and its children.
 	 *
 	 * @param repo
 	 *            the repository whose working tree will be scanned.
 	 */
 	public FileTreeIterator(Repository repo) {
-		this(repo,
-				repo.getConfig().get(WorkingTreeOptions.KEY).isDirNoGitLinks() ?
-						NoGitlinksStrategy.INSTANCE :
-						DefaultFileModeStrategy.INSTANCE);
-	}
-
-	/**
-	 * Create a new iterator to traverse the work tree and its children.
-	 *
-	 * @param repo
-	 *            the repository whose working tree will be scanned.
-	 * @param fileModeStrategy
-	 *            the strategy to use to determine the FileMode for a FileEntry;
-	 *            controls gitlinks etc.
-	 *
-	 * @since 4.3
-	 */
-	public FileTreeIterator(Repository repo, FileModeStrategy fileModeStrategy) {
 		this(repo.getWorkTree(), repo.getFS(),
-				repo.getConfig().get(WorkingTreeOptions.KEY),
-				fileModeStrategy);
+				repo.getConfig().get(WorkingTreeOptions.KEY));
 		initRootIterator(repo);
 	}
 
@@ -131,32 +102,9 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            working tree options to be used
 	 */
 	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options) {
-		this(root, fs, options, DefaultFileModeStrategy.INSTANCE);
-	}
-
-	/**
-	 * Create a new iterator to traverse the given directory and its children.
-	 *
-	 * @param root
-	 *            the starting directory. This directory should correspond to
-	 *            the root of the repository.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 * @param options
-	 *            working tree options to be used
-	 * @param fileModeStrategy
-	 *            the strategy to use to determine the FileMode for a FileEntry;
-	 *            controls gitlinks etc.
-	 *
-	 * @since 4.3
-	 */
-	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options,
-							FileModeStrategy fileModeStrategy) {
 		super(options);
 		directory = root;
 		this.fs = fs;
-		this.fileModeStrategy = fileModeStrategy;
 		init(entries());
 	}
 
@@ -165,72 +113,25 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *
 	 * @param p
 	 *            the parent iterator we were created from.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to perform
+	 *            certain file system operations.
 	 * @param root
 	 *            the subdirectory. This should be a directory contained within
 	 *            the parent directory.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 * @since 4.3
-	 * @deprecated use {@link #FileTreeIterator(FileTreeIterator, File, FS)}
-	 *             instead.
-	 */
-	@Deprecated
-	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
-			FS fs) {
-		this(p, root, fs, DefaultFileModeStrategy.INSTANCE);
-	}
-
-	/**
-	 * Create a new iterator to traverse a subdirectory.
-	 *
-	 * @param p
-	 *            the parent iterator we were created from.
-	 * @param root
-	 *            the subdirectory. This should be a directory contained within
-	 *            the parent directory.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 *
-	 * @since 4.3
-	 */
-	protected FileTreeIterator(final FileTreeIterator p, final File root,
-			FS fs) {
-		this(p, root, fs, p.fileModeStrategy);
-	}
-
-	/**
-	 * Create a new iterator to traverse a subdirectory, given the specified
-	 * FileModeStrategy.
-	 *
-	 * @param p
-	 *            the parent iterator we were created from.
-	 * @param root
-	 *            the subdirectory. This should be a directory contained within
-	 *            the parent directory
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 * @param fileModeStrategy
-	 *            the strategy to use to determine the FileMode for a given
-	 *            FileEntry.
-	 *
-	 * @since 4.3
 	 */
 	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
-			FS fs, FileModeStrategy fileModeStrategy) {
+			FS fs) {
 		super(p);
 		directory = root;
 		this.fs = fs;
-		this.fileModeStrategy = fileModeStrategy;
 		init(entries());
 	}
 
 	@Override
 	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
-		return new FileTreeIterator(this, ((FileEntry) current()).getFile(), fs, fileModeStrategy);
+		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
 
 	private Entry[] entries() {
@@ -239,100 +140,21 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			return EOF;
 		final Entry[] r = new Entry[all.length];
 		for (int i = 0; i < r.length; i++)
-			r[i] = new FileEntry(all[i], fs, fileModeStrategy);
+			r[i] = new FileEntry(all[i], fs);
 		return r;
 	}
-
-	/**
-	 * An interface representing the methods used to determine the FileMode for
-	 * a FileEntry.
-	 *
-	 * @since 4.3
-	 */
-	public interface FileModeStrategy {
-		/**
-		 * Compute the FileMode for a given File, based on its attributes.
-		 *
-		 * @param f
-		 *            the file to return a FileMode for
-		 * @param attributes
-		 *            the attributes of a file
-		 * @return a FileMode indicating whether the file is a regular file, a
-		 *         directory, a gitlink, etc.
-		 */
-		FileMode getMode(File f, FS.Attributes attributes);
-	}
-
-	/**
-	 * A default implementation of a FileModeStrategy; defaults to treating
-	 * nested .git directories as gitlinks, etc.
-	 *
-	 * @since 4.3
-	 */
-	static public class DefaultFileModeStrategy implements FileModeStrategy {
-		/**
-		 * a singleton instance of the default FileModeStrategy
-		 */
-		public final static DefaultFileModeStrategy INSTANCE =
-				new DefaultFileModeStrategy();
-
-		@Override
-		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink()) {
-				return FileMode.SYMLINK;
-			} else if (attributes.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists()) {
-					return FileMode.GITLINK;
-				} else {
-					return FileMode.TREE;
-				}
-			} else if (attributes.isExecutable()) {
-				return FileMode.EXECUTABLE_FILE;
-			} else {
-				return FileMode.REGULAR_FILE;
-			}
-		}
-	}
-
-	/**
-	 * A FileModeStrategy that implements native git's DIR_NO_GITLINKS
-	 * behavior. This is the same as the default FileModeStrategy, except
-	 * all directories will be treated as directories regardless of whether
-	 * or not they contain a .git directory or file.
-	 *
-	 * @since 4.3
-	 */
-	static public class NoGitlinksStrategy implements FileModeStrategy {
-
-		/**
-		 * a singleton instance of the default FileModeStrategy
-		 */
-		public final static NoGitlinksStrategy INSTANCE = new NoGitlinksStrategy();
-
-		@Override
-		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink()) {
-				return FileMode.SYMLINK;
-			} else if (attributes.isDirectory()) {
-				return FileMode.TREE;
-			} else if (attributes.isExecutable()) {
-				return FileMode.EXECUTABLE_FILE;
-			} else {
-				return FileMode.REGULAR_FILE;
-			}
-		}
-	}
-
 
 	/**
 	 * Wrapper for a standard Java IO file
 	 */
 	static public class FileEntry extends Entry {
+		final File file;
+
 		private final FileMode mode;
 
-		private FS.Attributes attributes;
+		private long length = -1;
 
-		private FS fs;
+		private long lastModified;
 
 		/**
 		 * Create a new file entry.
@@ -342,28 +164,18 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 * @param fs
 		 *            file system
 		 */
-		public FileEntry(File f, FS fs) {
-			this(f, fs, DefaultFileModeStrategy.INSTANCE);
-		}
+		public FileEntry(final File f, FS fs) {
+			file = f;
 
-		/**
-		 * Create a new file entry given the specified FileModeStrategy
-		 *
-		 * @param f
-		 *            file
-		 * @param fs
-		 *            file system
-		 * @param fileModeStrategy
-		 *            the strategy to use when determining the FileMode of a
-		 *            file; controls gitlinks etc.
-		 *
-		 * @since 4.3
-		 */
-		public FileEntry(File f, FS fs, FileModeStrategy fileModeStrategy) {
-			this.fs = fs;
-			f = fs.normalize(f);
-			attributes = fs.getAttributes(f);
-			mode = fileModeStrategy.getMode(f, attributes);
+			if (f.isDirectory()) {
+				if (new File(f, Constants.DOT_GIT).exists())
+					mode = FileMode.GITLINK;
+				else
+					mode = FileMode.TREE;
+			} else if (fs.canExecute(file))
+				mode = FileMode.EXECUTABLE_FILE;
+			else
+				mode = FileMode.REGULAR_FILE;
 		}
 
 		@Override
@@ -373,27 +185,26 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 		@Override
 		public String getName() {
-			return attributes.getName();
+			return file.getName();
 		}
 
 		@Override
 		public long getLength() {
-			return attributes.getLength();
+			if (length < 0)
+				length = file.length();
+			return length;
 		}
 
 		@Override
 		public long getLastModified() {
-			return attributes.getLastModifiedTime();
+			if (lastModified == 0)
+				lastModified = file.lastModified();
+			return lastModified;
 		}
 
 		@Override
 		public InputStream openInputStream() throws IOException {
-			if (fs.isSymLink(getFile()))
-				return new ByteArrayInputStream(fs.readSymLink(getFile())
-						.getBytes(
-						Constants.CHARACTER_ENCODING));
-			else
-				return new FileInputStream(getFile());
+			return new FileInputStream(file);
 		}
 
 		/**
@@ -402,7 +213,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 * @return the underlying file of this entry
 		 */
 		public File getFile() {
-			return attributes.getFile();
+			return file;
 		}
 	}
 
@@ -424,11 +235,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 	@Override
 	protected byte[] idSubmodule(final Entry e) {
-		return idSubmodule(getDirectory(), e);
-	}
-
-	@Override
-	protected String readSymlinkTarget(Entry entry) throws IOException {
-		return fs.readSymLink(getEntryFile());
+		if (repository == null)
+			return idSubmodule(getDirectory(), e);
+		return super.idSubmodule(e);
 	}
 }

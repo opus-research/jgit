@@ -78,7 +78,7 @@ class ConfigSnapshot {
 
 	ConfigSnapshot(List<ConfigLine> entries, ConfigSnapshot base) {
 		entryList = entries;
-		cache = new ConcurrentHashMap<>(16, 0.75f, 1);
+		cache = new ConcurrentHashMap<Object, Object>(16, 0.75f, 1);
 		baseState = base;
 	}
 
@@ -97,22 +97,12 @@ class ConfigSnapshot {
 	}
 
 	Set<String> getNames(String section, String subsection) {
-		return getNames(section, subsection, false);
-	}
-
-	Set<String> getNames(String section, String subsection, boolean recursive) {
-		Map<String, String> m = getNamesInternal(section, subsection, recursive);
-		return new CaseFoldingSet(m);
-	}
-
-	private Map<String, String> getNamesInternal(String section,
-			String subsection, boolean recursive) {
 		List<ConfigLine> s = sorted();
 		int idx = find(s, section, subsection, ""); //$NON-NLS-1$
 		if (idx < 0)
 			idx = -(idx + 1);
 
-		Map<String, String> m = new LinkedHashMap<>();
+		Map<String, String> m = new LinkedHashMap<String, String>();
 		while (idx < s.size()) {
 			ConfigLine e = s.get(idx++);
 			if (!e.match(section, subsection))
@@ -123,9 +113,7 @@ class ConfigSnapshot {
 			if (!m.containsKey(l))
 				m.put(l, e.name);
 		}
-		if (recursive && baseState != null)
-			m.putAll(baseState.getNamesInternal(section, subsection, recursive));
-		return m;
+		return new CaseFoldingSet(m);
 	}
 
 	String[] get(String section, String subsection, String name) {
@@ -187,7 +175,7 @@ class ConfigSnapshot {
 	}
 
 	private static List<ConfigLine> sort(List<ConfigLine> in) {
-		List<ConfigLine> sorted = new ArrayList<>(in.size());
+		List<ConfigLine> sorted = new ArrayList<ConfigLine>(in.size());
 		for (ConfigLine line : in) {
 			if (line.section != null && line.name != null)
 				sorted.add(line);
@@ -217,7 +205,6 @@ class ConfigSnapshot {
 	}
 
 	private static class LineComparator implements Comparator<ConfigLine> {
-		@Override
 		public int compare(ConfigLine a, ConfigLine b) {
 			return compare2(
 					a.section, a.subsection, a.name,
@@ -237,8 +224,8 @@ class ConfigSnapshot {
 		final Map<String, Set<String>> subsections;
 
 		SectionNames(ConfigSnapshot cfg) {
-			Map<String, String> sec = new LinkedHashMap<>();
-			Map<String, Set<String>> sub = new HashMap<>();
+			Map<String, String> sec = new LinkedHashMap<String, String>();
+			Map<String, Set<String>> sub = new HashMap<String, Set<String>>();
 			while (cfg != null) {
 				for (ConfigLine e : cfg.entryList) {
 					if (e.section == null)
@@ -253,7 +240,7 @@ class ConfigSnapshot {
 
 					Set<String> m = sub.get(l1);
 					if (m == null) {
-						m = new LinkedHashSet<>();
+						m = new LinkedHashSet<String>();
 						sub.put(l1, m);
 					}
 					m.add(e.subsection);
@@ -287,17 +274,14 @@ class ConfigSnapshot {
 		public Iterator<String> iterator() {
 			final Iterator<String> i = names.values().iterator();
 			return new Iterator<String>() {
-				@Override
 				public boolean hasNext() {
 					return i.hasNext();
 				}
 
-				@Override
 				public String next() {
 					return i.next();
 				}
 
-				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}

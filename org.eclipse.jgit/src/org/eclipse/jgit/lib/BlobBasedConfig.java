@@ -79,14 +79,7 @@ public class BlobBasedConfig extends Config {
 	public BlobBasedConfig(Config base, final byte[] blob)
 			throws ConfigInvalidException {
 		super(base);
-		final String decoded;
-		if (isUtf8(blob)) {
-			decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
-					blob, 3, blob.length);
-		} else {
-			decoded = RawParseUtils.decode(blob);
-		}
-		fromText(decoded);
+		fromText(RawParseUtils.decode(blob));
 	}
 
 	/**
@@ -111,8 +104,11 @@ public class BlobBasedConfig extends Config {
 	private static byte[] read(Repository db, AnyObjectId blobId)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		try (ObjectReader or = db.newObjectReader()) {
+		ObjectReader or = db.newObjectReader();
+		try {
 			return read(or, blobId);
+		} finally {
+			or.release();
 		}
 	}
 
@@ -150,12 +146,15 @@ public class BlobBasedConfig extends Config {
 	private static byte[] read(Repository db, AnyObjectId treeish, String path)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		try (ObjectReader or = db.newObjectReader()) {
+		ObjectReader or = db.newObjectReader();
+		try {
 			TreeWalk tree = TreeWalk.forPath(or, path, asTree(or, treeish));
 			if (tree == null)
 				throw new FileNotFoundException(MessageFormat.format(JGitText
 						.get().entryNotFoundByPath, path));
 			return read(or, tree.getObjectId(0));
+		} finally {
+			or.release();
 		}
 	}
 
@@ -169,8 +168,6 @@ public class BlobBasedConfig extends Config {
 				&& ((RevCommit) treeish).getTree() != null)
 			return ((RevCommit) treeish).getTree();
 
-		try (RevWalk rw = new RevWalk(or)) {
-			return rw.parseTree(treeish).getId();
-		}
+		return new RevWalk(or).parseTree(treeish).getId();
 	}
 }

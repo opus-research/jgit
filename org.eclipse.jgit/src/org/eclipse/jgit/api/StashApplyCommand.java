@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2017 GitHub Inc.
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,9 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
@@ -57,14 +54,10 @@ import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheCheckout.CheckoutMetadata;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.errors.CheckoutConflictException;
-import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
@@ -97,12 +90,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 	private boolean applyIndex = true;
 
-	private boolean applyUntracked = true;
-
-	private boolean ignoreRepositoryState;
-
-	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
-
 	/**
 	 * Create command to apply the changes of a stashed commit
 	 *
@@ -123,16 +110,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 */
 	public StashApplyCommand setStashRef(final String stashRef) {
 		this.stashRef = stashRef;
-		return this;
-	}
-
-	/**
-	 * @param willIgnoreRepositoryState
-	 * @return {@code this}
-	 * @since 3.2
-	 */
-	public StashApplyCommand ignoreRepositoryState(boolean willIgnoreRepositoryState) {
-		this.ignoreRepositoryState = willIgnoreRepositoryState;
 		return this;
 	}
 
@@ -161,20 +138,19 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 * @throws NoHeadException
 	 * @throws StashApplyFailureException
 	 */
-	@Override
 	public ObjectId call() throws GitAPIException,
 			WrongRepositoryStateException, NoHeadException,
 			StashApplyFailureException {
 		checkCallable();
 
-		if (!ignoreRepositoryState
-				&& repo.getRepositoryState() != RepositoryState.SAFE)
+		if (repo.getRepositoryState() != RepositoryState.SAFE)
 			throw new WrongRepositoryStateException(MessageFormat.format(
 					JGitText.get().stashApplyOnUnsafeRepository,
 					repo.getRepositoryState()));
 
-		try (ObjectReader reader = repo.newObjectReader();
-				RevWalk revWalk = new RevWalk(reader)) {
+		ObjectReader reader = repo.newObjectReader();
+		try {
+			RevWalk revWalk = new RevWalk(reader);
 
 			ObjectId headCommit = repo.resolve(Constants.HEAD);
 			if (headCommit == null)
@@ -182,76 +158,37 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 			final ObjectId stashId = getStashId();
 			RevCommit stashCommit = revWalk.parseCommit(stashId);
-			if (stashCommit.getParentCount() < 2
-					|| stashCommit.getParentCount() > 3)
+			if (stashCommit.getParentCount() != 2)
 				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().stashCommitIncorrectNumberOfParents,
-						stashId.name(),
-						Integer.valueOf(stashCommit.getParentCount())));
+						JGitText.get().stashCommitMissingTwoParents,
+						stashId.name()));
 
-			ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
+			ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 			ObjectId stashIndexCommit = revWalk.parseCommit(stashCommit
 					.getParent(1));
 			ObjectId stashHeadCommit = stashCommit.getParent(0);
-			ObjectId untrackedCommit = null;
-			if (applyUntracked && stashCommit.getParentCount() == 3)
-				untrackedCommit = revWalk.parseCommit(stashCommit.getParent(2));
 
-			ResolveMerger merger = (ResolveMerger) strategy.newMerger(repo);
-			merger.setCommitNames(new String[] { "stashed HEAD", "HEAD", //$NON-NLS-1$ //$NON-NLS-2$
-					"stash" }); //$NON-NLS-1$
+			ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
+					.newMerger(repo);
+			merger.setCommitNames(new String[] { "stashed HEAD", "HEAD",
+					"stash" });
 			merger.setBase(stashHeadCommit);
 			merger.setWorkingTreeIterator(new FileTreeIterator(repo));
-			boolean mergeSucceeded = merger.merge(headCommit, stashCommit);
-			List<String> modifiedByMerge = merger.getModifiedFiles();
-			if (!modifiedByMerge.isEmpty()) {
-				repo.fireEvent(
-						new WorkingTreeModifiedEvent(modifiedByMerge, null));
-			}
-			if (mergeSucceeded) {
+			if (merger.merge(headCommit, stashCommit)) {
 				DirCache dc = repo.lockDirCache();
 				DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
 						dc, merger.getResultTreeId());
 				dco.setFailOnConflict(true);
 				dco.checkout(); // Ignoring failed deletes....
 				if (applyIndex) {
-					ResolveMerger ixMerger = (ResolveMerger) strategy
+					ResolveMerger ixMerger = (ResolveMerger) MergeStrategy.RECURSIVE
 							.newMerger(repo, true);
-					ixMerger.setCommitNames(new String[] { "stashed HEAD", //$NON-NLS-1$
-							"HEAD", "stashed index" }); //$NON-NLS-1$//$NON-NLS-2$
-					ixMerger.setBase(stashHeadCommit);
+					ixMerger.setCommitNames(new String[] { "stashed HEAD",
+							"HEAD", "stashed index" });
 					boolean ok = ixMerger.merge(headCommit, stashIndexCommit);
 					if (ok) {
 						resetIndex(revWalk
 								.parseTree(ixMerger.getResultTreeId()));
-					} else {
-						throw new StashApplyFailureException(
-								JGitText.get().stashApplyConflict);
-					}
-				}
-
-				if (untrackedCommit != null) {
-					ResolveMerger untrackedMerger = (ResolveMerger) strategy
-							.newMerger(repo, true);
-					untrackedMerger.setCommitNames(new String[] {
-							"null", "HEAD", "untracked files" }); //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
-					// There is no common base for HEAD & untracked files
-					// because the commit for untracked files has no parent. If
-					// we use stashHeadCommit as common base (as in the other
-					// merges) we potentially report conflicts for files
-					// which are not even member of untracked files commit
-					untrackedMerger.setBase(null);
-					boolean ok = untrackedMerger.merge(headCommit,
-							untrackedCommit);
-					if (ok) {
-						try {
-							RevTree untrackedTree = revWalk
-									.parseTree(untrackedCommit);
-							resetUntracked(untrackedTree);
-						} catch (CheckoutConflictException e) {
-							throw new StashApplyFailureException(
-									JGitText.get().stashApplyConflict, e);
-						}
 					} else {
 						throw new StashApplyFailureException(
 								JGitText.get().stashApplyConflict);
@@ -267,6 +204,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 			throw e;
 		} catch (IOException e) {
 			throw new JGitInternalException(JGitText.get().stashApplyFailed, e);
+		} finally {
+			reader.release();
 		}
 	}
 
@@ -278,32 +217,13 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 		this.applyIndex = applyIndex;
 	}
 
-	/**
-	 * @param strategy
-	 *            The merge strategy to use in order to merge during this
-	 *            command execution.
-	 * @return {@code this}
-	 * @since 3.4
-	 */
-	public StashApplyCommand setStrategy(MergeStrategy strategy) {
-		this.strategy = strategy;
-		return this;
-	}
-
-	/**
-	 * @param applyUntracked
-	 *            true (default) if the command should restore untracked files
-	 * @since 3.4
-	 */
-	public void setApplyUntracked(boolean applyUntracked) {
-		this.applyUntracked = applyUntracked;
-	}
-
 	private void resetIndex(RevTree tree) throws IOException {
 		DirCache dc = repo.lockDirCache();
-		try (TreeWalk walk = new TreeWalk(repo)) {
+		TreeWalk walk = null;
+		try {
 			DirCacheBuilder builder = dc.builder();
 
+			walk = new TreeWalk(repo);
 			walk.addTree(tree);
 			walk.addTree(new DirCacheIterator(dc));
 			walk.setRecursive(true);
@@ -334,63 +254,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 			builder.commit();
 		} finally {
 			dc.unlock();
-		}
-	}
-
-	private void resetUntracked(RevTree tree) throws CheckoutConflictException,
-			IOException {
-		Set<String> actuallyModifiedPaths = new HashSet<>();
-		// TODO maybe NameConflictTreeWalk ?
-		try (TreeWalk walk = new TreeWalk(repo)) {
-			walk.addTree(tree);
-			walk.addTree(new FileTreeIterator(repo));
-			walk.setRecursive(true);
-
-			final ObjectReader reader = walk.getObjectReader();
-
-			while (walk.next()) {
-				final AbstractTreeIterator cIter = walk.getTree(0,
-						AbstractTreeIterator.class);
-				if (cIter == null)
-					// Not in commit, don't create untracked
-					continue;
-
-				final EolStreamType eolStreamType = walk.getEolStreamType();
-				final DirCacheEntry entry = new DirCacheEntry(walk.getRawPath());
-				entry.setFileMode(cIter.getEntryFileMode());
-				entry.setObjectIdFromRaw(cIter.idBuffer(), cIter.idOffset());
-
-				FileTreeIterator fIter = walk
-						.getTree(1, FileTreeIterator.class);
-				if (fIter != null) {
-					if (fIter.isModified(entry, true, reader)) {
-						// file exists and is dirty
-						throw new CheckoutConflictException(
-								entry.getPathString());
-					}
-				}
-
-				checkoutPath(entry, reader,
-						new CheckoutMetadata(eolStreamType, null));
-				actuallyModifiedPaths.add(entry.getPathString());
-			}
-		} finally {
-			if (!actuallyModifiedPaths.isEmpty()) {
-				repo.fireEvent(new WorkingTreeModifiedEvent(
-						actuallyModifiedPaths, null));
-			}
-		}
-	}
-
-	private void checkoutPath(DirCacheEntry entry, ObjectReader reader,
-			CheckoutMetadata checkoutMetadata) {
-		try {
-			DirCacheCheckout.checkoutEntry(repo, entry, reader, true,
-					checkoutMetadata);
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().checkoutConflictWithFile,
-					entry.getPathString()), e);
+			if (walk != null)
+				walk.release();
 		}
 	}
 }
