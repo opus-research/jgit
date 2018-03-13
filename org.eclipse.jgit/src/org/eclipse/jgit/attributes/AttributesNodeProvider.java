@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,30 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.attributes;
 
-package org.eclipse.jgit.annotations;
+import java.io.IOException;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.eclipse.jgit.lib.CoreConfig;
 
 /**
- * JGit's replacement for the {@code javax.annotations.Nullable}.
- * <p>
- * Denotes that a local variable, parameter, field, method return value can be
- * {@code null}.
+ * An interface used to retrieve the global and info {@link AttributesNode}s.
  *
  * @since 4.2
+ *
  */
-@Documented
-@Retention(RetentionPolicy.CLASS)
-@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface Nullable {
-	// marker annotation with no members
+public interface AttributesNodeProvider {
+
+	/**
+	 * Retrieve the {@link AttributesNode} that holds the information located
+	 * in $GIT_DIR/info/attributes file.
+	 *
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         $GIT_DIR/info/attributes file.
+	 * @throws IOException
+	 *             if an error is raised while parsing the attributes file
+	 */
+	public AttributesNode getInfoAttributesNode() throws IOException;
+
+	/**
+	 * Retrieve the {@link AttributesNode} that holds the information located
+	 * in the global gitattributes file.
+	 *
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         the global gitattributes file.
+	 * @throws IOException
+	 *             IOException if an error is raised while parsing the
+	 *             attributes file
+	 * @see CoreConfig#getAttributesFile()
+	 */
+	public AttributesNode getGlobalAttributesNode() throws IOException;
+
 }

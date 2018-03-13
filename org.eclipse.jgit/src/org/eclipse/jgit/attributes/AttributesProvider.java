@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,30 +40,18 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.attributes;
 
-package org.eclipse.jgit.annotations;
-
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.Map;
 
 /**
- * JGit's replacement for the {@code javax.annotations.Nullable}.
- * <p>
- * Denotes that a local variable, parameter, field, method return value can be
- * {@code null}.
+ * Interface for classes which provide git attributes
  *
  * @since 4.2
  */
-@Documented
-@Retention(RetentionPolicy.CLASS)
-@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface Nullable {
-	// marker annotation with no members
+public interface AttributesProvider {
+	/**
+	 * @return the currently active attributes by attribute key
+	 */
+	public Map<String, Attribute> getAttributes();
 }

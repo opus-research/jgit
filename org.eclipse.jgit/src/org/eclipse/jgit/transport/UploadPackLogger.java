@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,29 +41,35 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.annotations;
+package org.eclipse.jgit.transport;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 
 /**
- * JGit's replacement for the {@code javax.annotations.Nullable}.
+ * Logs activity that occurred within {@link UploadPack}.
  * <p>
- * Denotes that a local variable, parameter, field, method return value can be
- * {@code null}.
+ * Implementors of the interface are responsible for associating the current
+ * thread to a particular connection, if they need to also include connection
+ * information. One method is to use a {@link java.lang.ThreadLocal} to remember
+ * the connection information before invoking UploadPack.
  *
- * @since 4.2
+ * @deprecated use {@link PostUploadHook} instead
  */
-@Documented
-@Retention(RetentionPolicy.CLASS)
-@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface Nullable {
-	// marker annotation with no members
+@Deprecated
+public interface UploadPackLogger {
+	/** A simple no-op logger. */
+	public static final UploadPackLogger NULL = new UploadPackLogger() {
+		public void onPackStatistics(PackWriter.Statistics stats) {
+			// Do nothing.
+		}
+	};
+
+	/**
+	 * Notice to the logger after a pack has been sent.
+	 *
+	 * @param stats
+	 *            the statistics after sending a pack to the client.
+	 * @since 3.0
+	 */
+	public void onPackStatistics(PackWriter.Statistics stats);
 }

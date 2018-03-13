@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,29 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.annotations;
+package org.eclipse.jgit.transport;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
+import java.util.List;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 
 /**
- * JGit's replacement for the {@code javax.annotations.Nullable}.
+ * UploadPackLogger that delegates to a list of other loggers.
  * <p>
- * Denotes that a local variable, parameter, field, method return value can be
- * {@code null}.
+ * loggers are run in the order passed to the constructor.
  *
- * @since 4.2
+ * @deprecated Use {@link PostUploadHookChain} instead.
  */
-@Documented
-@Retention(RetentionPolicy.CLASS)
-@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface Nullable {
-	// marker annotation with no members
+@Deprecated
+public class UploadPackLoggerChain implements UploadPackLogger {
+	private final UploadPackLogger[] loggers;
+	private final int count;
+
+	/**
+	 * Create a new logger chaining the given loggers together.
+	 *
+	 * @param loggers
+	 *            loggers to execute, in order.
+	 * @return a new logger chain of the given loggers.
+	 */
+	public static UploadPackLogger newChain(
+			List<? extends UploadPackLogger> loggers) {
+		UploadPackLogger[] newLoggers = new UploadPackLogger[loggers.size()];
+		int i = 0;
+		for (UploadPackLogger logger : loggers)
+			if (logger != UploadPackLogger.NULL)
+				newLoggers[i++] = logger;
+		if (i == 0)
+			return UploadPackLogger.NULL;
+		else if (i == 1)
+			return newLoggers[0];
+		else
+			return new UploadPackLoggerChain(newLoggers, i);
+	}
+
+	/**
+	 * @since 3.0
+	 */
+	public void onPackStatistics(PackWriter.Statistics stats) {
+		for (int i = 0; i < count; i++)
+			loggers[i].onPackStatistics(stats);
+	}
+
+	private UploadPackLoggerChain(UploadPackLogger[] loggers, int count) {
+		this.loggers = loggers;
+		this.count = count;
+	}
 }

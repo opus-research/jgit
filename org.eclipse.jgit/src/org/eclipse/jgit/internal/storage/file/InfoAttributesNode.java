@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,30 +41,40 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.internal.storage.file;
 
-package org.eclipse.jgit.annotations;
+import java.io.File;
+import java.io.IOException;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+/** Attribute node loaded from the $GIT_DIR/info/attributes file. */
+public class InfoAttributesNode extends AttributesNode {
+	final Repository repository;
 
-/**
- * JGit's replacement for the {@code javax.annotations.Nullable}.
- * <p>
- * Denotes that a local variable, parameter, field, method return value can be
- * {@code null}.
- *
- * @since 4.2
- */
-@Documented
-@Retention(RetentionPolicy.CLASS)
-@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface Nullable {
-	// marker annotation with no members
+	/**
+	 * @param repository
+	 */
+	public InfoAttributesNode(Repository repository) {
+		this.repository = repository;
+	}
+
+	/**
+	 * @return the attributes node
+	 * @throws IOException
+	 */
+	public AttributesNode load() throws IOException {
+		AttributesNode r = new AttributesNode();
+
+		FS fs = repository.getFS();
+
+		File attributes = fs.resolve(repository.getDirectory(),
+				"info/attributes"); //$NON-NLS-1$
+		FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributes);
+
+		return r.getRules().isEmpty() ? null : r;
+	}
+
 }
