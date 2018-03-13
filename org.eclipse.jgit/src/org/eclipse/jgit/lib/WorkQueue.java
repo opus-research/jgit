@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2008-2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,60 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.lib;
 
-class ReftableConstants {
-	static final byte[] FILE_HEADER_MAGIC = { 'R', 'E', 'F', 'T' };
-	static final byte VERSION_1 = (byte) 1;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 
-	static final int FILE_HEADER_LEN = 24;
-	static final int FILE_FOOTER_LEN = 68;
+/**
+ * Simple work queue to run tasks in the background
+ */
+class WorkQueue {
+	private static final ScheduledThreadPoolExecutor executor;
 
-	static final byte FILE_BLOCK_TYPE = 'R';
-	static final byte REF_BLOCK_TYPE = 'r';
-	static final byte OBJ_BLOCK_TYPE = 'o';
-	static final byte LOG_BLOCK_TYPE = 'g';
-	static final byte INDEX_BLOCK_TYPE = 'i';
+	static final Object executorKiller;
 
-	static final int VALUE_NONE = 0x0;
-	static final int VALUE_1ID = 0x1;
-	static final int VALUE_2ID = 0x2;
-	static final int VALUE_SYMREF = 0x3;
-	static final int VALUE_TYPE_MASK = 0x7;
+	static {
+		// To support garbage collection, start our thread but
+		// swap out the thread factory. When our class is GC'd
+		// the executorKiller will finalize and ask the executor
+		// to shutdown, ending the worker.
+		//
+		int threads = 1;
+		executor = new ScheduledThreadPoolExecutor(threads,
+				new ThreadFactory() {
+					private final ThreadFactory baseFactory = Executors
+							.defaultThreadFactory();
 
-	static final int LOG_NONE = 0x0;
-	static final int LOG_DATA = 0x1;
+					@Override
+					public Thread newThread(Runnable taskBody) {
+						Thread thr = baseFactory.newThread(taskBody);
+						thr.setName("JGit-WorkQueue"); //$NON-NLS-1$
+						thr.setDaemon(true);
+						return thr;
+					}
+				});
+		executor.setRemoveOnCancelPolicy(true);
+		executor.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+		executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+		executor.prestartAllCoreThreads();
 
-	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
-	static final int MAX_RESTARTS = 65535;
+		// Now that the threads are running, its critical to swap out
+		// our own thread factory for one that isn't in the ClassLoader.
+		// This allows the class to GC.
+		//
+		executor.setThreadFactory(Executors.defaultThreadFactory());
 
-	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
-		return (n - o) >= FILE_HEADER_MAGIC.length
-				&& buf[o + 0] == FILE_HEADER_MAGIC[0]
-				&& buf[o + 1] == FILE_HEADER_MAGIC[1]
-				&& buf[o + 2] == FILE_HEADER_MAGIC[2]
-				&& buf[o + 3] == FILE_HEADER_MAGIC[3];
+		executorKiller = new Object() {
+			@Override
+			protected void finalize() {
+				executor.shutdownNow();
+			}
+		};
 	}
 
-	static long reverseUpdateIndex(long time) {
-		return 0xffffffffffffffffL - time;
-	}
-
-	private ReftableConstants() {
+	static ScheduledThreadPoolExecutor getExecutor() {
+		return executor;
 	}
 }

@@ -148,6 +148,7 @@ public class OpenSshConfig implements ConfigRepository {
 	 */
 	private static class State {
 		Map<String, HostEntry> entries = new LinkedHashMap<>();
+
 		Map<String, Host> hosts = new HashMap<>();
 	}
 
@@ -368,7 +369,7 @@ public class OpenSshConfig implements ConfigRepository {
 
 		/**
 		 * Keys that can be specified multiple times, building up a list. (I.e.,
-		 * those are the keys that do not follow the general rule of "first
+		 * those are the keys that do not follow to general rule of "first
 		 * occurrence wins".)
 		 */
 		private static final Set<String> MULTI_KEYS = new HashSet<>();
@@ -460,9 +461,8 @@ public class OpenSshConfig implements ConfigRepository {
 			if (key.equals("compression.s2c") //$NON-NLS-1$
 					|| key.equals("compression.c2s")) { //$NON-NLS-1$
 				String foo = findValue(key);
-				if (foo == null || foo.equals("no")) { //$NON-NLS-1$
+				if (foo == null || foo.equals("no")) //$NON-NLS-1$
 					return "none,zlib@openssh.com,zlib"; //$NON-NLS-1$
-				}
 				return "zlib@openssh.com,zlib,none"; //$NON-NLS-1$
 			}
 			return findValue(key);

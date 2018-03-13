@@ -43,13 +43,11 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -120,31 +118,6 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		assertTrue(indexDiff.diff());
 	}
 
-	private void assertDiff(IndexDiff indexDiff, IgnoreSubmoduleMode mode,
-			IgnoreSubmoduleMode... expectedEmptyModes) throws IOException {
-		boolean diffResult = indexDiff.diff();
-		Set<String> submodulePaths = indexDiff
-				.getPathsWithIndexMode(FileMode.GITLINK);
-		boolean emptyExpected = false;
-		for (IgnoreSubmoduleMode empty : expectedEmptyModes) {
-			if (mode.equals(empty)) {
-				emptyExpected = true;
-				break;
-			}
-		}
-		if (emptyExpected) {
-			assertFalse("diff should be false with mode=" + mode,
-					diffResult);
-			assertEquals("should have no paths with FileMode.GITLINK", 0,
-					submodulePaths.size());
-		} else {
-			assertTrue("diff should be true with mode=" + mode,
-					diffResult);
-			assertTrue("submodule path should have FileMode.GITLINK",
-					submodulePaths.contains("modules/submodule"));
-		}
-	}
-
 	@Theory
 	public void testDirtySubmoduleWorktree(IgnoreSubmoduleMode mode)
 			throws IOException {
@@ -152,8 +125,13 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		IndexDiff indexDiff = new IndexDiff(db, Constants.HEAD,
 				new FileTreeIterator(db));
 		indexDiff.setIgnoreSubmoduleMode(mode);
-		assertDiff(indexDiff, mode, IgnoreSubmoduleMode.ALL,
-				IgnoreSubmoduleMode.DIRTY);
+		if (mode.equals(IgnoreSubmoduleMode.ALL)
+				|| mode.equals(IgnoreSubmoduleMode.DIRTY))
+			assertFalse("diff should be false with mode=" + mode,
+					indexDiff.diff());
+		else
+			assertTrue("diff should be true with mode=" + mode,
+					indexDiff.diff());
 	}
 
 	@Theory
@@ -167,7 +145,12 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		IndexDiff indexDiff = new IndexDiff(db, Constants.HEAD,
 				new FileTreeIterator(db));
 		indexDiff.setIgnoreSubmoduleMode(mode);
-		assertDiff(indexDiff, mode, IgnoreSubmoduleMode.ALL);
+		if (mode.equals(IgnoreSubmoduleMode.ALL))
+			assertFalse("diff should be false with mode=" + mode,
+					indexDiff.diff());
+		else
+			assertTrue("diff should be true with mode=" + mode,
+					indexDiff.diff());
 	}
 
 	@Theory
@@ -180,8 +163,13 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		IndexDiff indexDiff = new IndexDiff(db, Constants.HEAD,
 				new FileTreeIterator(db));
 		indexDiff.setIgnoreSubmoduleMode(mode);
-		assertDiff(indexDiff, mode, IgnoreSubmoduleMode.ALL,
-				IgnoreSubmoduleMode.DIRTY);
+		if (mode.equals(IgnoreSubmoduleMode.ALL)
+				|| mode.equals(IgnoreSubmoduleMode.DIRTY))
+			assertFalse("diff should be false with mode=" + mode,
+					indexDiff.diff());
+		else
+			assertTrue("diff should be true with mode=" + mode,
+					indexDiff.diff());
 	}
 
 	@Theory
@@ -195,8 +183,13 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		IndexDiff indexDiff = new IndexDiff(db, Constants.HEAD,
 				new FileTreeIterator(db));
 		indexDiff.setIgnoreSubmoduleMode(mode);
-		assertDiff(indexDiff, mode, IgnoreSubmoduleMode.ALL,
-				IgnoreSubmoduleMode.DIRTY);
+		if (mode.equals(IgnoreSubmoduleMode.ALL)
+				|| mode.equals(IgnoreSubmoduleMode.DIRTY))
+			assertFalse("diff should be false with mode=" + mode,
+					indexDiff.diff());
+		else
+			assertTrue("diff should be true with mode=" + mode,
+					indexDiff.diff());
 	}
 
 	@Theory
@@ -207,7 +200,13 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		IndexDiff indexDiff = new IndexDiff(db, Constants.HEAD,
 				new FileTreeIterator(db));
 		indexDiff.setIgnoreSubmoduleMode(mode);
-		assertDiff(indexDiff, mode, IgnoreSubmoduleMode.ALL,
-				IgnoreSubmoduleMode.DIRTY, IgnoreSubmoduleMode.UNTRACKED);
+		if (mode.equals(IgnoreSubmoduleMode.ALL)
+				|| mode.equals(IgnoreSubmoduleMode.DIRTY)
+				|| mode.equals(IgnoreSubmoduleMode.UNTRACKED))
+			assertFalse("diff should be false with mode=" + mode,
+					indexDiff.diff());
+		else
+			assertTrue("diff should be true with mode=" + mode,
+					indexDiff.diff());
 	}
 }
