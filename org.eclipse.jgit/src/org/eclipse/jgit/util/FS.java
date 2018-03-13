@@ -157,6 +157,8 @@ public abstract class FS {
 
 	private volatile Holder<File> userHome;
 
+	private volatile Holder<File> gitPrefix;
+
 	/**
 	 * Constructs a file system abstraction.
 	 */
@@ -172,6 +174,7 @@ public abstract class FS {
 	 */
 	protected FS(FS src) {
 		userHome = src.userHome;
+		gitPrefix = src.gitPrefix;
 	}
 
 	/** @return a new instance of the same type of FS. */
@@ -420,8 +423,10 @@ public abstract class FS {
 	 * @param encoding
 	 *            to be used to parse the command's output
 	 * @param env
-	 *            Map of environment variables to be merged with those of the current process
+	 *            Map of environment variables to be merged with those of the
+	 *            current process
 	 * @return the one-line output of the command
+	 * @since 4.0
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
@@ -432,8 +437,9 @@ public abstract class FS {
 			}
 			ProcessBuilder pb = new ProcessBuilder(command);
 			pb.directory(dir);
-			if (env != null)
+			if (env != null) {
 				pb.environment().putAll(env);
+			}
 			final Process p = pb.start();
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
@@ -511,29 +517,63 @@ public abstract class FS {
 		return null;
 	}
 
-	/** @return the path to the Git executable. */
+	/** @return the $prefix directory C Git would use. */
+	public File gitPrefix() {
+		Holder<File> p = gitPrefix;
+		if (p == null) {
+			String overrideGitPrefix = SystemReader.getInstance().getProperty(
+					"jgit.gitprefix"); //$NON-NLS-1$
+			if (overrideGitPrefix != null)
+				p = new Holder<File>(new File(overrideGitPrefix));
+			else
+				p = new Holder<File>(discoverGitPrefix());
+			gitPrefix = p;
+		}
+		return p.value;
+	}
+
+	/**
+	 * @return the path to the Git executable.
+	 * @since 4.0
+	 */
 	protected abstract File discoverGitExe();
 
-	/** @return the path to the system-wide Git configuration file. */
+	/**
+	 * @return the path to the system-wide Git configuration file.
+	 * @since 4.0
+	 */
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
-		if (gitExe == null)
+		if (gitExe == null) {
 			return null;
+		}
 
-		// Trick Git into printing the path to the config file by using "echo" as the editor.
+		// Trick Git into printing the path to the config file by using "echo"
+		// as the editor.
 		Map<String, String> env = new HashMap<>();
 		env.put("GIT_EDITOR", "echo"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		String w = readPipe(gitExe.getParentFile(),
-				new String[]{"git", "config", "--system", "--edit"}, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-				Charset.defaultCharset().name(),
-				env);
-		if (StringUtils.isEmptyOrNull(w))
+				new String[] { "git", "config", "--system", "--edit" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+				Charset.defaultCharset().name(), env);
+		if (StringUtils.isEmptyOrNull(w)) {
 			return null;
+		}
 
 		return new File(w);
 	}
 
+	/** @return the $prefix directory C Git would use. */
+	protected File discoverGitPrefix() {
+		return resolveGrandparentFile(discoverGitExe());
+	}
+
+	/**
+	 * @param grandchild
+	 * @return the parent directory of this file's parent directory or
+	 *         {@code null} in case there's no grandparent directory
+	 * @since 4.0
+	 */
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
 			File parent = grandchild.getParentFile();
@@ -541,6 +581,18 @@ public abstract class FS {
 				return parent.getParentFile();
 		}
 		return null;
+	}
+
+	/**
+	 * Set the $prefix directory C Git uses.
+	 *
+	 * @param path
+	 *            the directory. Null if C Git is not installed.
+	 * @return {@code this}
+	 */
+	public FS setGitPrefix(File path) {
+		gitPrefix = new Holder<File>(path);
+		return this;
 	}
 
 	/**
