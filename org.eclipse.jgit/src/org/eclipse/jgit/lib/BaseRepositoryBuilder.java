@@ -565,16 +565,14 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 * based on other options. If insufficient information is available, an
 	 * exception is thrown to the caller.
 	 *
-	 * @return a repository matching this configuration. The caller is
-	 *         responsible to close the repository instance when it is no longer
-	 *         needed.
+	 * @return a repository matching this configuration.
 	 * @throws IllegalArgumentException
 	 *             insufficient parameters were set.
 	 * @throws IOException
 	 *             the repository could not be accessed to configure the rest of
 	 *             the builder's parameters.
 	 */
-	@SuppressWarnings({ "unchecked", "resource" })
+	@SuppressWarnings("unchecked")
 	public R build() throws IOException {
 		R repo = (R) new FileRepository(setup());
 		if (isMustExist() && !repo.getObjectDatabase().exists())
