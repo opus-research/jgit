@@ -262,8 +262,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		}
 
 		// Check subscribe output
+		assertEquals("subscribe", testLineIn.readString());
 		assertEquals("restart badtoken", testLineIn.readString());
-		assertEquals("last-pack 0", testLineIn.readString());
+		assertEquals("last-pack-number 0", testLineIn.readString());
 		assertEquals(PacketLineIn.END, testLineIn.readString());
 		assertEquals("repository testrepository", testLineIn.readString());
 		assertEquals("want refs/heads/master", testLineIn.readString());
@@ -278,9 +279,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testCleanStart() throws Exception {
 		// Setup server response
+		publisherLineOut.writeString("ACK");
 		publisherLineOut.writeString("restart-token server-token");
 		publisherLineOut.writeString("heartbeat-interval 10");
-		publisherLineOut.end();
 		writeHeartbeat();
 		try {
 			executeSubscribe();
@@ -296,11 +297,11 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testChangeToken() throws Exception {
 		// Setup server response
+		publisherLineOut.writeString("ACK");
 		publisherLineOut.writeString("restart-token server-token");
 		publisherLineOut.writeString("heartbeat-interval 10");
-		publisherLineOut.end();
 		writeHeartbeat();
-		publisherLineOut.writeString("change-restart-token new-server-token");
+		publisherLineOut.writeString("restart-token new-server-token");
 		try {
 			executeSubscribe();
 		} catch (TransportException e) {
@@ -315,9 +316,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testSingleUpdate() throws Exception {
 		// Setup server response
+		publisherLineOut.writeString("ACK");
 		publisherLineOut.writeString("restart-token server-token");
 		publisherLineOut.writeString("heartbeat-interval 10");
-		publisherLineOut.end();
 		writeHeartbeat();
 		// Add refs/tags/pubsubtest
 		ObjectId id = db.getRef("refs/heads/master").getLeaf().getObjectId();
@@ -337,9 +338,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testMultiUpdate() throws Exception {
 		// Setup server response
+		publisherLineOut.writeString("ACK");
 		publisherLineOut.writeString("restart-token server-token");
 		publisherLineOut.writeString("heartbeat-interval 10");
-		publisherLineOut.end();
 		// Create refs/heads/pubsub1
 		ObjectId id1 = db.getRef("refs/heads/master").getLeaf().getObjectId();
 		writeUpdate(ObjectId.zeroId(), id1, "refs/heads/pubsub1", "1234");
@@ -368,9 +369,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testBadUpdate() throws Exception {
 		// Setup server response
+		publisherLineOut.writeString("ACK");
 		publisherLineOut.writeString("restart-token server-token");
 		publisherLineOut.writeString("heartbeat-interval 10");
-		publisherLineOut.end();
 		writeHeartbeat();
 		// Add refs/heads/master (bad command, master already exists)
 		ObjectId id = db.getRef("refs/heads/master").getLeaf().getObjectId();
@@ -405,7 +406,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		pw.writePack(NullProgressMonitor.INSTANCE, NullProgressMonitor.INSTANCE,
 				publisherOut);
 		pw.release();
-		publisherLineOut.writeString("sequence " + sequence);
+		publisherLineOut.writeString("pack-number " + sequence);
 	}
 
 	private void executeSubscribe() throws Exception {

@@ -473,7 +473,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String searchForSizes;
 	/***/ public String secondsAgo;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
-	/***/ public String serviceNotEnabled;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
 	/***/ public String serviceNotPermittedNoName;

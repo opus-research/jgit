@@ -71,7 +71,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /** Filter in front of {@link InfoRefsServlet} to catch smart service requests. */
 abstract class SmartServiceInfoRefs implements Filter {
-	protected final String svc;
+	private final String svc;
 
 	private final Filter[] filters;
 
@@ -118,7 +118,7 @@ abstract class SmartServiceInfoRefs implements Filter {
 		}
 	}
 
-	protected void service(ServletRequest request, ServletResponse response)
+	private void service(ServletRequest request, ServletResponse response)
 			throws IOException {
 		final HttpServletRequest req = (HttpServletRequest) request;
 		final HttpServletResponse res = (HttpServletResponse) response;
