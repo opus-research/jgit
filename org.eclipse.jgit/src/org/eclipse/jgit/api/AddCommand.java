@@ -171,7 +171,7 @@ public class AddCommand extends GitCommand<DirCache> {
 							DirCacheEntry entry = new DirCacheEntry(path);
 							if (c == null || c.getDirCacheEntry() == null
 									|| !c.getDirCacheEntry().isAssumeValid()) {
-								FileMode mode = f.getIndexFileMode(c);
+								FileMode mode = f.getEntryFileMode();
 								entry.setFileMode(mode);
 
 								if (FileMode.GITLINK != mode) {
