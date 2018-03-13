@@ -78,8 +78,8 @@ public class SimilarityIndexTest extends TestCase {
 		assertEquals(8, src.common(dst));
 		assertEquals(8, dst.common(src));
 
-		assertEquals(100, src.score(dst, 100));
-		assertEquals(100, dst.score(src, 100));
+		assertEquals(100, src.score(dst));
+		assertEquals(100, dst.score(src));
 	}
 
 	public void testCommonScore_EmptyFiles() {
@@ -102,8 +102,8 @@ public class SimilarityIndexTest extends TestCase {
 		assertEquals(6, src.common(dst));
 		assertEquals(6, dst.common(src));
 
-		assertEquals(75, src.score(dst, 100));
-		assertEquals(75, dst.score(src, 100));
+		assertEquals(75, src.score(dst));
+		assertEquals(75, dst.score(src));
 	}
 
 	private static SimilarityIndex hash(String text) {

@@ -135,7 +135,7 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 		List<DiffEntry> entries = rd.compute();
 		assertEquals(1, entries.size());
-		assertRename(b, a, 66, entries.get(0));
+		assertRename(b, a, 64, entries.get(0));
 	}
 
 	public void testInexactRename_OneRenameTwoUnrelatedFiles() throws Exception {
@@ -158,7 +158,7 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertEquals(3, entries.size());
 		assertSame(c, entries.get(0));
 		assertSame(d, entries.get(1));
-		assertRename(b, a, 66, entries.get(2));
+		assertRename(b, a, 64, entries.get(2));
 	}
 
 	public void testInexactRename_LastByteDifferent() throws Exception {
@@ -173,7 +173,7 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 		List<DiffEntry> entries = rd.compute();
 		assertEquals(1, entries.size());
-		assertRename(b, a, 88, entries.get(0));
+		assertRename(b, a, 84, entries.get(0));
 	}
 
 	public void testInexactRenames_OnePair2() throws Exception {
@@ -189,7 +189,7 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 		List<DiffEntry> entries = rd.compute();
 		assertEquals(1, entries.size());
-		assertRename(b, a, 57, entries.get(0));
+		assertRename(b, a, 56, entries.get(0));
 	}
 
 	public void testNoRenames_SingleByteFiles() throws Exception {
