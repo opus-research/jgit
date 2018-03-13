@@ -157,8 +157,6 @@ public abstract class FS {
 
 	private volatile Holder<File> userHome;
 
-	private volatile Holder<File> gitSystemConfig;
-
 	/**
 	 * Constructs a file system abstraction.
 	 */
@@ -174,7 +172,6 @@ public abstract class FS {
 	 */
 	protected FS(FS src) {
 		userHome = src.userHome;
-		gitSystemConfig = src.gitSystemConfig;
 	}
 
 	/** @return a new instance of the same type of FS. */
@@ -518,15 +515,13 @@ public abstract class FS {
 	}
 
 	/**
-	 * @return the path to the Git executable or {@code null} if it cannot be
-	 *         determined.
+	 * @return the path to the Git executable.
 	 * @since 4.0
 	 */
 	protected abstract File discoverGitExe();
 
 	/**
-	 * @return the path to the system-wide Git configuration file or
-	 *         {@code null} if it cannot be determined.
+	 * @return the path to the system-wide Git configuration file.
 	 * @since 4.0
 	 */
 	protected File discoverGitSystemConfig() {
@@ -548,31 +543,6 @@ public abstract class FS {
 		}
 
 		return new File(w);
-	}
-
-	/**
-	 * @return the currently used path to the system-wide Git configuration
-	 *         file or {@code null} if none has been set.
-	 * @since 4.0
-	 */
-	public File getGitSystemConfig() {
-		if (gitSystemConfig == null) {
-			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
-		}
-		return gitSystemConfig.value;
-	}
-
-	/**
-	 * Set the path to the system-wide Git configuration file to use.
-	 *
-	 * @param configFile
-	 *            the path to the config file.
-	 * @return {@code this}
-	 * @since 4.0
-	 */
-	public FS setGitSystemConfig(File configFile) {
-		gitSystemConfig = new Holder<File>(configFile);
-		return this;
 	}
 
 	/**
@@ -972,7 +942,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Initialize a ProcessBuilder to run a command using the system shell.
+	 * Initialize a ProcesssBuilder to run a command using the system shell.
 	 *
 	 * @param cmd
 	 *            command to execute. This string should originate from the
