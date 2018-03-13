@@ -4,10 +4,9 @@ java_library(
   visibility = ['PUBLIC'],
 )
 
-genrule(
+java_library(
   name = 'jgit_src',
-  cmd = 'ln -s $(location //org.eclipse.jgit:jgit_src) $OUT',
-  out = 'jgit_src.zip',
+  exported_deps = ['//org.eclipse.jgit:jgit_src'],
   visibility = ['PUBLIC'],
 )
 

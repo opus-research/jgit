@@ -45,7 +45,6 @@ package org.eclipse.jgit.pgm;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.dircache.DirCache;
@@ -65,12 +64,8 @@ public class AddTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testAddNothing() throws Exception {
-		try {
-			execute("git add");
-			fail("Must die");
-		} catch (Die e) {
-			// expected, requires argument
-		}
+		assertEquals("fatal: Argument \"filepattern\" is required", //
+				executeUnchecked("git add")[0]);
 	}
 
 	@Test

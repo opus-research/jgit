@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.pgm.opt;
 
-import java.io.IOException;
 import java.io.Writer;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -54,7 +53,6 @@ import java.util.ResourceBundle;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.Die;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -88,7 +86,6 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 		registerHandler(RefSpec.class, RefSpecHandler.class);
 		registerHandler(RevCommit.class, RevCommitHandler.class);
 		registerHandler(RevTree.class, RevTreeHandler.class);
-		registerHandler(List.class, OptionWithValuesListHandler.class);
 	}
 
 	private final Repository db;
@@ -96,8 +93,6 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 	private RevWalk walk;
 
 	private boolean seenHelp;
-
-	private TextBuiltin cmd;
 
 	/**
 	 * Creates a new command line owner that parses arguments/options and set
@@ -130,12 +125,8 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 	 */
 	public CmdLineParser(final Object bean, Repository repo) {
 		super(bean);
-		if (bean instanceof TextBuiltin) {
-			cmd = (TextBuiltin) bean;
-		}
-		if (repo == null && cmd != null) {
-			repo = cmd.getRepository();
-		}
+		if (repo == null && bean instanceof TextBuiltin)
+			repo = ((TextBuiltin) bean).getRepository();
 		this.db = repo;
 	}
 
@@ -175,29 +166,12 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 
 		try {
 			super.parseArgument(tmp.toArray(new String[tmp.size()]));
-		} catch (Die e) {
-			if (!seenHelp) {
-				throw e;
-			}
-			printToErrorWriter(CLIText.fatalError(e.getMessage()));
 		} finally {
 			// reset "required" options to defaults for correct command printout
 			if (backup != null && !backup.isEmpty()) {
 				restoreRequiredOptions(backup);
 			}
 			seenHelp = false;
-		}
-	}
-
-	private void printToErrorWriter(String error) {
-		if (cmd == null) {
-			System.err.println(error);
-		} else {
-			try {
-				cmd.getErrorWriter().println(error);
-			} catch (IOException e1) {
-				System.err.println(error);
-			}
 		}
 	}
 
