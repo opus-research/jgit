@@ -87,7 +87,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 			for (String file : files) {
 				if (paths.isEmpty() || paths.contains(file))
-					FileUtils.delete(new File(file));
+					FileUtils.delete(new File(repo.getWorkTree(), file));
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
@@ -100,9 +100,11 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 *
 	 * @param paths
 	 *            the paths to set
+	 * @return {@code this}
 	 */
-	public void setPaths(Set<String> paths) {
+	public CleanCommand setPaths(Set<String> paths) {
 		this.paths = paths;
+		return this;
 	}
 
 }
