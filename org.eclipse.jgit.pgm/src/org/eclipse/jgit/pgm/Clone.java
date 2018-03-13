@@ -73,7 +73,7 @@ import org.eclipse.jgit.transport.URIish;
 @Command(common = true, usage = "Clone a repository into a new directory")
 class Clone extends AbstractFetchCommand {
 	@Option(name = "--origin", aliases = { "-o" }, metaVar = "name", usage = "use <name> instead of 'origin' to track upstream")
-	private String remoteName = "origin";
+	private String remoteName = Constants.DEFAULT_REMOTE_NAME;
 
 	@Argument(index = 0, required = true, metaVar = "uri-ish")
 	private String sourceUri;
@@ -93,15 +93,11 @@ class Clone extends AbstractFetchCommand {
 
 		final URIish uri = new URIish(sourceUri);
 		if (localName == null) {
-			String p = uri.getPath();
-			while (p.endsWith("/"))
-				p = p.substring(0, p.length() - 1);
-			final int s = p.lastIndexOf('/');
-			if (s < 0)
+			try {
+				localName = uri.getHumanishName();
+			} catch (IllegalArgumentException e) {
 				throw die("cannot guess local name from " + sourceUri);
-			localName = p.substring(s + 1);
-			if (localName.endsWith(".git"))
-				localName = localName.substring(0, localName.length() - 4);
+			}
 		}
 		if (gitdir == null)
 			gitdir = new File(localName, ".git");
