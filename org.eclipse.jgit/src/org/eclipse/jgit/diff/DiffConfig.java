@@ -45,7 +45,6 @@ package org.eclipse.jgit.diff;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.util.StringUtils;
 
 /** Keeps track of diff related configuration options. */
 public class DiffConfig {
@@ -56,37 +55,15 @@ public class DiffConfig {
 		}
 	};
 
-	/** Permissible values for {@code diff.renames}. */
-	public static enum RenameDetectionType {
-		/** Rename detection is disabled. */
-		FALSE,
-
-		/** Rename detection is enabled. */
-		TRUE,
-
-		/** Copies should be detected too. */
-		COPY
-	}
-
 	private final boolean noPrefix;
 
-	private final RenameDetectionType renameDetectionType;
+	private final boolean renames;
 
 	private final int renameLimit;
 
 	private DiffConfig(final Config rc) {
 		noPrefix = rc.getBoolean("diff", "noprefix", false);
-
-		final String renameString = rc.getString("diff", null, "renames");
-		if ("copy".equals(renameString) || "copies".equals(renameString))
-			renameDetectionType = RenameDetectionType.COPY;
-		else {
-			final Boolean renameBoolean = StringUtils
-					.toBooleanOrNull(renameString);
-			renameDetectionType = Boolean.TRUE.equals(renameBoolean) ? RenameDetectionType.TRUE
-					: RenameDetectionType.FALSE;
-		}
-
+		renames = rc.getBoolean("diff", "renames", false);
 		renameLimit = rc.getInt("diff", "renamelimit", 200);
 	}
 
@@ -97,12 +74,7 @@ public class DiffConfig {
 
 	/** @return true if rename detection is enabled by default. */
 	public boolean isRenameDetectionEnabled() {
-		return renameDetectionType != RenameDetectionType.FALSE;
-	}
-
-	/** @return type of rename detection to perform. */
-	public RenameDetectionType getRenameDetectionType() {
-		return renameDetectionType;
+		return renames;
 	}
 
 	/** @return limit on number of paths to perform inexact rename detection. */
