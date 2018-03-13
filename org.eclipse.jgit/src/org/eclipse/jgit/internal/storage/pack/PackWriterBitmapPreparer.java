@@ -78,8 +78,6 @@ import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.SystemReader;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
 /**
  * Helper class for the {@link PackWriter} to select commits for which to build
  * pack index bitmaps.
@@ -314,26 +312,16 @@ class PackWriterBitmapPreparer {
 		return revCommit.getCommitTime() > inactiveBranchTimestamp;
 	}
 
-	/**
-	 * A RevFilter that excludes the commits named in a bitmap from the walk.
-	 * <p>
-	 * If a commit is in {@code bitmap} then that commit is not emitted by the
-	 * walk and its parents are marked as SEEN so the walk can skip them.  The
-	 * bitmaps passed in have the property that the parents of any commit in
-	 * {@code bitmap} are also in {@code bitmap}, so marking the parents as
-	 * SEEN speeds up the RevWalk by saving it from walking down blind alleys
-	 * and does not change the commits emitted.
-	 */
-	private static class NotInBitmapFilter extends RevFilter {
-		private final BitmapBuilder bitmap;
+	private static class ExcludeBitmapRevFilter extends RevFilter {
+		private final BitmapBuilder exclude;
 
-		NotInBitmapFilter(BitmapBuilder bitmap) {
-			this.bitmap = bitmap;
+		ExcludeBitmapRevFilter(BitmapBuilder exclude) {
+			this.exclude = exclude;
 		}
 
 		@Override
 		public final boolean include(RevWalk rw, RevCommit c) {
-			if (!bitmap.contains(c)) {
+			if (!exclude.contains(c)) {
 				return true;
 			}
 			for (RevCommit p : c.getParents()) {
@@ -343,8 +331,8 @@ class PackWriterBitmapPreparer {
 		}
 
 		@Override
-		public final NotInBitmapFilter clone() {
-			throw new UnsupportedOperationException();
+		public final ExcludeBitmapRevFilter clone() {
+			return this;
 		}
 
 		@Override
@@ -375,7 +363,9 @@ class PackWriterBitmapPreparer {
 	private CommitSelectionHelper setupTipCommitBitmaps(RevWalk rw,
 			int expectedCommitCount) throws IncorrectObjectTypeException,
 					IOException, MissingObjectException {
-		BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
+		final BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
+		rw.setRevFilter(new ExcludeBitmapRevFilter(reuse));
+
 		List<BitmapCommit> reuseCommits = new ArrayList<BitmapCommit>();
 		for (PackBitmapIndexRemapper.Entry entry : bitmapRemapper) {
 			// More recent commits did not have the reuse flag set, so skip them
@@ -389,11 +379,11 @@ class PackWriterBitmapPreparer {
 
 			RevCommit rc = (RevCommit) ro;
 			reuseCommits.add(new BitmapCommit(rc, false, entry.getFlags()));
-			if (!reuse.contains(rc)) {
-				EWAHCompressedBitmap bitmap = bitmapRemapper.ofObjectType(
-						bitmapRemapper.getBitmap(rc), Constants.OBJ_COMMIT);
-				reuse.or(commitBitmapIndex.toBitmap(writeBitmaps, bitmap));
-			}
+			// PackBitmapIndexRemapper.ofObjectType() ties the underlying
+			// bitmap in the old pack into the new bitmap builder.
+			bitmapRemapper.ofObjectType(bitmapRemapper.getBitmap(rc),
+					Constants.OBJ_COMMIT).trim();
+			reuse.add(rc, Constants.OBJ_COMMIT);
 		}
 
 		// Add branch tips that are not represented in old bitmap indices. Set
@@ -420,7 +410,6 @@ class PackWriterBitmapPreparer {
 		// Create a list of commits in reverse order (older to newer).
 		// For each branch that contains the commit, mark its parents as being
 		// in the bitmap.
-		rw.setRevFilter(new NotInBitmapFilter(reuse));
 		RevCommit[] commits = new RevCommit[expectedCommitCount];
 		int pos = commits.length;
 		RevCommit rc;
