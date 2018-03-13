@@ -79,7 +79,7 @@ public class InMemoryRepository extends DfsRepository {
 		}
 
 		@Override
-		protected synchronized void commitPackImpl(
+		protected synchronized void commitPack(
 				Collection<DfsPackDescription> desc,
 				Collection<DfsPackDescription> replace) {
 			List<DfsPackDescription> n;

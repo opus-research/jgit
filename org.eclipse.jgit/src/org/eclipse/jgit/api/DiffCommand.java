@@ -44,9 +44,7 @@ package org.eclipse.jgit.api;
 
 import static org.eclipse.jgit.lib.Constants.HEAD;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.List;
 
 import org.eclipse.jgit.JGitText;
@@ -78,9 +76,8 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	private TreeFilter pathFilter = TreeFilter.ALL;
 
-	private boolean showNameAndStatusOnly;
-
-	private OutputStream out;
+	// TODO: fixed to true for now
+	private boolean showNameAndStatusOnly = true;
 
 	/**
 	 * @param repo
@@ -98,8 +95,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return a DiffEntry for each path which is different
 	 */
 	public List<DiffEntry> call() throws GitAPIException, IOException {
-		final DiffFormatter diffFmt = new DiffFormatter(
-				new BufferedOutputStream(out));
+		final DiffFormatter diffFmt = new DiffFormatter(null);
 		diffFmt.setRepository(repo);
 		try {
 			if (cached) {
@@ -126,13 +122,11 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 			diffFmt.setPathFilter(pathFilter);
 
-			List<DiffEntry> result = diffFmt.scan(oldTree, newTree);
 			if (showNameAndStatusOnly) {
-				return result;
+				return diffFmt.scan(oldTree, newTree);
 			} else {
-				diffFmt.format(result);
-				diffFmt.flush();
-				return result;
+				// TODO: not implemented yet
+				throw new UnsupportedOperationException();
 			}
 		} finally {
 			diffFmt.release();
@@ -186,17 +180,10 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return this instance
 	 */
 	public DiffCommand setShowNameAndStatusOnly(boolean showNameAndStatusOnly) {
+		// TODO: not implemented yet
+		if (!showNameAndStatusOnly)
+			throw new UnsupportedOperationException();
 		this.showNameAndStatusOnly = showNameAndStatusOnly;
-		return this;
-	}
-
-	/**
-	 * @param out
-	 *            the stream to write line data
-	 * @return this instance
-	 */
-	public DiffCommand setOutputStream(OutputStream out) {
-		this.out = out;
 		return this;
 	}
 }
