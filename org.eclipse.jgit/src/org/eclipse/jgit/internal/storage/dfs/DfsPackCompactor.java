@@ -72,6 +72,7 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -247,10 +248,22 @@ public class DfsPackCompactor {
 			}
 			compactPacks(ctx, pm);
 
-			List<DfsPackDescription> commit = getNewPacks();
+			List<DfsPackDescription> commit;
+			if (outDesc != null) {
+				commit = Collections.singletonList(outDesc);
+			} else {
+				commit = Collections.emptyList();
+			}
+
 			Collection<DfsPackDescription> remove = toPrune();
 			if (!commit.isEmpty() || !remove.isEmpty()) {
 				objdb.commitPack(commit, remove);
+			}
+
+			RefDatabase refdb = repo.getRefDatabase();
+			if (refdb instanceof DfsReftableDatabase) {
+				objdb.clearCache();
+				((DfsReftableDatabase) refdb).clearCache();
 			}
 		} finally {
 			rw = null;
@@ -505,11 +518,14 @@ public class DfsPackCompactor {
 
 	static ReftableConfig configureReftable(ReftableConfig cfg,
 			DfsOutputStream out) {
-		int bs = out.blockSize();
-		if (bs > 0) {
-			cfg = new ReftableConfig(cfg);
-			cfg.setRefBlockSize(bs);
-			cfg.setAlignBlocks(true);
+		cfg = new ReftableConfig(cfg);
+		if (out.blockSize() >= 256) {
+			cfg.setRefBlockSize(out.blockSize());
+		} else {
+			int sz = DfsBlockCache.getInstance().getBlockSize();
+			if (cfg.getRefBlockSize() < sz) {
+				cfg.setRefBlockSize(sz);
+			}
 		}
 		return cfg;
 	}

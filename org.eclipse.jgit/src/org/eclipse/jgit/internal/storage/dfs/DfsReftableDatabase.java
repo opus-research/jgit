@@ -74,11 +74,8 @@ import org.eclipse.jgit.util.RefMap;
  */
 public class DfsReftableDatabase extends DfsRefDatabase {
 	private final ReentrantLock lock = new ReentrantLock(true);
-
 	private DfsReader ctx;
-
 	private ReftableStack tableStack;
-
 	private MergedReftable mergedTables;
 
 	/**
@@ -123,7 +120,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	 * @throws IOException
 	 *             if tables cannot be opened.
 	 */
-	protected Reftable reader() throws IOException {
+	protected Reftable read() throws IOException {
 		lock.lock();
 		try {
 			if (mergedTables == null) {
@@ -150,8 +147,10 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 				if (ctx == null) {
 					ctx = odb.newReader();
 				}
-				tableStack = ReftableStack.open(ctx,
-						Arrays.asList(odb.getReftables()));
+				if (tableStack == null) {
+					tableStack = ReftableStack.open(ctx,
+							Arrays.asList(odb.getReftables()));
+				}
 			}
 			return tableStack;
 		} finally {
@@ -163,7 +162,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	public boolean isNameConflicting(String refName) throws IOException {
 		lock.lock();
 		try {
-			Reftable table = reader();
+			Reftable table = read();
 
 			// Cannot be nested within an existing reference.
 			int lastSlash = refName.lastIndexOf('/');
@@ -185,7 +184,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	public Ref exactRef(String name) throws IOException {
 		lock.lock();
 		try {
-			Reftable table = reader();
+			Reftable table = read();
 			Ref ref = table.exactRef(name);
 			if (ref != null && ref.isSymbolic()) {
 				return table.resolve(ref);
@@ -212,8 +211,9 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		RefList.Builder<Ref> all = new RefList.Builder<>();
 		lock.lock();
 		try {
-			Reftable table = reader();
-			try (RefCursor rc = ALL.equals(prefix) ? table.allRefs()
+			Reftable table = read();
+			try (RefCursor rc = ALL.equals(prefix)
+					? table.allRefs()
 					: table.seekRef(prefix)) {
 				while (rc.next()) {
 					Ref ref = table.resolve(rc.getRef());
@@ -264,12 +264,19 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	}
 
 	@Override
+	protected RefCache scanAllRefs() throws IOException {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
 	protected boolean compareAndPut(Ref oldRef, @Nullable Ref newRef)
 			throws IOException {
 		ReceiveCommand cmd = toCommand(oldRef, newRef);
 		try (RevWalk rw = new RevWalk(getRepository())) {
-			newBatchUpdate().setAllowNonFastForwards(true).addCommand(cmd)
-					.execute(rw, NullProgressMonitor.INSTANCE);
+			newBatchUpdate()
+				.setAllowNonFastForwards(true)
+				.addCommand(cmd)
+				.execute(rw, NullProgressMonitor.INSTANCE);
 		}
 		switch (cmd.getResult()) {
 		case OK:
@@ -290,14 +297,17 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		if (oldRef != null && oldRef.isSymbolic()) {
 			if (newRef != null) {
 				if (newRef.isSymbolic()) {
-					return ReceiveCommand.link(oldRef.getTarget().getName(),
+					return ReceiveCommand.link(
+							oldRef.getTarget().getName(),
 							newRef.getTarget().getName(), name);
 				} else {
-					return ReceiveCommand.unlink(oldRef.getTarget().getName(),
+					return ReceiveCommand.unlink(
+							oldRef.getTarget().getName(),
 							newId, name);
 				}
 			} else {
-				return ReceiveCommand.unlink(oldRef.getTarget().getName(),
+				return ReceiveCommand.unlink(
+						oldRef.getTarget().getName(),
 						ObjectId.zeroId(), name);
 			}
 		}
@@ -305,14 +315,17 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		if (newRef != null && newRef.isSymbolic()) {
 			if (oldRef != null) {
 				if (oldRef.isSymbolic()) {
-					return ReceiveCommand.link(oldRef.getTarget().getName(),
+					return ReceiveCommand.link(
+							oldRef.getTarget().getName(),
 							newRef.getTarget().getName(), name);
 				} else {
-					return ReceiveCommand.link(oldId,
+					return ReceiveCommand.link(
+							oldId,
 							newRef.getTarget().getName(), name);
 				}
 			} else {
-				return ReceiveCommand.link(ObjectId.zeroId(),
+				return ReceiveCommand.link(
+						ObjectId.zeroId(),
 						newRef.getTarget().getName(), name);
 			}
 		}
@@ -331,17 +344,17 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	}
 
 	private static String toName(Ref oldRef, Ref newRef) {
-		return oldRef != null ? oldRef.getName() : newRef.getName();
+		if (oldRef != null) {
+			return oldRef.getName();
+		} else if (newRef != null) {
+			return newRef.getName();
+		}
+		return null;
 	}
 
 	@Override
 	protected boolean compareAndRemove(Ref oldRef) throws IOException {
 		return compareAndPut(oldRef, null);
-	}
-
-	@Override
-	protected RefCache scanAllRefs() throws IOException {
-		throw new UnsupportedOperationException();
 	}
 
 	@Override

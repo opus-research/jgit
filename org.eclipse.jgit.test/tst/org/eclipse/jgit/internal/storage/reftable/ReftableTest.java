@@ -52,7 +52,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -126,7 +125,7 @@ public class ReftableTest {
 	@Test
 	public void estimateCurrentBytesOneRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
-		int expBytes = 24 + 4 + 5 + 4 + MASTER.length() + 20 + 68;
+		int expBytes = 24 + 4 + 5 + 3 + MASTER.length() + 20 + 68;
 
 		byte[] table;
 		ReftableConfig cfg = new ReftableConfig();
@@ -155,7 +154,7 @@ public class ReftableTest {
 		cfg.setIndexObjects(false);
 		cfg.setMaxIndexLevels(1);
 
-		int expBytes = 147860;
+		int expBytes = 139654;
 		byte[] table;
 		ReftableWriter writer = new ReftableWriter().setConfig(cfg);
 		try (ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
@@ -174,7 +173,7 @@ public class ReftableTest {
 	public void oneIdRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 5 + 4 + MASTER.length() + 20 + 68, table.length);
+		assertEquals(24 + 4 + 5 + 3 + MASTER.length() + 20 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -203,7 +202,7 @@ public class ReftableTest {
 	public void oneTagRef() throws IOException {
 		Ref exp = tag(V1_0, 1, 2);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 5 + 3 + V1_0.length() + 40 + 68, table.length);
+		assertEquals(24 + 4 + 5 + 2 + V1_0.length() + 40 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -224,7 +223,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				24 + 4 + 5 + 2 + HEAD.length() + 2 + MASTER.length() + 68,
+				24 + 4 + 5 + 2 + HEAD.length() + 1 + MASTER.length() + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -254,14 +253,10 @@ public class ReftableTest {
 		head = t.resolve(head);
 		assertNotNull(head);
 		assertEquals(id(1), head.getObjectId());
-
-		Ref master = t.exactRef(MASTER);
-		assertNotNull(master);
-		assertSame(master, t.resolve(master));
 	}
 
 	@Test
-	public void failDeepChainOfSymbolicRef() throws IOException {
+	public void failChainOfSymbolicRef() throws IOException {
 		Reftable t = read(write(
 				sym(HEAD, "refs/heads/1"),
 				sym("refs/heads/1", "refs/heads/2"),
@@ -281,7 +276,7 @@ public class ReftableTest {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 5 + 3 + name.length() + 68, table.length);
+		assertEquals(24 + 4 + 5 + 2 + name.length() + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -425,14 +420,13 @@ public class ReftableTest {
 
 		writer.finish();
 		byte[] table = buffer.toByteArray();
-		assertEquals(247, table.length);
+		assertEquals(245, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
 			assertTrue(rc.next());
 			assertEquals(MASTER, rc.getRef().getName());
 			assertEquals(id(1), rc.getRef().getObjectId());
-			assertEquals(1, rc.getUpdateIndex());
 
 			assertTrue(rc.next());
 			assertEquals(NEXT, rc.getRef().getName());
@@ -637,7 +631,7 @@ public class ReftableTest {
 			writer.finish();
 			fail("expected BlockSizeTooSmallException");
 		} catch (BlockSizeTooSmallException e) {
-			assertEquals(85, e.getMinimumBlockSize());
+			assertEquals(84, e.getMinimumBlockSize());
 		}
 	}
 

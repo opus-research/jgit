@@ -214,7 +214,7 @@ public class ReftableWriter {
 	public ReftableWriter sortAndWriteRefs(Collection<Ref> refsToPack)
 			throws IOException {
 		Iterator<RefEntry> itr = refsToPack.stream()
-				.map(r -> new RefEntry(r, maxUpdateIndex - minUpdateIndex))
+				.map(RefEntry::new)
 				.sorted(Entry::compare)
 				.iterator();
 		while (itr.hasNext()) {
@@ -236,28 +236,7 @@ public class ReftableWriter {
 	 *             if reftable cannot be written.
 	 */
 	public void writeRef(Ref ref) throws IOException {
-		writeRef(ref, maxUpdateIndex);
-	}
-
-	/**
-	 * Write one reference to the reftable.
-	 * <p>
-	 * References must be passed in sorted order.
-	 *
-	 * @param ref
-	 *            the reference to store.
-	 * @param updateIndex
-	 *            the updateIndex that modified this reference. Must be
-	 *            {@code >= minUpdateIndex} for this file.
-	 * @throws IOException
-	 *             if reftable cannot be written.
-	 */
-	public void writeRef(Ref ref, long updateIndex) throws IOException {
-		if (updateIndex < minUpdateIndex) {
-			throw new IllegalArgumentException();
-		}
-		long d = updateIndex - minUpdateIndex;
-		long blockPos = refs.write(new RefEntry(ref, d));
+		long blockPos = refs.write(new RefEntry(ref));
 		indexRef(ref, blockPos);
 	}
 

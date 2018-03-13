@@ -570,26 +570,24 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			DfsPackDescription a = fa.getPackDescription();
 			DfsPackDescription b = fb.getPackDescription();
 
-			// GC, COMPACT reftables first by higher category.
-			int c = category(b) - category(a);
+			// Prefer sorting by maxUpdateIndex, lower table first.
+			int c = Long.signum(a.getMaxUpdateIndex() - b.getMaxUpdateIndex());
 			if (c != 0) {
 				return c;
 			}
 
-			// Lower maxUpdateIndex first.
-			c = Long.signum(a.getMaxUpdateIndex() - b.getMaxUpdateIndex());
-			if (c != 0) {
-				return c;
+			// GC reftable first.
+			if (a.getPackSource() == PackSource.GC
+					&& b.getPackSource() != PackSource.GC) {
+				return -1;
+			} else if (b.getPackSource() == PackSource.GC
+					&& a.getPackSource() != PackSource.GC) {
+				return 1;
 			}
 
 			// Older reftable first.
 			return Long.signum(a.getLastModified() - b.getLastModified());
 		};
-	}
-
-	static int category(DfsPackDescription d) {
-		PackSource s = d.getPackSource();
-		return s != null ? s.category : 0;
 	}
 
 	/** Clears the cached list of packs, forcing them to be scanned again. */

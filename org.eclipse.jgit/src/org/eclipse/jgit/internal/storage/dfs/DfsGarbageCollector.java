@@ -107,7 +107,6 @@ public class DfsGarbageCollector {
 
 	private PackConfig packConfig;
 	private ReftableConfig reftableConfig;
-	private boolean convertToReftable = true;
 	private long reftableInitialMinUpdateIndex = 1;
 	private long reftableInitialMaxUpdateIndex = 1;
 
@@ -173,20 +172,12 @@ public class DfsGarbageCollector {
 	}
 
 	/**
-	 * @param convert
-	 *            if true, {@link #setReftableConfig(ReftableConfig)} has been
-	 *            set non-null, and a GC reftable doesn't yet exist, the garbage
-	 *            collector will make one by scanning the existing references,
-	 *            and writing a new reftable. Default is {@code true}.
-	 * @return {@code this}
-	 */
-	public DfsGarbageCollector setConvertToReftable(boolean convert) {
-		convertToReftable = convert;
-		return this;
-	}
-
-	/**
 	 * Set minUpdateIndex for the initial reftable created during conversion.
+	 * <p>
+	 * <b>Warning:</b> A setting {@code != 1} <b>disables cache refreshes</b>
+	 * normally performed at the start of {@link #pack(ProgressMonitor)}.
+	 * Callers must ensure the reference cache is current and will have been
+	 * read before the pack list.
 	 *
 	 * @param u
 	 *            minUpdateIndex for the initial reftable created by scanning
@@ -202,6 +193,11 @@ public class DfsGarbageCollector {
 
 	/**
 	 * Set maxUpdateIndex for the initial reftable created during conversion.
+	 * <p>
+	 * <b>Warning:</b> A setting {@code != 1} <b>disables cache refreshes</b>
+	 * normally performed at the start of {@link #pack(ProgressMonitor)}.
+	 * Callers must ensure the reference cache is current and will have been
+	 * read before the pack list.
 	 *
 	 * @param u
 	 *            maxUpdateIndex for the initial reftable created by scanning
@@ -210,7 +206,7 @@ public class DfsGarbageCollector {
 	 *            Defaults to {@code 1}. Must be {@code u >= 0}.
 	 * @return {@code this}
 	 */
-	public DfsGarbageCollector setReftableInitialMaxUpdateIndex(long u) {
+	public DfsGarbageCollector setReftableBootstrapMaxUpdateIndex(long u) {
 		reftableInitialMaxUpdateIndex = Math.max(0, u);
 		return this;
 	}
@@ -301,8 +297,11 @@ public class DfsGarbageCollector {
 		startTimeMillis = SystemReader.getInstance().getCurrentTime();
 		ctx = objdb.newReader();
 		try {
-			refdb.refresh();
-			objdb.clearCache();
+			if (reftableConfig != null && (reftableInitialMinUpdateIndex != 1
+					|| reftableInitialMaxUpdateIndex != 1)) {
+				refdb.refresh();
+				objdb.clearCache();
+			}
 
 			refsBefore = getAllRefs();
 			readPacksBefore();
@@ -353,6 +352,11 @@ public class DfsGarbageCollector {
 				packGarbage(pm);
 				objdb.commitPack(newPackDesc, toPrune());
 				rollback = false;
+
+				if (refdb instanceof DfsReftableDatabase) {
+					objdb.clearCache();
+					((DfsReftableDatabase) refdb).clearCache();
+				}
 				return true;
 			} finally {
 				if (rollback)
@@ -685,7 +689,7 @@ public class DfsGarbageCollector {
 	}
 
 	private void writeReftable(DfsPackDescription pack) throws IOException {
-		if (convertToReftable && !hasGcReftable()) {
+		if (!hasGcReftable()) {
 			writeReftable(pack, refsBefore);
 			return;
 		}

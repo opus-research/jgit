@@ -758,7 +758,6 @@ public class DfsGarbageCollectorTest {
 			t1.addFileExt(REFTABLE);
 		}
 		odb.commitPack(Collections.singleton(t1), null);
-		odb.clearCache();
 
 		DfsGarbageCollector gc = new DfsGarbageCollector(repo);
 		gc.setReftableConfig(new ReftableConfig());

@@ -78,6 +78,7 @@ import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
 import org.eclipse.jgit.internal.storage.reftable.ReftableWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -95,11 +96,8 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 	private static final int AVG_BYTES = 36;
 
 	private final DfsReftableDatabase refdb;
-
 	private final DfsObjDatabase odb;
-
 	private final ReentrantLock lock;
-
 	private final ReftableConfig reftableConfig;
 
 	/**
@@ -116,7 +114,10 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 		this.refdb = refdb;
 		this.odb = odb;
 		lock = refdb.getLock();
-		reftableConfig = new ReftableConfig(refdb.getRepository().getConfig());
+
+		Config cfg = refdb.getRepository().getConfig();
+		reftableConfig = new ReftableConfig();
+		reftableConfig.fromConfig(cfg);
 	}
 
 	@Override
@@ -138,7 +139,7 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 
 			lock.lock();
 			try {
-				Reftable table = refdb.reader();
+				Reftable table = refdb.read();
 				if (!checkExpected(table, pending)) {
 					return;
 				}
@@ -297,10 +298,12 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 
 	private ReftableWriter.Stats write(OutputStream os, ReftableConfig cfg,
 			long updateIndex, List<Ref> newRefs, List<ReceiveCommand> pending)
-			throws IOException {
+					throws IOException {
 		ReftableWriter writer = new ReftableWriter(cfg)
-				.setMinUpdateIndex(updateIndex).setMaxUpdateIndex(updateIndex)
-				.begin(os).sortAndWriteRefs(newRefs);
+				.setMinUpdateIndex(updateIndex)
+				.setMaxUpdateIndex(updateIndex)
+				.begin(os)
+				.sortAndWriteRefs(newRefs);
 		if (!isRefLogDisabled()) {
 			writeLog(writer, updateIndex, pending);
 		}
@@ -334,8 +337,13 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 					msg = msg.isEmpty() ? strResult : msg + ": " + strResult; //$NON-NLS-1$
 				}
 			}
-			writer.writeLog(name, updateIndex, ident, cmd.getOldId(),
-					cmd.getNewId(), msg);
+			writer.writeLog(
+					name,
+					updateIndex,
+					ident,
+					cmd.getOldId(),
+					cmd.getNewId(),
+					msg);
 		}
 	}
 
@@ -353,7 +361,8 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 			// force bit is set, meaning we can't actually distinguish between
 			// UPDATE and UPDATE_NONFASTFORWARD when isAllowNonFastForwards()
 			// returns true.
-			return isAllowNonFastForwards() ? ReflogEntry.PREFIX_FORCED_UPDATE
+			return isAllowNonFastForwards()
+					? ReflogEntry.PREFIX_FORCED_UPDATE
 					: ReflogEntry.PREFIX_FAST_FORWARD;
 		case UPDATE_NONFASTFORWARD:
 			return ReflogEntry.PREFIX_FORCED_UPDATE;
@@ -398,7 +407,8 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 		long updateIndex = 0;
 		for (Reftable r : refdb.stack().readers()) {
 			if (r instanceof ReftableReader) {
-				updateIndex = Math.max(updateIndex,
+				updateIndex = Math.max(
+						updateIndex,
 						((ReftableReader) r).maxUpdateIndex());
 			}
 		}
@@ -416,9 +426,13 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 		int lastIdx = readers.size() - 1;
 		DfsReftable last = stack.files().get(lastIdx);
 		DfsPackDescription desc = last.getPackDescription();
-		if (desc.getPackSource() != PackSource.INSERT
-				|| !packOnlyContainsReftable(desc)) {
+		if (desc.getPackSource() != PackSource.INSERT) {
 			return false;
+		}
+		for (PackExt ext : PackExt.values()) {
+			if (ext != REFTABLE && desc.hasFileExt(ext)) {
+				return false;
+			}
 		}
 
 		Reftable table = readers.get(lastIdx);
@@ -447,14 +461,5 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 		List<DfsReftable> stack = refdb.stack().files();
 		DfsReftable last = stack.get(stack.size() - 1);
 		return Collections.singleton(last.getPackDescription());
-	}
-
-	private boolean packOnlyContainsReftable(DfsPackDescription desc) {
-		for (PackExt ext : PackExt.values()) {
-			if (ext != REFTABLE && desc.hasFileExt(ext)) {
-				return false;
-			}
-		}
-		return true;
 	}
 }

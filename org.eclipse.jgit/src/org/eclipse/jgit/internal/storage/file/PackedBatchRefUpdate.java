@@ -146,7 +146,8 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		if (containsSymrefs(pending)) {
 			// packed-refs file cannot store symrefs
 			reject(pending.get(0), REJECTED_OTHER_REASON,
-					JGitText.get().atomicSymRefNotSupported, pending);
+					"atomic symref unsupported", //$NON-NLS-1$
+					pending);
 			return;
 		}
 
@@ -201,8 +202,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				return;
 			}
 			// commitPackedRefs removes lock file (by renaming over real file).
-			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList,
-					true);
+			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList);
 		} finally {
 			try {
 				unlockAll(locks);
@@ -422,6 +422,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		if (ident == null) {
 			ident = new PersonIdent(refdb.getRepository());
 		}
+		ReflogWriter w = refdb.getLogWriter();
 		for (ReceiveCommand cmd : commands) {
 			// Assume any pending commands have already been executed atomically.
 			if (cmd.getResult() != ReceiveCommand.Result.OK) {
@@ -431,7 +432,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 
 			if (cmd.getType() == ReceiveCommand.Type.DELETE) {
 				try {
-					RefDirectory.delete(refdb.logFor(name), RefDirectory.levelsIn(name));
+					RefDirectory.delete(w.logFor(name), RefDirectory.levelsIn(name));
 				} catch (IOException e) {
 					// Ignore failures, see below.
 				}
@@ -451,8 +452,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				}
 			}
 			try {
-				new ReflogWriter(refdb, isForceRefLog(cmd))
-						.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
+				w.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
 			} catch (IOException e) {
 				// Ignore failures, but continue attempting to write more reflogs.
 				//

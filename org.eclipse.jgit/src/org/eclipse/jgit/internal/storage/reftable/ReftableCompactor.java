@@ -49,8 +49,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ReflogEntry;
 
 /**
@@ -185,7 +185,7 @@ public class ReftableCompactor {
 	 * @return {@code true} if the compactor accepted this table; {@code false}
 	 *         if the compactor has reached its limit.
 	 * @throws IOException
-	 *             if size of {@code reader}, or its update indexes cannot be read.
+	 *             size of {@code reader}, or its update indexes cannot be read.
 	 */
 	public boolean tryAddFirst(ReftableReader reader) throws IOException {
 		long sz = reader.size();
@@ -214,7 +214,7 @@ public class ReftableCompactor {
 	 *            stream to write the compacted tables to. Caller is responsible
 	 *            for closing {@code out}.
 	 * @throws IOException
-	 *             if tables cannot be read, or cannot be written.
+	 *             tables cannot be read, or cannot be written.
 	 */
 	public void compact(OutputStream out) throws IOException {
 		MergedReftable mr = new MergedReftable(new ArrayList<>(tables));
@@ -237,7 +237,7 @@ public class ReftableCompactor {
 	private void mergeRefs(MergedReftable mr) throws IOException {
 		try (RefCursor rc = mr.allRefs()) {
 			while (rc.next()) {
-				writer.writeRef(rc.getRef(), rc.getUpdateIndex());
+				writer.writeRef(rc.getRef());
 			}
 		}
 	}
