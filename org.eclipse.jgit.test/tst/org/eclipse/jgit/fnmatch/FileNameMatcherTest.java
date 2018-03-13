@@ -44,8 +44,7 @@
 
 package org.eclipse.jgit.fnmatch;
 
-import static org.eclipse.jgit.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -54,7 +53,7 @@ import org.junit.Test;
 
 public class FileNameMatcherTest {
 
-	private static void assertMatch(final String pattern, final String input,
+	private void assertMatch(final String pattern, final String input,
 			final boolean matchExpected, final boolean appendCanMatchExpected)
 			throws InvalidPatternException {
 		final FileNameMatcher matcher = new FileNameMatcher(pattern, null);
@@ -63,8 +62,7 @@ public class FileNameMatcherTest {
 		assertEquals(appendCanMatchExpected, matcher.canAppendMatch());
 	}
 
-	private static void assertFileNameMatch(final String pattern,
-			final String input,
+	private void assertFileNameMatch(final String pattern, final String input,
 			final char excludedCharacter, final boolean matchExpected,
 			final boolean appendCanMatchExpected)
 			throws InvalidPatternException {
@@ -827,166 +825,26 @@ public class FileNameMatcherTest {
 	}
 
 	@Test
-	public void testUselessEscaping0() throws Exception {
-		assertFileNameMatch("a\\a", "aa", '/', true, false);
-	}
-
-	@Test
-	public void testUselessEscaping1() throws Exception {
-		assertFileNameMatch("a\\a", "a\\a", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping0() throws Exception {
-		assertFileNameMatch("\\\\", "\\", '/', true, false);
-	}
-
-	@Test
-	public void testEscaping1() throws Exception {
-		assertFileNameMatch("\\[", "[", '/', true, false);
-	}
-
-	@Test
-	public void testEscaping2() throws Exception {
-		assertFileNameMatch("\\[", "\\[", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping3() throws Exception {
-		assertFileNameMatch("\\]", "]", '/', true, false);
-	}
-
-	@Test
-	public void testEscaping4() throws Exception {
-		assertFileNameMatch("\\]", "\\]", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping5() throws Exception {
-		assertFileNameMatch("\\*", "*", '/', true, false);
-	}
-
-	@Test
-	public void testEscaping6() throws Exception {
-		assertFileNameMatch("\\*", "\\*", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping7() throws Exception {
-		assertFileNameMatch("\\?", "?", '/', true, false);
-	}
-
-	@Test
-	public void testEscaping8() throws Exception {
-		assertFileNameMatch("\\?", "\\?", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping9() throws Exception {
-		assertFileNameMatch("\\!", "!", '/', true, false);
-	}
-
-	@Test
-	public void testEscaping10() throws Exception {
-		assertFileNameMatch("\\!", "\\!", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping11() throws Exception {
-		assertFileNameMatch("\\[ab\\]", "a", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping12() throws Exception {
-		assertFileNameMatch("\\[ab\\]", "b", '/', false, false);
-	}
-
-	@Test
-	public void testEscaping13() throws Exception {
-		assertFileNameMatch("\\[ab\\]", "[ab]", '/', true, false);
-	}
-
-	@Test
-	public void testBracketsClosingAndEscaping0() throws Exception {
-		assertFileNameMatch("[\\!\\]]", "!", '/', true, false);
-	}
-
-	@Test
-	public void testBracketsClosingAndEscaping1() throws Exception {
-		assertFileNameMatch("[\\!\\]]", "]", '/', true, false);
-	}
-
-	@Test
-	public void testBracketsClosingAndEscaping2() throws Exception {
-		assertFileNameMatch("[\\!\\]]", "a", '/', false, false);
-	}
-
-	@Test
-	public void testBracketsClosingAndEscaping3() throws Exception {
-		assertFileNameMatch("[!\\!\\]]", "!", '/', false, false);
-	}
-
-	@Test
-	public void testBracketsClosingAndEscaping4() throws Exception {
-		assertFileNameMatch("[!\\!\\]]", "]", '/', false, false);
-	}
-
-	@Test
-	public void testBracketsClosingAndEscaping5() throws Exception {
-		assertFileNameMatch("[!\\!\\]]", "a", '/', true, false);
-	}
-
-	@Test
-	public void testBackSlashIsSeparatorAndEscaping0() throws Exception {
-		assertFileNameMatch("a\\b", "a\\b", '\\', true, false);
-	}
-
-	@Test
-	public void testBackSlashIsSeparatorAndEscaping1() throws Exception {
-		assertFileNameMatch("a\\b", "ab", '\\', false, false);
-	}
-
-	@Test
-	public void testPatternEndsWithBackslash0() throws Exception {
-		try {
-			assertMatch("\\", "no matter", true, true);
-			fail("InvalidPatternException expected");
-		} catch (InvalidPatternException e) {
-			// expected
-		}
-	}
-
-	@Test
-	public void testPatternEndsWithBackslash1() throws Exception {
-		try {
-			assertMatch("\\\\\\", "no matter", true, true);
-			fail("InvalidPatternException expected");
-		} catch (InvalidPatternException e) {
-			// expected
-		}
-	}
-
-	@Test
 	public void testReset() throws Exception {
 		final String pattern = "helloworld";
 		final FileNameMatcher matcher = new FileNameMatcher(pattern, null);
 		matcher.append("helloworld");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
 		matcher.reset();
 		matcher.append("hello");
-		assertFalse(matcher.isMatch());
-		assertTrue(matcher.canAppendMatch());
+		assertEquals(false, matcher.isMatch());
+		assertEquals(true, matcher.canAppendMatch());
 		matcher.append("world");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
 		matcher.append("to much");
-		assertFalse(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
+		assertEquals(false, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
 		matcher.reset();
 		matcher.append("helloworld");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
 	}
 
 	@Test
@@ -995,30 +853,30 @@ public class FileNameMatcherTest {
 		final FileNameMatcher matcher = new FileNameMatcher(pattern, null);
 		matcher.append("hello");
 		final FileNameMatcher childMatcher = matcher.createMatcherForSuffix();
-		assertFalse(matcher.isMatch());
-		assertTrue(matcher.canAppendMatch());
-		assertFalse(childMatcher.isMatch());
-		assertTrue(childMatcher.canAppendMatch());
+		assertEquals(false, matcher.isMatch());
+		assertEquals(true, matcher.canAppendMatch());
+		assertEquals(false, childMatcher.isMatch());
+		assertEquals(true, childMatcher.canAppendMatch());
 		matcher.append("world");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertFalse(childMatcher.isMatch());
-		assertTrue(childMatcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(false, childMatcher.isMatch());
+		assertEquals(true, childMatcher.canAppendMatch());
 		childMatcher.append("world");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertTrue(childMatcher.isMatch());
-		assertFalse(childMatcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(true, childMatcher.isMatch());
+		assertEquals(false, childMatcher.canAppendMatch());
 		childMatcher.reset();
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertFalse(childMatcher.isMatch());
-		assertTrue(childMatcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(false, childMatcher.isMatch());
+		assertEquals(true, childMatcher.canAppendMatch());
 		childMatcher.append("world");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertTrue(childMatcher.isMatch());
-		assertFalse(childMatcher.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(true, childMatcher.isMatch());
+		assertEquals(false, childMatcher.canAppendMatch());
 	}
 
 	@Test
@@ -1027,29 +885,29 @@ public class FileNameMatcherTest {
 		final FileNameMatcher matcher = new FileNameMatcher(pattern, null);
 		matcher.append("hello");
 		final FileNameMatcher copy = new FileNameMatcher(matcher);
-		assertFalse(matcher.isMatch());
-		assertTrue(matcher.canAppendMatch());
-		assertFalse(copy.isMatch());
-		assertTrue(copy.canAppendMatch());
+		assertEquals(false, matcher.isMatch());
+		assertEquals(true, matcher.canAppendMatch());
+		assertEquals(false, copy.isMatch());
+		assertEquals(true, copy.canAppendMatch());
 		matcher.append("world");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertFalse(copy.isMatch());
-		assertTrue(copy.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(false, copy.isMatch());
+		assertEquals(true, copy.canAppendMatch());
 		copy.append("world");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertTrue(copy.isMatch());
-		assertFalse(copy.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(true, copy.isMatch());
+		assertEquals(false, copy.canAppendMatch());
 		copy.reset();
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertFalse(copy.isMatch());
-		assertTrue(copy.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(false, copy.isMatch());
+		assertEquals(true, copy.canAppendMatch());
 		copy.append("helloworld");
-		assertTrue(matcher.isMatch());
-		assertFalse(matcher.canAppendMatch());
-		assertTrue(copy.isMatch());
-		assertFalse(copy.canAppendMatch());
+		assertEquals(true, matcher.isMatch());
+		assertEquals(false, matcher.canAppendMatch());
+		assertEquals(true, copy.isMatch());
+		assertEquals(false, copy.canAppendMatch());
 	}
 }

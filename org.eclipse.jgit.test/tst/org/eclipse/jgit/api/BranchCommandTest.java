@@ -59,14 +59,15 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NotMergedException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -263,10 +264,10 @@ public class BranchCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testCreateFromAnnotatetdTag() throws Exception {
-		Ref tagRef = git.tag().setName("V10").setObjectId(secondCommit).call();
+		RevTag tag = git.tag().setName("V10").setObjectId(secondCommit).call();
 		Ref branch = git.branchCreate().setName("FromAnnotatedTag")
 				.setStartPoint("refs/tags/V10").call();
-		assertFalse(tagRef.getObjectId().equals(branch.getObjectId()));
+		assertFalse(tag.getId().equals(branch.getObjectId()));
 		assertEquals(secondCommit.getId(), branch.getObjectId());
 	}
 
@@ -466,7 +467,9 @@ public class BranchCommandTest extends RepositoryTestCase {
 
 	public Ref createBranch(Git actGit, String name, boolean force,
 			String startPoint, SetupUpstreamMode mode)
-			throws JGitInternalException, GitAPIException {
+			throws JGitInternalException, RefAlreadyExistsException,
+			RefNotFoundException,
+			InvalidRefNameException {
 		CreateBranchCommand cmd = actGit.branchCreate();
 		cmd.setName(name);
 		cmd.setForce(force);

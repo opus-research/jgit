@@ -55,9 +55,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.SimilarityIndex.TableFullException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -111,7 +111,7 @@ public class RenameDetector {
 
 	private boolean done;
 
-	private final ObjectReader objectReader;
+	private final Repository repo;
 
 	/** Similarity score required to pair an add/delete as a rename. */
 	private int renameScore = 60;
@@ -136,21 +136,11 @@ public class RenameDetector {
 	 *            the repository to use for rename detection
 	 */
 	public RenameDetector(Repository repo) {
-		this(repo.newObjectReader(), repo.getConfig().get(DiffConfig.KEY));
-	}
+		this.repo = repo;
 
-	/**
-	 * Create a new rename detector with a specified reader and diff config.
-	 *
-	 * @param reader
-	 *            reader to obtain objects from the repository with.
-	 * @param cfg
-	 *            diff config specifying rename detection options.
-	 * @since 3.0
-	 */
-	public RenameDetector(ObjectReader reader, DiffConfig cfg) {
-		objectReader = reader.newReader();
+		DiffConfig cfg = repo.getConfig().get(DiffConfig.KEY);
 		renameLimit = cfg.getRenameLimit();
+
 		reset();
 	}
 
@@ -277,7 +267,7 @@ public class RenameDetector {
 			case COPY:
 			case RENAME:
 			default:
-				entries.add(entry);
+				entriesToAdd.add(entry);
 			}
 		}
 	}
@@ -320,10 +310,11 @@ public class RenameDetector {
 	 */
 	public List<DiffEntry> compute(ProgressMonitor pm) throws IOException {
 		if (!done) {
+			ObjectReader reader = repo.newObjectReader();
 			try {
-				return compute(objectReader, pm);
+				return compute(reader, pm);
 			} finally {
-				objectReader.release();
+				reader.release();
 			}
 		}
 		return Collections.unmodifiableList(entries);

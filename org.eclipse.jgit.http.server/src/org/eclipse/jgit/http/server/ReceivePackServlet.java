@@ -43,23 +43,13 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.hasChunkedEncodingRequestBug;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.hasPushStatusBug;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK_REQUEST_TYPE;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK_RESULT_TYPE;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.sendError;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
-import static org.eclipse.jgit.http.server.ServletUtils.consumeRequestBody;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 
 import java.io.IOException;
 import java.util.List;
@@ -84,6 +74,10 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /** Server side implementation of smart push over HTTP. */
 class ReceivePackServlet extends HttpServlet {
+	private static final String REQ_TYPE = "application/x-git-receive-pack-request";
+
+	private static final String RSP_TYPE = "application/x-git-receive-pack-result";
+
 	private static final long serialVersionUID = 1L;
 
 	static class InfoRefs extends SmartServiceInfoRefs {
@@ -91,7 +85,7 @@ class ReceivePackServlet extends HttpServlet {
 
 		InfoRefs(ReceivePackFactory<HttpServletRequest> receivePackFactory,
 				List<Filter> filters) {
-			super(RECEIVE_PACK, filters);
+			super("git-receive-pack", filters);
 			this.receivePackFactory = receivePackFactory;
 		}
 
@@ -135,7 +129,7 @@ class ReceivePackServlet extends HttpServlet {
 				return;
 
 			} catch (ServiceNotEnabledException e) {
-				sendError(req, rsp, SC_FORBIDDEN);
+				RepositoryFilter.sendError(SC_FORBIDDEN, req, rsp);
 				return;
 			}
 
@@ -159,31 +153,22 @@ class ReceivePackServlet extends HttpServlet {
 	@Override
 	public void doPost(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		if (!RECEIVE_PACK_REQUEST_TYPE.equals(req.getContentType())) {
+		if (!REQ_TYPE.equals(req.getContentType())) {
 			rsp.sendError(SC_UNSUPPORTED_MEDIA_TYPE);
 			return;
 		}
 
-		int[] version = parseVersion(req.getHeader(HDR_USER_AGENT));
-		if (hasChunkedEncodingRequestBug(version, req)) {
-			GitSmartHttpTools.sendError(req, rsp, SC_BAD_REQUEST, "\n\n"
-					+ HttpServerText.get().clientHas175ChunkedEncodingBug);
-			return;
-		}
-
-		SmartOutputStream out = new SmartOutputStream(req, rsp, false) {
-			@Override
-			public void flush() throws IOException {
-				doFlush();
-			}
-		};
-
 		ReceivePack rp = (ReceivePack) req.getAttribute(ATTRIBUTE_HANDLER);
 		try {
 			rp.setBiDirectionalPipe(false);
-			rp.setEchoCommandFailures(hasPushStatusBug(version));
-			rsp.setContentType(RECEIVE_PACK_RESULT_TYPE);
+			rsp.setContentType(RSP_TYPE);
 
+			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
+				@Override
+				public void flush() throws IOException {
+					doFlush();
+				}
+			};
 			rp.receive(getInputStream(req), out, null);
 			out.close();
 		} catch (UnpackException e) {
@@ -191,14 +176,12 @@ class ReceivePackServlet extends HttpServlet {
 			getServletContext().log(
 					HttpServerText.get().internalErrorDuringReceivePack,
 					e.getCause());
-			consumeRequestBody(req);
-			out.close();
 
-		} catch (Throwable e) {
+		} catch (IOException e) {
 			getServletContext().log(HttpServerText.get().internalErrorDuringReceivePack, e);
 			if (!rsp.isCommitted()) {
 				rsp.reset();
-				sendError(req, rsp, SC_INTERNAL_SERVER_ERROR);
+				rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			}
 			return;
 		}
