@@ -45,6 +45,7 @@ package org.eclipse.jgit.util;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.junit.MockSystemReader;
@@ -112,7 +113,7 @@ public class ChangeIdUtilTest {
 	}
 
 	@Test
-	public void testId() {
+	public void testId() throws IOException {
 		String msg = "A\nMessage\n";
 		ObjectId id = ChangeIdUtil.computeChangeId(treeId, parentId, p, q, msg);
 		assertEquals("73f3751208ac92cbb76f9a26ac4a0d9d472e381b", ObjectId

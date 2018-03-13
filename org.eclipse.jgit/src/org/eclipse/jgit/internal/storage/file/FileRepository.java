@@ -49,21 +49,16 @@ package org.eclipse.jgit.internal.storage.file;
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateRepository;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
@@ -189,7 +184,7 @@ public class FileRepository extends Repository {
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
 		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
-				getGitDir(true), Constants.CONFIG),
+				getDirectory(), Constants.CONFIG),
 				getFS());
 
 		loadSystemConfig();
@@ -202,30 +197,18 @@ public class FileRepository extends Repository {
 			}
 		});
 
-		final long repositoryFormatVersion = getConfig().getLong(
-				ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
-
-		String reftype = repoConfig.getString(
-				"extensions", null, "refsStorage"); //$NON-NLS-1$ //$NON-NLS-2$
-		if (repositoryFormatVersion >= 1 && reftype != null) {
-			if (StringUtils.equalsIgnoreCase(reftype, "reftree")) { //$NON-NLS-1$
-				refs = new RefTreeDatabase(this, new RefDirectory(this));
-			} else {
-				throw new IOException(JGitText.get().unknownRepositoryFormat);
-			}
-		} else {
-			refs = new RefDirectory(this);
-		}
-
+		refs = new RefDirectory(this);
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
 				getFS(), //
-				new File(getGitDir(true), Constants.SHALLOW));
+				new File(getDirectory(), Constants.SHALLOW));
 
 		if (objectDatabase.exists()) {
-			if (repositoryFormatVersion > 1)
+			final long repositoryFormatVersion = getConfig().getLong(
+					ConfigConstants.CONFIG_CORE_SECTION, null,
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
+			if (repositoryFormatVersion > 0)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
 						Long.valueOf(repositoryFormatVersion)));
@@ -283,7 +266,7 @@ public class FileRepository extends Repository {
 		final FileBasedConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
 			throw new IllegalStateException(MessageFormat.format(
-					JGitText.get().repositoryAlreadyExists, getGitDir(false)));
+					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
 		FileUtils.mkdirs(getDirectory(), true);
 		HideDotFiles hideDotFiles = getConfig().getEnum(
@@ -291,13 +274,13 @@ public class FileRepository extends Repository {
 				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
 				HideDotFiles.DOTGITONLY);
 		if (hideDotFiles != HideDotFiles.FALSE && !isBare()
-				&& getGitDir(false).getName().startsWith(".")) //$NON-NLS-1$
-			getFS().setHidden(getGitDir(false), true);
+				&& getDirectory().getName().startsWith(".")) //$NON-NLS-1$
+			getFS().setHidden(getDirectory(), true);
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getGitDir(false), "branches")); //$NON-NLS-1$
-		FileUtils.mkdir(new File(getGitDir(false), "hooks")); //$NON-NLS-1$
+		FileUtils.mkdir(new File(getDirectory(), "branches")); //$NON-NLS-1$
+		FileUtils.mkdir(new File(getDirectory(), "hooks")); //$NON-NLS-1$
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -305,7 +288,7 @@ public class FileRepository extends Repository {
 
 		final boolean fileMode;
 		if (getFS().supportsExecute()) {
-			File tmp = File.createTempFile("try", "execute", getGitDir(false)); //$NON-NLS-1$ //$NON-NLS-2$
+			File tmp = File.createTempFile("try", "execute", getDirectory()); //$NON-NLS-1$ //$NON-NLS-2$
 
 			getFS().setExecute(tmp, true);
 			final boolean on = getFS().canExecute(tmp);
@@ -321,7 +304,7 @@ public class FileRepository extends Repository {
 
 		SymLinks symLinks = SymLinks.FALSE;
 		if (getFS().supportsSymlinks()) {
-			File tmp = new File(getGitDir(false), "tmplink"); //$NON-NLS-1$
+			File tmp = new File(getDirectory(), "tmplink"); //$NON-NLS-1$
 			try {
 				getFS().createSymLink(tmp, "target"); //$NON-NLS-1$
 				symLinks = null;
@@ -349,16 +332,16 @@ public class FileRepository extends Repository {
 					ConfigConstants.CONFIG_KEY_PRECOMPOSEUNICODE, true);
 		if (!bare) {
 			File workTree = getWorkTree();
-			if (!getGitDir(false).getParentFile().equals(workTree)) {
+			if (!getDirectory().getParentFile().equals(workTree)) {
 				cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,
 						ConfigConstants.CONFIG_KEY_WORKTREE, getWorkTree()
 								.getAbsolutePath());
 				LockFile dotGitLockFile = new LockFile(new File(workTree,
-						Constants.DOT_GIT));
+						Constants.DOT_GIT), getFS());
 				try {
 					if (dotGitLockFile.lock()) {
 						dotGitLockFile.write(Constants.encode(Constants.GITDIR
-								+ getGitDir(false).getAbsolutePath()));
+								+ getDirectory().getAbsolutePath()));
 						dotGitLockFile.commit();
 					}
 				} finally {
@@ -496,63 +479,4 @@ public class FileRepository extends Repository {
 			return new ReflogReaderImpl(this, ref.getName());
 		return null;
 	}
-
-	@Override
-	public AttributesNodeProvider createAttributesNodeProvider() {
-		return new AttributesNodeProviderImpl(this);
-	}
-
-	/**
-	 * Implementation a {@link AttributesNodeProvider} for a
-	 * {@link FileRepository}.
-	 *
-	 * @author <a href="mailto:arthur.daussy@obeo.fr">Arthur Daussy</a>
-	 *
-	 */
-	static class AttributesNodeProviderImpl implements
-			AttributesNodeProvider {
-
-		private AttributesNode infoAttributesNode;
-
-		private AttributesNode globalAttributesNode;
-
-		/**
-		 * Constructor.
-		 *
-		 * @param repo
-		 *            {@link Repository} that will provide the attribute nodes.
-		 */
-		protected AttributesNodeProviderImpl(Repository repo) {
-			infoAttributesNode = new InfoAttributesNode(repo);
-			globalAttributesNode = new GlobalAttributesNode(repo);
-		}
-
-		public AttributesNode getInfoAttributesNode() throws IOException {
-			if (infoAttributesNode instanceof InfoAttributesNode)
-				infoAttributesNode = ((InfoAttributesNode) infoAttributesNode)
-						.load();
-			return infoAttributesNode;
-		}
-
-		public AttributesNode getGlobalAttributesNode() throws IOException {
-			if (globalAttributesNode instanceof GlobalAttributesNode)
-				globalAttributesNode = ((GlobalAttributesNode) globalAttributesNode)
-						.load();
-			return globalAttributesNode;
-		}
-
-		static void loadRulesFromFile(AttributesNode r, File attrs)
-				throws FileNotFoundException, IOException {
-			if (attrs.exists()) {
-				FileInputStream in = new FileInputStream(attrs);
-				try {
-					r.parse(in);
-				} finally {
-					in.close();
-				}
-			}
-		}
-
-	}
-
 }
