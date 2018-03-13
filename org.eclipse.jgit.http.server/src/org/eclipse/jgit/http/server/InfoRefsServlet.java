@@ -46,13 +46,11 @@ package org.eclipse.jgit.http.server;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -60,38 +58,20 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.PacketLineOut;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser;
-import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 
 /** Send a complete list of current refs, including peeled values for tags. */
 class InfoRefsServlet extends RepositoryServlet {
 	private static final long serialVersionUID = 1L;
 
-	private final UploadPackFactory uploadPackFactory;
-
 	private final ReceivePackFactory receivePackFactory;
 
-	InfoRefsServlet(final UploadPackFactory uploadPackFactory,
-			final ReceivePackFactory receivePackFactory) {
-		this.uploadPackFactory = uploadPackFactory;
+	InfoRefsServlet(final ReceivePackFactory receivePackFactory) {
 		this.receivePackFactory = receivePackFactory;
 	}
 
-	@Override
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		serve(req, rsp, true);
-	}
-
-	@Override
-	protected void doHead(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws ServletException, IOException {
-		serve(req, rsp, false);
-	}
-
-	private void serve(final HttpServletRequest req,
-			final HttpServletResponse rsp, final boolean sendBody)
-			throws IOException {
 		final byte[] raw;
 		try {
 			final Repository db = getRepository(req);
@@ -102,11 +82,7 @@ class InfoRefsServlet extends RepositoryServlet {
 				final PacketLineOut out = new PacketLineOut(buf);
 				out.writeString("# service=" + name + "\n");
 
-				if ("git-upload-pack".equals(name)) {
-					final UploadPack rp = uploadPackFactory.create(req, db);
-					rp.sendAdvertisedRefs(new PacketLineOutRefAdvertiser(out));
-
-				} else if ("git-receive-pack".equals(name)) {
+				if ("git-receive-pack".equals(name)) {
 					final ReceivePack rp = receivePackFactory.create(req, db);
 					rp.sendAdvertisedRefs(new PacketLineOutRefAdvertiser(out));
 
@@ -133,7 +109,7 @@ class InfoRefsServlet extends RepositoryServlet {
 			return;
 		}
 
-		send(raw, req, rsp, sendBody);
+		send(raw, req, rsp);
 	}
 
 	private byte[] dumbHttp(final Repository db) throws IOException {

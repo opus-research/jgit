@@ -60,15 +60,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
 import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.UploadPack;
 
 /**
  * Routes requests which match Git repository access over HTTP.
@@ -78,8 +75,6 @@ import org.eclipse.jgit.transport.UploadPack;
  */
 public class RepositoryRouter implements Filter {
 	private RepositoryResolver resolver;
-
-	private UploadPackFactory uploadPackFactory;
 
 	private ReceivePackFactory receivePackFactory;
 
@@ -95,37 +90,23 @@ public class RepositoryRouter implements Filter {
 	 */
 	public RepositoryRouter() {
 		this.resolver = null;
-		this.uploadPackFactory = new DefaultUploadPackFactory();
 		this.receivePackFactory = new DefaultReceivePackFactory();
 	}
 
 	/**
 	 * New router configured with a specific resolver.
-	 *
+	 * 
 	 * @param resolver
 	 *            the resolver to use when matching URL to Git repository.
-	 * @param uploadPackFactory
-	 *            factory to create UploadPack instances when a client wants to
-	 *            read a repository. If null upload-pack is disabled for all
-	 *            repositories. See {@link DefaultUploadPackFactory}.
 	 * @param receivePackFactory
 	 *            factory to create ReceivePack instances when a client wants to
 	 *            write to a repository. If null receive-pack is disabled for
 	 *            all repositories. See {@link DefaultReceivePackFactory}.
 	 */
 	public RepositoryRouter(final RepositoryResolver resolver,
-			UploadPackFactory uploadPackFactory,
 			ReceivePackFactory receivePackFactory) {
 		if (resolver == null)
 			throw new NullPointerException("RepositoryResolver not supplied");
-
-		if (uploadPackFactory == null)
-			uploadPackFactory = new UploadPackFactory() {
-				public UploadPack create(HttpServletRequest req, Repository db)
-						throws ServiceNotEnabledException {
-					throw new ServiceNotEnabledException();
-				}
-			};
 
 		if (receivePackFactory == null)
 			receivePackFactory = new ReceivePackFactory() {
@@ -136,7 +117,6 @@ public class RepositoryRouter implements Filter {
 			};
 
 		this.resolver = resolver;
-		this.uploadPackFactory = uploadPackFactory;
 		this.receivePackFactory = receivePackFactory;
 	}
 
@@ -152,17 +132,15 @@ public class RepositoryRouter implements Filter {
 		servlets = new ArrayList<ServletDefinition>();
 
 		bind("^/(.*)/(HEAD|refs/.*)$", new GetRefServlet());
-		bind("^/(.*)/info/refs$", new InfoRefsServlet(//
-				uploadPackFactory, //
-				receivePackFactory));
+		bind("^/(.*)/info/refs$", new InfoRefsServlet(receivePackFactory));
 		bind("^/(.*)/objects/info/packs$", new InfoPacksServlet());
 		bind("^/(.*)/objects/([0-9a-f]{2}/[0-9a-f]{38})$",
-				new LooseObjectFileServlet());
-		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.(?:pack|idx))$",
-				new PackFileServlet());
+				new ObjectFileServlet.Loose());
+		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.pack)$",
+				new ObjectFileServlet.Pack());
+		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.idx)$",
+				new ObjectFileServlet.PackIdx());
 
-		bind("^/(.*)/git-upload-pack$", //
-				new UploadPackServlet(uploadPackFactory));
 		bind("^/(.*)/git-receive-pack$", //
 				new ReceivePackServlet(receivePackFactory));
 

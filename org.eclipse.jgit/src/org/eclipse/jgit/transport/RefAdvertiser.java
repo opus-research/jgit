@@ -178,7 +178,7 @@ public abstract class RefAdvertiser {
 	}
 
 	/**
-	 * Advertise one object is available using the magic {@code. have}.
+	 * Advertise one object is available using the magic {@code .have}.
 	 * <p>
 	 * The magic {@code .have} advertisement is not available for fetching by a
 	 * client, but can be used by a client when considering a delta base

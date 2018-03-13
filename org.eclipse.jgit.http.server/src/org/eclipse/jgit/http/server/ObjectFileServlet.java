@@ -54,9 +54,59 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectDirectory;
 
-/** Sends any one pack or index from {@code GIT_DIR/objects/pack}. */
-class PackFileServlet extends RepositoryServlet {
+/** Sends any object from {@code GIT_DIR/objects/??/0 38}, or any pack file. */
+abstract class ObjectFileServlet extends RepositoryServlet {
 	private static final long serialVersionUID = 1L;
+
+	static class Loose extends ObjectFileServlet {
+		private static final long serialVersionUID = 1L;
+
+		Loose() {
+			super("application/x-git-loose-object");
+		}
+
+		@Override
+		String etag(final Sender.FileSender sender) throws IOException {
+			return Long.toHexString(sender.getLastModified());
+		}
+	}
+
+	private static abstract class PackData extends ObjectFileServlet {
+		private static final long serialVersionUID = 1L;
+
+		PackData(String contentType) {
+			super(contentType);
+		}
+
+		@Override
+		String etag(final Sender.FileSender sender) throws IOException {
+			return sender.getTailChecksum();
+		}
+	}
+
+	static class Pack extends PackData {
+		private static final long serialVersionUID = 1L;
+
+		Pack() {
+			super("application/x-git-packed-objects");
+		}
+	}
+
+	static class PackIdx extends PackData {
+		private static final long serialVersionUID = 1L;
+
+		PackIdx() {
+			super("application/x-git-packed-objects-toc");
+		}
+	}
+
+	private final String contentType;
+
+	ObjectFileServlet(final String contentType) {
+		this.contentType = contentType;
+	}
+
+	abstract String etag(Sender.FileSender sender) throws IOException;
 
 	@Override
 	public void doGet(final HttpServletRequest req,
@@ -73,29 +123,48 @@ class PackFileServlet extends RepositoryServlet {
 	private void serve(final HttpServletRequest req,
 			final HttpServletResponse rsp, final boolean sendBody)
 			throws IOException {
-		final Sender.FileSender send = createSender(req, req.getPathInfo());
-		if (send != null) {
-			try {
-				cacheForever(rsp);
-				rsp.setHeader("ETag", send.getTailChecksum());
-				rsp.setContentType("application/octet-stream");
-				rsp.setContentLength(send.getContentLength());
-				if (sendBody)
-					send.sendBody(rsp);
-			} finally {
-				send.close();
-			}
-		} else {
+		final String fileName = req.getPathInfo();
+		final Sender.FileSender sender = createSender(req, fileName);
+		if (sender == null) {
+			nocache(rsp);
 			rsp.sendError(HttpServletResponse.SC_NOT_FOUND);
+			return;
+		}
+
+		try {
+			final String etag = etag(sender);
+			final long lastModified = sender.getLastModified() / 1000 * 1000;
+
+			String ifNoneMatch = req.getHeader("If-None-Match");
+			if (etag.equals(ifNoneMatch)) {
+				rsp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
+				return;
+			}
+
+			long ifModifiedSince = req.getDateHeader("If-Modified-Since");
+			if (lastModified < ifModifiedSince) {
+				rsp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
+				return;
+			}
+
+			cacheForever(rsp);
+			rsp.setHeader("ETag", etag);
+			rsp.setDateHeader("Last-Modified", lastModified);
+			rsp.setContentType(contentType);
+			rsp.setContentLength(sender.getContentLength());
+			if (sendBody)
+				sender.sendBody(rsp);
+		} finally {
+			sender.close();
 		}
 	}
 
 	private Sender.FileSender createSender(final HttpServletRequest req,
-			final String packFileName) {
+			final String fileName) {
 		final ObjectDatabase db = getRepository(req).getObjectDatabase();
 		if (db instanceof ObjectDirectory) {
 			final File dir = ((ObjectDirectory) db).getDirectory();
-			final File obj = new File(dir, packFileName);
+			final File obj = new File(dir, fileName);
 			try {
 				return new Sender.FileSender(obj);
 			} catch (FileNotFoundException e) {
@@ -103,7 +172,9 @@ class PackFileServlet extends RepositoryServlet {
 			}
 
 		} else {
-			// Fail, we don't have the pack (or table of contents) to serve.
+			// TODO For loose object service, unpack the object & serve as loose
+			// For pack services, we are forced to return null as other
+			// database types might not support pack files.
 			//
 			return null;
 		}
