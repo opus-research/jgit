@@ -6,30 +6,18 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
-import java.text.Normalizer;
-import java.text.Normalizer.Form;
-
-import org.eclipse.jgit.util.SystemReader;
 
 class FileUtil {
 
 	static String readSymlink(File path) throws IOException {
 		Path nioPath = path.toPath();
 		Path target = Files.readSymbolicLink(nioPath);
-		String targetString = target.toString();
-		if (SystemReader.getInstance().isWindows())
-			targetString = targetString.replace('\\', '/');
-		else if (SystemReader.getInstance().isMacOS()) {
-			targetString = Normalizer.normalize(targetString, Form.NFC);
-		}
-		return targetString;
+		return target.toString();
 	}
 
 	public static void createSymLink(File path, String target)
 			throws IOException {
 		Path nioPath = path.toPath();
-		if (SystemReader.getInstance().isWindows())
-			target = target.replace('/', '\\');
 		Path nioTarget = new File(target).toPath();
 		Files.createSymbolicLink(nioPath, nioTarget);
 	}
@@ -62,7 +50,7 @@ class FileUtil {
 
 	public static void setHidden(File path, boolean hidden) throws IOException {
 		Path nioPath = path.toPath();
-		Files.setAttribute(nioPath, "dos:hidden", Boolean.valueOf(hidden),
+		Files.setAttribute(nioPath, "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
 				LinkOption.NOFOLLOW_LINKS);
 	}
 
