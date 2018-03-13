@@ -52,7 +52,6 @@ import static org.junit.Assert.fail;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
 
 import org.eclipse.jgit.junit.TestRng;
@@ -247,20 +246,6 @@ public class TemporaryBufferTest {
 		} finally {
 			b.destroy();
 		}
-	}
-
-	@Test
-	public void testInCoreInputStream() throws IOException {
-		final int cnt = 256;
-		final byte[] test = new TestRng(getName()).nextBytes(cnt);
-		final TemporaryBuffer.Heap b = new TemporaryBuffer.Heap(cnt + 4);
-		b.write(test);
-		b.close();
-
-		InputStream in = b.openInputStream();
-		byte[] act = new byte[cnt];
-		IO.readFully(in, act, 0, cnt);
-		assertTrue(Arrays.equals(test, act));
 	}
 
 	@Test
