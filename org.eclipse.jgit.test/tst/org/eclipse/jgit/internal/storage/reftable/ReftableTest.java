@@ -368,7 +368,7 @@ public class ReftableTest {
 	}
 
 	@Test
-	public void withReflogNoChain() throws IOException {
+	public void withReflog() throws IOException {
 		Ref master = ref(MASTER, 1);
 		Ref next = ref(NEXT, 2);
 		PersonIdent who = new PersonIdent("Log", "Ger", 1500079709, -8 * 60);

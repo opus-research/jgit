@@ -433,17 +433,6 @@ public class ReftableReader extends Reftable {
 		return end % blockSize == 0 ? blocks : (blocks + 1);
 	}
 
-	/**
-	 * Get size of the reftable, in bytes.
-	 *
-	 * @return size of the reftable, in bytes.
-	 * @throws IOException
-	 *             size cannot be obtained.
-	 */
-	public long size() throws IOException {
-		return src.size();
-	}
-
 	@Override
 	public void close() throws IOException {
 		src.close();
@@ -567,6 +556,8 @@ public class ReftableReader extends Reftable {
 		}
 	}
 
+	static final LongList EMPTY_LONG_LIST = new LongList(0);
+
 	private class ObjCursorImpl extends RefCursor {
 		private final long scanEnd;
 		private final ObjectId match;
@@ -590,7 +581,7 @@ public class ReftableReader extends Reftable {
 			BlockReader b = objIndex;
 			do {
 				if (b.seekKey(key) > 0) {
-					blockPos = new LongList(0);
+					blockPos = EMPTY_LONG_LIST;
 					return;
 				}
 				long pos = b.readPositionFromIndex();
@@ -610,7 +601,7 @@ public class ReftableReader extends Reftable {
 				b.skipValue();
 			}
 			if (blockPos == null) {
-				blockPos = new LongList(0);
+				blockPos = EMPTY_LONG_LIST;
 			}
 			if (blockPos.size() > 0) {
 				long pos = blockPos.get(listIdx++);

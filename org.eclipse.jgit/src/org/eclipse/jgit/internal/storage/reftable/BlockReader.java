@@ -398,7 +398,7 @@ class BlockReader {
 	}
 
 	/**
-	 * Find a key in the block and positions the current pointer on its record.
+	 * Finds a key in the block and positions the current pointer on its record.
 	 * <p>
 	 * As a side-effect this method arranges for the current pointer to be near
 	 * or exactly on {@code key}, allowing other methods to access data from
