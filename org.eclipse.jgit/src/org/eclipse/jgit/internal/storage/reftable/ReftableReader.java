@@ -59,6 +59,7 @@ import java.util.Arrays;
 import java.util.zip.CRC32;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
@@ -73,19 +74,13 @@ import org.eclipse.jgit.util.NB;
 public class ReftableReader implements AutoCloseable {
 	/** @return an empty reftable. */
 	public static ReftableReader emptyTable() {
-		return new ReftableReader(BlockSource.from(EmptyTableHolder.I));
-	}
-
-	private static class EmptyTableHolder {
-		final static byte[] I = makeEmptyTable();
-		private static byte[] makeEmptyTable() {
-			try {
-				ByteArrayOutputStream out = new ByteArrayOutputStream();
-				new ReftableWriter().begin(out).finish();
-				return out.toByteArray();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+		try {
+			int len = FILE_HEADER_LEN + FILE_FOOTER_LEN;
+			ByteArrayOutputStream buf = new ByteArrayOutputStream(len);
+			new ReftableWriter().begin(buf).finish();
+			return new ReftableReader(BlockSource.from(buf.toByteArray()));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
 	}
 
