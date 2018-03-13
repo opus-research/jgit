@@ -208,12 +208,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/**
 	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
-	 * 
+	 *
 	 * Once the DirCacheIterator has been set this iterator must only be
 	 * advanced by the TreeWalk that is supplied, as it assumes that itself and
 	 * the corresponding DirCacheIterator are positioned on the same file path
 	 * whenever {@link #idBuffer()} is invoked.
-	 * 
+	 *
 	 * @param walk
 	 *            the walk that will be advancing this iterator.
 	 * @param treeId
@@ -964,8 +964,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private static String readContentAsNormalizedString(DirCacheEntry entry,
-			ObjectReader reader)
-			throws MissingObjectException, IOException {
+			ObjectReader reader) throws MissingObjectException, IOException {
 		ObjectLoader open = reader.open(entry.getObjectId());
 		byte[] cachedBytes = open.getCachedBytes();
 		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
