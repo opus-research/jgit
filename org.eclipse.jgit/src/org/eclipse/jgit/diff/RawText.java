@@ -44,15 +44,11 @@
 
 package org.eclipse.jgit.diff;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.eclipse.jgit.errors.BinaryBlobException;
-import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -93,29 +89,7 @@ public class RawText extends Sequence {
 	 */
 	public RawText(final byte[] input) {
 		content = input;
-		IntList map;
-		try {
-			map = RawParseUtils.lineMap(content, 0, content.length);
-		} catch (BinaryBlobException e) {
-			map = new IntList(3);
-			map.add(Integer.MIN_VALUE);
-			map.add(0);
-			map.add(content.length);
-		}
-		lines = map;
-	}
-
-	/**
-	 * Construct a new RawText if the line map is already known.
-	 *
-	 * @param data
-	 *   the blob data.
-	 * @param lineMap
-	 *   Indices of line starts, with indexed by base-1 linenumber.
-	 */
-	private RawText(final byte[] data, final IntList lineMap) {
-		content = data;
-		lines = lineMap;
+		lines = RawParseUtils.lineMap(content, 0, content.length);
 	}
 
 	/**
@@ -320,67 +294,5 @@ public class RawText extends Sequence {
 			return "\r\n"; //$NON-NLS-1$
 		else
 			return "\n"; //$NON-NLS-1$
-	}
-
-	/**
-	 * Read a blob object into RawText, or throw BinaryBlobException if
-	 * the blob is binary.
-	 *
-	 * @param ldr
-	 *   the ObjectLoader for the blob
-	 * @param threshold
-	 *   if the blob is larger than this size, it is always assumed to be binary.
-	 * @since 4.10
-	 * @return the RawText representing the blob.
-	 * @throws BinaryBlobException if the blob contains binary data.
-	 * @throws IOException if the input could not be read.
-	 */
-	public static RawText load(ObjectLoader ldr, int threshold) throws IOException, BinaryBlobException {
-		long sz = ldr.getSize();
-
-		if (sz > threshold) {
-			throw new BinaryBlobException();
-		}
-
-		if (sz <= FIRST_FEW_BYTES) {
-			byte[] data = ldr.getCachedBytes(FIRST_FEW_BYTES);
-			if (isBinary(data)) {
-				throw new BinaryBlobException();
-			}
-			return new RawText(data);
-		}
-
-		byte[] head = new byte[FIRST_FEW_BYTES];
-		try (InputStream stream = ldr.openStream()) {
-			int off = 0;
-			int left = head.length;
-			while (left > 0) {
-				int n = stream.read(head, off, left);
-				if (n < 0) {
-					throw new EOFException();
-				}
-				left -= n;
-
-				while (n > 0) {
-					if (head[off] == '\0') {
-						throw new BinaryBlobException();
-					}
-					off++;
-					n--;
-				}
-			}
-
-			byte data[];
-			try {
-				data = new byte[(int)sz];
-			} catch (OutOfMemoryError e) {
-				throw new LargeObjectException.OutOfMemory(e);
-			}
-
-			System.arraycopy(head, 0, data, 0, head.length);
-			IO.readFully(stream, data, off, (int) (sz-off));
-			IntList lineMap = RawParseUtils.lineMap(data, 0, data.length);
-			return new RawText(data, lineMap);
-		}
 	}
 }
