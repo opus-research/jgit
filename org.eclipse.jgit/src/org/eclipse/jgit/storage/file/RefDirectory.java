@@ -288,7 +288,6 @@ public class RefDirectory extends RefDatabase {
 
 		RefList<LooseRef> loose;
 		if (scan.newLoose != null) {
-			scan.newLoose.sort();
 			loose = scan.newLoose.toRefList();
 			if (looseRefs.compareAndSet(oldLoose, loose))
 				modCnt.incrementAndGet();
@@ -313,7 +312,6 @@ public class RefDirectory extends RefDatabase {
 					loose = loose.remove(toRemove);
 			}
 		}
-		symbolic.sort();
 
 		return new RefMap(prefix, packed, upcast(loose), symbolic.toRefList());
 	}
