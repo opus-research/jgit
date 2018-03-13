@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Christian Halstrick
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,54 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.util;
 
-package org.eclipse.jgit.storage.dht.spi.memory;
+import static org.junit.Assert.fail;
 
-import java.text.MessageFormat;
-import java.util.concurrent.TimeoutException;
+import java.text.ParseException;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 
-import org.eclipse.jgit.storage.dht.DhtException;
-import org.eclipse.jgit.storage.dht.DhtText;
-import org.eclipse.jgit.storage.dht.RepositoryKey;
-import org.eclipse.jgit.storage.dht.RepositoryName;
-import org.eclipse.jgit.storage.dht.spi.RepositoryIndexTable;
-import org.eclipse.jgit.storage.dht.spi.memory.MemTable.Cell;
-import org.eclipse.jgit.storage.dht.spi.util.ColumnMatcher;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
-final class MemRepositoryIndexTable implements RepositoryIndexTable {
-	private final MemTable table = new MemTable();
+/**
+ * Tests which assert that unparseable Strings lead to ParseExceptions
+ */
+@RunWith(Theories.class)
+public class GitDateParserBadlyFormattedTest {
+	private String dateStr;
 
-	private final ColumnMatcher colId = new ColumnMatcher("id");
-
-	public RepositoryKey get(RepositoryName name) throws DhtException,
-			TimeoutException {
-		Cell cell = table.get(name.asBytes(), colId.name());
-		if (cell == null)
-			return null;
-		return RepositoryKey.fromBytes(cell.getValue());
+	public GitDateParserBadlyFormattedTest(String dateStr) {
+		this.dateStr = dateStr;
 	}
 
-	public void putUnique(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet( //
-				name.asBytes(), //
-				colId.name(), //
-				null, //
-				key.asBytes());
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
+	@DataPoints
+	static public String[] getDataPoints() {
+		return new String[] { "", "1970", "3000.3000.3000", "3 yesterday ago",
+				"now yesterday ago", "yesterdays", "3.day. 2.week.ago",
+				"day ago", "Gra Feb 21 15:35:00 2007 +0100",
+				"Sun Feb 21 15:35:00 2007 +0100",
+				"Wed Feb 21 15:35:00 Grand +0100" };
 	}
 
-	public void remove(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet(
-				name.asBytes(),
-				colId.name(),
-				key.asBytes(),
-				null);
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
+	@Theory
+	public void badlyFormattedWithExplicitRef() {
+		Calendar ref = new GregorianCalendar(SystemReader.getInstance()
+				.getTimeZone(), SystemReader.getInstance().getLocale());
+		try {
+			GitDateParser.parse(dateStr, ref);
+			fail("The expected ParseException while parsing '" + dateStr
+					+ "' did not occur.");
+		} catch (ParseException e) {
+			// expected
+		}
+	}
+
+	@Theory
+	public void badlyFormattedWithoutRef() {
+		try {
+			GitDateParser.parse(dateStr, null);
+			fail("The expected ParseException while parsing '" + dateStr
+					+ "' did not occur.");
+		} catch (ParseException e) {
+			// expected
+		}
 	}
 }

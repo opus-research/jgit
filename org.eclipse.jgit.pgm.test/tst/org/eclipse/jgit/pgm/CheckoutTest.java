@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.storage.dht;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.storage.dht.spi.memory.MemoryDatabase;
-import org.junit.Before;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Assert;
 import org.junit.Test;
 
-public class DhtRepositoryBuilderTest {
-	private MemoryDatabase db;
+public class CheckoutTest extends CLIRepositoryTestCase {
 
-	@Before
-	public void setUpDatabase() {
-		db = new MemoryDatabase();
+	@Test
+	public void testCheckoutSelf() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Already on 'master'", execute("git checkout master"));
 	}
 
 	@Test
-	public void testCreateAndOpen() throws IOException {
-		String name = "test.git";
+	public void testCheckoutBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
 
-		DhtRepository repo1 = db.open(name);
-		assertSame(db, repo1.getDatabase());
-		assertSame(repo1, repo1.getRefDatabase().getRepository());
-		assertSame(repo1, repo1.getObjectDatabase().getRepository());
+		assertEquals("Switched to branch 'side'", execute("git checkout side"));
+	}
 
-		assertEquals(name, repo1.getRepositoryName().asString());
-		assertNull(repo1.getRepositoryKey());
-		assertFalse(repo1.getObjectDatabase().exists());
+	@Test
+	public void testCheckoutNewBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
 
-		repo1.create(true);
-		assertNotNull(repo1.getRepositoryKey());
-		assertTrue(repo1.getObjectDatabase().exists());
+		assertEquals("Switched to a new branch 'side'",
+				execute("git checkout -b side"));
+	}
 
-		DhtRepository repo2 = db.open(name);
-		assertNotNull(repo2.getRepositoryKey());
-		assertTrue(repo2.getObjectDatabase().exists());
-		assertEquals(0, repo2.getAllRefs().size());
+	@Test
+	public void testCheckoutNonExistingBranch() throws Exception {
+		assertEquals(
+				"error: pathspec 'side' did not match any file(s) known to git.",
+				execute("git checkout side"));
+	}
 
-		Ref HEAD = repo2.getRef(Constants.HEAD);
-		assertTrue(HEAD.isSymbolic());
-		assertEquals(Constants.R_HEADS + Constants.MASTER, //
-				HEAD.getLeaf().getName());
+	@Test
+	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("A branch named 'master' already exists.",
+				execute("git checkout -b master"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
+		assertEquals("You are on a branch yet to be born",
+				execute("git checkout -b side"));
+	}
+
+	static private void assertEquals(String expected, String[] actual) {
+		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
+				actual.length); // ignore last line if empty
+		Assert.assertEquals(expected, actual[0]);
 	}
 }
