@@ -58,15 +58,14 @@ import org.eclipse.jgit.util.NB;
  * represent a different object name.
  */
 public abstract class AnyObjectId implements Comparable {
-	static final int RAW_LEN = 20;
+	static final int RAW_LEN = Constants.OBJECT_ID_LENGTH;
 
 	static final int STR_LEN = RAW_LEN * 2;
 
 	static {
-		if (RAW_LEN != Constants.OBJECT_ID_LENGTH)
+		if (RAW_LEN != 20)
 			throw new LinkageError("ObjectId expects"
-					+ " Constants.OBJECT_ID_LENGTH = 20; it is "
-					+ Constants.OBJECT_ID_LENGTH
+					+ " Constants.OBJECT_ID_LENGTH = 20; it is " + RAW_LEN
 					+ ".");
 	}
 
