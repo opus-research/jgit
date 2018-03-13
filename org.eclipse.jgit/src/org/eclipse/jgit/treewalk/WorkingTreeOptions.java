@@ -55,8 +55,11 @@ import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 /** Options used by the {@link WorkingTreeIterator}. */
 public class WorkingTreeOptions {
 	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY =
-			WorkingTreeOptions::new;
+	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
+		public WorkingTreeOptions parse(final Config cfg) {
+			return new WorkingTreeOptions(cfg);
+		}
+	};
 
 	private final boolean fileMode;
 

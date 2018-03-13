@@ -75,20 +75,6 @@ public class PackConfig {
 	public static final boolean DEFAULT_REUSE_OBJECTS = true;
 
 	/**
-	 * Default value of keep old packs option: {@value}
-	 * @see #setPreserveOldPacks(boolean)
-	 * @since 4.7
-	 */
-	public static final boolean DEFAULT_PRESERVE_OLD_PACKS = false;
-
-	/**
-	 * Default value of prune old packs option: {@value}
-	 * @see #setPrunePreserved(boolean)
-	 * @since 4.7
-	 */
-	public static final boolean DEFAULT_PRUNE_PRESERVED = false;
-
-	/**
 	 * Default value of delta compress option: {@value}
 	 *
 	 * @see #setDeltaCompress(boolean)
@@ -218,10 +204,6 @@ public class PackConfig {
 
 	private boolean reuseObjects = DEFAULT_REUSE_OBJECTS;
 
-	private boolean preserveOldPacks = DEFAULT_PRESERVE_OLD_PACKS;
-
-	private boolean prunePreserved = DEFAULT_PRUNE_PRESERVED;
-
 	private boolean deltaBaseAsOffset = DEFAULT_DELTA_BASE_AS_OFFSET;
 
 	private boolean deltaCompress = DEFAULT_DELTA_COMPRESS;
@@ -259,8 +241,6 @@ public class PackConfig {
 	private int bitmapInactiveBranchAgeInDays = DEFAULT_BITMAP_INACTIVE_BRANCH_AGE_IN_DAYS;
 
 	private boolean cutDeltaChains;
-
-	private boolean singlePack;
 
 	/** Create a default configuration. */
 	public PackConfig() {
@@ -301,8 +281,6 @@ public class PackConfig {
 		this.compressionLevel = cfg.compressionLevel;
 		this.reuseDeltas = cfg.reuseDeltas;
 		this.reuseObjects = cfg.reuseObjects;
-		this.preserveOldPacks = cfg.preserveOldPacks;
-		this.prunePreserved = cfg.prunePreserved;
 		this.deltaBaseAsOffset = cfg.deltaBaseAsOffset;
 		this.deltaCompress = cfg.deltaCompress;
 		this.maxDeltaDepth = cfg.maxDeltaDepth;
@@ -322,7 +300,6 @@ public class PackConfig {
 		this.bitmapExcessiveBranchCount = cfg.bitmapExcessiveBranchCount;
 		this.bitmapInactiveBranchAgeInDays = cfg.bitmapInactiveBranchAgeInDays;
 		this.cutDeltaChains = cfg.cutDeltaChains;
-		this.singlePack = cfg.singlePack;
 	}
 
 	/**
@@ -384,61 +361,6 @@ public class PackConfig {
 	 */
 	public void setReuseObjects(boolean reuseObjects) {
 		this.reuseObjects = reuseObjects;
-	}
-
-	/**
-	 * Checks whether to preserve old packs in a preserved directory
-	 *
-	 * Default setting: {@value #DEFAULT_PRESERVE_OLD_PACKS}
-	 *
-	 * @return true if repacking will preserve old pack files.
-	 * @since 4.7
-	 */
-	public boolean isPreserveOldPacks() {
-		return preserveOldPacks;
-	}
-
-	/**
-	 * Set preserve old packs configuration option for repacking.
-	 *
-	 * If enabled, old pack files are moved into a preserved subdirectory instead
-	 * of being deleted
-	 *
-	 * Default setting: {@value #DEFAULT_PRESERVE_OLD_PACKS}
-	 *
-	 * @param preserveOldPacks
-	 *            boolean indicating whether or not preserve old pack files
-	 * @since 4.7
-	 */
-	public void setPreserveOldPacks(boolean preserveOldPacks) {
-		this.preserveOldPacks = preserveOldPacks;
-	}
-
-	/**
-	 * Checks whether to remove preserved pack files in a preserved directory
-	 *
-	 * Default setting: {@value #DEFAULT_PRUNE_PRESERVED}
-	 *
-	 * @return true if repacking will remove preserved pack files.
-	 * @since 4.7
-	 */
-	public boolean isPrunePreserved() {
-		return prunePreserved;
-	}
-
-	/**
-	 * Set prune preserved configuration option for repacking.
-	 *
-	 * If enabled, preserved pack files are removed from a preserved subdirectory
-	 *
-	 * Default setting: {@value #DEFAULT_PRESERVE_OLD_PACKS}
-	 *
-	 * @param prunePreserved
-	 *            boolean indicating whether or not preserve old pack files
-	 * @since 4.7
-	 */
-	public void setPrunePreserved(boolean prunePreserved) {
-		this.prunePreserved = prunePreserved;
 	}
 
 	/**
@@ -555,30 +477,6 @@ public class PackConfig {
 	 */
 	public void setCutDeltaChains(boolean cut) {
 		cutDeltaChains = cut;
-	}
-
-	/**
-	 * @return true if all of refs/* should be packed in a single pack. Default
-	 *        is false, packing a separate GC_REST pack for references outside
-	 *        of refs/heads/* and refs/tags/*.
-	 * @since 4.9
-	 */
-	public boolean getSinglePack() {
-		return singlePack;
-	}
-
-	/**
-	 * If {@code true}, packs a single GC pack for all objects reachable from
-	 * refs/*. Otherwise packs the GC pack with objects reachable from
-	 * refs/heads/* and refs/tags/*, and a GC_REST pack with the remaining
-	 * reachable objects. Disabled by default, packing GC and GC_REST.
-	 *
-	 * @param single
-	 *            true to pack a single GC pack rather than GC and GC_REST packs
-	 * @since 4.9
-	 */
-	public void setSinglePack(boolean single) {
-		singlePack = single;
 	}
 
 	/**
@@ -1053,8 +951,6 @@ public class PackConfig {
 				rc.getBoolean("pack", "deltacompression", isDeltaCompress())); //$NON-NLS-1$ //$NON-NLS-2$
 		setCutDeltaChains(
 				rc.getBoolean("pack", "cutdeltachains", getCutDeltaChains())); //$NON-NLS-1$ //$NON-NLS-2$
-		setSinglePack(
-				rc.getBoolean("pack", "singlepack", getSinglePack())); //$NON-NLS-1$ //$NON-NLS-2$
 		setBuildBitmaps(
 				rc.getBoolean("pack", "buildbitmaps", isBuildBitmaps())); //$NON-NLS-1$ //$NON-NLS-2$
 		setBitmapContiguousCommitCount(
@@ -1073,7 +969,6 @@ public class PackConfig {
 						getBitmapInactiveBranchAgeInDays()));
 	}
 
-	@Override
 	public String toString() {
 		final StringBuilder b = new StringBuilder();
 		b.append("maxDeltaDepth=").append(getMaxDeltaDepth()); //$NON-NLS-1$
@@ -1102,7 +997,6 @@ public class PackConfig {
 				.append(getBitmapExcessiveBranchCount());
 		b.append(", bitmapInactiveBranchAge=") //$NON-NLS-1$
 				.append(getBitmapInactiveBranchAgeInDays());
-		b.append(", singlePack=").append(getSinglePack()); //$NON-NLS-1$
 		return b.toString();
 	}
 }

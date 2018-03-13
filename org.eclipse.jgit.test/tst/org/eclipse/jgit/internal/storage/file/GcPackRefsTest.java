@@ -43,13 +43,11 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.hamcrest.Matchers.lessThanOrEqualTo;
+import static java.lang.Integer.valueOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThat;
 
 import java.io.File;
 import java.io.IOException;
@@ -75,7 +73,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.junit.Test;
 
-@SuppressWarnings("boxing")
 public class GcPackRefsTest extends GcTestCase {
 	@Test
 	public void looseRefPacked() throws Exception {
@@ -92,7 +89,7 @@ public class GcPackRefsTest extends GcTestCase {
 		tr.branch(ref).commit().create();
 		String name = repo.findRef(ref).getName();
 		Path dir = repo.getDirectory().toPath().resolve(name).getParent();
-		assertNotNull(dir);
+
 		gc.packRefs();
 		assertFalse(Files.exists(dir));
 	}
@@ -102,23 +99,26 @@ public class GcPackRefsTest extends GcTestCase {
 		RevBlob a = tr.blob("a");
 		tr.lightweightTag("t", a);
 
-		CyclicBarrier syncPoint = new CyclicBarrier(2);
+		final CyclicBarrier syncPoint = new CyclicBarrier(2);
 
-		// Returns 0 for success, 1 in case of error when writing pack.
-		Callable<Integer> packRefs = () -> {
-			syncPoint.await();
-			try {
-				gc.packRefs();
-				return 0;
-			} catch (IOException e) {
-				return 1;
+		Callable<Integer> packRefs = new Callable<Integer>() {
+
+			/** @return 0 for success, 1 in case of error when writing pack */
+			public Integer call() throws Exception {
+				syncPoint.await();
+				try {
+					gc.packRefs();
+					return valueOf(0);
+				} catch (IOException e) {
+					return valueOf(1);
+				}
 			}
 		};
 		ExecutorService pool = Executors.newFixedThreadPool(2);
 		try {
 			Future<Integer> p1 = pool.submit(packRefs);
 			Future<Integer> p2 = pool.submit(packRefs);
-			assertThat(p1.get() + p2.get(), lessThanOrEqualTo(1));
+			assertEquals(1, p1.get().intValue() + p2.get().intValue());
 		} finally {
 			pool.shutdown();
 			pool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
@@ -157,7 +157,6 @@ public class GcPackRefsTest extends GcTestCase {
 		try {
 			Future<Result> result = pool.submit(new Callable<Result>() {
 
-				@Override
 				public Result call() throws Exception {
 					RefUpdate update = new RefDirectoryUpdate(
 							(RefDirectory) repo.getRefDatabase(),
@@ -182,7 +181,6 @@ public class GcPackRefsTest extends GcTestCase {
 			});
 
 			pool.submit(new Callable<Void>() {
-				@Override
 				public Void call() throws Exception {
 					refUpdateLockedRef.await();
 					gc.packRefs();

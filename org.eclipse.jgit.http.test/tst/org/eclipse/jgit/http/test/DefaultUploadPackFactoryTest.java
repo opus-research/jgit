@@ -69,7 +69,6 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 
 	private UploadPackFactory<HttpServletRequest> factory;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

@@ -188,7 +188,7 @@ public class FS_POSIX extends FS {
 		if (!isFile(f))
 			return false;
 		if (!canExecute)
-			return f.setExecutable(false, false);
+			return f.setExecutable(false);
 
 		try {
 			Path path = f.toPath();
@@ -225,7 +225,7 @@ public class FS_POSIX extends FS {
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<>(4 + args.length);
+		List<String> argv = new ArrayList<String>(4 + args.length);
 		argv.add("sh"); //$NON-NLS-1$
 		argv.add("-c"); //$NON-NLS-1$
 		argv.add(cmd + " \"$@\""); //$NON-NLS-1$

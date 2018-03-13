@@ -55,7 +55,6 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.lib.internal.WorkQueue;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -301,7 +300,7 @@ public class RepositoryCache {
 	}
 
 	private Collection<Key> getKeys() {
-		return new ArrayList<>(cacheMap.keySet());
+		return new ArrayList<Key>(cacheMap.keySet());
 	}
 
 	private void clearAllExpired() {

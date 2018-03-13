@@ -125,30 +125,16 @@ public class FileLfsServlet extends HttpServlet {
 		}
 	}
 
-	/**
-	 * Retrieve object id from request
-	 *
-	 * @param req
-	 *            servlet request
-	 * @param rsp
-	 *            servlet response
-	 * @return object id, or <code>null</code> if the object id could not be
-	 *         retrieved
-	 * @throws IOException
-	 *             if an I/O error occurs
-         * @since 4.6
-	 */
-	protected AnyLongObjectId getObjectToTransfer(HttpServletRequest req,
+	private AnyLongObjectId getObjectToTransfer(HttpServletRequest req,
 			HttpServletResponse rsp) throws IOException {
 		String info = req.getPathInfo();
-		int length = 1 + Constants.LONG_OBJECT_ID_STRING_LENGTH;
-		if (info.length() != length) {
+		if (info.length() != 1 + Constants.LONG_OBJECT_ID_STRING_LENGTH) {
 			sendError(rsp, HttpStatus.SC_UNPROCESSABLE_ENTITY, MessageFormat
 					.format(LfsServerText.get().invalidPathInfo, info));
 			return null;
 		}
 		try {
-			return LongObjectId.fromString(info.substring(1, length));
+			return LongObjectId.fromString(info.substring(1, 65));
 		} catch (InvalidLongObjectIdException e) {
 			sendError(rsp, HttpStatus.SC_UNPROCESSABLE_ENTITY, e.getMessage());
 			return null;

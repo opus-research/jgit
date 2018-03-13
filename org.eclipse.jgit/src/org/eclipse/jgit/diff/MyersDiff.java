@@ -119,7 +119,7 @@ public class MyersDiff<S extends Sequence> {
 		public <S extends Sequence> void diffNonCommon(EditList edits,
 				HashedSequenceComparator<S> cmp, HashedSequence<S> a,
 				HashedSequence<S> b, Edit region) {
-			new MyersDiff<>(edits, cmp, a, b, region);
+			new MyersDiff<S>(edits, cmp, a, b, region);
 		}
 	};
 
@@ -460,7 +460,6 @@ if (k < beginK || k > endK)
 		}
 
 		class ForwardEditPaths extends EditPaths {
-			@Override
 			final int snake(int k, int x) {
 				for (; x < endA && k + x < endB; x++)
 					if (!cmp.equals(a, x, b, k + x))
@@ -468,22 +467,18 @@ if (k < beginK || k > endK)
 				return x;
 			}
 
-			@Override
 			final int getLeft(final int x) {
 				return x;
 			}
 
-			@Override
 			final int getRight(final int x) {
 				return x + 1;
 			}
 
-			@Override
 			final boolean isBetter(final int left, final int right) {
 				return left > right;
 			}
 
-			@Override
 			final void adjustMinMaxK(final int k, final int x) {
 				if (x >= endA || k + x >= endB) {
 					if (k > backward.middleK)
@@ -493,7 +488,6 @@ if (k < beginK || k > endK)
 				}
 			}
 
-			@Override
 			final boolean meets(int d, int k, int x, long snake) {
 				if (k < backward.beginK || k > backward.endK)
 					return false;
@@ -508,7 +502,6 @@ if (k < beginK || k > endK)
 		}
 
 		class BackwardEditPaths extends EditPaths {
-			@Override
 			final int snake(int k, int x) {
 				for (; x > beginA && k + x > beginB; x--)
 					if (!cmp.equals(a, x - 1, b, k + x - 1))
@@ -516,22 +509,18 @@ if (k < beginK || k > endK)
 				return x;
 			}
 
-			@Override
 			final int getLeft(final int x) {
 				return x - 1;
 			}
 
-			@Override
 			final int getRight(final int x) {
 				return x;
 			}
 
-			@Override
 			final boolean isBetter(final int left, final int right) {
 				return left < right;
 			}
 
-			@Override
 			final void adjustMinMaxK(final int k, final int x) {
 				if (x <= beginA || k + x <= beginB) {
 					if (k > forward.middleK)
@@ -541,7 +530,6 @@ if (k < beginK || k > endK)
 				}
 			}
 
-			@Override
 			final boolean meets(int d, int k, int x, long snake) {
 				if (k < forward.beginK || k > forward.endK)
 					return false;
