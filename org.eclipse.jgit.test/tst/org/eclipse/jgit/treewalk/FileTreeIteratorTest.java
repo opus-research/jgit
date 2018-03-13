@@ -56,9 +56,9 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -96,19 +96,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 			writeTrashFile(s, s);
 			mtime[i] = new File(trash, s).lastModified();
 		}
-	}
-
-	@Test
-	public void testGetEntryContentLength() throws Exception {
-		final FileTreeIterator fti = new FileTreeIterator(db);
-		fti.next(1);
-		assertEquals(3, fti.getEntryContentLength());
-		fti.back(1);
-		assertEquals(2, fti.getEntryContentLength());
-		fti.next(1);
-		assertEquals(3, fti.getEntryContentLength());
-		fti.reset();
-		assertEquals(2, fti.getEntryContentLength());
 	}
 
 	@Test
@@ -236,7 +223,9 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		ObjectId fromRaw = ObjectId.fromRaw(fti.idBuffer(), fti.idOffset());
 		assertEquals("6b584e8ece562ebffc15d38808cd6b98fc3d97ea",
 				fromRaw.getName());
-		assertFalse(fti.isModified(dce, false));
+		ObjectReader objectReader = db.newObjectReader();
+		assertFalse(fti.isModified(dce, false, objectReader));
+		objectReader.release();
 	}
 
 	@Test
@@ -255,7 +244,9 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 				.getConfig().get(WorkingTreeOptions.KEY));
 		while (!fti.getEntryPathString().equals("symlink"))
 			fti.next(1);
-		assertFalse(fti.isModified(dce, false));
+		ObjectReader objectReader = db.newObjectReader();
+		assertFalse(fti.isModified(dce, false, objectReader));
+		objectReader.release();
 	}
 
 	@Test
@@ -278,7 +269,9 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		// If the rounding trick does not work we could skip the compareMetaData
 		// test and hope that we are usually testing the intended code path.
 		assertEquals(MetadataDiff.SMUDGED, fti.compareMetadata(dce));
-		assertTrue(fti.isModified(dce, false));
+		ObjectReader objectReader = db.newObjectReader();
+		assertTrue(fti.isModified(dce, false, objectReader));
+		objectReader.release();
 	}
 
 	@Test
