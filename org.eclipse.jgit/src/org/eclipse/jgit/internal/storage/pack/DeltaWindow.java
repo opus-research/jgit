@@ -117,30 +117,25 @@ final class DeltaWindow {
 
 	synchronized DeltaTask.Slice remaining() {
 		int e = end;
-		int n = (e - cur) >>> 1;
-		if (0 == n)
+		int halfRemaining = (e - cur) >>> 1;
+		if (0 == halfRemaining)
 			return null;
 
-		int t = e - n;
-		int h = toSearch[t].getPathHash();
-		for (int s = t + 1; s < e; s++) {
-			if (h != toSearch[s].getPathHash()) {
-				t = s;
-				break;
-			}
+		// Split on the next path after the 50% split point.
+		int p = e - halfRemaining;
+		int h = toSearch[p].getPathHash();
+		for (int n = p + 1; n < e; n++) {
+			if (h != toSearch[n].getPathHash())
+				return new DeltaTask.Slice(n, e);
 		}
-		return new DeltaTask.Slice(t, e);
+		return null;
 	}
 
-	synchronized DeltaTask.Slice stealWork(DeltaTask.Slice s) {
-		int t = s.beginIndex;
-		if (t <= cur)
-			return null;
-		int h = toSearch[cur].getPathHash();
-		if (h == toSearch[t].getPathHash())
-			return null;
-		end = t;
-		return s;
+	synchronized boolean tryStealWork(DeltaTask.Slice s) {
+		if (s.beginIndex <= cur)
+			return false;
+		end = s.beginIndex;
+		return true;
 	}
 
 	void search() throws IOException {
@@ -278,10 +273,6 @@ final class DeltaWindow {
 			return NEXT_RES;
 		}
 
-		// Do not use a base that is 32x larger than desired result.
-		if (res.size() < src.size() >>> 5)
-			return NEXT_SRC;
-
 		// Only consider a source with a short enough delta chain.
 		if (src.depth() > resMaxDepth)
 			return NEXT_SRC;
@@ -293,6 +284,10 @@ final class DeltaWindow {
 
 		// If we have to insert a lot to make this work, find another.
 		if (res.size() - src.size() > msz)
+			return NEXT_SRC;
+
+		// If the sizes are radically different, this is a bad pairing.
+		if (res.size() < src.size() / 16)
 			return NEXT_SRC;
 
 		DeltaIndex srcIndex;
