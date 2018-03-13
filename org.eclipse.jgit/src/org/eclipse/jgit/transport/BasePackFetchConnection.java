@@ -138,8 +138,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	static final String OPTION_NO_PROGRESS = "no-progress";
 
-	static final String OPTION_NO_DONE = "no-done";
-
 	static enum MultiAck {
 		OFF, CONTINUE, DETAILED;
 	}
@@ -170,8 +168,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	private boolean includeTags;
 
 	private boolean allowOfsDelta;
-
-	private boolean noDone;
 
 	private String lockMessage;
 
@@ -412,10 +408,9 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		if (allowOfsDelta)
 			wantCapability(line, OPTION_OFS_DELTA);
 
-		if (wantCapability(line, OPTION_MULTI_ACK_DETAILED)) {
+		if (wantCapability(line, OPTION_MULTI_ACK_DETAILED))
 			multiAck = MultiAck.DETAILED;
-			noDone = wantCapability(line, OPTION_NO_DONE);
-		} else if (wantCapability(line, OPTION_MULTI_ACK))
+		else if (wantCapability(line, OPTION_MULTI_ACK))
 			multiAck = MultiAck.CONTINUE;
 		else
 			multiAck = MultiAck.OFF;
@@ -446,13 +441,13 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		int havesSinceLastContinue = 0;
 		boolean receivedContinue = false;
 		boolean receivedAck = false;
-		boolean receivedReady = false;
+		boolean negotiate = true;
 
 		if (statelessRPC)
 			state.writeTo(out, null);
 
 		negotiateBegin();
-		SEND_HAVES: while (!receivedReady) {
+		SEND_HAVES: while (negotiate) {
 			final RevCommit c = walk.next();
 			if (c == null)
 				break SEND_HAVES;
@@ -519,7 +514,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					receivedContinue = true;
 					havesSinceLastContinue = 0;
 					if (anr == AckNackResult.ACK_READY)
-						receivedReady = true;
+						negotiate = false;
 					break;
 				}
 
@@ -545,14 +540,12 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		if (monitor.isCancelled())
 			throw new CancelledException();
 
-		if (!receivedReady || !noDone) {
-			// When statelessRPC is true we should always leave SEND_HAVES
-			// loop above while in the middle of a request. This allows us
-			// to just write done immediately.
-			//
-			pckOut.writeString("done\n");
-			pckOut.flush();
-		}
+		// When statelessRPC is true we should always leave SEND_HAVES
+		// loop above while in the middle of a request. This allows us
+		// to just write done immediately.
+		//
+		pckOut.writeString("done\n");
+		pckOut.flush();
 
 		if (!receivedAck) {
 			// Apparently if we have never received an ACK earlier
