@@ -134,15 +134,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code Pull} command
-	 *
-	 * @return a {@link PullCommand}
-	 */
-	public PullCommand pull() {
-		return new PullCommand(repo);
-	}
-
-	/**
 	 * Returns a command object to execute a {@code Add} command
 	 *
 	 * @see <a
@@ -179,19 +170,6 @@ public class Git {
 	 */
 	public FetchCommand fetch() {
 		return new FetchCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code Push} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-push.html"
-	 *      >Git documentation about Push</a>
-	 * @return a {@link PushCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Push} command
-	 */
-	public PushCommand push() {
-		return new PushCommand(repo);
 	}
 
 	/**
