@@ -45,40 +45,28 @@ package org.eclipse.jgit.lib;
 
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.IllegalTodoFileModification;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Describes a single line in a file formatted like the git-rebase-todo file.
- *
- * @since 3.2
  */
 public class RebaseTodoLine {
 	/**
 	 * Describes rebase actions
 	 */
-	@SuppressWarnings("nls")
 	public static enum Action {
 		/** Use commit */
-		PICK("pick", "p"),
-
+		PICK("pick", "p"), //$NON-NLS-1$ //$NON-NLS-2$
 		/** Use commit, but edit the commit message */
-		REWORD("reword", "r"),
-
+		REWORD("reword", "r"), //$NON-NLS-1$ //$NON-NLS-2$
 		/** Use commit, but stop for amending */
-		EDIT("edit", "e"),
-
-		/** Use commit, but meld into previous commit */
-		SQUASH("squash", "s"),
-
-		/** like "squash", but discard this commit's log message */
-		FIXUP("fixup", "f"),
-
+		EDIT("edit", "e"), // later add SQUASH, FIXUP, etc. //$NON-NLS-1$ //$NON-NLS-2$
 		/**
 		 * A comment in the file. Also blank lines (or lines containing only
 		 * whitespaces) are reported as comments
 		 */
-		COMMENT("comment", "#");
+		COMMENT("comment", "#"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		private final String token;
 
@@ -96,6 +84,7 @@ public class RebaseTodoLine {
 			return this.token;
 		}
 
+		@SuppressWarnings("nls")
 		@Override
 		public String toString() {
 			return "Action[" + token + "]";
@@ -111,7 +100,7 @@ public class RebaseTodoLine {
 						|| action.shortToken.equals(token))
 					return action;
 			}
-			throw new IllegalArgumentException(MessageFormat.format(
+			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().unknownOrUnsupportedCommand, token,
 					Action.values()));
 		}
@@ -167,11 +156,8 @@ public class RebaseTodoLine {
 	 * non-comment.
 	 *
 	 * @param newAction
-	 * @throws IllegalTodoFileModification
-	 *             on attempt to set a non-comment action on a line which was a
-	 *             comment line before.
 	 */
-	public void setAction(Action newAction) throws IllegalTodoFileModification {
+	public void setAction(Action newAction) {
 		if (!Action.COMMENT.equals(action) && Action.COMMENT.equals(newAction)) {
 			// transforming from non-comment to comment
 			if (comment == null)
@@ -183,7 +169,7 @@ public class RebaseTodoLine {
 		} else if (Action.COMMENT.equals(action) && !Action.COMMENT.equals(newAction)) {
 			// transforming from comment to non-comment
 			if (commit == null)
-				throw new IllegalTodoFileModification(MessageFormat.format(
+				throw new JGitInternalException(MessageFormat.format(
 						JGitText.get().cannotChangeActionOnComment, action,
 						newAction));
 		}
@@ -210,23 +196,17 @@ public class RebaseTodoLine {
 			this.comment = null;
 			return;
 		}
-
-		if (newComment.contains("\n") || newComment.contains("\r")) //$NON-NLS-1$ //$NON-NLS-2$
-			throw createInvalidCommentException(newComment);
-
+		Exception iae = new IllegalArgumentException(
+				MessageFormat.format(
+				JGitText.get().argumentIsNotAValidCommentString, newComment));
+		if (newComment.contains("\n") || newComment.contains("\r")) { //$NON-NLS-1$ //$NON-NLS-2$
+			throw new JGitInternalException(iae.getMessage(), iae);
+		}
 		if (newComment.trim().length() == 0 || newComment.startsWith("#")) { //$NON-NLS-1$
 			this.comment = newComment;
 			return;
 		}
-
-		throw createInvalidCommentException(newComment);
-	}
-
-	private static IllegalArgumentException createInvalidCommentException(
-			String newComment) {
-		return new IllegalArgumentException(
-				MessageFormat.format(
-				JGitText.get().argumentIsNotAValidCommentString, newComment));
+		throw new JGitInternalException(iae.getMessage(), iae);
 	}
 
 	/**
@@ -238,8 +218,8 @@ public class RebaseTodoLine {
 	}
 
 	/**
-	 * @return the first line of the commit message of the commit the action
-	 *         will be performed on.
+	 * @return the first line of the commit message of the commit on that the
+	 *         action will be performed on.
 	 */
 	public String getShortMessage() {
 		return shortMessage;

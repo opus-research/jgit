@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -72,9 +70,7 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.StringUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -164,21 +160,7 @@ public class FileRepository extends Repository {
 	public FileRepository(final BaseRepositoryBuilder options) throws IOException {
 		super(options);
 
-		if (StringUtils.isEmptyOrNull(SystemReader.getInstance().getenv(
-				Constants.GIT_CONFIG_NOSYSTEM_KEY)))
-			systemConfig = SystemReader.getInstance().openSystemConfig(null,
-					getFS());
-		else
-			systemConfig = new FileBasedConfig(null, FS.DETECTED) {
-				public void load() {
-					// empty, do not load
-				}
-
-				public boolean isOutdated() {
-					// regular class would bomb here
-					return false;
-				}
-			};
+		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
 		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
@@ -400,7 +382,7 @@ public class FileRepository extends Repository {
 
 	@Override
 	public void scanForRepoChanges() throws IOException {
-		getRefDatabase().getRefs(ALL); // This will look for changes to refs
+		getAllRefs(); // This will look for changes to refs
 		detectIndexChanges();
 	}
 

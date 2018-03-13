@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.StringUtils;
 
 /** An annotated tag. */
 public class RevTag extends RevObject {
@@ -235,7 +234,7 @@ public class RevTag extends RevObject {
 		final int msgE = RawParseUtils.endOfParagraph(raw, msgB);
 		String str = RawParseUtils.decode(enc, raw, msgB, msgE);
 		if (RevCommit.hasLF(raw, msgB, msgE))
-			str = StringUtils.replaceLineBreaksWithSpace(str);
+			str = str.replace('\n', ' ');
 		return str;
 	}
 

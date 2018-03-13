@@ -76,7 +76,6 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
 
@@ -281,7 +280,7 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
-		addTree(walk, mergeCommitTree);
+		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
 
@@ -307,7 +306,8 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) throws IOException {
 		if (m != null) {
-			checkValidPath(m);
+			if (!isValidPath(m))
+				throw new InvalidPathException(m.getEntryPathString());
 			// There is an entry in the merge commit. Means: we want to update
 			// what's currently in the index and working-tree to that one
 			if (i == null) {
@@ -326,8 +326,7 @@ public class DirCacheCheckout {
 						m.getEntryFileMode());
 			} else if (i.getDirCacheEntry() != null) {
 				// The index contains a file (and not a folder)
-				if (f.isModified(i.getDirCacheEntry(), true,
-						this.walk.getObjectReader())
+				if (f.isModified(i.getDirCacheEntry(), true)
 						|| i.getDirCacheEntry().getStage() != 0)
 					// The working tree file is dirty or the index contains a
 					// conflict
@@ -523,8 +522,8 @@ public class DirCacheCheckout {
 
 		String name = walk.getPathString();
 
-		if (m != null)
-			checkValidPath(m);
+		if (m != null && !isValidPath(m))
+			throw new InvalidPathException(m.getEntryPathString());
 
 		if (i == null && m == null && h == null) {
 			// File/Directory conflict case #20
@@ -556,9 +555,7 @@ public class DirCacheCheckout {
 		 * 3    D        F       D                 Y       N       N           Keep
 		 * 4    D        F       D                 N       N       N           Conflict
 		 * 5    D        F       F       Y         N       N       Y           Keep
-		 * 5b   D        F       F       Y         N       N       N           Conflict
 		 * 6    D        F       F       N         N       N       Y           Keep
-		 * 6b   D        F       F       N         N       N       N           Conflict
 		 * 7    F        D       F       Y         Y       N       N           Update
 		 * 8    F        D       F       N         Y       N       N           Conflict
 		 * 9    F        D       F       Y         N       N       N           Update
@@ -623,11 +620,7 @@ public class DirCacheCheckout {
 			case 0xF0D: // 18
 				remove(name);
 				break;
-			case 0xDFF: // 5 5b 6 6b
-				if (equalIdAndMode(iId, iMode, mId, mMode))
-					keep(dce); // 5 6
-				else
-					conflict(name, dce, h, m); // 5b 6b
+			case 0xDFF: // 5 6
 			case 0xFDD: // 10 11
 				// TODO: make use of tree extension as soon as available in jgit
 				// we would like to do something like
@@ -661,9 +654,7 @@ public class DirCacheCheckout {
 				break;
 			case 0xFFD: // 12 13 14
 				if (equalIdAndMode(hId, hMode, iId, iMode))
-					if (f == null
-							|| f.isModified(dce, true,
-									this.walk.getObjectReader()))
+					if (f == null || f.isModified(dce, true))
 						conflict(name, dce, h, m);
 					else
 						remove(name);
@@ -777,8 +768,7 @@ public class DirCacheCheckout {
 						// Nothing in Head
 						// Something in Index
 						if (dce != null
-								&& (f == null || f.isModified(dce, true,
-										this.walk.getObjectReader())))
+								&& (f == null || f.isModified(dce, true)))
 							// No file or file is dirty
 							// Nothing in Merge and current path is part of
 							// File/Folder conflict
@@ -845,9 +835,7 @@ public class DirCacheCheckout {
 						// Something different from a submodule in Index
 						// Nothing in Merge
 						// Something in Head
-						if (f == null
-								|| f.isModified(dce, true,
-										this.walk.getObjectReader()))
+						if (f == null || f.isModified(dce, true))
 							// file is dirty
 							// Index contains the same as Head
 							// Something different from a submodule in Index
@@ -910,8 +898,7 @@ public class DirCacheCheckout {
 						// file content
 						update(name, mId, mMode);
 					} else if (dce != null
-							&& (f == null || f.isModified(dce, true,
-									this.walk.getObjectReader()))) {
+							&& (f == null || f.isModified(dce, true))) {
 						// File doesn't exist or is dirty
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
@@ -1048,8 +1035,7 @@ public class DirCacheCheckout {
 			wtIt = tw.getTree(1, WorkingTreeIterator.class);
 			if (dcIt == null || wtIt == null)
 				return true;
-			if (wtIt.isModified(dcIt.getDirCacheEntry(), true,
-					this.walk.getObjectReader())) {
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true)) {
 				return true;
 			}
 		}
@@ -1165,14 +1151,14 @@ public class DirCacheCheckout {
 			forbidden[i] = Constants.encodeASCII(list[i]);
 	}
 
-	private static void checkValidPath(CanonicalTreeParser t)
-			throws InvalidPathException {
+	private static boolean isValidPath(CanonicalTreeParser t) {
 		for (CanonicalTreeParser i = t; i != null; i = i.getParent())
-			checkValidPathSegment(i);
+			if (!isValidPathSegment(i))
+				return false;
+		return true;
 	}
 
-	private static void checkValidPathSegment(CanonicalTreeParser t)
-			throws InvalidPathException {
+	private static boolean isValidPathSegment(CanonicalTreeParser t) {
 		boolean isWindows = SystemReader.getInstance().isWindows();
 		boolean isOSX = SystemReader.getInstance().isMacOS();
 		boolean ignCase = isOSX || isWindows;
@@ -1185,29 +1171,23 @@ public class DirCacheCheckout {
 		int start = ptr;
 		while (ptr < end) {
 			if (raw[ptr] == '/')
-				throw new InvalidPathException(
-						JGitText.get().invalidPathContainsSeparator,
-						"/", t.getEntryPathString()); //$NON-NLS-1$
+				return false;
 			if (isWindows) {
 				if (raw[ptr] == '\\')
-					throw new InvalidPathException(
-							JGitText.get().invalidPathContainsSeparator,
-							"\\", t.getEntryPathString()); //$NON-NLS-1$
+					return false;
 				if (raw[ptr] == ':')
-					throw new InvalidPathException(
-							JGitText.get().invalidPathContainsSeparator,
-							":", t.getEntryPathString()); //$NON-NLS-1$
+					return false;
 			}
 			ptr++;
 		}
-		// '.' and '..' are invalid here
+		// '.' and '.'' are invalid here
 		if (ptr - start == 1) {
 			if (raw[start] == '.')
-				throw new InvalidPathException(t.getEntryPathString());
+				return false;
 		} else if (ptr - start == 2) {
 			if (raw[start] == '.')
 				if (raw[start + 1] == '.')
-					throw new InvalidPathException(t.getEntryPathString());
+					return false;
 		} else if (ptr - start == 4) {
 			// .git (possibly case insensitive) is disallowed
 			if (raw[start] == '.')
@@ -1216,24 +1196,14 @@ public class DirCacheCheckout {
 							|| (ignCase && raw[start + 2] == 'I'))
 						if (raw[start + 3] == 't'
 								|| (ignCase && raw[start + 3] == 'T'))
-							throw new InvalidPathException(
-									t.getEntryPathString());
+							return false;
 		}
 		if (isWindows) {
 			// Space or period at end of file name is ignored by Windows.
 			// Treat this as a bad path for now. We may want to handle
 			// this as case insensitivity in the future.
-			if (ptr > 0) {
-				if (raw[ptr - 1] == '.')
-					throw new InvalidPathException(
-							JGitText.get().invalidPathPeriodAtEndWindows,
-							t.getEntryPathString());
-				if (raw[ptr - 1] == ' ')
-					throw new InvalidPathException(
-							JGitText.get().invalidPathSpaceAtEndWindows,
-							t.getEntryPathString());
-			}
-
+			if (raw[ptr - 1] == '.' || raw[ptr - 1] == ' ')
+				return false;
 			int i;
 			// Bad names, eliminate suffix first
 			for (i = start; i < ptr; ++i)
@@ -1251,14 +1221,13 @@ public class DirCacheCheckout {
 								break;
 						}
 						if (k == len)
-							throw new InvalidPathException(
-									JGitText.get().invalidPathReservedOnWindows,
-									RawParseUtils.decode(forbidden[j]), t
-											.getEntryPathString());
+							return false;
 					}
 				}
 			}
 		}
+
+		return true;
 	}
 
 	private static byte toUpper(byte b) {
