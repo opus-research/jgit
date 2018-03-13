@@ -75,15 +75,17 @@ import org.eclipse.jgit.util.NB;
 
 class BlockWriter {
 	private final byte blockType;
+	private final byte keyType;
 	private final List<Entry> entries = new ArrayList<>();
 	private final int blockSize;
 	private final int restartInterval;
 
-	private int bytesInKeyTable;
+	private int bytesInKeySection;
 	private int restartCnt;
 
-	BlockWriter(byte type, int bs, int ri) {
+	BlockWriter(byte type, byte kt, int bs, int ri) {
 		blockType = type;
+		keyType = kt;
 		blockSize = bs;
 		restartInterval = ri;
 	}
@@ -108,13 +110,13 @@ class BlockWriter {
 		return computeBlockSize(0, false);
 	}
 
-	int estimateIndexSizeIfAdding(byte[] lastKey, long blockOffset) {
-		IndexEntry entry = new IndexEntry(lastKey, blockOffset);
-		return computeBlockSize(entry.size(0), true);
+	int estimateIndexSizeIfAdding(byte[] lastKey, long blockPosition) {
+		IndexEntry entry = new IndexEntry(lastKey, blockPosition);
+		return computeBlockSize(entry.size(), true);
 	}
 
-	void addIndex(byte[] lastKey, long blockOffset) {
-		entries.add(new IndexEntry(lastKey, blockOffset));
+	void addIndex(byte[] lastKey, long blockPosition) {
+		entries.add(new IndexEntry(lastKey, blockPosition));
 	}
 
 	void addFirst(Entry entry) throws BlockSizeTooSmallException {
@@ -125,6 +127,16 @@ class BlockWriter {
 	}
 
 	boolean tryAdd(Entry entry) {
+		if (entry instanceof ObjEntry
+				&& computeBlockSize(1, entry.size()) > blockSize) {
+			// If the ObjEntry has so many ref block pointers that its
+			// encoding overflows the block size, reconfigure it to tell
+			// readers to instead scan all refs for this ObjectId. That
+			// significantly shrinks the entry to a very small size,
+			// which may now fit into this block.
+			((ObjEntry) entry).markScanRequired();
+		}
+
 		if (tryAdd(entry, true)) {
 			return true;
 		} else if (nextShouldBeRestart()) {
@@ -144,20 +156,24 @@ class BlockWriter {
 		if (!restart) {
 			byte[] prior = entries.get(entries.size() - 1).key;
 			prefixLen = commonPrefix(prior, prior.length, key);
-			if (prefixLen == 0) {
+			if (prefixLen <= 5 /* "refs/" */ && keyType == REF_BLOCK_TYPE) {
+				restart = true;
+				prefixLen = 0;
+			} else if (prefixLen == 0) {
 				restart = true;
 			}
 		}
 
-		int entrySize = entry.size(prefixLen);
+		entry.restart = restart;
+		entry.prefixLen = prefixLen;
+		int entrySize = entry.size();
 		if (computeBlockSize(entrySize, restart) > blockSize) {
 			return false;
 		}
 
-		bytesInKeyTable += entrySize;
+		bytesInKeySection += entrySize;
 		entries.add(entry);
 		if (restart) {
-			entry.restart = true;
 			restartCnt++;
 		}
 		return true;
@@ -170,37 +186,41 @@ class BlockWriter {
 	}
 
 	private int computeBlockSize(int key, boolean restart) {
+		return computeBlockSize(
+				restartCnt + (restart ? 1 : 0),
+				bytesInKeySection + key);
+	}
+
+	private static int computeBlockSize(int restartCnt, int entryBytes) {
 		return 4 // 4-byte block header
-				+ bytesInKeyTable + key
-				+ (restartCnt + (restart ? 1 : 0)) * 3
-				+ 2; // 2-byte restart_count
+				+ 2 // 2-byte restart_count
+				+ restartCnt * 3 // restart_offset
+				+ entryBytes;
 	}
 
 	void writeTo(ReftableOutputStream os) throws IOException {
 		if (blockType == INDEX_BLOCK_TYPE) {
 			selectIndexRestarts();
 		}
-		if (restartCnt > MAX_RESTARTS) {
+		if (restartCnt == 0 || restartCnt > MAX_RESTARTS) {
 			throw new IllegalStateException();
 		}
 
-		IntList restartOffsets = new IntList(restartCnt);
-		byte[] prior = {};
-
 		os.beginBlock(blockType);
-		for (int entryIdx = 0; entryIdx < entries.size(); entryIdx++) {
-			Entry entry = entries.get(entryIdx);
+		os.writeInt16(restartCnt);
+		int restartTbl = os.bytesWrittenInBlock();
+		os.reserve(restartCnt * 3);
+
+		int ri = 0;
+		for (Entry entry : entries) {
 			if (entry.restart) {
-				restartOffsets.add(os.bytesWrittenInBlock());
+				int ptr = restartTbl + (ri++ * 3);
+				int start = os.bytesWrittenInBlock();
+				os.patchInt24(ptr, start);
 			}
-			entry.writeKey(os, prior);
+			entry.writeKey(os);
 			entry.writeValue(os);
-			prior = entry.key;
 		}
-		for (int i = 0; i < restartOffsets.size(); i++) {
-			os.writeInt24(restartOffsets.get(i));
-		}
-		os.writeInt16(restartOffsets.size());
 		os.flushBlock();
 	}
 
@@ -208,17 +228,32 @@ class BlockWriter {
 		// Indexes grow without bound, but the restart table has a limit.
 		// Select restarts in the index as far apart as possible to stay
 		// within the MAX_RESTARTS limit defined by the file format.
-		int ir = Math.max(restartInterval, entries.size() / MAX_RESTARTS);
+		restartCnt = 0;
+		int ri = Math.max(restartInterval, entries.size() / MAX_RESTARTS);
 		for (int k = 0; k < entries.size(); k++) {
-			if ((k % ir) == 0) {
-				entries.get(k).restart = true;
+			Entry e = entries.get(k);
+			if ((k % ri) == 0) {
+				e.restart = true;
+				e.prefixLen = 0;
+				restartCnt++;
+			} else {
+				e.restart = false;
+			}
+		}
+
+		// Prefix compress non-restart index entries.
+		for (int k = 1; k < entries.size(); k++) {
+			Entry e = entries.get(k);
+			if (!e.restart) {
+				byte[] prior = entries.get(k - 1).key;
+				e.prefixLen = commonPrefix(prior, prior.length, e.key);
 			}
 		}
 	}
 
 	private BlockSizeTooSmallException blockSizeTooSmall(Entry entry) {
 		// Compute size required to fit this entry by itself.
-		int min = computeBlockSize(entry.size(0), true);
+		int min = computeBlockSize(1, entry.size());
 		return new BlockSizeTooSmallException(min);
 	}
 
@@ -258,32 +293,26 @@ class BlockWriter {
 		}
 
 		final byte[] key;
+		int prefixLen;
 		boolean restart;
 
 		Entry(byte[] key) {
 			this.key = key;
 		}
 
-		void writeKey(ReftableOutputStream os, byte[] prior) {
-			int pfx;
-			int sfx;
-			if (restart) {
-				pfx = 0;
-				sfx = key.length;
-			} else {
-				pfx = commonPrefix(prior, prior.length, key);
-				sfx = key.length - pfx;
-			}
-			os.writeVarint(pfx);
-			os.writeVarint(encodeSuffixAndType(sfx, valueType()));
-			os.write(key, pfx, sfx);
+		void writeKey(ReftableOutputStream os) {
+			int sfxLen = key.length - prefixLen;
+			os.writeVarint(prefixLen);
+			os.writeVarint(encodeSuffixAndType(sfxLen, valueType()));
+			os.write(key, prefixLen, sfxLen);
 		}
 
-		int size(int prefixLen) {
-			int sfx = key.length - prefixLen;
+		int size() {
+			int sfxLen = key.length - prefixLen;
+			int sfx = encodeSuffixAndType(sfxLen, valueType());
 			return computeVarintSize(prefixLen)
-					+ computeVarintSize(encodeSuffixAndType(sfx, valueType()))
-					+ sfx
+					+ computeVarintSize(sfx)
+					+ sfxLen
 					+ valueSize();
 		}
 
@@ -294,11 +323,11 @@ class BlockWriter {
 	}
 
 	static class IndexEntry extends Entry {
-		private final long blockOffset;
+		private final long blockPosition;
 
-		IndexEntry(byte[] key, long blockOffset) {
+		IndexEntry(byte[] key, long blockPosition) {
 			super(key);
-			this.blockOffset = blockOffset;
+			this.blockPosition = blockPosition;
 		}
 
 		@Override
@@ -313,12 +342,12 @@ class BlockWriter {
 
 		@Override
 		int valueSize() {
-			return computeVarintSize(blockOffset);
+			return computeVarintSize(blockPosition);
 		}
 
 		@Override
 		void writeValue(ReftableOutputStream os) {
-			os.writeVarint(blockOffset);
+			os.writeVarint(blockPosition);
 		}
 	}
 
@@ -423,11 +452,11 @@ class BlockWriter {
 	}
 
 	static class ObjEntry extends Entry {
-		final IntList blocks;
+		final IntList blockIds;
 
-		ObjEntry(int idLen, ObjectId id, IntList blocks) {
+		ObjEntry(int idLen, ObjectId id, IntList blockIds) {
 			super(key(idLen, id));
-			this.blocks = blocks;
+			this.blockIds = blockIds;
 		}
 
 		private static byte[] key(int idLen, ObjectId id) {
@@ -439,6 +468,10 @@ class BlockWriter {
 			return key;
 		}
 
+		void markScanRequired() {
+			blockIds.clear();
+		}
+
 		@Override
 		byte blockType() {
 			return OBJ_BLOCK_TYPE;
@@ -446,21 +479,25 @@ class BlockWriter {
 
 		@Override
 		int valueType() {
-			int cnt = blocks.size();
-			return cnt > VALUE_TYPE_MASK ? 0 : cnt;
+			int cnt = blockIds.size();
+			return cnt != 0 && cnt <= VALUE_TYPE_MASK ? cnt : 0;
 		}
 
 		@Override
 		int valueSize() {
+			int cnt = blockIds.size();
+			if (cnt == 0) {
+				return computeVarintSize(0);
+			}
+
 			int n = 0;
-			int cnt = blocks.size();
 			if (cnt > VALUE_TYPE_MASK) {
 				n += computeVarintSize(cnt);
 			}
-			n += computeVarintSize(blocks.get(0));
+			n += computeVarintSize(blockIds.get(0));
 			for (int j = 1; j < cnt; j++) {
-				int prior = blocks.get(j - 1);
-				int b = blocks.get(j);
+				int prior = blockIds.get(j - 1);
+				int b = blockIds.get(j);
 				n += computeVarintSize(b - prior);
 			}
 			return n;
@@ -468,14 +505,19 @@ class BlockWriter {
 
 		@Override
 		void writeValue(ReftableOutputStream os) throws IOException {
-			int cnt = blocks.size();
+			int cnt = blockIds.size();
+			if (cnt == 0) {
+				os.writeVarint(0);
+				return;
+			}
+
 			if (cnt > VALUE_TYPE_MASK) {
 				os.writeVarint(cnt);
 			}
-			os.writeVarint(blocks.get(0));
+			os.writeVarint(blockIds.get(0));
 			for (int j = 1; j < cnt; j++) {
-				int prior = blocks.get(j - 1);
-				int b = blocks.get(j);
+				int prior = blockIds.get(j - 1);
+				int b = blockIds.get(j);
 				os.writeVarint(b - prior);
 			}
 		}
@@ -523,8 +565,8 @@ class BlockWriter {
 		@Override
 		int valueSize() {
 			return 2 * OBJECT_ID_LENGTH
-					+ computeVarintSize(timeSecs)
 					+ 2 // tz
+					+ computeVarintSize(timeSecs)
 					+ computeVarintSize(name.length) + name.length
 					+ computeVarintSize(email.length) + email.length
 					+ computeVarintSize(msg.length) + msg.length;
@@ -534,8 +576,8 @@ class BlockWriter {
 		void writeValue(ReftableOutputStream os) {
 			os.writeId(oldId);
 			os.writeId(newId);
-			os.writeVarint(timeSecs);
 			os.writeInt16(tz);
+			os.writeVarint(timeSecs);
 			os.writeVarintString(name);
 			os.writeVarintString(email);
 			os.writeVarintString(msg);
