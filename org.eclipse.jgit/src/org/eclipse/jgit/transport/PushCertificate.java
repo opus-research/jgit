@@ -99,10 +99,6 @@ public class PushCertificate {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, PUSHER));
 		}
-		if (pushee == null || pushee.isEmpty()) {
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidField, PUSHEE));
-		}
 		if (nonce == null || nonce.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, NONCE));
@@ -213,30 +209,5 @@ public class PushCertificate {
 				.append('\n')
 				.append(rawCommands)
 				.toString();
-	}
-
-	@Override
-	public int hashCode() {
-		return signature.hashCode();
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (!(o instanceof PushCertificate)) {
-			return false;
-		}
-		PushCertificate p = (PushCertificate) o;
-		return version.equals(p.version)
-				&& pusher.equals(p.pusher)
-				&& pushee.equals(p.pushee)
-				&& nonceStatus == p.nonceStatus
-				&& rawCommands.equals(p.rawCommands)
-				&& signature.equals(p.signature);
-	}
-
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + '['
-				 + toText() + signature + ']';
 	}
 }

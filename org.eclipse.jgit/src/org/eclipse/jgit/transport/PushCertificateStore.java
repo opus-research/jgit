@@ -263,7 +263,11 @@ public class PushCertificateStore implements AutoCloseable {
 			ru.setNewObjectId(newCommit);
 			ru.setRefLogIdent(cb.getCommitter());
 			// TODO(dborowitz): Set message?
-			RefUpdate.Result result = ru.update(new RevWalk(inserter.newReader()));
+			RefUpdate.Result result;
+			try (ObjectReader insReader = inserter.newReader();
+					RevWalk rw = new RevWalk(insReader)) {
+				result = ru.update(rw);
+			}
 			if (result == RefUpdate.Result.NEW
 					|| result == RefUpdate.Result.FAST_FORWARD) {
 				added.clear();
