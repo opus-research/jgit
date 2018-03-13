@@ -1119,7 +1119,7 @@ public abstract class Repository {
 	 *
 	 * @return a more user friendly ref name
 	 */
-	public static String shortenRefName(String refName) {
+	public String shortenRefName(String refName) {
 		if (refName.startsWith(Constants.R_HEADS))
 			return refName.substring(Constants.R_HEADS.length());
 		if (refName.startsWith(Constants.R_TAGS))
