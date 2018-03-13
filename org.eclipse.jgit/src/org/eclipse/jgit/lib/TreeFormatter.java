@@ -52,9 +52,11 @@ import static org.eclipse.jgit.lib.FileMode.TREE;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -271,25 +273,6 @@ public class TreeFormatter {
 	}
 
 	/**
-	 * Compute the current tree's ObjectId.
-	 *
-	 * @return computed ObjectId of the tree
-	 */
-	public ObjectId getTreeId() {
-		final ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
-		if (buf != null)
-			return fmt.idFor(OBJ_TREE, buf, 0, ptr);
-
-		try {
-			final long len = overflowBuffer.length();
-			return fmt.idFor(OBJ_TREE, len, overflowBuffer.openInputStream());
-		} catch (IOException err) {
-			// This should never happen, its read failure on a byte array.
-			throw new RuntimeException(err);
-		}
-	}
-
-	/**
 	 * Insert this tree and obtain its ObjectId.
 	 *
 	 * @param ins
@@ -298,7 +281,7 @@ public class TreeFormatter {
 	 * @throws IOException
 	 *             the tree could not be stored.
 	 */
-	public ObjectId insert(ObjectInserter ins) throws IOException {
+	public ObjectId insertTo(ObjectInserter ins) throws IOException {
 		if (buf != null)
 			return ins.insert(OBJ_TREE, buf, 0, ptr);
 
@@ -307,12 +290,31 @@ public class TreeFormatter {
 	}
 
 	/**
+	 * Compute the ObjectId for this tree
+	 *
+	 * @param ins
+	 * @return ObjectId for this tree
+	 */
+	public ObjectId computeId(ObjectInserter ins) {
+		if (buf != null)
+			return ins.idFor(OBJ_TREE, buf, 0, ptr);
+
+		final long len = overflowBuffer.length();
+		try {
+			return ins.idFor(OBJ_TREE, len, overflowBuffer.openInputStream());
+		} catch (IOException e) {
+			// this should never happen
+			throw new RuntimeException(e);
+		}
+	}
+
+	/**
 	 * Copy this formatter's buffer into a byte array.
 	 *
 	 * This method is not efficient, as it needs to create a copy of the
 	 * internal buffer in order to supply an array of the correct size to the
 	 * caller. If the buffer is just to pass to an ObjectInserter, consider
-	 * using {@link #insert(ObjectInserter)} instead.
+	 * using {@link ObjectInserter#insert(TreeFormatter)} instead.
 	 *
 	 * @return a copy of this formatter's buffer.
 	 */
@@ -329,5 +331,39 @@ public class TreeFormatter {
 			// This should never happen, its read failure on a byte array.
 			throw new RuntimeException(err);
 		}
+	}
+
+	@Override
+	public String toString() {
+		byte[] raw = toByteArray();
+
+		CanonicalTreeParser p = new CanonicalTreeParser();
+		p.reset(raw);
+
+		StringBuilder r = new StringBuilder();
+		r.append("Tree={");
+		if (!p.eof()) {
+			r.append('\n');
+			try {
+				new ObjectChecker().checkTree(raw);
+			} catch (CorruptObjectException error) {
+				r.append("*** ERROR: ").append(error.getMessage()).append("\n");
+				r.append('\n');
+			}
+		}
+		while (!p.eof()) {
+			final FileMode mode = p.getEntryFileMode();
+			r.append(mode);
+			r.append(' ');
+			r.append(Constants.typeString(mode.getObjectType()));
+			r.append(' ');
+			r.append(p.getEntryObjectId().name());
+			r.append(' ');
+			r.append(p.getEntryPathString());
+			r.append('\n');
+			p.next();
+		}
+		r.append("}");
+		return r.toString();
 	}
 }

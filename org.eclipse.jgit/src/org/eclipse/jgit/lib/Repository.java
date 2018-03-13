@@ -79,6 +79,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -194,7 +195,7 @@ public abstract class Repository {
 		return getObjectDatabase().newInserter();
 	}
 
-	/** @return a new inserter to create objects in {@link #getObjectDatabase()} */
+	/** @return a new reader to read objects from {@link #getObjectDatabase()} */
 	public ObjectReader newObjectReader() {
 		return getObjectDatabase().newReader();
 	}
@@ -1186,7 +1187,7 @@ public abstract class Repository {
 				fos.close();
 			}
 		} else {
-			mergeMsgFile.delete();
+			FileUtils.delete(mergeMsgFile);
 		}
 	}
 
@@ -1252,7 +1253,7 @@ public abstract class Repository {
 				bos.close();
 			}
 		} else {
-			mergeHeadFile.delete();
+			FileUtils.delete(mergeHeadFile);
 		}
 	}
 }

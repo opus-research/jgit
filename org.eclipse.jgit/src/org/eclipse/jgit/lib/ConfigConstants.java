@@ -57,6 +57,15 @@ public class ConfigConstants {
 	/** The "remote" section */
 	public static final String CONFIG_REMOTE_SECTION = "remote";
 
+	/** The "diff" section */
+	public static final String CONFIG_DIFF_SECTION = "diff";
+
+	/** The "user" section */
+	public static final String CONFIG_USER_SECTION = "user";
+
+	/** The "algorithm" key */
+	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
+
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
@@ -89,4 +98,10 @@ public class ConfigConstants {
 
 	/** The "autosetupmerge" key */
 	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
+
+	/** The "name" key */
+	public static final String CONFIG_KEY_NAME = "name";
+
+	/** The "email" key */
+	public static final String CONFIG_KEY_EMAIL = "email";
 }
