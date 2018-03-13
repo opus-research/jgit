@@ -51,7 +51,6 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_BLOCK_SIZE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_INDEX_SIZE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_RESTARTS;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
@@ -749,7 +748,7 @@ public class ReftableWriter {
 		int estimateBytes(long curBlockPos) {
 			BlockWriter b = new BlockWriter(
 					INDEX_BLOCK_TYPE, keyType,
-					MAX_INDEX_SIZE,
+					MAX_BLOCK_SIZE,
 					Math.max(restartInterval, entries.size() / MAX_RESTARTS));
 			try {
 				for (Entry e : entries) {
@@ -789,7 +788,7 @@ public class ReftableWriter {
 			// index block with the entire remaining set of keys.
 			BlockWriter b = new BlockWriter(
 					INDEX_BLOCK_TYPE, keyType,
-					MAX_INDEX_SIZE,
+					MAX_BLOCK_SIZE,
 					Math.max(restartInterval, keys.size() / MAX_RESTARTS));
 			for (Entry e : keys) {
 				b.mustAdd(e);
