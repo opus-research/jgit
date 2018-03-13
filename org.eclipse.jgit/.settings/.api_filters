@@ -14,14 +14,6 @@
             </message_arguments>
         </filter>
     </resource>
-    <resource path="src/org/eclipse/jgit/lib/Repository.java" type="org.eclipse.jgit.lib.Repository">
-        <filter comment="Only implementors of Repository are affected. That should be allowed" id="336695337">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.lib.Repository"/>
-                <message_argument value="createAttributesNodeProvider()"/>
-            </message_arguments>
-        </filter>
-    </resource>
     <resource path="src/org/eclipse/jgit/transport/PushCertificate.java" type="org.eclipse.jgit.transport.PushCertificate">
         <filter comment="PushCertificate wasn't really usable in 4.0" id="338722907">
             <message_arguments>
@@ -40,20 +32,6 @@
         <filter comment="PushCertificates haven't been really usable in 4.0" id="338849923">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.transport.PushCertificateParser"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/treewalk/WorkingTreeIterator.java" type="org.eclipse.jgit.treewalk.WorkingTreeIterator">
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.treewalk.WorkingTreeIterator"/>
-                <message_argument value="getGlobalAttributesNode()"/>
-            </message_arguments>
-        </filter>
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.treewalk.WorkingTreeIterator"/>
-                <message_argument value="getInfoAttributesNode()"/>
             </message_arguments>
         </filter>
     </resource>
