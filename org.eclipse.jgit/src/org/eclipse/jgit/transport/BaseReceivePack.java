@@ -67,6 +67,7 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
@@ -152,6 +153,9 @@ public abstract class BaseReceivePack {
 	 * making it suitable for single round-trip systems RPCs such as HTTP.
 	 */
 	protected boolean biDirectionalPipe = true;
+
+	/** Expecting data after the pack footer */
+	protected boolean expectDataAfterPackFooter;
 
 	/** Should an incoming transfer validate objects? */
 	protected boolean checkReceivedObjects;
@@ -451,6 +455,19 @@ public abstract class BaseReceivePack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
+	}
+
+	/** @return true if there is data expected after the pack footer. */
+	public boolean isExpectDataAfterPackFooter() {
+		return expectDataAfterPackFooter;
+	}
+
+	/**
+	 * @param e
+	 *            true if there is additional data in InputStream after pack.
+	 */
+	public void setExpectDataAfterPackFooter(boolean e) {
+		expectDataAfterPackFooter = e;
 	}
 
 	/**
@@ -907,7 +924,9 @@ public abstract class BaseReceivePack {
 			parser.setAllowThin(true);
 			parser.setNeedNewObjectIds(checkReferencedIsReachable);
 			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
-			parser.setCheckEofAfterPackFooter(!biDirectionalPipe);
+			parser.setCheckEofAfterPackFooter(!biDirectionalPipe
+					&& !isExpectDataAfterPackFooter());
+			parser.setExpectDataAfterPackFooter(isExpectDataAfterPackFooter());
 			parser.setObjectChecking(isCheckReceivedObjects());
 			parser.setLockMessage(lockMsg);
 			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
@@ -1086,11 +1105,11 @@ public abstract class BaseReceivePack {
 
 				if (oldObj instanceof RevCommit && newObj instanceof RevCommit) {
 					try {
-						if (!walk.isMergedInto((RevCommit) oldObj,
-								(RevCommit) newObj)) {
-							cmd
-									.setType(ReceiveCommand.Type.UPDATE_NONFASTFORWARD);
-						}
+						if (walk.isMergedInto((RevCommit) oldObj,
+								(RevCommit) newObj))
+							cmd.setTypeFastForwardUpdate();
+						else
+							cmd.setType(ReceiveCommand.Type.UPDATE_NONFASTFORWARD);
 					} catch (MissingObjectException e) {
 						cmd.setResult(Result.REJECTED_MISSING_OBJECT, e
 								.getMessage());
@@ -1099,6 +1118,12 @@ public abstract class BaseReceivePack {
 					}
 				} else {
 					cmd.setType(ReceiveCommand.Type.UPDATE_NONFASTFORWARD);
+				}
+
+				if (cmd.getType() == ReceiveCommand.Type.UPDATE_NONFASTFORWARD
+						&& !isAllowNonFastForwards()) {
+					cmd.setResult(Result.REJECTED_NONFASTFORWARD);
+					continue;
 				}
 			}
 
@@ -1123,20 +1148,30 @@ public abstract class BaseReceivePack {
 
 	/** Execute commands to update references. */
 	protected void executeCommands() {
-		List<ReceiveCommand> toApply = ReceiveCommand.filter(commands,
-				Result.NOT_ATTEMPTED);
+		List<ReceiveCommand> toApply = filterCommands(Result.NOT_ATTEMPTED);
+		if (toApply.isEmpty())
+			return;
+
 		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
 		if (sideBand) {
 			SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
 			pm.setDelayStart(250, TimeUnit.MILLISECONDS);
 			updating = pm;
 		}
-		updating.beginTask(JGitText.get().updatingReferences, toApply.size());
-		for (ReceiveCommand cmd : toApply) {
-			updating.update(1);
-			cmd.execute(this);
+
+		BatchRefUpdate batch = db.getRefDatabase().newBatchUpdate();
+		batch.setAllowNonFastForwards(isAllowNonFastForwards());
+		batch.setRefLogIdent(getRefLogIdent());
+		batch.setRefLogMessage("push", true);
+		batch.addCommand(toApply);
+		try {
+			batch.execute(walk, updating);
+		} catch (IOException err) {
+			for (ReceiveCommand cmd : toApply) {
+				if (cmd.getResult() == Result.NOT_ATTEMPTED)
+					cmd.reject(err);
+			}
 		}
-		updating.endTask();
 	}
 
 	/**
@@ -1175,9 +1210,10 @@ public abstract class BaseReceivePack {
 			}
 
 			final StringBuilder r = new StringBuilder();
-			r.append("ng ");
-			r.append(cmd.getRefName());
-			r.append(" ");
+			if (forClient)
+				r.append("ng ").append(cmd.getRefName()).append(" ");
+			else
+				r.append(" ! [rejected] ").append(cmd.getRefName()).append(" (");
 
 			switch (cmd.getResult()) {
 			case NOT_ATTEMPTED:
@@ -1224,6 +1260,8 @@ public abstract class BaseReceivePack {
 				// We shouldn't have reached this case (see 'ok' case above).
 				continue;
 			}
+			if (!forClient)
+				r.append(")");
 			out.sendString(r.toString());
 		}
 	}
