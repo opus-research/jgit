@@ -185,7 +185,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			for (Step step : steps) {
 				if (step.action != Action.PICK)
 					continue;
-				popSteps(1);
 				Collection<ObjectId> ids = or.resolve(step.commit);
 				if (ids.size() != 1)
 					throw new JGitInternalException(
@@ -204,6 +203,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						.call();
 				monitor.endTask();
 				if (newHead == null) {
+					popSteps(stepsToPop);
 					return new RebaseResult(commitToPick);
 				}
 				stepsToPop++;
@@ -238,15 +238,14 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private void popSteps(int numSteps) throws IOException {
 		if (numSteps == 0)
 			return;
-		List<String> todoLines = new ArrayList<String>();
-		List<String> poppedLines = new ArrayList<String>();
-		File todoFile = new File(rebaseDir, "git-rebase-todo");
-		File doneFile = new File(rebaseDir, "done");
+		List<String> lines = new ArrayList<String>();
+		File file = new File(rebaseDir, "git-rebase-todo");
 		BufferedReader br = new BufferedReader(new InputStreamReader(
-				new FileInputStream(todoFile), "UTF-8"));
+				new FileInputStream(file), "UTF-8"));
+		int popped = 0;
 		try {
 			// check if the line starts with a action tag (pick, skip...)
-			while (poppedLines.size() < numSteps) {
+			while (popped < numSteps) {
 				String popCandidate = br.readLine();
 				if (popCandidate == null)
 					break;
@@ -257,43 +256,28 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					pop = Action.parse(actionToken) != null;
 				}
 				if (pop)
-					poppedLines.add(popCandidate);
+					popped++;
 				else
-					todoLines.add(popCandidate);
+					lines.add(popCandidate);
 			}
 			String readLine = br.readLine();
 			while (readLine != null) {
-				todoLines.add(readLine);
+				lines.add(readLine);
 				readLine = br.readLine();
 			}
 		} finally {
 			br.close();
 		}
 
-		BufferedWriter todoWriter = new BufferedWriter(new OutputStreamWriter(
-				new FileOutputStream(todoFile), "UTF-8"));
+		BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
+				new FileOutputStream(file), "UTF-8"));
 		try {
-			for (String writeLine : todoLines) {
-				todoWriter.write(writeLine);
-				todoWriter.newLine();
+			for (String writeLine : lines) {
+				bw.write(writeLine);
+				bw.newLine();
 			}
 		} finally {
-			todoWriter.close();
-		}
-
-		if (poppedLines.size() > 0) {
-			// append here
-			BufferedWriter doneWriter = new BufferedWriter(
-					new OutputStreamWriter(
-							new FileOutputStream(doneFile, true), "UTF-8"));
-			try {
-				for (String writeLine : poppedLines) {
-					doneWriter.write(writeLine);
-					doneWriter.newLine();
-				}
-			} finally {
-				doneWriter.close();
-			}
+			bw.close();
 		}
 	}
 
@@ -341,7 +325,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		createFile(rebaseDir, "head", headId.name());
 		createFile(rebaseDir, "head-name", headName);
 		createFile(rebaseDir, "onto", upstreamCommit.name());
-		createFile(rebaseDir, "interactive", "");
 		BufferedWriter fw = new BufferedWriter(new OutputStreamWriter(
 				new FileOutputStream(new File(rebaseDir, "git-rebase-todo")),
 				"UTF-8"));
