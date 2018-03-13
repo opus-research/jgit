@@ -46,7 +46,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -125,7 +124,12 @@ public class ManifestParser extends DefaultHandler {
 		this.filename = filename;
 		this.defaultBranch = defaultBranch;
 		this.rootRepo = rootRepo;
-		this.baseUrl = normalizeEmptyPath(URI.create(baseUrl));
+
+		// Strip trailing '/' to match repo behavior.
+		while (baseUrl.endsWith("/")) { //$NON-NLS-1$
+			baseUrl = baseUrl.substring(0, baseUrl.length()-1);
+		}
+		this.baseUrl = URI.create(baseUrl);
 
 		plusGroups = new HashSet<>();
 		minusGroups = new HashSet<>();
@@ -253,7 +257,7 @@ public class ManifestParser extends DefaultHandler {
 			return;
 
 		// Only do the following after we finished reading everything.
-		Map<String, URI> remoteUrls = new HashMap<>();
+		Map<String, String> remoteUrls = new HashMap<>();
 		if (defaultRevision == null && defaultRemote != null) {
 			Remote remote = remotes.get(defaultRemote);
 			if (remote != null) {
@@ -283,44 +287,21 @@ public class ManifestParser extends DefaultHandler {
 					revision = r.revision;
 				}
 			}
-			URI remoteUrl = remoteUrls.get(remote);
+			String remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				String fetch = remotes.get(remote).fetch;
-				if (fetch == null) {
-					// We could also just assume fetch=="." ?
-					throw new SAXException("'fetch' attribute is mandatory.");
-				}
-				remoteUrl = normalizeEmptyPath(baseUrl.resolve(fetch));
+				remoteUrl = baseUrl.resolve(remotes.get(remote).fetch).toString();
+				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
+					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
 				remoteUrls.put(remote, remoteUrl);
 			}
-			proj.setUrl(remoteUrl.resolve(proj.getName()).toString()).setDefaultRevision(revision);
+			proj.setUrl(remoteUrl + proj.getName())
+					.setDefaultRevision(revision);
 		}
 
 		filteredProjects.addAll(projects);
 		removeNotInGroup();
 		removeOverlaps();
 	}
-
-	static URI normalizeEmptyPath(URI u) {
-		// URI.create("scheme://host").resolve("a/b") => "scheme://hosta/b"
-		// That seems like a bug. We workaround this by special casing the
-		// empty path case.
-		if (u.getHost() != null && !u.getHost().isEmpty() &&
-			(u.getPath() == null || u.getPath().isEmpty())) {
-			try {
-				return new URI(u.getScheme(),
-					u.getUserInfo(), u.getHost(), u.getPort(),
-					"/", u.getQuery(), u.getFragment());
-			} catch (URISyntaxException x) {
-				throw new IllegalArgumentException(x.getMessage(), x);
-			}
-		}
-		return u;
-	}
-
-
-
-
 
 	/**
 	 * Getter for projects.
