@@ -56,7 +56,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.RefDirectory;
 import org.eclipse.jgit.internal.storage.file.ReflogWriter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -69,9 +68,6 @@ import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Command class to delete a stashed commit reference
- * <p>
- * Currently only supported on a traditional file repository using
- * one-file-per-ref reflogs.
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
@@ -88,10 +84,6 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 	 */
 	public StashDropCommand(Repository repo) {
 		super(repo);
-		if (!(repo.getRefDatabase() instanceof RefDirectory)) {
-			throw new UnsupportedOperationException(
-					JGitText.get().stashDropNotSupported);
-		}
 	}
 
 	/**
@@ -213,11 +205,10 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 			return null;
 		}
 
-		RefDirectory refdb = (RefDirectory) repo.getRefDatabase();
-		ReflogWriter writer = new ReflogWriter(refdb, true);
+		ReflogWriter writer = new ReflogWriter(repo, true);
 		String stashLockRef = ReflogWriter.refLockFor(R_STASH);
-		File stashLockFile = refdb.logFor(stashLockRef);
-		File stashFile = refdb.logFor(R_STASH);
+		File stashLockFile = writer.logFor(stashLockRef);
+		File stashFile = writer.logFor(R_STASH);
 		if (stashLockFile.exists())
 			throw new JGitInternalException(JGitText.get().stashDropFailed,
 					new LockFailedException(stashFile));
