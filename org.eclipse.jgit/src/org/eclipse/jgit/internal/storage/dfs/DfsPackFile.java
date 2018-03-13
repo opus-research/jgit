@@ -72,6 +72,7 @@ import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.file.PackReverseIndex;
 import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
 import org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -88,9 +89,8 @@ import org.eclipse.jgit.util.LongList;
  * objects are similar.
  */
 public final class DfsPackFile extends BlockBasedFile {
-	final DfsStreamKey idxKey;
-
-	final DfsStreamKey reverseIdxKey;
+	final DfsStreamKey idxKey = new DfsStreamKey();
+	final DfsStreamKey reverseIdxKey = new DfsStreamKey();
 	DfsStreamKey bitmapKey;
 
 	/**
@@ -125,11 +125,11 @@ public final class DfsPackFile extends BlockBasedFile {
 	 *            cache that owns the pack data.
 	 * @param desc
 	 *            description of the pack within the DFS.
+	 * @param key
+	 *            interned key used to identify blocks in the block cache.
 	 */
-	DfsPackFile(DfsBlockCache cache, DfsPackDescription desc) {
-		super(cache, desc.getStreamKey(PACK), desc, PACK);
-		idxKey = desc.getStreamKey(INDEX);
-		reverseIdxKey = idxKey.derive(".r"); //$NON-NLS-1$
+	DfsPackFile(DfsBlockCache cache, DfsPackDescription desc, DfsStreamKey key) {
+		super(cache, key, desc, PACK);
 		length = desc.getFileSize(PACK);
 		if (length <= 0)
 			length = -1;
@@ -146,6 +146,11 @@ public final class DfsPackFile extends BlockBasedFile {
 	public boolean isIndexLoaded() {
 		DfsBlockCache.Ref<PackIndex> idxref = index;
 		return idxref != null && idxref.has();
+	}
+
+	/** @return bytes cached in memory for this pack, excluding the index. */
+	public long getCachedSize() {
+		return key.cachedSize.get();
 	}
 
 	void setPackIndex(PackIndex idx) {
@@ -245,7 +250,7 @@ public final class DfsPackFile extends BlockBasedFile {
 				return idx;
 		}
 
-		if (!packDesc.hasFileExt(BITMAP_INDEX))
+		if (!packDesc.hasFileExt(PackExt.BITMAP_INDEX))
 			return null;
 
 		synchronized (initLock) {
@@ -256,7 +261,7 @@ public final class DfsPackFile extends BlockBasedFile {
 					return idx;
 			}
 			if (bitmapKey == null) {
-				bitmapKey = packDesc.getStreamKey(BITMAP_INDEX);
+				bitmapKey = new DfsStreamKey();
 			}
 			long size;
 			PackBitmapIndex idx;
@@ -372,6 +377,7 @@ public final class DfsPackFile extends BlockBasedFile {
 
 	/** Release all memory used by this DfsPackFile instance. */
 	public void close() {
+		cache.remove(this);
 		index = null;
 		reverseIndex = null;
 	}

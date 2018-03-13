@@ -43,49 +43,15 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import java.util.concurrent.atomic.AtomicLong;
 
-import java.util.Arrays;
-
-/** Key used by {@link DfsBlockCache} to disambiguate streams. */
-public final class DfsStreamKey {
-	final byte[] nameBin;
+final class DfsStreamKey {
 	final int hash;
+	final AtomicLong cachedSize = new AtomicLong();
 
-	/**
-	 * @param name
-	 *            compute the key from a string name.
-	 */
-	public DfsStreamKey(String name) {
+	DfsStreamKey() {
 		// Multiply by 31 here so we can more directly combine with another
 		// value without doing the multiply there.
-		hash = name.hashCode() * 31;
-		nameBin = name.getBytes(UTF_8);
-	}
-
-	@Override
-	public int hashCode() {
-		return hash;
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (o instanceof DfsStreamKey) {
-			DfsStreamKey k = (DfsStreamKey) o;
-			return hash == k.hash && Arrays.equals(nameBin, k.nameBin);
-		}
-		return false;
-	}
-
-	/**
-	 * Derive a new StreamKey based on this existing key.
-	 *
-	 * @param s
-	 *            a derivation suffix.
-	 * @return derived stream key.
-	 */
-	public DfsStreamKey derive(String s) {
-		String name = new String(nameBin, 0, nameBin.length, UTF_8);
-		return new DfsStreamKey(name + s);
+		hash = System.identityHashCode(this) * 31;
 	}
 }
