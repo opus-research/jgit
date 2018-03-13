@@ -75,6 +75,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedOutputStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
@@ -282,6 +284,8 @@ public class PackWriter {
 	private Collection<? extends ObjectId> unshallowObjects;
 
 	private PackBitmapIndexBuilder writeBitmaps;
+
+	private CRC32 crc32;
 
 	/**
 	 * Create writer for specified repository.
@@ -1011,10 +1015,13 @@ public class PackWriter {
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
 
-		final PackOutputStream out = new PackOutputStream(writeMonitor,
-				packStream, this);
-		if (isIndexDisabled())
-			out.disableCRC32();
+		crc32 = new CRC32();
+		final PackOutputStream out = new PackOutputStream(
+			writeMonitor,
+			isIndexDisabled()
+				? packStream
+				: new CheckedOutputStream(packStream, crc32),
+			this);
 
 		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
@@ -1501,12 +1508,12 @@ public class PackWriter {
 			if (otp.isWritten())
 				return; // Delta chain cycle caused this to write already.
 
-			out.resetCRC32();
+			crc32.reset();
 			otp.setOffset(out.length());
 			try {
 				reuseSupport.copyObjectAsIs(out, otp, reuseValidate);
 				out.endObject();
-				otp.setCRC(out.getCRC32());
+				otp.setCRC((int) crc32.getValue());
 				typeStats.reusedObjects++;
 				if (otp.isDeltaRepresentation()) {
 					typeStats.reusedDeltas++;
@@ -1540,7 +1547,7 @@ public class PackWriter {
 		else
 			writeWholeObjectDeflate(out, otp);
 		out.endObject();
-		otp.setCRC(out.getCRC32());
+		otp.setCRC((int) crc32.getValue());
 	}
 
 	private void writeBase(PackOutputStream out, ObjectToPack base)
@@ -1554,7 +1561,7 @@ public class PackWriter {
 		final Deflater deflater = deflater();
 		final ObjectLoader ldr = reader.open(otp, otp.getType());
 
-		out.resetCRC32();
+		crc32.reset();
 		otp.setOffset(out.length());
 		out.writeHeader(otp, ldr.getSize());
 
@@ -1568,7 +1575,7 @@ public class PackWriter {
 			final ObjectToPack otp) throws IOException {
 		writeBase(out, otp.getDeltaBase());
 
-		out.resetCRC32();
+		crc32.reset();
 		otp.setOffset(out.length());
 
 		DeltaCache.Ref ref = otp.popCachedDelta();
