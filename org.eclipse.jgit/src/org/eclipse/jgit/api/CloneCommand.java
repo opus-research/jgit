@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2017 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -59,7 +58,6 @@ import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BranchConfig.BranchRebaseMode;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -77,8 +75,6 @@ import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.TagOpt;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Clone a repository into a new working directory
@@ -110,61 +106,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private Collection<String> branchesToClone;
 
-	private Callback callback;
-
-	private boolean directoryExistsInitially;
-
-	private boolean gitDirExistsInitially;
-
-	/**
-	 * Callback for status of clone operation.
-	 *
-	 * @since 4.8
-	 */
-	public interface Callback {
-		/**
-		 * Notify initialized submodules.
-		 *
-		 * @param submodules
-		 *            the submodules
-		 *
-		 */
-		void initializedSubmodules(Collection<String> submodules);
-
-		/**
-		 * Notify starting to clone a submodule.
-		 *
-		 * @param path
-		 *            the submodule path
-		 */
-		void cloningSubmodule(String path);
-
-		/**
-		 * Notify checkout of commit
-		 *
-		 * @param commit
-		 *            the id of the commit being checked out
-		 * @param path
-		 *            the submodule path
-		 */
-		void checkingOut(AnyObjectId commit, String path);
-	}
-
 	/**
 	 * Create clone command with no repository set
 	 */
 	public CloneCommand() {
 		super(null);
-	}
-
-	/**
-	 * Get the git directory. This is primarily used for tests.
-	 *
-	 * @return the git directory
-	 */
-	@Nullable
-	File getDirectory() {
-		return directory;
 	}
 
 	/**
@@ -184,55 +130,26 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	@Override
 	public Git call() throws GitAPIException, InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
-		URIish u = null;
-		try {
-			u = new URIish(uri);
-			verifyDirectories(u);
-		} catch (URISyntaxException e) {
-			throw new InvalidRemoteException(
-					MessageFormat.format(JGitText.get().invalidURL, uri));
-		}
 		Repository repository = null;
-		FetchResult fetchResult = null;
-		Thread cleanupHook = new Thread(() -> cleanup());
-		Runtime.getRuntime().addShutdownHook(cleanupHook);
 		try {
-			repository = init();
-			fetchResult = fetch(repository, u);
+			URIish u = new URIish(uri);
+			repository = init(u);
+			FetchResult result = fetch(repository, u);
+			if (!noCheckout)
+				checkout(repository, result);
+			return new Git(repository, true);
 		} catch (IOException ioe) {
 			if (repository != null) {
 				repository.close();
 			}
-			cleanup();
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		} catch (URISyntaxException e) {
 			if (repository != null) {
 				repository.close();
 			}
-			cleanup();
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
-		} catch (GitAPIException | RuntimeException e) {
-			if (repository != null) {
-				repository.close();
-			}
-			cleanup();
-			throw e;
-		} finally {
-			Runtime.getRuntime().removeShutdownHook(cleanupHook);
 		}
-		if (!noCheckout) {
-			try {
-				checkout(repository, fetchResult);
-			} catch (IOException ioe) {
-				repository.close();
-				throw new JGitInternalException(ioe.getMessage(), ioe);
-			} catch (GitAPIException | RuntimeException e) {
-				repository.close();
-				throw e;
-			}
-		}
-		return new Git(repository, true);
 	}
 
 	private static boolean isNonEmptyDirectory(File dir) {
@@ -243,12 +160,12 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		return false;
 	}
 
-	void verifyDirectories(URIish u) {
+	private Repository init(URIish u) throws GitAPIException {
+		InitCommand command = Git.init();
+		command.setBare(bare);
 		if (directory == null && gitDir == null) {
-			directory = new File(u.getHumanishName() + (bare ? Constants.DOT_GIT_EXT : "")); //$NON-NLS-1$
+			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
 		}
-		directoryExistsInitially = directory != null && directory.exists();
-		gitDirExistsInitially = gitDir != null && gitDir.exists();
 		validateDirs(directory, gitDir, bare);
 		if (isNonEmptyDirectory(directory)) {
 			throw new JGitInternalException(MessageFormat.format(
@@ -258,11 +175,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cloneNonEmptyDirectory, gitDir.getName()));
 		}
-	}
-
-	private Repository init() throws GitAPIException {
-		InitCommand command = Git.init();
-		command.setBare(bare);
 		if (directory != null) {
 			command.setDirectory(directory);
 		}
@@ -368,18 +280,12 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private void cloneSubmodules(Repository clonedRepo) throws IOException,
 			GitAPIException {
 		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
-		Collection<String> submodules = init.call();
-		if (submodules.isEmpty()) {
+		if (init.call().isEmpty())
 			return;
-		}
-		if (callback != null) {
-			callback.initializedSubmodules(submodules);
-		}
 
 		SubmoduleUpdateCommand update = new SubmoduleUpdateCommand(clonedRepo);
 		configure(update);
 		update.setProgressMonitor(monitor);
-		update.setCallback(callback);
 		if (!update.call().isEmpty()) {
 			SubmoduleWalk walk = SubmoduleWalk.forIndex(clonedRepo);
 			while (walk.next()) {
@@ -617,19 +523,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		return this;
 	}
 
-	/**
-	 * Register a progress callback.
-	 *
-	 * @param callback
-	 *            the callback
-	 * @return {@code this}
-	 * @since 4.8
-	 */
-	public CloneCommand setCallback(Callback callback) {
-		this.callback = callback;
-		return this;
-	}
-
 	private static void validateDirs(File directory, File gitDir, boolean bare)
 			throws IllegalStateException {
 		if (directory != null) {
@@ -653,40 +546,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 							JGitText.get().initFailedNonBareRepoSameDirs,
 							gitDir, directory));
 			}
-		}
-	}
-
-	private void cleanup() {
-		try {
-			if (directory != null) {
-				if (!directoryExistsInitially) {
-					FileUtils.delete(directory, FileUtils.RECURSIVE
-							| FileUtils.SKIP_MISSING | FileUtils.IGNORE_ERRORS);
-				} else {
-					deleteChildren(directory);
-				}
-			}
-			if (gitDir != null) {
-				if (!gitDirExistsInitially) {
-					FileUtils.delete(gitDir, FileUtils.RECURSIVE
-							| FileUtils.SKIP_MISSING | FileUtils.IGNORE_ERRORS);
-				} else {
-					deleteChildren(directory);
-				}
-			}
-		} catch (IOException e) {
-			// Ignore; this is a best-effort cleanup in error cases, and
-			// IOException should not be raised anyway
-		}
-	}
-
-	private void deleteChildren(File file) throws IOException {
-		if (!FS.DETECTED.isDirectory(file)) {
-			return;
-		}
-		for (File child : file.listFiles()) {
-			FileUtils.delete(child, FileUtils.RECURSIVE | FileUtils.SKIP_MISSING
-					| FileUtils.IGNORE_ERRORS);
 		}
 	}
 }

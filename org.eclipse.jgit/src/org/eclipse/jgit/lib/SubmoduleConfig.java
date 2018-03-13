@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.util.StringUtils;
-
 /**
  * Submodule section of a Git configuration file.
  *
@@ -82,12 +80,7 @@ public class SubmoduleConfig {
 
 		@Override
 		public boolean matchConfigValue(String s) {
-			if (StringUtils.isEmptyOrNull(s)) {
-				return false;
-			}
-			s = s.replace('-', '_');
-			return name().equalsIgnoreCase(s)
-					|| configValue.equalsIgnoreCase(s);
+			return configValue.equals(s);
 		}
 	}
 }

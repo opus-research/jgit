@@ -95,7 +95,7 @@ import org.eclipse.jgit.util.BlockList;
  * See the base {@link ObjectReader} documentation for details. Notably, a
  * reader is not thread safe.
  */
-public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
+public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	private static final int MAX_RESOLVE_MATCHES = 256;
 
 	/** Temporary buffer large enough for at least one raw object id. */
@@ -104,21 +104,17 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	/** Database this reader loads objects from. */
 	final DfsObjDatabase db;
 
-	final DfsReaderIoStats.Accumulator stats = new DfsReaderIoStats.Accumulator();
-
 	private Inflater inf;
+
 	private DfsBlock block;
+
 	private DeltaBaseCache baseCache;
+
 	private DfsPackFile last;
+
 	private boolean avoidUnreachable;
 
-	/**
-	 * Initialize a new DfsReader
-	 *
-	 * @param db
-	 *            parent DfsObjDatabase.
-	 */
-	protected DfsReader(DfsObjDatabase db) {
+	DfsReader(DfsObjDatabase db) {
 		this.db = db;
 		this.streamFileThreshold = db.getReaderOptions().getStreamFileThreshold();
 	}
@@ -135,7 +131,7 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	@Override
 	public ObjectReader newReader() {
-		return db.newReader();
+		return new DfsReader(db);
 	}
 
 	@Override
@@ -174,7 +170,6 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		PackList packList = db.getPackList();
 		resolveImpl(packList, id, matches);
 		if (matches.size() < MAX_RESOLVE_MATCHES && packList.dirty()) {
-			stats.scanPacks++;
 			resolveImpl(db.scanPacks(packList), id, matches);
 		}
 		return matches;
@@ -203,7 +198,6 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (hasImpl(packList, objectId)) {
 			return true;
 		} else if (packList.dirty()) {
-			stats.scanPacks++;
 			return hasImpl(db.scanPacks(packList), objectId);
 		}
 		return false;
@@ -240,7 +234,6 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			return checkType(ldr, objectId, typeHint);
 		}
 		if (packList.dirty()) {
-			stats.scanPacks++;
 			ldr = openImpl(db.scanPacks(packList), objectId);
 			if (ldr != null) {
 				return checkType(ldr, objectId, typeHint);
@@ -323,7 +316,6 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		List<FoundObject<T>> r = new ArrayList<>();
 		findAllImpl(packList, pending, r);
 		if (!pending.isEmpty() && packList.dirty()) {
-			stats.scanPacks++;
 			findAllImpl(db.scanPacks(packList), pending, r);
 		}
 		for (T t : pending) {
@@ -460,6 +452,7 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		final IOException findAllError = error;
 		return new AsyncObjectSizeQueue<T>() {
 			private FoundObject<T> cur;
+
 			private long sz;
 
 			@Override
@@ -655,7 +648,7 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	/**
 	 * Copy bytes from the window to a caller supplied buffer.
 	 *
-	 * @param file
+	 * @param pack
 	 *            the file the desired window is stored within.
 	 * @param position
 	 *            position within the file to read from.
@@ -674,24 +667,24 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	 *             this cursor does not match the provider or id and the proper
 	 *             window could not be acquired through the provider's cache.
 	 */
-	int copy(BlockBasedFile file, long position, byte[] dstbuf, int dstoff,
-			int cnt) throws IOException {
+	int copy(DfsPackFile pack, long position, byte[] dstbuf, int dstoff, int cnt)
+			throws IOException {
 		if (cnt == 0)
 			return 0;
 
-		long length = file.length;
+		long length = pack.length;
 		if (0 <= length && length <= position)
 			return 0;
 
 		int need = cnt;
 		do {
-			pin(file, position);
+			pin(pack, position);
 			int r = block.copy(position, dstbuf, dstoff, need);
 			position += r;
 			dstoff += r;
 			need -= r;
 			if (length < 0)
-				length = file.length;
+				length = pack.length;
 		} while (0 < need && position < length);
 		return cnt - need;
 	}
@@ -725,10 +718,9 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		for (int dstoff = 0;;) {
 			int n = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
 			dstoff += n;
-			if (inf.finished() || (headerOnly && dstoff == dstbuf.length)) {
-				stats.inflatedBytes += dstoff;
+			if (inf.finished() || (headerOnly && dstoff == dstbuf.length))
 				return dstoff;
-			} else if (inf.needsInput()) {
+			if (inf.needsInput()) {
 				pin(pack, position);
 				position += block.setInput(position, inf);
 			} else if (n == 0)
@@ -756,24 +748,20 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			inf.reset();
 	}
 
-	void pin(BlockBasedFile file, long position) throws IOException {
-		if (block == null || !block.contains(file.key, position)) {
+	void pin(DfsPackFile pack, long position) throws IOException {
+		DfsBlock b = block;
+		if (b == null || !b.contains(pack.key, position)) {
 			// If memory is low, we may need what is in our window field to
 			// be cleaned up by the GC during the get for the next window.
 			// So we always clear it, even though we are just going to set
 			// it again.
 			block = null;
-			block = file.getOrLoadBlock(position, this);
+			block = pack.getOrLoadBlock(position, this);
 		}
 	}
 
 	void unpin() {
 		block = null;
-	}
-
-	/** @return IO statistics accumulated by this reader. */
-	public DfsReaderIoStats getIoStats() {
-		return new DfsReaderIoStats(stats);
 	}
 
 	/** Release the current window cursor. */

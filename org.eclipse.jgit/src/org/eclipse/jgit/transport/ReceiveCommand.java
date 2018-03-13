@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -191,20 +190,6 @@ public class ReceiveCommand {
 		}
 	}
 
-	/**
-	 * Check whether a command failed due to transaction aborted.
-	 *
-	 * @param cmd
-	 *            command.
-	 * @return whether the command failed due to transaction aborted, as in {@link
-	 *         #abort(Iterable)}.
-	 * @since 4.9
-	 */
-	public static boolean isTransactionAborted(ReceiveCommand cmd) {
-		return cmd.getResult() == REJECTED_OTHER_REASON
-				&& cmd.getMessage().equals(JGitText.get().transactionAborted);
-	}
-
 	private final ObjectId oldId;
 
 	private final ObjectId newId;
@@ -219,21 +204,13 @@ public class ReceiveCommand {
 
 	private String message;
 
-	private boolean customRefLog;
-
-	private String refLogMessage;
-
-	private boolean refLogIncludeResult;
-
-	private Boolean forceRefLog;
-
 	private boolean typeIsCorrect;
 
 	/**
 	 * Create a new command for {@link BaseReceivePack}.
 	 *
 	 * @param oldId
-	 *            the expected old object id; must not be null. Use
+	 *            the old object id; must not be null. Use
 	 *            {@link ObjectId#zeroId()} to indicate a ref creation.
 	 * @param newId
 	 *            the new object id; must not be null. Use
@@ -243,23 +220,15 @@ public class ReceiveCommand {
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
-		}
-		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
-		}
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;
 
 		type = Type.UPDATE;
-		if (ObjectId.zeroId().equals(oldId)) {
+		if (ObjectId.zeroId().equals(oldId))
 			type = Type.CREATE;
-		}
-		if (ObjectId.zeroId().equals(newId)) {
+		if (ObjectId.zeroId().equals(newId))
 			type = Type.DELETE;
-		}
 	}
 
 	/**
@@ -274,45 +243,14 @@ public class ReceiveCommand {
 	 * @param name
 	 *            name of the ref being affected.
 	 * @param type
-	 *            type of the command. Must be {@link Type#CREATE} if {@code
-	 *            oldId} is zero, or {@link Type#DELETE} if {@code newId} is zero.
+	 *            type of the command.
 	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
-		}
-		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
-		}
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;
-		switch (type) {
-		case CREATE:
-			if (!ObjectId.zeroId().equals(oldId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().createRequiresZeroOldId);
-			}
-			break;
-		case DELETE:
-			if (!ObjectId.zeroId().equals(newId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().deleteRequiresZeroNewId);
-			}
-			break;
-		case UPDATE:
-		case UPDATE_NONFASTFORWARD:
-			if (ObjectId.zeroId().equals(newId)
-					|| ObjectId.zeroId().equals(oldId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().updateRequiresOldIdAndNewId);
-			}
-			break;
-		default:
-			throw new IllegalStateException(JGitText.get().enumValueNotSupported0);
-		}
 		this.type = type;
 	}
 
@@ -349,116 +287,6 @@ public class ReceiveCommand {
 	/** @return the message associated with a failure status. */
 	public String getMessage() {
 		return message;
-	}
-
-	/**
-	 * Set the message to include in the reflog.
-	 * <p>
-	 * Overrides the default set by {@code setRefLogMessage} on any containing
-	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
-	 *
-	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
-	 * @param appendStatus
-	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
-	 * @since 4.9
-	 */
-	public void setRefLogMessage(String msg, boolean appendStatus) {
-		customRefLog = true;
-		if (msg == null && !appendStatus) {
-			disableRefLog();
-		} else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
-			refLogIncludeResult = true;
-		} else {
-			refLogMessage = msg;
-			refLogIncludeResult = appendStatus;
-		}
-	}
-
-	/**
-	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
-	 *
-	 * @since 4.9
-	 */
-	public void disableRefLog() {
-		customRefLog = true;
-		refLogMessage = null;
-		refLogIncludeResult = false;
-	}
-
-	/**
-	 * Force writing a reflog for the updated ref.
-	 *
-	 * @param force whether to force.
-	 * @since 4.9
-	 */
-	public void setForceRefLog(boolean force) {
-		forceRefLog = Boolean.valueOf(force);
-	}
-
-	/**
-	 * Check whether this command has a custom reflog message setting that should
-	 * override defaults in any containing
-	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
-	 * <p>
-	 * Does not take into account whether {@code #setForceRefLog(boolean)} has
-	 * been called.
-	 *
-	 * @return whether a custom reflog is set.
-	 * @since 4.9
-	 */
-	public boolean hasCustomRefLog() {
-		return customRefLog;
-	}
-
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 * @since 4.9
-	 */
-	public boolean isRefLogDisabled() {
-		return refLogMessage == null;
-	}
-
-	/**
-	 * Get the message to include in the reflog.
-	 *
-	 * @return message the caller wants to include in the reflog; null if the
-	 *         update should not be logged.
-	 * @since 4.9
-	 */
-	@Nullable
-	public String getRefLogMessage() {
-		return refLogMessage;
-	}
-
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 *
-	 * @return true if the message should include the result.
-	 * @since 4.9
-	 */
-	public boolean isRefLogIncludingResult() {
-		return refLogIncludeResult;
-	}
-
-	/**
-	 * Check whether the reflog should be written regardless of repo defaults.
-	 *
-	 * @return whether force writing is enabled; null if {@code
-	 * #setForceRefLog(boolean)} was never called.
-	 * @since 4.9
-	 */
-	@Nullable
-	public Boolean isForceRefLog() {
-		return forceRefLog;
 	}
 
 	/**
@@ -527,7 +355,6 @@ public class ReceiveCommand {
 		try {
 			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
 			ru.setRefLogIdent(rp.getRefLogIdent());
-			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
 			switch (getType()) {
 			case DELETE:
 				if (!ObjectId.zeroId().equals(getOldId())) {
@@ -599,14 +426,6 @@ public class ReceiveCommand {
 
 		case REJECTED_CURRENT_BRANCH:
 			setResult(Result.REJECTED_CURRENT_BRANCH);
-			break;
-
-		case REJECTED_MISSING_OBJECT:
-			setResult(Result.REJECTED_MISSING_OBJECT);
-			break;
-
-		case REJECTED_OTHER_REASON:
-			setResult(Result.REJECTED_OTHER_REASON);
 			break;
 
 		default:

@@ -44,29 +44,21 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.COMPACT;
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.internal.storage.pack.PackExt.REFTABLE;
 import static org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation.PACK_DELTA;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.file.PackReverseIndex;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.reftable.ReftableCompactor;
-import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -97,15 +89,16 @@ import org.eclipse.jgit.util.io.CountingOutputStream;
  */
 public class DfsPackCompactor {
 	private final DfsRepository repo;
+
 	private final List<DfsPackFile> srcPacks;
-	private final List<DfsReftable> srcReftables;
+
 	private final List<ObjectIdSet> exclude;
 
-	private PackStatistics newStats;
-	private DfsPackDescription outDesc;
+	private final List<DfsPackDescription> newPacks;
+
+	private final List<PackStatistics> newStats;
 
 	private int autoAddSize;
-	private ReftableConfig reftableConfig;
 
 	private RevWalk rw;
 	private RevFlag added;
@@ -121,19 +114,9 @@ public class DfsPackCompactor {
 		repo = repository;
 		autoAddSize = 5 * 1024 * 1024; // 5 MiB
 		srcPacks = new ArrayList<>();
-		srcReftables = new ArrayList<>();
 		exclude = new ArrayList<>(4);
-	}
-
-	/**
-	 * @param cfg
-	 *            configuration to write a reftable. Reftable compacting is
-	 *            disabled (default) when {@code cfg} is {@code null}.
-	 * @return {@code this}
-	 */
-	public DfsPackCompactor setReftableConfig(ReftableConfig cfg) {
-		reftableConfig = cfg;
-		return this;
+		newPacks = new ArrayList<>(1);
+		newStats = new ArrayList<>(1);
 	}
 
 	/**
@@ -154,19 +137,7 @@ public class DfsPackCompactor {
 	}
 
 	/**
-	 * Add a reftable to be compacted.
-	 *
-	 * @param table
-	 *            a reftable to combine.
-	 * @return {@code this}
-	 */
-	public DfsPackCompactor add(DfsReftable table) {
-		srcReftables.add(table);
-		return this;
-	}
-
-	/**
-	 * Automatically select pack and reftables to be included, and add them.
+	 * Automatically select packs to be included, and add them.
 	 * <p>
 	 * Packs are selected based on size, smaller packs get included while bigger
 	 * ones are omitted.
@@ -183,16 +154,6 @@ public class DfsPackCompactor {
 				add(pack);
 			else
 				exclude(pack);
-		}
-
-		if (reftableConfig != null) {
-			for (DfsReftable table : objdb.getReftables()) {
-				DfsPackDescription d = table.getPackDescription();
-				if (d.getPackSource() != GC
-						&& d.getFileSize(REFTABLE) < autoAddSize) {
-					add(table);
-				}
-			}
 		}
 		return this;
 	}
@@ -236,68 +197,58 @@ public class DfsPackCompactor {
 	 *             the packs cannot be compacted.
 	 */
 	public void compact(ProgressMonitor pm) throws IOException {
-		if (pm == null) {
+		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
-		}
 
 		DfsObjDatabase objdb = repo.getObjectDatabase();
-		try (DfsReader ctx = objdb.newReader()) {
-			if (reftableConfig != null && !srcReftables.isEmpty()) {
-				compactReftables(ctx);
-			}
-			compactPacks(ctx, pm);
+		try (DfsReader ctx = (DfsReader) objdb.newReader()) {
+			PackConfig pc = new PackConfig(repo);
+			pc.setIndexVersion(2);
+			pc.setDeltaCompress(false);
+			pc.setReuseDeltas(true);
+			pc.setReuseObjects(true);
 
-			List<DfsPackDescription> commit = getNewPacks();
-			Collection<DfsPackDescription> remove = toPrune();
-			if (!commit.isEmpty() || !remove.isEmpty()) {
-				objdb.commitPack(commit, remove);
+			PackWriter pw = new PackWriter(pc, ctx);
+			try {
+				pw.setDeltaBaseAsOffset(true);
+				pw.setReuseDeltaCommits(false);
+
+				addObjectsToPack(pw, ctx, pm);
+				if (pw.getObjectCount() == 0) {
+					List<DfsPackDescription> remove = toPrune();
+					if (remove.size() > 0)
+						objdb.commitPack(
+								Collections.<DfsPackDescription>emptyList(),
+								remove);
+					return;
+				}
+
+				boolean rollback = true;
+				DfsPackDescription pack = objdb.newPack(COMPACT,
+						estimatePackSize());
+				try {
+					writePack(objdb, pack, pw, pm);
+					writeIndex(objdb, pack, pw);
+
+					PackStatistics stats = pw.getStatistics();
+					pw.close();
+					pw = null;
+
+					pack.setPackStats(stats);
+					objdb.commitPack(Collections.singletonList(pack), toPrune());
+					newPacks.add(pack);
+					newStats.add(stats);
+					rollback = false;
+				} finally {
+					if (rollback)
+						objdb.rollbackPack(Collections.singletonList(pack));
+				}
+			} finally {
+				if (pw != null)
+					pw.close();
 			}
 		} finally {
 			rw = null;
-		}
-	}
-
-	private void compactPacks(DfsReader ctx, ProgressMonitor pm)
-			throws IOException, IncorrectObjectTypeException {
-		DfsObjDatabase objdb = repo.getObjectDatabase();
-		PackConfig pc = new PackConfig(repo);
-		pc.setIndexVersion(2);
-		pc.setDeltaCompress(false);
-		pc.setReuseDeltas(true);
-		pc.setReuseObjects(true);
-
-		PackWriter pw = new PackWriter(pc, ctx);
-		try {
-			pw.setDeltaBaseAsOffset(true);
-			pw.setReuseDeltaCommits(false);
-
-			addObjectsToPack(pw, ctx, pm);
-			if (pw.getObjectCount() == 0) {
-				return;
-			}
-
-			boolean rollback = true;
-			initOutDesc(objdb);
-			try {
-				writePack(objdb, outDesc, pw, pm);
-				writeIndex(objdb, outDesc, pw);
-
-				PackStatistics stats = pw.getStatistics();
-				pw.close();
-				pw = null;
-
-				outDesc.setPackStats(stats);
-				newStats = stats;
-				rollback = false;
-			} finally {
-				if (rollback) {
-					objdb.rollbackPack(Collections.singletonList(outDesc));
-				}
-			}
-		} finally {
-			if (pw != null) {
-				pw.close();
-			}
 		}
 	}
 
@@ -312,81 +263,27 @@ public class DfsPackCompactor {
 		return size;
 	}
 
-	private void compactReftables(DfsReader ctx) throws IOException {
-		DfsObjDatabase objdb = repo.getObjectDatabase();
-		Collections.sort(srcReftables, objdb.reftableComparator());
-
-		try (ReftableStack stack = ReftableStack.open(ctx, srcReftables)) {
-			initOutDesc(objdb);
-			ReftableCompactor compact = new ReftableCompactor();
-			compact.addAll(stack.readers());
-			compact.setIncludeDeletes(true);
-			writeReftable(objdb, outDesc, compact);
-		}
-	}
-
-	private void initOutDesc(DfsObjDatabase objdb) throws IOException {
-		if (outDesc == null) {
-			outDesc = objdb.newPack(COMPACT, estimatePackSize());
-		}
-	}
-
 	/** @return all of the source packs that fed into this compaction. */
-	public Collection<DfsPackDescription> getSourcePacks() {
-		Set<DfsPackDescription> src = new HashSet<>();
-		for (DfsPackFile pack : srcPacks) {
-			src.add(pack.getPackDescription());
-		}
-		for (DfsReftable table : srcReftables) {
-			src.add(table.getPackDescription());
-		}
-		return src;
+	public List<DfsPackDescription> getSourcePacks() {
+		return toPrune();
 	}
 
 	/** @return new packs created by this compaction. */
 	public List<DfsPackDescription> getNewPacks() {
-		return outDesc != null
-				? Collections.singletonList(outDesc)
-				: Collections.emptyList();
+		return newPacks;
 	}
 
 	/** @return statistics corresponding to the {@link #getNewPacks()}. */
 	public List<PackStatistics> getNewPackStatistics() {
-		return newStats != null
-				? Collections.singletonList(newStats)
-				: Collections.emptyList();
+		return newStats;
 	}
 
-	private Collection<DfsPackDescription> toPrune() {
-		Set<DfsPackDescription> packs = new HashSet<>();
-		for (DfsPackFile pack : srcPacks) {
-			packs.add(pack.getPackDescription());
-		}
-
-		Set<DfsPackDescription> reftables = new HashSet<>();
-		for (DfsReftable table : srcReftables) {
-			reftables.add(table.getPackDescription());
-		}
-
-		for (Iterator<DfsPackDescription> i = packs.iterator(); i.hasNext();) {
-			DfsPackDescription d = i.next();
-			if (d.hasFileExt(REFTABLE) && !reftables.contains(d)) {
-				i.remove();
-			}
-		}
-
-		for (Iterator<DfsPackDescription> i = reftables.iterator();
-				i.hasNext();) {
-			DfsPackDescription d = i.next();
-			if (d.hasFileExt(PACK) && !packs.contains(d)) {
-				i.remove();
-			}
-		}
-
-		Set<DfsPackDescription> toPrune = new HashSet<>();
-		toPrune.addAll(packs);
-		toPrune.addAll(reftables);
-		return toPrune;
+	private List<DfsPackDescription> toPrune() {
+		int cnt = srcPacks.size();
+		List<DfsPackDescription> all = new ArrayList<>(cnt);
+		for (DfsPackFile pack : srcPacks)
+			all.add(pack.getPackDescription());
+		return all;
 	}
 
 	private void addObjectsToPack(PackWriter pw, DfsReader ctx,
@@ -473,45 +370,28 @@ public class DfsPackCompactor {
 	private static void writePack(DfsObjDatabase objdb,
 			DfsPackDescription pack,
 			PackWriter pw, ProgressMonitor pm) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {
+		DfsOutputStream out = objdb.writeFile(pack, PACK);
+		try {
 			pw.writePack(pm, pm, out);
 			pack.addFileExt(PACK);
-			pack.setBlockSize(PACK, out.blockSize());
+		} finally {
+			out.close();
 		}
 	}
 
 	private static void writeIndex(DfsObjDatabase objdb,
 			DfsPackDescription pack,
 			PackWriter pw) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, INDEX)) {
+		DfsOutputStream out = objdb.writeFile(pack, INDEX);
+		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
 			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
-			pack.setBlockSize(INDEX, out.blockSize());
 			pack.setIndexVersion(pw.getIndexVersion());
+		} finally {
+			out.close();
 		}
-	}
-
-	private void writeReftable(DfsObjDatabase objdb, DfsPackDescription pack,
-			ReftableCompactor compact) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, REFTABLE)) {
-			compact.setConfig(configureReftable(reftableConfig, out));
-			compact.compact(out);
-			pack.addFileExt(REFTABLE);
-			pack.setReftableStats(compact.getStats());
-		}
-	}
-
-	static ReftableConfig configureReftable(ReftableConfig cfg,
-			DfsOutputStream out) {
-		int bs = out.blockSize();
-		if (bs > 0) {
-			cfg = new ReftableConfig(cfg);
-			cfg.setRefBlockSize(bs);
-			cfg.setAlignBlocks(true);
-		}
-		return cfg;
 	}
 
 	private static class ObjectIdWithOffset extends ObjectId {

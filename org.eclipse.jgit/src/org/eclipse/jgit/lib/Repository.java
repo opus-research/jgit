@@ -106,13 +106,7 @@ import org.slf4j.LoggerFactory;
  * A repository holds all objects and refs used for managing source code (could
  * be any type of file, but source code is what SCM's are typically used for).
  * <p>
- * The thread-safety of a {@link Repository} very much depends on the concrete
- * implementation. Applications working with a generic {@code Repository} type
- * must not assume the instance is thread-safe.
- * <ul>
- * <li>{@code FileRepository} is thread-safe.
- * <li>{@code DfsRepository} thread-safety is determined by its subclass.
- * </ul>
+ * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
 	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
@@ -1152,33 +1146,6 @@ public abstract class Repository implements AutoCloseable {
 		if (isBare())
 			throw new NoWorkTreeException();
 		return indexFile;
-	}
-
-	/**
-	 * Locate a reference to a commit and immediately parse its content.
-	 * <p>
-	 * This method only returns successfully if the commit object exists,
-	 * is verified to be a commit, and was parsed without error.
-	 *
-	 * @param id
-	 *            name of the commit object.
-	 * @return reference to the commit object. Never null.
-	 * @throws MissingObjectException
-	 *             the supplied commit does not exist.
-	 * @throws IncorrectObjectTypeException
-	 *             the supplied id is not a commit or an annotated tag.
-	 * @throws IOException
-	 *             a pack file or loose object could not be read.
-	 * @since 4.8
-	 */
-	public RevCommit parseCommit(AnyObjectId id) throws IncorrectObjectTypeException,
-			IOException, MissingObjectException {
-		if (id instanceof RevCommit && ((RevCommit) id).getRawBuffer() != null) {
-			return (RevCommit) id;
-		}
-		try (RevWalk walk = new RevWalk(this)) {
-			return walk.parseCommit(id);
-		}
 	}
 
 	/**
