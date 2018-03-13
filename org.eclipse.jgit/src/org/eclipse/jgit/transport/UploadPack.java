@@ -511,12 +511,10 @@ public class UploadPack {
 				try {
 					obj = q.next();
 				} catch (MissingObjectException notFound) {
-					ObjectId id = notFound.getObjectId();
-					if (wantIds.contains(id)) {
-						String msg = MessageFormat.format(
-								JGitText.get().wantNotValid, id.name());
-						pckOut.writeString("ERR " + msg);
-						throw new PackProtocolException(msg, notFound);
+					if (wantIds.contains(notFound.getObjectId())) {
+						throw new PackProtocolException(
+								MessageFormat.format(JGitText.get().notValid,
+										notFound.getMessage()), notFound);
 					}
 					continue;
 				}
@@ -528,10 +526,8 @@ public class UploadPack {
 				//
 				if (wantIds.remove(obj)) {
 					if (!advertised.contains(obj)) {
-						String msg = MessageFormat.format(
-								JGitText.get().wantNotValid, obj.name());
-						pckOut.writeString("ERR " + msg);
-						throw new PackProtocolException(msg);
+						throw new PackProtocolException(MessageFormat.format(
+								JGitText.get().notValid, obj.name()));
 					}
 
 					if (!obj.has(WANT)) {
