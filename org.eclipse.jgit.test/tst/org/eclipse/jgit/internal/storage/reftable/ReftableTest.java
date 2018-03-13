@@ -214,6 +214,60 @@ public class ReftableTest {
 	}
 
 	@Test
+	public void oneTextRef() throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		ReftableWriter writer = new ReftableWriter().begin(buffer);
+		writer.writeText(
+				"MERGE_HEAD",
+				id(1).name() + '\n' + id(2).name() + '\n');
+		writer.finish();
+		byte[] table = buffer.toByteArray();
+
+		assertEquals(
+				8 + 4 + 2 + "MERGE_HEAD".length() + 1 + 82 + 6 + 52,
+				table.length);
+
+		ReftableReader t = read(table);
+		try (RefCursor rc = t.allRefs()) {
+			assertTrue(rc.next());
+			Ref act = rc.getRef();
+			assertNotNull(act);
+			assertFalse(act.isSymbolic());
+			assertEquals("MERGE_HEAD", act.getName());
+			assertEquals(id(1), act.getObjectId());
+			assertFalse(rc.next());
+		}
+	}
+
+	@Test
+	public void oneNonRefTextFile() throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		ReftableWriter writer = new ReftableWriter().begin(buffer);
+		writer.writeText("SAVE", "content");
+		writer.finish();
+		byte[] table = buffer.toByteArray();
+
+		assertEquals(
+				8 + 4 + 2 + "SAVE".length() + 1 + "content".length() + 6 + 52,
+				table.length);
+
+		ReftableReader t = read(table);
+		assertFalse(t.hasRef("SAVE")); // behaves as deleted.
+
+		t.setIncludeDeletes(true);
+		try (RefCursor rc = t.allRefs()) {
+			assertTrue(rc.next());
+			Ref act = rc.getRef();
+			assertNotNull(act);
+			assertFalse(act.isSymbolic());
+			assertEquals(NEW, act.getStorage());
+			assertEquals("SAVE", act.getName());
+			assertNull(act.getObjectId());
+			assertFalse(rc.next());
+		}
+	}
+
+	@Test
 	public void oneDeletedRef() throws IOException {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
