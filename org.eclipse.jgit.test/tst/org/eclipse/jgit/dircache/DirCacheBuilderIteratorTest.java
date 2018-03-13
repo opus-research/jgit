@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.eclipse.jgit.treewalk.TreeWalk.T_BASE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -91,7 +90,7 @@ public class DirCacheBuilderIteratorTest extends RepositoryTestCase {
 		assertEquals(expIdx, c.ptr);
 		assertSame(ents[expIdx], c.getDirCacheEntry());
 		assertEquals(paths[expIdx], tw.getPathString());
-		assertEquals(mode.getBits(), tw.getRawMode(T_BASE));
+		assertEquals(mode.getBits(), tw.getRawMode(0));
 		assertSame(mode, tw.getFileMode(0));
 		b.add(c.getDirCacheEntry());
 

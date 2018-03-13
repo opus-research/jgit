@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import static org.eclipse.jgit.treewalk.TreeWalk.T_BASE;
-
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -55,6 +53,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * changes that will affect decorations and show up in an attempt to commit.
  */
 public final class InterIndexDiffFilter extends TreeFilter {
+	private static final int baseTree = 0;
 
 	/**
 	 * Predefined InterIndexDiffFilter for finding changes between two dircaches
@@ -67,9 +66,9 @@ public final class InterIndexDiffFilter extends TreeFilter {
 		if (n == 1) // Assume they meant difference to empty tree.
 			return true;
 
-		final int m = walker.getRawMode(T_BASE);
+		final int m = walker.getRawMode(baseTree);
 		for (int i = 1; i < n; i++) {
-			DirCacheIterator baseDirCache = walker.getTree(T_BASE,
+			DirCacheIterator baseDirCache = walker.getTree(baseTree,
 					DirCacheIterator.class);
 			DirCacheIterator newDirCache = walker.getTree(i,
 					DirCacheIterator.class);
@@ -83,7 +82,7 @@ public final class InterIndexDiffFilter extends TreeFilter {
 						return false;
 				}
 			}
-			if (walker.getRawMode(i) != m || !walker.idEqual(i, T_BASE))
+			if (walker.getRawMode(i) != m || !walker.idEqual(i, baseTree))
 				return true;
 		}
 		return false;
