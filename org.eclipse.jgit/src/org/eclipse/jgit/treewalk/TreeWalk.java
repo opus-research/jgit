@@ -50,7 +50,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.AttributesNode;
@@ -1132,10 +1131,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 		WorkingTreeIterator workingTreeIterator = getTree(WorkingTreeIterator.class);
 		DirCacheIterator dirCacheIterator = getTree(DirCacheIterator.class);
-		CanonicalTreeParser other = getTree(CanonicalTreeParser.class);
 
-		if (workingTreeIterator == null && dirCacheIterator == null
-				&& other == null) {
+		if (workingTreeIterator == null && dirCacheIterator == null) {
 			// Can not retrieve the attributes without at least one of the above
 			// iterators.
 			return Collections.<String, Attribute> emptyMap();
@@ -1155,7 +1152,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 			// Gets the attributes located on the current entry path
 			getPerDirectoryEntryAttributes(path, isDir, operationType,
-					workingTreeIterator, dirCacheIterator, other,
+					workingTreeIterator, dirCacheIterator,
 					attributes);
 
 			// Gets the attributes located in the global attribute file
@@ -1183,8 +1180,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *            a {@link WorkingTreeIterator} matching the current entry
 	 * @param dirCacheIterator
 	 *            a {@link DirCacheIterator} matching the current entry
-	 * @param other
-	 *            a {@link CanonicalTreeParser} matching the current entry
 	 * @param attributes
 	 *            Non null map holding the existing attributes. This map will be
 	 *            augmented with new entry. None entry will be overrided.
@@ -1194,21 +1189,18 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	private void getPerDirectoryEntryAttributes(String path, boolean isDir,
 			OperationType opType, WorkingTreeIterator workingTreeIterator,
-			DirCacheIterator dirCacheIterator, CanonicalTreeParser other,
-			Map<String, Attribute> attributes)
+			DirCacheIterator dirCacheIterator, Map<String, Attribute> attributes)
 			throws IOException {
 		// Prevents infinite recurrence
-		if (workingTreeIterator != null || dirCacheIterator != null
-				|| other != null) {
+		if (workingTreeIterator != null || dirCacheIterator != null) {
 			AttributesNode currentAttributesNode = getCurrentAttributesNode(
-					opType, workingTreeIterator, dirCacheIterator, other);
+					opType, workingTreeIterator, dirCacheIterator);
 			if (currentAttributesNode != null) {
 				currentAttributesNode.getAttributes(path, isDir, attributes);
 			}
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
 					getParent(dirCacheIterator, DirCacheIterator.class),
-					getParent(other, CanonicalTreeParser.class),
 					attributes);
 		}
 	}
@@ -1244,7 +1236,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @param opType
 	 * @param workingTreeIterator
 	 * @param dirCacheIterator
-	 * @param other
 	 * @return a {@link AttributesNode} of the current entry,
 	 *         {@link NullPointerException} otherwise.
 	 * @throws IOException
@@ -1252,10 +1243,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *             parsing one on the attributes file.
 	 */
 	private AttributesNode getCurrentAttributesNode(OperationType opType,
-			@Nullable WorkingTreeIterator workingTreeIterator,
-			@Nullable DirCacheIterator dirCacheIterator,
-			@Nullable CanonicalTreeParser other)
-					throws IOException {
+			WorkingTreeIterator workingTreeIterator,
+			DirCacheIterator dirCacheIterator) throws IOException {
 		AttributesNode attributesNode = null;
 		switch (opType) {
 		case CHECKIN_OP:
@@ -1266,16 +1255,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				attributesNode = dirCacheIterator
 						.getEntryAttributesNode(getObjectReader());
 			}
-			if (attributesNode == null && other != null) {
-				attributesNode = other
-						.getEntryAttributesNode(getObjectReader());
-			}
 			break;
 		case CHECKOUT_OP:
-			if (other != null) {
-				attributesNode = other
-						.getEntryAttributesNode(getObjectReader());
-			}
 			if (dirCacheIterator != null) {
 				attributesNode = dirCacheIterator
 						.getEntryAttributesNode(getObjectReader());
