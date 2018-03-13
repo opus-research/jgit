@@ -47,7 +47,6 @@ package org.eclipse.jgit.storage.dfs;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
-import static org.eclipse.jgit.storage.pack.PackExt.PACK;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -62,7 +61,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -92,13 +90,7 @@ import org.eclipse.jgit.storage.pack.PackOutputStream;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.BlockList;
 
-/**
- * Reader to access repository content through.
- * <p>
- * See the base {@link ObjectReader} documentation for details. Notably, a
- * reader is not thread safe.
- */
-public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
+final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	/** Temporary buffer large enough for at least one raw object id. */
 	final byte[] tempId = new byte[OBJECT_ID_LENGTH];
 
@@ -192,11 +184,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (typeHint == OBJ_ANY)
 			throw new MissingObjectException(objectId.copy(), "unknown");
 		throw new MissingObjectException(objectId.copy(), typeHint);
-	}
-
-	@Override
-	public Set<ObjectId> getShallowCommits() {
-		return Collections.emptySet();
 	}
 
 	private static final Comparator<FoundObject<?>> FOUND_OBJECT_SORT = new Comparator<FoundObject<?>>() {
@@ -662,7 +649,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				pack.setInvalid();
 				throw new IOException(MessageFormat.format(
 						JGitText.get().packfileCorruptionDetected,
-						pack.getPackDescription().getFileName(PACK)));
+						pack.getPackDescription().getPackName()));
 			}
 		}
 	}

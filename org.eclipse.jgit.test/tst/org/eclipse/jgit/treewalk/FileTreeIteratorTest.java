@@ -49,7 +49,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.security.MessageDigest;
 
 import org.eclipse.jgit.api.Git;
@@ -59,9 +58,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -199,31 +195,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		//
 		FileUtils.delete(new File(trash, paths[0]));
 		assertEquals(expect, top.getEntryObjectId());
-	}
-
-	@Test
-	public void testDirCacheMatchingId() throws Exception {
-		File f = writeTrashFile("file", "content");
-		Git git = new Git(db);
-		writeTrashFile("file", "content");
-		fsTick(f);
-		git.add().addFilepattern("file").call();
-		DirCacheEntry dce = db.readDirCache().getEntry("file");
-		TreeWalk tw = new TreeWalk(db);
-		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
-				.getConfig().get(WorkingTreeOptions.KEY));
-		tw.addTree(fti);
-		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
-		tw.addTree(dci);
-		fti.setDirCacheIterator(tw, 1);
-		while (tw.next() && !tw.getPathString().equals("file")) {
-			//
-		}
-		assertEquals(MetadataDiff.EQUAL, fti.compareMetadata(dce));
-		ObjectId fromRaw = ObjectId.fromRaw(fti.idBuffer(), fti.idOffset());
-		assertEquals("6b584e8ece562ebffc15d38808cd6b98fc3d97ea",
-				fromRaw.getName());
-		assertFalse(fti.isModified(dce, false));
 	}
 
 	@Test
@@ -431,43 +402,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 
 		assertTrue(walk.next());
 		assertTrue(indexIter.idEqual(workTreeIter));
-	}
-
-	@Test
-	public void idOffset() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("fileAinfsonly", "A");
-		File fileBinindex = writeTrashFile("fileBinindex", "B");
-		fsTick(fileBinindex);
-		git.add().addFilepattern("fileBinindex").call();
-		writeTrashFile("fileCinfsonly", "C");
-		TreeWalk tw = new TreeWalk(db);
-		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
-		FileTreeIterator workTreeIter = new FileTreeIterator(db);
-		tw.addTree(indexIter);
-		tw.addTree(workTreeIter);
-		workTreeIter.setDirCacheIterator(tw, 0);
-		assertEntry("d46c305e85b630558ee19cc47e73d2e5c8c64cdc", "a,", tw);
-		assertEntry("58ee403f98538ec02409538b3f80adf610accdec", "a,b", tw);
-		assertEntry("0000000000000000000000000000000000000000", "a", tw);
-		assertEntry("b8d30ff397626f0f1d3538d66067edf865e201d6", "a0b", tw);
-		// The reason for adding this test. Check that the id is correct for
-		// mixed
-		assertEntry("8c7e5a667f1b771847fe88c01c3de34413a1b220",
-				"fileAinfsonly", tw);
-		assertEntry("7371f47a6f8bd23a8fa1a8b2a9479cdd76380e54", "fileBinindex",
-				tw);
-		assertEntry("96d80cd6c4e7158dbebd0849f4fb7ce513e5828c",
-				"fileCinfsonly", tw);
-		assertFalse(tw.next());
-	}
-
-	private static void assertEntry(String sha1string, String path, TreeWalk tw)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			CorruptObjectException, IOException {
-		assertTrue(tw.next());
-		assertEquals(path, tw.getPathString());
-		assertEquals(sha1string, tw.getObjectId(1).getName() /* 1=filetree here */);
 	}
 
 	private static String nameOf(final AbstractTreeIterator i) {

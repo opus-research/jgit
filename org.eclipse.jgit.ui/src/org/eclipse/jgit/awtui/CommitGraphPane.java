@@ -94,8 +94,7 @@ public class CommitGraphPane extends JTable {
 		int h = 0;
 		for (int i = 0; i<getColumnCount(); ++i) {
 			TableCellRenderer renderer = getDefaultRenderer(getColumnClass(i));
-			Component c = renderer.getTableCellRendererComponent(this,
-					"ÅOj", false, false, 0, i); //$NON-NLS-1$
+			Component c = renderer.getTableCellRendererComponent(this, "ÅOj", false, false, 0, i);
 			h = Math.max(h, c.getPreferredSize().height);
 		}
 		setRowHeight(h + getRowMargin());
@@ -130,7 +129,7 @@ public class CommitGraphPane extends JTable {
 		final TableColumn author = cols.getColumn(1);
 		final TableColumn date = cols.getColumn(2);
 
-		graph.setHeaderValue(""); //$NON-NLS-1$
+		graph.setHeaderValue("");
 		author.setHeaderValue(UIText.get().author);
 		date.setHeaderValue(UIText.get().date);
 
@@ -187,9 +186,9 @@ public class CommitGraphPane extends JTable {
 
 			final String valueStr;
 			if (pi != null)
-				valueStr = pi.getName() + " <" + pi.getEmailAddress() + ">"; //$NON-NLS-1$ //$NON-NLS-2$
+				valueStr = pi.getName() + " <" + pi.getEmailAddress() + ">";
 			else
-				valueStr = ""; //$NON-NLS-1$
+				valueStr = "";
 			return super.getTableCellRendererComponent(table, valueStr,
 					isSelected, hasFocus, row, column);
 		}
@@ -199,7 +198,7 @@ public class CommitGraphPane extends JTable {
 		private static final long serialVersionUID = 1L;
 
 		private final DateFormat fmt = new SimpleDateFormat(
-				"yyyy-MM-dd HH:mm:ss"); //$NON-NLS-1$
+				"yyyy-MM-dd HH:mm:ss");
 
 		public Component getTableCellRendererComponent(final JTable table,
 				final Object value, final boolean isSelected,
@@ -210,7 +209,7 @@ public class CommitGraphPane extends JTable {
 			if (pi != null)
 				valueStr = fmt.format(pi.getWhen());
 			else
-				valueStr = ""; //$NON-NLS-1$
+				valueStr = "";
 			return super.getTableCellRendererComponent(table, valueStr,
 					isSelected, hasFocus, row, column);
 		}

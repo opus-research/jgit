@@ -58,13 +58,12 @@ public class HttpServerText extends TranslationBundle {
 		return NLS.getBundleFor(HttpServerText.class);
 	}
 
-	// @formatter:off
 	/***/ public String alreadyInitializedByContainer;
 	/***/ public String cannotGetLengthOf;
-	/***/ public String clientHas175ChunkedEncodingBug;
 	/***/ public String encodingNotSupportedByThisLibrary;
 	/***/ public String expectedRepositoryAttribute;
 	/***/ public String filterMustNotBeNull;
+	/***/ public String internalErrorDuringPublishSubscribe;
 	/***/ public String internalErrorDuringReceivePack;
 	/***/ public String internalErrorDuringUploadPack;
 	/***/ public String internalServerError;

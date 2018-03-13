@@ -153,7 +153,7 @@ public abstract class OperationResult {
 	 *         remote produced no additional messages.
 	 */
 	public String getMessages() {
-		return messageBuffer != null ? messageBuffer.toString() : ""; //$NON-NLS-1$
+		return messageBuffer != null ? messageBuffer.toString() : "";
 	}
 
 	void addMessages(final String msg) {
@@ -161,7 +161,7 @@ public abstract class OperationResult {
 			if (messageBuffer == null)
 				messageBuffer = new StringBuilder();
 			messageBuffer.append(msg);
-			if (!msg.endsWith("\n")) //$NON-NLS-1$
+			if (!msg.endsWith("\n"))
 				messageBuffer.append('\n');
 		}
 	}

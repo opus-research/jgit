@@ -43,14 +43,10 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.hasChunkedEncodingRequestBug;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.hasPushStatusBug;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
 import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK;
 import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK_REQUEST_TYPE;
 import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK_RESULT_TYPE;
@@ -59,7 +55,6 @@ import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
 import static org.eclipse.jgit.http.server.ServletUtils.consumeRequestBody;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 
 import java.io.IOException;
 import java.util.List;
@@ -76,6 +71,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PostReceiveHook;
+import org.eclipse.jgit.transport.PostReceiveHookChain;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
@@ -119,8 +116,11 @@ class ReceivePackServlet extends HttpServlet {
 	static class Factory implements Filter {
 		private final ReceivePackFactory<HttpServletRequest> receivePackFactory;
 
+		private PostReceiveHook postReceiveHook;
+
 		Factory(ReceivePackFactory<HttpServletRequest> receivePackFactory) {
 			this.receivePackFactory = receivePackFactory;
+			postReceiveHook = PostReceiveHook.NULL;
 		}
 
 		public void doFilter(ServletRequest request, ServletResponse response,
@@ -130,6 +130,8 @@ class ReceivePackServlet extends HttpServlet {
 			ReceivePack rp;
 			try {
 				rp = receivePackFactory.create(req, getRepository(req));
+				rp.setPostReceiveHook(PostReceiveHookChain.newChain(
+						postReceiveHook, rp.getPostReceiveHook()));
 			} catch (ServiceNotAuthorizedException e) {
 				rsp.sendError(SC_UNAUTHORIZED);
 				return;
@@ -154,6 +156,13 @@ class ReceivePackServlet extends HttpServlet {
 		public void destroy() {
 			// Nothing.
 		}
+
+		/**
+		 * @param hook
+		 */
+		public void setPostReceiveHook(PostReceiveHook hook) {
+			this.postReceiveHook = hook != null ? hook : PostReceiveHook.NULL;
+		}
 	}
 
 	@Override
@@ -164,14 +173,7 @@ class ReceivePackServlet extends HttpServlet {
 			return;
 		}
 
-		int[] version = parseVersion(req.getHeader(HDR_USER_AGENT));
-		if (hasChunkedEncodingRequestBug(version, req)) {
-			GitSmartHttpTools.sendError(req, rsp, SC_BAD_REQUEST, "\n\n"
-					+ HttpServerText.get().clientHas175ChunkedEncodingBug);
-			return;
-		}
-
-		SmartOutputStream out = new SmartOutputStream(req, rsp, false) {
+		SmartOutputStream out = new SmartOutputStream(req, rsp) {
 			@Override
 			public void flush() throws IOException {
 				doFlush();
@@ -181,7 +183,6 @@ class ReceivePackServlet extends HttpServlet {
 		ReceivePack rp = (ReceivePack) req.getAttribute(ATTRIBUTE_HANDLER);
 		try {
 			rp.setBiDirectionalPipe(false);
-			rp.setEchoCommandFailures(hasPushStatusBug(version));
 			rsp.setContentType(RECEIVE_PACK_RESULT_TYPE);
 
 			rp.receive(getInputStream(req), out, null);

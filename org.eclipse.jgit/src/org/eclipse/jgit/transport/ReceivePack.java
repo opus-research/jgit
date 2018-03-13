@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_REPORT_STATUS;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -64,11 +62,6 @@ public class ReceivePack extends BaseReceivePack {
 
 	/** Hook to report on the commands after execution. */
 	private PostReceiveHook postReceive;
-
-	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
-	private boolean reportStatus;
-
-	private boolean echoCommandFailures;
 
 	/**
 	 * Create a new pack receive for an open repository.
@@ -125,17 +118,6 @@ public class ReceivePack extends BaseReceivePack {
 	}
 
 	/**
-	 * @param echo
-	 *            if true this class will report command failures as warning
-	 *            messages before sending the command results. This is usually
-	 *            not necessary, but may help buggy Git clients that discard the
-	 *            errors when all branches fail.
-	 */
-	public void setEchoCommandFailures(boolean echo) {
-		echoCommandFailures = echo;
-	}
-
-	/**
 	 * Execute the receive task on the socket.
 	 *
 	 * @param input
@@ -167,14 +149,8 @@ public class ReceivePack extends BaseReceivePack {
 		}
 	}
 
-	@Override
-	protected void enableCapabilities() {
-		reportStatus = isCapabilityEnabled(CAPABILITY_REPORT_STATUS);
-		super.enableCapabilities();
-	}
-
 	private void service() throws IOException {
-		if (isBiDirectionalPipe()) {
+		if (biDirectionalPipe) {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 			pckOut.flush();
 		} else
@@ -206,29 +182,16 @@ public class ReceivePack extends BaseReceivePack {
 			unlockPack();
 
 			if (reportStatus) {
-				if (echoCommandFailures && msgOut != null) {
-					sendStatusReport(false, unpackError, new Reporter() {
-						void sendString(final String s) throws IOException {
-							msgOut.write(Constants.encode(s + "\n")); //$NON-NLS-1$
-						}
-					});
-					msgOut.flush();
-					try {
-						Thread.sleep(500);
-					} catch (InterruptedException wakeUp) {
-						// Ignore an early wake up.
-					}
-				}
 				sendStatusReport(true, unpackError, new Reporter() {
 					void sendString(final String s) throws IOException {
-						pckOut.writeString(s + "\n"); //$NON-NLS-1$
+						pckOut.writeString(s + "\n");
 					}
 				});
 				pckOut.end();
 			} else if (msgOut != null) {
 				sendStatusReport(false, unpackError, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgOut.write(Constants.encode(s + "\n")); //$NON-NLS-1$
+						msgOut.write(Constants.encode(s + "\n"));
 					}
 				});
 			}
@@ -242,6 +205,6 @@ public class ReceivePack extends BaseReceivePack {
 
 	@Override
 	protected String getLockMessageProcessName() {
-		return "jgit receive-pack"; //$NON-NLS-1$
+		return "jgit receive-pack";
 	}
 }

@@ -53,29 +53,29 @@ class RevList extends RevWalkTextBuiltin {
 	@Override
 	protected void show(final RevCommit c) throws Exception {
 		if (c.has(RevFlag.UNINTERESTING))
-			outw.print('-');
-		c.getId().copyTo(outbuffer, outw);
+			out.print('-');
+		c.getId().copyTo(outbuffer, out);
 		if (parents)
 			for (int i = 0; i < c.getParentCount(); i++) {
-				outw.print(' ');
-				c.getParent(i).getId().copyTo(outbuffer, outw);
+				out.print(' ');
+				c.getParent(i).getId().copyTo(outbuffer, out);
 			}
-		outw.println();
+		out.println();
 	}
 
 	@Override
 	protected void show(final ObjectWalk ow, final RevObject obj)
 			throws Exception {
 		if (obj.has(RevFlag.UNINTERESTING))
-			outw.print('-');
-		obj.getId().copyTo(outbuffer, outw);
+			out.print('-');
+		obj.getId().copyTo(outbuffer, out);
 		final String path = ow.getPathString();
 		if (path != null) {
-			outw.print(' ');
-			outw.print(path);
+			out.print(' ');
+			out.print(path);
 		} else if (obj instanceof RevTree)
-			outw.print(' ');
-		outw.println();
+			out.print(' ');
+		out.println();
 
 	}
 }

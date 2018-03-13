@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.merge.ResolveMerger;
@@ -88,15 +87,6 @@ public class RebaseResult {
 		 * Failed; the original HEAD was restored
 		 */
 		FAILED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * Conflicts: checkout of target HEAD failed
-		 */
-		CONFLICTS {
 			@Override
 			public boolean isSuccessful() {
 				return false;
@@ -158,8 +148,6 @@ public class RebaseResult {
 
 	private Map<String, MergeFailureReason> failingPaths;
 
-	private List<String> conflicts;
-
 	private RebaseResult(Status status) {
 		this.status = status;
 		currentCommit = null;
@@ -189,18 +177,6 @@ public class RebaseResult {
 	}
 
 	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#CONFLICTS}
-	 *
-	 * @param conflicts
-	 *            the list of conflicting paths
-	 */
-	RebaseResult(List<String> conflicts) {
-		status = Status.CONFLICTS;
-		currentCommit = null;
-		this.conflicts = conflicts;
-	}
-
-	/**
 	 * @return the overall status
 	 */
 	public Status getStatus() {
@@ -222,12 +198,5 @@ public class RebaseResult {
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return failingPaths;
-	}
-
-	/**
-	 * @return the list of conflicts if status is {@link Status#CONFLICTS}
-	 */
-	public List<String> getConflicts() {
-		return conflicts;
 	}
 }

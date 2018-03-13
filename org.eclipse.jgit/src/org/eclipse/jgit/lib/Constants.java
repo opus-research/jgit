@@ -56,7 +56,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
 
 /** Misc. constants used throughout JGit. */
-@SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git for all objects. */
 	private static final String HASH_FUNCTION = "SHA-1";
@@ -247,6 +246,9 @@ public final class Constants {
 	/** Prefix for notes refs */
 	public static final String R_NOTES = "refs/notes/";
 
+	/** Prefix for pubsub refs */
+	public static final String R_PUBSUB = "refs/pubsub/";
+
 	/** Standard notes ref */
 	public static final String R_NOTES_COMMITS = R_NOTES + "commits";
 
@@ -340,9 +342,6 @@ public final class Constants {
 
 	/** Name of the submodules file */
 	public static final String DOT_GIT_MODULES = ".gitmodules";
-
-	/** Name of the .git/shallow file */
-	public static final String SHALLOW = "shallow";
 
 	/**
 	 * Create a new digest function for objects.
@@ -559,9 +558,6 @@ public final class Constants {
 
 	/** name of the file containing the commit msg for a squash commit */
 	public static final String SQUASH_MSG = "SQUASH_MSG";
-
-	/** name of the file containing the ID of a revert commit in case of conflicts */
-	public static final String REVERT_HEAD = "REVERT_HEAD";
 
 	/**
 	 * name of the ref ORIG_HEAD used by certain commands to store the original

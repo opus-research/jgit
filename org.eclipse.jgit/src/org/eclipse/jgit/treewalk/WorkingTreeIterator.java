@@ -131,9 +131,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** Cached canonical length, initialized from {@link #idBuffer()} */
 	private long canonLen = -1;
 
-	/** The offset of the content id in {@link #idBuffer()} */
-	private int contentIdOffset;
-
 	/**
 	 * Create a new iterator with no parent.
 	 *
@@ -237,16 +234,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
-					contentIdOffset = i.idOffset();
-					contentIdFromPtr = ptr;
-					return contentId = i.idBuffer();
-				}
-				contentIdOffset = 0;
-			} else {
-				contentIdOffset = 0;
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL)
+					return i.idBuffer();
 			}
 		}
+
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -435,7 +427,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	@Override
 	public int idOffset() {
-		return contentIdOffset;
+		return 0;
 	}
 
 	@Override
@@ -646,7 +638,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (e == null)
 				continue;
 			final String name = e.getName();
-			if (".".equals(name) || "..".equals(name)) //$NON-NLS-1$ //$NON-NLS-2$
+			if (".".equals(name) || "..".equals(name))
 				continue;
 			if (Constants.DOT_GIT.equals(name))
 				continue;
@@ -759,10 +751,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		long fileLastModified = getEntryLastModified();
 		if (cacheLastModified % 1000 == 0)
 			fileLastModified = fileLastModified - fileLastModified % 1000;
-		// Some Java version on Linux return whole seconds only even when
-		// the file systems supports more precision.
-		else if (fileLastModified % 1000 == 0)
-			cacheLastModified = cacheLastModified - cacheLastModified % 1000;
+
 		if (fileLastModified != cacheLastModified)
 			return MetadataDiff.DIFFER_BY_TIMESTAMP;
 		else if (!entry.isSmudged())
@@ -940,7 +929,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 
 		public String toString() {
-			return getMode().toString() + " " + getName(); //$NON-NLS-1$
+			return getMode().toString() + " " + getName();
 		}
 
 		/**
@@ -1057,7 +1046,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					.getExcludesFile();
 			if (path != null) {
 				File excludesfile;
-				if (path.startsWith("~/")) //$NON-NLS-1$
+				if (path.startsWith("~/"))
 					excludesfile = fs.resolve(fs.userHome(), path.substring(2));
 				else
 					excludesfile = fs.resolve(null, path);
@@ -1065,7 +1054,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 
 			File exclude = fs
-					.resolve(repository.getDirectory(), "info/exclude"); //$NON-NLS-1$
+					.resolve(repository.getDirectory(), "info/exclude");
 			loadRulesFromFile(r, exclude);
 
 			return r.getRules().isEmpty() ? null : r;

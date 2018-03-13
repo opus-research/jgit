@@ -45,9 +45,6 @@
 
 package org.eclipse.jgit.storage.dfs;
 
-import static org.eclipse.jgit.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
-
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -70,7 +67,6 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackReverseIndex;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
@@ -165,7 +161,7 @@ public final class DfsPackFile {
 		this.packDesc = desc;
 		this.key = key;
 
-		length = desc.getFileSize(PACK);
+		length = desc.getPackSize();
 		if (length <= 0)
 			length = -1;
 	}
@@ -175,22 +171,13 @@ public final class DfsPackFile {
 		return packDesc;
 	}
 
-	/**
-	 * @return whether the pack index file is loaded and cached in memory.
-	 * @since 2.2
-	 */
-	public boolean isIndexLoaded() {
-		DfsBlockCache.Ref<PackIndex> idxref = index;
-		return idxref != null && idxref.get() != null;
-	}
-
 	/** @return bytes cached in memory for this pack, excluding the index. */
 	public long getCachedSize() {
 		return key.cachedSize.get();
 	}
 
 	private String getPackName() {
-		return packDesc.getFileName(PACK);
+		return packDesc.getPackName();
 	}
 
 	void setBlockSize(int newSize) {
@@ -219,9 +206,6 @@ public final class DfsPackFile {
 		if (invalid)
 			throw new PackInvalidException(getPackName());
 
-		Repository.getGlobalListenerList()
-				.dispatch(new BeforeDfsPackIndexLoadedEvent(this));
-
 		synchronized (initLock) {
 			idxref = index;
 			if (idxref != null) {
@@ -232,7 +216,7 @@ public final class DfsPackFile {
 
 			PackIndex idx;
 			try {
-				ReadableChannel rc = ctx.db.openFile(packDesc, INDEX);
+				ReadableChannel rc = ctx.db.openPackIndex(packDesc);
 				try {
 					InputStream in = Channels.newInputStream(rc);
 					int wantSize = 8192;
@@ -249,15 +233,13 @@ public final class DfsPackFile {
 			} catch (EOFException e) {
 				invalid = true;
 				IOException e2 = new IOException(MessageFormat.format(
-						DfsText.get().shortReadOfIndex,
-						packDesc.getFileName(INDEX)));
+						DfsText.get().shortReadOfIndex, packDesc.getIndexName()));
 				e2.initCause(e);
 				throw e2;
 			} catch (IOException e) {
 				invalid = true;
 				IOException e2 = new IOException(MessageFormat.format(
-						DfsText.get().cannotReadIndex,
-						packDesc.getFileName(INDEX)));
+						DfsText.get().cannotReadIndex, packDesc.getIndexName()));
 				e2.initCause(e);
 				throw e2;
 			}
@@ -283,28 +265,14 @@ public final class DfsPackFile {
 					return revidx;
 			}
 
-			PackIndex idx = idx(ctx);
-			PackReverseIndex revidx = new PackReverseIndex(idx);
-			int sz = (int) Math.min(
-					idx.getObjectCount() * 8, Integer.MAX_VALUE);
-			reverseIndex = cache.put(key, POS_REVERSE_INDEX, sz, revidx);
+			PackReverseIndex revidx = new PackReverseIndex(idx(ctx));
+			reverseIndex = cache.put(key, POS_REVERSE_INDEX,
+					packDesc.getReverseIndexSize(), revidx);
 			return revidx;
 		}
 	}
 
-	/**
-	 * Check if an object is stored within this pack.
-	 *
-	 * @param ctx
-	 *            reader context to support reading from the backing store if
-	 *            the index is not already loaded in memory.
-	 * @param id
-	 *            object to be located.
-	 * @return true if the object exists in this pack; false if it does not.
-	 * @throws IOException
-	 *             the pack index is not available, or is corrupt.
-	 */
-	public boolean hasObject(DfsReader ctx, AnyObjectId id) throws IOException {
+	boolean hasObject(DfsReader ctx, AnyObjectId id) throws IOException {
 		final long offset = idx(ctx).findOffset(id);
 		return 0 < offset && !isCorrupt(offset);
 	}
@@ -623,7 +591,7 @@ public final class DfsPackFile {
 			throw new PackInvalidException(getPackName());
 
 		boolean close = true;
-		ReadableChannel rc = ctx.db.openFile(packDesc, PACK);
+		ReadableChannel rc = ctx.db.openPackFile(packDesc);
 		try {
 			// If the block alignment is not yet known, discover it. Prefer the
 			// larger size from either the cache or the file itself.
