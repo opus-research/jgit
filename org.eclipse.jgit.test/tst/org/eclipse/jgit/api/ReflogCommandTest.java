@@ -43,12 +43,10 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Collection;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.ReflogEntry;
@@ -73,49 +71,20 @@ public class ReflogCommandTest extends RepositoryTestCase {
 		writeTrashFile(FILE, "Hello world");
 		git.add().addFilepattern(FILE).call();
 		commit1 = git.commit().setMessage("Initial commit").call();
-		git.checkout().setCreateBranch(true).setName("b1").call();
 		git.rm().addFilepattern(FILE).call();
 		commit2 = git.commit().setMessage("Removed file").call();
-		git.notesAdd().setObjectId(commit1).setMessage("data").call();
+		git.notesAdd().setObjectId(commit1)
+				.setMessage("data").call();
 	}
 
-	/**
-	 * Test getting the HEAD reflog
-	 *
-	 * @throws Exception
-	 */
 	@Test
-	public void testHeadReflog() throws Exception {
+	public void testReflog() throws Exception {
 		Collection<ReflogEntry> reflog = git.reflog().call();
-		assertNotNull(reflog);
-		assertEquals(3, reflog.size());
+		assertTrue(reflog.size() == 2);
 		ReflogEntry[] reflogs = reflog.toArray(new ReflogEntry[reflog.size()]);
-		assertEquals(reflogs[2].getComment(), "commit: Initial commit");
-		assertEquals(reflogs[2].getNewId(), commit1.getId());
-		assertEquals(reflogs[2].getOldId(), ObjectId.zeroId());
-		assertEquals(reflogs[1].getNewId(), commit1.getId());
-		assertEquals(reflogs[1].getOldId(), commit1.getId());
-		assertEquals(reflogs[0].getComment(), "commit: Removed file");
+		assertEquals(reflogs[1].getComment(), "commit: Initial commit");
 		assertEquals(reflogs[0].getNewId(), commit2.getId());
 		assertEquals(reflogs[0].getOldId(), commit1.getId());
 	}
 
-	/**
-	 * Test getting the reflog for an explicit branch
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testBranchReflog() throws Exception {
-		Collection<ReflogEntry> reflog = git.reflog()
-				.setRef(Constants.R_HEADS + "b1").call();
-		assertNotNull(reflog);
-		assertEquals(2, reflog.size());
-		ReflogEntry[] reflogs = reflog.toArray(new ReflogEntry[reflog.size()]);
-		assertEquals(reflogs[0].getComment(), "commit: Removed file");
-		assertEquals(reflogs[0].getNewId(), commit2.getId());
-		assertEquals(reflogs[0].getOldId(), commit1.getId());
-		assertEquals(reflogs[1].getNewId(), commit1.getId());
-		assertEquals(reflogs[1].getOldId(), ObjectId.zeroId());
-	}
 }

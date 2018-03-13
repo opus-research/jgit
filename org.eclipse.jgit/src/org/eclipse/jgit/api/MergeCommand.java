@@ -71,9 +71,9 @@ import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
-import org.eclipse.jgit.merge.Merger;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
+import org.eclipse.jgit.merge.ThreeWayMerger;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -193,7 +193,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						commits, head);
 				repo.writeMergeCommitMsg(mergeMessage);
 				repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
-				Merger merger = mergeStrategy.newMerger(repo);
+				ThreeWayMerger merger = (ThreeWayMerger) mergeStrategy
+						.newMerger(repo);
 				boolean noProblems;
 				Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults = null;
 				Map<String, MergeFailureReason> failingPaths = null;
@@ -210,18 +211,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
-				refLogMessage.append(": Merge made by ");
-				refLogMessage.append(mergeStrategy.getName());
-				refLogMessage.append('.');
+
 				if (noProblems) {
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
 							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-
-					RevCommit newHead = new Git(getRepository()).commit()
-							.setReflogComment(refLogMessage.toString()).call();
+					RevCommit newHead = new Git(getRepository()).commit().call();
 					return new MergeResult(newHead.getId(),
 							null, new ObjectId[] {
 									headCommit.getId(), srcCommit.getId() },
