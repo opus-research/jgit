@@ -54,7 +54,12 @@ import org.eclipse.jgit.lib.Config.SectionParser;
 public class SignedPushConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
 	public static final SectionParser<SignedPushConfig> KEY =
-			SignedPushConfig::new;
+			new SectionParser<SignedPushConfig>() {
+		@Override
+		public SignedPushConfig parse(Config cfg) {
+			return new SignedPushConfig(cfg);
+		}
+	};
 
 	private String certNonceSeed;
 	private int certNonceSlopLimit;

@@ -46,8 +46,7 @@ package org.eclipse.jgit.pgm.debug;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
+import org.eclipse.jgit.internal.storage.reftable.BlockSource;
 import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -68,12 +67,13 @@ class ReadReftable extends TextBuiltin {
 		try (FileInputStream in = new FileInputStream(input);
 				BlockSource src = BlockSource.from(in);
 				ReftableReader reader = new ReftableReader(src)) {
-			try (RefCursor rc = ref != null
-					? reader.seekRef(ref)
-					: reader.allRefs()) {
-				while (rc.next()) {
-					write(rc.getRef());
-				}
+			if (ref != null) {
+				reader.seek(ref);
+			} else {
+				reader.seekToFirstRef();
+			}
+			while (reader.next()) {
+				write(reader.getRef());
 			}
 		}
 	}
