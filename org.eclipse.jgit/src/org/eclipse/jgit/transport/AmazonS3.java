@@ -79,7 +79,7 @@ import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -512,10 +512,14 @@ public class AmazonS3 {
 			final HttpURLConnection c) throws IOException {
 		final IOException err = new IOException(MessageFormat.format(JGitText.get().amazonS3ActionFailed
 				, action, key, HttpSupport.response(c), c.getResponseMessage()));
+		final InputStream errorStream = c.getErrorStream();
+		if (errorStream == null)
+			return err;
+
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		byte[] buf = new byte[2048];
 		for (;;) {
-			final int n = c.getErrorStream().read(buf);
+			final int n = errorStream.read(buf);
 			if (n < 0)
 				break;
 			if (n > 0)

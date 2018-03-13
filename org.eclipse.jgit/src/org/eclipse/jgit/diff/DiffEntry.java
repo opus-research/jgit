@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
@@ -82,6 +83,15 @@ public class DiffEntry {
 		COPY;
 	}
 
+	/** Specify the old or new side for more generalized access. */
+	public static enum Side {
+		/** The old side of a DiffEntry. */
+		OLD,
+
+		/** The new side of a DiffEntry. */
+		NEW;
+	}
+
 	/**
 	 * Create an empty DiffEntry
 	 */
@@ -97,8 +107,40 @@ public class DiffEntry {
 	 * @return headers describing the changed files.
 	 * @throws IOException
 	 *             the repository cannot be accessed.
+	 * @throws IllegalArgumentException
+	 *             When given TreeWalk doesn't have exactly two trees.
 	 */
 	public static List<DiffEntry> scan(TreeWalk walk) throws IOException {
+		return scan(walk, false);
+	}
+
+	/**
+	 * Convert the TreeWalk into DiffEntry headers, depending on
+	 * {@code includeTrees} it will add tree objects into result or not.
+	 *
+	 * @param walk
+	 *            the TreeWalk to walk through. Must have exactly two trees and
+	 *            when {@code includeTrees} parameter is {@code true} it can't
+	 *            be recursive.
+	 * @param includeTrees
+	 *            include tree object's.
+	 * @return headers describing the changed files.
+	 * @throws IOException
+	 *             the repository cannot be accessed.
+	 * @throws IllegalArgumentException
+	 *             when {@code includeTrees} is true and given TreeWalk is
+	 *             recursive. Or when given TreeWalk doesn't have exactly two
+	 *             trees
+	 */
+	public static List<DiffEntry> scan(TreeWalk walk, boolean includeTrees)
+			throws IOException {
+		if (walk.getTreeCount() != 2)
+			throw new IllegalArgumentException(
+					JGitText.get().treeWalkMustHaveExactlyTwoTrees);
+		if (includeTrees && walk.isRecursive())
+			throw new IllegalArgumentException(
+					JGitText.get().cannotBeRecursiveWhenTreesAreIncluded);
+
 		List<DiffEntry> r = new ArrayList<DiffEntry>();
 		MutableObjectId idBuf = new MutableObjectId();
 		while (walk.next()) {
@@ -124,13 +166,19 @@ public class DiffEntry {
 				entry.changeType = ChangeType.DELETE;
 				r.add(entry);
 
-			} else {
+			} else if (!entry.oldId.equals(entry.newId)) {
 				entry.changeType = ChangeType.MODIFY;
 				if (RenameDetector.sameType(entry.oldMode, entry.newMode))
 					r.add(entry);
 				else
 					r.addAll(breakModify(entry));
+			} else if (entry.oldMode != entry.newMode) {
+				entry.changeType = ChangeType.MODIFY;
+				r.add(entry);
 			}
+
+			if (includeTrees && walk.isSubtree())
+				walk.enterSubtree();
 		}
 		return r;
 	}
@@ -284,6 +332,17 @@ public class DiffEntry {
 		return newPath;
 	}
 
+	/**
+	 * Get the path associated with this file.
+	 *
+	 * @param side
+	 *            which path to obtain.
+	 * @return name for this file.
+	 */
+	public String getPath(Side side) {
+		return side == Side.OLD ? getOldPath() : getNewPath();
+	}
+
 	/** @return the old file mode, if described in the patch */
 	public FileMode getOldMode() {
 		return oldMode;
@@ -292,6 +351,17 @@ public class DiffEntry {
 	/** @return the new file mode, if described in the patch */
 	public FileMode getNewMode() {
 		return newMode;
+	}
+
+	/**
+	 * Get the mode associated with this file.
+	 *
+	 * @param side
+	 *            which mode to obtain.
+	 * @return the mode.
+	 */
+	public FileMode getMode(Side side) {
+		return side == Side.OLD ? getOldMode() : getNewMode();
 	}
 
 	/** @return the type of change this patch makes on {@link #getNewPath()} */
@@ -324,6 +394,17 @@ public class DiffEntry {
 	 */
 	public AbbreviatedObjectId getNewId() {
 		return newId;
+	}
+
+	/**
+	 * Get the object id.
+	 *
+	 * @param side
+	 *            the side of the id to get.
+	 * @return the object id; null if there is no index line
+	 */
+	public AbbreviatedObjectId getId(Side side) {
+		return side == Side.OLD ? getOldId() : getNewId();
 	}
 
 	@Override

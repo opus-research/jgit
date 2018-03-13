@@ -128,15 +128,18 @@ class PendingGenerator extends Generator {
 			for (;;) {
 				final RevCommit c = pending.next();
 				if (c == null) {
-					walker.reader.release();
+					walker.reader.walkAdviceEnd();
 					return null;
 				}
 
 				final boolean produce;
 				if ((c.flags & UNINTERESTING) != 0)
 					produce = false;
-				else
+				else {
+					if (filter.requiresCommitBody())
+						c.parseBody(walker);
 					produce = filter.include(walker, c);
+				}
 
 				for (final RevCommit p : c.parents) {
 					if ((p.flags & SEEN) != 0)
@@ -174,7 +177,7 @@ class PendingGenerator extends Generator {
 					c.disposeBody();
 			}
 		} catch (StopWalkException swe) {
-			walker.reader.release();
+			walker.reader.walkAdviceEnd();
 			pending.clear();
 			return null;
 		}

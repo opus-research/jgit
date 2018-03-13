@@ -46,16 +46,16 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
@@ -81,15 +81,19 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
  * {@link #readAdvertisedRefs()} methods in constructor or before any use. They
  * should also handle resources releasing in {@link #close()} method if needed.
  */
-class BasePackPushConnection extends BasePackConnection implements
+public abstract class BasePackPushConnection extends BasePackConnection implements
 		PushConnection {
-	static final String CAPABILITY_REPORT_STATUS = "report-status";
+	/** The client expects a status report after the server processes the pack. */
+	public static final String CAPABILITY_REPORT_STATUS = "report-status";
 
-	static final String CAPABILITY_DELETE_REFS = "delete-refs";
+	/** The server supports deleting refs. */
+	public static final String CAPABILITY_DELETE_REFS = "delete-refs";
 
-	static final String CAPABILITY_OFS_DELTA = "ofs-delta";
+	/** The server supports packs with OFS deltas. */
+	public static final String CAPABILITY_OFS_DELTA = "ofs-delta";
 
-	static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
+	/** The client supports using the 64K side-band for progress messages. */
+	public static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
 
 	private final boolean thinPack;
 
@@ -108,7 +112,13 @@ class BasePackPushConnection extends BasePackConnection implements
 	/** Time in milliseconds spent transferring the pack data. */
 	private long packTransferTime;
 
-	BasePackPushConnection(final PackTransport packTransport) {
+	/**
+	 * Create a new connection to push using the native git transport.
+	 *
+	 * @param packTransport
+	 *            the transport.
+	 */
+	public BasePackPushConnection(final PackTransport packTransport) {
 		super(packTransport);
 		thinPack = transport.isPushThin();
 	}
@@ -143,6 +153,16 @@ class BasePackPushConnection extends BasePackConnection implements
 		return new TransportException(uri, JGitText.get().pushNotPermitted);
 	}
 
+	/**
+	 * Push one or more objects and update the remote repository.
+	 *
+	 * @param monitor
+	 *            progress monitor to receive status updates.
+	 * @param refUpdates
+	 *            update commands to be applied to the remote repository.
+	 * @throws TransportException
+	 *             if any exception occurs.
+	 */
 	protected void doPush(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
@@ -227,10 +247,9 @@ class BasePackPushConnection extends BasePackConnection implements
 
 	private void writePack(final Map<String, RemoteRefUpdate> refUpdates,
 			final ProgressMonitor monitor) throws IOException {
-		List<ObjectId> remoteObjects = new ArrayList<ObjectId>(getRefs().size());
-		List<ObjectId> newObjects = new ArrayList<ObjectId>(refUpdates.size());
+		Set<ObjectId> remoteObjects = new HashSet<ObjectId>();
+		Set<ObjectId> newObjects = new HashSet<ObjectId>();
 
-		final long start;
 		final PackWriter writer = new PackWriter(transport.getPackConfig(),
 				local.newObjectReader());
 		try {
@@ -243,16 +262,16 @@ class BasePackPushConnection extends BasePackConnection implements
 					newObjects.add(r.getNewObjectId());
 			}
 
+			writer.setUseCachedPacks(true);
 			writer.setThin(thinPack);
+			writer.setReuseValidatingObjects(false);
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
-			start = System.currentTimeMillis();
 			writer.writePack(monitor, monitor, out);
 		} finally {
 			writer.release();
 		}
-		out.flush();
-		packTransferTime = System.currentTimeMillis() - start;
+		packTransferTime = writer.getStatistics().getTimeWriting();
 	}
 
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)

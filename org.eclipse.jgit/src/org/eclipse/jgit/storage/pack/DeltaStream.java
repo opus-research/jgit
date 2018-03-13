@@ -49,8 +49,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.IO;
 
 /**
@@ -215,7 +215,8 @@ public abstract class DeltaStream extends InputStream {
 				if (n < 0)
 					throw new CorruptObjectException(
 							JGitText.get().baseLengthIncorrect);
-				baseOffset += n;
+				copyOffset += n;
+				baseOffset = copyOffset;
 				break;
 
 			case CMD_INSERT:
@@ -225,6 +226,7 @@ public abstract class DeltaStream extends InputStream {
 
 			case CMD_EOF:
 				return 0 < act ? act : -1;
+
 			default:
 				throw new CorruptObjectException(
 						JGitText.get().unsupportedCommand0);

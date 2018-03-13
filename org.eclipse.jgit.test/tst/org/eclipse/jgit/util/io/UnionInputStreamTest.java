@@ -43,13 +43,19 @@
 
 package org.eclipse.jgit.util.io;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
-public class UnionInputStreamTest extends TestCase {
+public class UnionInputStreamTest {
+	@Test
 	public void testEmptyStream() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		assertTrue(u.isEmpty());
@@ -60,6 +66,7 @@ public class UnionInputStreamTest extends TestCase {
 		u.close();
 	}
 
+	@Test
 	public void testReadSingleBytes() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 
@@ -91,6 +98,7 @@ public class UnionInputStreamTest extends TestCase {
 		assertTrue(u.isEmpty());
 	}
 
+	@Test
 	public void testReadByteBlocks() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1, 0, 2 }));
@@ -98,13 +106,22 @@ public class UnionInputStreamTest extends TestCase {
 		u.add(new ByteArrayInputStream(new byte[] { 4, 5 }));
 
 		final byte[] r = new byte[5];
-		assertEquals(5, u.read(r, 0, 5));
-		assertTrue(Arrays.equals(new byte[] { 1, 0, 2, 3, 4 }, r));
+		assertEquals(3, u.read(r, 0, 5));
+		assertTrue(Arrays.equals(new byte[] { 1, 0, 2, }, slice(r, 3)));
 		assertEquals(1, u.read(r, 0, 5));
-		assertEquals(5, r[0]);
+		assertEquals(3, r[0]);
+		assertEquals(2, u.read(r, 0, 5));
+		assertTrue(Arrays.equals(new byte[] { 4, 5, }, slice(r, 2)));
 		assertEquals(-1, u.read(r, 0, 5));
 	}
 
+	private static byte[] slice(byte[] in, int len) {
+		byte[] r = new byte[len];
+		System.arraycopy(in, 0, r, 0, len);
+		return r;
+	}
+
+	@Test
 	public void testArrayConstructor() throws IOException {
 		final UnionInputStream u = new UnionInputStream(
 				new ByteArrayInputStream(new byte[] { 1, 0, 2 }),
@@ -112,13 +129,16 @@ public class UnionInputStreamTest extends TestCase {
 				new ByteArrayInputStream(new byte[] { 4, 5 }));
 
 		final byte[] r = new byte[5];
-		assertEquals(5, u.read(r, 0, 5));
-		assertTrue(Arrays.equals(new byte[] { 1, 0, 2, 3, 4 }, r));
+		assertEquals(3, u.read(r, 0, 5));
+		assertTrue(Arrays.equals(new byte[] { 1, 0, 2, }, slice(r, 3)));
 		assertEquals(1, u.read(r, 0, 5));
-		assertEquals(5, r[0]);
+		assertEquals(3, r[0]);
+		assertEquals(2, u.read(r, 0, 5));
+		assertTrue(Arrays.equals(new byte[] { 4, 5, }, slice(r, 2)));
 		assertEquals(-1, u.read(r, 0, 5));
 	}
 
+	@Test
 	public void testMarkSupported() {
 		final UnionInputStream u = new UnionInputStream();
 		assertFalse(u.markSupported());
@@ -126,15 +146,16 @@ public class UnionInputStreamTest extends TestCase {
 		assertFalse(u.markSupported());
 	}
 
+	@Test
 	public void testSkip() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1, 0, 2 }));
 		u.add(new ByteArrayInputStream(new byte[] { 3 }));
 		u.add(new ByteArrayInputStream(new byte[] { 4, 5 }));
 		assertEquals(0, u.skip(0));
-		assertEquals(4, u.skip(4));
-		assertEquals(4, u.read());
-		assertEquals(1, u.skip(5));
+		assertEquals(3, u.skip(3));
+		assertEquals(3, u.read());
+		assertEquals(2, u.skip(5));
 		assertEquals(0, u.skip(5));
 		assertEquals(-1, u.read());
 
@@ -147,6 +168,7 @@ public class UnionInputStreamTest extends TestCase {
 		assertEquals(-1, u.read());
 	}
 
+	@Test
 	public void testAutoCloseDuringRead() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		final boolean closed[] = new boolean[2];
@@ -177,6 +199,7 @@ public class UnionInputStreamTest extends TestCase {
 		assertTrue(closed[1]);
 	}
 
+	@Test
 	public void testCloseDuringClose() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		final boolean closed[] = new boolean[2];
@@ -200,6 +223,7 @@ public class UnionInputStreamTest extends TestCase {
 		assertTrue(closed[1]);
 	}
 
+	@Test
 	public void testExceptionDuringClose() {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1 }) {

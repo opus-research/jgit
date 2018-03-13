@@ -44,9 +44,16 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.revwalk.ObjectWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 
 /**
@@ -57,7 +64,7 @@ import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
  */
 public abstract class ObjectReader {
 	/** Type hint indicating the caller doesn't know the type. */
-	protected static final int OBJ_ANY = -1;
+	public static final int OBJ_ANY = -1;
 
 	/**
 	 * Construct a new reader from the same data.
@@ -68,6 +75,104 @@ public abstract class ObjectReader {
 	 * @return a brand new reader, using the same data source.
 	 */
 	public abstract ObjectReader newReader();
+
+	/**
+	 * Obtain a unique abbreviation (prefix) of an object SHA-1.
+	 *
+	 * This method uses a reasonable default for the minimum length. Callers who
+	 * don't care about the minimum length should prefer this method.
+	 *
+	 * The returned abbreviation would expand back to the argument ObjectId when
+	 * passed to {@link #resolve(AbbreviatedObjectId)}, assuming no new objects
+	 * are added to this repository between calls.
+	 *
+	 * @param objectId
+	 *            object identity that needs to be abbreviated.
+	 * @return SHA-1 abbreviation.
+	 * @throws IOException
+	 *             the object store cannot be read.
+	 */
+	public AbbreviatedObjectId abbreviate(AnyObjectId objectId)
+			throws IOException {
+		return abbreviate(objectId, 7);
+	}
+
+	/**
+	 * Obtain a unique abbreviation (prefix) of an object SHA-1.
+	 *
+	 * The returned abbreviation would expand back to the argument ObjectId when
+	 * passed to {@link #resolve(AbbreviatedObjectId)}, assuming no new objects
+	 * are added to this repository between calls.
+	 *
+	 * The default implementation of this method abbreviates the id to the
+	 * minimum length, then resolves it to see if there are multiple results.
+	 * When multiple results are found, the length is extended by 1 and resolve
+	 * is tried again.
+	 *
+	 * @param objectId
+	 *            object identity that needs to be abbreviated.
+	 * @param len
+	 *            minimum length of the abbreviated string. Must be in the range
+	 *            [2, {@value Constants#OBJECT_ID_STRING_LENGTH}].
+	 * @return SHA-1 abbreviation. If no matching objects exist in the
+	 *         repository, the abbreviation will match the minimum length.
+	 * @throws IOException
+	 *             the object store cannot be read.
+	 */
+	public AbbreviatedObjectId abbreviate(AnyObjectId objectId, int len)
+			throws IOException {
+		if (len == Constants.OBJECT_ID_STRING_LENGTH)
+			return AbbreviatedObjectId.fromObjectId(objectId);
+
+		AbbreviatedObjectId abbrev = objectId.abbreviate(len);
+		Collection<ObjectId> matches = resolve(abbrev);
+		while (1 < matches.size() && len < Constants.OBJECT_ID_STRING_LENGTH) {
+			abbrev = objectId.abbreviate(++len);
+			List<ObjectId> n = new ArrayList<ObjectId>(8);
+			for (ObjectId candidate : matches) {
+				if (abbrev.prefixCompare(candidate) == 0)
+					n.add(candidate);
+			}
+			if (1 < n.size())
+				matches = n;
+			else
+				matches = resolve(abbrev);
+		}
+		return abbrev;
+	}
+
+	/**
+	 * Resolve an abbreviated ObjectId to its full form.
+	 *
+	 * This method searches for an ObjectId that begins with the abbreviation,
+	 * and returns at least some matching candidates.
+	 *
+	 * If the returned collection is empty, no objects start with this
+	 * abbreviation. The abbreviation doesn't belong to this repository, or the
+	 * repository lacks the necessary objects to complete it.
+	 *
+	 * If the collection contains exactly one member, the abbreviation is
+	 * (currently) unique within this database. There is a reasonably high
+	 * probability that the returned id is what was previously abbreviated.
+	 *
+	 * If the collection contains 2 or more members, the abbreviation is not
+	 * unique. In this case the implementation is only required to return at
+	 * least 2 candidates to signal the abbreviation has conflicts. User
+	 * friendly implementations should return as many candidates as reasonably
+	 * possible, as the caller may be able to disambiguate further based on
+	 * context. However since databases can be very large (e.g. 10 million
+	 * objects) returning 625,000 candidates for the abbreviation "0" is simply
+	 * unreasonable, so implementors should draw the line at around 256 matches.
+	 *
+	 * @param id
+	 *            abbreviated id to resolve to a complete identity. The
+	 *            abbreviation must have a length of at least 2.
+	 * @return candidates that begin with the abbreviated identity.
+	 * @throws IOException
+	 *             the object store cannot be read.
+	 */
+	public abstract Collection<ObjectId> resolve(AbbreviatedObjectId id)
+			throws IOException;
 
 	/**
 	 * Does the requested object exist in this database?
@@ -146,6 +251,60 @@ public abstract class ObjectReader {
 			IOException;
 
 	/**
+	 * Asynchronous object opening.
+	 *
+	 * @param <T>
+	 *            type of identifier being supplied.
+	 * @param objectIds
+	 *            objects to open from the object store. The supplied collection
+	 *            must not be modified until the queue has finished.
+	 * @param reportMissing
+	 *            if true missing objects are reported by calling failure with a
+	 *            MissingObjectException. This may be more expensive for the
+	 *            implementation to guarantee. If false the implementation may
+	 *            choose to report MissingObjectException, or silently skip over
+	 *            the object with no warning.
+	 * @return queue to read the objects from.
+	 */
+	public <T extends ObjectId> AsyncObjectLoaderQueue<T> open(
+			Iterable<T> objectIds, final boolean reportMissing) {
+		final Iterator<T> idItr = objectIds.iterator();
+		return new AsyncObjectLoaderQueue<T>() {
+			private T cur;
+
+			public boolean next() throws MissingObjectException, IOException {
+				if (idItr.hasNext()) {
+					cur = idItr.next();
+					return true;
+				} else {
+					return false;
+				}
+			}
+
+			public T getCurrent() {
+				return cur;
+			}
+
+			public ObjectId getObjectId() {
+				return cur;
+			}
+
+			public ObjectLoader open() throws IOException {
+				return ObjectReader.this.open(cur, OBJ_ANY);
+			}
+
+			public boolean cancel(boolean mayInterruptIfRunning) {
+				return true;
+			}
+
+			public void release() {
+				// Since we are sequential by default, we don't
+				// have any state to clean up if we terminate early.
+			}
+		};
+	}
+
+	/**
 	 * Get only the size of an object.
 	 * <p>
 	 * The default implementation of this method opens an ObjectLoader.
@@ -171,6 +330,101 @@ public abstract class ObjectReader {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		return open(objectId, typeHint).getSize();
+	}
+
+	/**
+	 * Asynchronous object size lookup.
+	 *
+	 * @param <T>
+	 *            type of identifier being supplied.
+	 * @param objectIds
+	 *            objects to get the size of from the object store. The supplied
+	 *            collection must not be modified until the queue has finished.
+	 * @param reportMissing
+	 *            if true missing objects are reported by calling failure with a
+	 *            MissingObjectException. This may be more expensive for the
+	 *            implementation to guarantee. If false the implementation may
+	 *            choose to report MissingObjectException, or silently skip over
+	 *            the object with no warning.
+	 * @return queue to read object sizes from.
+	 */
+	public <T extends ObjectId> AsyncObjectSizeQueue<T> getObjectSize(
+			Iterable<T> objectIds, final boolean reportMissing) {
+		final Iterator<T> idItr = objectIds.iterator();
+		return new AsyncObjectSizeQueue<T>() {
+			private T cur;
+
+			private long sz;
+
+			public boolean next() throws MissingObjectException, IOException {
+				if (idItr.hasNext()) {
+					cur = idItr.next();
+					sz = getObjectSize(cur, OBJ_ANY);
+					return true;
+				} else {
+					return false;
+				}
+			}
+
+			public T getCurrent() {
+				return cur;
+			}
+
+			public ObjectId getObjectId() {
+				return cur;
+			}
+
+			public long getSize() {
+				return sz;
+			}
+
+			public boolean cancel(boolean mayInterruptIfRunning) {
+				return true;
+			}
+
+			public void release() {
+				// Since we are sequential by default, we don't
+				// have any state to clean up if we terminate early.
+			}
+		};
+	}
+
+	/**
+	 * Advice from a {@link RevWalk} that a walk is starting from these roots.
+	 *
+	 * @param walk
+	 *            the revision pool that is using this reader.
+	 * @param roots
+	 *            starting points of the revision walk. The starting points have
+	 *            their headers parsed, but might be missing bodies.
+	 * @throws IOException
+	 *             the reader cannot initialize itself to support the walk.
+	 */
+	public void walkAdviceBeginCommits(RevWalk walk, Collection<RevCommit> roots)
+			throws IOException {
+		// Do nothing by default, most readers don't want or need advice.
+	}
+
+	/**
+	 * Advice from an {@link ObjectWalk} that trees will be traversed.
+	 *
+	 * @param ow
+	 *            the object pool that is using this reader.
+	 * @param min
+	 *            the first commit whose root tree will be read.
+	 * @param max
+	 *            the last commit whose root tree will be read.
+	 * @throws IOException
+	 *             the reader cannot initialize itself to support the walk.
+	 */
+	public void walkAdviceBeginTrees(ObjectWalk ow, RevCommit min, RevCommit max)
+			throws IOException {
+		// Do nothing by default, most readers don't want or need advice.
+	}
+
+	/** Advice from that a walk is over. */
+	public void walkAdviceEnd() {
+		// Do nothing by default, most readers don't want or need advice.
 	}
 
 	/**

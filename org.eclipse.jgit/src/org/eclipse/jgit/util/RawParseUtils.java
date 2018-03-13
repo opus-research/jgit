@@ -54,7 +54,11 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
+import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -67,7 +71,12 @@ public final class RawParseUtils {
 
 	private static final byte[] footerLineKeyChars;
 
+	private static final Map<String, Charset> encodingAliases;
+
 	static {
+		encodingAliases = new HashMap<String, Charset>();
+		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1"));
+
 		digits10 = new byte['9' + 1];
 		Arrays.fill(digits10, (byte) -1);
 		for (char i = '0'; i <= '9'; i++)
@@ -155,6 +164,8 @@ public final class RawParseUtils {
 			return o;
 		}
 		final boolean isneg = value < 0;
+		if (isneg)
+			value = -value;
 		while (value != 0) {
 			b[--o] = base10byte[value % 10];
 			value /= 10;
@@ -649,7 +660,35 @@ public final class RawParseUtils {
 		if (enc < 0)
 			return Constants.CHARSET;
 		final int lf = nextLF(b, enc);
-		return Charset.forName(decode(Constants.CHARSET, b, enc, lf - 1));
+		String decoded = decode(Constants.CHARSET, b, enc, lf - 1);
+		try {
+			return Charset.forName(decoded);
+		} catch (IllegalCharsetNameException badName) {
+			Charset aliased = charsetForAlias(decoded);
+			if (aliased != null)
+				return aliased;
+			throw badName;
+		} catch (UnsupportedCharsetException badName) {
+			Charset aliased = charsetForAlias(decoded);
+			if (aliased != null)
+				return aliased;
+			throw badName;
+		}
+	}
+
+	/**
+	 * Parse a name string (e.g. author, committer, tagger) into a PersonIdent.
+	 * <p>
+	 * Leading spaces won't be trimmed from the string, i.e. will show up in the
+	 * parsed name afterwards.
+	 *
+	 * @param in
+	 *            the string to parse a name from.
+	 * @return the parsed identity or null in case the identity could not be
+	 *         parsed.
+	 */
+	public static PersonIdent parsePersonIdent(final String in) {
+		return parsePersonIdent(Constants.encode(in), 0);
 	}
 
 	/**
@@ -667,32 +706,42 @@ public final class RawParseUtils {
 	 *            first position after the space which delimits the header field
 	 *            name (e.g. "author" or "committer") from the rest of the
 	 *            identity line.
-	 * @return the parsed identity. Never null.
+	 * @return the parsed identity or null in case the identity could not be
+	 *         parsed.
 	 */
 	public static PersonIdent parsePersonIdent(final byte[] raw, final int nameB) {
 		final Charset cs = parseEncoding(raw);
 		final int emailB = nextLF(raw, nameB, '<');
 		final int emailE = nextLF(raw, emailB, '>');
-		if (emailB <= nameB + 1 || // No name
-			emailB >= raw.length || // No email start
-			raw[emailB] == '\n' ||
-			emailE >= raw.length - 1 || // No email end at all or no trailing date
-			raw[emailE] == '\n') {
+		if (emailB >= raw.length || raw[emailB] == '\n' ||
+				(emailE >= raw.length - 1 && raw[emailE - 1] != '>'))
 			return null;
-		}
 
-		final String name = decode(cs, raw, nameB, emailB - 2);
+		final int nameEnd = emailB - 2 >= nameB && raw[emailB - 2] == ' ' ?
+				emailB - 2 : emailB - 1;
+		final String name = decode(cs, raw, nameB, nameEnd);
 		final String email = decode(cs, raw, emailB, emailE - 1);
 
-		final MutableInteger ptrout = new MutableInteger();
-		final long when = parseLongBase10(raw, emailE + 1, ptrout);
-		final int whenE = ptrout.value;
-		if (whenE >= raw.length || // No trailing timezone
-			raw[whenE] == '\n') {
-			return null;
-		}
+		// Start searching from end of line, as after first name-email pair,
+		// another name-email pair may occur. We will ignore all kinds of
+		// "junk" following the first email.
+		//
+		// We've to use (emailE - 1) for the case that raw[email] is LF,
+		// otherwise we would run too far. "-2" is necessary to position
+		// before the LF in case of LF termination resp. the penultimate
+		// character if there is no trailing LF.
+		final int tzBegin = lastIndexOfTrim(raw, ' ',
+				nextLF(raw, emailE - 1) - 2) + 1;
+		if (tzBegin <= emailE) // No time/zone, still valid
+			return new PersonIdent(name, email, 0, 0);
 
-		final int tz = parseTimeZoneOffset(raw, whenE);
+		final int whenBegin = Math.max(emailE,
+				lastIndexOfTrim(raw, ' ', tzBegin - 1) + 1);
+		if (whenBegin >= tzBegin - 1) // No time/zone, still valid
+			return new PersonIdent(name, email, 0, 0);
+
+		final long when = parseLongBase10(raw, whenBegin, null);
+		final int tz = parseTimeZoneOffset(raw, tzBegin);
 		return new PersonIdent(name, email, when * 1000L, tz);
 	}
 
@@ -713,7 +762,8 @@ public final class RawParseUtils {
 	 *            identity line.
 	 * @return the parsed identity. Never null.
 	 */
-	public static PersonIdent parsePersonIdentOnly(final byte[] raw, final int nameB) {
+	public static PersonIdent parsePersonIdentOnly(final byte[] raw,
+			final int nameB) {
 		int stop = nextLF(raw, nameB);
 		int emailB = nextLF(raw, nameB, '<');
 		int emailE = nextLF(raw, emailB, '>');
@@ -1020,6 +1070,20 @@ public final class RawParseUtils {
 		while (0 < ptr && start < ptr && b[ptr - 1] == '\n')
 			ptr--;
 		return ptr;
+	}
+
+	private static int lastIndexOfTrim(byte[] raw, char ch, int pos) {
+		while (pos >= 0 && raw[pos] == ' ')
+			pos--;
+
+		while (pos >= 0 && raw[pos] != ch)
+			pos--;
+
+		return pos;
+	}
+
+	private static Charset charsetForAlias(String name) {
+		return encodingAliases.get(StringUtils.toLowerCase(name));
 	}
 
 	private RawParseUtils() {

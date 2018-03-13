@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2008, Charles O'Farrell <charleso@charleso.org>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2008, Charles O'Farrell <charleso@charleso.org>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg.lists@dewire.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
@@ -47,12 +48,14 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
+import java.util.List;
 
-import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ListTagCommand;
+import org.eclipse.jgit.api.TagCommand;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -64,7 +67,7 @@ class Tag extends TextBuiltin {
 	@Option(name = "-m", metaVar = "metaVar_message", usage = "usage_tagMessage")
 	private String message = "";
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_name")
+	@Argument(index = 0, metaVar = "metaVar_name")
 	private String tagName;
 
 	@Argument(index = 1, metaVar = "metaVar_object")
@@ -72,27 +75,23 @@ class Tag extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		if (object == null) {
-			object = db.resolve(Constants.HEAD);
-			if (object == null)
-				throw die(MessageFormat.format(CLIText.get().cannotResolve, Constants.HEAD));
+		Git git = new Git(db);
+		if (tagName != null) {
+			TagCommand command = git.tag().setForceUpdate(force)
+					.setMessage(message).setName(tagName);
+
+			if (object != null) {
+				RevWalk walk = new RevWalk(db);
+				command.setObjectId(walk.parseAny(object));
+			}
+
+			command.call();
+		} else {
+			ListTagCommand command = git.tagList();
+			List<RevTag> list = command.call();
+			for (RevTag revTag : list) {
+				out.println(revTag.getTagName());
+			}
 		}
-
-		if (!tagName.startsWith(Constants.R_TAGS))
-			tagName = Constants.R_TAGS + tagName;
-		if (!force && db.resolve(tagName) != null) {
-			throw die(MessageFormat.format(CLIText.get().fatalErrorTagExists
-					, tagName.substring(Constants.R_TAGS.length())));
-		}
-
-		final ObjectLoader ldr = db.open(object);
-
-		org.eclipse.jgit.lib.Tag tag = new org.eclipse.jgit.lib.Tag(db);
-		tag.setObjId(object);
-		tag.setType(Constants.typeString(ldr.getType()));
-		tag.setTagger(new PersonIdent(db));
-		tag.setMessage(message.replaceAll("\r", ""));
-		tag.setTag(tagName.substring(Constants.R_TAGS.length()));
-		tag.tag();
 	}
 }

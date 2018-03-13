@@ -46,16 +46,21 @@ package org.eclipse.jgit.storage.file;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Set;
 
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSubclassMap;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.util.FS;
 
 /**
  * The cached instance of an {@link ObjectDirectory}.
@@ -68,7 +73,7 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	 * The set that contains unpacked objects identifiers, it is created when
 	 * the cached instance is created.
 	 */
-	private final ObjectIdSubclassMap<ObjectId> unpackedObjects = new ObjectIdSubclassMap<ObjectId>();
+	private final ObjectIdOwnerMap<UnpackedObjectId> unpackedObjects = new ObjectIdOwnerMap<UnpackedObjectId>();
 
 	private final ObjectDirectory wrapped;
 
@@ -97,7 +102,8 @@ class CachedObjectDirectory extends FileObjectDatabase {
 				if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 					continue;
 				try {
-					unpackedObjects.add(ObjectId.fromString(d + e));
+					ObjectId id = ObjectId.fromString(d + e);
+					unpackedObjects.add(new UnpackedObjectId(id));
 				} catch (IllegalArgumentException notAnObject) {
 					// ignoring the file that does not represent loose object
 				}
@@ -108,11 +114,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	public void close() {
 		// Don't close anything.
-	}
-
-	@Override
-	public ObjectInserter newInserter() {
-		return wrapped.newInserter();
 	}
 
 	@Override
@@ -131,6 +132,21 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
+	Config getConfig() {
+		return wrapped.getConfig();
+	}
+
+	@Override
+	FS getFS() {
+		return wrapped.getFS();
+	}
+
+	@Override
+	Collection<? extends CachedPack> getCachedPacks() throws IOException {
+		return wrapped.getCachedPacks();
+	}
+
+	@Override
 	AlternateHandle[] myAlternates() {
 		if (alts == null) {
 			AlternateHandle[] src = wrapped.myAlternates();
@@ -141,6 +157,17 @@ class CachedObjectDirectory extends FileObjectDatabase {
 			}
 		}
 		return alts;
+	}
+
+	@Override
+	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
+			throws IOException {
+		// In theory we could accelerate the loose object scan using our
+		// unpackedObjects map, but its not worth the huge code complexity.
+		// Scanning a single loose directory is fast enough, and this is
+		// unlikely to be called anyway.
+		//
+		wrapped.resolve(matches, id);
 	}
 
 	@Override
@@ -175,15 +202,15 @@ class CachedObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	boolean hasObject2(String objectId) {
-		// This method should never be invoked.
-		throw new UnsupportedOperationException();
+		return unpackedObjects.contains(ObjectId.fromString(objectId));
 	}
 
 	@Override
 	ObjectLoader openObject2(WindowCursor curs, String objectName,
 			AnyObjectId objectId) throws IOException {
-		// This method should never be invoked.
-		throw new UnsupportedOperationException();
+		if (unpackedObjects.contains(objectId))
+			return wrapped.openObject2(curs, objectName, objectId);
+		return null;
 	}
 
 	@Override
@@ -196,8 +223,32 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	long getObjectSize2(WindowCursor curs, String objectName, AnyObjectId objectId)
 			throws IOException {
-		// This method should never be invoked.
-		throw new UnsupportedOperationException();
+		if (unpackedObjects.contains(objectId))
+			return wrapped.getObjectSize2(curs, objectName, objectId);
+		return -1;
+	}
+
+	@Override
+	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId objectId,
+			boolean createDuplicate) throws IOException {
+		InsertLooseObjectResult result = wrapped.insertUnpackedObject(tmp,
+				objectId, createDuplicate);
+		switch (result) {
+		case INSERTED:
+		case EXISTS_LOOSE:
+			unpackedObjects.addIfAbsent(new UnpackedObjectId(objectId));
+			break;
+
+		case EXISTS_PACKED:
+		case FAILURE:
+			break;
+		}
+		return result;
+	}
+
+	@Override
+	PackFile openPack(File pack, File idx) throws IOException {
+		return wrapped.openPack(pack, idx);
 	}
 
 	@Override
@@ -206,8 +257,9 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		wrapped.selectObjectRepresentation(packer, otp, curs);
 	}
 
-	@Override
-	int getStreamFileThreshold() {
-		return wrapped.getStreamFileThreshold();
+	private static class UnpackedObjectId extends ObjectIdOwnerMap.Entry {
+		UnpackedObjectId(AnyObjectId id) {
+			super(id);
+		}
 	}
 }

@@ -51,8 +51,10 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -96,12 +98,13 @@ class PackIndexV1 extends PackIndex {
 		IO.readFully(fd, packChecksum, 0, packChecksum.length);
 	}
 
-	long getObjectCount() {
+	@Override
+	public long getObjectCount() {
 		return objectCnt;
 	}
 
 	@Override
-	long getOffset64Count() {
+	public long getOffset64Count() {
 		long n64 = 0;
 		for (final MutableEntry e : this) {
 			if (e.getOffset() >= Integer.MAX_VALUE)
@@ -111,7 +114,7 @@ class PackIndexV1 extends PackIndex {
 	}
 
 	@Override
-	ObjectId getObjectId(final long nthPosition) {
+	public ObjectId getObjectId(final long nthPosition) {
 		int levelOne = Arrays.binarySearch(idxHeader, nthPosition + 1);
 		long base;
 		if (levelOne >= 0) {
@@ -129,11 +132,12 @@ class PackIndexV1 extends PackIndex {
 
 		base = levelOne > 0 ? idxHeader[levelOne - 1] : 0;
 		final int p = (int) (nthPosition - base);
-		final int dataIdx = ((4 + Constants.OBJECT_ID_LENGTH) * p) + 4;
+		final int dataIdx = idOffset(p);
 		return ObjectId.fromRaw(idxdata[levelOne], dataIdx);
 	}
 
-	long findOffset(final AnyObjectId objId) {
+	@Override
+	public long findOffset(final AnyObjectId objId) {
 		final int levelOne = objId.getFirstByte();
 		byte[] data = idxdata[levelOne];
 		if (data == null)
@@ -142,7 +146,7 @@ class PackIndexV1 extends PackIndex {
 		int low = 0;
 		do {
 			final int mid = (low + high) >>> 1;
-			final int pos = ((4 + Constants.OBJECT_ID_LENGTH) * mid) + 4;
+			final int pos = idOffset(mid);
 			final int cmp = objId.compareTo(data, pos);
 			if (cmp < 0)
 				high = mid;
@@ -159,17 +163,53 @@ class PackIndexV1 extends PackIndex {
 	}
 
 	@Override
-	long findCRC32(AnyObjectId objId) {
+	public long findCRC32(AnyObjectId objId) {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	boolean hasCRC32Support() {
+	public boolean hasCRC32Support() {
 		return false;
 	}
 
+	@Override
 	public Iterator<MutableEntry> iterator() {
 		return new IndexV1Iterator();
+	}
+
+	@Override
+	public void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
+			int matchLimit) throws IOException {
+		byte[] data = idxdata[id.getFirstByte()];
+		if (data == null)
+			return;
+		int max = data.length / (4 + Constants.OBJECT_ID_LENGTH);
+		int high = max;
+		int low = 0;
+		do {
+			int p = (low + high) >>> 1;
+			final int cmp = id.prefixCompare(data, idOffset(p));
+			if (cmp < 0)
+				high = p;
+			else if (cmp == 0) {
+				// We may have landed in the middle of the matches.  Move
+				// backwards to the start of matches, then walk forwards.
+				//
+				while (0 < p && id.prefixCompare(data, idOffset(p - 1)) == 0)
+					p--;
+				for (; p < max && id.prefixCompare(data, idOffset(p)) == 0; p++) {
+					matches.add(ObjectId.fromRaw(data, idOffset(p)));
+					if (matches.size() > matchLimit)
+						break;
+				}
+				return;
+			} else
+				low = p + 1;
+		} while (low < high);
+	}
+
+	private static int idOffset(int mid) {
+		return ((4 + Constants.OBJECT_ID_LENGTH) * mid) + 4;
 	}
 
 	private class IndexV1Iterator extends EntriesIterator {

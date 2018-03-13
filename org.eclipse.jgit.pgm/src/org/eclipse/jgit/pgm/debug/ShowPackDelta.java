@@ -46,6 +46,7 @@ package org.eclipse.jgit.pgm.debug;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -103,9 +104,10 @@ class ShowPackDelta extends TextBuiltin {
 		};
 
 		ByteArrayOutputStream buf = new ByteArrayOutputStream();
-		asis.selectObjectRepresentation(pw, target);
+		asis.selectObjectRepresentation(pw, NullProgressMonitor.INSTANCE,
+				Collections.singleton(target));
 		asis.copyObjectAsIs(new PackOutputStream(NullProgressMonitor.INSTANCE,
-				buf, pw), target);
+				buf, pw), target, true);
 
 		// At this point the object header has no delta information,
 		// because it was output as though it were a whole object.
