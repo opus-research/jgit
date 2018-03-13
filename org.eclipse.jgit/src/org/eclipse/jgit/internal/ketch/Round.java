@@ -64,8 +64,8 @@ abstract class Round {
 	/**
 	 * Invoked without {@link KetchLeader#lock} to build objects.
 	 * <p>
-	 * Sets {@link #acceptedNew} and then calls {@link #acceptAsync()} to begin
-	 * execution of the round across the system.
+	 * Creates new accepted commit and calls {@link #acceptAsync(AnyObjectId)}
+	 * to begin execution of the round across the system.
 	 *
 	 * @throws IOException
 	 *             the round cannot build new objects within the leader's
@@ -73,11 +73,8 @@ abstract class Round {
 	 */
 	abstract void start() throws IOException;
 
-	void setAcceptedNew(AnyObjectId id) {
-		acceptedNew = new LogId(id, acceptedOld.index + 1);
-	}
-
-	void acceptAsync() {
+	void acceptAsync(AnyObjectId id) {
+		acceptedNew = acceptedOld.nextId(id);
 		leader.acceptAsync(this);
 	}
 

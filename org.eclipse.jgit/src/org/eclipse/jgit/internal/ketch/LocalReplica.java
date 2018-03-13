@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import static org.eclipse.jgit.internal.ketch.KetchConstants.ACCEPTED;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.COMMITTED;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod.ALL_REFS;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod.TXN_COMMITTED;
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
@@ -91,16 +89,21 @@ public class LocalReplica extends KetchReplica {
 	}
 
 	/**
+	 * Initializes local replica by reading accepted and committed references.
+	 * <p>
+	 * Loads accepted and committed references from the reference database of
+	 * the local replica and stores their current ObjectIds in memory.
+	 *
 	 * @param repo
 	 *            repository to initialize state from.
 	 * @throws IOException
 	 *             cannot read repository state.
 	 */
 	protected void initialize(Repository repo) throws IOException {
-		String txnNamespace = getTxnNamespace();
 		RefDatabase refdb = repo.getRefDatabase();
 		if (refdb instanceof RefTreeDatabase) {
 			RefTreeDatabase treeDb = (RefTreeDatabase) refdb;
+			String txnNamespace = getSystem().getTxnNamespace();
 			if (!txnNamespace.equals(treeDb.getTxnNamespace())) {
 				throw new IOException(MessageFormat.format(
 						KetchText.get().mismatchedTxnNamespace,
@@ -109,8 +112,8 @@ public class LocalReplica extends KetchReplica {
 			refdb = treeDb.getBootstrap();
 		}
 		initialize(refdb.exactRef(
-				txnNamespace + ACCEPTED,
-				txnNamespace + COMMITTED));
+				getSystem().getTxnAccepted(),
+				getSystem().getTxnCommitted()));
 	}
 
 	@Override
@@ -132,9 +135,9 @@ public class LocalReplica extends KetchReplica {
 		});
 	}
 
-	private void update(Repository repo, ReplicaPushRequest req)
+	private void update(Repository git, ReplicaPushRequest req)
 			throws IOException {
-		RefDatabase refdb = repo.getRefDatabase();
+		RefDatabase refdb = git.getRefDatabase();
 		CommitMethod method = getCommitMethod();
 
 		// Local replica probably uses RefTreeDatabase, the request should
@@ -157,15 +160,12 @@ public class LocalReplica extends KetchReplica {
 		// Run everything else first, then accepted (if present),
 		// then committed (if present). This ensures an earlier
 		// failure will not update these critical references.
-		String acceptedRefName = getTxnNamespace() + ACCEPTED;
-		String committedRefName = getTxnNamespace() + COMMITTED;
-
 		ReceiveCommand accepted = null;
 		ReceiveCommand committed = null;
 		for (ReceiveCommand cmd : req.getCommands()) {
-			if (acceptedRefName.equals(cmd.getRefName())) {
+			if (getSystem().getTxnAccepted().equals(cmd.getRefName())) {
 				accepted = cmd;
-			} else if (committedRefName.equals(cmd.getRefName())) {
+			} else if (getSystem().getTxnCommitted().equals(cmd.getRefName())) {
 				committed = cmd;
 			} else {
 				batch.addCommand(cmd);
@@ -173,7 +173,7 @@ public class LocalReplica extends KetchReplica {
 		}
 		if (committed != null && method == ALL_REFS) {
 			Map<String, Ref> refs = refdb.getRefs(ALL);
-			batch.addCommand(commit(repo, refs, committed.getNewId()));
+			batch.addCommand(commit(git, refs, committed.getNewId()));
 		}
 		if (accepted != null) {
 			batch.addCommand(accepted);
@@ -182,7 +182,7 @@ public class LocalReplica extends KetchReplica {
 			batch.addCommand(committed);
 		}
 
-		try (RevWalk rw = new RevWalk(repo)) {
+		try (RevWalk rw = new RevWalk(git)) {
 			batch.execute(rw, NullProgressMonitor.INSTANCE);
 		}
 
@@ -207,7 +207,7 @@ public class LocalReplica extends KetchReplica {
 		// Be paranoid and reject non txnNamespace names, this
 		// is a programming error in Ketch that should not occur.
 
-		String txnNamespace = getTxnNamespace();
+		String txnNamespace = getSystem().getTxnNamespace();
 		for (ReceiveCommand cmd : cmdList) {
 			if (!cmd.getRefName().startsWith(txnNamespace)) {
 				cmd.setResult(REJECTED_OTHER_REASON,

@@ -44,8 +44,6 @@
 package org.eclipse.jgit.internal.ketch;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.ACCEPTED;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.*;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitSpeed.BATCHED;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitSpeed.FAST;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.State.AHEAD;
@@ -86,21 +84,35 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Any Ketch replica, either {@link LocalReplica} or {@link RemoteGitReplica}. */
+/**
+ * A Ketch replica, either {@link LocalReplica} or {@link RemoteGitReplica}.
+ * <p>
+ * Replicas can be either a stock Git replica, or Ketch-aware replica.
+ * <p>
+ * A stock Git replica has no special knowledge of Ketch and simply stores
+ * objects and references. Ketch communicates with the stock Git replica using
+ * the Git push wire protocol. The {@link KetchLeader} commits an agreed upon
+ * state by pushing all references to the Git replica, for example
+ * {@code "refs/heads/master"} is pushed during commit. Stock Git replicas use
+ * {@link CommitMethod#ALL_REFS} to record the final state.
+ * <p>
+ * Ketch-aware replicas understand the {@code RefTree} sent during the proposal
+ * and during commit are able to update their own reference space to match the
+ * state represented by the {@code RefTree}. Ketch-aware replicas typically use
+ * a {@link org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase} and
+ * {@link CommitMethod#TXN_COMMITTED} to record the final state.
+ */
 public abstract class KetchReplica {
 	static final Logger log = LoggerFactory.getLogger(KetchReplica.class);
-	private static final byte[] PEEL = { '^', '{', '}' };
+	private static final byte[] PEEL = { ' ', '^' };
 
-	/** Type of behavior for this replica. */
-	public enum Type {
-		/** Replica is not a participant in the Ketch system. */
-		NONE,
-
+	/** Participation of a replica. */
+	public enum Participation {
 		/** Replica can vote. */
-		VOTER,
+		FULL,
 
 		/** Replica does not vote, but tracks leader. */
-		FOLLOWER;
+		FOLLOWER_ONLY;
 	}
 
 	/** How this replica wants to receive Ketch commit operations. */
@@ -112,16 +124,22 @@ public abstract class KetchReplica {
 		TXN_COMMITTED;
 	}
 
-	/** When does this replica commit? */
+	/** Delay before committing to a replica. */
 	public enum CommitSpeed {
-		/** Send commit immediately, may run concurrently with next proposal. */
+		/**
+		 * Send the commit immediately, even if it could be batched with the
+		 * next proposal.
+		 */
 		FAST,
 
-		/** Batch commit with next proposal. */
+		/**
+		 * Batch the commit with next proposal, which generates less network
+		 * use, but may provide slower consistency on the replica.
+		 */
 		BATCHED;
 	}
 
-	/** Current state of this remote. */
+	/** Current state of a replica. */
 	public enum State {
 		/** Leader has not yet contacted the replica. */
 		UNKNOWN,
@@ -138,13 +156,13 @@ public abstract class KetchReplica {
 		/** Replica's history contains the leader's history. */
 		AHEAD,
 
-		/** Connectivity with the replica is not working. */
+		/** Replica can not be contacted. */
 		OFFLINE;
 	}
 
 	private final KetchLeader leader;
 	private final String name;
-	private final Type type;
+	private final Participation participation;
 	private final CommitMethod commitMethod;
 	private final CommitSpeed commitSpeed;
 	private final long minRetryMillis;
@@ -170,7 +188,7 @@ public abstract class KetchReplica {
 	 */
 	private ObjectId txnCommitted;
 
-	/** What is happening with this remote. */
+	/** What is happening with this replica. */
 	private State state = UNKNOWN;
 	private String error;
 
@@ -185,14 +203,14 @@ public abstract class KetchReplica {
 	 * @param leader
 	 *            instance this replica follows.
 	 * @param name
-	 *            unique-ish name identifying this remote for debugging.
+	 *            unique-ish name identifying this replica for debugging.
 	 * @param cfg
 	 *            how Ketch should treat the replica.
 	 */
 	protected KetchReplica(KetchLeader leader, String name, ReplicaConfig cfg) {
 		this.leader = leader;
 		this.name = name;
-		this.type = cfg.getType();
+		this.participation = cfg.getParticipation();
 		this.commitMethod = cfg.getCommitMethod();
 		this.commitSpeed = cfg.getCommitSpeed();
 		this.minRetryMillis = cfg.getMinRetry(MILLISECONDS);
@@ -218,14 +236,14 @@ public abstract class KetchReplica {
 		return name;
 	}
 
-	/** @return describe this replica for error/debug logging purposes. */
+	/** @return description of this replica for error/debug logging purposes. */
 	protected String describeForLog() {
 		return getName();
 	}
 
-	/** @return configured Ketch behavior of the repository. */
-	public Type getType() {
-		return type;
+	/** @return how the replica participates in this Ketch system. */
+	public Participation getParticipation() {
+		return participation;
 	}
 
 	/** @return how Ketch will commit to the repository. */
@@ -236,11 +254,6 @@ public abstract class KetchReplica {
 	/** @return when Ketch will commit to the repository. */
 	public CommitSpeed getCommitSpeed() {
 		return commitSpeed;
-	}
-
-	/** @return reference namespace storing transaction refs. */
-	protected String getTxnNamespace() {
-		return getSystem().getTxnNamespace();
 	}
 
 	/**
@@ -256,10 +269,10 @@ public abstract class KetchReplica {
 		}
 	}
 
-	Snapshot.Replica snapshot() {
-		Snapshot.Replica s = new Snapshot.Replica();
+	ReplicaSnapshot snapshot() {
+		ReplicaSnapshot s = new ReplicaSnapshot();
 		s.name = name;
-		s.type = type;
+		s.type = participation;
 		s.txnAccepted = txnAccepted;
 		s.txnCommitted = txnCommitted;
 		s.state = state;
@@ -300,13 +313,13 @@ public abstract class KetchReplica {
 		// TODO(sop) Lagging replicas should build accept on the fly.
 		if (round.stageCommands != null) {
 			for (ReceiveCommand c : round.stageCommands) {
-				// TODO(sop): Do not send certain object graphs to remote.
+				// TODO(sop): Do not send certain object graphs to replica.
 				cmds.add(copy(c));
 			}
 		}
 		cmds.add(new ReceiveCommand(
-round.acceptedOld, round.acceptedNew,
-				getTxnNamespace() + ACCEPTED));
+				round.acceptedOld, round.acceptedNew,
+				getSystem().getTxnAccepted()));
 		pushAsync(new ReplicaPushRequest(this, cmds));
 	}
 
@@ -324,8 +337,9 @@ round.acceptedOld, round.acceptedNew,
 
 	private void commit(List<ReceiveCommand> cmds, ObjectId committed) {
 		removeStaged(cmds, committed);
-		cmds.add(new ReceiveCommand(txnCommitted, committed,
-				getTxnNamespace() + COMMITTED));
+		cmds.add(new ReceiveCommand(
+				txnCommitted, committed,
+				getSystem().getTxnCommitted()));
 	}
 
 	private void removeStaged(List<ReceiveCommand> cmds, ObjectId committed) {
@@ -337,7 +351,7 @@ round.acceptedOld, round.acceptedNew,
 			return;
 		}
 
-		long n = ((LogId) committed).index;
+		LogId committedId = (LogId) committed;
 		Iterator<Map.Entry<ObjectId, List<ReceiveCommand>>> i;
 
 		i = staged.entrySet().iterator();
@@ -345,7 +359,7 @@ round.acceptedOld, round.acceptedNew,
 			Map.Entry<ObjectId, List<ReceiveCommand>> e = i.next();
 			if (e.getKey() instanceof LogId) {
 				LogId k = (LogId) e.getKey();
-				if (k.index <= n) {
+				if (k.isBefore(committedId)) {
 					delete(cmds, e.getValue());
 					i.remove();
 				}
@@ -507,10 +521,10 @@ round.acceptedOld, round.acceptedNew,
 	 */
 	protected void initialize(Map<String, Ref> refs) {
 		if (txnAccepted == null) {
-			txnAccepted = getId(refs.get(getTxnNamespace() + ACCEPTED));
+			txnAccepted = getId(refs.get(getSystem().getTxnAccepted()));
 		}
 		if (txnCommitted == null) {
-			txnCommitted = getId(refs.get(getTxnNamespace() + COMMITTED));
+			txnCommitted = getId(refs.get(getSystem().getTxnCommitted()));
 		}
 	}
 
@@ -520,18 +534,14 @@ round.acceptedOld, round.acceptedNew,
 		ReceiveCommand commitCmd = null;
 		List<ReceiveCommand> stages = null;
 
-		String acceptedRefName = getTxnNamespace() + ACCEPTED;
-		String committedRefName = getTxnNamespace() + COMMITTED;
-		String stageNamespace = getTxnNamespace() + STAGE;
-
 		for (ReceiveCommand c : cmds) {
-			if (acceptedRefName.equals(c.getRefName())) {
+			if (getSystem().getTxnAccepted().equals(c.getRefName())) {
 				acceptCmd = c;
-			} else if (committedRefName.equals(c.getRefName())) {
+			} else if (getSystem().getTxnCommitted().equals(c.getRefName())) {
 				commitCmd = c;
 			} else if (c.getResult() == OK
 					&& c.getType() == CREATE
-					&& c.getRefName().startsWith(stageNamespace)) {
+					&& c.getRefName().startsWith(getSystem().getTxnStage())) {
 				if (stages == null) {
 					stages = new ArrayList<>();
 				}
@@ -624,7 +634,7 @@ round.acceptedOld, round.acceptedNew,
 			// Initialize during first conversation.
 			Map<String, Ref> adv = req.getRefs();
 			if (adv != null) {
-				Ref refs = adv.get(getTxnNamespace() + COMMITTED);
+				Ref refs = adv.get(getSystem().getTxnCommitted());
 				txnCommitted = getId(refs);
 			}
 		}
@@ -670,13 +680,13 @@ round.acceptedOld, round.acceptedNew,
 			tw.addTree(rw.parseCommit(committed).getTree());
 			while (tw.next()) {
 				if (tw.getRawMode(0) != TYPE_GITLINK
-						|| tw.isPathSuffix(PEEL, 3)) {
+						|| tw.isPathSuffix(PEEL, 2)) {
 					// Symbolic references cannot be pushed.
 					// Caching peeled values is handled remotely.
 					continue;
 				}
 
-				// TODO(sop) Do not send certain ref names to remote.
+				// TODO(sop) Do not send certain ref names to replica.
 				String n = RefTree.refName(tw.getPathString());
 				Ref oldRef = remote.remove(n);
 				ObjectId oldId = getId(oldRef);
@@ -689,9 +699,7 @@ round.acceptedOld, round.acceptedNew,
 
 		// Delete any extra references not in the committed state.
 		for (Ref r : remote.values()) {
-			// TODO(sop) Do not delete precious names from remote.
-			if (!r.getName().startsWith(getTxnNamespace())
-					&& !HEAD.equals(r.getName())) {
+			if (canDelete(r)) {
 				delta.add(new ReceiveCommand(
 					r.getObjectId(),
 					ObjectId.zeroId(),
@@ -699,6 +707,17 @@ round.acceptedOld, round.acceptedNew,
 			}
 		}
 		return delta;
+	}
+
+	boolean canDelete(Ref r) {
+		if (HEAD.equals(r.getName())) {
+			return false;
+		}
+		if (r.getName().startsWith(getSystem().getTxnNamespace())) {
+			return false;
+		}
+		// TODO(sop) Do not delete precious names from replica.
+		return true;
 	}
 
 	@NonNull
