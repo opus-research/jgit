@@ -113,7 +113,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return < 0 if this id comes before other; 0 if this id is equal to
 	 *         other; > 0 if this id comes after other.
 	 */
-	public int compareTo(final AnyObjectId other) {
+	public final int compareTo(final AnyObjectId other) {
 		if (this == other)
 			return 0;
 
@@ -138,7 +138,7 @@ public abstract class AnyObjectId implements Comparable {
 		return NB.compareUInt32(w5, other.w5);
 	}
 
-	public int compareTo(final Object other) {
+	public final int compareTo(final Object other) {
 		return compareTo(((AnyObjectId) other));
 	}
 
@@ -153,7 +153,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return a negative integer, zero, or a positive integer as this object is
 	 *         less than, equal to, or greater than the specified object.
 	 */
-	public int compareTo(final byte[] bs, final int p) {
+	public final int compareTo(final byte[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, NB.decodeInt32(bs, p));
@@ -186,7 +186,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return a negative integer, zero, or a positive integer as this object is
 	 *         less than, equal to, or greater than the specified object.
 	 */
-	public int compareTo(final int[] bs, final int p) {
+	public final int compareTo(final int[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, bs[p]);
@@ -219,7 +219,7 @@ public abstract class AnyObjectId implements Comparable {
 		return abbr.prefixCompare(this) == 0;
 	}
 
-	public int hashCode() {
+	public final int hashCode() {
 		return w2;
 	}
 
@@ -321,6 +321,32 @@ public abstract class AnyObjectId implements Comparable {
 	 */
 	public void copyTo(final OutputStream w) throws IOException {
 		w.write(toHexByteArray());
+	}
+
+	/**
+	 * Copy this ObjectId to a byte array in hex format.
+	 *
+	 * @param b
+	 *            the buffer to copy to.
+	 * @param o
+	 *            the offset within b to write at.
+	 */
+	public void copyTo(byte[] b, int o) {
+		formatHexByte(b, o + 0, w1);
+		formatHexByte(b, o + 8, w2);
+		formatHexByte(b, o + 16, w3);
+		formatHexByte(b, o + 24, w4);
+		formatHexByte(b, o + 32, w5);
+	}
+
+	/**
+	 * Copy this ObjectId to a ByteBuffer in hex format.
+	 *
+	 * @param b
+	 *            the buffer to copy to.
+	 */
+	public void copyTo(ByteBuffer b) {
+		b.put(toHexByteArray());
 	}
 
 	private byte[] toHexByteArray() {

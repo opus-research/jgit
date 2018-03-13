@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,62 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.events;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
-/**
- * Contains options used by the WorkingTreeIterator.
- */
-public class WorkingTreeOptions {
+public class ConfigChangeEventTest extends RepositoryTestCase {
+	public void testFileRepository_ChangeEventsOnlyOnSave() throws Exception {
+		final ConfigChangedEvent[] events = new ConfigChangedEvent[1];
+		db.getListenerList().addConfigChangedListener(
+				new ConfigChangedListener() {
+					public void onConfigChanged(ConfigChangedEvent event) {
+						events[0] = event;
+					}
+				});
+		FileBasedConfig config = db.getConfig();
+		assertNull(events[0]);
 
-	/**
-	 * Creates default options which reflect the original configuration of Git
-	 * on Unix systems.
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createDefaultInstance() {
-		return new WorkingTreeOptions(false);
-	}
+		// set a value to some arbitrary key
+		config.setString("test", "section", "event", "value");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 
-	/**
-	 * Creates options based on the specified repository configuration.
-	 *
-	 * @param config
-	 *            repository configuration to create options for
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createConfigurationInstance(Config config) {
-		return new WorkingTreeOptions(config.get(CoreConfig.KEY).isAutoCRLF());
-	}
+		// reset for the next test
+		events[0] = null;
 
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 **/
-	private final boolean autoCRLF;
-
-	/**
-	 * Creates new options.
-	 *
-	 * @param autoCRLF
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
-	 */
-	public WorkingTreeOptions(boolean autoCRLF) {
-		this.autoCRLF = autoCRLF;
-	}
-
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 *
-	 * @return true if EOLs should be canonicalized.
-	 */
-	public boolean isAutoCRLF() {
-		return autoCRLF;
+		// unset the value we have just set above
+		config.unset("test", "section", "event");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 	}
 }

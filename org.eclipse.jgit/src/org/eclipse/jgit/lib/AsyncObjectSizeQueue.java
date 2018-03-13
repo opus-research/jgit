@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,71 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.lib;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 
-import junit.framework.TestCase;
+import org.eclipse.jgit.errors.MissingObjectException;
 
-public class EolCanonicalizingInputStreamTest extends TestCase {
+/**
+ * Queue to examine object sizes asynchronously.
+ *
+ * A queue may perform background lookup of object sizes and supply them
+ * (possibly out-of-order) to the application.
+ *
+ * @param <T>
+ *            type of identifier supplied to the call that made the queue.
+ */
+public interface AsyncObjectSizeQueue<T extends ObjectId> extends
+		AsyncOperation {
 
-	public void testLF() throws IOException {
-		final byte[] bytes = asBytes("1\n2\n3");
-		test(bytes, bytes);
-	}
+	/**
+	 * Position this queue onto the next available result.
+	 *
+	 * @return true if there is a result available; false if the queue has
+	 *         finished its input iteration.
+	 * @throws MissingObjectException
+	 *             the object does not exist. If the implementation is retaining
+	 *             the application's objects {@link #getCurrent()} will be the
+	 *             current object that is missing. There may be more results
+	 *             still available, so the caller should continue invoking next
+	 *             to examine another result.
+	 * @throws IOException
+	 *             the object store cannot be accessed.
+	 */
+	public boolean next() throws MissingObjectException, IOException;
 
-	public void testCR() throws IOException {
-		final byte[] bytes = asBytes("1\r2\r3");
-		test(bytes, bytes);
-	}
+	/**
+	 * @return the current object, null if the implementation lost track.
+	 *         Implementations may for performance reasons discard the caller's
+	 *         ObjectId and provider their own through {@link #getObjectId()}.
+	 */
+	public T getCurrent();
 
-	public void testCRLF() throws IOException {
-		test(asBytes("1\r\n2\r\n3"), asBytes("1\n2\n3"));
-	}
+	/** @return the ObjectId of the current object. Never null. */
+	public ObjectId getObjectId();
 
-	public void testLFCR() throws IOException {
-		final byte[] bytes = asBytes("1\n\r2\n\r3");
-		test(bytes, bytes);
-	}
-
-	private void test(byte[] input, byte[] expected) throws IOException {
-		final InputStream bis1 = new ByteArrayInputStream(input);
-		final InputStream cis1 = new EolCanonicalizingInputStream(bis1);
-		int index1 = 0;
-		for (int b = cis1.read(); b != -1; b = cis1.read()) {
-			assertEquals(expected[index1], (byte) b);
-			index1++;
-		}
-
-		assertEquals(expected.length, index1);
-
-		for (int bufferSize = 1; bufferSize < 10; bufferSize++) {
-			final byte[] buffer = new byte[bufferSize];
-			final InputStream bis2 = new ByteArrayInputStream(input);
-			final InputStream cis2 = new EolCanonicalizingInputStream(bis2);
-
-			int read = 0;
-			for (int readNow = cis2.read(buffer, 0, buffer.length); readNow != -1
-					&& read < expected.length; readNow = cis2.read(buffer, 0,
-					buffer.length)) {
-				for (int index2 = 0; index2 < readNow; index2++) {
-					assertEquals(expected[read + index2], buffer[index2]);
-				}
-				read += readNow;
-			}
-
-			assertEquals(expected.length, read);
-		}
-	}
-
-	private static byte[] asBytes(String in) {
-		try {
-			return in.getBytes("UTF-8");
-		} catch (UnsupportedEncodingException ex) {
-			throw new AssertionError();
-		}
-	}
+	/** @return the size of the current object. */
+	public long getSize();
 }

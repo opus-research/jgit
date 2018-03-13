@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,90 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
-import java.io.InputStream;
+
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AsyncOperation;
 
 /**
- * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
+ * Queue to lookup and parse objects asynchronously.
  *
- * Note: Make sure to apply this InputStream only to text files!
+ * A queue may perform background lookup of objects and supply them (possibly
+ * out-of-order) to the application.
  */
-public class EolCanonicalizingInputStream extends InputStream {
-	private final byte[] single = new byte[1];
-
-	private final byte[] buf = new byte[8096];
-
-	private final InputStream in;
-
-	private int cnt;
-
-	private int ptr;
-
+public interface AsyncRevObjectQueue extends AsyncOperation {
 	/**
-	 * Creates a new InputStream, wrapping the specified stream
+	 * Obtain the next object.
 	 *
-	 * @param in
-	 *            raw input stream
+	 * @return the object; null if there are no more objects remaining.
+	 * @throws MissingObjectException
+	 *             the object does not exist. There may be more objects
+	 *             remaining in the iteration, the application should call
+	 *             {@link #next()} again.
+	 * @throws IOException
+	 *             the object store cannot be accessed.
 	 */
-	public EolCanonicalizingInputStream(InputStream in) {
-		this.in = in;
-	}
-
-	@Override
-	public int read() throws IOException {
-		final int read = read(single, 0, 1);
-		return read == 1 ? single[0] & 0xff : -1;
-	}
-
-	@Override
-	public int read(byte[] bs, int off, int len) throws IOException {
-		if (len == 0)
-			return 0;
-
-		if (cnt == -1)
-			return -1;
-
-		final int startOff = off;
-		final int end = off + len;
-
-		while (off < end) {
-			if (ptr == cnt && !fillBuffer()) {
-				break;
-			}
-
-			byte b = buf[ptr++];
-			if (b != '\r') {
-				bs[off++] = b;
-				continue;
-			}
-
-			if (ptr == cnt && !fillBuffer()) {
-				bs[off++] = '\r';
-				break;
-			}
-
-			if (buf[ptr] == '\n') {
-				bs[off++] = '\n';
-				ptr++;
-			} else
-				bs[off++] = '\r';
-		}
-
-		return startOff == off ? -1 : off - startOff;
-	}
-
-	@Override
-	public void close() throws IOException {
-		in.close();
-	}
-
-	private boolean fillBuffer() throws IOException {
-		cnt = in.read(buf, 0, buf.length);
-		if (cnt < 1)
-			return false;
-		ptr = 0;
-		return true;
-	}
+	public RevObject next() throws MissingObjectException, IOException;
 }
