@@ -909,9 +909,9 @@ public class DirCacheCheckout {
 						// file content
 						update(name, mId, mMode);
 					} else if (dce != null
-							&& (f != null && f.isModified(dce, true,
+							&& (f == null || f.isModified(dce, true,
 									this.walk.getObjectReader()))) {
-						// File exists and is dirty
+						// File doesn't exist or is dirty
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
 						// Something in Merge
@@ -919,7 +919,7 @@ public class DirCacheCheckout {
 						// but the file is dirty. Report a conflict
 						conflict(name, dce, h, m);
 					} else {
-						// File doesn't exist or is clean
+						// File exists and is clean
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
 						// Something in Merge
