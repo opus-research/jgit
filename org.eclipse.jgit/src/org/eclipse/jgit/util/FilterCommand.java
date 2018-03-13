@@ -40,30 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.errors;
+package org.eclipse.jgit.util;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
- * Something went wrong while transporting lfs objects
+ * An abstraction for JGits builtin implementations for hooks and filters.
+ * Instead of spawning an external processes to start a filter/hook and to pump
+ * data from/to stdin/stdout these builtin coammnds may be used. They are
+ * constructed by {@link FilterCommandFactory}.
  *
  * @since 4.5
  */
-public class LfsTransportException extends IOException {
-	private static final long serialVersionUID = 1L;
+public abstract class FilterCommand {
+	/**
+	 * The {@link InputStream} this command should read from
+	 */
+	protected InputStream in;
 
 	/**
-	 * @param message
-	 * @param cause
+	 * The {@link OutputStream} this command should write to
 	 */
-	public LfsTransportException(String message, Throwable cause) {
-		super(message, cause);
+	protected OutputStream out;
+
+	/**
+	 * @param in
+	 * @param out
+	 */
+	public FilterCommand(InputStream in, OutputStream out) {
+		this.in = in;
+		this.out = out;
 	}
 
 	/**
-	 * @param message
+	 * Execute the command. The command is supposed to read data from
+	 * {@link #in} and to write the result to {@link #out}. It returns the
+	 * number of bytes it read from {@link #in}. It should be called in a loop
+	 * until it returns -1 signaling that the {@link InputStream} is completely
+	 * processed.
+	 *
+	 * @return the number of bytes read from the {@link InputStream} or -1. -1
+	 *         means that the {@link InputStream} is completely processed.
+	 * @throws IOException
+	 *             when {@link IOException} occured while reading from
+	 *             {@link #in} or writing to {@link #out}
+	 *
 	 */
-	public LfsTransportException(String message) {
-		super(message);
-	}
+	public abstract int run() throws IOException;
 }

@@ -62,8 +62,7 @@ public class LfsUtil {
 
 	/**
 	 * @param root
-	 *            the path to the LFS directory. Most of the times this will be
-	 *            "<repo>/.git/lfs"
+	 *            the path to the LFS media directory. Will be "<repo>/.git/lfs"
 	 */
 	public LfsUtil(Path root) {
 		this.root = root;
@@ -77,8 +76,8 @@ public class LfsUtil {
 	}
 
 	/**
-	 * @return the path to the temp directory used by LFS. Most of the times
-	 *         this will be "<repo>/.git/lfs/tmp"
+	 * @return the path to the temp directory used by LFS. Will be
+	 *         "<repo>/.git/lfs/tmp"
 	 */
 	public Path getLfsTmpDir() {
 		if (tmpDir == null) {
@@ -88,8 +87,8 @@ public class LfsUtil {
 	}
 
 	/**
-	 * @return the path to the object directory used by LFS. Most of the times
-	 *         this will be "<repo>/.git/lfs/objects"
+	 * @return the path to the object directory used by LFS. Will be
+	 *         "<repo>/.git/lfs/objects"
 	 */
 	public Path getLfsObjDir() {
 		if (objDir == null) {
@@ -117,7 +116,7 @@ public class LfsUtil {
 	 * @return a new temporary file in the lfs directory
 	 * @throws IOException
 	 */
-	public Path getTmpFile() throws IOException {
+	public Path createTmpFile() throws IOException {
 		return Files.createTempFile(getLfsTmpDir(), null, null);
 	}
 

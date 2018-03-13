@@ -763,7 +763,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			git2.add().addFilepattern("filterTest.txt").call();
 			RevCommit one = git2.commit().setMessage("add filterText.txt").call();
 			assertEquals(
-					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid 7bd5d32e5c494354aa4c2473a1306d0ce7b52cc3bffeb342c03cd517ef8cf8da\nsize 16\n]",
+					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:7bd5d32e5c494354aa4c2473a1306d0ce7b52cc3bffeb342c03cd517ef8cf8da\nsize 16\n]",
 					indexState(CONTENT));
 
 			fsTick(writeTrashFile("filterTest.txt", "bon giorno world, V1\n"));
@@ -772,20 +772,20 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 
 			assertTrue(git2.status().call().isClean());
 			assertEquals(
-					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid 087148cccf53b0049c56475c1595113c9da4b638997c3489af8ac7108d51ef13\nsize 21\n]",
+					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:087148cccf53b0049c56475c1595113c9da4b638997c3489af8ac7108d51ef13\nsize 21\n]",
 					indexState(CONTENT));
 
 			git2.checkout().setName(one.getName()).call();
 			assertTrue(git2.status().call().isClean());
 			assertEquals(
-					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid 7bd5d32e5c494354aa4c2473a1306d0ce7b52cc3bffeb342c03cd517ef8cf8da\nsize 16\n]",
+					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:7bd5d32e5c494354aa4c2473a1306d0ce7b52cc3bffeb342c03cd517ef8cf8da\nsize 16\n]",
 					indexState(CONTENT));
 			assertEquals("hello world, V1\n", read("filterTest.txt"));
 
 			git2.checkout().setName(two.getName()).call();
 			assertTrue(git2.status().call().isClean());
 			assertEquals(
-					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid 087148cccf53b0049c56475c1595113c9da4b638997c3489af8ac7108d51ef13\nsize 21\n]",
+					"[.gitattributes, mode:100644, content:filterTest.txt filter=lfs][Test.txt, mode:100644, content:Some change][filterTest.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:087148cccf53b0049c56475c1595113c9da4b638997c3489af8ac7108d51ef13\nsize 21\n]",
 					indexState(CONTENT));
 			assertEquals("bon giorno world, V1\n", read("filterTest.txt"));
 		}
