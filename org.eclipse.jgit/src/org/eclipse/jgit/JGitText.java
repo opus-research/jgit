@@ -112,7 +112,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotDetermineProxyFor;
 	/***/ public String cannotDownload;
 	/***/ public String cannotExecute;
-	/***/ public String cannotFindRepository;
 	/***/ public String cannotGet;
 	/***/ public String cannotListRefs;
 	/***/ public String cannotLock;

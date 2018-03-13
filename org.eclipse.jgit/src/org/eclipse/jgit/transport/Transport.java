@@ -328,8 +328,7 @@ public abstract class Transport {
 	 *            type of filesystem the local repository is stored on.
 	 * @return true if the protocol is supported.
 	 */
-	public static boolean canHandleProtocol(final URIish remote, final FS fs)
-			throws NotSupportedException {
+	public static boolean canHandleProtocol(final URIish remote, final FS fs) {
 		if (TransportGitSsh.canHandle(remote))
 			return true;
 

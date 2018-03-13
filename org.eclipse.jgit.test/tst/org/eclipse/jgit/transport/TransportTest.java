@@ -48,7 +48,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,7 +55,6 @@ import java.util.Collections;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -210,21 +208,5 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 		assertEquals("refs/heads/a", tru.getRemoteName());
 		assertEquals(db.resolve("refs/heads/a"), tru.getNewObjectId());
 		assertNull(tru.getOldObjectId());
-	}
-
-	/**
-	 * Test meaningful exception message when open transport to non-existing
-	 * local repository
-	 */
-	@Test
-	public void testNonExistingLocalRepositoryException() throws IOException {
-		FileRepository repository = createBareRepository();
-		File dir = repository.getDirectory();
-		recursiveDelete(dir);
-		try {
-			Transport.open(db, dir.getCanonicalPath());
-		} catch (Exception e) {
-			assertEquals("Cannot find repository at " + dir.getCanonicalPath(), e.getMessage());
-		}
 	}
 }
