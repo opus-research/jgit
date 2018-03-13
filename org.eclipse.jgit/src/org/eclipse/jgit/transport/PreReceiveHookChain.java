@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,25 +41,49 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.api.errors;
+package org.eclipse.jgit.transport;
 
+import java.util.Collection;
+import java.util.List;
 
 /**
- * An IO Exception thrown when an attempt to add a fails because the conversion
- * is irreversible.
+ * {@link PreReceiveHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor.
  */
-public class UnsafeCRLFException extends GitAPIException {
-
-	private static final long serialVersionUID = 1L;
+public class PreReceiveHookChain implements PreReceiveHook {
+	private final PreReceiveHook[] hooks;
+	private final int count;
 
 	/**
-	 * Construct an {@link UnsafeCRLFException} exception
-	 * 
-	 * @param message
-	 * @param cause
-	 *            Underlying exception
+	 * Create a new hook chaining the given hooks together.
+	 *
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
 	 */
-	public UnsafeCRLFException(String message, Throwable cause) {
-		super(message, cause);
+	public static PreReceiveHook newChain(List<? extends PreReceiveHook> hooks) {
+		PreReceiveHook[] newHooks = new PreReceiveHook[hooks.size()];
+		int i = 0;
+		for (PreReceiveHook hook : hooks)
+			if (hook != PreReceiveHook.NULL)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return PreReceiveHook.NULL;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new PreReceiveHookChain(newHooks, i);
+	}
+
+	public void onPreReceive(ReceivePack rp,
+			Collection<ReceiveCommand> commands) {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPreReceive(rp, commands);
+	}
+
+	private PreReceiveHookChain(PreReceiveHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
 	}
 }

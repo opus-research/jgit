@@ -52,7 +52,6 @@ import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.UnsafeCRLFException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
@@ -68,7 +67,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	public void testTaggingOnHead() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
-			InvalidTagNameException, UnsafeCRLFException {
+			InvalidTagNameException {
 		Git git = new Git(db);
 		RevCommit commit = git.commit().setMessage("initial commit").call();
 		RevTag tag = git.tag().setName("tag").call();
@@ -79,7 +78,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	public void testTagging() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
-			InvalidTagNameException, UnsafeCRLFException {
+			InvalidTagNameException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		RevCommit commit = git.commit().setMessage("second commit").call();
@@ -91,8 +90,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testEmptyTagName() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException,
-			UnsafeCRLFException {
+			JGitInternalException, WrongRepositoryStateException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		try {
@@ -108,7 +106,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	public void testInvalidTagName() throws NoHeadException,
 			NoMessageException, UnmergedPathException,
 			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException, UnsafeCRLFException {
+			WrongRepositoryStateException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		try {
@@ -123,8 +121,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	public void testFailureOnSignedTags() throws NoHeadException,
 			NoMessageException, UnmergedPathException,
 			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException, InvalidTagNameException,
-			UnsafeCRLFException {
+			WrongRepositoryStateException, InvalidTagNameException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		try {

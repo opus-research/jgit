@@ -72,7 +72,6 @@ import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -396,11 +395,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	private ByteBuffer filterClean(byte[] src, int n)
 			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
-		return IO.readWholeStream(filterClean(in), n);
+		try {
+			return IO.readWholeStream(filterClean(in), n);
+		} finally {
+			safeClose(in);
+		}
 	}
 
-	private InputStream filterClean(InputStream in) throws IOException {
-		return new EolCanonicalizingInputStream(in, false);
+	private InputStream filterClean(InputStream in) {
+		return new EolCanonicalizingInputStream(in);
 	}
 
 	/**
@@ -489,49 +492,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * operations.
 	 * <p>
 	 * The caller will close the stream once complete.
-	 * <p>
-	 * The input stream may perform CRLF conversion and throw an exception if
-	 * there is a problem such as irreversible conversion.
 	 *
 	 * @return a stream to read from the file.
 	 * @throws IOException
 	 *             the file could not be opened for reading.
 	 */
 	public InputStream openEntryStream() throws IOException {
-		return openEntryStream(getOptions().getSafeCRLF());
-	}
-
-	/**
-	 * Obtain an input stream to read the file content.
-	 * <p>
-	 * Efficient implementations are not required. The caller will usually
-	 * obtain the stream only once per entry, if at all.
-	 * <p>
-	 * The input stream should not use buffering if the implementation can avoid
-	 * it. The caller will buffer as necessary to perform efficient block IO
-	 * operations.
-	 * <p>
-	 * The caller will close the stream once complete.
-	 * <p>
-	 * The input stream may perform CRLF conversion and throw an exception if
-	 * there is a problem such as irreversible conversion
-	 *
-	 * @param safe
-	 *            when true the returned stream will fail if CRLF conversion is
-	 *            irreversible, i.e. contains a mix or CRLF and LF line endings.
-	 * 
-	 * @return a stream to read from the file.
-	 * @throws IOException
-	 *             the file could not be opened for reading.
-	 */
-	public InputStream openEntryStream(boolean safe) throws IOException {
-		InputStream rawis = current().openInputStream();
-		InputStream is;
-		if (getOptions().getAutoCRLF() != AutoCRLF.FALSE)
-			is = new EolCanonicalizingInputStream(rawis, safe);
-		else
-			is = rawis;
-		return is;
+		return current().openInputStream();
 	}
 
 	/**

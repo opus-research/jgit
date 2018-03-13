@@ -58,7 +58,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.UnsafeCRLFException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -89,8 +88,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	public void setupRepository() throws IOException, NoFilepatternException,
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException,
-			UnsafeCRLFException {
+			JGitInternalException, WrongRepositoryStateException {
 
 		// create initial commit
 		git = new Git(db);
@@ -141,7 +139,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 	public void testHardReset() throws JGitInternalException,
 			AmbiguousObjectException, IOException, NoFilepatternException,
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
-			WrongRepositoryStateException, UnsafeCRLFException {
+			WrongRepositoryStateException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.HARD).setRef(initialCommit.getName())
@@ -179,7 +177,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 	public void testSoftReset() throws JGitInternalException,
 			AmbiguousObjectException, IOException, NoFilepatternException,
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
-			WrongRepositoryStateException, UnsafeCRLFException {
+			WrongRepositoryStateException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.SOFT).setRef(initialCommit.getName())
@@ -201,7 +199,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 	public void testMixedReset() throws JGitInternalException,
 			AmbiguousObjectException, IOException, NoFilepatternException,
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
-			WrongRepositoryStateException, UnsafeCRLFException {
+			WrongRepositoryStateException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.MIXED).setRef(initialCommit.getName())

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,33 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.transport;
 
-import java.io.IOException;
+import java.util.List;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.storage.pack.PackWriter;
 
 /**
- * An IO Exception thrown when attempting to perform non-reversible CRLF to LF
- * conversion.
+ * {@link UploadPackLogger} that delegates to a list of other loggers.
+ * <p>
+ * loggers are run in the order passed to the constructor.
  */
-public class UnsafeCRLFConversionException extends IOException {
-
-	private static final long serialVersionUID = 1L;
+public class UploadPackLoggerChain implements UploadPackLogger {
+	private final UploadPackLogger[] loggers;
+	private final int count;
 
 	/**
-	 * Construct an {@link UnsafeCRLFConversionException}
+	 * Create a new logger chaining the given loggers together.
+	 *
+	 * @param loggers
+	 *            loggers to execute, in order.
+	 * @return a new logger chain of the given loggers.
 	 */
-	public UnsafeCRLFConversionException() {
-		this(JGitText.get().unsafeCrlfConversion);
+	public static UploadPackLogger newChain(
+			List<? extends UploadPackLogger> loggers) {
+		UploadPackLogger[] newLoggers = new UploadPackLogger[loggers.size()];
+		int i = 0;
+		for (UploadPackLogger logger : loggers)
+			if (logger != UploadPackLogger.NULL)
+				newLoggers[i++] = logger;
+		if (i == 0)
+			return UploadPackLogger.NULL;
+		else if (i == 1)
+			return newLoggers[0];
+		else
+			return new UploadPackLoggerChain(newLoggers, i);
 	}
 
-	/**
-	 * Construct an {@link UnsafeCRLFConversionException} exception
-	 *
-	 * @param message
-	 */
-	public UnsafeCRLFConversionException(String message) {
-		super(message);
+	public void onPackStatistics(PackWriter.Statistics stats) {
+		for (int i = 0; i < count; i++)
+			loggers[i].onPackStatistics(stats);
+	}
+
+	private UploadPackLoggerChain(UploadPackLogger[] loggers, int count) {
+		this.loggers = loggers;
+		this.count = count;
 	}
 }
