@@ -55,10 +55,13 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.eclipse.jgit.dircache.DirCache;
@@ -67,6 +70,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -105,10 +109,13 @@ public class PushCertificateStore implements AutoCloseable {
 	private static class PendingCert {
 		private PushCertificate cert;
 		private PersonIdent ident;
+		private Collection<ReceiveCommand> matching;
 
-		private PendingCert(PushCertificate cert, PersonIdent ident) {
+		private PendingCert(PushCertificate cert, PersonIdent ident,
+				Collection<ReceiveCommand> matching) {
 			this.cert = cert;
 			this.ident = ident;
+			this.matching = matching;
 		}
 	}
 
@@ -307,7 +314,34 @@ public class PushCertificateStore implements AutoCloseable {
 	 *            #save()}.
 	 */
 	public void put(PushCertificate cert, PersonIdent ident) {
-		pending.add(new PendingCert(cert, ident));
+		put(cert, ident, null);
+	}
+
+	/**
+	 * Put a certificate to be saved to the store, matching a set of commands.
+	 * <p>
+	 * Like {@link #put(PushCertificate, PersonIdent)}, except a value is only
+	 * stored for a push certificate if there is a corresponding command in the
+	 * list that exactly matches the old/new values mentioned in the push
+	 * certificate.
+	 * <p>
+	 * Pending certificates added to this method are not returned by {@link
+	 * #get(String)} and {@link #getAll(String)} until after calling {@link
+	 * #save()}.
+	 *
+	 * @param cert
+	 *            certificate to store.
+	 * @param ident
+	 *            identity for the commit that stores this certificate. Pending
+	 *            certificates are sorted by identity timestamp during {@link
+	 *            #save()}.
+	 * @param matching
+	 *            only store certs for the refs listed in this list whose values
+	 *            match the commands in the cert.
+	 */
+	public void put(PushCertificate cert, PersonIdent ident,
+			Collection<ReceiveCommand> matching) {
+		pending.add(new PendingCert(cert, ident, matching));
 	}
 
 	/**
@@ -326,8 +360,66 @@ public class PushCertificateStore implements AutoCloseable {
 	 *             repository.
 	 */
 	public RefUpdate.Result save() throws IOException {
-		if (pending.isEmpty()) {
+		ObjectId newId = write();
+		if (newId == null) {
 			return RefUpdate.Result.NO_CHANGE;
+		}
+		try (ObjectInserter inserter = db.newObjectInserter()) {
+			RefUpdate.Result result = updateRef(newId);
+			switch (result) {
+				case FAST_FORWARD:
+				case NEW:
+				case NO_CHANGE:
+					pending.clear();
+					break;
+				default:
+					break;
+			}
+			return result;
+		} finally {
+			close();
+		}
+	}
+
+	/**
+	 * Save pending certificates to the store in an existing batch ref update.
+	 * <p>
+	 * One commit is created per certificate added with {@link
+	 * #put(PushCertificate, PersonIdent)}, in order of identity timestamps, all
+	 * commits are flushed, and a single command is added to the batch.
+	 * <p>
+	 * The cached ref value and pending list are <em>not</em> cleared. If the ref
+	 * update succeeds, the caller is responsible for calling {@link #close()}
+	 * and/or {@link #clear()}.
+	 *
+	 * @param batch
+	 *            update to save to.
+	 * @return whether a command was added to the batch.
+	 * @throws IOException
+	 *             if there was an error reading from or writing to the
+	 *             repository.
+	 */
+	public boolean save(BatchRefUpdate batch) throws IOException {
+		ObjectId newId = write();
+		if (newId == null) {
+			return false;
+		}
+		batch.addCommand(new ReceiveCommand(
+				commit != null ? commit : ObjectId.zeroId(), newId, REF_NAME));
+		return true;
+	}
+
+	/**
+	 * Clear pending certificates added with {@link #put(PushCertificate,
+	 * PersonIdent)}.
+	 */
+	public void clear() {
+		pending.clear();
+	}
+
+	private ObjectId write() throws IOException {
+		if (pending.isEmpty()) {
+			return null;
 		}
 		if (reader == null) {
 			load();
@@ -341,19 +433,7 @@ public class PushCertificateStore implements AutoCloseable {
 				curr = saveCert(inserter, dc, pc, curr);
 			}
 			inserter.flush();
-			RefUpdate.Result result = updateRef(curr);
-			switch (result) {
-				case FAST_FORWARD:
-				case NEW:
-				case NO_CHANGE:
-					pending.clear();
-					break;
-				default:
-					break;
-			}
-			return result;
-		} finally {
-			close();
+			return curr;
 		}
 	}
 
@@ -379,10 +459,27 @@ public class PushCertificateStore implements AutoCloseable {
 
 	private ObjectId saveCert(ObjectInserter inserter, DirCache dc,
 			PendingCert pc, ObjectId curr) throws IOException {
+		Map<String, ReceiveCommand> byRef;
+		if (pc.matching != null) {
+			byRef = new HashMap<>();
+			for (ReceiveCommand cmd : pc.matching) {
+				if (byRef.put(cmd.getRefName(), cmd) != null) {
+					throw new IllegalStateException();
+				}
+			}
+		} else {
+			byRef = null;
+		}
+
 		DirCacheEditor editor = dc.editor();
 		String certText = pc.cert.toText() + pc.cert.getSignature();
 		final ObjectId certId = inserter.insert(OBJ_BLOB, certText.getBytes(UTF_8));
+		boolean any = false;
 		for (ReceiveCommand cmd : pc.cert.getCommands()) {
+			if (byRef != null && !commandsEqual(cmd, byRef.get(cmd.getRefName()))) {
+				continue;
+			}
+			any = true;
 			editor.add(new PathEdit(pathName(cmd.getRefName())) {
 				@Override
 				public void apply(DirCacheEntry ent) {
@@ -390,6 +487,9 @@ public class PushCertificateStore implements AutoCloseable {
 					ent.setObjectId(certId);
 				}
 			});
+		}
+		if (!any) {
+			return curr;
 		}
 		editor.finish();
 		CommitBuilder cb = new CommitBuilder();
@@ -403,6 +503,15 @@ public class PushCertificateStore implements AutoCloseable {
 		}
 		cb.setMessage(buildMessage(pc.cert));
 		return inserter.insert(OBJ_COMMIT, cb.build());
+	}
+
+	private static boolean commandsEqual(ReceiveCommand c1, ReceiveCommand c2) {
+		if (c1 == null || c2 == null) {
+			return c1 == c2;
+		}
+		return c1.getRefName().equals(c2.getRefName())
+				&& c1.getOldId().equals(c2.getOldId())
+				&& c1.getNewId().equals(c2.getNewId());
 	}
 
 	private RefUpdate.Result updateRef(ObjectId newId) throws IOException {

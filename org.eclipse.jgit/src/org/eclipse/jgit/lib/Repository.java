@@ -120,9 +120,6 @@ public abstract class Repository implements AutoCloseable {
 	/** If not bare, the top level directory of the working files. */
 	private final File workTree;
 
-	// TODO: docs
-	private final DirectoryFlags directoryFlags;
-
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
@@ -137,7 +134,6 @@ public abstract class Repository implements AutoCloseable {
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
-		directoryFlags = options.getDirectoryFlags();
 	}
 
 	/** @return listeners observing only events on this repository. */
@@ -853,8 +849,9 @@ public abstract class Repository implements AutoCloseable {
 	 * Except when HEAD is detached, in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
-	 * @return name of current branch (for example {@code refs/heads/master}) or
-	 *         an ObjectId in hex format if the current branch is detached.
+	 * @return name of current branch (for example {@code refs/heads/master}),
+	 *         an ObjectId in hex format if the current branch is detached,
+	 *         or null if the repository is corrupt and has no HEAD reference.
 	 * @throws IOException
 	 */
 	public String getFullBranch() throws IOException {
@@ -875,8 +872,9 @@ public abstract class Repository implements AutoCloseable {
 	 * leading prefix {@code refs/heads/} is removed from the reference before
 	 * it is returned to the caller.
 	 *
-	 * @return name of current branch (for example {@code master}), or an
-	 *         ObjectId in hex format if the current branch is detached.
+	 * @return name of current branch (for example {@code master}), an
+	 *         ObjectId in hex format if the current branch is detached,
+	 *         or null if the repository is corrupt and has no HEAD reference.
 	 * @throws IOException
 	 */
 	public String getBranch() throws IOException {
@@ -1247,11 +1245,6 @@ public abstract class Repository implements AutoCloseable {
 		if (isBare())
 			throw new NoWorkTreeException();
 		return workTree;
-	}
-
-	// TODO: docs
-	public DirectoryFlags getDirectoryFlags() {
-		return directoryFlags;
 	}
 
 	/**

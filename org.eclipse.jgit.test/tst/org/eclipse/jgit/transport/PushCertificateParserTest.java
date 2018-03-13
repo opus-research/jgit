@@ -55,6 +55,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.StringReader;
 
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
@@ -214,6 +215,7 @@ public class PushCertificateParserTest {
 				cmd.getNewId().name());
 
 		assertEquals(concatPacketLines(INPUT, 0, 6), cert.toText());
+		assertEquals(concatPacketLines(INPUT, 0, 17), cert.toTextWithSignature());
 
 		String signature = concatPacketLines(INPUT, 6, 17);
 		assertTrue(signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE));
@@ -280,9 +282,7 @@ public class PushCertificateParserTest {
 
 	@Test
 	public void testParseReader() throws Exception {
-		Reader reader = new InputStreamReader(
-				new ByteArrayInputStream(
-						Constants.encode(concatPacketLines(INPUT, 0, 18))));
+		Reader reader = new StringReader(concatPacketLines(INPUT, 0, 18));
 		PushCertificate streamCert = PushCertificateParser.fromReader(reader);
 
 		PacketLineIn pckIn = newPacketLineIn(INPUT);
@@ -321,6 +321,14 @@ public class PushCertificateParserTest {
 	}
 
 	@Test
+	public void testParseString() throws Exception {
+		String str = concatPacketLines(INPUT, 0, 18);
+		assertEquals(
+				PushCertificateParser.fromReader(new StringReader(str)),
+				PushCertificateParser.fromString(str));
+	}
+
+	@Test
 	public void testParseMultipleFromStream() throws Exception {
 		String input = concatPacketLines(INPUT, 0, 17);
 		assertFalse(input.contains(PushCertificateParser.END_CERT));
@@ -352,6 +360,7 @@ public class PushCertificateParserTest {
 		PushCertificate cert = parser.build();
 		assertEquals("0.1", cert.getVersion());
 		assertNull(cert.getPushee());
+		assertFalse(cert.toText().contains(PushCertificateParser.PUSHEE));
 	}
 
 	private static String concatPacketLines(String input, int begin, int end)

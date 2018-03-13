@@ -203,19 +203,34 @@ public class PushCertificate {
 	 * @since 4.1
 	 */
 	public String toText() {
+		return toStringBuilder().toString();
+	}
+
+	/**
+	 * @return original text payload plus signature; the final output will be
+	 *     valid as input to {@link PushCertificateParser#fromString(String)}.
+	 * @since 4.1
+	 */
+	public String toTextWithSignature() {
+		return toStringBuilder().append(signature).toString();
+	}
+
+	private StringBuilder toStringBuilder() {
 		StringBuilder sb = new StringBuilder()
 				.append(VERSION).append(' ').append(version).append('\n')
 				.append(PUSHER).append(' ').append(getPusher())
-				.append('\n')
-				.append(PUSHEE).append(' ').append(pushee).append('\n')
-				.append(NONCE).append(' ').append(nonce).append('\n')
+				.append('\n');
+		if (pushee != null) {
+			sb.append(PUSHEE).append(' ').append(pushee).append('\n');
+		}
+		sb.append(NONCE).append(' ').append(nonce).append('\n')
 				.append('\n');
 		for (ReceiveCommand cmd : commands) {
 			sb.append(cmd.getOldId().name())
 				.append(' ').append(cmd.getNewId().name())
 				.append(' ').append(cmd.getRefName()).append('\n');
 		}
-		return sb.toString();
+		return sb;
 	}
 
 	@Override
@@ -256,6 +271,6 @@ public class PushCertificate {
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + '['
-				 + toText() + signature + ']';
+				 + toTextWithSignature() + ']';
 	}
 }

@@ -49,18 +49,23 @@ import static org.eclipse.jgit.lib.RefUpdate.Result.LOCK_FAILURE;
 import static org.eclipse.jgit.lib.RefUpdate.Result.NEW;
 import static org.eclipse.jgit.lib.RefUpdate.Result.NO_CHANGE;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
+import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -269,6 +274,49 @@ public class PushCertificateStoreTest {
 		assertEquals(FAST_FORWARD, store2.save());
 		assertCerts(store2, "refs/heads/master", addMaster);
 		assertCerts(store2, "refs/heads/branch", addBranch);
+	}
+
+	@Test
+	public void saveInBatch() throws Exception {
+		BatchRefUpdate batch = repo.getRefDatabase().newBatchUpdate();
+		assertFalse(store.save(batch));
+		assertEquals(0, batch.getCommands().size());
+		PushCertificate addMaster = newCert(
+				command(zeroId(), ID1, "refs/heads/master"));
+		store.put(addMaster, newIdent());
+		assertTrue(store.save(batch));
+
+		List<ReceiveCommand> commands = batch.getCommands();
+		assertEquals(1, commands.size());
+		ReceiveCommand cmd = commands.get(0);
+		assertEquals("refs/meta/push-certs", cmd.getRefName());
+		assertEquals(ReceiveCommand.Result.NOT_ATTEMPTED, cmd.getResult());
+
+		try (RevWalk rw = new RevWalk(repo)) {
+			batch.execute(rw, NullProgressMonitor.INSTANCE);
+			assertEquals(ReceiveCommand.Result.OK, cmd.getResult());
+		}
+	}
+
+	@Test
+	public void putMatchingWithNoMatchingRefs() throws Exception {
+		PushCertificate addMaster = newCert(
+				command(zeroId(), ID1, "refs/heads/master"),
+				command(zeroId(), ID2, "refs/heads/branch"));
+		store.put(addMaster, newIdent(), Collections.<ReceiveCommand> emptyList());
+		assertEquals(NO_CHANGE, store.save());
+	}
+
+	@Test
+	public void putMatchingWithSomeMatchingRefs() throws Exception {
+		PushCertificate addMasterAndBranch = newCert(
+				command(zeroId(), ID1, "refs/heads/master"),
+				command(zeroId(), ID2, "refs/heads/branch"));
+		store.put(addMasterAndBranch, newIdent(),
+				Collections.singleton(addMasterAndBranch.getCommands().get(0)));
+		assertEquals(NEW, store.save());
+		assertCerts("refs/heads/master", addMasterAndBranch);
+		assertCerts("refs/heads/branch");
 	}
 
 	private PersonIdent newIdent() {
