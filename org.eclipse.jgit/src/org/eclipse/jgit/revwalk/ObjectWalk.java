@@ -133,7 +133,6 @@ public class ObjectWalk extends RevWalk {
 	 */
 	public ObjectWalk(ObjectReader or) {
 		super(or);
-		setRetainBody(false);
 		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
 		pathBuf = new byte[256];
