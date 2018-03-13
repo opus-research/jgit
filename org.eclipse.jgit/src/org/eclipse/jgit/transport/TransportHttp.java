@@ -424,9 +424,15 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	@Override
-	public SubscribeConnection openSubscribe()
+	public SubscribeConnection openSubscribe(Subscriber subscriber)
 			throws NotSupportedException, TransportException {
-		return new SmartHttpSubscribeConnection();
+		SubscribeConnection conn = new SmartHttpSubscribeConnection();
+		try {
+			conn.doSubscribeAdvertisement(subscriber);
+		} catch (IOException e) {
+			throw new TransportException(uri, e.getMessage(), e);
+		}
+		return conn;
 	}
 
 	@Override
@@ -484,7 +490,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			HttpURLConnection conn, String service, int authAttempts)
 			throws NoRemoteRepositoryException, TransportException,
 			IOException {
-		final int status = HttpSupport.response(conn);
+		int status = HttpSupport.response(conn);
 		switch (status) {
 		case HttpURLConnection.HTTP_OK:
 			return conn;
@@ -499,11 +505,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				throw new TransportException(uri, MessageFormat.format(
 						JGitText.get().authenticationNotSupported, uri));
 			if (1 < authAttempts
-					|| !authMethod.authorize(uri,
-							getCredentialsProvider())) {
-				throw new TransportException(uri,
-						JGitText.get().notAuthorized);
-			}
+					|| !authMethod.authorize(uri, getCredentialsProvider()))
+				throw new TransportException(uri, JGitText.get().notAuthorized);
 			return null;
 
 		case HttpURLConnection.HTTP_FORBIDDEN:
