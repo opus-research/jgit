@@ -69,6 +69,7 @@ import java.util.TreeMap;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -320,16 +321,16 @@ public class GitIndex {
 		}
 	}
 
-	private boolean File_canExecute(File f){
-		return db.getFs().canExecute(f);
+	static boolean File_canExecute( File f){
+		return FS.INSTANCE.canExecute(f);
 	}
 
-	private boolean File_setExecute(File f, boolean value) {
-		return db.getFs().setExecute(f, value);
+	static boolean File_setExecute(File f, boolean value) {
+		return FS.INSTANCE.setExecute(f, value);
 	}
 
-	private boolean File_hasExecute() {
-		return db.getFs().supportsExecute();
+	static boolean File_hasExecute() {
+		return FS.INSTANCE.supportsExecute();
 	}
 
 	static byte[] makeKey(File wd, File f) {
