@@ -385,7 +385,7 @@ public class DirCacheEntry {
 
 	/**
 	 * Set the file mode for this entry.
-	 * 
+	 *
 	 * @param mode
 	 *            the new mode constant.
 	 * @throws IllegalArgumentException
