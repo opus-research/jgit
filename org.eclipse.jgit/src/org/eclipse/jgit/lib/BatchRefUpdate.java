@@ -305,6 +305,7 @@ public class BatchRefUpdate {
 							break;
 						case UPDATE:
 						case UPDATE_NONFASTFORWARD:
+							monitor.update(1);
 							RefUpdate ruu = newUpdate(cmd);
 							cmd.setResult(ruu.update(walk));
 							break;
