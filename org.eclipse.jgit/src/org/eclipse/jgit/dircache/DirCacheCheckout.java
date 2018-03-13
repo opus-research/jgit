@@ -1309,11 +1309,18 @@ public class DirCacheCheckout {
 			if (checkoutMetadata.smudgeFilterCommand != null) {
 				if (Repository
 						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
-					BuiltinCommand command = Repository.getCommand(
-							checkoutMetadata.smudgeFilterCommand, repo,
-							ol.openStream(), channel);
-					while (command.run() != -1)
-						;
+					BuiltinCommand command = null;
+					try {
+						command = Repository.getCommand(
+								checkoutMetadata.smudgeFilterCommand, repo,
+								ol.openStream(), channel);
+					} catch (IOException e) {
+						ol.copyTo(channel);
+					}
+					if (command != null) {
+						while (command.run() != -1)
+							;
+					}
 				} else {
 					ProcessBuilder filterProcessBuilder = fs.runInShell(
 							checkoutMetadata.smudgeFilterCommand, new String[0]);
