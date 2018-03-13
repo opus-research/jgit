@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.util.sha1;
+
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ObjectId;
 
 /**
- * Submodule section of a Git configuration file.
+ * Thrown by {@link SHA1} if it detects a likely hash collision.
  *
  * @since 4.7
  */
-public class SubmoduleConfig {
+public class Sha1CollisionException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
+	 * Initialize with default message.
+	 *
+	 * @param id
+	 *            object whose contents are a hash collision.
 	 */
-	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("true"), //$NON-NLS-1$
-
-		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
-
-		/** Completely disable recursion. */
-		NO("false"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private FetchRecurseSubmodulesMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			return configValue.equals(s);
-		}
+	public Sha1CollisionException(ObjectId id) {
+		super(MessageFormat.format(
+				JGitText.get().sha1CollisionDetected1,
+				id.name()));
 	}
 }
