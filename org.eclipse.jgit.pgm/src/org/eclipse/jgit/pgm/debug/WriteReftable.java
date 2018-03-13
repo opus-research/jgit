@@ -107,7 +107,7 @@ class WriteReftable extends TextBuiltin {
 	@SuppressWarnings({ "nls", "boxing" })
 	@Override
 	protected void run() throws Exception {
-		List<Ref> refs = read(in);
+		List<Ref> refs = readRefs(in);
 		List<LogEntry> logs = readLog(reflogIn);
 
 		ReftableWriter.Stats stats;
@@ -139,29 +139,21 @@ class WriteReftable extends TextBuiltin {
 		}
 
 		double fileMiB = ((double) stats.totalBytes()) / MIB;
-		long avgPad = stats.paddingBytes()
-				/ (stats.refBlockCount() + stats.objBlockCount());
 		printf("Summary:");
 		printf("  file sz : %.1f MiB (%d bytes)", fileMiB, stats.totalBytes());
 		printf("  padding : %d KiB", stats.paddingBytes() / KIB);
-		printf("  avg pad : %d bytes / block", avgPad);
 		errw.println();
 
 		printf("Refs:");
 		printf("  ref blk : %d", stats.refBlockSize());
 		printf("  restarts: %d", stats.restartInterval());
 		printf("  refs    : %d", stats.refCount());
-		printf("  blocks  : %d", stats.refBlockCount());
 		if (stats.refIndexLevels() > 0) {
 			int idxSize = (int) Math.round(((double) stats.refIndexSize()) / KIB);
-			int avgIdx = stats.refIndexSize() / stats.refBlockCount();
 			printf("  idx sz  : %d KiB", idxSize);
 			printf("  idx lvl : %d", stats.refIndexLevels());
-			printf("  avg idx : %d bytes", avgIdx);
 		}
-		printf("  lookup  : %.1f", stats.diskSeeksPerRead());
 		printf("  avg ref : %d bytes", stats.refBytes() / refs.size());
-		printf("  refs/blk: %d", stats.refCount() / stats.refBlockCount());
 		errw.println();
 
 		if (stats.objCount() > 0) {
@@ -171,7 +163,6 @@ class WriteReftable extends TextBuiltin {
 			printf("  obj blk : %d", stats.refBlockSize());
 			printf("  restarts: %d", stats.restartInterval());
 			printf("  objects : %d", stats.objCount());
-			printf("  blocks  : %d", stats.objBlockCount());
 			printf("  obj sz  : %d MiB (%d bytes)", objMiB, stats.objBytes());
 			if (stats.objIndexSize() > 0) {
 				int s = (int) Math.round(((double) stats.objIndexSize()) / KIB);
@@ -180,19 +171,15 @@ class WriteReftable extends TextBuiltin {
 			}
 			printf("  id len  : %d bytes (%d hex digits)", idLen, 2 * idLen);
 			printf("  avg obj : %d bytes", stats.objBytes() / stats.objCount());
-			printf("  obj/blk : %d", stats.objCount() / stats.objBlockCount());
 			errw.println();
 		}
 		if (stats.logCount() > 0) {
 			int logMiB = (int) Math.round(((double) stats.logBytes()) / MIB);
 			printf("Log:");
 			printf("  log blk : %d", stats.logBlockSize());
-			printf("  avg blk : %d bytes", stats.logBytes() / stats.logBlockCount());
 			printf("  logs    : %d", stats.logCount());
-			printf("  blocks  : %d", stats.logBlockCount());
 			printf("  log sz  : %d MiB (%d bytes)", logMiB, stats.logBytes());
 			printf("  avg log : %d bytes", stats.logBytes() / logs.size());
-			printf("  log/blk : %d", stats.logCount() / stats.logBlockCount());
 			errw.println();
 		}
 	}
@@ -201,7 +188,7 @@ class WriteReftable extends TextBuiltin {
 		errw.println(String.format(fmt, args));
 	}
 
-	static List<Ref> read(String inputFile) throws IOException {
+	static List<Ref> readRefs(String inputFile) throws IOException {
 		List<Ref> refs = new ArrayList<>();
 		try (BufferedReader br = new BufferedReader(
 				new InputStreamReader(new FileInputStream(inputFile), UTF_8))) {
@@ -250,19 +237,20 @@ class WriteReftable extends TextBuiltin {
 			String line;
 			while ((line = br.readLine()) != null) {
 				Matcher m = pattern.matcher(line);
-				if (m.matches()) {
-					String ref = m.group(1);
-					double t = Double.parseDouble(m.group(2));
-					long time = ((long) t) * 1000L;
-					long index = (long) (t * 1e6);
-					String user = m.group(3);
-					ObjectId oldId = parseId(m.group(4));
-					ObjectId newId = parseId(m.group(5));
-					String msg = m.group(6);
-					String email = user + "@gerrit"; //$NON-NLS-1$
-					PersonIdent who = new PersonIdent(user, email, time, -480);
-					log.add(new LogEntry(ref, index, who, oldId, newId, msg));
+				if (!m.matches()) {
+					throw new IOException("unparsed line: " + line); //$NON-NLS-1$
 				}
+				String ref = m.group(1);
+				double t = Double.parseDouble(m.group(2));
+				long time = ((long) t) * 1000L;
+				long index = (long) (t * 1e6);
+				String user = m.group(3);
+				ObjectId oldId = parseId(m.group(4));
+				ObjectId newId = parseId(m.group(5));
+				String msg = m.group(6);
+				String email = user + "@gerrit"; //$NON-NLS-1$
+				PersonIdent who = new PersonIdent(user, email, time, -480);
+				log.add(new LogEntry(ref, index, who, oldId, newId, msg));
 			}
 		}
 		Collections.sort(log, LogEntry::compare);
