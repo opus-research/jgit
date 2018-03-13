@@ -47,8 +47,6 @@ import org.eclipse.jgit.lib.PersonIdent;
 
 /**
  * Parsed reflog entry
- *
- * @since 3.0
  */
 public interface ReflogEntry {
 
