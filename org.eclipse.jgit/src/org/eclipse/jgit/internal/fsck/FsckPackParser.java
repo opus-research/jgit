@@ -172,7 +172,6 @@ public class FsckPackParser extends PackParser {
 
 	@Override
 	protected void onPackFooter(byte[] hash) throws IOException {
-		// Do nothing.
 	}
 
 	@Override
@@ -184,7 +183,6 @@ public class FsckPackParser extends PackParser {
 
 	@Override
 	protected void onEndThinPack() throws IOException {
-		// Do nothing.
 	}
 
 	@Override
@@ -221,12 +219,12 @@ public class FsckPackParser extends PackParser {
 		if (bytes == null) {
 			return -1;
 		}
-		int offs = (int) (channelPosition - block * blockSize);
-		int bytesToCopy = Math.min(cnt, bytes.length - offs);
+		int offset = (int) (channelPosition - block * blockSize);
+		int bytesToCopy = Math.min(cnt, bytes.length - offset);
 		if (bytesToCopy < 1) {
 			return -1;
 		}
-		System.arraycopy(bytes, offs, dst, pos, bytesToCopy);
+		System.arraycopy(bytes, offset, dst, pos, bytesToCopy);
 		return bytesToCopy;
 	}
 
@@ -255,7 +253,6 @@ public class FsckPackParser extends PackParser {
 	@Override
 	protected void onStoreStream(byte[] raw, int pos, int len)
 			throws IOException {
-		// Do nothing.
 	}
 
 	/**
@@ -280,14 +277,13 @@ public class FsckPackParser extends PackParser {
 			PackedObjectInfo entry = getObject(i);
 			inPack.add(new ObjFromPack(entry));
 
-			long offs = idx.findOffset(entry);
-			if (offs == -1) {
+			long offset = idx.findOffset(entry);
+			if (offset == -1) {
 				throw new CorruptPackIndexException(
 						MessageFormat.format(JGitText.get().missingObject,
-								Integer.valueOf(entry.getType()),
-								entry.getName()),
+								entry.getType(), entry.getName()),
 						ErrorType.MISSING_OBJ);
-			} else if (offs != entry.getOffset()) {
+			} else if (offset != entry.getOffset()) {
 				throw new CorruptPackIndexException(MessageFormat
 						.format(JGitText.get().mismatchOffset, entry.getName()),
 						ErrorType.MISMATCH_OFFSET);
@@ -321,11 +317,11 @@ public class FsckPackParser extends PackParser {
 	 * Set the object count for overwriting the expected object count from pack
 	 * header.
 	 *
-	 * @param objectCount
+	 * @param expectedObjectCount
 	 *            the actual expected object count.
 	 */
-	public void overwriteObjectCount(long objectCount) {
-		this.expectedObjectCount = objectCount;
+	public void overwriteObjectCount(long expectedObjectCount) {
+		this.expectedObjectCount = expectedObjectCount;
 	}
 
 	static class ObjFromPack extends ObjectIdOwnerMap.Entry {
