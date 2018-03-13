@@ -100,7 +100,6 @@ public class ObjectChecker {
 
 	private boolean allowZeroMode;
 	private boolean windows;
-	private boolean macosx;
 
 	/**
 	 * Enable accepting leading zero mode in tree entries.
@@ -130,21 +129,6 @@ public class ObjectChecker {
 	 */
 	public ObjectChecker setSafeForWindows(boolean win) {
 		windows = win;
-		return this;
-	}
-
-
-	/**
-	 * Restrict trees to only names legal on Mac OS X platforms.
-	 * <p>
-	 * Rejects any mixed case forms of reserved names ({@code .git}).
-	 *
-	 * @param mac true if Mac OS X name checking should be performed.
-	 * @return {@code this}.
-	 * @since 3.4
-	 */
-	public ObjectChecker setSafeForMacOS(boolean mac) {
-		macosx = mac;
 		return this;
 	}
 
@@ -456,7 +440,7 @@ public class ObjectChecker {
 			if (end - ptr >= 4
 					&& toLower(raw[ptr + 2]) == 'm'
 					&& toLower(raw[ptr + 1]) == 'o'
-					&& isDigit(raw[ptr + 3])
+					&& isPositiveDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
 				throw new CorruptObjectException("invalid name 'COM"
 						+ ((char) raw[ptr + 3]) + "'");
@@ -466,7 +450,7 @@ public class ObjectChecker {
 			if (end - ptr >= 4
 					&& toLower(raw[ptr + 1]) == 'p'
 					&& toLower(raw[ptr + 2]) == 't'
-					&& isDigit(raw[ptr + 3])
+					&& isPositiveDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
 				throw new CorruptObjectException("invalid name 'LPT"
 						+ ((char) raw[ptr + 3]) + "'");
@@ -507,7 +491,7 @@ public class ObjectChecker {
 	}
 
 	private boolean isDotGit(byte[] buf, int p) {
-		if (windows || macosx)
+		if (windows)
 			return toLower(buf[p]) == 'g'
 					&& toLower(buf[p + 1]) == 'i'
 					&& toLower(buf[p + 2]) == 't';
@@ -520,7 +504,7 @@ public class ObjectChecker {
 		return (char) b;
 	}
 
-	private static boolean isDigit(byte b) {
+	private static boolean isPositiveDigit(byte b) {
 		return '1' <= b && b <= '9';
 	}
 
