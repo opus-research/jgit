@@ -43,18 +43,15 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.*;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.junit.Test;
 
-public class PatchCcErrorTest {
-	@Test
+import junit.framework.TestCase;
+
+public class PatchCcErrorTest extends TestCase {
 	public void testError_CcTruncatedOld() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -91,7 +88,7 @@ public class PatchCcErrorTest {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = JGitTestUtil.getName() + ".patch";
+		final String patchFile = getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

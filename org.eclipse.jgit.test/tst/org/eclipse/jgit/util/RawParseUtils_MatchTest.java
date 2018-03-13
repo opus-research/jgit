@@ -43,27 +43,23 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.*;
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Test;
 
-public class RawParseUtils_MatchTest {
-	@Test
+public class RawParseUtils_MatchTest extends TestCase {
 	public void testMatch_Equal() {
 		final byte[] src = Constants.encodeASCII(" differ\n");
 		final byte[] dst = Constants.encodeASCII("foo differ\n");
 		assertTrue(RawParseUtils.match(dst, 3, src) == 3 + src.length);
 	}
 
-	@Test
 	public void testMatch_NotEqual() {
 		final byte[] src = Constants.encodeASCII(" differ\n");
 		final byte[] dst = Constants.encodeASCII("a differ\n");
 		assertTrue(RawParseUtils.match(dst, 2, src) < 0);
 	}
 
-	@Test
 	public void testMatch_Prefix() {
 		final byte[] src = Constants.encodeASCII("author ");
 		final byte[] dst = Constants.encodeASCII("author A. U. Thor");
@@ -71,7 +67,6 @@ public class RawParseUtils_MatchTest {
 		assertTrue(RawParseUtils.match(dst, 1, src) < 0);
 	}
 
-	@Test
 	public void testMatch_TooSmall() {
 		final byte[] src = Constants.encodeASCII("author ");
 		final byte[] dst = Constants.encodeASCII("author autho");

@@ -43,16 +43,13 @@
 
 package org.eclipse.jgit.util.io;
 
-import static org.junit.Assert.*;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class UnionInputStreamTest {
-	@Test
+public class UnionInputStreamTest extends TestCase {
 	public void testEmptyStream() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		assertTrue(u.isEmpty());
@@ -63,7 +60,6 @@ public class UnionInputStreamTest {
 		u.close();
 	}
 
-	@Test
 	public void testReadSingleBytes() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 
@@ -95,7 +91,6 @@ public class UnionInputStreamTest {
 		assertTrue(u.isEmpty());
 	}
 
-	@Test
 	public void testReadByteBlocks() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1, 0, 2 }));
@@ -110,7 +105,6 @@ public class UnionInputStreamTest {
 		assertEquals(-1, u.read(r, 0, 5));
 	}
 
-	@Test
 	public void testArrayConstructor() throws IOException {
 		final UnionInputStream u = new UnionInputStream(
 				new ByteArrayInputStream(new byte[] { 1, 0, 2 }),
@@ -125,7 +119,6 @@ public class UnionInputStreamTest {
 		assertEquals(-1, u.read(r, 0, 5));
 	}
 
-	@Test
 	public void testMarkSupported() {
 		final UnionInputStream u = new UnionInputStream();
 		assertFalse(u.markSupported());
@@ -133,7 +126,6 @@ public class UnionInputStreamTest {
 		assertFalse(u.markSupported());
 	}
 
-	@Test
 	public void testSkip() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1, 0, 2 }));
@@ -155,7 +147,6 @@ public class UnionInputStreamTest {
 		assertEquals(-1, u.read());
 	}
 
-	@Test
 	public void testAutoCloseDuringRead() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		final boolean closed[] = new boolean[2];
@@ -186,7 +177,6 @@ public class UnionInputStreamTest {
 		assertTrue(closed[1]);
 	}
 
-	@Test
 	public void testCloseDuringClose() throws IOException {
 		final UnionInputStream u = new UnionInputStream();
 		final boolean closed[] = new boolean[2];
@@ -210,7 +200,6 @@ public class UnionInputStreamTest {
 		assertTrue(closed[1]);
 	}
 
-	@Test
 	public void testExceptionDuringClose() {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1 }) {

@@ -43,14 +43,11 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
-
 import java.util.Collections;
 
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.junit.Test;
 
 public class RevWalkPathFilter1Test extends RevWalkTestCase {
 	protected void filter(final String path) {
@@ -59,7 +56,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 				TreeFilter.ANY_DIFF));
 	}
 
-	@Test
 	public void testEmpty_EmptyTree() throws Exception {
 		final RevCommit a = commit();
 		filter("a");
@@ -67,7 +63,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testEmpty_NoMatch() throws Exception {
 		final RevCommit a = commit(tree(file("0", blob("0"))));
 		filter("a");
@@ -75,7 +70,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testSimple1() throws Exception {
 		final RevCommit a = commit(tree(file("0", blob("0"))));
 		filter("0");
@@ -84,7 +78,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testEdits_MatchNone() throws Exception {
 		final RevCommit a = commit(tree(file("0", blob("a"))));
 		final RevCommit b = commit(tree(file("0", blob("b"))), a);
@@ -95,7 +88,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testEdits_MatchAll() throws Exception {
 		final RevCommit a = commit(tree(file("0", blob("a"))));
 		final RevCommit b = commit(tree(file("0", blob("b"))), a);
@@ -110,7 +102,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testStringOfPearls_FilePath1() throws Exception {
 		final RevCommit a = commit(tree(file("d/f", blob("a"))));
 		final RevCommit b = commit(tree(file("d/f", blob("a"))), a);
@@ -127,7 +118,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testStringOfPearls_FilePath2() throws Exception {
 		final RevCommit a = commit(tree(file("d/f", blob("a"))));
 		final RevCommit b = commit(tree(file("d/f", blob("a"))), a);
@@ -146,7 +136,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testStringOfPearls_DirPath2() throws Exception {
 		final RevCommit a = commit(tree(file("d/f", blob("a"))));
 		final RevCommit b = commit(tree(file("d/f", blob("a"))), a);
@@ -165,7 +154,6 @@ public class RevWalkPathFilter1Test extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testStringOfPearls_FilePath3() throws Exception {
 		final RevCommit a = commit(tree(file("d/f", blob("a"))));
 		final RevCommit b = commit(tree(file("d/f", blob("a"))), a);

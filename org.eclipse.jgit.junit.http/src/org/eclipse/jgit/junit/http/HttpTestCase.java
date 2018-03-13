@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.junit.http;
 
-import static org.junit.Assert.*;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -75,12 +73,12 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 	/** In-memory application server; subclass must start. */
 	protected AppServer server;
 
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 		server = new AppServer();
 	}
 
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		server.tearDown();
 		super.tearDown();
 	}

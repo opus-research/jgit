@@ -43,60 +43,17 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
-
-import org.eclipse.jgit.util.RawParseUtils;
-import org.junit.Assert;
-import org.junit.Test;
 
 public abstract class JGitTestUtil {
 	public static final String CLASSPATH_TO_RESOURCES = "org/eclipse/jgit/test/resources/";
 
 	private JGitTestUtil() {
 		throw new UnsupportedOperationException();
-	}
-
-	public static String getName() {
-		Throwable throwable = new Throwable();
-		for (StackTraceElement stackTrace : throwable.getStackTrace()) {
-			String className = stackTrace.getClassName();
-			String methodName = stackTrace.getMethodName();
-			Method method;
-			try {
-				method = Class.forName(className).getMethod(methodName,
-						(Class[]) null);
-			} catch (SecurityException e) {
-				throw new Error(
-						"Cannot determie name of test, possibly incomplete getName",
-						e);
-			} catch (NoSuchMethodException e) {
-				// could be private, i.e. not a test method
-				// could have arguments, not handled
-				continue;
-			} catch (ClassNotFoundException e) {
-				throw new Error(
-						"Cannot determie name of test, possibly incomplete getName",
-						e);
-			}
-			Test annotation = method.getAnnotation(Test.class);
-			if (annotation != null)
-				return methodName;
-		}
-		throw new Error(
-				"Cannot determie name of test, possibly incomplete getName");
-	}
-
-	public static void assertEquals(byte[] exp, byte[] act) {
-		Assert.assertEquals(s(exp), s(act));
-	}
-
-	private static String s(byte[] raw) {
-		return RawParseUtils.decode(raw);
 	}
 
 	public static File getTestResourceFile(final String fileName) {

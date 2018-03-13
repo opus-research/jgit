@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
-
 import java.io.IOException;
 import java.util.Date;
 
@@ -56,12 +54,10 @@ import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.NotRevFilter;
 import org.eclipse.jgit.revwalk.filter.OrRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.junit.Test;
 
 public class RevWalkFilterTest extends RevWalkTestCase {
 	private static final MyAll MY_ALL = new MyAll();
 
-	@Test
 	public void testFilter_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -75,7 +71,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_Negate_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -86,7 +81,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NOT_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -97,7 +91,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NONE() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -108,7 +101,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NOT_NONE() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -122,7 +114,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_ALL_And_NONE() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -133,7 +124,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NONE_And_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -144,7 +134,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_ALL_Or_NONE() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -158,7 +147,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NONE_Or_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -172,7 +160,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_MY_ALL_And_NONE() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -183,7 +170,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NONE_And_MY_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -194,7 +180,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_MY_ALL_Or_NONE() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -208,7 +193,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NONE_Or_MY_ALL() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -222,7 +206,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testFilter_NO_MERGES() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -241,7 +224,6 @@ public class RevWalkFilterTest extends RevWalkTestCase {
 		assertNull(rw.next());
 	}
 
-	@Test
 	public void testCommitTimeRevFilter() throws Exception {
 		final RevCommit a = commit();
 		tick(100);

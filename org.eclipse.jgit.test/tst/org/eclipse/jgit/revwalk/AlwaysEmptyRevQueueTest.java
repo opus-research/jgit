@@ -43,14 +43,9 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
-
-import org.junit.Test;
-
 public class AlwaysEmptyRevQueueTest extends RevWalkTestCase {
 	private final AbstractRevQueue q = AbstractRevQueue.EMPTY_QUEUE;
 
-	@Test
 	public void testEmpty() throws Exception {
 		assertNull(q.next());
 		assertTrue(q.everbodyHasFlag(RevWalk.UNINTERESTING));
@@ -58,13 +53,11 @@ public class AlwaysEmptyRevQueueTest extends RevWalkTestCase {
 		assertEquals(0, q.outputType());
 	}
 
-	@Test
 	public void testClear() throws Exception {
 		q.clear();
 		testEmpty();
 	}
 
-	@Test
 	public void testAddFails() throws Exception {
 		try {
 			q.add(commit());

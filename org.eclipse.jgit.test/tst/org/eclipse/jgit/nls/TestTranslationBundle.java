@@ -43,18 +43,15 @@
 
 package org.eclipse.jgit.nls;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import java.util.Locale;
 
 import org.eclipse.jgit.errors.TranslationBundleLoadingException;
 import org.eclipse.jgit.errors.TranslationStringMissingException;
-import org.junit.Test;
 
-public class TestTranslationBundle {
+import junit.framework.TestCase;
 
-	@Test
+public class TestTranslationBundle extends TestCase {
+
 	public void testMissingPropertiesFile() {
 		try {
 			new NoPropertiesBundle().load(NLS.ROOT_LOCALE);
@@ -66,7 +63,6 @@ public class TestTranslationBundle {
 		}
 	}
 
-	@Test
 	public void testMissingString() {
 		try {
 			new MissingPropertyBundle().load(NLS.ROOT_LOCALE);
@@ -79,7 +75,6 @@ public class TestTranslationBundle {
 		}
 	}
 
-	@Test
 	public void testNonTranslatedBundle() {
 		NonTranslatedBundle bundle = new NonTranslatedBundle();
 
@@ -96,7 +91,6 @@ public class TestTranslationBundle {
 		assertEquals("Good morning {0}", bundle.goodMorning);
 	}
 
-	@Test
 	public void testGermanTranslation() {
 		GermanTranslatedBundle bundle = new GermanTranslatedBundle();
 

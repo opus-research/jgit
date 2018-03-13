@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTag;
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
+import java.util.Date;
+import java.util.TimeZone;
 
-public class PushCommandTest extends RepositoryTestCase {
+import junit.framework.TestCase;
 
-	public void testPush() throws JGitInternalException, IOException,
-			GitAPIException, URISyntaxException {
-
-		// create other repository
-		Repository db2 = createWorkRepository();
-
-		// setup the first repository
-		final StoredConfig config = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
-		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
-		remoteConfig.addURI(uri);
-		remoteConfig.update(config);
-		config.save();
-
-		Git git1 = new Git(db);
-		// create some refs via commits and tag
-		RevCommit commit = git1.commit().setMessage("initial commit").call();
-		RevTag tag = git1.tag().setName("tag").call();
-
-		try {
-			db2.resolve(commit.getId().getName() + "^{commit}");
-			fail("id shouldn't exist yet");
-		} catch (MissingObjectException e) {
-			// we should get here
-		}
-
-		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
-		git1.push().setRemote("test").setRefSpecs(spec)
-				.call();
-
-		assertEquals(commit.getId(),
-				db2.resolve(commit.getId().getName() + "^{commit}"));
-		assertEquals(tag.getId(), db2.resolve(tag.getId().getName()));
+public class T0001_PersonIdent extends TestCase {
+	public void test001_NewIdent() {
+		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
+				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
+		assertEquals("A U Thor", p.getName());
+		assertEquals("author@example.com", p.getEmailAddress());
+		assertEquals(1142878501000L, p.getWhen().getTime());
+		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
+				p.toExternalString());
 	}
 
+	public void test002_NewIdent() {
+		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
+				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
+		assertEquals("A U Thor", p.getName());
+		assertEquals("author@example.com", p.getEmailAddress());
+		assertEquals(1142878501000L, p.getWhen().getTime());
+		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
+				p.toExternalString());
+	}
 }

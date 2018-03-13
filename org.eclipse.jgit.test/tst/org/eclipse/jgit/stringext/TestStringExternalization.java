@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.stringext;
 
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.awtui.UIText;
 import org.eclipse.jgit.console.ConsoleText;
@@ -51,7 +53,7 @@ import org.eclipse.jgit.iplog.IpLogText;
 import org.eclipse.jgit.nls.NLS;
 import org.eclipse.jgit.pgm.CLIText;
 
-public class TestStringExternalization {
+public class TestStringExternalization extends TestCase {
 
 	private static Class[] translationBundleClasses = new Class[] {
 		ConsoleText.class, HttpServerText.class, IpLogText.class, CLIText.class,

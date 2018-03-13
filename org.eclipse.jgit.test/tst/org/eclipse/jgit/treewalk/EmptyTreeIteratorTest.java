@@ -43,22 +43,17 @@
 
 package org.eclipse.jgit.treewalk;
 
-import static org.junit.Assert.*;
-
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Test;
 
 public class EmptyTreeIteratorTest extends RepositoryTestCase {
-	@Test
 	public void testAtEOF() throws Exception {
 		final EmptyTreeIterator etp = new EmptyTreeIterator();
 		assertTrue(etp.first());
 		assertTrue(etp.eof());
 	}
 
-	@Test
 	public void testCreateSubtreeIterator() throws Exception {
 		final EmptyTreeIterator etp = new EmptyTreeIterator();
 		final ObjectReader reader = db.newObjectReader();
@@ -69,7 +64,6 @@ public class EmptyTreeIteratorTest extends RepositoryTestCase {
 		assertTrue(sub instanceof EmptyTreeIterator);
 	}
 
-	@Test
 	public void testEntryObjectId() throws Exception {
 		final EmptyTreeIterator etp = new EmptyTreeIterator();
 		assertSame(ObjectId.zeroId(), etp.getEntryObjectId());
@@ -78,7 +72,6 @@ public class EmptyTreeIteratorTest extends RepositoryTestCase {
 		assertEquals(ObjectId.zeroId(), ObjectId.fromRaw(etp.idBuffer()));
 	}
 
-	@Test
 	public void testNextDoesNothing() throws Exception {
 		final EmptyTreeIterator etp = new EmptyTreeIterator();
 		etp.next(1);
@@ -92,7 +85,6 @@ public class EmptyTreeIteratorTest extends RepositoryTestCase {
 		assertEquals(ObjectId.zeroId(), ObjectId.fromRaw(etp.idBuffer()));
 	}
 
-	@Test
 	public void testBackDoesNothing() throws Exception {
 		final EmptyTreeIterator etp = new EmptyTreeIterator();
 		etp.back(1);
@@ -106,7 +98,6 @@ public class EmptyTreeIteratorTest extends RepositoryTestCase {
 		assertEquals(ObjectId.zeroId(), ObjectId.fromRaw(etp.idBuffer()));
 	}
 
-	@Test
 	public void testStopWalkCallsParent() throws Exception {
 		final boolean called[] = new boolean[1];
 		assertFalse(called[0]);

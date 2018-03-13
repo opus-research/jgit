@@ -43,12 +43,9 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.*;
+import junit.framework.TestCase;
 
-import org.junit.Test;
-
-public class IntListTest {
-	@Test
+public class IntListTest extends TestCase {
 	public void testEmpty_DefaultCapacity() {
 		final IntList i = new IntList();
 		assertEquals(0, i.size());
@@ -60,7 +57,6 @@ public class IntListTest {
 		}
 	}
 
-	@Test
 	public void testEmpty_SpecificCapacity() {
 		final IntList i = new IntList(5);
 		assertEquals(0, i.size());
@@ -72,7 +68,6 @@ public class IntListTest {
 		}
 	}
 
-	@Test
 	public void testAdd_SmallGroup() {
 		final IntList i = new IntList();
 		final int n = 5;
@@ -90,7 +85,6 @@ public class IntListTest {
 		}
 	}
 
-	@Test
 	public void testAdd_ZeroCapacity() {
 		final IntList i = new IntList(0);
 		assertEquals(0, i.size());
@@ -98,7 +92,6 @@ public class IntListTest {
 		assertEquals(1, i.get(0));
 	}
 
-	@Test
 	public void testAdd_LargeGroup() {
 		final IntList i = new IntList();
 		final int n = 500;
@@ -116,14 +109,12 @@ public class IntListTest {
 		}
 	}
 
-	@Test
 	public void testFillTo0() {
 		final IntList i = new IntList();
 		i.fillTo(0, Integer.MIN_VALUE);
 		assertEquals(0, i.size());
 	}
 
-	@Test
 	public void testFillTo1() {
 		final IntList i = new IntList();
 		i.fillTo(1, Integer.MIN_VALUE);
@@ -133,7 +124,6 @@ public class IntListTest {
 		assertEquals(0, i.get(1));
 	}
 
-	@Test
 	public void testFillTo100() {
 		final IntList i = new IntList();
 		i.fillTo(100, Integer.MIN_VALUE);
@@ -143,7 +133,6 @@ public class IntListTest {
 		assertEquals(3, i.get(100));
 	}
 
-	@Test
 	public void testClear() {
 		final IntList i = new IntList();
 		final int n = 5;
@@ -161,7 +150,6 @@ public class IntListTest {
 		}
 	}
 
-	@Test
 	public void testSet() {
 		final IntList i = new IntList();
 		i.add(1);
@@ -183,7 +171,6 @@ public class IntListTest {
 		assertEquals(2, i.get(1));
 	}
 
-	@Test
 	public void testToString() {
 		final IntList i = new IntList();
 		i.add(1);

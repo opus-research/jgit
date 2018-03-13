@@ -45,7 +45,6 @@
 package org.eclipse.jgit.merge;
 
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.junit.Assert.*;
 
 import java.io.IOException;
 
@@ -60,11 +59,9 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.junit.Test;
 
 public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 
-	@Test
 	public void testOurs() throws IOException {
 		Merger ourMerger = MergeStrategy.OURS.newMerger(db);
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("a"), db.resolve("c") });
@@ -72,7 +69,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertEquals(db.mapTree("a").getId(), ourMerger.getResultTreeId());
 	}
 
-	@Test
 	public void testTheirs() throws IOException {
 		Merger ourMerger = MergeStrategy.THEIRS.newMerger(db);
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("a"), db.resolve("c") });
@@ -80,7 +76,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertEquals(db.mapTree("c").getId(), ourMerger.getResultTreeId());
 	}
 
-	@Test
 	public void testTrivialTwoWay() throws IOException {
 		Merger ourMerger = MergeStrategy.SIMPLE_TWO_WAY_IN_CORE.newMerger(db);
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("a"), db.resolve("c") });
@@ -88,7 +83,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertEquals("02ba32d3649e510002c21651936b7077aa75ffa9",ourMerger.getResultTreeId().name());
 	}
 
-	@Test
 	public void testTrivialTwoWay_disjointhistories() throws IOException {
 		Merger ourMerger = MergeStrategy.SIMPLE_TWO_WAY_IN_CORE.newMerger(db);
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("a"), db.resolve("c~4") });
@@ -96,7 +90,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertEquals("86265c33b19b2be71bdd7b8cb95823f2743d03a8",ourMerger.getResultTreeId().name());
 	}
 
-	@Test
 	public void testTrivialTwoWay_ok() throws IOException {
 		Merger ourMerger = MergeStrategy.SIMPLE_TWO_WAY_IN_CORE.newMerger(db);
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("a^0^0^0"), db.resolve("a^0^0^1") });
@@ -104,14 +97,12 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertEquals(db.mapTree("a^0^0").getId(), ourMerger.getResultTreeId());
 	}
 
-	@Test
 	public void testTrivialTwoWay_conflict() throws IOException {
 		Merger ourMerger = MergeStrategy.SIMPLE_TWO_WAY_IN_CORE.newMerger(db);
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("f"), db.resolve("g") });
 		assertFalse(merge);
 	}
 
-	@Test
 	public void testTrivialTwoWay_validSubtreeSort() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();
@@ -164,7 +155,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(tw.next());
 	}
 
-	@Test
 	public void testTrivialTwoWay_concurrentSubtreeChange() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();
@@ -212,7 +202,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(tw.next());
 	}
 
-	@Test
 	public void testTrivialTwoWay_conflictSubtreeChange() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();
@@ -246,7 +235,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(merge);
 	}
 
-	@Test
 	public void testTrivialTwoWay_leftDFconflict1() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();
@@ -279,7 +267,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(merge);
 	}
 
-	@Test
 	public void testTrivialTwoWay_rightDFconflict1() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();
@@ -312,7 +299,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(merge);
 	}
 
-	@Test
 	public void testTrivialTwoWay_leftDFconflict2() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();
@@ -343,7 +329,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(merge);
 	}
 
-	@Test
 	public void testTrivialTwoWay_rightDFconflict2() throws Exception {
 		final DirCache treeB = db.readDirCache();
 		final DirCache treeO = db.readDirCache();

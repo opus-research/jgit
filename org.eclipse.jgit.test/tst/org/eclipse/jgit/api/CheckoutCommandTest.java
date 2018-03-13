@@ -42,8 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.*;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -59,8 +57,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
 
 public class CheckoutCommandTest extends RepositoryTestCase {
 	private Git git;
@@ -70,8 +66,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	RevCommit secondCommit;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 		git = new Git(db);
 		// commit something
@@ -90,7 +85,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		secondCommit = git.commit().setMessage("Second commit").call();
 	}
 
-	@Test
 	public void testSimpleCheckout() {
 		try {
 			git.checkout().setName("test").call();
@@ -99,7 +93,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckout() {
 		try {
 			git.checkout().setName("test").call();
@@ -116,7 +109,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCreateBranchOnCheckout() throws IOException {
 		try {
 			git.checkout().setCreateBranch(true).setName("test2").call();
@@ -126,7 +118,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		assertNotNull(db.getRef("test2"));
 	}
 
-	@Test
 	public void testCheckoutToNonExistingBranch() throws JGitInternalException,
 			RefAlreadyExistsException, InvalidRefNameException {
 		try {
@@ -137,7 +128,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckoutWithConflict() {
 		CheckoutCommand co = git.checkout();
 		try {
@@ -151,7 +141,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckoutWithNonDeletedFiles() throws Exception {
 		File testFile = writeTrashFile("temp", "");
 		FileInputStream fis = new FileInputStream(testFile);
@@ -187,7 +176,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckoutCommit() {
 		try {
 			Ref result = git.checkout().setName(initialCommit.name()).call();

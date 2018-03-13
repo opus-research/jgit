@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.*;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -57,7 +55,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.storage.file.ReflogReader.Entry;
-import org.junit.Test;
 
 public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 
@@ -82,7 +79,6 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 	static byte[] headLine = "3333333333333333333333333333333333333333 3e7549db262d1e836d9bf0af7e22355468f1717c A U Thor <thor@committer.au> 1243028201 -0100\tbranch: change to HEAD\n"
 			.getBytes();
 
-	@Test
 	public void testReadOneLine() throws Exception {
 		setupReflog("logs/refs/heads/master", oneLine);
 
@@ -109,7 +105,6 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 		return fmt.format(id.getWhen());
 	}
 
-	@Test
 	public void testReadTwoLine() throws Exception {
 		setupReflog("logs/refs/heads/master", twoLine);
 
@@ -145,7 +140,6 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 		assertEquals("branch: Created from rr/renamebranchv4", e.getComment());
 	}
 
-	@Test
 	public void testReadWhileAppendIsInProgress() throws Exception {
 		setupReflog("logs/refs/heads/master", twoLineWithAppendInProgress);
 		ReflogReader reader = new ReflogReader(db, "refs/heads/master");
@@ -170,7 +164,6 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 	}
 
 
-	@Test
 	public void testReadRightLog() throws Exception {
 		setupReflog("logs/refs/heads/a", aLine);
 		setupReflog("logs/refs/heads/master", masterLine);
@@ -183,7 +176,6 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 				.getLastEntry().getComment());
 	}
 
-	@Test
 	public void testNoLog() throws Exception {
 		assertEquals(0, db.getReflogReader("master").getReverseEntries().size());
 		assertNull(db.getReflogReader("master").getLastEntry());
