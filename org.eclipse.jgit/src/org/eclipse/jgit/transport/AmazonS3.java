@@ -512,14 +512,10 @@ public class AmazonS3 {
 			final HttpURLConnection c) throws IOException {
 		final IOException err = new IOException(MessageFormat.format(JGitText.get().amazonS3ActionFailed
 				, action, key, HttpSupport.response(c), c.getResponseMessage()));
-		final InputStream errorStream = c.getErrorStream();
-		if (errorStream == null)
-			return err;
-
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		byte[] buf = new byte[2048];
 		for (;;) {
-			final int n = errorStream.read(buf);
+			final int n = c.getErrorStream().read(buf);
 			if (n < 0)
 				break;
 			if (n > 0)
