@@ -53,19 +53,6 @@ public class ListenerList {
 	private final ConcurrentMap<Class<? extends RepositoryListener>, CopyOnWriteArrayList<ListenerHandle>> lists = new ConcurrentHashMap<>();
 
 	/**
-	 * Register a {@link WorkingTreeModifiedListener}.
-	 *
-	 * @param listener
-	 *            the listener implementation.
-	 * @return handle to later remove the listener.
-	 * @since 4.9
-	 */
-	public ListenerHandle addWorkingTreeModifiedListener(
-			WorkingTreeModifiedListener listener) {
-		return addListener(WorkingTreeModifiedListener.class, listener);
-	}
-
-	/**
 	 * Register an IndexChangedListener.
 	 *
 	 * @param listener
