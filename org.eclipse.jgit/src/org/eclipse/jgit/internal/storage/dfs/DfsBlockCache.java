@@ -175,7 +175,6 @@ public final class DfsBlockCache {
 	/** Number of bytes currently loaded in the cache. */
 	private volatile long liveBytes;
 
-	@SuppressWarnings("unchecked")
 	private DfsBlockCache(final DfsBlockCacheConfig cfg) {
 		tableSize = tableSize(cfg);
 		if (tableSize < 1)
@@ -417,7 +416,6 @@ public final class DfsBlockCache {
 		clockLock.unlock();
 	}
 
-	@SuppressWarnings("unchecked")
 	private void addToClock(Ref ref, int credit) {
 		clockLock.lock();
 		try {
