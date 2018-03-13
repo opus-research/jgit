@@ -855,8 +855,7 @@ public class Config {
 	 *
 	 * <pre>
 	 * [section &quot;subsection&quot;]
-	 *         name = value1
-	 *         name = value2
+	 *         name = value
 	 * </pre>
 	 *
 	 * @param section
