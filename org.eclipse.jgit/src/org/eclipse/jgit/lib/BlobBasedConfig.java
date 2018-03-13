@@ -79,14 +79,7 @@ public class BlobBasedConfig extends Config {
 	public BlobBasedConfig(Config base, final byte[] blob)
 			throws ConfigInvalidException {
 		super(base);
-		final String decoded;
-		if (isUtf8(blob)) {
-			decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
-					blob, 3, blob.length);
-		} else {
-			decoded = RawParseUtils.decode(blob);
-		}
-		fromText(decoded);
+		fromText(RawParseUtils.decode(blob));
 	}
 
 	/**

@@ -103,7 +103,7 @@ public class DirCacheTree {
 	private DirCacheTree parent;
 
 	/** Name of this tree within its parent. */
-	byte[] encodedName;
+	private byte[] encodedName;
 
 	/** Number of {@link DirCacheEntry} records that belong to this tree. */
 	private int entrySpan;
@@ -249,15 +249,7 @@ public class DirCacheTree {
 		return children[i];
 	}
 
-	/**
-	 * Get the tree's ObjectId.
-	 * <p>
-	 * If {@link #isValid()} returns false this method will return null.
-	 *
-	 * @return ObjectId of this tree or null.
-	 * @since 4.3
-	 */
-	public ObjectId getObjectId() {
+	ObjectId getObjectId() {
 		return id;
 	}
 

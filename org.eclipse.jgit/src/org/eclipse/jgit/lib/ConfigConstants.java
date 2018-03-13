@@ -107,13 +107,6 @@ public class ConfigConstants {
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
-	/**
-	 * The "eol" key
-	 *
-	 * @since 4.3
-	 */
-	public static final String CONFIG_KEY_EOL = "eol";
-
 	/** The "bare" key */
 	public static final String CONFIG_KEY_BARE = "bare";
 
@@ -235,23 +228,11 @@ public class ConfigConstants {
 	 */
 	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
 
-	/**
-	 * The "dirnogitlinks" key
-	 * @since 4.3
-	 */
-	public static final String CONFIG_KEY_DIRNOGITLINKS = "dirNoGitLinks";
-
 	/** The "precomposeunicode" key */
 	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
 
 	/** The "pruneexpire" key */
 	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
-
-	/**
-	 * The "prunepackexpire" key
-	 * @since 4.3
-	 */
-	public static final String CONFIG_KEY_PRUNEPACKEXPIRE = "prunepackexpire";
 
 	/**
 	 * The "aggressiveDepth" key

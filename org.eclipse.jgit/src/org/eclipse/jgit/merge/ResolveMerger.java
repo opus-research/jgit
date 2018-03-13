@@ -786,6 +786,11 @@ public class ResolveMerger extends ThreeWayMerger {
 	private File writeMergedFile(MergeResult<RawText> result)
 			throws FileNotFoundException, IOException {
 		File workTree = db.getWorkTree();
+		if (workTree == null)
+			// TODO: This should be handled by WorkingTreeIterators which
+			// support write operations
+			throw new UnsupportedOperationException();
+
 		FS fs = db.getFS();
 		File of = new File(workTree, tw.getPathString());
 		File parentFolder = of.getParentFile();
@@ -1005,14 +1010,13 @@ public class ResolveMerger extends ThreeWayMerger {
 		builder = dircache.builder();
 		DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
-		tw = new NameConflictTreeWalk(db, reader);
+		tw = new NameConflictTreeWalk(reader);
 		tw.addTree(baseTree);
 		tw.addTree(headTree);
 		tw.addTree(mergeTree);
-		int dciPos = tw.addTree(buildIt);
+		tw.addTree(buildIt);
 		if (workingTreeIterator != null) {
 			tw.addTree(workingTreeIterator);
-			workingTreeIterator.setDirCacheIterator(tw, dciPos);
 		} else {
 			tw.setFilter(TreeFilter.ANY_DIFF);
 		}
