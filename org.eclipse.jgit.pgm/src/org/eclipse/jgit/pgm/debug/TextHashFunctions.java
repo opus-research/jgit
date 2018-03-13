@@ -341,17 +341,18 @@ class TextHashFunctions extends TextBuiltin {
 			}
 		}
 
-		if (db.getDirectory() != null) {
-			String name = db.getDirectory().getName();
-			File parent = db.getDirectory().getParentFile();
+		File directory = db.getDirectory();
+		if (directory != null) {
+			String name = directory.getName();
+			File parent = directory.getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
 			outw.println(name + ":"); //$NON-NLS-1$
 		}
-		outw.format("  %6d files; %5d avg. unique lines/file\n", //
+		outw.format("  %6d files; %5d avg. unique lines/file\n", //$NON-NLS-1$
 				valueOf(fileCnt), //
 				valueOf(lineCnt / fileCnt));
-		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len");
+		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 		outw.println("-----------------------------------------------"); //$NON-NLS-1$
 		String lastHashName = null;
 		for (Function fun : all) {
@@ -404,9 +405,9 @@ class TextHashFunctions extends TextBuiltin {
 				}
 			}
 		} catch (IllegalArgumentException e) {
-			throw new RuntimeException("Cannot determine names", e);
+			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
 		} catch (IllegalAccessException e) {
-			throw new RuntimeException("Cannot determine names", e);
+			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
 		}
 
 		List<Function> all = new ArrayList<Function>();
