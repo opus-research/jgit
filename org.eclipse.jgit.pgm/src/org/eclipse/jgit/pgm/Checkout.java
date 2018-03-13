@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -41,58 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
 
-/**
- * Constants for use with the Configuration classes: section names,
- * configuration keys
- */
-public class ConfigConstants {
-	/** The "core" section */
-	public static final String CONFIG_CORE_SECTION = "core";
+package org.eclipse.jgit.pgm;
 
-	/** The "branch" section */
-	public static final String CONFIG_BRANCH_SECTION = "branch";
+import org.eclipse.jgit.api.CheckoutCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-	/** The "remote" section */
-	public static final String CONFIG_REMOTE_SECTION = "remote";
+@Command(common = true, usage = "usage_checkout")
+class Checkout extends TextBuiltin {
 
-	/** The "diff" section */
-	public static final String CONFIG_DIFF_SECTION = "diff";
+	@Option(name = "-b", usage = "usage_createBranchAndCheckout")
+	private boolean createBranch = false;
 
-	/** The "algorithm" key */
-	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
+	@Option(name = "---force", aliases = { "-f" }, usage = "usage_forceCheckout")
+	private boolean force = false;
 
-	/** The "autocrlf" key */
-	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
+	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_checkout")
+	private String name;
 
-	/** The "bare" key */
-	public static final String CONFIG_KEY_BARE = "bare";
-
-	/** The "filemode" key */
-	public static final String CONFIG_KEY_FILEMODE = "filemode";
-
-	/** The "logallrefupdates" key */
-	public static final String CONFIG_KEY_LOGALLREFUPDATES = "logallrefupdates";
-
-	/** The "repositoryformatversion" key */
-	public static final String CONFIG_KEY_REPO_FORMAT_VERSION = "repositoryformatversion";
-
-	/** The "worktree" key */
-	public static final String CONFIG_KEY_WORKTREE = "worktree";
-
-	/** The "remote" key */
-	public static final String CONFIG_KEY_REMOTE = "remote";
-
-	/** The "merge" key */
-	public static final String CONFIG_KEY_MERGE = "merge";
-
-	/** The "rebase" key */
-	public static final String CONFIG_KEY_REBASE = "rebase";
-
-	/** The "url" key */
-	public static final String CONFIG_KEY_URL = "url";
-
-	/** The "autosetupmerge" key */
-	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
+	@Override
+	protected void run() throws Exception {
+		CheckoutCommand command = new Git(db).checkout();
+		command.setCreateBranch(createBranch);
+		command.setName(name);
+		command.setForce(force);
+		command.call();
+	}
 }
