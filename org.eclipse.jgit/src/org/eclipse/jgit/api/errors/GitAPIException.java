@@ -46,25 +46,16 @@ public abstract class GitAPIException extends Exception {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Constructs a new exception with the specified detail message and cause.
-	 *
-	 * @param message
-	 *            detail message
-	 * @param cause
-	 *            cause
-	 * @since 3.1
+	 * Constructs a new exception with the specified detail
+	 * message and cause.
 	 */
 	protected GitAPIException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
 	/**
-	 * Constructs a new exception with the specified detail message and no
-	 * cause.
-	 *
-	 * @param message
-	 *            detail message
-	 * @since 3.1
+	 * Constructs a new exception with the specified detail
+	 * message and no cause.
 	 */
 	protected GitAPIException(String message) {
 		super(message);

@@ -49,6 +49,8 @@ import java.text.MessageFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
@@ -95,10 +97,10 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * }
  * </pre>
  *
- * @see <a href="http://git-htmldocs.googlecode.com/git/git-archive.html" >Git
- *      documentation about archive</a>
+ * @see <a href="http://git-htmldocs.googlecode.com/git/git-archive.html"
+ *      >Git documentation about archive</a>
  *
- * @since 3.1
+ * @since 3.0
  */
 public class ArchiveCommand extends GitCommand<OutputStream> {
 	/**
@@ -114,53 +116,11 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *	} finally {
 	 *		out.close();
 	 *	}
-	 *
-	 * @param <T>
-	 *            type representing an archive being created.
 	 */
 	public static interface Format<T extends Closeable> {
-		/**
-		 * Start a new archive. Entries can be included in the archive using the
-		 * putEntry method, and then the archive should be closed using its
-		 * close method.
-		 *
-		 * @param s
-		 *            underlying output stream to which to write the archive.
-		 * @return new archive object for use in putEntry
-		 * @throws IOException
-		 *             thrown by the underlying output stream for I/O errors
-		 */
-		T createArchiveOutputStream(OutputStream s) throws IOException;
-
-		/**
-		 * Write an entry to an archive.
-		 *
-		 * @param out
-		 *            archive object from createArchiveOutputStream
-		 * @param path
-		 *            full filename relative to the root of the archive
-		 * @param mode
-		 *            mode (for example FileMode.REGULAR_FILE or
-		 *            FileMode.SYMLINK)
-		 * @param loader
-		 *            blob object with data for this entry
-		 * @throws IOException
-		 *            thrown by the underlying output stream for I/O errors
-		 */
+		T createArchiveOutputStream(OutputStream s);
 		void putEntry(T out, String path, FileMode mode,
 				ObjectLoader loader) throws IOException;
-
-		/**
-		 * Filename suffixes representing this format (e.g.,
-		 * { ".tar.gz", ".tgz" }).
-		 *
-		 * The behavior is undefined when suffixes overlap (if
-		 * one format claims suffix ".7z", no other format should
-		 * take ".tar.7z").
-		 *
-		 * @return this format's suffixes
-		 */
-		Iterable<String> suffixes();
 	}
 
 	/**
@@ -209,8 +169,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *              An archival format with that name was already registered.
 	 */
 	public static void registerFormat(String name, Format<?> fmt) {
-		// TODO(jrn): Check that suffixes don't overlap.
-
 		if (formats.putIfAbsent(name, fmt) != null)
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().archiveFormatAlreadyRegistered,
@@ -232,16 +190,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 					name));
 	}
 
-	private static Format<?> formatBySuffix(String filenameSuffix)
-			throws UnsupportedFormatException {
-		if (filenameSuffix != null)
-			for (Format<?> fmt : formats.values())
-				for (String sfx : fmt.suffixes())
-					if (filenameSuffix.endsWith(sfx))
-						return fmt;
-		return lookupFormat("tar"); //$NON-NLS-1$
-	}
-
 	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
 		Format<?> fmt = formats.get(formatName);
 		if (fmt == null)
@@ -251,10 +199,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 
 	private OutputStream out;
 	private ObjectId tree;
-	private String format;
-
-	/** Filename suffix, for automatically choosing a format. */
-	private String suffix;
+	private String format = "tar";
 
 	/**
 	 * @param repo
@@ -264,7 +209,8 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		setCallable(false);
 	}
 
-	private <T extends Closeable> OutputStream writeArchive(Format<T> fmt) {
+	private <T extends Closeable>
+	OutputStream writeArchive(Format<T> fmt) throws GitAPIException {
 		final TreeWalk walk = new TreeWalk(repo);
 		try {
 			final T outa = fmt.createArchiveOutputStream(out);
@@ -307,11 +253,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	public OutputStream call() throws GitAPIException {
 		checkCallable();
 
-		final Format<?> fmt;
-		if (format == null)
-			fmt = formatBySuffix(suffix);
-		else
-			fmt = lookupFormat(format);
+		final Format<?> fmt = lookupFormat(format);
 		return writeArchive(fmt);
 	}
 
@@ -330,26 +272,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	}
 
 	/**
-	 * Set the intended filename for the produced archive. Currently the only
-	 * effect is to determine the default archive format when none is specified
-	 * with {@link #setFormat(String)}.
-	 *
-	 * @param filename
-	 *            intended filename for the archive
-	 * @return this
-	 */
-	public ArchiveCommand setFilename(String filename) {
-		int slash = filename.lastIndexOf('/');
-		int dot = filename.indexOf('.', slash + 1);
-
-		if (dot == -1)
-			this.suffix = ""; //$NON-NLS-1$
-		else
-			this.suffix = filename.substring(dot);
-		return this;
-	}
-
-	/**
 	 * @param out
 	 *	      the stream to which to write the archive
 	 * @return this
@@ -361,9 +283,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 
 	/**
 	 * @param fmt
-	 *	      archive format (e.g., "tar" or "zip").
-	 *	      null means to choose automatically based on
-	 *	      the archive filename.
+	 *	      archive format (e.g., "tar" or "zip")
 	 * @return this
 	 */
 	public ArchiveCommand setFormat(String fmt) {
