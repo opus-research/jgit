@@ -101,9 +101,6 @@ import org.xml.sax.helpers.XMLReaderFactory;
  * This will parse a repo XML manifest, convert it into .gitmodules file and the
  * repository config file.
  *
- * If called against a bare repository, it will replace all the existing content
- * of the repository with the contents populated from the manifest.
- *
  * @see <a href="https://code.google.com/p/git-repo/">git-repo project page</a>
  * @since 3.4
  */
@@ -361,8 +358,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				if (inGroups(proj)) {
 					command.addSubmodule(remoteUrl + proj.name,
 							proj.path,
-							proj.revision == null
-									? defaultRevision : proj.revision,
+							proj.revision == null ?
+									defaultRevision : proj.revision,
 							proj.copyfiles);
 				}
 			}
@@ -471,8 +468,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/**
 	 * Set the author/committer for the bare repository commit.
 	 *
-	 * For non-bare repositories, the current user will be used and this will be
-	 * ignored.
+	 * For non-bare repositories, the current user will be used and this will be ignored.
 	 *
 	 * @param author
 	 * @return this command
@@ -524,6 +520,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			DirCacheBuilder builder = index.builder();
 			ObjectInserter inserter = repo.newObjectInserter();
 			RevWalk rw = new RevWalk(repo);
+
 			try {
 				Config cfg = new Config();
 				for (Project proj : bareProjects) {
