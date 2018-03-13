@@ -212,12 +212,6 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	@Override
-	public void refresh() {
-		super.refresh();
-		rescan();
-	}
-
-	@Override
 	public boolean isNameConflicting(String name) throws IOException {
 		RefList<Ref> packed = getPackedRefs();
 		RefList<LooseRef> loose = getLooseRefs();
@@ -497,15 +491,22 @@ public class RefDirectory extends RefDatabase {
 
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
+		boolean detachingSymbolicRef = false;
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = readRef(name, packed);
 		if (ref != null)
 			ref = resolve(ref, 0, null, null, packed);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
-		else if (detach && ref.isSymbolic())
-			ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
-		return new RefDirectoryUpdate(this, ref);
+		else {
+			detachingSymbolicRef = detach && ref.isSymbolic();
+			if (detachingSymbolicRef)
+				ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
+		}
+		RefDirectoryUpdate refDirUpdate = new RefDirectoryUpdate(this, ref);
+		if (detachingSymbolicRef)
+			refDirUpdate.setDetachingSymbolicRef();
+		return refDirUpdate;
 	}
 
 	@Override
@@ -547,7 +548,7 @@ public class RefDirectory extends RefDatabase {
 				throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLockFile, packedRefsFile));
 			try {
-				PackedRefList cur = readPackedRefs(0, 0);
+				PackedRefList cur = readPackedRefs();
 				int idx = cur.find(name);
 				if (0 <= idx)
 					commitPackedRefs(lck, cur.remove(idx), packed);
@@ -689,21 +690,19 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList getPackedRefs() throws IOException {
-		long size = packedRefsFile.length();
-		long mtime = size != 0 ? packedRefsFile.lastModified() : 0;
-
 		final PackedRefList curList = packedRefs.get();
-		if (size == curList.lastSize && mtime == curList.lastModified)
+		if (!curList.snapshot.isModified(packedRefsFile))
 			return curList;
 
-		final PackedRefList newList = readPackedRefs(size, mtime);
+		final PackedRefList newList = readPackedRefs();
 		if (packedRefs.compareAndSet(curList, newList))
 			modCnt.incrementAndGet();
 		return newList;
 	}
 
-	private PackedRefList readPackedRefs(long size, long mtime)
+	private PackedRefList readPackedRefs()
 			throws IOException {
+		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
 		final BufferedReader br;
 		try {
 			br = new BufferedReader(new InputStreamReader(new FileInputStream(
@@ -713,7 +712,7 @@ public class RefDirectory extends RefDatabase {
 			return PackedRefList.NO_PACKED_REFS;
 		}
 		try {
-			return new PackedRefList(parsePackedRefs(br), size, mtime);
+			return new PackedRefList(parsePackedRefs(br), snapshot);
 		} finally {
 			br.close();
 		}
@@ -779,7 +778,7 @@ public class RefDirectory extends RefDatabase {
 			protected void writeFile(String name, byte[] content)
 					throws IOException {
 				lck.setFSync(true);
-				lck.setNeedStatInformation(true);
+				lck.setNeedSnapshot(true);
 				try {
 					lck.write(content);
 				} catch (IOException ioe) {
@@ -794,8 +793,8 @@ public class RefDirectory extends RefDatabase {
 				if (!lck.commit())
 					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name));
 
-				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
-						content.length, lck.getCommitLastModified()));
+				packedRefs.compareAndSet(oldPackedList, new PackedRefList(
+						refs, lck.getCommitSnapshot()));
 			}
 		}.writePackedRefs();
 	}
@@ -967,19 +966,14 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private static class PackedRefList extends RefList<Ref> {
-		static final PackedRefList NO_PACKED_REFS = new PackedRefList(RefList
-				.emptyList(), 0, 0);
+		static final PackedRefList NO_PACKED_REFS = new PackedRefList(
+				RefList.emptyList(), FileSnapshot.MISSING_FILE);
 
-		/** Last length of the packed-refs file when we read it. */
-		final long lastSize;
+		final FileSnapshot snapshot;
 
-		/** Last modified time of the packed-refs file when we read it. */
-		final long lastModified;
-
-		PackedRefList(RefList<Ref> src, long size, long mtime) {
+		PackedRefList(RefList<Ref> src, FileSnapshot s) {
 			super(src);
-			lastSize = size;
-			lastModified = mtime;
+			snapshot = s;
 		}
 	}
 
