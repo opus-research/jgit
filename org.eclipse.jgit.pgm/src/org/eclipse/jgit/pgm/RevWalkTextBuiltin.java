@@ -199,9 +199,9 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		final int n = walkLoop();
 		if (count) {
 			final long end = System.currentTimeMillis();
-			err.print(n);
-			err.print(' ');
-			err.println(MessageFormat.format(
+			errw.print(n);
+			errw.print(' ');
+			errw.println(MessageFormat.format(
 							CLIText.get().timeInMilliSeconds,
 							Long.valueOf(end - start)));
 		}
