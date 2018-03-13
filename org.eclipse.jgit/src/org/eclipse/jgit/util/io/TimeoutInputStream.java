@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009, 2013 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -83,7 +83,8 @@ public class TimeoutInputStream extends FilterInputStream {
 	 */
 	public void setTimeout(final int millis) {
 		if (millis < 0)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidTimeout, millis));
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().invalidTimeout, Integer.valueOf(millis)));
 		timeout = millis;
 	}
 
@@ -136,7 +137,8 @@ public class TimeoutInputStream extends FilterInputStream {
 		myTimer.end();
 	}
 
-	private static InterruptedIOException readTimedOut() {
-		return new InterruptedIOException(JGitText.get().readTimedOut);
+	private InterruptedIOException readTimedOut() {
+		return new InterruptedIOException(MessageFormat.format(
+				JGitText.get().readTimedOut, Integer.valueOf(timeout)));
 	}
 }

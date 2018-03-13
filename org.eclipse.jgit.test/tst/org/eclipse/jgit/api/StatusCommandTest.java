@@ -44,6 +44,7 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,13 +53,15 @@ import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.junit.Test;
 
 public class StatusCommandTest extends RepositoryTestCase {
 
 	@Test
-	public void testEmptyStatus() throws IOException {
+	public void testEmptyStatus() throws NoWorkTreeException,
+			GitAPIException {
 		Git git = new Git(db);
 
 		Status stat = git.status().call();
@@ -123,6 +126,46 @@ public class StatusCommandTest extends RepositoryTestCase {
 		assertEquals(set("a"), stat.getUntracked());
 		git.commit().setMessage("t").call();
 
+		writeTrashFile("sub/a", "sub-file");
+		stat = git.status().call();
+		assertEquals(1, stat.getUntrackedFolders().size());
+		assertTrue(stat.getUntrackedFolders().contains("sub"));
+	}
+
+	@Test
+	public void testDifferentStatesWithPaths() throws IOException,
+			NoFilepatternException, GitAPIException {
+		Git git = new Git(db);
+		writeTrashFile("a", "content of a");
+		writeTrashFile("D/b", "content of b");
+		writeTrashFile("D/c", "content of c");
+		writeTrashFile("D/D/d", "content of d");
+		git.add().addFilepattern(".").call();
+
+		writeTrashFile("a", "new content of a");
+		writeTrashFile("D/b", "new content of b");
+		writeTrashFile("D/D/d", "new content of d");
+
+
+		// filter on an not existing path
+		Status stat = git.status().addPath("x").call();
+		assertEquals(0, stat.getModified().size());
+
+		// filter on an existing file
+		stat = git.status().addPath("a").call();
+		assertEquals(set("a"), stat.getModified());
+
+		// filter on an existing folder
+		stat = git.status().addPath("D").call();
+		assertEquals(set("D/b", "D/D/d"), stat.getModified());
+
+		// filter on an existing folder and file
+		stat = git.status().addPath("D/D").addPath("a").call();
+		assertEquals(set("a", "D/D/d"), stat.getModified());
+
+		// do not filter at all
+		stat = git.status().call();
+		assertEquals(set("a", "D/b", "D/D/d"), stat.getModified());
 	}
 
 	public static Set<String> set(String... elements) {

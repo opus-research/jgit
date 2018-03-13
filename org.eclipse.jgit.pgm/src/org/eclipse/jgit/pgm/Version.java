@@ -45,6 +45,8 @@ package org.eclipse.jgit.pgm;
 
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.pgm.internal.CLIText;
+
 @Command(common = true, usage = "usage_DisplayTheVersionOfJgit")
 class Version extends TextBuiltin {
 	@Override
@@ -53,7 +55,7 @@ class Version extends TextBuiltin {
 		if (pkg == null || pkg.getImplementationVersion() == null)
 			throw die(CLIText.get().cannotReadPackageInformation);
 
-		out.println(MessageFormat.format(CLIText.get().jgitVersion, pkg.getImplementationVersion()));
+		outw.println(MessageFormat.format(CLIText.get().jgitVersion, pkg.getImplementationVersion()));
 	}
 
 	@Override

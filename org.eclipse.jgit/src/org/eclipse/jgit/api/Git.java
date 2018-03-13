@@ -138,6 +138,17 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command to list remote branches/tags without a local
+	 * repository.
+	 *
+	 * @return a {@link LsRemoteCommand}
+	 * @since 3.1
+	 */
+	public static LsRemoteCommand lsRemoteRepository() {
+		return new LsRemoteCommand(null);
+	}
+
+	/**
 	 * Returns a command object to execute a {@code init} command
 	 *
 	 * @see <a
@@ -403,6 +414,16 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command to create an archive from a tree
+	 *
+	 * @return a {@link ArchiveCommand}
+	 * @since 3.1
+	 */
+	public ArchiveCommand archive() {
+		return new ArchiveCommand(repo);
+	}
+
+	/**
 	 * Returns a command to add notes to an object
 	 *
 	 * @return a {@link AddNoteCommand}
@@ -576,6 +597,7 @@ public class Git {
 	 * Returns a command object used to create a stashed commit
 	 *
 	 * @return a {@link StashCreateCommand}
+	 * @since 2.0
 	 */
 	public StashCreateCommand stashCreate() {
 		return new StashCreateCommand(repo);
@@ -585,6 +607,7 @@ public class Git {
 	 * Returns a command object used to apply a stashed commit
 	 *
 	 * @return a {@link StashApplyCommand}
+	 * @since 2.0
 	 */
 	public StashApplyCommand stashApply() {
 		return new StashApplyCommand(repo);
@@ -594,6 +617,7 @@ public class Git {
 	 * Returns a command object used to drop a stashed commit
 	 *
 	 * @return a {@link StashDropCommand}
+	 * @since 2.0
 	 */
 	public StashDropCommand stashDrop() {
 		return new StashDropCommand(repo);
@@ -608,9 +632,35 @@ public class Git {
 	 *
 	 * @return a {@link ApplyCommand} used to collect all optional parameters
 	 *         and to finally execute the {@code apply} command
+	 * @since 2.0
 	 */
 	public ApplyCommand apply() {
 		return new ApplyCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code gc} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-gc.html"
+	 *      >Git documentation about gc</a>
+	 *
+	 * @return a {@link GarbageCollectCommand} used to collect all optional
+	 *         parameters and to finally execute the {@code gc} command
+	 * @since 2.2
+	 */
+	public GarbageCollectCommand gc() {
+		return new GarbageCollectCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to find human-readable names of revisions.
+	 *
+	 * @return a {@link NameRevCommand}.
+	 * @since 3.0
+	 */
+	public NameRevCommand nameRev() {
+		return new NameRevCommand(repo);
 	}
 
 	/**

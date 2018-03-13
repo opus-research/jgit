@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -56,6 +56,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
 
 /** Misc. constants used throughout JGit. */
+@SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git for all objects. */
 	private static final String HASH_FUNCTION = "SHA-1";
@@ -264,6 +265,13 @@ public final class Constants {
 	/** Packed refs file */
 	public static final String PACKED_REFS = "packed-refs";
 
+	/**
+	 * Excludes-file
+	 *
+	 * @since 3.0
+	 */
+	public static final String INFO_EXCLUDE = "info/exclude";
+
 	/** The environment variable that contains the system user name */
 	public static final String OS_USER_NAME_KEY = "user.name";
 
@@ -340,6 +348,9 @@ public final class Constants {
 	/** Name of the submodules file */
 	public static final String DOT_GIT_MODULES = ".gitmodules";
 
+	/** Name of the .git/shallow file */
+	public static final String SHALLOW = "shallow";
+
 	/**
 	 * Create a new digest function for objects.
 	 *
@@ -375,7 +386,8 @@ public final class Constants {
 		case OBJ_TAG:
 			return TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
 		}
 	}
 
@@ -399,7 +411,8 @@ public final class Constants {
 		case OBJ_TAG:
 			return ENCODED_TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
 		}
 	}
 
@@ -550,6 +563,12 @@ public final class Constants {
 
 	/** name of the file containing the ID of a cherry pick commit in case of conflicts */
 	public static final String CHERRY_PICK_HEAD = "CHERRY_PICK_HEAD";
+
+	/** name of the file containing the commit msg for a squash commit */
+	public static final String SQUASH_MSG = "SQUASH_MSG";
+
+	/** name of the file containing the ID of a revert commit in case of conflicts */
+	public static final String REVERT_HEAD = "REVERT_HEAD";
 
 	/**
 	 * name of the ref ORIG_HEAD used by certain commands to store the original

@@ -71,7 +71,7 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -113,7 +113,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		return dco.getUpdated();
 	}
 
-	private Map<String, MergeFailureReason> getConflicts() {
+	private List<String> getConflicts() {
 		return dco.getConflicts();
 	}
 
@@ -262,11 +262,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		merge = buildTree(mkmap("foo", "a"));
 		tw = TreeWalk.forPath(db, "foo", merge);
-		ObjectId anotherId = tw.getObjectId(0);
 
 		prescanTwoTrees(head, merge);
 
-		assertEquals(anotherId, getUpdated().get("foo"));
+		assertConflict("foo");
 	}
 
 	void setupCase(HashMap<String, String> headEntries, HashMap<String, String> mergeEntries, HashMap<String, String> indexEntries) throws IOException {
@@ -387,7 +386,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		assertTrue(getUpdated().isEmpty());
 		assertTrue(getRemoved().isEmpty());
-		assertTrue(getConflicts().containsKey("foo"));
+		assertTrue(getConflicts().contains("foo"));
 
 		// rule 10
 
@@ -409,7 +408,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		assertTrue(getRemoved().isEmpty());
 		assertTrue(getUpdated().isEmpty());
-		assertTrue(getConflicts().containsKey("foo"));
+		assertTrue(getConflicts().contains("foo"));
 
 		// rule 12 & 13
 		headMap.put("foo", "head");
@@ -418,7 +417,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		assertTrue(getRemoved().isEmpty());
 		assertTrue(getUpdated().isEmpty());
-		assertTrue(getConflicts().containsKey("foo"));
+		assertTrue(getConflicts().contains("foo"));
 
 		// rules 14 & 15
 		setupCase(headMap, headMap, idxMap);
@@ -428,7 +427,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// rules 16 & 17
 		setupCase(headMap, mergeMap, idxMap); go();
-		assertTrue(getConflicts().containsKey("foo"));
+		assertTrue(getConflicts().contains("foo"));
 
 		// rules 18 & 19
 		setupCase(headMap, idxMap, idxMap); go();
@@ -444,7 +443,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		writeTrashFile("foo", "bar");
 		db.readDirCache().getEntry(0).setUpdateNeeded(true);
 		go();
-		assertTrue(getConflicts().containsKey("foo"));
+		assertTrue(getConflicts().contains("foo"));
 	}
 
 	private void assertAllEmpty() {
@@ -465,8 +464,8 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	 *     ------------------------------------------------------------------
 	 *1    D        D       F       Y         N       Y       N           Update
 	 *2    D        D       F       N         N       Y       N           Conflict
-	 *3    D        F       D                 Y       N       N           Update
-	 *4    D        F       D                 N       N       N           Update
+	 *3    D        F       D                 Y       N       N           Keep
+	 *4    D        F       D                 N       N       N           Conflict
 	 *5    D        F       F       Y         N       N       Y           Keep
 	 *6    D        F       F       N         N       N       Y           Keep
 	 *7    F        D       F       Y         Y       N       N           Update
@@ -523,18 +522,16 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testDirectoryFileConflicts_3() throws Exception {
-		// 3 - the first to break!
+		// 3
 		doit(mk("DF/DF"), mk("DF/DF"), mk("DF"));
-		assertUpdated("DF/DF");
-		assertRemoved("DF");
+		assertNoConflicts();
 	}
 
 	@Test
 	public void testDirectoryFileConflicts_4() throws Exception {
 		// 4 (basically same as 3, just with H and M different)
 		doit(mk("DF/DF"), mkmap("DF/DF", "foo"), mk("DF"));
-		assertUpdated("DF/DF");
-		assertRemoved("DF");
+		assertConflict("DF/DF");
 
 	}
 
@@ -721,7 +718,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	}
 
 	protected void assertConflict(String s) {
-		assertTrue(getConflicts().containsKey(s));
+		assertTrue(getConflicts().contains(s));
 	}
 
 	protected void assertUpdated(String s) {
@@ -939,7 +936,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		} catch (CheckoutConflictException e) {
 			assertIndex(mk("foo"));
 			assertWorkDir(mkmap("foo", "different"));
-			assertTrue(getConflicts().containsKey("foo"));
+			assertEquals(Arrays.asList("foo"), getConflicts());
 			assertTrue(new File(trash, "foo").isFile());
 		}
 	}
