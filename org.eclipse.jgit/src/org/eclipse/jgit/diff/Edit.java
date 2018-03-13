@@ -63,7 +63,7 @@ package org.eclipse.jgit.diff;
  * that is sequence B has replaced the range of elements between
  * <code>[beginA, endA)</code> with those found in <code>[beginB, endB)</code>.
  */
-public class Edit implements Comparable<Edit> {
+public class Edit {
 	/** Type of edit */
 	public static enum Type {
 		/** Sequence B has inserted the region. */
@@ -191,22 +191,5 @@ public class Edit implements Comparable<Edit> {
 	public String toString() {
 		final Type t = getType();
 		return t + "(" + beginA + "-" + endA + "," + beginB + "-" + endB + ")";
-	}
-
-	/**
-	 * Compare two Edits by comparing which region they would like to change on
-	 * sequence A. If the region in A of edit x ends before the region of A of
-	 * edit y starts ... then x is "smaller" than y.
-	 * When this method returns 0 this should not be misinterpreted that the two
-	 * Edits are really equal. This only means that they can't be put into some
-	 * order.
-	 */
-	public int compareTo(Edit o) {
-		if (endA<=o.beginA) {
-			return -1;
-		} else if (o.endA < beginA) {
-			return 1;
-		}
-		return 0;
 	}
 }
