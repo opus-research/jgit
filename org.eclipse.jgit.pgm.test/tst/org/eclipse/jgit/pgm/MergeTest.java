@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,35 +40,54 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.pgm;
 
-/**
- * A convenient base class which provides empty method bodies for all
- * ProgressMonitor methods.
- * <p>
- * Could be used in scenarios when only some of the progress notifications are
- * important and others can be ignored.
- */
-public abstract class EmptyProgressMonitor implements ProgressMonitor {
+import static org.junit.Assert.assertEquals;
 
-	public void start(int totalTasks) {
-		// empty
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.eclipse.jgit.merge.MergeStrategy;
+import org.junit.Before;
+import org.junit.Test;
+
+public class MergeTest extends CLIRepositoryTestCase {
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
-	public void beginTask(String title, int totalWork) {
-		// empty
+	@Test
+	public void testMergeSelf() throws Exception {
+		assertEquals("Already up-to-date.", execute("git merge master")[0]);
 	}
 
-	public void update(int completed) {
-		// empty
+	@Test
+	public void testFastForward() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+		writeTrashFile("file", "master");
+		new Git(db).add().addFilepattern("file").call();
+		new Git(db).commit().setMessage("commit").call();
+		new Git(db).checkout().setName("side").call();
+
+		assertEquals("Fast-forward", execute("git merge master")[0]);
 	}
 
-	public void endTask() {
-		// empty
-	}
+	@Test
+	public void testMerge() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+		writeTrashFile("master", "content");
+		new Git(db).add().addFilepattern("master").call();
+		new Git(db).commit().setMessage("master commit").call();
+		new Git(db).checkout().setName("side").call();
+		writeTrashFile("side", "content");
+		new Git(db).add().addFilepattern("side").call();
+		new Git(db).commit().setMessage("side commit").call();
 
-	public boolean isCancelled() {
-		return false;
+		assertEquals("Merge made by the '" + MergeStrategy.RESOLVE.getName()
+				+ "' strategy.", execute("git merge master")[0]);
 	}
-
 }
