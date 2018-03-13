@@ -46,6 +46,8 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -62,7 +64,6 @@ import org.eclipse.jgit.internal.storage.file.FileObjectDatabase.AlternateReposi
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -251,12 +252,6 @@ public class FileRepository extends Repository {
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
 		FileUtils.mkdirs(getDirectory(), true);
-		HideDotFiles hideDotFiles = getConfig().getEnum(
-				ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
-				HideDotFiles.DOTGITONLY);
-		if (hideDotFiles != HideDotFiles.FALSE)
-			getFS().setHidden(getDirectory(), true);
 		refs.create();
 		objectDatabase.create();
 
@@ -404,7 +399,7 @@ public class FileRepository extends Repository {
 
 	@Override
 	public void scanForRepoChanges() throws IOException {
-		getAllRefs(); // This will look for changes to refs
+		getRefDatabase().getRefs(ALL); // This will look for changes to refs
 		detectIndexChanges();
 	}
 
