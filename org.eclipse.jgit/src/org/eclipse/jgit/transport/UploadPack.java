@@ -100,8 +100,6 @@ public class UploadPack {
 
 	static final String OPTION_NO_PROGRESS = BasePackFetchConnection.OPTION_NO_PROGRESS;
 
-	static final String OPTION_NO_DONE = BasePackFetchConnection.OPTION_NO_DONE;
-
 	/** Database we read the objects from. */
 	private final Repository db;
 
@@ -165,8 +163,6 @@ public class UploadPack {
 	/** null if {@link #commonBase} should be examined again. */
 	private Boolean okToGiveUp;
 
-	private boolean sentReady;
-
 	/** Objects we sent in our advertisement list, clients can ask for these. */
 	private Set<ObjectId> advertised;
 
@@ -185,8 +181,6 @@ public class UploadPack {
 	private final RevFlagSet SAVE;
 
 	private MultiAck multiAck = MultiAck.OFF;
-
-	private boolean noDone;
 
 	private PackWriter.Statistics statistics;
 
@@ -407,10 +401,9 @@ public class UploadPack {
 			return;
 		}
 
-		if (options.contains(OPTION_MULTI_ACK_DETAILED)) {
+		if (options.contains(OPTION_MULTI_ACK_DETAILED))
 			multiAck = MultiAck.DETAILED;
-			noDone = options.contains(OPTION_NO_DONE);
-		} else if (options.contains(OPTION_MULTI_ACK))
+		else if (options.contains(OPTION_MULTI_ACK))
 			multiAck = MultiAck.CONTINUE;
 		else
 			multiAck = MultiAck.OFF;
@@ -444,7 +437,6 @@ public class UploadPack {
 		adv.init(db);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK_DETAILED);
-		adv.advertiseCapability(OPTION_NO_DONE);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
 		adv.advertiseCapability(OPTION_OFS_DELTA);
 		adv.advertiseCapability(OPTION_SIDE_BAND);
@@ -504,10 +496,6 @@ public class UploadPack {
 				last = processHaveLines(peerHas, last);
 				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
 					pckOut.writeString("NAK\n");
-				if (noDone && sentReady) {
-					pckOut.writeString("ACK " + last.name() + "\n");
-					return true;
-				}
 				if (!biDirectionalPipe)
 					return false;
 				pckOut.flush();
@@ -550,7 +538,6 @@ public class UploadPack {
 		List<ObjectId> toParse = peerHas;
 		HashSet<ObjectId> peerHasSet = null;
 		boolean needMissing = false;
-		sentReady = false;
 
 		if (wantAll.isEmpty() && !wantIds.isEmpty()) {
 			// We have not yet parsed the want list. Parse it now.
@@ -570,10 +557,12 @@ public class UploadPack {
 				try {
 					obj = q.next();
 				} catch (MissingObjectException notFound) {
-					if (wantIds.contains(notFound.getObjectId())) {
-						throw new PackProtocolException(
-								MessageFormat.format(JGitText.get().notValid,
-										notFound.getMessage()), notFound);
+					ObjectId id = notFound.getObjectId();
+					if (wantIds.contains(id)) {
+						String msg = MessageFormat.format(
+								JGitText.get().wantNotValid, id.name());
+						pckOut.writeString("ERR " + msg);
+						throw new PackProtocolException(msg, notFound);
 					}
 					continue;
 				}
@@ -585,8 +574,10 @@ public class UploadPack {
 				//
 				if (wantIds.remove(obj)) {
 					if (!advertised.contains(obj)) {
-						throw new PackProtocolException(MessageFormat.format(
-								JGitText.get().notValid, obj.name()));
+						String msg = MessageFormat.format(
+								JGitText.get().wantNotValid, obj.name());
+						pckOut.writeString("ERR " + msg);
+						throw new PackProtocolException(msg);
 					}
 
 					if (!obj.has(WANT)) {
@@ -653,6 +644,7 @@ public class UploadPack {
 		// telling us about its history.
 		//
 		boolean didOkToGiveUp = false;
+		boolean sentReady = false;
 		if (0 < missCnt) {
 			for (int i = peerHas.size() - 1; i >= 0; i--) {
 				ObjectId id = peerHas.get(i);
@@ -666,8 +658,8 @@ public class UploadPack {
 							pckOut.writeString("ACK " + id.name() + " continue\n");
 							break;
 						case DETAILED:
-							sentReady = true;
 							pckOut.writeString("ACK " + id.name() + " ready\n");
+							sentReady = true;
 							break;
 						}
 					}
@@ -678,8 +670,8 @@ public class UploadPack {
 
 		if (multiAck == MultiAck.DETAILED && !didOkToGiveUp && okToGiveUp()) {
 			ObjectId id = peerHas.get(peerHas.size() - 1);
-			sentReady = true;
 			pckOut.writeString("ACK " + id.name() + " ready\n");
+			sentReady = true;
 		}
 
 		try {
