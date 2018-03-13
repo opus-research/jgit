@@ -46,10 +46,24 @@ package org.eclipse.jgit.diff;
 /**
  * Supports {@link PatienceDiff} by finding unique but common elements.
  *
+ * This index object is constructed once for each region being considered by the
+ * main {@link PatienceDiff} algorithm, which really means its once for each
+ * recursive step. Each index instance processes a fixed sized region from the
+ * sequences, and during recursion the region is split into two smaller segments
+ * and processed again.
+ *
+ * Index instances from a higher level invocation message some state into a
+ * lower level invocation by passing the {@link #nCommon} array from the higher
+ * invocation into the two sub-steps as {@link #pCommon}. This permits some
+ * matching work that was already done in the higher invocation to be reused in
+ * the sub-step and can save a lot of time when element equality is expensive.
+ *
  * @param <S>
  *            type of sequence the scanner will scan.
+ * @param <C>
+ *            type of comparator to evaluate the sequence elements.
  */
-final class PatienceDiffIndex<S extends Sequence> {
+final class PatienceDiffIndex<S extends Sequence, C extends SequenceComparator<? super S>> {
 	private static final int A_DUPLICATE = 1;
 
 	private static final int B_DUPLICATE = 2;
@@ -62,7 +76,22 @@ final class PatienceDiffIndex<S extends Sequence> {
 
 	private static final int PTR_MASK = 0x7fffffff;
 
-	private final SequenceComparator<S> cmp;
+	private final C cmp;
+
+	private final S a;
+
+	private final S b;
+
+	private final Edit region;
+
+	/** Pairs of beginB, endB indices previously found to be common and unique. */
+	private final long[] pCommon;
+
+	/** First valid index in {@link #pCommon}. */
+	private final int pBegin;
+
+	/** 1 past the last valid entry in {@link #pCommon}. */
+	private final int pEnd;
 
 	/** Keyed by {@code cmp.hash() & tableMask} to yield an entry offset. */
 	private final int[] table;
@@ -100,16 +129,37 @@ final class PatienceDiffIndex<S extends Sequence> {
 	/** Total number of entries that exist in {@link #ptrs}. */
 	private int entryCnt;
 
+	/** Number of entries in {@link #ptrs} that are actually unique. */
+	private int uniqueCommonCnt;
+
+	/**
+	 * Pairs of beginB, endB indices found to be common and unique.
+	 *
+	 * In order to find the longest common (but unique) sequence within a
+	 * region, we also found all of the other common but unique sequences in
+	 * that same region. This array stores all of those results, allowing them
+	 * to be passed into the subsequent recursive passes so we can later reuse
+	 * these matches and avoid recomputing the same points again.
+	 */
 	long[] nCommon;
 
+	/** Number of items in {@link #nCommon}. */
 	int nCnt;
 
+	/** Index of the longest common subsequence in {@link #nCommon}. */
 	int cIdx;
 
-	PatienceDiffIndex(SequenceComparator<S> cmp, Edit region) {
+	PatienceDiffIndex(C cmp, S a, S b, Edit region, //
+			long[] pCommon, int pIdx, int pCnt) {
 		this.cmp = cmp;
+		this.a = a;
+		this.b = b;
+		this.region = region;
+		this.pCommon = pCommon;
+		this.pBegin = pIdx;
+		this.pEnd = pCnt;
 
-		final int blockCnt = Math.max(region.getLengthA(), region.getLengthB());
+		final int blockCnt = region.getLengthB();
 		if (blockCnt < 1) {
 			table = new int[] {};
 			tableMask = 0;
@@ -131,38 +181,87 @@ final class PatienceDiffIndex<S extends Sequence> {
 		}
 	}
 
-	void scanB(S seq, int ptr, int end) {
+	/**
+	 * Index elements in sequence B for later matching with sequence A.
+	 *
+	 * This is the first stage of preparing an index to find the longest common
+	 * sequence. Elements of sequence B in the range [ptr, end) are scanned in
+	 * order and added to the internal hashtable.
+	 *
+	 * If prior matches were given in the constructor, these may be used to
+	 * fast-forward through sections of B to avoid unnecessary recomputation.
+	 */
+	private void scanB() {
 		// We insert in ascending order so that a later scan of the table
 		// from 0 through entryCnt will iterate through B in order. This
 		// is the desired result ordering from match().
 		//
-		SCAN: for (; ptr < end; ptr++) {
-			final int key = cmp.hash(seq, ptr);
+		int ptr = region.beginB;
+		final int end = region.endB;
+		int pIdx = pBegin;
+		SCAN: while (ptr < end) {
+			final int key = cmp.hash(b, ptr);
 			final int tIdx = key & tableMask;
 
+			if (pIdx < pEnd) {
+				final long priorRec = pCommon[pIdx];
+				if (ptr == bOf(priorRec)) {
+					// We know this region is unique from a prior pass.
+					// Insert the start point, and skip right to the end.
+					//
+					insertB(key, tIdx, ptr);
+					pIdx++;
+					ptr = aOfRaw(priorRec);
+					continue SCAN;
+				}
+			}
+
+			// We aren't sure what the status of this element is. Add
+			// it to our hashtable, and flag it as duplicate if there
+			// was already a different entry present.
+			//
 			for (int eIdx = table[tIdx]; eIdx != 0; eIdx = next[eIdx]) {
 				if (hash[eIdx] != key)
 					continue;
 
 				final long rec = ptrs[eIdx];
-				if (cmp.equals(seq, ptr, seq, bOf(rec))) {
+				if (cmp.equals(b, ptr, b, bOf(rec))) {
 					ptrs[eIdx] = rec | B_DUPLICATE;
+					ptr++;
 					continue SCAN;
 				}
 			}
 
-			// The element is (thus far) unique. Inject it into the table.
-			//
-			final int eIdx = ++entryCnt;
-			hash[eIdx] = key;
-			ptrs[eIdx] = ((long) ptr) << B_SHIFT;
-			next[eIdx] = table[tIdx];
-			table[tIdx] = eIdx;
+			insertB(key, tIdx, ptr);
+			ptr++;
 		}
 	}
 
-	void scanA(S a, int ptr, int end, S b) {
-		SCAN: for (; ptr < end; ptr++) {
+	private void insertB(final int key, final int tIdx, int ptr) {
+		final int eIdx = ++entryCnt;
+		hash[eIdx] = key;
+		ptrs[eIdx] = ((long) ptr) << B_SHIFT;
+		next[eIdx] = table[tIdx];
+		table[tIdx] = eIdx;
+	}
+
+	/**
+	 * Index elements in sequence A for later matching.
+	 *
+	 * This is the second stage of preparing an index to find the longest common
+	 * sequence. The state requires {@link #scanB()} to have been invoked first.
+	 *
+	 * Each element of A in the range [ptr, end) are searched for in the
+	 * internal hashtable, to see if B has already registered a location.
+	 *
+	 * If prior matches were given in the constructor, these may be used to
+	 * fast-forward through sections of A to avoid unnecessary recomputation.
+	 */
+	private void scanA() {
+		int ptr = region.beginA;
+		final int end = region.endA;
+		int pLast = pBegin - 1;
+		SCAN: while (ptr < end) {
 			final int key = cmp.hash(a, ptr);
 			final int tIdx = key & tableMask;
 
@@ -175,25 +274,75 @@ final class PatienceDiffIndex<S extends Sequence> {
 				final int aPtr = aOfRaw(rec);
 				if (aPtr != 0 && cmp.equals(a, ptr, a, aPtr - 1)) {
 					ptrs[eIdx] = rec | A_DUPLICATE;
+					uniqueCommonCnt--;
+					ptr++;
 					continue SCAN;
 				}
 
-				if (cmp.equals(a, ptr, b, bOf(rec))) {
-					ptrs[eIdx] = rec | (((long) (ptr + 1)) << A_SHIFT);
+				final int bs = bOf(rec);
+				if (!cmp.equals(a, ptr, b, bs)) {
+					ptr++;
 					continue SCAN;
 				}
+
+				// This element is both common and unique. Link the
+				// two sequences together at this point.
+				//
+				ptrs[eIdx] = rec | (((long) (ptr + 1)) << A_SHIFT);
+				uniqueCommonCnt++;
+
+				if (pBegin < pEnd) {
+					// If we have prior match point data, we might be able
+					// to locate the length of the match and skip past all
+					// of those elements. We try to take advantage of the
+					// fact that pCommon is sorted by B, and its likely that
+					// matches in A appear in the same order as they do in B.
+					//
+					for (int pIdx = pLast + 1;; pIdx++) {
+						if (pIdx == pEnd)
+							pIdx = pBegin;
+						else if (pIdx == pLast)
+							break;
+
+						final long priorRec = pCommon[pIdx];
+						final int priorB = bOf(priorRec);
+						if (bs < priorB)
+							break;
+						if (bs == priorB) {
+							ptr += aOfRaw(priorRec) - priorB;
+							pLast = pIdx;
+							continue SCAN;
+						}
+					}
+				}
+
+				ptr++;
+				continue SCAN;
 			}
+
+			ptr++;
 		}
 	}
 
-	Edit match(Edit region, S a, S b, long[] pCommon, int pIdx, int pCnt) {
-		// Everything inside of our ptrs table at this point is already
-		// paired up, and is sorted by appearance order in B. If the
-		// record exists, its certainly in B. So we just have to check
-		// that it is still unique, and was paired up with an A.
-		//
+	/**
+	 * Scan all potential matches and find the longest common sequence.
+	 *
+	 * If this method returns non-null, the caller should copy out the
+	 * {@link #nCommon} array and pass that through to the recursive sub-steps
+	 * so that existing common matches can be reused rather than recomputed.
+	 *
+	 * @return an edit covering the longest common sequence. Null if there are
+	 *         no common unique sequences present.
+	 */
+	Edit findLongestCommonSequence() {
+		scanB();
+		scanA();
 
-		nCommon = new long[entryCnt];
+		if (uniqueCommonCnt == 0)
+			return null;
+
+		nCommon = new long[uniqueCommonCnt];
+		int pIdx = pBegin;
 		Edit lcs = new Edit(0, 0);
 
 		MATCH: for (int eIdx = 1; eIdx <= entryCnt; eIdx++) {
@@ -206,36 +355,38 @@ final class PatienceDiffIndex<S extends Sequence> {
 				continue;
 
 			int as = aOf(rec);
-			int be;
+			if (pIdx < pEnd) {
+				final long priorRec = pCommon[pIdx];
+				if (bs == bOf(priorRec)) {
+					// We had a prior match and we know its unique.
+					// Reuse its region rather than computing again.
+					//
+					int be = aOfRaw(priorRec);
 
-			while (pIdx < pCnt) {
-				final long p = pCommon[pIdx];
-				if (bs < bOf(p))
-					break;
+					if (lcs.getLengthB() < be - bs) {
+						as -= bOf(rec) - bs;
+						lcs.beginA = as;
+						lcs.beginB = bs;
+						lcs.endA = as + (be - bs);
+						lcs.endB = be;
+						cIdx = nCnt;
+					}
 
-				be = aOfRaw(p);
-				if (be <= bs) {
+					nCommon[nCnt] = priorRec;
+					if (++nCnt == uniqueCommonCnt)
+						break MATCH;
+
 					pIdx++;
-					continue;
+					continue MATCH;
 				}
-				bs = bOf(p);
-
-				if (lcs.getLengthB() < be - bs) {
-					as -= bOf(rec) - bs;
-					lcs.beginA = as;
-					lcs.beginB = bs;
-					lcs.endA = as + (be - bs);
-					lcs.endB = be;
-					cIdx = nCnt;
-				}
-
-				nCommon[nCnt++] = rec;
-				pIdx++;
-				continue MATCH;
 			}
 
+			// We didn't have prior match data, or this is the first time
+			// seeing this particular pair. Extend the region as large as
+			// possible and remember it for future use.
+			//
 			int ae = as + 1;
-			be = bs + 1;
+			int be = bs + 1;
 
 			while (region.beginA < as && region.beginB < bs
 					&& cmp.equals(a, as - 1, b, bs - 1)) {
@@ -256,11 +407,12 @@ final class PatienceDiffIndex<S extends Sequence> {
 				cIdx = nCnt;
 			}
 
-			nCommon[nCnt++] = (((long) bs) << B_SHIFT)
-					| (((long) be) << A_SHIFT);
+			nCommon[nCnt] = (((long) bs) << B_SHIFT) | (((long) be) << A_SHIFT);
+			if (++nCnt == uniqueCommonCnt)
+				break MATCH;
 		}
 
-		return 0 < nCnt ? lcs : null;
+		return lcs;
 	}
 
 	private static boolean isDuplicate(long rec) {

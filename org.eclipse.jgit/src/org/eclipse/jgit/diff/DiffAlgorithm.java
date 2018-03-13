@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,48 +43,37 @@
 
 package org.eclipse.jgit.diff;
 
-public class DiffTestDataGenerator {
+/**
+ * Compares two {@link Sequence}s to create an {@link EditList} of changes.
+ *
+ * An algorithm's {@code diff} method must be callable from concurrent threads
+ * without data collisions. This permits some algorithms to use a singleton
+ * pattern, with concurrent invocations using the same singleton. Other
+ * algorithms may support parameterization, in which case the caller can create
+ * a unique instance per thread.
+ */
+public interface DiffAlgorithm {
 	/**
-	 * Generate sequence of characters in ascending order. The first character
-	 * is a space. All subsequent characters have an ASCII code one greater then
-	 * the ASCII code of the preceding character. On exception: the character
-	 * following which follows '~' is again a ' '.
+	 * Compare two sequences and identify a list of edits between them.
 	 *
-	 * @param len
-	 *            length of the String to be returned
-	 * @return the sequence of characters as String
+	 * @param <S>
+	 *            type of sequence being compared.
+	 * @param <C>
+	 *            type of comparator to evaluate the sequence elements.
+	 * @param cmp
+	 *            the comparator supplying the element equivalence function.
+	 * @param a
+	 *            the first (also known as old or pre-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'A' side: {@link Edit#getBeginA()}, {@link Edit#getEndA()}.
+	 * @param b
+	 *            the first (also known as new or post-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'B' side: {@link Edit#getBeginB()}, {@link Edit#getEndB()}.
+	 * @return a modifiable edit list comparing the two sequences. If empty, the
+	 *         sequences are identical according to {@code cmp}'s rules. The
+	 *         result list is never null.
 	 */
-	public static String generateSequence(int len) {
-		return generateSequence(len, 0, 0);
-	}
-
-	/**
-	 * Generate sequence of characters similar to the one returned by
-	 * {@link #generateSequence(int)}. But this time in each chunk of
-	 * <skipPeriod> characters the last <skipLength> characters are left out. By
-	 * calling this method twice with two different prime skipPeriod values and
-	 * short skipLength values you create test data which is similar to what
-	 * programmers do to their source code - huge files with only few
-	 * insertions/deletions/changes.
-	 *
-	 * @param len
-	 *            length of the String to be returned
-	 * @param skipPeriod
-	 * @param skipLength
-	 * @return the sequence of characters as String
-	 */
-	public static String generateSequence(int len, int skipPeriod,
-			int skipLength) {
-		StringBuilder text = new StringBuilder(len);
-		int skipStart = skipPeriod - skipLength;
-		int skippedChars = 0;
-		for (int i = 0; i - skippedChars < len; ++i) {
-			if (skipPeriod == 0 || i % skipPeriod < skipStart) {
-				text.append((char) (32 + i % 95));
-			} else {
-				skippedChars++;
-			}
-		}
-		return text.toString();
-	}
+	public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
+			C cmp, S a, S b);
 }

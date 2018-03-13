@@ -118,6 +118,8 @@ public class DiffFormatter {
 
 	private int abbreviationLength = 7;
 
+	private DiffAlgorithm diffAlgorithm = MyersDiff.INSTANCE;
+
 	private RawTextComparator comparator = RawTextComparator.DEFAULT;
 
 	private int binaryFileThreshold = DEFAULT_BINARY_FILE_THRESHOLD;
@@ -207,20 +209,31 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Set the helper that constructs difference output.
+	 * Set the algorithm that constructs difference output.
 	 *
-	 * @param type
-	 *            the factory to create different output. Different types of
-	 *            factories can produce different whitespace behavior, for
-	 *            example.
+	 * @param alg
+	 *            the algorithm to produce text file differences.
+	 * @see MyersDiff#INSTANCE
+	 */
+	public void setDiffAlgorithm(DiffAlgorithm alg) {
+		diffAlgorithm = alg;
+	}
+
+	/**
+	 * Set the line equivalence function for text file differences.
+	 *
+	 * @param cmp
+	 *            The equivalence function used to determine if two lines of
+	 *            text are identical. The function can be changed to ignore
+	 *            various types of whitespace.
 	 * @see RawTextComparator#DEFAULT
 	 * @see RawTextComparator#WS_IGNORE_ALL
 	 * @see RawTextComparator#WS_IGNORE_CHANGE
 	 * @see RawTextComparator#WS_IGNORE_LEADING
 	 * @see RawTextComparator#WS_IGNORE_TRAILING
 	 */
-	public void setDiffComparator(RawTextComparator type) {
-		comparator = type;
+	public void setDiffComparator(RawTextComparator cmp) {
+		comparator = cmp;
 	}
 
 	/**
@@ -893,7 +906,7 @@ public class DiffFormatter {
 	}
 
 	private EditList diff(RawText a, RawText b) {
-		return new MyersDiff<RawText>(comparator, a, b).getEdits();
+		return diffAlgorithm.diff(comparator, a, b);
 	}
 
 	private void assertHaveRepository() {

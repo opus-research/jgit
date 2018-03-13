@@ -171,17 +171,24 @@ public class PatienceDiffTest extends TestCase {
 		assertEquals(new Edit(6, 7, 6, 7), r.get(1));
 	}
 
+	public void testEdit_DuplicateAButCommonUniqueInB() {
+		EditList r = diff(t("AbbcR"), t("CbcS"));
+		assertEquals(2, r.size());
+		assertEquals(new Edit(0, 2, 0, 1), r.get(0));
+		assertEquals(new Edit(4, 5, 3, 4), r.get(1));
+	}
+
 	public void testPerformanceTestDeltaLength() {
 		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
 		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
 		CharArray ac = new CharArray(a);
 		CharArray bc = new CharArray(b);
-		EditList r = PatienceDiff.diff(new CharCmp(), ac, bc);
+		EditList r = new PatienceDiff().diff(new CharCmp(), ac, bc);
 		assertEquals(25, r.size());
 	}
 
 	private static EditList diff(RawText a, RawText b) {
-		return PatienceDiff.diff(RawTextComparator.DEFAULT, a, b);
+		return new PatienceDiff().diff(RawTextComparator.DEFAULT, a, b);
 	}
 
 	private static RawText t(String text) {

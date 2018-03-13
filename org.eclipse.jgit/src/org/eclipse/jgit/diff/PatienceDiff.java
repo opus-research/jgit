@@ -98,27 +98,24 @@ package org.eclipse.jgit.diff;
  * 2 doesn't need to be done again because any common part was already removed
  * by the prior step 2 or 5.</li>
  * </ol>
- *
- * @param <S>
- *            type of sequence.
  */
-public class PatienceDiff<S extends Sequence> {
+public class PatienceDiff implements DiffAlgorithm {
+	/** Algorithm we use when there are no common unique lines in a region. */
+	private DiffAlgorithm fallback;
+
 	/**
-	 * Compute the difference between two sequences.
+	 * Set the algorithm used when there are no common unique lines remaining.
 	 *
-	 * @param <S>
-	 *            type of sequence.
-	 * @param cmp
-	 *            equivalence function to compare the two sequences.
-	 * @param a
-	 *            the first (aka old) sequence.
-	 * @param b
-	 *            the second (aka new) sequence.
-	 * @return the differences describing how to edit {@code a} to become
-	 *         {@code b}. The list is empty if they are identical.
+	 * @param alg
+	 *            the secondary algorithm. If null the region will be denoted as
+	 *            a single REPLACE block.
 	 */
-	public static <S extends Sequence> EditList diff(SequenceComparator<S> cmp,
-			S a, S b) {
+	public void setFallbackAlgorithm(DiffAlgorithm alg) {
+		fallback = alg;
+	}
+
+	public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
+			C cmp, S a, S b) {
 		Edit e = new Edit(0, a.size(), 0, b.size());
 		e = cmp.reduceCommonStartEnd(a, b, e);
 
@@ -131,7 +128,7 @@ public class PatienceDiff<S extends Sequence> {
 		}
 
 		case REPLACE: {
-			PatienceDiff<S> d = new PatienceDiff<S>(cmp, a, b);
+			State<S, C> d = new State<S, C>(cmp, a, b);
 			d.diff(e, null, 0, 0);
 			return d.edits;
 		}
@@ -144,58 +141,70 @@ public class PatienceDiff<S extends Sequence> {
 		}
 	}
 
-	private final SequenceComparator<S> cmp;
+	private class State<S extends Sequence, C extends SequenceComparator<? super S>> {
+		private final C cmp;
 
-	private final S a;
+		private final S a;
 
-	private final S b;
+		private final S b;
 
-	/** Result edits we have determined that must be made to convert a to b. */
-	private final EditList edits;
+		/** Result edits we have determined that must be made to convert a to b. */
+		final EditList edits;
 
-	private PatienceDiff(SequenceComparator<S> cmp, S a, S b) {
-		this.cmp = cmp;
-		this.a = a;
-		this.b = b;
-		this.edits = new EditList();
-	}
-
-	private void diff(Edit region, long[] pCommon, int pIdx, int pCnt) {
-		switch (region.getType()) {
-		case INSERT:
-		case DELETE:
-			edits.add(region);
-			return;
-
-		case REPLACE:
-			break;
-
-		case EMPTY:
-			return;
+		State(C cmp, S a, S b) {
+			this.cmp = cmp;
+			this.a = a;
+			this.b = b;
+			this.edits = new EditList();
 		}
 
-		PatienceDiffIndex<S> idx = new PatienceDiffIndex<S>(cmp, region);
-		idx.scanB(b, region.beginB, region.endB);
-		idx.scanA(a, region.beginA, region.endA, b);
-		Edit lcs = idx.match(region, a, b, pCommon, pIdx, pCnt);
+		private void diff(Edit e, long[] pCommon, int pIdx, int pEnd) {
+			switch (e.getType()) {
+			case INSERT:
+			case DELETE:
+				edits.add(e);
+				return;
 
-		if (lcs != null) {
-			pCommon = idx.nCommon;
-			pIdx = idx.cIdx;
-			pCnt = idx.nCnt;
-			idx = null;
+			case REPLACE:
+				break;
 
-			diff(region.before(lcs), pCommon, 0, pIdx);
-			diff(region.after(lcs), pCommon, pIdx + 1, pCnt);
+			case EMPTY:
+			default:
+				throw new IllegalStateException();
+			}
 
-		} else {
-			// If we have no unique common lines, replace the entire region
-			// on the one side with the region from the other.
-			//
-			// Some implementations fall back to Myers O(ND) implementation
-			// at this point.
-			//
-			edits.add(region);
+			PatienceDiffIndex<S, C> p;
+
+			p = new PatienceDiffIndex<S, C>(cmp, a, b, e, pCommon, pIdx, pEnd);
+			Edit lcs = p.findLongestCommonSequence();
+
+			if (lcs != null) {
+				pCommon = p.nCommon;
+				pIdx = p.cIdx;
+				pEnd = p.nCnt;
+				p = null;
+
+				diff(e.before(lcs), pCommon, 0, pIdx);
+				diff(e.after(lcs), pCommon, pIdx + 1, pEnd);
+
+			} else if (fallback != null) {
+				p = null;
+
+				SubsequenceComparator<S> c = new SubsequenceComparator<S>(cmp);
+				Subsequence<S> x = new Subsequence<S>(a, e.beginA, e.endA);
+				Subsequence<S> y = new Subsequence<S>(b, e.beginB, e.endB);
+
+				for (Edit r : fallback.diff(c, x, y)) {
+					r.beginA += e.beginA;
+					r.beginB += e.beginB;
+					r.endA += e.beginA;
+					r.endB += e.beginB;
+					edits.add(r);
+				}
+
+			} else {
+				edits.add(e);
+			}
 		}
 	}
 }

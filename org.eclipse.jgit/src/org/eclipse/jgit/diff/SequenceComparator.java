@@ -60,9 +60,7 @@ public abstract class SequenceComparator<S extends Sequence> {
 	 * Compare two items to determine if they are equivalent.
 	 *
 	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}). Callers should be smart enough to
-	 * never invoke {@code equals(a, ai, a, ai)}, and therefore implementations
-	 * should not try to optimize for this corner case.
+	 * {@code a} again in position {@code b}).
 	 *
 	 * @param a
 	 *            the first sequence.
