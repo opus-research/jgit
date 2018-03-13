@@ -967,7 +967,7 @@ public class PackWriter {
 
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
-			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>();
+			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>(cnt);
 			tmp.addAll(objectsLists[Constants.OBJ_TAG]);
 			tmp.addAll(objectsLists[Constants.OBJ_COMMIT]);
 			tmp.addAll(objectsLists[Constants.OBJ_TREE]);
@@ -1396,10 +1396,10 @@ public class PackWriter {
 		otp.setCRC(out.getCRC32());
 	}
 
-	private void writeBase(PackOutputStream out, ObjectToPack base)
+	private void writeBase(PackOutputStream out, ObjectToPack baseInPack)
 			throws IOException {
-		if (base != null && !base.isWritten() && !base.isEdge())
-			writeObjectImpl(out, base);
+		if (baseInPack != null && !baseInPack.isWritten())
+			writeObjectImpl(out, baseInPack);
 	}
 
 	private void writeWholeObjectDeflate(PackOutputStream out,
