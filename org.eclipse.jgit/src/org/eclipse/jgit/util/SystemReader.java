@@ -49,6 +49,8 @@ package org.eclipse.jgit.util;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -238,17 +240,15 @@ public abstract class SystemReader {
 	}
 
 	/**
-	 * @return true if we are running on a Windows.
-	 */
-	public boolean isWindows() {
-		return getProperty("os.name").startsWith("Windows");
-	}
-
-	/**
 	 * @return true if we are running on Mac OS X
 	 */
 	public boolean isMacOS() {
-		String osDotName = getProperty("os.name");
+		String osDotName = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return getProperty("os.name");
+					}
+				});
 		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName);
 	}
 
