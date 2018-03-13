@@ -140,6 +140,9 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
+	/**
+	 * @since 3.6
+	 */
 	@Override
 	public File tryFindHook(Repository repository, Hook hook) {
 		final File gitdir = repository.getDirectory();

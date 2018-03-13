@@ -89,6 +89,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.Hook;
+import org.eclipse.jgit.util.ProcessResult;
 
 /**
  * A class used to execute a {@code Commit} command. It has setters for all
@@ -126,15 +127,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Setting this option bypasses the {@link Hook#PRE_COMMIT pre-commit} and
-	 * {@link Hook#COMMIT_MSG} hooks.
+	 * {@link Hook#COMMIT_MSG commit-msg} hooks.
 	 */
 	private boolean noVerify;
-
-	/**
-	 * Setting this option bypasses the {@link Hook#POST_REWRITE post-rewrite}
-	 * hook.
-	 */
-	private boolean noPostRewrite;
 
 	/**
 	 * @param repo
@@ -182,11 +177,13 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
 				final PrintStream hookErrRedirect = new PrintStream(
 						errorByteArray);
-				int preCommitHookResult = FS.DETECTED.runIfPresent(repo,
+				ProcessResult preCommitHookResult = FS.DETECTED.runIfPresent(
+						repo,
 						Hook.PRE_COMMIT, new String[0], System.out,
 						hookErrRedirect, null);
 				final String errorDetails = errorByteArray.toString();
-				if (preCommitHookResult != 0) {
+				if (preCommitHookResult.getStatus() == ProcessResult.Status.OK
+						&& preCommitHookResult.getExitCode() != 0) {
 					commitRejectedByHook(Hook.PRE_COMMIT, errorDetails);
 				}
 			}
@@ -227,7 +224,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				}
 
 			// lock the index
-			RevCommit revCommit = null;
 			DirCache index = repo.lockDirCache();
 			try {
 				if (!only.isEmpty())
@@ -254,7 +250,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					ObjectId commitId = odi.insert(commit);
 					odi.flush();
 
-					revCommit = rw.parseCommit(commitId);
+					RevCommit revCommit = rw.parseCommit(commitId);
 					RefUpdate ru = repo.updateRef(Constants.HEAD);
 					ru.setNewObjectId(commitId);
 					if (reflogComment != null) {
@@ -289,7 +285,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							repo.writeMergeCommitMsg(null);
 							repo.writeRevertHead(null);
 						}
-						break;
+						return revCommit;
 					}
 					case REJECTED:
 					case LOCK_FAILURE:
@@ -307,22 +303,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			} finally {
 				index.unlock();
 			}
-
-			if (amend && headId != null && !noPostRewrite) {
-				final ObjectId oldId = headId;
-				final ObjectId newId = revCommit.getId();
-				final String rewritten = oldId.getName() + ' '
-						+ newId.getName() + '\n';
-				int postRewriteHookResult = FS.DETECTED.runIfPresent(repo,
-						Hook.POST_REWRITE, new String[] { "amend" }, //$NON-NLS-1$
-						System.out, System.err, rewritten);
-				if (postRewriteHookResult != 0) {
-					// TODO as for the post-commit, this hook's return value
-					// holds no meaning, but the user might want to be told that
-					// his hook failed somehow.
-				}
-			}
-			return revCommit;
 		} catch (UnmergedPathException e) {
 			throw new UnmergedPathsException(e);
 		} catch (IOException e) {
@@ -782,26 +762,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Sets the {@link #noVerify} option on this commit command.
+	 * <p>
+	 * Both the {@link Hook#PRE_COMMIT pre-commit} and {@link Hook#COMMIT_MSG
+	 * commit-msg} hooks can block a commit by their return value; setting this
+	 * option to <code>true</code> will bypass these two hooks.
+	 * </p>
 	 *
 	 * @param noVerify
-	 *            Whether this commit should be verified.
+	 *            Whether this commit should be verified by the pre-commit and
+	 *            commit-msg hooks.
 	 * @return {@code this}
+	 * @since 3.6
 	 */
 	public CommitCommand setNoVerify(boolean noVerify) {
 		this.noVerify = noVerify;
-		return this;
-	}
-
-	/**
-	 * Sets the {@link #noPostRewrite} option on this commit command.
-	 *
-	 * @param noPostRewrite
-	 *            Whether this commit should bypass the
-	 *            {@link Hook#POST_REWRITE post-rewrite} hook.
-	 * @return {@code this}
-	 */
-	public CommitCommand setNoPostRewrite(boolean noPostRewrite) {
-		this.noPostRewrite = noPostRewrite;
 		return this;
 	}
 

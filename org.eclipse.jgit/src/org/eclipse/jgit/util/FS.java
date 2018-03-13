@@ -45,9 +45,7 @@ package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -69,6 +67,7 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.ProcessResult.Status;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -630,7 +629,7 @@ public abstract class FS {
 	 * Checks whether the given hook is defined for the given repository, then
 	 * runs it with the given arguments.
 	 * <p>
-	 * By default, the hook's standard output and error will be redirected to
+	 * The hook's standard output and error will be redirected to
 	 * <code>System.out</code> and <code>System.err</code> respectively. The
 	 * hook will have no stdin.
 	 * </p>
@@ -640,15 +639,15 @@ public abstract class FS {
 	 * @param hook
 	 *            The particular hook we wish to execute.
 	 * @param args
-	 *            Arguments to pass to this hook.
-	 * @return The exit value of the hook. Defaults to <code>0</code> if the
-	 *         hook has no exit value, does not exist or cannot be run on this
-	 *         {@link FS}.
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
+	 * @return The ProcessResult describing this hook's execution.
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
+	 * @since 3.6
 	 */
-	public int runIfPresent(Repository repository, final Hook hook,
+	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args) throws JGitInternalException {
 		return runIfPresent(repository, hook, args, System.out, System.err,
 				null);
@@ -663,7 +662,8 @@ public abstract class FS {
 	 * @param hook
 	 *            The particular hook we wish to execute.
 	 * @param args
-	 *            Arguments to pass to this hook.
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
 	 * @param outRedirect
 	 *            A print stream on which to redirect the hook's stdout. Can be
 	 *            <code>null</code>, in which case the hook's standard output
@@ -675,17 +675,16 @@ public abstract class FS {
 	 * @param stdinArgs
 	 *            A string to pass on to the standard input of the hook. May be
 	 *            <code>null</code>.
-	 * @return The exit value of the hook. Defaults to <code>0</code> if the
-	 *         hook has no exit value, does not exist or cannot be run on this
-	 *         {@link FS}.
+	 * @return The ProcessResult describing this hook's execution.
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
+	 * @since 3.6
 	 */
-	public int runIfPresent(Repository repository, final Hook hook,
+	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
 			String stdinArgs) throws JGitInternalException {
-		return 0;
+		return new ProcessResult(Status.NOT_SUPPORTED);
 	}
 
 	/**
@@ -697,28 +696,12 @@ public abstract class FS {
 	 *            The hook we're trying to find.
 	 * @return The {@link File} containing this particular hook if it exists in
 	 *         the given repository, <code>null</code> otherwise.
+	 * @since 3.6
 	 */
 	public File tryFindHook(Repository repository, final Hook hook) {
-		final File gitDir = repository.getDirectory();
-		final File[] hookDirCandidates = gitDir.listFiles(new FileFilter() {
-			public boolean accept(File pathname) {
-				return pathname.isDirectory()
-						&& pathname.getName().equals("hooks"); //$NON-NLS-1$
-			}
-		});
-		if (hookDirCandidates.length < 1)
-			return null;
-
-		final File[] matchingHooks = hookDirCandidates[0]
-				.listFiles(new FileFilter() {
-					public boolean accept(File pathname) {
-						return pathname.isFile()
-								&& pathname.getName().equals(hook.getName());
-					}
-				});
-		if (matchingHooks.length < 1)
-			return null;
-		return matchingHooks[0];
+		final File hookFile = new File(new File(repository.getDirectory(),
+				"hooks"), hook.getName()); //$NON-NLS-1$
+		return hookFile.isFile() ? hookFile : null;
 	}
 
 	/**
@@ -744,8 +727,11 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
+	 * @since 3.6
 	 */
-	protected int runHook(ProcessBuilder hookProcessBuilder, OutputStream outRedirect, OutputStream errRedirect, String stdinArgs) throws IOException, InterruptedException {
+	protected int runProcess(ProcessBuilder hookProcessBuilder,
+			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
+			throws IOException, InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
 		// We'll record the first I/O exception that occurs, but keep on trying
@@ -1052,8 +1038,7 @@ public abstract class FS {
 		public StreamGobbler(InputStream stream, OutputStream output) {
 			this.reader = new BufferedReader(new InputStreamReader(stream));
 			if (output == null)
-				this.writer = new BufferedWriter(new OutputStreamWriter(
-						new ByteArrayOutputStream()));
+				this.writer = null;
 			else
 				this.writer = new BufferedWriter(new OutputStreamWriter(output));
 		}
@@ -1065,7 +1050,7 @@ public abstract class FS {
 			while ((line = reader.readLine()) != null) {
 				// Do not try to write again after a failure, but keep reading
 				// as long as possible to prevent the input stream from choking.
-				if (!writeFailure) {
+				if (!writeFailure && writer != null) {
 					try {
 						writer.write(line);
 						writer.newLine();
