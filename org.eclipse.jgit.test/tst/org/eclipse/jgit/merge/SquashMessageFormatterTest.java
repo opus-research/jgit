@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,57 +42,48 @@
  */
 package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 
-import java.io.File;
+import java.util.Arrays;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.junit.Before;
 import org.junit.Test;
 
-public class ResolveMergerTest extends RepositoryTestCase {
+/**
+ * Test construction of squash message by {@link SquashMessageFormatterTest}.
+ */
+public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
+	private GitDateFormatter dateFormatter;
+	private SquashMessageFormatter msgFormatter;
+	private RevCommit revCommit;
 
-	@Test
-	public void failingPathsShouldNotResultInOKReturnValue() throws Exception {
-		File folder1 = new File(db.getWorkTree(), "folder1");
-		FileUtils.mkdir(folder1);
-		File file = new File(folder1, "file1.txt");
-		write(file, "folder1--file1.txt");
-		file = new File(folder1, "file2.txt");
-		write(file, "folder1--file2.txt");
-
-		Git git = new Git(db);
-		git.add().addFilepattern(folder1.getName()).call();
-		RevCommit base = git.commit().setMessage("adding folder").call();
-
-		recursiveDelete(folder1);
-		git.rm().addFilepattern("folder1/file1.txt")
-				.addFilepattern("folder1/file2.txt").call();
-		RevCommit other = git.commit()
-				.setMessage("removing folders on 'other'").call();
-
-		git.checkout().setName(base.name()).call();
-
-		file = new File(db.getWorkTree(), "unrelated.txt");
-		write(file, "unrelated");
-
-		git.add().addFilepattern("unrelated").call();
-		RevCommit head = git.commit().setMessage("Adding another file").call();
-
-		// Untracked file to cause failing path for delete() of folder1
-		file = new File(folder1, "file3.txt");
-		write(file, "folder1--file3.txt");
-
-		ResolveMerger merger = new ResolveMerger(db, false);
-		merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
-		merger.setWorkingTreeIterator(new FileTreeIterator(db));
-		boolean ok = merger.merge(head.getId(), other.getId());
-
-		assertFalse(merger.getFailingPaths().isEmpty());
-		assertFalse(ok);
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+		msgFormatter = new SquashMessageFormatter();
 	}
 
+	@Test
+	public void testCommit() throws Exception {
+		Git git = new Git(db);
+		revCommit = git.commit().setMessage("squash_me").call();
+
+		Ref master = db.getRef("refs/heads/master");
+		String message = msgFormatter.format(Arrays.asList(revCommit), master);
+		assertEquals(
+				"Squashed commit of the following:\n\ncommit "
+						+ revCommit.getName() + "\nAuthor: "
+						+ revCommit.getAuthorIdent().getName() + " <"
+						+ revCommit.getAuthorIdent().getEmailAddress()
+						+ ">\nDate:   " + dateFormatter.formatDate(author)
+						+ "\n\n\tsquash_me\n", message);
+	}
 }
