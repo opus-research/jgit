@@ -121,7 +121,7 @@ class RefDirectoryUpdate extends RefUpdate {
 		}
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
-		database.stored(this, lock.getCommitSnapshot());
+		database.stored(this, lock.getCommitLastModified());
 		return status;
 	}
 
@@ -159,7 +159,7 @@ class RefDirectoryUpdate extends RefUpdate {
 			database.log(this, msg, false);
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
-		database.storedSymbolicRef(this, lock.getCommitSnapshot(), target);
+		database.storedSymbolicRef(this, lock.getCommitLastModified(), target);
 
 		if (getRef().getStorage() == Ref.Storage.NEW)
 			return Result.NEW;
