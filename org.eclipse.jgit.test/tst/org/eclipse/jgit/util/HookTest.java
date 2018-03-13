@@ -112,7 +112,8 @@ public class HookTest extends RepositoryTestCase {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		git.commit().setMessage("commit")
 				.setHookOutputStream(new PrintStream(out)).call();
-		assertEquals(".git/COMMIT_EDITMSG\n", out.toString("UTF-8"));
+		assertEquals(".git/COMMIT_EDITMSG\n",
+				out.toString("UTF-8"));
 	}
 
 	@Test
@@ -144,6 +145,7 @@ public class HookTest extends RepositoryTestCase {
 				new String[] {
 				"arg1", "arg2" },
 				new PrintStream(out), new PrintStream(err), "stdin");
+
 		assertEquals("unexpected hook output", "test arg1 arg2\nstdin\n",
 				out.toString("UTF-8"));
 		assertEquals("unexpected output on stderr stream", "stderr\n",

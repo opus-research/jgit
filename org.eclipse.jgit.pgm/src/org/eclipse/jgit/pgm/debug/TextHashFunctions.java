@@ -300,10 +300,10 @@ class TextHashFunctions extends TextBuiltin {
 
 		long fileCnt = 0;
 		long lineCnt = 0;
-		try (ObjectReader or = db.newObjectReader()) {
-			final MutableObjectId id = new MutableObjectId();
+		try (ObjectReader or = db.newObjectReader();
 			RevWalk rw = new RevWalk(or);
-			TreeWalk tw = new TreeWalk(or);
+			TreeWalk tw = new TreeWalk(or)) {
+			final MutableObjectId id = new MutableObjectId();
 			tw.reset(rw.parseTree(db.resolve(Constants.HEAD)));
 			tw.setRecursive(true);
 
@@ -341,9 +341,10 @@ class TextHashFunctions extends TextBuiltin {
 			}
 		}
 
-		if (db.getDirectory() != null) {
-			String name = db.getDirectory().getName();
-			File parent = db.getDirectory().getParentFile();
+		File directory = db.getDirectory();
+		if (directory != null) {
+			String name = directory.getName();
+			File parent = directory.getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
 			outw.println(name + ":"); //$NON-NLS-1$

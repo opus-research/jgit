@@ -91,6 +91,13 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	}
 
 	@Override
+	public Ref exactRef(String name) throws IOException {
+		RefCache curr = read();
+		Ref ref = curr.ids.get(name);
+		return ref != null ? resolve(ref, 0, curr.ids) : null;
+	}
+
+	@Override
 	public Ref getRef(String needle) throws IOException {
 		RefCache curr = read();
 		for (String prefix : SEARCH_PATH) {
@@ -101,14 +108,6 @@ public abstract class DfsRefDatabase extends RefDatabase {
 			}
 		}
 		return null;
-	}
-
-	private Ref getOneRef(String refName) throws IOException {
-		RefCache curr = read();
-		Ref ref = curr.ids.get(refName);
-		if (ref != null)
-			return resolve(ref, 0, curr.ids);
-		return ref;
 	}
 
 	@Override
@@ -212,7 +211,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	public RefUpdate newUpdate(String refName, boolean detach)
 			throws IOException {
 		boolean detachingSymbolicRef = false;
-		Ref ref = getOneRef(refName);
+		Ref ref = exactRef(refName);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, refName, null);
 		else
