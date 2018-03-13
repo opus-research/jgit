@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -106,6 +107,8 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cantWrite;
 	/***/ public String changesNotStagedForCommit;
 	/***/ public String changesToBeCommitted;
+	/***/ public String checkoutConflict;
+	/***/ public String checkoutConflictPathLine;
 	/***/ public String commitLabel;
 	/***/ public String conflictingUsageOf_git_dir_andArguments;
 	/***/ public String couldNotCreateBranch;
@@ -140,6 +143,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String mergeWentWellStoppedBeforeCommitting;
 	/***/ public String metaVar_KEY;
 	/***/ public String metaVar_archiveFormat;
+	/***/ public String metaVar_archivePrefix;
 	/***/ public String metaVar_arg;
 	/***/ public String metaVar_author;
 	/***/ public String metaVar_bucket;
