@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,64 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.storage.dfs;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Assert;
+import org.junit.Test;
 
-import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.GC;
-import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
+public class CheckoutTest extends CLIRepositoryTestCase {
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
+	@Test
+	public void testCheckoutSelf() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
 
-class DfsObjectRepresentation extends StoredObjectRepresentation {
-	final ObjectToPack object;
-
-	DfsPackFile pack;
-
-	/**
-	 * Position of {@link #pack} in the reader's pack list. Lower numbers are
-	 * newer/more recent packs and less likely to contain the best format for a
-	 * base object. Higher numbered packs are bigger, more stable, and favored
-	 * by PackWriter when selecting representations... but only if they come
-	 * last in the representation ordering.
-	 */
-	int packIndex;
-
-	long offset;
-
-	int format;
-
-	long length;
-
-	ObjectId baseId;
-
-	DfsObjectRepresentation(ObjectToPack object) {
-		this.object = object;
+		assertEquals("Already on 'master'", execute("git checkout master"));
 	}
 
-	@Override
-	public int getFormat() {
-		return format;
+	@Test
+	public void testCheckoutBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+
+		assertEquals("Switched to branch 'side'", execute("git checkout side"));
 	}
 
-	@Override
-	public int getWeight() {
-		return (int) Math.min(length, Integer.MAX_VALUE);
+	@Test
+	public void testCheckoutNewBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Switched to a new branch 'side'",
+				execute("git checkout -b side"));
 	}
 
-	@Override
-	public ObjectId getDeltaBase() {
-		return baseId;
+	@Test
+	public void testCheckoutNonExistingBranch() throws Exception {
+		assertEquals(
+				"error: pathspec 'side' did not match any file(s) known to git.",
+				execute("git checkout side"));
 	}
 
-	@Override
-	public boolean wasDeltaAttempted() {
-		if (pack != null) {
-			PackSource source = pack.getPackDescription().getPackSource();
-			return source == GC || source == UNREACHABLE_GARBAGE;
-		}
-		return false;
+	@Test
+	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("A branch named 'master' already exists.",
+				execute("git checkout -b master"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
+		assertEquals("You are on a branch yet to be born",
+				execute("git checkout -b side"));
+	}
+
+	static private void assertEquals(String expected, String[] actual) {
+		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
+				actual.length); // ignore last line if empty
+		Assert.assertEquals(expected, actual[0]);
 	}
 }

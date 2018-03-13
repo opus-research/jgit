@@ -42,7 +42,9 @@
  */
 package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -51,12 +53,14 @@ import java.io.IOException;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.util.FileUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class ResolveMergerTest extends RepositoryTestCase {
@@ -99,6 +103,267 @@ public class ResolveMergerTest extends RepositoryTestCase {
 
 		assertFalse(merger.getFailingPaths().isEmpty());
 		assertFalse(ok);
+	}
+
+	/**
+	 * Merging two conflicting subtrees when the index does not contain any file
+	 * in that subtree should lead to a conflicting state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeConflictingTreesWithoutIndex() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("d/1", "orig");
+		git.add().addFilepattern("d/1").call();
+		RevCommit first = git.commit().setMessage("added d/1").call();
+
+		writeTrashFile("d/1", "master");
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("modified d/1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("d/1", "side");
+		git.commit().setAll(true).setMessage("modified d/1 on side").call();
+
+		git.rm().addFilepattern("d/1").call();
+		git.rm().addFilepattern("d").call();
+		MergeResult mergeRes = git.merge().include(masterCommit).call();
+		assertEquals(MergeStatus.CONFLICTING, mergeRes.getMergeStatus());
+		assertEquals(
+				"[d/1, mode:100644, stage:1, content:orig][d/1, mode:100644, stage:2, content:side][d/1, mode:100644, stage:3, content:master]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * Merging two different but mergeable subtrees when the index does not
+	 * contain any file in that subtree should lead to a merged state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeMergeableTreesWithoutIndex() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("d/1", "1\n2\n3");
+		git.add().addFilepattern("d/1").call();
+		RevCommit first = git.commit().setMessage("added d/1").call();
+
+		writeTrashFile("d/1", "1master\n2\n3");
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("modified d/1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("d/1", "1\n2\n3side");
+		git.commit().setAll(true).setMessage("modified d/1 on side").call();
+
+		git.rm().addFilepattern("d/1").call();
+		git.rm().addFilepattern("d").call();
+		MergeResult mergeRes = git.merge().include(masterCommit).call();
+		assertEquals(MergeStatus.MERGED, mergeRes.getMergeStatus());
+		assertEquals("[d/1, mode:100644, content:1master\n2\n3side\n]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * Merging two equal subtrees when the index does not contain any file in
+	 * that subtree should lead to a merged state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeEqualTreesWithoutIndex() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("d/1", "orig");
+		git.add().addFilepattern("d/1").call();
+		RevCommit first = git.commit().setMessage("added d/1").call();
+
+		writeTrashFile("d/1", "modified");
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("modified d/1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("d/1", "modified");
+		git.commit().setAll(true).setMessage("modified d/1 on side").call();
+
+		git.rm().addFilepattern("d/1").call();
+		git.rm().addFilepattern("d").call();
+		MergeResult mergeRes = git.merge().include(masterCommit).call();
+		assertEquals(MergeStatus.MERGED, mergeRes.getMergeStatus());
+		assertEquals("[d/1, mode:100644, content:modified]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * Merging two equal subtrees with an incore merger should lead to a merged
+	 * state (The 'Gerrit' use case).
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeEqualTreesInCore() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("d/1", "orig");
+		git.add().addFilepattern("d/1").call();
+		RevCommit first = git.commit().setMessage("added d/1").call();
+
+		writeTrashFile("d/1", "modified");
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("modified d/1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("d/1", "modified");
+		RevCommit sideCommit = git.commit().setAll(true)
+				.setMessage("modified d/1 on side").call();
+
+		git.rm().addFilepattern("d/1").call();
+		git.rm().addFilepattern("d").call();
+
+		ThreeWayMerger resolveMerger = MergeStrategy.RESOLVE
+				.newMerger(db, true);
+		boolean noProblems = resolveMerger.merge(masterCommit, sideCommit);
+		assertTrue(noProblems);
+	}
+
+	/**
+	 * Merging two equal subtrees when the index and HEAD does not contain any
+	 * file in that subtree should lead to a merged state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeEqualNewTrees() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("2", "orig");
+		git.add().addFilepattern("2").call();
+		RevCommit first = git.commit().setMessage("added 2").call();
+
+		writeTrashFile("d/1", "orig");
+		git.add().addFilepattern("d/1").call();
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("added d/1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("d/1", "orig");
+		git.add().addFilepattern("d/1").call();
+		git.commit().setAll(true).setMessage("added d/1 on side").call();
+
+		git.rm().addFilepattern("d/1").call();
+		git.rm().addFilepattern("d").call();
+		MergeResult mergeRes = git.merge().include(masterCommit).call();
+		assertEquals(MergeStatus.MERGED, mergeRes.getMergeStatus());
+		assertEquals(
+				"[2, mode:100644, content:orig][d/1, mode:100644, content:orig]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * Merging two conflicting subtrees when the index and HEAD does not contain
+	 * any file in that subtree should lead to a conflicting state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeConflictingNewTrees() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("2", "orig");
+		git.add().addFilepattern("2").call();
+		RevCommit first = git.commit().setMessage("added 2").call();
+
+		writeTrashFile("d/1", "master");
+		git.add().addFilepattern("d/1").call();
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("added d/1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("d/1", "side");
+		git.add().addFilepattern("d/1").call();
+		git.commit().setAll(true).setMessage("added d/1 on side").call();
+
+		git.rm().addFilepattern("d/1").call();
+		git.rm().addFilepattern("d").call();
+		MergeResult mergeRes = git.merge().include(masterCommit).call();
+		assertEquals(MergeStatus.CONFLICTING, mergeRes.getMergeStatus());
+		assertEquals(
+				"[2, mode:100644, content:orig][d/1, mode:100644, stage:2, content:side][d/1, mode:100644, stage:3, content:master]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * Merging two conflicting files when the index contains a tree for that
+	 * path should lead to a failed state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeConflictingFilesWithTreeInIndex() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("0", "orig");
+		git.add().addFilepattern("0").call();
+		RevCommit first = git.commit().setMessage("added 0").call();
+
+		writeTrashFile("0", "master");
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("modified 0 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("0", "side");
+		git.commit().setAll(true).setMessage("modified 0 on side").call();
+
+		git.rm().addFilepattern("0").call();
+		writeTrashFile("0/0", "side");
+		git.add().addFilepattern("0/0").call();
+		MergeResult mergeRes = git.merge().include(masterCommit).call();
+		assertEquals(MergeStatus.FAILED, mergeRes.getMergeStatus());
+	}
+
+	/**
+	 * Merging two equal files when the index contains a tree for that path
+	 * should lead to a failed state.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void checkMergeMergeableFilesWithTreeInIndex() throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("0", "orig");
+		writeTrashFile("1", "1\n2\n3");
+		git.add().addFilepattern("0").addFilepattern("1").call();
+		RevCommit first = git.commit().setMessage("added 0, 1").call();
+
+		writeTrashFile("1", "1master\n2\n3");
+		RevCommit masterCommit = git.commit().setAll(true)
+				.setMessage("modified 1 on master").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("1", "1\n2\n3side");
+		git.commit().setAll(true).setMessage("modified 1 on side").call();
+
+		git.rm().addFilepattern("0").call();
+		writeTrashFile("0/0", "modified");
+		git.add().addFilepattern("0/0").call();
+		try {
+			git.merge().include(masterCommit).call();
+			Assert.fail("Didn't get the expected exception");
+		} catch (CheckoutConflictException e) {
+			assertEquals(1, e.getConflictingPaths().size());
+			assertEquals("0/0", e.getConflictingPaths().get(0));
+		}
 	}
 
 	@Test
@@ -175,8 +440,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				.call();
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "4", "*" + lastTs4, "<*"
-				+ lastTsIndex, "<0",
-				"2", "3", "<.git/index");
+				+ lastTsIndex, "<0", "2", "3", "<.git/index");
 		lastTsIndex = indexFile.lastModified();
 
 		// Checkout a side branch. This should touch only "0", "2 and "3"
@@ -185,8 +449,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				.setName("side").call();
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "4", "*" + lastTs4, "<*"
-				+ lastTsIndex, "<0",
-				"2", "3", ".git/index");
+				+ lastTsIndex, "<0", "2", "3", ".git/index");
 		lastTsIndex = indexFile.lastModified();
 
 		// This checkout may have populated worktree and index so fast that we
