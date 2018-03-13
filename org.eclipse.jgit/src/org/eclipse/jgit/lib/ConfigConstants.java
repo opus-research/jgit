@@ -127,7 +127,7 @@ public class ConfigConstants {
 
 	/**
 	 * The "symlinks" key
-	 * 
+	 *
 	 * @since 3.3
 	 */
 	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
