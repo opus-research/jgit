@@ -116,12 +116,13 @@ final class LargePackedWholeObject extends ObjectLoader {
 			}
 		}
 
-		in = new BufferedInputStream( //
-				new InflaterInputStream( //
-						in, //
-						ctx.inflater(), //
-						8192), //
-				8192);
+		// Align buffer to inflater size, at a larger than default block.
+		// This reduces the number of context switches from the
+		// caller down into the pack stream inflation.
+		int bufsz = 8192;
+		in = new BufferedInputStream(
+				new InflaterInputStream(in, ctx.inflater(), bufsz),
+				bufsz);
 		return new ObjectStream.Filter(type, size, in);
 	}
 }
