@@ -11,6 +11,6 @@ java_library(
     deps = [
         # We want these deps to be provided_deps
         "//org.eclipse.jgit:jgit",
-        "//lib:commons-compress",
+        "@commons_compress//jar",
     ],
 )

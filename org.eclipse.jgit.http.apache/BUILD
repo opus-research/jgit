@@ -7,7 +7,7 @@ java_library(
     resources = glob(["resources/**"]),
     deps = [
         "//org.eclipse.jgit:jgit",
-        "//lib:httpclient",
-        "//lib:httpcore",
+        "@httpclient//jar",
+        "@httpcore//jar",
     ],
 )
