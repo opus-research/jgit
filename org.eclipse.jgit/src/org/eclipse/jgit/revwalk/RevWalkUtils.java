@@ -45,11 +45,13 @@ package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.Ref;
@@ -108,8 +110,6 @@ public final class RevWalkUtils {
 	 * <p>
 	 * In order to improve performance this method assumes clock skew among
 	 * committers is never larger than 24 hours.
-	 * <p>
-	 * All commits must come from the RevWalk passed to this method
 	 *
 	 * @param commit
 	 *            the commit we are looking at
@@ -130,6 +130,7 @@ public final class RevWalkUtils {
 		List<Ref> result = new ArrayList<Ref>();
 		// searches from branches can be cut off early if any parent of the
 		// search-for commit is found. This is quite likely, so optimize for this.
+		revWalk.markStart(Arrays.asList(commit.getParents()));
 		ObjectIdSubclassMap<ObjectId> cutOff = new ObjectIdSubclassMap<ObjectId>();
 
 		final int SKEW = 24*3600; // one day clock skew
@@ -149,13 +150,13 @@ public final class RevWalkUtils {
 			RevCommit current;
 			Ref found = null;
 			while ((current = revWalk.next()) != null) {
-				if (current == commit) {
+				if (AnyObjectId.equals(current, commit)) {
 					found = ref;
 					break;
 				}
 				if (cutOff.contains(current))
 					break;
-				maybeCutOff.add(current);
+				maybeCutOff.add(current.toObjectId());
 			}
 			if (found != null)
 				result.add(ref);
