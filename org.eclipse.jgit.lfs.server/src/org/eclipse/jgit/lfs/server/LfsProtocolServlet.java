@@ -83,8 +83,7 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final String CONTENTTYPE_VND_GIT_LFS_JSON =
-			"application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
+	private static final String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json"; //$NON-NLS-1$
 
 	private Gson gson = createGson();
 
@@ -144,7 +143,6 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
 		String path = req.getPathInfo();
 
-		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 		LargeFileRepository repo = null;
 		try {
 			repo = getLargeFileRepository(request, path);
@@ -152,6 +150,7 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 				res.setStatus(SC_SERVICE_UNAVAILABLE);
 			} else {
 				res.setStatus(SC_OK);
+				res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 				TransferHandler handler = TransferHandler
 						.forOperation(request.operation, repo, request.objects);
 				gson.toJson(handler.process(), w);
@@ -184,9 +183,10 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	}
 
 	private Gson createGson() {
-		return new GsonBuilder()
-				.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.disableHtmlEscaping()
-				.create();
+		GsonBuilder gb = new GsonBuilder()
+				.setFieldNamingPolicy(
+						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+				.setPrettyPrinting().disableHtmlEscaping();
+		return gb.create();
 	}
 }
