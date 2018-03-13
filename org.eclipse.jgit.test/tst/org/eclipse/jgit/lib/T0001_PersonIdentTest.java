@@ -93,7 +93,7 @@ public class T0001_PersonIdentTest {
 				"  author@example.com  ");
 
 		assertEquals("  A U Thor  ", personIdent.getName());
-		assertEquals("  author@example.com  ", personIdent.getEmailAddress());
+		assertEquals("  author@example.com  ", personIdent.getName());
 
 		String externalString = personIdent.toExternalString();
 		assertTrue(externalString.startsWith("A U Thor <author@example.com>"));
