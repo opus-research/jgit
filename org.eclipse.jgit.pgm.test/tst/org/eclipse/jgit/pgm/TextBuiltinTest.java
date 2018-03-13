@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2017, Ned Twigg <ned.twigg@diffplug.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.pgm;
+
+import static org.eclipse.jgit.junit.JGitTestUtil.check;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.ResetCommand;
-import org.eclipse.jgit.api.ResetCommand.ResetType;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.eclipse.jgit.pgm.opt.CmdLineParser;
+import org.eclipse.jgit.pgm.opt.SubcommandHandler;
+import org.junit.Test;
 import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 
-@Command(common = true, usage = "usage_reset")
-class Reset extends TextBuiltin {
+public class TextBuiltinTest extends CLIRepositoryTestCase {
+	public static class GitCliJGitWrapperParser {
+		@Argument(index = 0, metaVar = "metaVar_command", required = true, handler = SubcommandHandler.class)
+		TextBuiltin subcommand;
 
-	@Option(name = "--soft", usage = "usage_resetSoft")
-	private boolean soft = false;
-
-	@Option(name = "--mixed", usage = "usage_resetMixed")
-	private boolean mixed = false;
-
-	@Option(name = "--hard", usage = "usage_resetHard")
-	private boolean hard = false;
-
-	@Argument(required = false, index = 0, metaVar = "metaVar_commitish", usage = "usage_resetReference")
-	private String commit;
-
-	@Argument(required = false, index = 1, metaVar = "metaVar_paths")
-	@Option(name = "--", metaVar = "metaVar_paths", handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<>();
-
-	@Override
-	protected void run() throws Exception {
-		try (Git git = new Git(db)) {
-			ResetCommand command = git.reset();
-			command.setRef(commit);
-			if (paths.size() > 0) {
-				for (String path : paths)
-					command.addPath(path);
-			} else {
-				ResetType mode = null;
-				if (soft)
-					mode = selectMode(mode, ResetType.SOFT);
-				if (mixed)
-					mode = selectMode(mode, ResetType.MIXED);
-				if (hard)
-					mode = selectMode(mode, ResetType.HARD);
-				if (mode == null)
-					throw die("no reset mode set"); //$NON-NLS-1$
-				command.setMode(mode);
-			}
-			command.call();
-		}
+		@Argument(index = 1, metaVar = "metaVar_arg")
+		List<String> arguments = new ArrayList<>();
 	}
 
-	private static ResetType selectMode(ResetType mode, ResetType want) {
-		if (mode != null)
-			throw die("reset modes are mutually exclusive, select one"); //$NON-NLS-1$
-		return want;
+	private String[] runAndCaptureUsingInitRaw(String... args)
+			throws Exception {
+		CLIGitCommand.Result result = new CLIGitCommand.Result();
+
+		GitCliJGitWrapperParser bean = new GitCliJGitWrapperParser();
+		final CmdLineParser clp = new CmdLineParser(bean);
+		clp.parseArgument(args);
+
+		final TextBuiltin cmd = bean.subcommand;
+		cmd.initRaw(db, null, null, result.out, result.err);
+		cmd.execute(bean.arguments.toArray(new String[bean.arguments.size()]));
+		if (cmd.getOutputWriter() != null) {
+			cmd.getOutputWriter().flush();
+		}
+		if (cmd.getErrorWriter() != null) {
+			cmd.getErrorWriter().flush();
+		}
+		return result.outLines().toArray(new String[0]);
+	}
+
+	@Test
+	public void testCleanDeleteDirs() throws Exception {
+		try (Git git = new Git(db)) {
+			git.commit().setMessage("initial commit").call();
+
+			writeTrashFile("dir/file", "someData");
+			writeTrashFile("a", "someData");
+			writeTrashFile("b", "someData");
+
+			// all these files should be there
+			assertTrue(check(db, "a"));
+			assertTrue(check(db, "b"));
+			assertTrue(check(db, "dir/file"));
+
+			assertArrayOfLinesEquals(new String[] { "Removing a", "Removing b",
+					"Removing dir/" },
+					runAndCaptureUsingInitRaw("clean", "-d", "-f"));
+			assertFalse(check(db, "a"));
+			assertFalse(check(db, "b"));
+			assertFalse(check(db, "dir/file"));
+		}
 	}
 }

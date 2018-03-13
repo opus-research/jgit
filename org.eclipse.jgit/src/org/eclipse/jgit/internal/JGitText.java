@@ -100,6 +100,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String blockSizeNotPowerOf2;
+	/***/ public String bothRefTargetsMustNotBeNull;
 	/***/ public String branchNameInvalid;
 	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
@@ -366,6 +367,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
+	/***/ public String httpConfigCannotNormalizeURL;
+	/***/ public String httpConfigInvalidURL;
 	/***/ public String hugeIndexesAreNotSupportedByJgitYet;
 	/***/ public String hunkBelongsToAnotherFile;
 	/***/ public String hunkDisconnectedFromFile;
@@ -491,6 +494,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String months;
 	/***/ public String monthsAgo;
 	/***/ public String multipleMergeBasesFor;
+	/***/ public String nameMustNotBeNullOrEmpty;
 	/***/ public String need2Arguments;
 	/***/ public String needPackOut;
 	/***/ public String needsAtLeastOneEntry;
@@ -664,6 +668,14 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceRefDoesntResolveToAnyObject;
 	/***/ public String sourceRefNotSpecifiedForRefspec;
 	/***/ public String squashCommitNotUpdatingHEAD;
+	/***/ public String sslFailureExceptionMessage;
+	/***/ public String sslFailureInfo;
+	/***/ public String sslFailureCause;
+	/***/ public String sslFailureTrustExplanation;
+	/***/ public String sslTrustAlways;
+	/***/ public String sslTrustForRepo;
+	/***/ public String sslTrustNow;
+	/***/ public String sslVerifyCannotSave;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String stashApplyConflict;
@@ -675,6 +687,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashDropDeleteRefFailed;
 	/***/ public String stashDropFailed;
 	/***/ public String stashDropMissingReflog;
+	/***/ public String stashDropNotSupported;
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;

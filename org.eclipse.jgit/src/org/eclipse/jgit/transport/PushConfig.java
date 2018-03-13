@@ -41,37 +41,39 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.transport;
 
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.util.StringUtils;
 
 /**
- * Submodule section of a Git configuration file.
+ * Push section of a Git configuration file.
  *
- * @since 4.7
+ * @since 4.9
  */
-public class SubmoduleConfig {
-
+public class PushConfig {
 	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
+	 * Config values for push.recurseSubmodules.
 	 */
-	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("true"), //$NON-NLS-1$
+	public enum PushRecurseSubmodulesMode implements Config.ConfigEnum {
+		/**
+		 * Verify that all submodule commits that changed in the revisions to be
+		 * pushed are available on at least one remote of the submodule.
+		 */
+		CHECK("check"), //$NON-NLS-1$
 
 		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
+		 * All submodules that changed in the revisions to be pushed will be
+		 * pushed.
 		 */
 		ON_DEMAND("on-demand"), //$NON-NLS-1$
 
-		/** Completely disable recursion. */
+		/** Default behavior of ignoring submodules when pushing is retained. */
 		NO("false"); //$NON-NLS-1$
 
 		private final String configValue;
 
-		private FetchRecurseSubmodulesMode(String configValue) {
+		private PushRecurseSubmodulesMode(String configValue) {
 			this.configValue = configValue;
 		}
 
