@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012, IBM Corporation and others.
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.internal.storage.file;
 
-import static org.eclipse.jgit.pgm.CLIGitCommand.split;
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
-public class CLIGitCommandTest {
+public class AutoGcTest extends GcTestCase {
 
 	@Test
-	public void testSplit() throws Exception {
-		assertArrayEquals(new String[0], split(""));
-		assertArrayEquals(new String[] { "a" }, split("a"));
-		assertArrayEquals(new String[] { "a", "b" }, split("a b"));
-		assertArrayEquals(new String[] { "a", "b c" }, split("a 'b c'"));
-		assertArrayEquals(new String[] { "a", "b c" }, split("a \"b c\""));
-		assertArrayEquals(new String[] { "a", "b\\c" }, split("a \"b\\c\""));
+	public void testNotTooManyLooseObjects() {
+		assertFalse("should not find too many loose objects",
+				gc.tooManyLooseObjects());
+	}
+
+	@Test
+	public void testTooManyLooseObjects() throws Exception {
+		FileBasedConfig c = repo.getConfig();
+		c.setInt(ConfigConstants.CONFIG_GC_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTO, 255);
+		c.save();
+		commitChain(10, 50);
+		assertTrue("should find too many loose objects",
+				gc.tooManyLooseObjects());
+	}
+
+	@Test
+	public void testNotTooManyPacks() {
+		assertFalse("should not find too many packs", gc.tooManyPacks());
+	}
+
+	@Test
+	public void testTooManyPacks() throws Exception {
+		FileBasedConfig c = repo.getConfig();
+		c.setInt(ConfigConstants.CONFIG_GC_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT, 1);
+		c.save();
+		SampleDataRepositoryTestCase.copyCGitTestPacks(repo);
+
+		assertTrue("should find too many packs", gc.tooManyPacks());
 	}
 }

@@ -435,7 +435,6 @@ public class RepoCommandTest extends RepositoryTestCase {
 			assertFalse(
 					"The foo/Hello file should be skipped", foohello.exists());
 			localDb.close();
-
 			// The content of Hello file should be expected
 			BufferedReader reader = new BufferedReader(new FileReader(hello));
 			String content = reader.readLine();

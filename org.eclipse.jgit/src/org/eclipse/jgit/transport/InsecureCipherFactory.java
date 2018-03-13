@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012, IBM Corporation and others.
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +40,26 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.eclipse.jgit.pgm.CLIGitCommand.split;
-import static org.junit.Assert.assertArrayEquals;
+package org.eclipse.jgit.transport;
 
-import org.junit.Test;
+import java.security.NoSuchAlgorithmException;
 
-public class CLIGitCommandTest {
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 
-	@Test
-	public void testSplit() throws Exception {
-		assertArrayEquals(new String[0], split(""));
-		assertArrayEquals(new String[] { "a" }, split("a"));
-		assertArrayEquals(new String[] { "a", "b" }, split("a b"));
-		assertArrayEquals(new String[] { "a", "b c" }, split("a 'b c'"));
-		assertArrayEquals(new String[] { "a", "b c" }, split("a \"b c\""));
-		assertArrayEquals(new String[] { "a", "b\\c" }, split("a \"b\\c\""));
+/**
+ * <b>DO NOT USE</b> Factory to create any cipher.
+ * <p>
+ * This is a hack for {@link WalkEncryption} to create any cipher configured by
+ * the end-user. Using this class allows JGit to violate ErrorProne's security
+ * recommendations (<a
+ * href="http://errorprone.info/bugpattern/InsecureCryptoUsage"
+ * >InsecureCryptoUsage</a>), which is not secure.
+ */
+class InsecureCipherFactory {
+	static Cipher create(String algo)
+			throws NoSuchAlgorithmException, NoSuchPaddingException {
+		return Cipher.getInstance(algo);
 	}
 }
