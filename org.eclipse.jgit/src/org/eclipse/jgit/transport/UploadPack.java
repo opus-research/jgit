@@ -57,12 +57,12 @@ import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.lib.GitRepository;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PackWriter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevFlagSet;
@@ -96,7 +96,7 @@ public class UploadPack {
 	static final String OPTION_NO_PROGRESS = BasePackFetchConnection.OPTION_NO_PROGRESS;
 
 	/** Database we read the objects from. */
-	private final GitRepository db;
+	private final Repository db;
 
 	/** Revision traversal support over {@link #db}. */
 	private final RevWalk walk;
@@ -171,7 +171,7 @@ public class UploadPack {
 	 * @param copyFrom
 	 *            the source repository.
 	 */
-	public UploadPack(final GitRepository copyFrom) {
+	public UploadPack(final Repository copyFrom) {
 		db = copyFrom;
 		walk = new RevWalk(db);
 		walk.setRetainBody(false);
@@ -190,7 +190,7 @@ public class UploadPack {
 	}
 
 	/** @return the repository this upload is reading from. */
-	public final GitRepository getRepository() {
+	public final Repository getRepository() {
 		return db;
 	}
 
@@ -428,9 +428,9 @@ public class UploadPack {
 			if (line == PacketLineIn.END) {
 				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
 					pckOut.writeString("NAK\n");
+				pckOut.flush();
 				if (!biDirectionalPipe)
 					return false;
-				pckOut.flush();
 
 			} else if (line.startsWith("have ") && line.length() == 45) {
 				final ObjectId id = ObjectId.fromString(line.substring(5));

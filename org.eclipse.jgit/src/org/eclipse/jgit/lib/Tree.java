@@ -157,7 +157,7 @@ public class Tree extends TreeEntry implements Treeish {
 		return -(low + 1);
 	}
 
-	private final GitRepository db;
+	private final Repository db;
 
 	private TreeEntry[] contents;
 
@@ -166,7 +166,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 *
 	 * @param repo The repository that owns the Tree.
 	 */
-	public Tree(final GitRepository repo) {
+	public Tree(final Repository repo) {
 		super(null, null, null);
 		db = repo;
 		contents = EMPTY_TREE;
@@ -180,7 +180,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 * @param raw
 	 * @throws IOException
 	 */
-	public Tree(final GitRepository repo, final ObjectId myId, final byte[] raw)
+	public Tree(final Repository repo, final ObjectId myId, final byte[] raw)
 			throws IOException {
 		super(null, myId, null);
 		db = repo;
@@ -223,7 +223,7 @@ public class Tree extends TreeEntry implements Treeish {
 		return getParent() == null;
 	}
 
-	public GitRepository getRepository() {
+	public Repository getRepository() {
 		return db;
 	}
 
@@ -530,7 +530,7 @@ public class Tree extends TreeEntry implements Treeish {
 
 	private void ensureLoaded() throws IOException, MissingObjectException {
 		if (!isLoaded()) {
-			final ObjectLoader or = db.openObject(getId());
+			final ObjectLoader or = db.openTree(getId());
 			if (or == null)
 				throw new MissingObjectException(getId(), Constants.TYPE_TREE);
 			readTree(or.getBytes());

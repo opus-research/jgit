@@ -167,7 +167,7 @@ public class PackWriter {
 	// edge objects for thin packs
 	private final ObjectIdSubclassMap<ObjectId> edgeObjects = new ObjectIdSubclassMap<ObjectId>();
 
-	private final GitRepository db;
+	private final Repository db;
 
 	private PackOutputStream out;
 
@@ -233,15 +233,13 @@ public class PackWriter {
 	 *            operations progress monitor, used within
 	 *            {@link #writePack(OutputStream)}.
 	 */
-	public PackWriter(final GitRepository repo, final ProgressMonitor imonitor,
+	public PackWriter(final Repository repo, final ProgressMonitor imonitor,
 			final ProgressMonitor wmonitor) {
 		this.db = repo;
 		initMonitor = imonitor == null ? NullProgressMonitor.INSTANCE : imonitor;
 		writeMonitor = wmonitor == null ? NullProgressMonitor.INSTANCE : wmonitor;
-
-		final CoreConfig coreConfig = db.getConfig().get(CoreConfig.KEY);
-		this.deflater = new Deflater(coreConfig.getCompression());
-		this.outputVersion = coreConfig.getPackIndexVersion();
+		this.deflater = new Deflater(db.getConfig().getCore().getCompression());
+		outputVersion = repo.getConfig().getCore().getPackIndexVersion();
 	}
 
 	/**
@@ -621,7 +619,7 @@ public class PackWriter {
 	private void searchForReuse(
 			final Collection<PackedObjectLoader> reuseLoaders,
 			final ObjectToPack otp) throws IOException {
-		db.getObjectDatabase().openObjectInAllPacks(reuseLoaders, windowCursor, otp);
+		db.openObjectInAllPacks(otp, reuseLoaders, windowCursor);
 		if (reuseDeltas) {
 			selectDeltaReuseForObject(otp, reuseLoaders);
 		}
@@ -821,7 +819,8 @@ public class PackWriter {
 			IncorrectObjectTypeException {
 		final ObjectWalk walker = new ObjectWalk(db);
 		walker.setRetainBody(false);
-		walker.sort(RevSort.COMMIT_TIME_DESC);
+		walker.sort(RevSort.TOPO);
+		walker.sort(RevSort.COMMIT_TIME_DESC, true);
 		if (thin)
 			walker.sort(RevSort.BOUNDARY, true);
 

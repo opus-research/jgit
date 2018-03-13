@@ -53,20 +53,18 @@ import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Tag;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 
 /** Specialized RevWalk for visualization of a commit graph. */
 public class PlotWalk extends RevWalk {
 
-	private Map<ObjectId, Set<Ref>> reverseRefMap;
+	private Map<AnyObjectId, Set<Ref>> reverseRefMap;
 
 	@Override
 	public void dispose() {
@@ -117,8 +115,8 @@ public class PlotWalk extends RevWalk {
 	class PlotRefComparator implements Comparator<Ref> {
 		public int compare(Ref o1, Ref o2) {
 			try {
-				RevObject obj1 = parseAny(o1.getObjectId());
-				RevObject obj2 = parseAny(o2.getObjectId());
+				Object obj1 = getRepository().mapObject(o1.getObjectId(), o1.getName());
+				Object obj2 = getRepository().mapObject(o2.getObjectId(), o2.getName());
 				long t1 = timeof(obj1);
 				long t2 = timeof(obj2);
 				if (t1 > t2)
@@ -131,15 +129,11 @@ public class PlotWalk extends RevWalk {
 				return 0;
 			}
 		}
-
-		long timeof(RevObject o) {
-			if (o instanceof RevCommit)
-				return ((RevCommit) o).getCommitTime();
-			if (o instanceof RevTag) {
-				RevTag tag = (RevTag) o;
-				PersonIdent who = tag.getTaggerIdent();
-				return who != null ? who.getWhen().getTime() : 0;
-			}
+		long timeof(Object o) {
+			if (o instanceof Commit)
+				return ((Commit)o).getCommitter().getWhen().getTime();
+			if (o instanceof Tag)
+				return ((Tag)o).getTagger().getWhen().getTime();
 			return 0;
 		}
 	}

@@ -76,8 +76,6 @@ import org.eclipse.jgit.util.FS;
 public class ObjectDirectory extends ObjectDatabase {
 	private static final PackList NO_PACKS = new PackList(-1, -1, new PackFile[0]);
 
-	private final Config config;
-
 	private final File objects;
 
 	private final File infoDirectory;
@@ -95,8 +93,6 @@ public class ObjectDirectory extends ObjectDatabase {
 	/**
 	 * Initialize a reference to an on-disk object directory.
 	 *
-	 * @param cfg
-	 *            configuration this directory consults for write settings.
 	 * @param dir
 	 *            the location of the <code>objects</code> directory.
 	 * @param alternateObjectDir
@@ -105,8 +101,7 @@ public class ObjectDirectory extends ObjectDatabase {
 	 *            the file system abstraction which will be necessary to
 	 *            perform certain file system operations.
 	 */
-	public ObjectDirectory(final Config cfg, final File dir, File[] alternateObjectDir, FS fs) {
-		config = cfg;
+	public ObjectDirectory(final File dir, File[] alternateObjectDir, FS fs) {
 		objects = dir;
 		this.alternateObjectDir = alternateObjectDir;
 		infoDirectory = new File(objects, "info");
@@ -133,11 +128,6 @@ public class ObjectDirectory extends ObjectDatabase {
 		objects.mkdirs();
 		infoDirectory.mkdir();
 		packDirectory.mkdir();
-	}
-
-	@Override
-	public ObjectInserter newInserter() {
-		return new ObjectDirectoryInserter(this, config);
 	}
 
 	@Override
@@ -511,7 +501,7 @@ public class ObjectDirectory extends ObjectDatabase {
 			final Repository db = RepositoryCache.open(FileKey.exact(parent, fs));
 			return new AlternateRepositoryDatabase(db);
 		}
-		return new ObjectDirectory(config, objdir, null, fs);
+		return new ObjectDirectory(objdir, null, fs);
 	}
 
 	private static final class PackList {

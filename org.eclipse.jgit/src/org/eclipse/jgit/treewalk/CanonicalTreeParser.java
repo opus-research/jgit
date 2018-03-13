@@ -52,7 +52,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.GitRepository;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -148,7 +147,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 * @throws IOException
 	 *             a loose object or pack file could not be read.
 	 */
-	public CanonicalTreeParser resetRoot(final GitRepository repo,
+	public CanonicalTreeParser resetRoot(final Repository repo,
 			final AnyObjectId id, final WindowCursor curs)
 			throws IncorrectObjectTypeException, IOException {
 		CanonicalTreeParser p = this;
@@ -197,7 +196,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 * @throws IOException
 	 *             a loose object or pack file could not be read.
 	 */
-	public void reset(final GitRepository repo, final AnyObjectId id,
+	public void reset(final Repository repo, final AnyObjectId id,
 			final WindowCursor curs)
 			throws IncorrectObjectTypeException, IOException {
 		final ObjectLoader ldr = repo.openObject(curs, id);
@@ -214,7 +213,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	}
 
 	@Override
-	public CanonicalTreeParser createSubtreeIterator(final GitRepository repo,
+	public CanonicalTreeParser createSubtreeIterator(final Repository repo,
 			final MutableObjectId idBuffer, final WindowCursor curs)
 			throws IncorrectObjectTypeException, IOException {
 		idBuffer.fromRaw(idBuffer(), idOffset());
@@ -243,14 +242,14 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 *             a loose object or pack file could not be read.
 	 */
 	public final CanonicalTreeParser createSubtreeIterator0(
-			final GitRepository repo, final AnyObjectId id,
-			final WindowCursor curs) throws IOException {
+			final Repository repo, final AnyObjectId id, final WindowCursor curs)
+			throws IOException {
 		final CanonicalTreeParser p = new CanonicalTreeParser(this);
 		p.reset(repo, id, curs);
 		return p;
 	}
 
-	public CanonicalTreeParser createSubtreeIterator(final GitRepository repo)
+	public CanonicalTreeParser createSubtreeIterator(final Repository repo)
 			throws IncorrectObjectTypeException, IOException {
 		final WindowCursor curs = new WindowCursor();
 		try {
