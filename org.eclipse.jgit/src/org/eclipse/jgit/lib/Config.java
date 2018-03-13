@@ -134,24 +134,24 @@ public class Config {
 					r.append('"');
 					inquote = false;
 				}
-				r.append("\\n\\\n");
+				r.append("\\n\\\n"); //$NON-NLS-1$
 				lineStart = r.length();
 				break;
 
 			case '\t':
-				r.append("\\t");
+				r.append("\\t"); //$NON-NLS-1$
 				break;
 
 			case '\b':
-				r.append("\\b");
+				r.append("\\b"); //$NON-NLS-1$
 				break;
 
 			case '\\':
-				r.append("\\\\");
+				r.append("\\\\"); //$NON-NLS-1$
 				break;
 
 			case '"':
-				r.append("\\\"");
+				r.append("\\\""); //$NON-NLS-1$
 				break;
 
 			case ';':
@@ -354,7 +354,7 @@ public class Config {
 	@SuppressWarnings("unchecked")
 	private static <T> T[] allValuesOf(final T value) {
 		try {
-			return (T[]) value.getClass().getMethod("values").invoke(null);
+			return (T[]) value.getClass().getMethod("values").invoke(null); //$NON-NLS-1$
 		} catch (Exception err) {
 			String typeName = value.getClass().getName();
 			String msg = MessageFormat.format(
@@ -388,14 +388,20 @@ public class Config {
 			return defaultValue;
 
 		String n = value.replace(' ', '_');
+
+		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
+		// the real world before its breakage was fully understood, we must
+		// also accept '-' as though it were ' '.
+		n = n.replace('-', '_');
+
 		T trueState = null;
 		T falseState = null;
 		for (T e : all) {
 			if (StringUtils.equalsIgnoreCase(e.name(), n))
 				return e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE"))
+			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE")) //$NON-NLS-1$
 				trueState = e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE"))
+			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE")) //$NON-NLS-1$
 				falseState = e;
 		}
 
@@ -412,11 +418,13 @@ public class Config {
 		}
 
 		if (subsection != null)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText
-					.get().enumValueNotSupported3, section, name, value));
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().enumValueNotSupported3, section, subsection,
+					name, value));
 		else
-			throw new IllegalArgumentException(MessageFormat.format(JGitText
-					.get().enumValueNotSupported2, section, name, value));
+			throw new IllegalArgumentException(
+					MessageFormat.format(JGitText.get().enumValueNotSupported2,
+							section, name, value));
 	}
 
 	/**
@@ -664,11 +672,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + " g";
+			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + " m";
+			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + " k";
+			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
 		else
 			s = String.valueOf(value);
 
@@ -695,7 +703,7 @@ public class Config {
 	 */
 	public void setBoolean(final String section, final String subsection,
 			final String name, final boolean value) {
-		setString(section, subsection, name, value ? "true" : "false");
+		setString(section, subsection, name, value ? "true" : "false"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 	/**
@@ -937,8 +945,8 @@ public class Config {
 					out.append(' ');
 					String escaped = escapeValue(e.subsection);
 					// make sure to avoid double quotes here
-					boolean quoted = escaped.startsWith("\"")
-							&& escaped.endsWith("\"");
+					boolean quoted = escaped.startsWith("\"") //$NON-NLS-1$
+							&& escaped.endsWith("\""); //$NON-NLS-1$
 					if (!quoted)
 						out.append('"');
 					out.append(escaped);
@@ -947,11 +955,11 @@ public class Config {
 				}
 				out.append(']');
 			} else if (e.section != null && e.name != null) {
-				if (e.prefix == null || "".equals(e.prefix))
+				if (e.prefix == null || "".equals(e.prefix)) //$NON-NLS-1$
 					out.append('\t');
 				out.append(e.name);
 				if (MAGIC_EMPTY_VALUE != e.value) {
-					out.append(" =");
+					out.append(" ="); //$NON-NLS-1$
 					if (e.value != null) {
 						out.append(' ');
 						out.append(escapeValue(e.value));
@@ -1005,7 +1013,7 @@ public class Config {
 			} else if (e.section == null && Character.isWhitespace(c)) {
 				// Save the leading whitespace (if any).
 				if (e.prefix == null)
-					e.prefix = "";
+					e.prefix = ""; //$NON-NLS-1$
 				e.prefix += c;
 
 			} else if ('[' == c) {
@@ -1018,7 +1026,7 @@ public class Config {
 				}
 				if (']' != input)
 					throw new ConfigInvalidException(JGitText.get().badGroupHeader);
-				e.suffix = "";
+				e.suffix = ""; //$NON-NLS-1$
 
 			} else if (last != null) {
 				// Read a value.
@@ -1026,7 +1034,7 @@ public class Config {
 				e.subsection = last.subsection;
 				in.reset();
 				e.name = readKeyName(in);
-				if (e.name.endsWith("\n")) {
+				if (e.name.endsWith("\n")) { //$NON-NLS-1$
 					e.name = e.name.substring(0, e.name.length() - 1);
 					e.value = MAGIC_EMPTY_VALUE;
 				} else
