@@ -179,10 +179,6 @@ public class UploadPack {
 
 	private MultiAck multiAck = MultiAck.OFF;
 
-	private PackWriter.Statistics statistics;
-
-	private UploadPackLogger logger;
-
 	/**
 	 * Create a new pack upload for an open repository.
 	 *
@@ -288,16 +284,6 @@ public class UploadPack {
 	}
 
 	/**
-	 * Set the logger.
-	 *
-	 * @param logger
-	 *            the logger instance. If null, no logging occurs.
-	 */
-	public void setLogger(UploadPackLogger logger) {
-		this.logger = logger;
-	}
-
-	/**
 	 * Execute the upload task on the socket.
 	 *
 	 * @param input
@@ -344,17 +330,6 @@ public class UploadPack {
 				}
 			}
 		}
-	}
-
-	/**
-	 * Get the PackWriter's statistics if a pack was sent to the client.
-	 *
-	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
-	 *         connection, or if the client was already up-to-date.
-	 */
-	public PackWriter.Statistics getPackStatistics() {
-		return statistics;
 	}
 
 	private void service() throws IOException {
@@ -729,7 +704,7 @@ public class UploadPack {
 			}
 
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-			statistics = pw.getStatistics();
+			packOut.flush();
 
 			if (msgOut != null) {
 				String msg = pw.getStatistics().getMessage() + '\n';
@@ -743,8 +718,5 @@ public class UploadPack {
 
 		if (sideband)
 			pckOut.end();
-
-		if (logger != null && statistics != null)
-			logger.onPackStatistics(statistics);
 	}
 }

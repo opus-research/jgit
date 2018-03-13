@@ -246,6 +246,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		List<ObjectId> remoteObjects = new ArrayList<ObjectId>(getRefs().size());
 		List<ObjectId> newObjects = new ArrayList<ObjectId>(refUpdates.size());
 
+		final long start;
 		final PackWriter writer = new PackWriter(transport.getPackConfig(),
 				local.newObjectReader());
 		try {
@@ -262,11 +263,13 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			writer.setThin(thinPack);
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
+			start = System.currentTimeMillis();
 			writer.writePack(monitor, monitor, out);
 		} finally {
 			writer.release();
 		}
-		packTransferTime = writer.getStatistics().getTimeWriting();
+		out.flush();
+		packTransferTime = System.currentTimeMillis() - start;
 	}
 
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)
