@@ -175,9 +175,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	private int delayFreeFlags;
 
 	private int retainOnReset;
-
-	private final boolean closeReader;
-
 	int carryFlags = UNINTERESTING;
 
 	final ArrayList<RevCommit> roots;
@@ -203,27 +200,22 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 *
 	 * @param repo
 	 *            the repository the walker will obtain data from. An
-	 *            ObjectReader will be created by the walker, and will be closed
-	 *            when the walker is closed.
+	 *            ObjectReader will be created by the walker, and must be
+	 *            released by the caller.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo.newObjectReader(), true);
+		this(repo.newObjectReader());
 	}
 
 	/**
 	 * Create a new revision walker for a given repository.
-	 * <p>
 	 *
 	 * @param or
-	 *            the reader the walker will obtain data from. The reader is not
-	 *            closed when the walker is closed (but is closed by {@link
-	 *            #dispose()}.
+	 *            the reader the walker will obtain data from. The reader should
+	 *            be released by the caller when the walker is no longer
+	 *            required.
 	 */
 	public RevWalk(ObjectReader or) {
-		this(or, false);
-	}
-
-	private RevWalk(ObjectReader or, boolean closeReader) {
 		reader = or;
 		idBuffer = new MutableObjectId();
 		objects = new ObjectIdOwnerMap<RevObject>();
@@ -234,7 +226,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
 		retainBody = true;
-		this.closeReader = closeReader;
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -263,9 +254,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		if (closeReader) {
-			reader.close();
-		}
+		reader.close();
 	}
 
 	/**
@@ -1295,13 +1284,13 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * All RevFlag instances are also invalidated, and must not be reused.
 	 */
 	public void dispose() {
-		reader.release();
+		reader.close();
 		freeFlags = APP_FLAGS;
 		delayFreeFlags = 0;
 		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
-		reader.release();
+		reader.close();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
