@@ -42,10 +42,8 @@
  */
 package org.eclipse.jgit.api;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
@@ -101,15 +99,6 @@ public class RebaseResult {
 		 * Failed; the original HEAD was restored
 		 */
 		FAILED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * The repository contains uncomitted changes
-		 */
-		UNCOMMITTED_CHANGES {
 			@Override
 			public boolean isSuccessful() {
 				return false;
@@ -196,23 +185,27 @@ public class RebaseResult {
 
 	private List<String> conflicts;
 
-	private Set<String> uncommittedChanges;
-
 	private RebaseResult(Status status) {
 		this.status = status;
 		currentCommit = null;
 	}
 
-	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#STOPPED}
-	 *
-	 * @param commit
-	 *            current commit
-	 * @param status
-	 */
-	RebaseResult(RevCommit commit, RebaseResult.Status status) {
+	private RebaseResult(Status status, RevCommit commit) {
 		this.status = status;
 		currentCommit = commit;
+	}
+
+	/**
+	 * Create <code>RebaseResult</code>
+	 * 
+	 * @param status
+	 * @param commit
+	 *            current commit
+	 * @return the RebaseResult
+	 */
+	static RebaseResult result(RebaseResult.Status status,
+			RevCommit commit) {
+		return new RebaseResult(status, commit);
 	}
 
 	/**
@@ -220,11 +213,13 @@ public class RebaseResult {
 	 *
 	 * @param failingPaths
 	 *            list of paths causing this rebase to fail
+	 * @return the RebaseResult
 	 */
-	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
-		status = Status.FAILED;
-		currentCommit = null;
-		this.failingPaths = failingPaths;
+	static RebaseResult failed(
+			Map<String, MergeFailureReason> failingPaths) {
+		RebaseResult result = new RebaseResult(Status.FAILED);
+		result.failingPaths = failingPaths;
+		return result;
 	}
 
 	/**
@@ -232,24 +227,12 @@ public class RebaseResult {
 	 *
 	 * @param conflicts
 	 *            the list of conflicting paths
+	 * @return the RebaseResult
 	 */
-	RebaseResult(List<String> conflicts) {
-		status = Status.CONFLICTS;
-		currentCommit = null;
-		this.conflicts = conflicts;
-	}
-
-	/**
-	 * Create <code>RebaseResult</code> with status
-	 * {@link Status#UNCOMMITTED_CHANGES}
-	 *
-	 * @param uncommittedChanges
-	 *            the list of paths
-	 */
-	RebaseResult(Set<String> uncommittedChanges) {
-		status = Status.UNCOMMITTED_CHANGES;
-		currentCommit = null;
-		this.uncommittedChanges = uncommittedChanges;
+	static RebaseResult conflicts(List<String> conflicts) {
+		RebaseResult result = new RebaseResult(Status.CONFLICTS);
+		result.conflicts = conflicts;
+		return result;
 	}
 
 	/**
@@ -282,15 +265,4 @@ public class RebaseResult {
 	public List<String> getConflicts() {
 		return conflicts;
 	}
-
-	/**
-	 * @return the list of uncommitted changes if status is
-	 *         {@link Status#UNCOMMITTED_CHANGES}
-	 */
-	public List<String> getUncommittedChanges() {
-		List<String> list = new ArrayList<String>();
-		list.addAll(uncommittedChanges);
-		return list;
-	}
-
 }
