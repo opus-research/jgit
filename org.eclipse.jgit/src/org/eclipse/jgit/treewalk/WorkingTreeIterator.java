@@ -67,7 +67,6 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
@@ -84,7 +83,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
@@ -831,11 +829,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @param reader
 	 *            access to repository objects if necessary. Should not be null.
 	 * @return true if content is most likely different.
-	 * @throws IOException
 	 * @since 3.3
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
-			ObjectReader reader) throws IOException {
+			ObjectReader reader) {
 		MetadataDiff diff = compareMetadata(entry);
 		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
@@ -853,8 +850,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		case EQUAL:
 			return false;
 		case DIFFER_BY_METADATA:
-			if (mode == FileMode.SYMLINK.getBits())
-				return contentCheck(entry, reader);
 			return true;
 		default:
 			throw new IllegalStateException(MessageFormat.format(
@@ -898,10 +893,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            acccess to repository data if necessary
 	 * @return <code>true</code> if the content doesn't match,
 	 *         <code>false</code> if it matches
-	 * @throws IOException
 	 */
-	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader)
-			throws IOException {
+	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader) {
 		if (getEntryObjectId().equals(entry.getObjectId())) {
 			// Content has not changed
 
@@ -917,9 +910,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 			return false;
 		} else {
-			if (mode == FileMode.SYMLINK.getBits())
-				return !new File(readContentAsString(current()))
-						.equals(new File(readContentAsString(entry)));
 			// Content differs: that's a real change, perhaps
 			if (reader == null) // deprecated use, do no further checks
 				return true;
@@ -966,21 +956,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 			return true;
 		}
-	}
-
-	private String readContentAsString(DirCacheEntry entry)
-			throws MissingObjectException, IOException {
-		ObjectLoader open = repository.open(entry.getObjectId());
-		byte[] cachedBytes = open.getCachedBytes();
-		return RawParseUtils.decode(cachedBytes);
-	}
-
-	private static String readContentAsString(Entry entry) throws IOException {
-		long length = entry.getLength();
-		byte[] content = new byte[(int) length];
-		InputStream is = entry.openInputStream();
-		IO.readFully(is, content, 0, (int) length);
-		return RawParseUtils.decode(content);
 	}
 
 	private long computeLength(InputStream in) throws IOException {
