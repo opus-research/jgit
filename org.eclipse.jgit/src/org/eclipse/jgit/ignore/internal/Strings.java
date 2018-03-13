@@ -123,15 +123,12 @@ public class Strings {
 	static int count(String s, char c, boolean ignoreFirstLast) {
 		int start = 0;
 		int count = 0;
-		int length = s.length();
-		while (start < length) {
+		while (true) {
 			start = s.indexOf(c, start);
-			if (start == -1) {
+			if (start == -1)
 				break;
-			}
-			if (!ignoreFirstLast || (start != 0 && start != length - 1)) {
+			if (!ignoreFirstLast || (start != 0 && start != s.length()))
 				count++;
-			}
 			start++;
 		}
 		return count;
