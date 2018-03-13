@@ -108,6 +108,12 @@ public class ConfigConstants {
 	public static final String CONFIG_PULL_SECTION = "pull";
 
 	/**
+	 * The "merge" section
+	 * @since 4.9
+	 */
+	public static final String CONFIG_MERGE_SECTION = "merge";
+
+	/**
 	 * The "filter" section
 	 * @since 4.6
 	 */
@@ -363,6 +369,13 @@ public class ConfigConstants {
 	 * @since 3.0
 	 */
 	public static final String CONFIG_KEY_RENAMES = "renames";
+
+	/**
+	 * The "inCoreLimit" key in the "merge section". It's a size limit (bytes) used to
+	 * control a file to be stored in {@code Heap} or {@code LocalFile} during the merge.
+	 * @since 4.9
+	 */
+	public static final String CONFIG_KEY_IN_CORE_LIMIT = "inCoreLimit";
 
 	/**
 	 * The "prune" key
