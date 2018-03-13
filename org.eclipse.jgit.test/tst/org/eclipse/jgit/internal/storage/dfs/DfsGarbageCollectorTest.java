@@ -9,16 +9,17 @@ import static org.eclipse.jgit.internal.storage.pack.PackExt.REFTABLE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
+import org.eclipse.jgit.internal.storage.dfs.DfsRefDatabase;
 import org.eclipse.jgit.internal.storage.reftable.RefCursor;
 import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
 import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
@@ -722,7 +723,7 @@ public class DfsGarbageCollectorTest {
 
 		DfsPackDescription t1 = odb.newPack(INSERT);
 		try (DfsOutputStream out = odb.writeFile(t1, REFTABLE)) {
-			out.write("ignored".getBytes(StandardCharsets.UTF_8));
+			new ReftableWriter().begin(out).finish();
 			t1.addFileExt(REFTABLE);
 		}
 		odb.commitPack(Collections.singleton(t1), null);
@@ -739,9 +740,9 @@ public class DfsGarbageCollectorTest {
 		assertTrue("commit0 in pack", isObjectInPack(commit0, pack));
 		assertTrue("commit1 in pack", isObjectInPack(commit1, pack));
 
-		// Only INSERT REFTABLE above is present.
+		// A GC and the older INSERT REFTABLE above is present.
 		DfsReftable[] tables = odb.getReftables();
-		assertEquals(1, tables.length);
+		assertEquals(2, tables.length);
 		assertEquals(t1, tables[0].getPackDescription());
 	}
 
@@ -754,7 +755,7 @@ public class DfsGarbageCollectorTest {
 
 		DfsPackDescription t1 = odb.newPack(INSERT);
 		try (DfsOutputStream out = odb.writeFile(t1, REFTABLE)) {
-			out.write("ignored".getBytes(StandardCharsets.UTF_8));
+			new ReftableWriter().begin(out).finish();
 			t1.addFileExt(REFTABLE);
 		}
 		odb.commitPack(Collections.singleton(t1), null);
@@ -841,6 +842,106 @@ public class DfsGarbageCollectorTest {
 
 			assertFalse(rc.next());
 		}
+	}
+
+	@Test
+	public void reftableWithoutTombstoneResurrected() throws Exception {
+		RevCommit commit0 = commit().message("0").create();
+		String NEXT = "refs/heads/next";
+		DfsRefDatabase refdb = (DfsRefDatabase)repo.getRefDatabase();
+		git.update(NEXT, commit0);
+		Ref next = refdb.exactRef(NEXT);
+		assertNotNull(next);
+		assertEquals(commit0, next.getObjectId());
+
+		git.delete(NEXT);
+		refdb.clearCache();
+		assertNull(refdb.exactRef(NEXT));
+
+		DfsGarbageCollector gc = new DfsGarbageCollector(repo);
+		gc.setReftableConfig(new ReftableConfig());
+		gc.setIncludeDeletes(false);
+		gc.setConvertToReftable(false);
+		run(gc);
+		assertEquals(1, odb.getReftables().length);
+		try (DfsReader ctx = odb.newReader();
+			 ReftableReader rr = odb.getReftables()[0].open(ctx)) {
+			rr.setIncludeDeletes(true);
+			assertEquals(1, rr.minUpdateIndex());
+			assertEquals(2, rr.maxUpdateIndex());
+			assertNull(rr.exactRef(NEXT));
+		}
+
+		RevCommit commit1 = commit().message("1").create();
+		DfsPackDescription t1 = odb.newPack(INSERT);
+		Ref newNext = new ObjectIdRef.PeeledNonTag(Ref.Storage.LOOSE, NEXT,
+				commit1);
+		try (DfsOutputStream out = odb.writeFile(t1, REFTABLE)) {
+			ReftableWriter w = new ReftableWriter();
+			w.setMinUpdateIndex(1);
+			w.setMaxUpdateIndex(1);
+			w.begin(out);
+			w.writeRef(newNext, 1);
+			w.finish();
+			t1.addFileExt(REFTABLE);
+			t1.setReftableStats(w.getStats());
+		}
+		odb.commitPack(Collections.singleton(t1), null);
+		assertEquals(2, odb.getReftables().length);
+		refdb.clearCache();
+		newNext = refdb.exactRef(NEXT);
+		assertNotNull(newNext);
+		assertEquals(commit1, newNext.getObjectId());
+	}
+
+	@Test
+	public void reftableWithTombstoneNotResurrected() throws Exception {
+		RevCommit commit0 = commit().message("0").create();
+		String NEXT = "refs/heads/next";
+		DfsRefDatabase refdb = (DfsRefDatabase)repo.getRefDatabase();
+		git.update(NEXT, commit0);
+		Ref next = refdb.exactRef(NEXT);
+		assertNotNull(next);
+		assertEquals(commit0, next.getObjectId());
+
+		git.delete(NEXT);
+		refdb.clearCache();
+		assertNull(refdb.exactRef(NEXT));
+
+		DfsGarbageCollector gc = new DfsGarbageCollector(repo);
+		gc.setReftableConfig(new ReftableConfig());
+		gc.setIncludeDeletes(true);
+		gc.setConvertToReftable(false);
+		run(gc);
+		assertEquals(1, odb.getReftables().length);
+		try (DfsReader ctx = odb.newReader();
+			 ReftableReader rr = odb.getReftables()[0].open(ctx)) {
+			rr.setIncludeDeletes(true);
+			assertEquals(1, rr.minUpdateIndex());
+			assertEquals(2, rr.maxUpdateIndex());
+			next = rr.exactRef(NEXT);
+			assertNotNull(next);
+			assertNull(next.getObjectId());
+		}
+
+		RevCommit commit1 = commit().message("1").create();
+		DfsPackDescription t1 = odb.newPack(INSERT);
+		Ref newNext = new ObjectIdRef.PeeledNonTag(Ref.Storage.LOOSE, NEXT,
+				commit1);
+		try (DfsOutputStream out = odb.writeFile(t1, REFTABLE)) {
+			ReftableWriter w = new ReftableWriter();
+			w.setMinUpdateIndex(1);
+			w.setMaxUpdateIndex(1);
+			w.begin(out);
+			w.writeRef(newNext, 1);
+			w.finish();
+			t1.addFileExt(REFTABLE);
+			t1.setReftableStats(w.getStats());
+		}
+		odb.commitPack(Collections.singleton(t1), null);
+		assertEquals(2, odb.getReftables().length);
+		refdb.clearCache();
+		assertNull(refdb.exactRef(NEXT));
 	}
 
 	private TestRepository<InMemoryRepository>.CommitBuilder commit() {
