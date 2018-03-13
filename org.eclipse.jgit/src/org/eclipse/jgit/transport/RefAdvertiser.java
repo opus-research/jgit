@@ -61,35 +61,12 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 
 /** Support for the start of {@link UploadPack} and {@link ReceivePack}. */
-public abstract class RefAdvertiser {
-	/** Advertiser which frames lines in a {@link PacketLineOut} format. */
-	public static class PacketLineOutRefAdvertiser extends RefAdvertiser {
-		private final PacketLineOut pckOut;
+class RefAdvertiser {
+	private final PacketLineOut pckOut;
 
-		/**
-		 * Create a new advertiser for the supplied stream.
-		 *
-		 * @param out
-		 *            the output stream.
-		 */
-		public PacketLineOutRefAdvertiser(PacketLineOut out) {
-			pckOut = out;
-		}
+	private final RevWalk walk;
 
-		@Override
-		protected void writeOne(final CharSequence line) throws IOException {
-			pckOut.writeString(line.toString());
-		}
-
-		@Override
-		protected void end() throws IOException {
-			pckOut.end();
-		}
-	}
-
-	private RevWalk walk;
-
-	private RevFlag ADVERTISED;
+	private final RevFlag ADVERTISED;
 
 	private final StringBuilder tmpLine = new StringBuilder(100);
 
@@ -101,72 +78,22 @@ public abstract class RefAdvertiser {
 
 	private boolean first = true;
 
-	/**
-	 * Initialize a new advertisement formatter.
-	 *
-	 * @param protoWalk
-	 *            the RevWalk used to parse objects that are advertised.
-	 * @param advertisedFlag
-	 *            flag marked on any advertised objects parsed out of the
-	 *            {@code protoWalk}'s object pool, permitting the caller to
-	 *            later quickly determine if an object was advertised (or not).
-	 */
-	public void init(final RevWalk protoWalk, final RevFlag advertisedFlag) {
+	RefAdvertiser(final PacketLineOut out, final RevWalk protoWalk,
+			final RevFlag advertisedFlag) {
+		pckOut = out;
 		walk = protoWalk;
 		ADVERTISED = advertisedFlag;
 	}
 
-	/**
-	 * Toggle tag peeling.
-	 * <p>
-	 * <p>
-	 * This method must be invoked prior to any of the following:
-	 * <ul>
-	 * <li>{@link #send(Collection)}
-	 * <li>{@link #advertiseHave(AnyObjectId)}
-	 * <li>{@link #includeAdditionalHaves()}
-	 * </ul>
-	 *
-	 * @param deref
-	 *            true to show the dereferenced value of a tag as the special
-	 *            ref <code>$tag^{}</code> ; false to omit it from the output.
-	 */
-	public void setDerefTags(final boolean deref) {
+	void setDerefTags(final boolean deref) {
 		derefTags = deref;
 	}
 
-	/**
-	 * Add one protocol capability to the initial advertisement.
-	 * <p>
-	 * This method must be invoked prior to any of the following:
-	 * <ul>
-	 * <li>{@link #send(Collection)}
-	 * <li>{@link #advertiseHave(AnyObjectId)}
-	 * <li>{@link #includeAdditionalHaves()}
-	 * </ul>
-	 *
-	 * @param name
-	 *            the name of a single protocol capability supported by the
-	 *            caller. The set of capabilities are sent to the client in the
-	 *            advertisement, allowing the client to later selectively enable
-	 *            features it recognizes.
-	 */
-	public void advertiseCapability(String name) {
+	void advertiseCapability(String name) {
 		capablities.add(name);
 	}
 
-	/**
-	 * Format an advertisement for the supplied refs.
-	 *
-	 * @param refs
-	 *            zero or more refs to format for the client. The collection is
-	 *            copied and sorted before display and therefore may appear in
-	 *            any order.
-	 * @throws IOException
-	 *             the underlying output stream failed to write out an
-	 *             advertisement record.
-	 */
-	public void send(final Collection<Ref> refs) throws IOException {
+	void send(final Collection<Ref> refs) throws IOException {
 		for (final Ref r : RefComparator.sort(refs)) {
 			final RevObject obj = parseAnyOrNull(r.getObjectId());
 			if (obj != null) {
@@ -177,21 +104,7 @@ public abstract class RefAdvertiser {
 		}
 	}
 
-	/**
-	 * Advertise one object is available using the magic {@code .have}.
-	 * <p>
-	 * The magic {@code .have} advertisement is not available for fetching by a
-	 * client, but can be used by a client when considering a delta base
-	 * candidate before transferring data in a push. Within the record created
-	 * by this method the ref name is simply the invalid string {@code .have}.
-	 *
-	 * @param id
-	 *            identity of the object that is assumed to exist.
-	 * @throws IOException
-	 *             the underlying output stream failed to write out an
-	 *             advertisement record.
-	 */
-	public void advertiseHave(AnyObjectId id) throws IOException {
+	void advertiseHave(AnyObjectId id) throws IOException {
 		RevObject obj = parseAnyOrNull(id);
 		if (obj != null) {
 			advertiseAnyOnce(obj, ".have");
@@ -200,14 +113,7 @@ public abstract class RefAdvertiser {
 		}
 	}
 
-	/**
-	 * Include references of alternate repositories as {@code .have} lines.
-	 *
-	 * @throws IOException
-	 *             the underlying output stream failed to write out an
-	 *             advertisement record.
-	 */
-	public void includeAdditionalHaves() throws IOException {
+	void includeAdditionalHaves() throws IOException {
 		additionalHaves(walk.getRepository().getObjectDatabase());
 	}
 
@@ -223,8 +129,7 @@ public abstract class RefAdvertiser {
 			advertiseHave(r.getObjectId());
 	}
 
-	/** @return true if no advertisements have been sent yet. */
-	public boolean isEmpty() {
+	boolean isEmpty() {
 		return first;
 	}
 
@@ -267,22 +172,7 @@ public abstract class RefAdvertiser {
 		advertiseAny(tag.getObject(), refName);
 	}
 
-	/**
-	 * Advertise one object under a specific name.
-	 * <p>
-	 * If the advertised object is a tag, this method does not advertise the
-	 * peeled version of it.
-	 *
-	 * @param id
-	 *            the object to advertise.
-	 * @param refName
-	 *            name of the reference to advertise the object as, can be any
-	 *            string not including the NUL byte.
-	 * @throws IOException
-	 *             the underlying output stream failed to write out an
-	 *             advertisement record.
-	 */
-	public void advertiseId(final AnyObjectId id, final String refName)
+	void advertiseId(final AnyObjectId id, final String refName)
 			throws IOException {
 		tmpLine.setLength(0);
 		id.copyTo(tmpId, tmpLine);
@@ -300,27 +190,6 @@ public abstract class RefAdvertiser {
 			}
 		}
 		tmpLine.append('\n');
-		writeOne(tmpLine.toString());
+		pckOut.writeString(tmpLine.toString());
 	}
-
-	/**
-	 * Write a single advertisement line.
-	 *
-	 * @param line
-	 *            the advertisement line to be written. The line always ends
-	 *            with LF. Never null or the empty string.
-	 * @throws IOException
-	 *             the underlying output stream failed to write out an
-	 *             advertisement record.
-	 */
-	protected abstract void writeOne(CharSequence line) throws IOException;
-
-	/**
-	 * Mark the end of the advertisements.
-	 *
-	 * @throws IOException
-	 *             the underlying output stream failed to write out an
-	 *             advertisement record.
-	 */
-	protected abstract void end() throws IOException;
 }

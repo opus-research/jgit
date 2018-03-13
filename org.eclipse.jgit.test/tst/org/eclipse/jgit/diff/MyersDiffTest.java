@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009, Johannes E. Schindelin
+ * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,60 +42,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.diff;
 
-import java.util.regex.Matcher;
+import junit.framework.TestCase;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-
-class WrappedRequest extends HttpServletRequestWrapper {
-	private final String path;
-
-	private final String pathInfo;
-
-	WrappedRequest(final HttpServletRequest originalRequest,
-			final Matcher matcher, final int pathInfoGroup) {
-		super(originalRequest);
-
-		path = computePath(originalRequest, matcher, pathInfoGroup);
-		pathInfo = computePathInfo();
+public class MyersDiffTest extends TestCase {
+	public void testAtEnd() {
+		assertDiff("HELLO", "HELL", " -4,1 +4,0");
 	}
 
-	private static String computePath(final HttpServletRequest originalRequest,
-			final Matcher matcher, final int pathInfoGroup) {
-		final String originalServletPath = originalRequest.getServletPath();
-		if (pathInfoGroup <= matcher.groupCount()) {
-			final int s = matcher.start(pathInfoGroup);
-			if (0 <= s)
-				return originalServletPath.substring(0, s);
-			else
-				return originalServletPath;
-		} else
-			return originalServletPath;
+	public void testAtStart() {
+		assertDiff("Git", "JGit", " -0,0 +0,1");
 	}
 
-	private String computePathInfo() {
-		String r = getRequestURI().substring(getContextPath().length())
-				.replaceAll("[/]{2,}", "/").substring(path.length());
-		if ("".equals(r) && path.length() != 0)
-			r = null;
-		return r;
+	public void testSimple() {
+		assertDiff("HELLO WORLD", "LOW",
+			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
+		// is ambiguous, could be this, too:
+		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
 	}
 
-	@Override
-	public String getPathTranslated() {
-		final String p = getPathInfo();
-		return p != null ? getRealPath(p) : null;
+	public void assertDiff(String a, String b, String edits) {
+		MyersDiff diff = new MyersDiff(toCharArray(a), toCharArray(b));
+		assertEquals(edits, toString(diff.getEdits()));
 	}
 
-	@Override
-	public String getPathInfo() {
-		return pathInfo;
+	private static String toString(EditList list) {
+		StringBuilder builder = new StringBuilder();
+		for (Edit e : list)
+			builder.append(" -" + e.beginA
+					+ "," + (e.endA - e.beginA)
+				+ " +" + e.beginB + "," + (e.endB - e.beginB));
+		return builder.toString();
 	}
 
-	@Override
-	public String getServletPath() {
-		return path;
+	private static CharArray toCharArray(String s) {
+		return new CharArray(s);
+	}
+
+	protected static String toString(Sequence seq, int begin, int end) {
+		CharArray a = (CharArray)seq;
+		return new String(a.array, begin, end - begin);
+	}
+
+	protected static String toString(CharArray a, CharArray b,
+			int x, int k) {
+		return "(" + x + "," + (k + x)
+			+ (x < 0 ? '<' :
+					(x >= a.array.length ?
+					 '>' : a.array[x]))
+			+ (k + x < 0 ? '<' :
+					(k + x >= b.array.length ?
+					 '>' : b.array[k + x]))
+			+ ")";
+	}
+
+	private static class CharArray implements Sequence {
+		char[] array;
+		public CharArray(String s) { array = s.toCharArray(); }
+		public int size() { return array.length; }
+		public boolean equals(int i, Sequence other, int j) {
+			CharArray o = (CharArray)other;
+			return array[i] == o.array[j];
+		}
 	}
 }
