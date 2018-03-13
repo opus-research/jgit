@@ -60,7 +60,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl;
-import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl.CompressedBitmap;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexBuilder;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexRemapper;
@@ -391,7 +390,7 @@ class PackWriterBitmapPreparer {
 			if (!reuse.contains(rc)) {
 				EWAHCompressedBitmap bitmap = bitmapRemapper.ofObjectType(
 						bitmapRemapper.getBitmap(rc), Constants.OBJ_COMMIT);
-				reuse.or(new CompressedBitmap(bitmap, commitBitmapIndex));
+				reuse.or(commitBitmapIndex.toBitmap(writeBitmaps, bitmap));
 			}
 		}
 
