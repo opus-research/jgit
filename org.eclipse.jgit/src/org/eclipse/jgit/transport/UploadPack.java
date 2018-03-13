@@ -56,7 +56,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.Constants;
@@ -66,7 +65,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
-import org.eclipse.jgit.revwalk.DepthWalk;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -104,8 +102,6 @@ public class UploadPack {
 	static final String OPTION_NO_PROGRESS = BasePackFetchConnection.OPTION_NO_PROGRESS;
 
 	static final String OPTION_NO_DONE = BasePackFetchConnection.OPTION_NO_DONE;
-
-	static final String OPTION_SHALLOW = BasePackFetchConnection.OPTION_SHALLOW;
 
 	/** Database we read the objects from. */
 	private final Repository db;
@@ -163,15 +159,6 @@ public class UploadPack {
 
 	/** Objects on both sides, these don't have to be sent. */
 	private final Set<RevObject> commonBase = new HashSet<RevObject>();
-
-	/** Shallow commits the client already has. */
-	private final Set<ObjectId> clientShallowCommits = new HashSet<ObjectId>();
-
-	/** Shallow commits on the client which are now becoming unshallow */
-	private final List<ObjectId> unshallowCommits = new ArrayList<ObjectId>();
-
-	/** Desired depth from the client on a shallow request. */
-	private int depth;
 
 	/** Commit time of the oldest common commit, in seconds. */
 	private int oldestTime;
@@ -431,8 +418,6 @@ public class UploadPack {
 			else
 				multiAck = MultiAck.OFF;
 
-			if (depth != 0)
-				processShallow();
 			sendPack = negotiate();
 		} catch (PackProtocolException err) {
 			reportErrorDuringNegotiate(err.getMessage());
@@ -472,39 +457,6 @@ public class UploadPack {
 		}
 	}
 
-	private void processShallow() throws IOException {
-		DepthWalk.RevWalk depthWalk =
-			new DepthWalk.RevWalk(walk.getObjectReader(), depth);
-
-		// Find all the commits which will be shallow
-		for (ObjectId o : wantIds) {
-			try {
-				depthWalk.markRoot(depthWalk.parseCommit(o));
-			} catch (IncorrectObjectTypeException notCommit) {
-				// Ignore non-commits in this loop.
-			}
-		}
-
-		RevCommit o;
-		while ((o = depthWalk.next()) != null) {
-			DepthWalk.Commit c = (DepthWalk.Commit) o;
-
-			// Commits at the boundary which aren't already shallow in
-			// the client need to be marked as such
-			if (c.getDepth() == depth && !clientShallowCommits.contains(c))
-				pckOut.writeString("shallow " + o.name());
-
-			// Commits not on the boundary which are shallow in the client
-			// need to become unshallowed
-			if (c.getDepth() < depth && clientShallowCommits.contains(c)) {
-				unshallowCommits.add(c.copy());
-				pckOut.writeString("unshallow " + c.name());
-			}
-		}
-
-		pckOut.end();
-	}
-
 	/**
 	 * Generate an advertisement of available refs and capabilities.
 	 *
@@ -536,7 +488,6 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_SIDE_BAND_64K);
 		adv.advertiseCapability(OPTION_THIN_PACK);
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
-		adv.advertiseCapability(OPTION_SHALLOW);
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
 		adv.setDerefTags(true);
@@ -558,17 +509,6 @@ public class UploadPack {
 
 			if (line == PacketLineIn.END)
 				break;
-
-			if (line.startsWith("deepen ")) {
-				depth = Integer.parseInt(line.substring(7));
-				continue;
-			}
-
-			if (line.startsWith("shallow ")) {
-				clientShallowCommits.add(ObjectId.fromString(line.substring(8)));
-				continue;
-			}
-
 			if (!line.startsWith("want ") || line.length() < 45)
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "want", line));
 
@@ -596,13 +536,6 @@ public class UploadPack {
 			try {
 				line = pckIn.readString();
 			} catch (EOFException eof) {
-				// EOF on stateless RPC (aka smart HTTP) and non-shallow request
-				// means the client asked for the updated shallow/unshallow data,
-				// disconnected, and will try another request with actual want/have.
-				// Don't report the EOF here, its a bug in the protocol that the client
-				// just disconnects without sending an END.
-				if (!biDirectionalPipe && depth > 0)
-					return false;
 				throw eof;
 			}
 
@@ -953,9 +886,6 @@ public class UploadPack {
 				}
 				pw.setTagTargets(tagTargets);
 			}
-
-			if (depth > 0)
-				pw.setShallowPack(depth, unshallowCommits);
 
 			RevWalk rw = walk;
 			if (wantAll.isEmpty()) {
