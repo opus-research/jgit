@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <git@sdiz.net>
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <j16sdiz+freenet@gmail.com>
- * Copyright (C) 2015 Thomas Meyer <thomas@m3y3r.de>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +40,61 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
+import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+public class RemoteSetUrlCommandTest extends AbstractRemoteCommandTest {
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;;
+	@Test
+	public void testSetUrl() throws Exception {
+		// setup an initial remote
+		setupRemote();
 
-@Command(usage = "usage_RevParse")
-class RevParse extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_RevParseAll")
-	boolean all;
+		// execute the command to change the fetch url
+		RemoteSetUrlCommand cmd = Git.wrap(db).remoteSetUrl();
+		cmd.setName(REMOTE_NAME);
+		URIish newUri = new URIish("git://test.com/test");
+		cmd.setUri(newUri);
+		RemoteConfig remote = cmd.call();
 
-	@Option(name = "--verify", usage = "usage_RevParseVerify")
-	boolean verify;
+		// assert that the changed remote has the new fetch url
+		assertEquals(REMOTE_NAME, remote.getName());
+		assertArrayEquals(new URIish[] { newUri }, remote.getURIs().toArray());
 
-	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<ObjectId> commits = new ArrayList<ObjectId>();
-
-	@Override
-	protected void run() throws Exception {
-		if (all) {
-			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
-			for (final Ref r : allRefs.values()) {
-				ObjectId objectId = r.getObjectId();
-				// getRefs skips dangling symrefs, so objectId should never be
-				// null.
-				if (objectId == null) {
-					throw new NullPointerException();
-				}
-				outw.println(objectId.name());
-			}
-		} else {
-			if (verify && commits.size() > 1) {
-				throw new CmdLineException(CLIText.get().needSingleRevision);
-			}
-
-			for (final ObjectId o : commits) {
-				outw.println(o.name());
-			}
-		}
+		// assert that the changed remote is available in the git configuration
+		assertRemoteConfigEquals(remote,
+				new RemoteConfig(db.getConfig(), REMOTE_NAME));
 	}
+
+	@Test
+	public void testSetPushUrl() throws Exception {
+		// setup an initial remote
+		RemoteConfig remoteConfig = setupRemote();
+
+		// execute the command to change the push url
+		RemoteSetUrlCommand cmd = Git.wrap(db).remoteSetUrl();
+		cmd.setName(REMOTE_NAME);
+		URIish newUri = new URIish("git://test.com/test");
+		cmd.setUri(newUri);
+		cmd.setPush(true);
+		RemoteConfig remote = cmd.call();
+
+		// assert that the changed remote has the old fetch url and the new push
+		// url
+		assertEquals(REMOTE_NAME, remote.getName());
+		assertEquals(remoteConfig.getURIs(), remote.getURIs());
+		assertArrayEquals(new URIish[] { newUri },
+				remote.getPushURIs().toArray());
+
+		// assert that the changed remote is available in the git configuration
+		assertRemoteConfigEquals(remote,
+				new RemoteConfig(db.getConfig(), REMOTE_NAME));
+	}
+
 }

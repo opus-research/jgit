@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <git@sdiz.net>
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <j16sdiz+freenet@gmail.com>
- * Copyright (C) 2015 Thomas Meyer <thomas@m3y3r.de>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +40,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertEquals;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.junit.Test;
 
-@Command(usage = "usage_RevParse")
-class RevParse extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_RevParseAll")
-	boolean all;
+public class RemoteListCommandTest extends AbstractRemoteCommandTest {
 
-	@Option(name = "--verify", usage = "usage_RevParseVerify")
-	boolean verify;
+	@Test
+	public void testList() throws Exception {
+		// setup an initial remote
+		RemoteConfig remoteConfig = setupRemote();
 
-	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<ObjectId> commits = new ArrayList<ObjectId>();
+		// execute the command to list the remotes
+		List<RemoteConfig> remotes = Git.wrap(db).remoteList().call();
 
-	@Override
-	protected void run() throws Exception {
-		if (all) {
-			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
-			for (final Ref r : allRefs.values()) {
-				ObjectId objectId = r.getObjectId();
-				// getRefs skips dangling symrefs, so objectId should never be
-				// null.
-				if (objectId == null) {
-					throw new NullPointerException();
-				}
-				outw.println(objectId.name());
-			}
-		} else {
-			if (verify && commits.size() > 1) {
-				throw new CmdLineException(CLIText.get().needSingleRevision);
-			}
-
-			for (final ObjectId o : commits) {
-				outw.println(o.name());
-			}
-		}
+		// assert that there is only one remote
+		assertEquals(1, remotes.size());
+		// assert that the available remote is the initial remote
+		assertRemoteConfigEquals(remoteConfig, remotes.get(0));
 	}
+
 }
