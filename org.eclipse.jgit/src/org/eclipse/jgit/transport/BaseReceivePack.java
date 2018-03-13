@@ -51,12 +51,10 @@ import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
-import java.io.File;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -67,7 +65,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.errors.TooLargePackException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.BatchRefUpdate;
@@ -92,7 +89,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.util.io.InterruptTimer;
-import org.eclipse.jgit.util.io.LimitedInputStream;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
 
@@ -237,9 +233,6 @@ public abstract class BaseReceivePack {
 
 	/** Git object size limit */
 	private long maxObjectSizeLimit;
-
-	/** Total pack size limit */
-	private long maxPackSizeLimit = -1;
 
 	/**
 	 * Create a new pack receive for an open repository.
@@ -629,24 +622,6 @@ public abstract class BaseReceivePack {
 		maxObjectSizeLimit = limit;
 	}
 
-
-	/**
-	 * Set the maximum allowed pack size.
-	 * <p>
-	 * A pack exceeding this size will be rejected.
-	 *
-	 * @param limit
-	 *            the pack size limit, in bytes
-	 *
-	 * @since 3.3
-	 */
-	public void setMaxPackSizeLimit(final long limit) {
-		if (limit < 0)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().receivePackInvalidLimit, Long.valueOf(limit)));
-		maxPackSizeLimit = limit;
-	}
-
 	/**
 	 * Check whether the client expects a side-band stream.
 	 *
@@ -766,14 +741,6 @@ public abstract class BaseReceivePack {
 			rawOut = o;
 		}
 
-		if (maxPackSizeLimit >= 0)
-			rawIn = new LimitedInputStream(rawIn, maxPackSizeLimit) {
-				@Override
-				protected void limitExceeded() throws TooLargePackException {
-					throw new TooLargePackException(limit);
-				}
-			};
-
 		pckIn = new PacketLineIn(rawIn);
 		pckOut = new PacketLineOut(rawOut);
 		pckOut.setFlushOnEnd(false);
@@ -805,20 +772,14 @@ public abstract class BaseReceivePack {
 	/**
 	 * Unlock the pack written by this object.
 	 *
-	 * @return the pack file that was unlocked, {@code null} if there was no
-	 *         lock
 	 * @throws IOException
 	 *             the pack could not be unlocked.
-	 * @since 3.3
 	 */
-	protected File unlockPack() throws IOException {
+	protected void unlockPack() throws IOException {
 		if (packLock != null) {
-			File packFile = packLock.getPackFile();
 			packLock.unlock();
 			packLock = null;
-			return packFile;
 		}
-		return null;
 	}
 
 	/**
