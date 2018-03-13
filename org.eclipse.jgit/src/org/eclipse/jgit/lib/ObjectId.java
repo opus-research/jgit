@@ -111,7 +111,7 @@ public class ObjectId extends AnyObjectId implements Serializable {
 	}
 
 	/**
-	 * Compare two object identifier byte sequences for equality.
+	 * Compare to object identifier byte sequences for equality.
 	 *
 	 * @param firstBuffer
 	 *            the first buffer to compare against. Must have at least 20
@@ -119,7 +119,7 @@ public class ObjectId extends AnyObjectId implements Serializable {
 	 * @param fi
 	 *            first offset within firstBuffer to begin testing.
 	 * @param secondBuffer
-	 *            the second buffer to compare against. Must have at least 20
+	 *            the second buffer to compare against. Must have at least 2
 	 *            bytes from position bi through the end of the buffer.
 	 * @param si
 	 *            first offset within secondBuffer to begin testing.
