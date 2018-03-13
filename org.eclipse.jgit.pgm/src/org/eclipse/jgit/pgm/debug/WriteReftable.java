@@ -117,10 +117,13 @@ class WriteReftable extends TextBuiltin {
 				cfg.setRestartInterval(restartInterval);
 			}
 
-			ReftableWriter w = new ReftableWriter().setConfig(cfg).begin(os);
+			ReftableWriter w = new ReftableWriter(cfg);
+			w.setMinUpdateIndex(min(logs)).setMaxUpdateIndex(max(logs));
+			w.begin(os);
 			w.sortAndWriteRefs(refs);
 			for (LogEntry e : logs) {
-				w.writeLog(e.ref, e.who, e.oldId, e.newId, e.message);
+				w.writeLog(e.ref, e.updateIndex, e.who,
+						e.oldId, e.newId, e.message);
 			}
 			stats = w.finish().getStats();
 		}
@@ -169,10 +172,11 @@ class WriteReftable extends TextBuiltin {
 			printf("  obj/blk : %d", stats.objCount() / stats.objBlockCount());
 			errw.println();
 		}
-		if (logs.size() > 0) {
+		if (stats.logCount() > 0) {
 			int logMiB = (int) Math.round(((double) stats.logBytes()) / MIB);
 			printf("Log:");
 			printf("  log blk : %d", stats.logBlockSize());
+			printf("  avg blk : %d bytes", stats.logBytes() / stats.logBlockCount());
 			printf("  logs    : %d", stats.logCount());
 			printf("  blocks  : %d", stats.logBlockCount());
 			printf("  log sz  : %d MiB (%d bytes)", logMiB, stats.logBytes());
@@ -227,7 +231,7 @@ class WriteReftable extends TextBuiltin {
 				new InputStreamReader(new FileInputStream(logPath), UTF_8))) {
 			@SuppressWarnings("nls")
 			Pattern pattern = Pattern.compile("([^,]+)" // 1: ref
-					+ ",([0-9]+)(?:[.][0-9]+)?" // 2: time
+					+ ",([0-9]+(?:[.][0-9]+)?)" // 2: time
 					+ ",([^,]+)" // 3: who
 					+ ",([^,]+)" // 4: old
 					+ ",([^,]+)" // 5: new
@@ -237,19 +241,29 @@ class WriteReftable extends TextBuiltin {
 				Matcher m = pattern.matcher(line);
 				if (m.matches()) {
 					String ref = m.group(1);
-					long time = Long.parseLong(m.group(2), 10) * 1000L;
+					double t = Double.parseDouble(m.group(2));
+					long time = ((long) t) * 1000L;
+					long index = (long) (t * 1e6);
 					String user = m.group(3);
 					ObjectId oldId = parseId(m.group(4));
 					ObjectId newId = parseId(m.group(5));
 					String msg = m.group(6);
 					String email = user + "@gerrit"; //$NON-NLS-1$
 					PersonIdent who = new PersonIdent(user, email, time, -480);
-					log.add(new LogEntry(ref, who, oldId, newId, msg));
+					log.add(new LogEntry(ref, index, who, oldId, newId, msg));
 				}
 			}
 		}
 		Collections.sort(log, LogEntry::compare);
 		return log;
+	}
+
+	private static long min(List<LogEntry> log) {
+		return log.stream().mapToLong(e -> e.updateIndex).min().orElse(0);
+	}
+
+	private static long max(List<LogEntry> log) {
+		return log.stream().mapToLong(e -> e.updateIndex).max().orElse(0);
 	}
 
 	private static ObjectId parseId(String s) {
@@ -263,28 +277,26 @@ class WriteReftable extends TextBuiltin {
 		static int compare(LogEntry a, LogEntry b) {
 			int cmp = a.ref.compareTo(b.ref);
 			if (cmp == 0) {
-				cmp = Long.signum(b.time() - a.time());
+				cmp = Long.signum(b.updateIndex - a.updateIndex);
 			}
 			return cmp;
 		}
 
 		final String ref;
+		final long updateIndex;
 		final PersonIdent who;
 		final ObjectId oldId;
 		final ObjectId newId;
 		final String message;
 
-		LogEntry(String ref, PersonIdent who,
+		LogEntry(String ref, long updateIndex, PersonIdent who,
 				ObjectId oldId, ObjectId newId, String message) {
 			this.ref = ref;
+			this.updateIndex = updateIndex;
 			this.who = who;
 			this.oldId = oldId;
 			this.newId = newId;
 			this.message = message;
-		}
-
-		long time() {
-			return who.getWhen().getTime();
 		}
 	}
 }
