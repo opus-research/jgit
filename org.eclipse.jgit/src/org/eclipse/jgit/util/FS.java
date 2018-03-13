@@ -44,12 +44,14 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.security.AccessController;
@@ -58,15 +60,14 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -110,7 +111,7 @@ public abstract class FS {
 		}
 	}
 
-	final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -247,7 +248,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
-		return FileUtils.lastModified(f);
+		return f.lastModified();
 	}
 
 	/**
@@ -260,7 +261,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
-		FileUtils.setLastModified(f, time);
+		f.setLastModified(time);
 	}
 
 	/**
@@ -273,7 +274,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
-		return FileUtils.getLength(path);
+		return path.length();
 	}
 
 	/**
@@ -285,7 +286,9 @@ public abstract class FS {
 	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
-		FileUtils.delete(f);
+		if (!f.delete())
+			throw new IOException(MessageFormat.format(
+					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
@@ -406,7 +409,6 @@ public abstract class FS {
 	 *            to be used to parse the command's output
 	 * @return the one-line output of the command
 	 */
-	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding) {
 		return readPipe(dir, command, encoding, null);
 	}
@@ -426,7 +428,6 @@ public abstract class FS {
 	 * @return the one-line output of the command
 	 * @since 4.0
 	 */
-	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
 		try {
@@ -440,30 +441,36 @@ public abstract class FS {
 				pb.environment().putAll(env);
 			}
 			Process p = pb.start();
+			BufferedReader lineRead = new BufferedReader(
+					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
 			String r = null;
-			try (BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), encoding))) {
+			try {
 				r = lineRead.readLine();
 				if (debug) {
 					LOG.debug("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-					LOG.debug("remaining output:\n"); //$NON-NLS-1$
-					String l;
-					while ((l = lineRead.readLine()) != null) {
+					LOG.debug("(ignoring remaing output:"); //$NON-NLS-1$
+				}
+				String l;
+				while ((l = lineRead.readLine()) != null) {
+					if (debug) {
 						LOG.debug(l);
 					}
 				}
+			} finally {
+				p.getErrorStream().close();
+				lineRead.close();
 			}
 
 			for (;;) {
 				try {
 					int rc = p.waitFor();
 					gobbler.join();
-					if (rc == 0 && !gobbler.fail.get()) {
+					if (rc == 0 && r != null && r.length() > 0
+							&& !gobbler.fail.get())
 						return r;
-					}
 					if (debug) {
 						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
 					}
@@ -473,7 +480,7 @@ public abstract class FS {
 				}
 			}
 		} catch (IOException e) {
-			LOG.error("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
+			LOG.debug("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
 		}
 		if (debug) {
 			LOG.debug("readpipe returns null"); //$NON-NLS-1$
@@ -485,39 +492,52 @@ public abstract class FS {
 		private final Process p;
 		private final String desc;
 		private final String dir;
-		final AtomicBoolean fail = new AtomicBoolean();
+		private final boolean debug = LOG.isDebugEnabled();
+		private final AtomicBoolean fail = new AtomicBoolean();
 
-		GobblerThread(Process p, String[] command, File dir) {
+		private GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
-			this.desc = Arrays.toString(command);
-			this.dir = Objects.toString(dir);
+			if (debug) {
+				this.desc = Arrays.asList(command).toString();
+				this.dir = dir.toString();
+			} else {
+				this.desc = null;
+				this.dir = null;
+			}
 		}
 
 		public void run() {
-			StringBuilder err = new StringBuilder();
-			try (InputStream is = p.getErrorStream()) {
+			InputStream is = p.getErrorStream();
+			try {
 				int ch;
-				while ((ch = is.read()) != -1) {
-					err.append((char) ch);
+				if (debug) {
+					while ((ch = is.read()) != -1) {
+						System.err.print((char) ch);
+					}
+				} else {
+					while (is.read() != -1) {
+						// ignore
+					}
 				}
 			} catch (IOException e) {
-				if (p.exitValue() != 0) {
-					logError(e);
-					fail.set(true);
-				} else {
-					// ignore. git terminated faster and stream was just closed
-				}
-			} finally {
-				if (err.length() > 0) {
-					LOG.error(err.toString());
-				}
+				logError(e);
+				fail.set(true);
+			}
+			try {
+				is.close();
+			} catch (IOException e) {
+				logError(e);
+				fail.set(true);
 			}
 		}
 
 		private void logError(Throwable t) {
+			if (!debug) {
+				return;
+			}
 			String msg = MessageFormat.format(
 					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
-			LOG.error(msg, t);
+			LOG.debug(msg, t);
 		}
 	}
 
@@ -536,14 +556,6 @@ public abstract class FS {
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
 		if (gitExe == null) {
-			return null;
-		}
-
-		// Bug 480782: Check if the discovered git executable is JGit CLI
-		String v = readPipe(gitExe.getParentFile(),
-				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
-				Charset.defaultCharset().name());
-		if (v != null && v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
@@ -611,7 +623,8 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
-		return FileUtils.readSymLink(path);
+		throw new SymlinksNotSupportedException(
+				JGitText.get().errorSymlinksNotSupported);
 	}
 
 	/**
@@ -621,7 +634,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
-		return FileUtils.isSymlink(path);
+		return false;
 	}
 
 	/**
@@ -633,7 +646,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean exists(File path) {
-		return FileUtils.exists(path);
+		return path.exists();
 	}
 
 	/**
@@ -645,7 +658,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
-		return FileUtils.isDirectory(path);
+		return path.isDirectory();
 	}
 
 	/**
@@ -657,7 +670,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
-		return FileUtils.isFile(path);
+		return path.isFile();
 	}
 
 	/**
@@ -668,7 +681,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
-		return FileUtils.isHidden(path);
+		return path.isHidden();
 	}
 
 	/**
@@ -680,7 +693,9 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtils.setHidden(path, hidden);
+		if (!path.getName().startsWith(".")) //$NON-NLS-1$
+			throw new IllegalArgumentException(
+					JGitText.get().hiddenFilesStartWithDot);
 	}
 
 	/**
@@ -692,7 +707,8 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
-		FileUtils.createSymLink(path, target);
+		throw new SymlinksNotSupportedException(
+				JGitText.get().errorSymlinksNotSupported);
 	}
 
 	/**
@@ -850,10 +866,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public File findHook(Repository repository, final String hookName) {
-		File gitDir = repository.getDirectory();
-		if (gitDir == null)
-			return null;
-		final File hookFile = new File(new File(gitDir,
+		final File hookFile = new File(new File(repository.getDirectory(),
 				Constants.HOOKS), hookName);
 		return hookFile.isFile() ? hookFile : null;
 	}
@@ -881,14 +894,15 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 4.2
+	 * @since 4.1
 	 */
 	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
 			throws IOException, InterruptedException {
 		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
 				stdinArgs.getBytes(Constants.CHARACTER_ENCODING));
-		return runProcess(processBuilder, outRedirect, errRedirect, in);
+		return runProcess(processBuilder, outRedirect, errRedirect, in,
+				false);
 	}
 
 	/**
@@ -913,17 +927,23 @@ public abstract class FS {
 	 *            any data over stdin. If binary is set to
 	 *            <code>false</code> then it is expected that the process
 	 *            expects text data which should be processed line by line.
+	 * @param binary
+	 *            Determines whether the process is expecting/emitting binary
+	 *            data over stdin/stdout. Non binary data will be copied
+	 *            line-by-line to and from the processes stdin/stdout. Binary
+	 *            data will be copied in chunks of 4K. Copying binary data with
+	 *            binary set to <code>false</code> can lead to data corruption.
 	 * @return the return code of this process.
 	 * @throws IOException
 	 *             if an I/O error occurs while executing this process.
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 4.2
+	 * @since 4.1
 	 */
 	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect,
-			InputStream inRedirect) throws IOException,
+			InputStream inRedirect, boolean binary) throws IOException,
 			InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
@@ -933,14 +953,14 @@ public abstract class FS {
 		try {
 			process = processBuilder.start();
 			final Callable<Void> errorGobbler = new StreamGobbler(
-					process.getErrorStream(), errRedirect);
+					process.getErrorStream(), errRedirect, binary);
 			final Callable<Void> outputGobbler = new StreamGobbler(
-					process.getInputStream(), outRedirect);
+					process.getInputStream(), outRedirect, binary);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
 			OutputStream outputStream = process.getOutputStream();
 			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream)
+				new StreamGobbler(inRedirect, outputStream, binary)
 						.call();
 			}
 			outputStream.close();
@@ -1090,28 +1110,28 @@ public abstract class FS {
 			return lastModifiedTime;
 		}
 
-		private final boolean isDirectory;
+		private boolean isDirectory;
 
-		private final boolean isSymbolicLink;
+		private boolean isSymbolicLink;
 
-		private final boolean isRegularFile;
+		private boolean isRegularFile;
 
-		private final long creationTime;
+		private long creationTime;
 
-		private final long lastModifiedTime;
+		private long lastModifiedTime;
 
-		private final boolean isExecutable;
+		private boolean isExecutable;
 
-		private final File file;
+		private File file;
 
-		private final boolean exists;
+		private boolean exists;
 
 		/**
 		 * file length
 		 */
 		protected long length = -1;
 
-		final FS fs;
+		FS fs;
 
 		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
 				boolean isExecutable, boolean isSymbolicLink,
@@ -1130,14 +1150,14 @@ public abstract class FS {
 		}
 
 		/**
-		 * Constructor when there are issues with reading. All attributes except
-		 * given will be set to the default values.
+		 * Constructor when there are issues with reading
 		 *
 		 * @param fs
 		 * @param path
 		 */
 		public Attributes(File path, FS fs) {
-			this(fs, path, false, false, false, false, false, 0L, 0L, 0L);
+			this.file = path;
+			this.fs = fs;
 		}
 
 		/**
@@ -1221,33 +1241,64 @@ public abstract class FS {
 	 * </p>
 	 */
 	private static class StreamGobbler implements Callable<Void> {
+		private BufferedReader reader;
 		private InputStream in;
 
+		private BufferedWriter writer;
 		private OutputStream out;
 
-		public StreamGobbler(InputStream stream, OutputStream output) {
-			this.in = stream;
-			this.out = output;
+		private boolean binary = false;
+
+		public StreamGobbler(InputStream stream, OutputStream output, boolean binary) {
+			this.binary = binary;
+			if (!binary) {
+				this.reader = new BufferedReader(new InputStreamReader(stream));
+				if (output != null)
+					this.writer = new BufferedWriter(new OutputStreamWriter(
+							output));
+			} else {
+				this.in = stream;
+				this.out = output;
+			}
 		}
 
 		public Void call() throws IOException {
 			boolean writeFailure = false;
-			byte buffer[] = new byte[4096];
-			int readBytes;
-			while ((readBytes = in.read(buffer)) != -1) {
-				// Do not try to write again after a failure, but keep
-				// reading as long as possible to prevent the input stream
-				// from choking.
-				if (!writeFailure && out != null) {
-					try {
-						out.write(buffer, 0, readBytes);
-						out.flush();
-					} catch (IOException e) {
-						writeFailure = true;
+			if (binary) {
+				byte buffer[] = new byte[4096];
+				int readBytes;
+				while ((readBytes = in.read(buffer)) != -1) {
+					// Do not try to write again after a failure, but keep
+					// reading as long as possible to prevent the input stream
+					// from choking.
+					if (!writeFailure && out != null) {
+						try {
+							out.write(buffer, 0, readBytes);
+							out.flush();
+						} catch (IOException e) {
+							writeFailure = true;
+						}
 					}
 				}
+				return null;
+			} else {
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					// Do not try to write again after a failure, but keep
+					// reading as long as possible to prevent the input stream
+					// from choking.
+					if (!writeFailure && writer != null) {
+						try {
+							writer.write(line);
+							writer.newLine();
+							writer.flush();
+						} catch (IOException e) {
+							writeFailure = true;
+						}
+					}
+				}
+				return null;
 			}
-			return null;
 		}
 	}
 }
