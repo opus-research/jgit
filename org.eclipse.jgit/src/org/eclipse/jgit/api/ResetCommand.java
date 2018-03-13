@@ -44,16 +44,12 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Collection;
-import java.util.LinkedList;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -62,7 +58,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.TreeWalk;
 
 /**
  * A class used to execute a {@code Reset} command. It has setters for all
@@ -108,11 +103,9 @@ public class ResetCommand extends GitCommand<Ref> {
 		KEEP // TODO not implemented yet
 	}
 
-	private String ref = Constants.HEAD;
+	private String ref;
 
 	private ResetType mode;
-
-	private Collection<String> filepaths = new LinkedList<String>();
 
 	/**
 	 *
@@ -162,13 +155,6 @@ public class ResetCommand extends GitCommand<Ref> {
 						e);
 			} finally {
 				rw.release();
-			}
-
-			if (!filepaths.isEmpty()) {
-				// reset [commit] -- paths
-				resetIndexForPaths(commit);
-				setCallable(false);
-				return repo.getRef(Constants.HEAD);
 			}
 
 			// write the ref
@@ -231,64 +217,8 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * @return this instance
 	 */
 	public ResetCommand setMode(ResetType mode) {
-		if (!filepaths.isEmpty())
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>..."));
 		this.mode = mode;
 		return this;
-	}
-
-	/**
-	 * @param file
-	 *            the file to add
-	 * @return this instance
-	 */
-	public ResetCommand addFile(String file) {
-		if (mode != null)
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "<paths>...",
-					"[--mixed | --soft | --hard]"));
-		filepaths.add(file);
-		return this;
-	}
-
-	private void resetIndexForPaths(RevCommit commit) {
-		final DirCacheEditor edit;
-		try {
-			edit = repo.lockDirCache().editor();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-
-		for (String path : filepaths) {
-			try {
-				final TreeWalk tw = TreeWalk.forPath(repo, path,
-						commit.getTree());
-				if (tw != null) {
-					edit.add(new DirCacheEditor.PathEdit(path) {
-						@Override
-						public void apply(DirCacheEntry ent) {
-							// System.err.println(ent.getPathString()
-							//									+ " updated to " + tw.getObjectId(0) + "from " + ent.getObjectId()); //$NON-NLS-1$ //$NON-NLS-2$
-							ent.setFileMode(tw.getFileMode(0));
-							ent.setObjectId(tw.getObjectId(0));
-						}
-					});
-				} else {
-					// not in index,
-					edit.add(new DirCacheEditor.DeletePath(path));
-				}
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-
-		try {
-			edit.commit();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
 	}
 
 	private void resetIndex(RevCommit commit) throws IOException {
