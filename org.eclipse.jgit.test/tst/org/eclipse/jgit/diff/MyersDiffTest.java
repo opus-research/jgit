@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
- * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009, Johannes E. Schindelin
+ * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,61 +42,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.diff;
 
-import java.io.File;
-import java.io.IOException;
+import junit.framework.TestCase;
 
-import org.eclipse.jgit.lib.GitIndex.Entry;
+public class MyersDiffTest extends TestCase {
+	public void testAtEnd() {
+		assertDiff("HELLO", "HELL", " -4,1 +4,0");
+	}
 
-/**
- * Visitor interface for traversing the index and two trees in parallel.
- *
- * When merging we deal with up to two tree nodes and a base node. Then
- * we figure out what to do.
- *
- * A File argument is supplied to allow us to check for modifications in
- * a work tree or update the file.
- */
-public interface IndexTreeVisitor {
-	/**
-	 * Visit a blob, and corresponding tree and index entries.
-	 *
-	 * @param treeEntry
-	 * @param indexEntry
-	 * @param file
-	 * @throws IOException
-	 */
-	public void visitEntry(TreeEntry treeEntry, Entry indexEntry, File file) throws IOException;
-	
-	/**
-	 * Visit a blob, and corresponding tree nodes and associated index entry.
-	 *
-	 * @param treeEntry
-	 * @param auxEntry
-	 * @param indexEntry
-	 * @param file
-	 * @throws IOException
-	 */
-	public void visitEntry(TreeEntry treeEntry, TreeEntry auxEntry, Entry indexEntry, File file) throws IOException;
+	public void testAtStart() {
+		assertDiff("Git", "JGit", " -0,0 +0,1");
+	}
 
-	/**
-	 * Invoked after handling all child nodes of a tree, during a three way merge
-	 *
-	 * @param tree
-	 * @param auxTree
-	 * @param curDir
-	 * @throws IOException
-	 */
-	public void finishVisitTree(Tree tree, Tree auxTree, String curDir) throws IOException;
+	public void testSimple() {
+		assertDiff("HELLO WORLD", "LOW",
+			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
+		// is ambiguous, could be this, too:
+		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
+	}
 
-	/**
-	 * Invoked after handling all child nodes of a tree, during two way merge.
-	 *
-	 * @param tree
-	 * @param i
-	 * @param curDir
-	 * @throws IOException
-	 */
-	public void finishVisitTree(Tree tree, int i, String curDir) throws IOException;
+	public void assertDiff(String a, String b, String edits) {
+		MyersDiff diff = new MyersDiff(toCharArray(a), toCharArray(b));
+		assertEquals(edits, toString(diff.getEdits()));
+	}
+
+	private static String toString(EditList list) {
+		StringBuilder builder = new StringBuilder();
+		for (Edit e : list)
+			builder.append(" -" + e.beginA
+					+ "," + (e.endA - e.beginA)
+				+ " +" + e.beginB + "," + (e.endB - e.beginB));
+		return builder.toString();
+	}
+
+	private static CharArray toCharArray(String s) {
+		return new CharArray(s);
+	}
+
+	protected static String toString(Sequence seq, int begin, int end) {
+		CharArray a = (CharArray)seq;
+		return new String(a.array, begin, end - begin);
+	}
+
+	protected static String toString(CharArray a, CharArray b,
+			int x, int k) {
+		return "(" + x + "," + (k + x)
+			+ (x < 0 ? '<' :
+					(x >= a.array.length ?
+					 '>' : a.array[x]))
+			+ (k + x < 0 ? '<' :
+					(k + x >= b.array.length ?
+					 '>' : b.array[k + x]))
+			+ ")";
+	}
+
+	private static class CharArray implements Sequence {
+		char[] array;
+		public CharArray(String s) { array = s.toCharArray(); }
+		public int size() { return array.length; }
+		public boolean equals(int i, Sequence other, int j) {
+			CharArray o = (CharArray)other;
+			return array[i] == o.array[j];
+		}
+	}
 }

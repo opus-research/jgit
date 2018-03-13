@@ -126,6 +126,16 @@ public class T0003_Basic extends RepositoryTestCase {
 		assertTrue("Read-only " + o, !o.canWrite());
 	}
 
+	public void test004_CheckNewConfig() {
+		final RepositoryConfig c = db.getConfig();
+		assertNotNull(c);
+		assertEquals("0", c.getString("core", null, "repositoryformatversion"));
+		assertEquals("0", c.getString("CoRe", null, "REPOSITORYFoRmAtVeRsIoN"));
+		assertEquals("true", c.getString("core", null, "filemode"));
+		assertEquals("true", c.getString("cOrE", null, "fIlEModE"));
+		assertNull(c.getString("notavalue", null, "reallyNotAValue"));
+	}
+
 	public void test005_ReadSimpleConfig() {
 		final RepositoryConfig c = db.getConfig();
 		assertNotNull(c);
@@ -276,10 +286,10 @@ public class T0003_Basic extends RepositoryTestCase {
 		t.setTag("test020b");
 		t.setObjId(ObjectId.fromString("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"));
 		t.tag();
-
+		
 		Tag mapTag = db.mapTag("test020b");
 		assertEquals("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", mapTag.getObjId().name());
-
+		
 		// We do not repeat the plain tag test for other object types
 	}
 
@@ -330,7 +340,7 @@ public class T0003_Basic extends RepositoryTestCase {
 		assertEquals(new PersonIdent(jauthor, 1154236443000L, -4 * 60), mapTag.getAuthor());
 		assertEquals("b5d3b45a96b340441f5abb9080411705c51cc86c", mapTag.getObjId().name());
 	}
-
+	
 	public void test023_createCommitNonAnullii() throws IOException {
 		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
 		final Tree almostEmptyTree = new Tree(db);
@@ -344,9 +354,6 @@ public class T0003_Basic extends RepositoryTestCase {
 		commit.setMessage("\u00dcbergeeks");
 		ObjectId cid = new ObjectWriter(db).writeCommit(commit);
 		assertEquals("4680908112778718f37e686cbebcc912730b3154", cid.name());
-		Commit loadedCommit = db.mapCommit(cid);
-		assertNotSame(loadedCommit, commit);
-		assertEquals(commit.getMessage(), loadedCommit.getMessage());
 	}
 
 	public void test024_createCommitNonAscii() throws IOException {
@@ -363,7 +370,7 @@ public class T0003_Basic extends RepositoryTestCase {
 		ObjectId cid = new ObjectWriter(db).writeCommit(commit);
 		assertEquals("2979b39d385014b33287054b87f77bcb3ecb5ebf", cid.name());
 	}
-
+	
 	public void test025_packedRefs() throws IOException {
 		test020_createBlobTag();
 		test021_createTreeTag();
@@ -502,9 +509,9 @@ public class T0003_Basic extends RepositoryTestCase {
 		assertEquals(c2.getCommitId(), rm4.getParentIds()[1]);
 		assertEquals(c3.getCommitId(), rm4.getParentIds()[2]);
 	}
-
+	
 	public void test027_UnpackedRefHigherPriorityThanPacked() throws IOException {
-		PrintWriter writer = new PrintWriter(new FileWriter(new File(db.getDirectory(), "refs/heads/a")));
+		PrintWriter writer = new PrintWriter(new FileWriter(new File(db.getDirectory(), "refs/heads/a"))); 
 		String unpackedId = "7f822839a2fe9760f386cbbbcb3f92c5fe81def7";
 		writer.print(unpackedId);
 		writer.print('\n');
