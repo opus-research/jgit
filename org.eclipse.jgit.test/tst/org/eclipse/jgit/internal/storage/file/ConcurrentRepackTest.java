@@ -150,11 +150,11 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		// within the pack has been modified.
 		//
 		final RevObject o2 = writeBlob(eden, "o2");
-		try (final PackWriter pw = new PackWriter(eden)) {
-			pw.addObject(o2);
-			pw.addObject(o1);
-			write(out1, pw);
-		}
+		final PackWriter pw = new PackWriter(eden);
+		pw.addObject(o2);
+		pw.addObject(o1);
+		write(out1, pw);
+		pw.release();
 
 		// Try the old name, then the new name. The old name should cause the
 		// pack to reload when it opens and the index and pack mismatch.
@@ -216,18 +216,18 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 
 	private File[] pack(final Repository src, final RevObject... list)
 			throws IOException {
-		try (final PackWriter pw = new PackWriter(src)) {
-			for (final RevObject o : list) {
-				pw.addObject(o);
-			}
-
-			final ObjectId name = pw.computeName();
-			final File packFile = fullPackFileName(name, ".pack");
-			final File idxFile = fullPackFileName(name, ".idx");
-			final File[] files = new File[] { packFile, idxFile };
-			write(files, pw);
-			return files;
+		final PackWriter pw = new PackWriter(src);
+		for (final RevObject o : list) {
+			pw.addObject(o);
 		}
+
+		final ObjectId name = pw.computeName();
+		final File packFile = fullPackFileName(name, ".pack");
+		final File idxFile = fullPackFileName(name, ".idx");
+		final File[] files = new File[] { packFile, idxFile };
+		write(files, pw);
+		pw.release();
+		return files;
 	}
 
 	private static void write(final File[] files, final PackWriter pw)
@@ -282,10 +282,13 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 			throws IOException {
 		final RevWalk revWalk = new RevWalk(repo);
 		final byte[] bytes = Constants.encode(data);
+		final ObjectInserter inserter = repo.newObjectInserter();
 		final ObjectId id;
-		try (final ObjectInserter inserter = repo.newObjectInserter()) {
+		try {
 			id = inserter.insert(Constants.OBJ_BLOB, bytes);
 			inserter.flush();
+		} finally {
+			inserter.release();
 		}
 		try {
 			parse(id);
