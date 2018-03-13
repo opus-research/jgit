@@ -534,7 +534,6 @@ public class Config {
 	 *            if {@code true} recursively adds the names defined in all base
 	 *            configurations
 	 * @return the list of names defined for this section
-	 * @since 3.2
 	 */
 	public Set<String> getNames(String section, boolean recursive) {
 		return getState().getNames(section, null, recursive);
@@ -549,7 +548,6 @@ public class Config {
 	 *            if {@code true} recursively adds the names defined in all base
 	 *            configurations
 	 * @return the list of names defined for this subsection
-	 * @since 3.2
 	 */
 	public Set<String> getNames(String section, String subsection,
 			boolean recursive) {
