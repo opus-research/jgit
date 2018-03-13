@@ -514,16 +514,63 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code apply} command
+	 * Returns a command object to execute a {@code submodule add} command
 	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-apply.html"
-	 *      >Git documentation about apply</a>
-	 * @return a {@link ApplyCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code apply} command
+	 * @return a {@link SubmoduleAddCommand} used to add a new submodule to a
+	 *         parent repository
 	 */
-	public ApplyCommand apply() {
-		return new ApplyCommand(repo);
+	public SubmoduleAddCommand submoduleAdd() {
+		return new SubmoduleAddCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code submodule init} command
+	 *
+	 * @return a {@link SubmoduleInitCommand} used to initialize the
+	 *         repository's config with settings from the .gitmodules file in
+	 *         the working tree
+	 */
+	public SubmoduleInitCommand submoduleInit() {
+		return new SubmoduleInitCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code submodule status} command
+	 *
+	 * @return a {@link SubmoduleStatusCommand} used to report the status of a
+	 *         repository's configured submodules
+	 */
+	public SubmoduleStatusCommand submoduleStatus() {
+		return new SubmoduleStatusCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code submodule sync} command
+	 *
+	 * @return a {@link SubmoduleSyncCommand} used to update the URL of a
+	 *         submodule from the parent repository's .gitmodules file
+	 */
+	public SubmoduleSyncCommand submoduleSync() {
+		return new SubmoduleSyncCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code submodule update} command
+	 *
+	 * @return a {@link SubmoduleUpdateCommand} used to update the submodules in
+	 *         a repository to the configured revision
+	 */
+	public SubmoduleUpdateCommand submoduleUpdate() {
+		return new SubmoduleUpdateCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to list stashed commits
+	 *
+	 * @return a {@link StashListCommand}
+	 */
+	public StashListCommand stashList() {
+		return new StashListCommand(repo);
 	}
 
 	/**

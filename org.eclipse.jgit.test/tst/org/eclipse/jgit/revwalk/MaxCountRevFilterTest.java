@@ -40,56 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.revwalk;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertNull;
 
-import org.eclipse.jgit.patch.ApplyError;
-import org.eclipse.jgit.patch.FormatError;
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
+import org.junit.Test;
 
-/**
- * Encapsulates the result of a {@link ApplyCommand}
- */
-public class ApplyResult {
+public class MaxCountRevFilterTest extends RevWalkTestCase {
+	@Test
+	public void testMaxCountRevFilter() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c1 = commit(b);
+		final RevCommit c2 = commit(b);
+		final RevCommit d = commit(c1, c2);
+		final RevCommit e = commit(d);
 
-	private List<FormatError> formatErrors = Collections.emptyList();
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(3));
+		markStart(e);
+		assertCommit(e, rw.next());
+		assertCommit(d, rw.next());
+		assertCommit(c2, rw.next());
+		assertNull(rw.next());
 
-	private List<ApplyError> applyErrors = new ArrayList<ApplyError>();
-
-	/**
-	 * @param formatErrors
-	 *            formatting errors
-	 * @return this instance
-	 */
-	public ApplyResult setFormatErrors(List<FormatError> formatErrors) {
-		this.formatErrors = formatErrors;
-		return this;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(e);
+		assertNull(rw.next());
 	}
 
-	/**
-	 * @return collection of formatting errors, if any.
-	 */
-	public List<FormatError> getFormatErrors() {
-		return formatErrors;
-	}
+	@Test
+	public void testMaxCountRevFilter0() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-	/**
-	 * @param applyError
-	 *            an error that occurred when applying a patch
-	 * @return this instance
-	 */
-	public ApplyResult addApplyError(ApplyError applyError) {
-		applyErrors.add(applyError);
-		return this;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(b);
+		assertNull(rw.next());
 	}
-
-	/**
-	 * @return collection of applying errors, if any.
-	 */
-	public List<ApplyError> getApplyErrors() {
-		return applyErrors;
-	}
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,113 +40,76 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.patch;
+package org.eclipse.jgit.submodule;
 
-import java.io.IOException;
+import org.eclipse.jgit.lib.ObjectId;
 
-import org.eclipse.jgit.diff.DiffEntry.ChangeType;
+/**
+ * Status class containing the type, path, and commit id of the submodule.
+ */
+public class SubmoduleStatus {
 
-/** An error which occurred when applying a patch */
-public class ApplyError {
+	private final SubmoduleStatusType type;
 
-	private FileHeader fileHeader;
+	private final String path;
 
-	private ChangeType changeType;
+	private final ObjectId indexId;
 
-	private char hunkContorlChar;
-
-	private HunkHeader hunkHeader;
-
-	private IOException ioException;
+	private final ObjectId headId;
 
 	/**
-	 * @param fh
-	 *            file header
-	 * @param t
-	 *            change type
-	 * @param c
-	 *            hunk control char
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
 	 */
-	public ApplyError(FileHeader fh, ChangeType t, char c) {
-		this.fileHeader = fh;
-		this.changeType = t;
-		this.hunkContorlChar = c;
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId) {
+		this(type, path, indexId, null);
 	}
 
 	/**
-	 * @param fh
-	 *            file header
-	 * @param t
-	 *            change type
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
+	 * @param headId
 	 */
-	public ApplyError(FileHeader fh, ChangeType t) {
-		this(fh, t, (char) 0);
-
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId, final ObjectId headId) {
+		this.type = type;
+		this.path = path;
+		this.indexId = indexId;
+		this.headId = headId;
 	}
 
 	/**
-	 * @param hh
-	 *            hunk header
-	 * @param c
-	 *            hunk control char
+	 * @return type
 	 */
-	public ApplyError(HunkHeader hh, char c) {
-		this(hh.getFileHeader(), ChangeType.MODIFY, c);
-		this.hunkHeader = hh;
+	public SubmoduleStatusType getType() {
+		return type;
 	}
 
 	/**
-	 * @param e
-	 *            IO exception
+	 * @return path
 	 */
-	public ApplyError(IOException e) {
-		this.ioException = e;
+	public String getPath() {
+		return path;
 	}
 
 	/**
-	 * @return file header
+	 * @return index object id
 	 */
-	public FileHeader getFileHeader() {
-		return fileHeader;
+	public ObjectId getIndexId() {
+		return indexId;
 	}
 
 	/**
-	 * @return hunk header
+	 * @return HEAD object id
 	 */
-	public HunkHeader getHunkHeader() {
-		return hunkHeader;
-	}
-
-	/**
-	 * @return change type
-	 */
-	public ChangeType getChangeType() {
-		return changeType;
-	}
-
-	/**
-	 * @return hunk control char
-	 */
-	public char getHunkControlChar() {
-		return hunkContorlChar;
-	}
-
-	@Override
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		if (ioException != null) {
-			r.append(ioException.getMessage());
-		} else {
-			r.append(getChangeType().name());
-			if (getHunkControlChar() != 0) {
-				r.append(","); //$NON-NLS-1$
-				r.append(getHunkControlChar());
-			}
-			r.append(": at hunk "); //$NON-NLS-1$
-			r.append(getHunkHeader());
-			r.append("  in "); //$NON-NLS-1$
-			r.append(getFileHeader());
-		}
-		return r.toString();
+	public ObjectId getHeadId() {
+		return headId;
 	}
 }
