@@ -72,7 +72,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.ReceiveSession;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
@@ -95,7 +94,7 @@ class ReceivePackServlet extends HttpServlet {
 		protected void begin(HttpServletRequest req, Repository db)
 				throws IOException, ServiceNotEnabledException,
 				ServiceNotAuthorizedException {
-			ReceiveSession rp = receivePackFactory.create(req, db);
+			ReceivePack rp = receivePackFactory.create(req, db);
 			req.setAttribute(ATTRIBUTE_HANDLER, rp);
 		}
 
@@ -123,7 +122,7 @@ class ReceivePackServlet extends HttpServlet {
 				FilterChain chain) throws IOException, ServletException {
 			HttpServletRequest req = (HttpServletRequest) request;
 			HttpServletResponse rsp = (HttpServletResponse) response;
-			ReceiveSession rp;
+			ReceivePack rp;
 			try {
 				rp = receivePackFactory.create(req, getRepository(req));
 			} catch (ServiceNotAuthorizedException e) {
