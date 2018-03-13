@@ -95,7 +95,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * the same RevWalk at the same time. The Iterator may buffer RevCommits, while
  * {@link #next()} does not.
  */
-public class RevWalk implements Iterable<RevCommit> {
+public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	private static final int MB = 1 << 20;
 
 	/**
@@ -166,6 +166,8 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	final ObjectReader reader;
 
+	private final boolean closeReader;
+
 	final MutableObjectId idBuffer;
 
 	ObjectIdOwnerMap<RevObject> objects;
@@ -175,6 +177,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	private int delayFreeFlags;
 
 	private int retainOnReset;
+
 	int carryFlags = UNINTERESTING;
 
 	final ArrayList<RevCommit> roots;
@@ -200,22 +203,27 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *
 	 * @param repo
 	 *            the repository the walker will obtain data from. An
-	 *            ObjectReader will be created by the walker, and must be
-	 *            released by the caller.
+	 *            ObjectReader will be created by the walker, and will be closed
+	 *            when the walker is closed.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo.newObjectReader());
+		this(repo.newObjectReader(), true);
 	}
 
 	/**
 	 * Create a new revision walker for a given repository.
+	 * <p>
 	 *
 	 * @param or
-	 *            the reader the walker will obtain data from. The reader should
-	 *            be released by the caller when the walker is no longer
-	 *            required.
+	 *            the reader the walker will obtain data from. The reader is not
+	 *            closed when the walker is closed (but is closed by {@link
+	 *            #dispose()}.
 	 */
 	public RevWalk(ObjectReader or) {
+		this(or, false);
+	}
+
+	private RevWalk(ObjectReader or, boolean closeReader) {
 		reader = or;
 		idBuffer = new MutableObjectId();
 		objects = new ObjectIdOwnerMap<RevObject>();
@@ -226,6 +234,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
 		retainBody = true;
+		this.closeReader = closeReader;
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -237,10 +246,26 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * Release any resources used by this walker's reader.
 	 * <p>
 	 * A walker that has been released can be used again, but may need to be
-	 * released after the subsequent usage.
+	 * released after the subsequent usage. Use {@link #close()} instead.
 	 */
+	@Deprecated
 	public void release() {
-		reader.release();
+		close();
+	}
+
+	/**
+	 * Release any resources used by this walker's reader.
+	 * <p>
+	 * A walker that has been released can be used again, but may need to be
+	 * released after the subsequent usage.
+	 *
+	 * @since 4.0
+	 */
+	@Override
+	public void close() {
+		if (closeReader) {
+			reader.close();
+		}
 	}
 
 	/**
@@ -1270,13 +1295,13 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * All RevFlag instances are also invalidated, and must not be reused.
 	 */
 	public void dispose() {
-		reader.release();
+		reader.close();
 		freeFlags = APP_FLAGS;
 		delayFreeFlags = 0;
 		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
-		reader.release();
+		reader.close();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);

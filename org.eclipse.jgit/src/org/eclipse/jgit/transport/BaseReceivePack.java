@@ -246,6 +246,15 @@ public abstract class BaseReceivePack {
 	/** The size of the received pack, including index size */
 	private Long packSize;
 
+	PushCertificateParser pushCertificateParser;
+
+	/**
+	 * @return the push certificate used to verify the pushers identity.
+	 */
+	PushCertificate getPushCertificate() {
+		return pushCertificateParser;
+	}
+
 	/**
 	 * Create a new pack receive for an open repository.
 	 *
@@ -267,6 +276,7 @@ public abstract class BaseReceivePack {
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
 		clientShallowCommits = new HashSet<ObjectId>();
+		pushCertificateParser = new PushCertificateParser(db, cfg);
 	}
 
 	/** Configuration for receive operations. */
@@ -287,6 +297,9 @@ public abstract class BaseReceivePack {
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
 
+		final String certNonceSeed;
+		final int certNonceSlopLimit;
+
 		ReceiveConfig(final Config config) {
 			checkReceivedObjects = config.getBoolean(
 					"receive", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
@@ -304,6 +317,8 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
+			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$
+			certNonceSlopLimit = config.getInt("receive", "certnonceslop", 0); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 
 		ObjectChecker newObjectChecker() {
@@ -929,6 +944,9 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
+		if (pushCertificateParser.enabled())
+			adv.advertiseCapability(
+				pushCertificateParser.getAdvertiseNonce());
 		if (db.getRefDatabase().performsAtomicTransactions())
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
@@ -968,7 +986,17 @@ public abstract class BaseReceivePack {
 				final FirstLine firstLine = new FirstLine(line);
 				enabledCapabilities = firstLine.getCapabilities();
 				line = firstLine.getLine();
+
+				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT))
+					pushCertificateParser.receiveHeader(pckIn,
+							!isBiDirectionalPipe());
 			}
+
+			if (line.equals("-----BEGIN PGP SIGNATURE-----\n")) //$NON-NLS-1$
+				pushCertificateParser.receiveSignature(pckIn);
+
+			if (pushCertificateParser.enabled())
+				pushCertificateParser.addCommand(line);
 
 			if (line.length() < 83) {
 				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
@@ -1042,8 +1070,7 @@ public abstract class BaseReceivePack {
 		if (sideBand)
 			resolving = new SideBandProgressMonitor(msgOut);
 
-		ObjectInserter ins = db.newObjectInserter();
-		try {
+		try (ObjectInserter ins = db.newObjectInserter()) {
 			String lockMsg = "jgit receive-pack"; //$NON-NLS-1$
 			if (getRefLogIdent() != null)
 				lockMsg += " from " + getRefLogIdent().toExternalString(); //$NON-NLS-1$
@@ -1061,8 +1088,6 @@ public abstract class BaseReceivePack {
 			packLock = parser.parse(receiving, resolving);
 			packSize = Long.valueOf(parser.getPackSize());
 			ins.flush();
-		} finally {
-			ins.release();
 		}
 
 		if (timeoutIn != null)
@@ -1091,67 +1116,69 @@ public abstract class BaseReceivePack {
 		}
 		parser = null;
 
-		final ObjectWalk ow = new ObjectWalk(db);
-		ow.setRetainBody(false);
-		if (baseObjects != null) {
-			ow.sort(RevSort.TOPO);
-			if (!baseObjects.isEmpty())
-				ow.sort(RevSort.BOUNDARY, true);
-		}
-
-		for (final ReceiveCommand cmd : commands) {
-			if (cmd.getResult() != Result.NOT_ATTEMPTED)
-				continue;
-			if (cmd.getType() == ReceiveCommand.Type.DELETE)
-				continue;
-			ow.markStart(ow.parseAny(cmd.getNewId()));
-		}
-		for (final ObjectId have : advertisedHaves) {
-			RevObject o = ow.parseAny(have);
-			ow.markUninteresting(o);
-
-			if (baseObjects != null && !baseObjects.isEmpty()) {
-				o = ow.peel(o);
-				if (o instanceof RevCommit)
-					o = ((RevCommit) o).getTree();
-				if (o instanceof RevTree)
-					ow.markUninteresting(o);
+		try (final ObjectWalk ow = new ObjectWalk(db)) {
+			ow.setRetainBody(false);
+			if (baseObjects != null) {
+				ow.sort(RevSort.TOPO);
+				if (!baseObjects.isEmpty())
+					ow.sort(RevSort.BOUNDARY, true);
 			}
-		}
 
-		checking.beginTask(JGitText.get().countingObjects, ProgressMonitor.UNKNOWN);
-		RevCommit c;
-		while ((c = ow.next()) != null) {
-			checking.update(1);
-			if (providedObjects != null //
-					&& !c.has(RevFlag.UNINTERESTING) //
-					&& !providedObjects.contains(c))
-				throw new MissingObjectException(c, Constants.TYPE_COMMIT);
-		}
-
-		RevObject o;
-		while ((o = ow.nextObject()) != null) {
-			checking.update(1);
-			if (o.has(RevFlag.UNINTERESTING))
-				continue;
-
-			if (providedObjects != null) {
-				if (providedObjects.contains(o))
+			for (final ReceiveCommand cmd : commands) {
+				if (cmd.getResult() != Result.NOT_ATTEMPTED)
 					continue;
-				else
-					throw new MissingObjectException(o, o.getType());
+				if (cmd.getType() == ReceiveCommand.Type.DELETE)
+					continue;
+				ow.markStart(ow.parseAny(cmd.getNewId()));
+			}
+			for (final ObjectId have : advertisedHaves) {
+				RevObject o = ow.parseAny(have);
+				ow.markUninteresting(o);
+
+				if (baseObjects != null && !baseObjects.isEmpty()) {
+					o = ow.peel(o);
+					if (o instanceof RevCommit)
+						o = ((RevCommit) o).getTree();
+					if (o instanceof RevTree)
+						ow.markUninteresting(o);
+				}
 			}
 
-			if (o instanceof RevBlob && !db.hasObject(o))
-				throw new MissingObjectException(o, Constants.TYPE_BLOB);
-		}
-		checking.endTask();
+			checking.beginTask(JGitText.get().countingObjects,
+					ProgressMonitor.UNKNOWN);
+			RevCommit c;
+			while ((c = ow.next()) != null) {
+				checking.update(1);
+				if (providedObjects != null //
+						&& !c.has(RevFlag.UNINTERESTING) //
+						&& !providedObjects.contains(c))
+					throw new MissingObjectException(c, Constants.TYPE_COMMIT);
+			}
 
-		if (baseObjects != null) {
-			for (ObjectId id : baseObjects) {
-				o = ow.parseAny(id);
-				if (!o.has(RevFlag.UNINTERESTING))
-					throw new MissingObjectException(o, o.getType());
+			RevObject o;
+			while ((o = ow.nextObject()) != null) {
+				checking.update(1);
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
+
+				if (providedObjects != null) {
+					if (providedObjects.contains(o))
+						continue;
+					else
+						throw new MissingObjectException(o, o.getType());
+				}
+
+				if (o instanceof RevBlob && !db.hasObject(o))
+					throw new MissingObjectException(o, Constants.TYPE_BLOB);
+			}
+			checking.endTask();
+
+			if (baseObjects != null) {
+				for (ObjectId id : baseObjects) {
+					o = ow.parseAny(id);
+					if (!o.has(RevFlag.UNINTERESTING))
+						throw new MissingObjectException(o, o.getType());
+				}
 			}
 		}
 	}
@@ -1474,7 +1501,7 @@ public abstract class BaseReceivePack {
 	 *             the pack could not be unlocked.
 	 */
 	protected void release() throws IOException {
-		walk.release();
+		walk.close();
 		unlockPack();
 		timeoutIn = null;
 		rawIn = null;
