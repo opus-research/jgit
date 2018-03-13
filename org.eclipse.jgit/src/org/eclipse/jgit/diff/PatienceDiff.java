@@ -182,8 +182,6 @@ public class PatienceDiff extends DiffAlgorithm {
 				break;
 
 			case EMPTY:
-				break;
-
 			default:
 				throw new IllegalStateException();
 			}
