@@ -119,11 +119,11 @@ A reftable file has the following high-level structure:
       first_ref_block
     }
     ref_blocks*
-    ref_index?
+    ref_index*
     obj_blocks*
-    obj_index?
+    obj_index*
     log_blocks*
-    log_index?
+    log_index*
     footer
 
 A log-only file omits the `ref_blocks`, `ref_index`, `obj_blocks` and
@@ -133,7 +133,7 @@ A log-only file omits the `ref_blocks`, `ref_index`, `obj_blocks` and
       header
     }
     log_blocks*
-    log_index?
+    log_index*
     footer
 
 in a log-only file the first log block immediately follows the file
