@@ -541,9 +541,4 @@ public class ObjectDirectory extends ObjectDatabase {
 			return true;
 		}
 	}
-
-	@Override
-	public ObjectDatabase newCachedDatabase() {
-		return new CachedObjectDirectory(this);
-	}
 }
