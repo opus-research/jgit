@@ -804,7 +804,15 @@ public class BlameGenerator {
 		return false;
 	}
 
-	/** @return current revision being blamed. */
+	/**
+	 * Get the revision blamed for the current region.
+	 * <p>
+	 * The source commit may be null if the line was blamed to an uncommitted
+	 * revision, such as the working tree copy, or during a reverse blame if the
+	 * line survives to the end revision (e.g. the branch tip).
+	 *
+	 * @return current revision being blamed.
+	 */
 	public RevCommit getSourceCommit() {
 		return currentSource.sourceCommit;
 	}
