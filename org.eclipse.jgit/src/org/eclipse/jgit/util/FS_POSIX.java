@@ -113,6 +113,6 @@ abstract class FS_POSIX extends FS {
 						return System.getProperty("os.name");
 					}
 				});
-		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName);
+		return "Mac OS X".equals(osDotName);
 	}
 }

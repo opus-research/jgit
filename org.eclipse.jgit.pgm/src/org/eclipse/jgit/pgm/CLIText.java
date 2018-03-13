@@ -180,11 +180,9 @@ public class CLIText extends TranslationBundle {
 	/***/ public String repaint;
 	/***/ public String serviceNotSupported;
 	/***/ public String skippingObject;
-	/***/ public String tagLabel;
-	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
-	/***/ public String unknownMergeStrategy;
+	/***/ public String unknownMergeStratey;
 	/***/ public String unsupportedOperation;
 	/***/ public String warningNoCommitGivenOnCommandLine;
 }
