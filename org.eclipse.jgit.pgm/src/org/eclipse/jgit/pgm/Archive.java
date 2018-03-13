@@ -90,20 +90,14 @@ class Archive extends TextBuiltin {
 			final ZipArchiveEntry entry = new ZipArchiveEntry(name);
 			final ObjectLoader loader = reader.open(idBuf);
 			entry.setSize(loader.getSize());
-
-			if (mode == FileMode.REGULAR_FILE)
-				; // ok
-			else if (mode == FileMode.EXECUTABLE_FILE ||
-				 mode == FileMode.SYMLINK)
-				entry.setUnixMode(mode.getBits());
-			else
-				System.err.println(MessageFormat.format( //
-						CLIText.get().archiveEntryModeIgnored, //
-						name));
-
 			out.putArchiveEntry(entry);
 			loader.copyTo(out);
 			out.closeArchiveEntry();
+
+			if (mode != FileMode.REGULAR_FILE)
+				System.err.println(MessageFormat.format( //
+						CLIText.get().archiveEntryModeIgnored, //
+						name));
 		}
 
 		out.close();
