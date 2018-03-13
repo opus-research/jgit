@@ -49,7 +49,6 @@ import java.io.File;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 
 class IndexPack extends TextBuiltin {
@@ -65,8 +64,7 @@ class IndexPack extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		if (indexVersion == -1)
-			indexVersion = db.getConfig().get(CoreConfig.KEY)
-					.getPackIndexVersion();
+			indexVersion = db.getConfig().getCore().getPackIndexVersion();
 		final BufferedInputStream in;
 		final org.eclipse.jgit.transport.IndexPack ip;
 		in = new BufferedInputStream(System.in);

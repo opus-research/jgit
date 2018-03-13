@@ -148,12 +148,12 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 			throws FileNotFoundException, IOException {
 		final BundleWriter bw;
 
-		bw = new BundleWriter(db);
+		bw = new BundleWriter(db, NullProgressMonitor.INSTANCE);
 		bw.include(name, ObjectId.fromString(anObjectToInclude));
 		if (assume != null)
 			bw.assume(assume);
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
-		bw.writeBundle(NullProgressMonitor.INSTANCE, out);
+		bw.writeBundle(out);
 		return out.toByteArray();
 	}
 
