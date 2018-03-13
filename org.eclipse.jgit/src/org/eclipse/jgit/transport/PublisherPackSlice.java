@@ -45,14 +45,13 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * A slice of a PublisherPack stored either in memory or on disk, abstracted by
- * an InputStream.
+ * A slice of a PublisherPack stored either in memory or on
+ * implementation-specific storage (disk, DFS, etc).
  */
 public abstract class PublisherPackSlice {
 	/** Policy controlling automatic loading of data into memory. */
@@ -66,21 +65,34 @@ public abstract class PublisherPackSlice {
 		public boolean shouldLoad(PublisherPackSlice slice);
 	}
 
-	/** Callbacks for load and store events. */
-	public interface LoadCallback {
+	/** Deallocator callback for a slice's memory. */
+	public interface Deallocator {
+		/**
+		 * Called after deallocating a slice's memory.
+		 *
+		 * @throws PublisherException
+		 */
+		public void deallocate() throws PublisherException;
+
+		/** No-op deallocator instance. */
+		public static Deallocator INSTANCE = new Deallocator() {
+			public void deallocate() throws PublisherException {
+				// Nothing
+			}
+		};
+	}
+
+	/** Used to allocate memory pool space for a slice. */
+	public interface Allocator {
 		/**
 		 * Called once upon successful load of this slice into memory.
 		 *
 		 * @param slice
+		 * @return deallocator for this slice
+		 * @throws PublisherException
 		 */
-		public void loaded(PublisherPackSlice slice);
-
-		/**
-		 * Called once upon successful store of this slice.
-		 *
-		 * @param slice
-		 */
-		public void unloaded(PublisherPackSlice slice);
+		public Deallocator allocate(PublisherPackSlice slice)
+				throws PublisherException;
 	}
 
 	/** Size of each write in bytes between relocking. */
@@ -91,31 +103,37 @@ public abstract class PublisherPackSlice {
 	/** Memory storage for this Slice. */
 	private byte memoryBuffer[];
 
-	private volatile boolean inMemory = true;
-
 	private volatile boolean closed;
-
-	private final AtomicInteger referenceCount = new AtomicInteger();
 
 	private final LoadPolicy loadPolicy;
 
-	private final LoadCallback loadCallback;
+	private final Allocator memoryAllocator;
+
+	private volatile Deallocator deallocator;
 
 	final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
 	/**
 	 * @param policy
 	 * @param callback
-	 * @param consumers
 	 * @param buf
 	 */
-	public PublisherPackSlice(LoadPolicy policy, LoadCallback callback,
-			int consumers, byte[] buf) {
+	public PublisherPackSlice(
+			LoadPolicy policy, Allocator callback, byte[] buf) {
 		loadPolicy = policy;
-		loadCallback = callback;
-		referenceCount.set(consumers);
+		memoryAllocator = callback;
 		size = buf.length;
 		memoryBuffer = buf;
+	}
+
+	/**
+	 * Set an initial deallocator for when the slice is already loaded into
+	 * memory.
+	 *
+	 * @param d
+	 */
+	void setDeallocator(Deallocator d) {
+		deallocator = d;
 	}
 
 	/** @return the size of this slice in bytes */
@@ -124,8 +142,7 @@ public abstract class PublisherPackSlice {
 	}
 
 	/**
-	 * Transfer into physical memory, and update any outstanding InputStreams to
-	 * read from the loaded buffer.
+	 * Transfer into physical memory.
 	 *
 	 * @throws IOException
 	 */
@@ -133,51 +150,38 @@ public abstract class PublisherPackSlice {
 		Lock writeLock = rwLock.writeLock();
 		writeLock.lock();
 		try {
-			if (inMemory)
+			if (isLoaded())
 				return;
 			memoryBuffer = doLoad();
-			inMemory = true;
 		} finally {
 			writeLock.unlock();
 		}
 		// Loaded may call store()
-		loadCallback.loaded(this);
+		deallocator = memoryAllocator.allocate(this);
 	}
 
 	/**
-	 * Same as {@link #store()}, except only call
-	 * {@link LoadCallback#unloaded(PublisherPackSlice)} if allocated is true.
+	 * Free physical memory and transfer to storage.
 	 *
-	 * @param allocated
 	 * @return true if this block was released, false if it wasn't loaded
 	 * @throws IOException
 	 */
-	protected boolean store(boolean allocated) throws IOException {
+	protected boolean store() throws IOException {
 		Lock writeLock = rwLock.writeLock();
 		writeLock.lock();
 		try {
-			if (!inMemory)
+			if (!isLoaded())
 				return false;
 			doStore(memoryBuffer);
-			inMemory = false;
 			memoryBuffer = null;
-			if (allocated)
-				loadCallback.unloaded(this);
+			if (isLoaded()) {
+				deallocator.deallocate();
+				deallocator = null;
+			}
 			return true;
 		} finally {
 			writeLock.unlock();
 		}
-	}
-
-	/**
-	 * Free physical memory and transfer to storage, and update any outstanding
-	 * InputStreams to load from the storage location.
-	 *
-	 * @return true if this block was released, false if it wasn't loaded
-	 * @throws IOException
-	 */
-	public boolean store() throws IOException {
-		return store(true);
 	}
 
 	/**
@@ -214,7 +218,7 @@ public abstract class PublisherPackSlice {
 	 * @param out
 	 * @throws IOException
 	 */
-	public void writeToStream(OutputStream out) throws IOException {
+	void writeToStream(OutputStream out) throws IOException {
 		if (loadPolicy.shouldLoad(this))
 			load();
 		int pos = 0;
@@ -225,7 +229,7 @@ public abstract class PublisherPackSlice {
 				if (closed)
 					throw new IOException("Slice already closed");
 				int writeLen = Math.min(size - pos, WRITE_SIZE);
-				if (inMemory)
+				if (isLoaded())
 					out.write(memoryBuffer, pos, writeLen);
 				else
 					doStoredWrite(out, pos, writeLen);
@@ -237,41 +241,20 @@ public abstract class PublisherPackSlice {
 	}
 
 	/**
-	 * Increase reference count for this slice by 1.
-	 *
-	 * @return true if the count was incremented before it reached 0
-	 */
-	public boolean incrementOpen() {
-		return referenceCount.getAndIncrement() > 0;
-	}
-
-	/**
-	 * Release one reference to this Slice. This should be called by every
-	 * client after they no longer need this Slice.
-	 */
-	public void release() {
-		if (referenceCount.decrementAndGet() == 0) {
-			if (inMemory)
-				loadCallback.unloaded(this);
-			close();
-		}
-	}
-
-	/** @return true if this Slice's memory can be recycled */
-	public boolean canRecycle() {
-		return referenceCount.get() == 0 && closed;
-	}
-
-	/**
 	 * Delete all resources this slice used.
+	 *
+	 * @throws PublisherException
 	 */
-	public void close() {
+	public void close() throws PublisherException {
 		Lock writeLock = rwLock.writeLock();
 		writeLock.lock();
 		try {
-			inMemory = false;
 			memoryBuffer = null;
 			closed = true;
+			if (isLoaded()) {
+				deallocator.deallocate();
+				deallocator = null;
+			}
 		} finally {
 			writeLock.unlock();
 		}
@@ -284,6 +267,6 @@ public abstract class PublisherPackSlice {
 
 	/** @return true if this slice is in memory */
 	public boolean isLoaded() {
-		return inMemory;
+		return (deallocator != null);
 	}
 }

@@ -45,7 +45,6 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,7 +53,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -62,6 +60,7 @@ import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.util.RefTranslator;
 
 /**
  * A subscription to a single repository using one or more SubscriptionSpecs.
@@ -80,134 +79,6 @@ public class SubscribedRepository {
 	private List<RefSpec> specs;
 
 	private Map<String, Ref> remoteRefs;
-
-	/**
-	 * Get the PubSub ref location from a remote tracking ref. The /pubsub/ ref
-	 * tree is different from the /remotes/ tree in that it can store branches
-	 * and tags. Branches are under /heads/ and tags are under /tags/.
-	 *
-	 * @param rc
-	 * @param trackingRef
-	 *            e.g "refs/remotes/origin/master"
-	 * @return pubsub ref location, e.g "refs/pubsub/origin/heads/master"
-	 */
-	public static String getPubSubRefFromTracking(
-			RemoteConfig rc, String trackingRef) {
-		String ref = getRemoteRefFromTracking(rc, trackingRef);
-		return getPubSubRefFromRemote(rc.getName(), ref);
-	}
-
-	/**
-	 * Get the PubSub ref location from a remote ref.
-	 *
-	 * @param remote
-	 *            e.g "origin"
-	 * @param remoteRef
-	 *            e.g "refs/heads/master"
-	 * @return pubsub ref location, e.g "refs/pubsub/origin/heads/master"
-	 */
-	public static String getPubSubRefFromRemote(
-			String remote, String remoteRef) {
-		return translateRef(
-				Constants.R_REFS, Constants.R_PUBSUB + remote + "/", remoteRef);
-	}
-
-	/**
-	 * Get the tracking ref location from a pubsub ref. This strips off the
-	 * pubsub prefix /heads/. Translation is only allowed from a pubsub branch
-	 * ref to a remote ref, because the /remotes/ tree only stores branches.
-	 *
-	 * @param rc
-	 * @param pubsubRef
-	 *            e.g "refs/pubsub/origin/heads/master"
-	 * @return tracking ref location, e.g "refs/remotes/origin/master"
-	 */
-	public static String getTrackingRefFromPubSub(
-			RemoteConfig rc, String pubsubRef) {
-		String remote = getRemoteRefFromPubSub(rc.getName(), pubsubRef);
-		return getTrackingRefFromRemote(rc, remote);
-	}
-
-	/**
-	 * Get the remote ref location from a tracking ref.
-	 *
-	 * @param rc
-	 * @param trackingRef
-	 *            e.g "refs/remotes/origin/master"
-	 * @return remote ref location, e.g "refs/heads/master"
-	 */
-	public static String getRemoteRefFromTracking(
-			RemoteConfig rc, String trackingRef) {
-		// Match ref against the tracking side of a fetch spec
-		String local = null;
-		for (RefSpec r : rc.getFetchRefSpecs()) {
-			if (r.matchDestination(trackingRef)) {
-				if (r.isWildcard())
-					local = r.getSource()
-							.substring(0, r.getSource().length() - 1)
-							+ trackingRef.substring(
-									r.getDestination().length() - 1);
-				else
-					local = r.getSource();
-			}
-		}
-		if (local == null)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().noMatchingFetchSpec, trackingRef,
-					rc.getName()));
-		return local;
-	}
-
-	/**
-	 * Get the tracking ref location from a remote ref.
-	 *
-	 * @param rc
-	 * @param remoteRef
-	 *            e.g "refs/heads/master"
-	 * @return tracking ref location, e.g "refs/remotes/origin/master"
-	 */
-	public static String getTrackingRefFromRemote(
-			RemoteConfig rc, String remoteRef) {
-		// Match ref against the remote side of a fetch spec
-		String local = null;
-		for (RefSpec r : rc.getFetchRefSpecs()) {
-			if (r.matchSource(remoteRef)) {
-				if (r.isWildcard())
-					local = r.getDestination()
-							.substring(0, r.getDestination().length() - 1)
-							+ remoteRef.substring(r.getSource().length() - 1);
-				else
-					local = r.getDestination();
-			}
-		}
-		if (local == null)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().noMatchingFetchSpec, remoteRef,
-					rc.getName()));
-		return local;
-	}
-
-	/**
-	 * Get the remote ref location from a pubsub ref.
-	 *
-	 * @param remote
-	 *            e.g "origin"
-	 * @param ref
-	 *            e.g "refs/pubsub/origin/heads/master"
-	 * @return remote ref location, e.g "refs/heads/master"
-	 */
-	public static String getRemoteRefFromPubSub(String remote, String ref) {
-		return translateRef(
-				Constants.R_PUBSUB + remote + "/", Constants.R_REFS, ref);
-	}
-
-	private static String translateRef(String oldPrefix, String newPrefix,
-			String ref) {
-		if (!ref.startsWith(oldPrefix))
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidRefName, ref));
-		return newPrefix + ref.substring(oldPrefix.length());
-	}
 
 	/**
 	 * Create a new SubscribedRepository using the Subscriber config. Create
@@ -247,8 +118,8 @@ public class SubscribedRepository {
 		remoteConfig = new RemoteConfig(repository.getConfig(), remoteName);
 		Set<String> existingRefs = new LinkedHashSet<String>(
 				repository.getRefDatabase().getRefs(
-						getPubSubRefFromRemote(remoteName, Constants.R_REFS))
-						.keySet());
+						RefTranslator.getPubSubRefFromRemote(
+								remoteName, Constants.R_REFS)).keySet());
 		Map<String, Ref> refs = getRemoteRefs();
 		// Delete all non-matching refs in refs/pubsub/* first
 		for (Map.Entry<String, Ref> entry : refs.entrySet()) {
@@ -257,7 +128,7 @@ public class SubscribedRepository {
 			existingRefs.remove(existingRef);
 		}
 		for (String r : existingRefs) {
-			String pubsubRef = getPubSubRefFromRemote(
+			String pubsubRef = RefTranslator.getPubSubRefFromRemote(
 					remoteName, Constants.R_REFS + r);
 			if (repository.getRef(pubsubRef) == null)
 				continue;
@@ -268,7 +139,8 @@ public class SubscribedRepository {
 		// Set up space in refs/pubsub/* by copying all locally matching refs
 		for (Map.Entry<String, Ref> entry : refs.entrySet()) {
 			String ref = entry.getKey();
-			String pubsubRef = getPubSubRefFromRemote(remoteName, ref);
+			String pubsubRef = RefTranslator.getPubSubRefFromRemote(
+					remoteName, ref);
 			if (repository.getRef(pubsubRef) != null)
 				continue;
 			RefUpdate ru = repository.updateRef(pubsubRef);
@@ -312,11 +184,12 @@ public class SubscribedRepository {
 			if (isTag)
 				remoteRef = spec.getSource();
 			else
-				remoteRef = getTrackingRefFromRemote(remoteConfig, spec.getSource());
+				remoteRef = RefTranslator.getTrackingRefFromRemote(
+						remoteConfig, spec.getSource());
 			Collection<Ref> c;
 			if (spec.isWildcard()) {
-				remoteRef = remoteRef.substring(0, remoteRef.length() - 1);
-				c = refdb.getRefs(remoteRef).values();
+				c = refdb.getRefs(SubscribeSpec.stripWildcard(remoteRef))
+						.values();
 			} else {
 				Ref r = refdb.getRef(remoteRef);
 				if (r == null)
@@ -327,7 +200,8 @@ public class SubscribedRepository {
 				if (isTag)
 					matches.put(r.getName(), r);
 				else
-					matches.put(getRemoteRefFromTracking(remoteConfig, r.getName()), r);
+					matches.put(RefTranslator.getRemoteRefFromTracking(
+							remoteConfig, r.getName()), r);
 			}
 		}
 		remoteRefs = matches;
@@ -353,15 +227,17 @@ public class SubscribedRepository {
 		Map<String, Ref> matches = new HashMap<String, Ref>();
 		RefDatabase rdb = repository.getRefDatabase();
 		for (RefSpec spec : getSubscribeSpecs()) {
-			String pubsubRef = getPubSubRefFromRemote(remoteName, spec.getSource());
+			String pubsubRef = RefTranslator.getPubSubRefFromRemote(remoteName, spec.getSource());
 			if (spec.isWildcard()) {
 				pubsubRef = pubsubRef.substring(0, pubsubRef.length() - 1);
 				for (Ref r : rdb.getRefs(pubsubRef).values())
-					matches.put(getRemoteRefFromPubSub(remoteName, r.getName()), r);
+					matches.put(RefTranslator.getRemoteRefFromPubSub(
+							remoteName, r.getName()), r);
 			} else {
 				Ref r = rdb.getRef(pubsubRef);
 				if (r != null)
-					matches.put(getRemoteRefFromPubSub(remoteName, r.getName()), r);
+					matches.put(RefTranslator.getRemoteRefFromPubSub(
+							remoteName, r.getName()), r);
 			}
 		}
 		return matches;

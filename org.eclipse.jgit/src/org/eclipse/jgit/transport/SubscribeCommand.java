@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.transport;
 
+import java.util.Arrays;
+
 /** A command to subscribe or unsubscribe from a spec. */
 public class SubscribeCommand {
 	/** Subscribe or unsubscribe from the spec */
@@ -53,9 +55,9 @@ public class SubscribeCommand {
 		UNSUBSCRIBE
 	}
 
-	private Command command;
+	private final Command command;
 
-	private String spec;
+	private final String spec;
 
 	/**
 	 * @param c
@@ -82,6 +84,11 @@ public class SubscribeCommand {
 			return false;
 		SubscribeCommand o = (SubscribeCommand) other;
 		return o.command == command && o.spec.equals(spec);
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(new Object[] { command, spec });
 	}
 
 	@Override

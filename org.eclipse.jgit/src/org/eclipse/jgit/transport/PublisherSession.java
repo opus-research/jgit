@@ -44,26 +44,19 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PublisherStream.Window;
 import org.eclipse.jgit.transport.SubscribeCommand.Command;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.util.ConcurrentLinkedList.ConcurrentIterator;
 
 /**
  * The state of one client connection to one or more repositories. This is to
@@ -71,27 +64,17 @@ import org.eclipse.jgit.util.ConcurrentLinkedList.ConcurrentIterator;
  */
 public class PublisherSession {
 	/**
-	 * The state of a single client repository and list of current subscriptions
-	 * to be persisted across disconnects and updated when packs are
-	 * successfully pushed.
+	 * The state of a single client repository and list of current
+	 * subscriptions.
 	 */
-	public class SubscribedRepository {
-		private final Map<String, SubscribeSpec> subscribeSpecs;
+	public static class SubscribedRepository {
+		private final Set<SubscribeSpec> subscribeSpecs;
 
 		private final String name;
 
-		SubscribedRepository(String name) {
+		private SubscribedRepository(String name) {
 			this.name = name;
-			subscribeSpecs = new HashMap<String, SubscribeSpec>();
-		}
-
-		/**
-		 * @param s
-		 *            remove subscribe spec
-		 * @return true if this spec existed and was removed
-		 */
-		public synchronized boolean remove(SubscribeSpec s) {
-			return (subscribeSpecs.remove(s.getRefName()) != null);
+			subscribeSpecs = new HashSet<SubscribeSpec>();
 		}
 
 		/**
@@ -99,13 +82,13 @@ public class PublisherSession {
 		 *            add subscribe spec
 		 * @return false if this spec did not exist and was added
 		 */
-		public synchronized boolean add(SubscribeSpec s) {
-			return (subscribeSpecs.put(s.getRefName(), s) != null);
+		private boolean add(SubscribeSpec s) {
+			return !subscribeSpecs.add(s);
 		}
 
 		/** @return the current subscribe specs for this client */
-		public Collection<SubscribeSpec> getSubscribeSpecs() {
-			return Collections.unmodifiableCollection(subscribeSpecs.values());
+		public Set<SubscribeSpec> getSubscribeSpecs() {
+			return Collections.unmodifiableSet(subscribeSpecs);
 		}
 
 		/** @return this repository's name e.g "repo.git" */
@@ -135,21 +118,14 @@ public class PublisherSession {
 
 	private final String restartToken;
 
-	private volatile PublisherClient client;
-
-	private final Publisher publisher;
-
-	private final ConcurrentIterator<PublisherPack> packStreamIterator;
-
-	private List<PublisherPack> initialUpdates;
+	private final Window pushStreamIterator;
 
 	private ScheduledFuture<?> deleteTimer;
 
-	PublisherSession(Publisher p, SessionGenerator generator) {
-		restartToken = generator.generate();
+	PublisherSession(Window iterator, String sessionId) {
+		restartToken = sessionId;
 		state = new HashMap<String, SubscribedRepository>();
-		publisher = p;
-		packStreamIterator = p.getPackStreamIterator();
+		pushStreamIterator = iterator;
 	}
 
 	/** @return a unique key for this client's state */
@@ -158,312 +134,80 @@ public class PublisherSession {
 	}
 
 	/**
-	 * Connect the client communication channel and synchronize any updated
-	 * subscription requests and ref states. Decrease reference counts on packs
-	 * that are no longer subscribed to, and increase counts on new packs. Build
-	 * an initial update pack to bring the client up to the server's state.
+	 * Record the client's subscribe commands in the session's state.
 	 *
-	 * @param c
+	 * @param commands
 	 * @throws IOException
 	 * @throws ServiceNotEnabledException
 	 * @throws ServiceNotAuthorizedException
 	 */
-	public synchronized void sync(PublisherClient c) throws IOException,
-			ServiceNotAuthorizedException, ServiceNotEnabledException {
-		disconnect();
-		client = c;
-
-		// Sync subscribe/unsubscribe requests, record the commands that changed
-		Map<String, Map<SubscribeSpec, Command>> realCommands = syncCommands(
-				c.getCommands());
-
-		Map<String, Map<String, ObjectId>> baseUpdateRefs = syncReferenceCounts(
-				realCommands);
-
-		// Fill in ref values for subscribe commands not matching any pack in
-		// the stream from the server repository
-		for (Entry<String, Map<SubscribeSpec, Command>> e :
-				realCommands.entrySet()) {
+	public synchronized void sync(Map<String, List<SubscribeCommand>> commands)
+			throws IOException, ServiceNotAuthorizedException,
+			ServiceNotEnabledException {
+		for (Entry<String, List<SubscribeCommand>> e :
+				commands.entrySet()) {
 			String name = e.getKey();
-			Repository serverRepository = publisher.getRepository(
-					c, name);
-			RefDatabase refDb = serverRepository.getRefDatabase();
-			List<Ref> refList = new ArrayList<Ref>();
-			for (Entry<SubscribeSpec, Command> e2 : e.getValue().entrySet()) {
-				if (e2.getValue() == Command.UNSUBSCRIBE)
-					continue;
-				SubscribeSpec s = e2.getKey();
-				Collection<Ref> serverRefs;
-				if (s.isWildcard()) {
-					String refName = s.getRefName();
-					refName = refName.substring(0, refName.length() - 1);
-					serverRefs = refDb.getRefs(refName).values();
-					if (serverRefs.isEmpty())
-						continue;
-					refList.addAll(serverRefs);
-				} else {
-					Ref r = refDb.getRef(s.getRefName());
-					if (r == null)
-						continue;
-					refList.add(r);
-				}
+			SubscribedRepository sr = state.get(name);
+			if (sr == null) {
+				sr = new SubscribedRepository(name);
+				state.put(name, sr);
 			}
-			Map<String, ObjectId> repoBaseRefs = baseUpdateRefs.get(name);
-			if (repoBaseRefs == null) {
-				repoBaseRefs = new HashMap<String, ObjectId>();
-				baseUpdateRefs.put(name, repoBaseRefs);
-			}
-			for (Ref r : refList) {
-				if (!repoBaseRefs.containsKey(r.getName()))
-					repoBaseRefs.put(r.getName(), r.getObjectId());
+			for (SubscribeCommand command : e.getValue()) {
+				if (command.getCommand() == Command.SUBSCRIBE)
+					sr.add(new SubscribeSpec(command.getSpec()));
 			}
 		}
-
-		// Push updates to the client to get them up to date with the current
-		// repository state
-		initialUpdates = new ArrayList<PublisherPack>();
-		Map<String, Map<String, ObjectId>> clientState = client
-				.getRefState();
-		for (Entry<String, Map<String, ObjectId>> e :
-				baseUpdateRefs.entrySet()) {
-			String repoName = e.getKey();
-			Repository serverRepository = publisher.getRepository(
-					c, repoName);
-			publisher.hookRepository(serverRepository, repoName);
-
-			List<ReceiveCommand> refUpdates = new ArrayList<ReceiveCommand>();
-
-			Map<String, ObjectId> clientRepoState = clientState.get(repoName);
-			for (Entry<String, ObjectId> e2 : e.getValue().entrySet()) {
-				// Is this ref different from the client's value?
-				String refName = e2.getKey();
-				ObjectId refValue = e2.getValue();
-				ObjectId ourRef = clientRepoState.get(refName);
-				if (ourRef == null)
-					// New ref on the server
-					refUpdates.add(new ReceiveCommand(
-							ObjectId.zeroId(), refValue, refName));
-				else if (!refValue.equals(ourRef))
-					refUpdates.add(new ReceiveCommand(
-							ourRef, refValue, refName));
-			}
-			if (!refUpdates.isEmpty()) {
-				initialUpdates.add(publisher.createInitialPack(
-						refUpdates, serverRepository, repoName));
-			}
-		}
-	}
-
-	private Map<String, Map<SubscribeSpec, Command>> syncCommands(
-			Map<String, List<SubscribeCommand>> commands) {
-		Map<String, Map<SubscribeSpec, Command>> realCommands = new HashMap<
-				String, Map<SubscribeSpec, Command>>();
-		for (Entry<String, List<SubscribeCommand>> e : commands.entrySet()) {
-			String repoName = e.getKey();
-			SubscribedRepository repo = state.get(repoName);
-			if (repo == null) {
-				repo = new SubscribedRepository(repoName);
-				state.put(repoName, repo);
-			}
-			Map<SubscribeSpec, Command> realRepoCommands = new HashMap<
-					SubscribeSpec, Command>();
-			realCommands.put(repoName, realRepoCommands);
-			for (SubscribeCommand cmd : e.getValue()) {
-				if (cmd.getCommand() == Command.SUBSCRIBE) {
-					SubscribeSpec spec = new SubscribeSpec(cmd.getSpec());
-					if (!repo.add(spec))
-						realRepoCommands.put(spec, cmd.getCommand());
-				} else if (cmd.getCommand() == Command.UNSUBSCRIBE) {
-					SubscribeSpec spec = new SubscribeSpec(cmd.getSpec());
-					if (repo.remove(spec))
-						realRepoCommands.put(spec, cmd.getCommand());
-				}
-			}
-		}
-		return realCommands;
 	}
 
 	/**
-	 * Dereference all packs that would have been used, but now will not because
-	 * of unsubscribe commands. Get all server refs that match new subscribe
-	 * commands, then bring the client up to date to the old id of the first
-	 * pack that mentions each command. This lets the client continue to read
-	 * from where it is in the stream as it adds and removes subscriptions.
-	 *
-	 * @param realCommands
-	 * @return a map of all refs that are now matched by the new subscribe
-	 *         commands. Each ref is the first instance of that ref in a
-	 *         PublisherPack.
+	 * @return the names of all SubscribedRepository states for this session
 	 */
-	private Map<String, Map<String, ObjectId>> syncReferenceCounts(
-			Map<String, Map<SubscribeSpec, Command>> realCommands) {
-		Map<String, Map<String, ObjectId>> newSubscribeRefs = new HashMap<
-				String, Map<String, ObjectId>>();
-		for (Iterator<PublisherPack> it = packStreamIterator.copy();
-				it.hasNext();) {
-			PublisherPack pk = it.next();
-			Collection<ReceiveCommand> packCommands = pk.getCommands();
-
-			if (!realCommands.containsKey(pk.getRepositoryName()))
-				continue;
-			// Unsubscribe if a single command matches an unsubscribe spec and
-			// no other specs
-			boolean matchUnsubscribe = false;
-			boolean matchSubscribe = false;
-			Map<String, ObjectId> matchingRefs = new HashMap<String, ObjectId>();
-			Map<String, ObjectId> existingRefs = newSubscribeRefs.get(
-					pk.getRepositoryName());
-			Map<SubscribeSpec, Command> changedCommands = realCommands.get(
-					pk.getRepositoryName());
-			for (ReceiveCommand packCommand : packCommands) {
-				for (Entry<SubscribeSpec, Command> e :
-						changedCommands.entrySet()) {
-					if (e.getKey().isMatch(packCommand.getRefName())) {
-						if (e.getValue() == Command.SUBSCRIBE) {
-							matchSubscribe = true;
-							// Don't overwrite older refs
-							if (existingRefs != null && !existingRefs
-									.containsKey(packCommand.getRefName()))
-								matchingRefs.put(packCommand.getRefName(),
-										packCommand.getOldId());
-						} else
-							matchUnsubscribe = true;
-					}
-				}
-			}
-			if (matchUnsubscribe && matchSubscribe) {
-				// Do nothing
-			} else if (matchUnsubscribe) {
-				// Decrement
-				pk.release();
-			} else if (matchSubscribe) {
-				// Try to increment, if this fails then the pack has been closed
-				// and we shouldn't add the matching refs
-				if (!pk.incrementOpen())
-					continue;
-			}
-			if (!matchingRefs.isEmpty()) {
-				if (existingRefs == null)
-					newSubscribeRefs.put(pk.getRepositoryName(), matchingRefs);
-				else
-					existingRefs.putAll(matchingRefs);
-			}
-		}
-		return newSubscribeRefs;
+	public synchronized Set<String> getSubscribedRepositoryNames() {
+		return Collections.unmodifiableSet(state.keySet());
 	}
 
 	/**
 	 * @param repoName
-	 * @return subscription specs for the named repository
+	 * @return subscription specs for the named repository, never null
 	 */
-	public Collection<SubscribeSpec> getSubscriptions(String repoName) {
+	public synchronized Set<SubscribeSpec> getSubscriptions(String repoName) {
 		SubscribedRepository r = state.get(repoName);
-		if (r == null) {
-			return Collections.emptyList();
-		}
-		return Collections.unmodifiableCollection(r.subscribeSpecs.values());
-	}
-
-	/** @return true if there is a client connected */
-	public boolean isConnected() {
-		PublisherClient pc = client;
-		return (pc != null && !pc.isClosed());
-	}
-
-	/** @return the currently connected client */
-	public PublisherClient getClient() {
-		return client;
-	}
-
-	/** Disconnect the current PublisherClient. */
-	public synchronized void disconnect() {
-		PublisherClient pc = client;
-		if (pc != null && !pc.isClosed()) {
-			pc.close();
-			client = null;
-			startDeleteTimer();
-		}
+		if (r == null)
+			return Collections.emptySet();
+		return r.getSubscribeSpecs();
 	}
 
 	/**
-	 * Close this session, decrement all references to packs we would have used.
-	 */
-	public void close() {
-		disconnect();
-		for (Iterator<PublisherPack> it = packStreamIterator.copy();
-				it.hasNext();) {
-			PublisherPack pk = it.next();
-			SubscribedRepository sr = state.get(pk.getRepositoryName());
-			if (sr == null)
-				continue;
-			if (pk.match(sr.getSubscribeSpecs()))
-				pk.release();
-		}
-	}
-
-	private boolean matchPack(PublisherPack pk) {
-		SubscribedRepository sr = state.get(pk.getRepositoryName());
-		return sr != null && pk.match(sr.getSubscribeSpecs());
-	}
-
-	/** Reset the stream to before the current update. */
-	public void rollbackUpdateStream() {
-		packStreamIterator.reset();
-	}
-
-	/**
-	 * First updates using the initial backlog, then continues from the main
-	 * update stream.
+	 * Close this session, release the stream window.
 	 *
-	 * @param heartbeatInterval
-	 *            in milliseconds
-	 * @return the next matching pack, or null
-	 * @throws InterruptedException
+	 * @throws PublisherException
 	 */
-	public PublisherPack getNextUpdate(int heartbeatInterval)
-			throws InterruptedException {
-		if (!initialUpdates.isEmpty())
-			return initialUpdates.remove(0);
-		int waitTime = heartbeatInterval;
-		while (waitTime > 0) {
-			long startTime = System.currentTimeMillis();
-			PublisherPack next;
-			try {
-				next = packStreamIterator.next(
-						waitTime, TimeUnit.MILLISECONDS);
-			} catch (TimeoutException e) {
-				next = null;
-			}
-			waitTime -= (System.currentTimeMillis() - startTime);
-			if (next != null && matchPack(next)) {
-				packStreamIterator.markBefore();
-				return next;
-			}
-		}
-
-		return null;
+	public void close() throws PublisherException {
+		pushStreamIterator.release();
 	}
 
-	/** @return the next update without advancing the stream */
-	public PublisherPack peekNextUpdate() {
-		return packStreamIterator.peek();
+	/**
+	 * @return the window into the PublisherStream
+	 */
+	public PublisherStream.Window getStream() {
+		return pushStreamIterator;
 	}
 
-	/** Start the timer to delete this session. */
-	private void startDeleteTimer() {
-		deleteTimer = publisher.startDeleteTimer(this);
+	void setDeleteTimer(ScheduledFuture<?> timer) {
+		deleteTimer = timer;
 	}
 
 	/** @return true if the timer to delete this session was canceled */
-	public boolean stopDeleteTimer() {
+	public boolean cancelDeleteTimer() {
 		if (deleteTimer == null)
 			return true;
-		return deleteTimer.cancel(false);
+		boolean result = deleteTimer.cancel(false);
+		deleteTimer = null;
+		return result;
 	}
 
 	@Override
 	public String toString() {
-		return "PublisherSession[id=" + restartToken + ", connected="
-				+ isConnected() + "]";
+		return "PublisherSession[id=" + restartToken + "]";
 	}
 }

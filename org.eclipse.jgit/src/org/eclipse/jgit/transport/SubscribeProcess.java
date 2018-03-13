@@ -44,6 +44,7 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,47 +56,78 @@ import java.util.Set;
 
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.transport.PubSubConfig.Publisher;
 import org.eclipse.jgit.transport.SubscribeCommand.Command;
 
 /**
- * Subscribes to a single remote Publisher process with multiple repositories.
+ * Performs the subscribe loop with fast-restart.
+ *
+ * @see BasePackSubscribeConnection
  */
-public class Subscriber {
+class SubscribeProcess {
+	/** Exponential backoff with auto-reset. */
+	private static class Backoff {
+		private int n;
+
+		private final int max;
+
+		private final int timeout; // ms
+
+		private long lastCall;
+
+		private Backoff(int max, int ms) {
+			this.max = max;
+			this.timeout = ms;
+		}
+
+		/**
+		 * If this is called at an interval > timeout, the retry count is
+		 * automatically reset to 0.
+		 *
+		 * @throws InterruptedException
+		 */
+		private void backoff() throws InterruptedException {
+			if (milliTime() - lastCall > timeout)
+				reset();
+			n += 1;
+			double r = Math.random() + 0.5;
+			double exp = Math.pow(2, n);
+			long delay = (long) (r * timeout * exp);
+			Thread.sleep(Math.min(max, delay));
+			lastCall = milliTime();
+		}
+
+		private void reset() {
+			n = 0;
+		}
+
+		private long milliTime() {
+			return System.nanoTime() / 1000000;
+		}
+	}
+
 	/** The default timeout for a subscribe connection. */
-	public final static int SUBSCRIBE_TIMEOUT = 3 * 60 * 60;
+	public final static int SUBSCRIBE_TIMEOUT = 3 * 60 * 60; // Seconds
 
 	private final Transport transport;
 
-	private PubSubConfig.Publisher config;
-
 	private SubscribeConnection connection;
 
-	private String restartToken;
-
-	private String lastPackNumber;
-
-	private final Map<String, SubscribedRepository> repoSubscriptions;
+	private final SubscribeState subscriber;
 
 	private int timeout;
 
 	/**
 	 * @param uri
-	 * @throws IOException
+	 * @param s
+	 * @throws TransportException
+	 * @throws NotSupportedException
 	 */
-	public Subscriber(URIish uri) throws IOException {
-		transport = Transport.open(uri);
-		repoSubscriptions = new HashMap<String, SubscribedRepository>();
+	public SubscribeProcess(URIish uri, SubscribeState s)
+			throws NotSupportedException, TransportException {
+		subscriber = s;
 		timeout = SUBSCRIBE_TIMEOUT;
-	}
-
-	/**
-	 * Set the timeout for the subscribe connection.
-	 *
-	 * @param timeout
-	 */
-	public void setTimeout(int timeout) {
-		this.timeout = timeout;
+		transport = Transport.open(uri);
 	}
 
 	/**
@@ -108,15 +140,15 @@ public class Subscriber {
 	 * @throws IOException
 	 * @throws URISyntaxException
 	 */
-	public Map<String, List<SubscribeCommand>> sync(
+	/* Visible for testing */
+	Map<String, List<SubscribeCommand>> applyConfig(
 			PubSubConfig.Publisher publisher)
 			throws IOException, URISyntaxException {
-		config = publisher;
 		Map<String, List<SubscribeCommand>> subscribeCommands = new HashMap<
 				String, List<SubscribeCommand>>();
 
 		for (PubSubConfig.Subscriber s : publisher.getSubscribers()) {
-			SubscribedRepository sr = repoSubscriptions.get(s.getName());
+			SubscribedRepository sr = subscriber.getRepository(s.getName());
 			List<SubscribeCommand> repoCommands = new ArrayList<
 					SubscribeCommand>();
 
@@ -152,7 +184,7 @@ public class Subscriber {
 			}
 
 			subscribeCommands.put(sr.getName(), repoCommands);
-			repoSubscriptions.put(sr.getName(), sr);
+			subscriber.putRepository(sr.getName(), sr);
 			sr.setUpRefs();
 		}
 		return subscribeCommands;
@@ -160,76 +192,74 @@ public class Subscriber {
 
 	/**
 	 * Advertise all refs to subscribe to, create SubscribedRepo instances for
-	 * each repository. This method blocks until the connection is closed.
+	 * each repository. This method blocks until the connection is closed with
+	 * {@link #close()}, or throws an exception.
 	 *
-	 * @param commands
-	 * @param monitor
+	 * @param publisher
+	 * @param output
 	 * @throws NotSupportedException
 	 * @throws InterruptedException
-	 * @throws TransportException
 	 * @throws IOException
+	 * @throws URISyntaxException
 	 */
-	public void subscribe(final Map<String, List<SubscribeCommand>> commands,
-			ProgressMonitor monitor) throws NotSupportedException,
-			InterruptedException, TransportException, IOException {
-		connection = transport.openSubscribe(this);
-		transport.setTimeout(timeout);
-		try {
-			connection.doSubscribe(this, commands, monitor);
-		} finally {
-			close();
+	public void execute(Publisher publisher, PrintWriter output)
+			throws NotSupportedException, InterruptedException, IOException,
+			URISyntaxException {
+		Map<String, List<SubscribeCommand>> commands = applyConfig(publisher);
+		// Max 240s backoff, 4s timeout
+		Backoff backoff = new Backoff(240 * 1000, 4 * 1000);
+		while (true) {
+			if (Thread.interrupted())
+				throw new InterruptedException();
+			try {
+				doSubscribe(commands, output);
+			} catch (NotSupportedException e) {
+				throw e;
+			} catch (TransportException e) {
+				throw e;
+			} catch (IOException e) {
+				// Connection error, reconnect with fast-restart if possible,
+				// else resend commands. If we connected successfully, clear
+				// the command list.
+				if (subscriber.getRestartToken() != null)
+					commands = Collections.emptyMap();
+				backoff.backoff();
+				continue;
+			}
+			// Clear all state when disconnected cleanly before reconnecting.
+			backoff.reset();
+			subscriber.reset();
+			commands = applyConfig(publisher);
 		}
 	}
 
-	/** @return a unique key to identify this subscriber (scheme://host/) */
-	public String getKey() {
-		return config.getKey();
-	}
-
-	/**
-	 * @param r
-	 * @return the repository with this key, or null.
-	 */
-	public SubscribedRepository getRepository(String r) {
-		return repoSubscriptions.get(r);
-	}
-
-	/**
-	 * @return the set of all repository names this subscriber will connect to.
-	 */
-	public Set<String> getAllRepositories() {
-		return Collections.unmodifiableSet(repoSubscriptions.keySet());
-	}
-
-	/** @return fast restart token, or null if none. */
-	public String getRestartToken() {
-		return restartToken;
-	}
-
-	/** @param restart */
-	public void setRestartToken(String restart) {
-		restartToken = restart;
-	}
-
-	/** @return the last pack number. */
-	public String getLastPackNumber() {
-		return lastPackNumber;
-	}
-
-	/**
-	 * Set the last pack number.
-	 *
-	 * @param number
-	 */
-	public void setLastPackNumber(String number) {
-		lastPackNumber = number;
-	}
-
-	/** Close this subscription. */
-	public void close() {
-		if (connection != null) {
+	void doSubscribe(
+			Map<String, List<SubscribeCommand>> commands, PrintWriter output)
+			throws NotSupportedException, TransportException,
+			InterruptedException, IOException {
+		transport.setTimeout(timeout);
+		connection = transport.openSubscribe(subscriber);
+		try {
+			connection.subscribe(subscriber, commands, output);
+		} finally {
 			connection.close();
 			connection = null;
 		}
+	}
+
+	/* Visible for testing */
+	SubscribeState getSubscriber() {
+		return subscriber;
+	}
+
+	/* Visible for testing */
+	void setTimeout(int timeout) {
+		this.timeout = timeout;
+	}
+
+	/** Release all resources. */
+	public void close() {
+		transport.close();
+		subscriber.close();
 	}
 }

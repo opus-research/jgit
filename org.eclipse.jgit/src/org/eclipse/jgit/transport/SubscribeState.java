@@ -41,57 +41,92 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport.resolver;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.transport.Publisher;
-import org.eclipse.jgit.transport.PublisherClient;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Interface for creating PublisherClients linked to a Publisher.
- *
- * @param <C>
- *            type of connection
+ * The state of a SubscribeConnection to a single remote Publisher process with
+ * multiple repositories.
  */
-public interface PublisherClientFactory<C> {
-	/** Disabled service. */
-	public static final PublisherClientFactory DISABLED =
-		new PublisherClientFactory() {
+public class SubscribeState {
+	private final Map<String, SubscribedRepository>
+			repoSubscriptions = new HashMap<String, SubscribedRepository>();
 
-		public void setPublisher(Publisher p) {
-			// Nothing
-		}
+	private String restartToken;
 
-		public void setResolver(RepositoryResolver r) {
-			// Nothing
-		}
+	private String lastPackId;
 
-		public PublisherClient create(Object req)
-				throws ServiceNotEnabledException,
-				ServiceNotAuthorizedException {
-			throw new ServiceNotEnabledException();
-		}
-	};
+	/** @return fast restart token, or null if none. */
+	public String getRestartToken() {
+		return restartToken;
+	}
+
+	/** @param restart */
+	public void setRestartToken(String restart) {
+		restartToken = restart;
+	}
+
+	/** @return the last pack id. */
+	public String getLastPackId() {
+		return lastPackId;
+	}
 
 	/**
-	 * @param p
-	 *            Publisher instance used when creating PublisherClients
+	 * Set the last pack id.
+	 *
+	 * @param id
 	 */
-	void setPublisher(Publisher p);
+	public void setLastPackId(String id) {
+		lastPackId = id;
+	}
 
 	/**
 	 * @param r
-	 *            RepositoryResolver used to look up repositories using the
-	 *            connection passed to {@link #create(Object)}.
+	 * @param repository
 	 */
-	void setResolver(RepositoryResolver<C> r);
+	public void putRepository(String r, SubscribedRepository repository) {
+		repoSubscriptions.put(r, repository);
+	}
 
 	/**
-	 * @param req
-	 *            the request connection
-	 * @return PublisherClient instance for this connection
-	 * @throws ServiceNotEnabledException
-	 * @throws ServiceNotAuthorizedException
+	 * @param r
+	 * @return the repository with this key, or null.
 	 */
-	PublisherClient create(C req)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
+	public SubscribedRepository getRepository(String r) {
+		return repoSubscriptions.get(r);
+	}
+
+	/**
+	 * @return the set of all repository names this subscriber will connect to.
+	 */
+	public Set<String> getAllRepositories() {
+		return Collections.unmodifiableSet(repoSubscriptions.keySet());
+	}
+
+	/**
+	 * Reset the state of this subscriber and clear the subscribe specs of all
+	 * SubscribedRepositories.
+	 */
+	public void reset() {
+		List<RefSpec> clearSpecs = Collections.emptyList();
+		for (SubscribedRepository sr : repoSubscriptions.values())
+			sr.setSubscribeSpecs(clearSpecs);
+		setRestartToken(null);
+		setLastPackId(null);
+	}
+
+	/**
+	 * Release all resources used by this Subscriber and close all
+	 * SubscribedRepositories.
+	 */
+	public void close() {
+		for (SubscribedRepository sr : repoSubscriptions.values())
+			sr.close();
+		repoSubscriptions.clear();
+	}
 }

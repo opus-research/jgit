@@ -53,6 +53,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -99,24 +100,24 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		}
 
 		@Override
-		public SubscribeConnection openSubscribe(Subscriber sub)
+		public SubscribeConnection openSubscribe(SubscribeState sub)
 				throws NotSupportedException, TransportException {
 			BasePackSubscribeConnection c = new BasePackSubscribeConnection(
 					this) {
 				@Override
-				public void doSubscribeAdvertisement(
-						Subscriber s) throws IOException {
+				public void sendSubscribeAdvertisement(SubscribeState s)
+						throws IOException {
 					// Nothing
 				}
 
 				@Override
-				public void doSubscribe(Subscriber s,
+				public void subscribe(SubscribeState s,
 						Map<String, List<SubscribeCommand>> subscribeCommands,
-						ProgressMonitor monitor) throws InterruptedException,
+						PrintWriter output) throws InterruptedException,
 						TransportException, IOException {
 					init(new ByteArrayInputStream(publisherOut.toByteArray()),
 							testOut);
-					super.doSubscribe(s, subscribeCommands, monitor);
+					super.subscribe(s, subscribeCommands, output);
 				}
 			};
 			return c;
@@ -128,7 +129,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		}
 	}
 
-	Subscriber subscriber;
+	SubscribeProcess process;
+
+	SubscribeState subscriber;
 
 	TransportProtocol newProtocol;
 
@@ -220,8 +223,10 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		};
 
 		Transport.register(newProtocol);
-		subscriber = new Subscriber(publisherConfig.getUri());
-		subscriber.setTimeout(1000);
+		process = new SubscribeProcess(
+				publisherConfig.getUri(), new SubscribeState());
+		process.setTimeout(1000);
+		subscriber = process.getSubscriber();
 	}
 
 	@After
@@ -235,7 +240,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	public void testError() throws Exception {
 		// Setup client
 		subscriber.setRestartToken("server-token");
-		subscriber.setLastPackNumber("0");
+		subscriber.setLastPackId("0");
 		// Setup server response
 		publisherLineOut.writeString("error: no access to chromium");
 		try {
@@ -250,7 +255,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	public void testBadRestart() throws Exception {
 		// Setup client
 		subscriber.setRestartToken("badtoken");
-		subscriber.setLastPackNumber("0");
+		subscriber.setLastPackId("0");
 		// Setup server response
 		publisherLineOut.writeString("reconnect");
 		try {
@@ -264,7 +269,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		// Check subscribe output
 		assertEquals("subscribe", testLineIn.readString());
 		assertEquals("restart badtoken", testLineIn.readString());
-		assertEquals("last-pack-number 0", testLineIn.readString());
+		assertEquals("last-pack-id 0", testLineIn.readString());
 		assertEquals(PacketLineIn.END, testLineIn.readString());
 		assertEquals("repository testrepository", testLineIn.readString());
 		assertEquals("want refs/heads/master", testLineIn.readString());
@@ -291,7 +296,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 			// Stream timeout
 		}
 		assertEquals("server-token", subscriber.getRestartToken());
-		assertTrue(null == subscriber.getLastPackNumber());
+		assertTrue(null == subscriber.getLastPackId());
 	}
 
 	@Test
@@ -310,7 +315,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 			// Stream timeout
 		}
 		assertEquals("new-server-token", subscriber.getRestartToken());
-		assertTrue(null == subscriber.getLastPackNumber());
+		assertTrue(null == subscriber.getLastPackId());
 	}
 
 	@Test
@@ -332,7 +337,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		String tagId = db.getRef("refs/pubsub/origin/tags/pubsubtest")
 				.getLeaf().getObjectId().name();
 		assertEquals(id.name(), tagId);
-		assertEquals("1234", subscriber.getLastPackNumber());
+		assertEquals("1234", subscriber.getLastPackId());
 	}
 
 	@Test
@@ -363,7 +368,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		String pubsubId2 = db.getRef("refs/pubsub/origin/heads/pubsub2")
 				.getLeaf().getObjectId().name();
 		assertEquals(id2.name(), pubsubId2);
-		assertEquals("5678", subscriber.getLastPackNumber());
+		assertEquals("5678", subscriber.getLastPackId());
 	}
 
 	@Test
@@ -406,13 +411,13 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		pw.writePack(NullProgressMonitor.INSTANCE, NullProgressMonitor.INSTANCE,
 				publisherOut);
 		pw.release();
-		publisherLineOut.writeString("pack-number " + sequence);
+		publisherLineOut.writeString("pack-id " + sequence);
 	}
 
 	private void executeSubscribe() throws Exception {
 		try {
-			subscriber.subscribe(
-					subscriber.sync(publisherConfig), progressMonitor);
+			process.doSubscribe(process.applyConfig(publisherConfig),
+					new PrintWriter(new ByteArrayOutputStream()));
 		} catch (EOFException e) {
 			// Nothing, end of stream
 		} finally {

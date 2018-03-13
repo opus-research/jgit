@@ -44,7 +44,6 @@
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.transport.SubscribeCommand.Command.SUBSCRIBE;
-import static org.eclipse.jgit.transport.SubscribeCommand.Command.UNSUBSCRIBE;
 
 import java.io.BufferedOutputStream;
 import java.io.EOFException;
@@ -53,16 +52,21 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PublisherStream.Window;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
@@ -70,35 +74,46 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
  * A single client (connection) subscribed to one or more repositories.
  */
 public abstract class PublisherClient {
-	private static final int HEARTBEAT_INTERVAL = 10000;
+	private static class Header {
+		private String lastPackId;
+
+		private String restartToken;
+	}
+
+	private static class Request {
+		private Map<String, List<SubscribeCommand>>
+				commands = new HashMap<String, List<SubscribeCommand>>();
+
+		private Map<String, Map<String, ObjectId>>
+				clientRefState = new HashMap<String, Map<String, ObjectId>>();
+	}
+
+	private static final int HEARTBEAT_INTERVAL = 10000; // ms
 
 	private final Publisher publisher;
 
-	private Map<String, List<SubscribeCommand>> commands;
-
-	private Map<String, Map<String, ObjectId>> refState;
+	private PublisherSession session;
 
 	private PacketLineIn in;
 
 	private OutputStream out;
 
-	private String restartToken;
-
-	private int lastPackNumber;
-
-	private volatile boolean closed;
-
-	private Thread consumeThread;
+	private int heartbeatInterval;
 
 	/**
 	 * @param p
 	 *            the publisher process
 	 */
 	public PublisherClient(Publisher p) {
-		lastPackNumber = -1;
 		publisher = p;
-		commands = new HashMap<String, List<SubscribeCommand>>();
-		refState = new HashMap<String, Map<String, ObjectId>>();
+		heartbeatInterval = HEARTBEAT_INTERVAL;
+	}
+
+	/**
+	 * @param ms interval between heartbeats, in ms
+	 */
+	public void setHeartbeatInterval(int ms) {
+		heartbeatInterval = ms;
 	}
 
 	/**
@@ -113,32 +128,28 @@ public abstract class PublisherClient {
 	 * @throws ServiceNotEnabledException
 	 * @throws ServiceNotAuthorizedException
 	 */
-	public void subscribe(
+	public void subscribeLoop(
 			InputStream myIn, OutputStream myOut, OutputStream messages)
 			throws IOException, ServiceNotAuthorizedException,
 			ServiceNotEnabledException {
-		this.in = new PacketLineIn(myIn);
-		this.out = new BufferedOutputStream(myOut);
+		in = new PacketLineIn(myIn);
+		out = new BufferedOutputStream(myOut);
 
-		if (isAdvertisement())
-			doAdvertisement();
-		else
-			doSubscribe();
-	}
-
-	/**
-	 * @return true if this request is an advertisement for the pubsub service.
-	 * @throws TransportException
-	 * @throws IOException
-	 */
-	private boolean isAdvertisement() throws TransportException, IOException {
-		String line = in.readString();
-		if (line.equals("advertisement"))
-			return true;
-		if (line.equals("subscribe"))
-			return false;
-		throw new TransportException(MessageFormat.format(
-				JGitText.get().expectedGot, "advertisement|subscribe", line));
+		try {
+			String line = in.readString();
+			if (line.equals("advertisement"))
+				doAdvertisement();
+			else if (line.equals("subscribe"))
+				doSubscribe();
+			else
+				throw new TransportException(MessageFormat.format(
+						JGitText.get().expectedGot, "advertisement|subscribe",
+						line));
+		} finally {
+			in = null;
+			out.close();
+			out = null;
+		}
 	}
 
 	/**
@@ -157,14 +168,9 @@ public abstract class PublisherClient {
 					throw new TransportException(MessageFormat.format(
 							JGitText.get().expectedGot, "repositoryaccess",
 							line));
-				Repository r = null;
-				try {
-					r = openRepository(line.substring(
-							"repositoryaccess ".length()));
-				} finally {
-					if (r != null)
-						r.close();
-				}
+				Repository r = openRepository(
+						line.substring("repositoryaccess ".length()));
+				r.close();
 			}
 			pktLineOut.writeString("ACK");
 		} catch (TransportException e) {
@@ -178,88 +184,182 @@ public abstract class PublisherClient {
 
 	private void doSubscribe() throws TransportException, IOException,
 			ServiceNotAuthorizedException, ServiceNotEnabledException {
-		readHeaders();
-		readSubscribeCommands();
+		Header header = readHeaders();
+		Request request = readSubscribeCommands();
 
-		// Add client to each of the subscribed repositories.
-		PublisherSession clientState = publisher.connectClient(this);
 		PacketLineOut pktLineOut = new PacketLineOut(out);
-		if (clientState == null) {
+		// If a client tries to reconnect using a restart token as well as
+		// changing their subscribe specs, force them to reconnect. This case
+		// may be handled in the future (the protocol supports
+		// "stop"/unsubscribe).
+		if (request.commands.size() > 0 && header.restartToken != null) {
 			pktLineOut.writeString("reconnect");
 			pktLineOut.end();
 			return;
 		}
-		// If restarting from a pack number, check that we have a reference
-		// to that pack next in the stream. Clients will supply this number only
-		// when they were in the process of receiving a pack.
-		if (lastPackNumber != -1) {
-			PublisherPack nextPack = clientState.peekNextUpdate();
-			if (nextPack == null
-					|| nextPack.getPackNumber() != lastPackNumber) {
+
+		Window stream;
+
+		if (header.restartToken != null) {
+			session = publisher.reconnectSession(header.restartToken);
+			// If the client supplied a restart token that was not found, force
+			// a reconnect.
+			if (session == null) {
 				pktLineOut.writeString("reconnect");
 				pktLineOut.end();
 				return;
 			}
+			stream = session.getStream();
+			if (!stream.rollback(header.lastPackId)) {
+				pktLineOut.writeString("reconnect");
+				pktLineOut.end();
+				return;
+			}
+		} else {
+			session = publisher.newSession();
+			stream = session.getStream();
+			session.sync(request.commands);
+			generateInitialPacks(request.clientRefState);
 		}
+
+		header = null;
+		request = null;
+
 		pktLineOut.writeString("ACK");
-		pktLineOut.writeString("restart-token " + clientState.getKey());
+		pktLineOut.writeString("restart-token " + session.getKey());
 		pktLineOut.writeString(
-				"heartbeat-interval " + HEARTBEAT_INTERVAL / 1000);
+				"heartbeat-interval " + heartbeatInterval / 1000);
+		pktLineOut.flush();
 
 		// Wait here for new PublisherUpdates until the connection is dropped
-		consumeThread = Thread.currentThread();
+		Thread consumeThread = Thread.currentThread();
 		String oldThreadName = consumeThread.getName();
-		consumeThread.setName("PubSub Consumer " + clientState.getKey());
+		consumeThread.setName("PubSub Consumer " + session.getKey());
 		try {
 			while (true) {
 				if (Thread.interrupted())
 					throw new InterruptedException();
-				PublisherPack pk = clientState.getNextUpdate(
-						HEARTBEAT_INTERVAL);
-				if (closed)
-					throw new EOFException();
-				if (pk == null)
-					pktLineOut.writeString("heartbeat");
-				else {
-					// Write repository line
-					pktLineOut.writeString("update " + pk.getRepositoryName());
-					for (Iterator<PublisherPackSlice> it = pk.getSlices();
-							it.hasNext();)
-						it.next().writeToStream(out);
-					pktLineOut.writeString("pack-number " + pk.getPackNumber());
-					pk.release();
-				}
-				pktLineOut.flush();
+				sendUpdate(pktLineOut, stream);
 			}
-		} catch (IOException e) {
-			clientState.rollbackUpdateStream();
 		} catch (InterruptedException e) {
 			// Nothing, interrupted by disconnect
 		} finally {
 			consumeThread.setName(oldThreadName);
 			consumeThread = null;
-			clientState.disconnect();
+			publisher.startDeleteTimer(session);
+		}
+	}
+
+	private void sendUpdate(PacketLineOut pktLineOut, Window stream)
+			throws InterruptedException, IOException,
+			ServiceNotAuthorizedException, ServiceNotEnabledException {
+		int waitTime = heartbeatInterval;
+		PublisherPush push = null;
+		PublisherPack pack = null;
+		while (waitTime > 0) {
+			long startTime = System.currentTimeMillis();
+			push = stream.next(waitTime, TimeUnit.MILLISECONDS);
+			waitTime -= (System.currentTimeMillis() - startTime);
+			if (push == null)
+				break;
+			pack = push.get(this);
+			if (pack == null)
+				continue; // This client doesn't want this update
+			stream.mark();
+			break;
+		}
+		if (publisher.isClosed())
+			throw new EOFException();
+		if (push == null || pack == null) {
+			pktLineOut.writeString("heartbeat");
+			pktLineOut.flush();
+		} else {
+			// Write repository update
+			pktLineOut.writeString("update "
+					+ push.getRepositoryName());
+			pack.writeToStream(out);
+			pktLineOut.writeString("pack-id " + push.getPushId());
+			pktLineOut.flush();
+		}
+	}
+
+	private void generateInitialPacks(
+			Map<String, Map<String, ObjectId>> clientRefState)
+			throws RepositoryNotFoundException,
+			ServiceMayNotContinueException,
+			ServiceNotAuthorizedException,
+			ServiceNotEnabledException,
+			IOException {
+		Window it = session.getStream();
+		int idCounter = 0;
+		for (String name : session.getSubscribedRepositoryNames()) {
+			List<ReceiveCommand> updateCommands = new ArrayList<
+					ReceiveCommand>();
+			Map<String, ObjectId> clientState = clientRefState.get(name);
+			if (clientState == null)
+				clientState = Collections.emptyMap();
+			Repository r = openRepository(name);
+			try {
+				publisher.hookRepository(r, name);
+				RefDatabase refDb = r.getRefDatabase();
+				// Generate a list of ReceiveCommands to get the client up to
+				// date from {client ref state} -> {matching server side ref
+				// state}
+				for (SubscribeSpec spec : session.getSubscriptions(name)) {
+					Collection<Ref> matchedServerRefs;
+					if (spec.isWildcard()) {
+						String ref = spec.getRefName();
+						matchedServerRefs = refDb.getRefs(
+								SubscribeSpec.stripWildcard(ref)).values();
+					} else {
+						Ref ref = refDb.getRef(spec.getRefName());
+						if (ref == null)
+							continue;
+						matchedServerRefs = Collections.singleton(ref);
+					}
+					// Find starting points from client state
+					for (Ref ref : matchedServerRefs) {
+						ObjectId start = clientState.get(ref.getName());
+						if (start == null)
+							start = ObjectId.zeroId();
+						ObjectId end = ref.getObjectId();
+						if (start.equals(end))
+							continue;
+						updateCommands.add(
+								new ReceiveCommand(start, end, ref.getName()));
+					}
+				}
+				if (updateCommands.size() == 0)
+					continue;
+				it.prepend(new PublisherPush(name, updateCommands, "pack-"
+						+ session.getKey() + "-" + idCounter++, publisher
+						.getPackFactory()));
+			} finally {
+				r.close();
+			}
 		}
 	}
 
 	/**
 	 * <pre>
 	 * restart [token]
-	 * last-pack [number]
+	 * last-pack-id [number]
 	 * [END]
 	 * </pre>
 	 *
+	 * @return header values
 	 * @throws IOException
 	 */
-	private void readHeaders() throws IOException {
+	private Header readHeaders() throws IOException {
+		Header h = new Header();
 		String line;
 		while ((line = in.readString()) != PacketLineIn.END) {
 			if (line.startsWith("restart "))
-				restartToken = line.substring("restart ".length());
-			else if (line.startsWith("last-pack-number "))
-				lastPackNumber = Integer.parseInt(line.substring(
-						"last-pack-number ".length()));
+				h.restartToken = line.substring("restart ".length());
+			else if (line.startsWith("last-pack-id "))
+				h.lastPackId = line.substring("last-pack-id ".length());
 		}
+		return h;
 	}
 
 	/**
@@ -273,19 +373,22 @@ public abstract class PublisherClient {
 	 * [END]
 	 * ...
 	 * done
-	 * </pre>
 	 *
+	 * @return request data
 	 * @throws IOException
+	 * @throws TransportException
 	 */
-	private void readSubscribeCommands() throws IOException {
+	private Request readSubscribeCommands()
+			throws IOException, TransportException {
+		Request r = new Request();
 		String line;
 		ArrayList<SubscribeCommand> cmdList = null;
 		Map<String, ObjectId> stateList = null;
 		String repo = null;
 		while (!(line = in.readString()).startsWith("done")) {
-			if (line == PacketLineIn.END) {
-				commands.put(repo, cmdList);
-				refState.put(repo, stateList);
+			if (line == PacketLineIn.END && repo != null) {
+				r.commands.put(repo, cmdList);
+				r.clientRefState.put(repo, stateList);
 				repo = null;
 				cmdList = null;
 				stateList = null;
@@ -295,61 +398,31 @@ public abstract class PublisherClient {
 				stateList = new HashMap<String, ObjectId>();
 			} else {
 				if (repo == null || cmdList == null || stateList == null)
-					throw new IOException(MessageFormat.format(JGitText
+					throw new TransportException(MessageFormat.format(JGitText
 							.get().invalidSubscribeRequest, line));
 				if (line.startsWith("want "))
 					cmdList.add(new SubscribeCommand(SUBSCRIBE, line.substring(
 							"want ".length())));
 				else if (line.startsWith("stop "))
-					cmdList.add(new SubscribeCommand(UNSUBSCRIBE, line
-							.substring("stop ".length())));
+					throw new TransportException(
+							JGitText.get().stopCommandNotSupported);
 				else if (line.startsWith("have ")) {
 					String[] parts = line.split(" ", 3);
+					if (parts.length != 3)
+						throw new TransportException(MessageFormat.format(
+								JGitText.get().invalidSubscribeRequest, line));
 					stateList.put(parts[2], ObjectId.fromString(parts[1]));
 				}
 			}
 		}
+		return r;
 	}
 
-	/** @return restart token, or null if none exists */
-	String getRestartToken() {
-		return restartToken;
-	}
-
-	Map<String, List<SubscribeCommand>> getCommands() {
-		return commands;
-	}
-
-	Map<String, Map<String, ObjectId>> getRefState() {
-		return refState;
-	}
-
-	/** Close the output connection. */
-	public synchronized void close() {
-		if (!closed) {
-			closed = true;
-			try {
-				out.close();
-			} catch (IOException e) {
-				// Do nothing.
-			} finally {
-				out = null;
-			}
-			// Break any thread waiting on new updates
-			if (consumeThread != null) {
-				consumeThread.interrupt();
-			}
-		}
-	}
-
-	/** @return true if this client connection is closed */
-	public boolean isClosed() {
-		return closed;
-	}
-
-	/** @return output stream to write packs to */
-	public OutputStream getOutputStream() {
-		return out;
+	/**
+	 * @return the state of this client
+	 */
+	public PublisherSession getSession() {
+		return session;
 	}
 
 	/**
