@@ -238,7 +238,13 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	public abstract Ref exactRef(String name) throws IOException;
+	public Ref exactRef(String name) throws IOException {
+		Ref ref = getRef(name);
+		if (ref == null || !name.equals(ref.getName())) {
+			return null;
+		}
+		return ref;
+	}
 
 	/**
 	 * Read the specified references.
