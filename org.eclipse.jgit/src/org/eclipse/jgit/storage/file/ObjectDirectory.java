@@ -222,10 +222,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *         history of the repository.
 	 */
 	public Collection<PackFile> getPacks() {
-		PackList list = packList.get();
-		if (list == NO_PACKS)
-			list = scanPacks(list);
-		PackFile[] packs = list.packs;
+		final PackFile[] packs = packList.get().packs;
 		return Collections.unmodifiableCollection(Arrays.asList(packs));
 	}
 
