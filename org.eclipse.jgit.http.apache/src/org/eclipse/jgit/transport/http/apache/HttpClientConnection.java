@@ -94,7 +94,6 @@ import org.apache.http.conn.ssl.X509HostnameVerifier;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
-import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
 import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.transport.http.apache.internal.HttpApacheText;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -138,13 +137,9 @@ public class HttpClientConnection implements HttpConnection {
 			RequestConfig.Builder configBuilder = RequestConfig.custom();
 			if (proxy != null && !Proxy.NO_PROXY.equals(proxy)) {
 				isUsingProxy = true;
-
 				InetSocketAddress adr = (InetSocketAddress) proxy.address();
-				HttpHost proxyHost = new HttpHost(adr.getHostName(),
-						adr.getPort(), "http");
-				configBuilder.setProxy(proxyHost);
-				clientBuilder.setRoutePlanner(
-						new DefaultProxyRoutePlanner(proxyHost));
+				clientBuilder.setProxy(
+						new HttpHost(adr.getHostName(), adr.getPort()));
 			}
 			if (timeout != null) {
 				configBuilder.setConnectTimeout(timeout.intValue());
@@ -159,16 +154,15 @@ public class HttpClientConnection implements HttpConnection {
 			if (hostnameverifier != null) {
 				SSLConnectionSocketFactory sslConnectionFactory = new SSLConnectionSocketFactory(
 						getSSLContext(), hostnameverifier);
+				clientBuilder.setSSLSocketFactory(sslConnectionFactory);
 				Registry<ConnectionSocketFactory> registry = RegistryBuilder
 						.<ConnectionSocketFactory> create()
 						.register("https", sslConnectionFactory).build();
-				clientBuilder
-						.setSSLSocketFactory(sslConnectionFactory)
-						.setConnectionManager(new BasicHttpClientConnectionManager(registry));
+				clientBuilder.setConnectionManager(
+						new BasicHttpClientConnectionManager(registry));
 			}
-			client = clientBuilder
-					.setDefaultRequestConfig(configBuilder.build())
-					.build();
+			clientBuilder.setDefaultRequestConfig(configBuilder.build());
+			client = clientBuilder.build();
 		}
 
 		return client;
