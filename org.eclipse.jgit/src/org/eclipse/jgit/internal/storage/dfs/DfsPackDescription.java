@@ -44,13 +44,11 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.internal.storage.pack.PackExt.REFTABLE;
 
 import java.util.Arrays;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
-import org.eclipse.jgit.internal.storage.reftable.ReftableWriter;
 import org.eclipse.jgit.storage.pack.PackStatistics;
 
 /**
@@ -70,11 +68,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	private int[] blockSizeMap;
 	private long objectCount;
 	private long deltaCount;
-	private long minUpdateIndex;
-	private long maxUpdateIndex;
-
-	private PackStatistics packStats;
-	private ReftableWriter.Stats refStats;
+	private PackStatistics stats;
 	private int extensions;
 	private int indexVersion;
 	private long estimatedPackSize;
@@ -173,36 +167,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 */
 	public DfsPackDescription setLastModified(long timeMillis) {
 		lastModified = timeMillis;
-		return this;
-	}
-
-	/** @return minUpdateIndex for the reftable, if present. */
-	public long getMinUpdateIndex() {
-		return minUpdateIndex;
-	}
-
-	/**
-	 * @param min
-	 *            minUpdateIndex for the reftable, or 0.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setMinUpdateIndex(long min) {
-		minUpdateIndex = min;
-		return this;
-	}
-
-	/** @return maxUpdateIndex for the reftable, if present. */
-	public long getMaxUpdateIndex() {
-		return maxUpdateIndex;
-	}
-
-	/**
-	 * @param max
-	 *            maxUpdateIndex for the reftable, or 0.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setMaxUpdateIndex(long max) {
-		maxUpdateIndex = max;
 		return this;
 	}
 
@@ -317,28 +281,15 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *         is being committed to the repository.
 	 */
 	public PackStatistics getPackStats() {
-		return packStats;
+		return stats;
 	}
 
 	DfsPackDescription setPackStats(PackStatistics stats) {
-		this.packStats = stats;
+		this.stats = stats;
 		setFileSize(PACK, stats.getTotalBytes());
 		setObjectCount(stats.getTotalObjects());
 		setDeltaCount(stats.getTotalDeltas());
 		return this;
-	}
-
-	/** @return stats from the sibling reftable, if created. */
-	public ReftableWriter.Stats getReftableStats() {
-		return refStats;
-	}
-
-	void setReftableStats(ReftableWriter.Stats stats) {
-		this.refStats = stats;
-		setMinUpdateIndex(stats.minUpdateIndex());
-		setMaxUpdateIndex(stats.maxUpdateIndex());
-		setFileSize(REFTABLE, stats.totalBytes());
-		setBlockSize(REFTABLE, stats.refBlockSize());
 	}
 
 	/**
@@ -347,8 +298,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return {@code this}
 	 */
 	public DfsPackDescription clearPackStats() {
-		packStats = null;
-		refStats = null;
+		stats = null;
 		return this;
 	}
 
