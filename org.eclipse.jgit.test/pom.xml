@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
    Copyright (C) 2009, Google Inc.
-   Copyright (C) 2009, Igor Fedorenko <ifedorenko@sonatype.com>
    Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
    Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
    and other copyright owners as documented in the project's IP log.
@@ -56,7 +55,6 @@
     <version>0.6.0-SNAPSHOT</version>
   </parent>
 
-  <packaging>eclipse-plugin</packaging>
   <artifactId>org.eclipse.jgit.test</artifactId>
   <name>JGit - Core Tests</name>
 
@@ -66,47 +64,36 @@
 
   <dependencies>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.2</version>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.junit</artifactId>
     </dependency>
   </dependencies>
 
   <build>
-    <resources>
-      <resource>
-        <directory>tst-rsrc</directory>
-      </resource>
-    </resources>
+    <testSourceDirectory>tst/</testSourceDirectory>
+
+    <testResources>
+      <testResource>
+        <directory>tst-rsrc/</directory>
+      </testResource>
+    </testResources>
+
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.4.2</version>
-        <executions>
-          <execution>
-            <id>default</id>
-            <goals>
-              <goal>test</goal>
-            </goals>
-            <phase>test</phase>
-            <configuration>
-              <testClassesDirectory>${project.build.outputDirectory}</testClassesDirectory>
-              <includes>
-                <include>**/*Test.java</include>
-                <include>**/*TestCase.java</include>
-                <include>**/T000*.java</include>
-              </includes>
-              <excludes>
-                <exclude>org/eclipse/jgit/lib/SpeedTestBase*.java</exclude>
-                <exclude>org/eclipse/jgit/lib/T0005_ShallowSpeedTest*.java</exclude>
-                <exclude>org/eclipse/jgit/lib/T0006_DeepSpeedTest*.java</exclude>
-                <exclude>org/eclipse/jgit/lib/T0007_GitIndexTest*.java</exclude>
-                <exclude>org/eclipse/jgit/patch/EGitPatchHistoryTest*.java</exclude>
-              </excludes>
-            </configuration>
-          </execution>
-        </executions>
+        <configuration>
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*TestCase.java</include>
+            <include>**/T000*.java</include>
+          </includes>
+        </configuration>
       </plugin>
     </plugins>
   </build>
