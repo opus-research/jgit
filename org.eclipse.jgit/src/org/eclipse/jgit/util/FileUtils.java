@@ -100,7 +100,7 @@ public class FileUtils {
 
 	/**
 	 * Delete file or folder
-	 * 
+	 *
 	 * @param f
 	 *            {@code File} to be deleted
 	 * @param options
