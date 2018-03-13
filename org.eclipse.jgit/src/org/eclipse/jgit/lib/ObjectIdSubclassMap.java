@@ -63,13 +63,13 @@ import java.util.NoSuchElementException;
 public class ObjectIdSubclassMap<V extends ObjectId> implements Iterable<V> {
 	private static final int INITIAL_TABLE_SIZE = 2048;
 
-	int size;
+	private int size;
 
 	private int grow;
 
 	private int mask;
 
-	V[] table;
+	private V[] table;
 
 	/** Create an empty map. */
 	public ObjectIdSubclassMap() {
