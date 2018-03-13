@@ -73,7 +73,7 @@ import org.eclipse.jgit.util.FS;
  * Represents a Git repository.
  * <p>
  * A repository holds all objects and refs used for managing source code (could
- * by any type of file, but source code is what SCM's are typically used for).
+ * be any type of file, but source code is what SCM's are typically used for).
  * <p>
  * This class is thread-safe.
  */
@@ -718,20 +718,6 @@ public abstract class Repository {
 		if (name != null)
 			return shortenRefName(name);
 		return name;
-	}
-
-	/**
-	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
-	 * <p>
-	 * When a repository borrows objects from another repository, it can
-	 * advertise that it safely has that other repository's references, without
-	 * exposing any other details about the other repository.  This may help
-	 * a client trying to push changes avoid pushing more than it needs to.
-	 *
-	 * @return unmodifiable collection of other known objects.
-	 */
-	public Set<ObjectId> getAdditionalHaves() {
-		return Collections.emptySet();
 	}
 
 	/**
