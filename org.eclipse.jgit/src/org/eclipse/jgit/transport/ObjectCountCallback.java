@@ -43,70 +43,29 @@
 
 package org.eclipse.jgit.transport;
 
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
+
 /**
- * The required information to verify the push.
+ * A callback to tell caller the count of objects ASAP.
  *
- * @since 4.0
+ * @since 4.1
  */
-public class PushCertificate {
-	/** The tuple "name &lt;email&gt;" as presented in the push certificate. */
-	String pusher;
-
-	/** The remote URL the signed push goes to. */
-	String pushee;
-
-	/** What we think about the returned signed nonce. */
-	NonceStatus nonceStatus;
-
-	/** Verification result of the nonce returned during push. */
-	public enum NonceStatus {
-		/** Nonce was not expected, yet client sent one anyway. */
-		UNSOLICITED,
-		/** Nonce is invalid and did not match server's expectations. */
-		BAD,
-		/** Nonce is required, but was not sent by client. */
-		MISSING,
-		/** Received nonce is valid. */
-		OK,
-		/** Received nonce is valid and within the accepted slop window. */
-		SLOP
-	}
-
-	String commandList;
-	String signature;
-
+public interface ObjectCountCallback {
 	/**
-	 * @return the signature, consisting of the lines received between the lines
-	 *         '----BEGIN GPG SIGNATURE-----\n' and the '----END GPG
-	 *         SIGNATURE-----\n'
+	 * Invoked when the {@link PackWriter} has counted the objects to be
+	 * written to pack.
+	 * <p>
+	 * An {@code ObjectCountCallback} can use this information to decide
+	 * whether the
+	 * {@link PackWriter#writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
+	 * operation should be aborted.
+	 * <p>
+	 * This callback will be called exactly once.
+	 *
+	 * @param objectCount
+	 *            the count of the objects.
+	 * @throws WriteAbortedException
+	 *             to indicate that the write operation should be aborted.
 	 */
-	public String getSignature() {
-		return signature;
-	}
-
-	/**
-	 * @return the list of commands as one string to be feed into the signature
-	 *         verifier.
-	 */
-	public String getCommandList() {
-		return commandList;
-	}
-
-	/**
-	 * @return the tuple "name &lt;email&gt;" as presented by the client in the
-	 *         push certificate.
-	 */
-	public String getPusher() {
-		return pusher;
-	}
-
-	/** @return URL of the repository the push was originally sent to. */
-	public String getPushee() {
-		return pushee;
-	}
-
-	/** @return verification status of the nonce embedded in the certificate. */
-	public NonceStatus getNonceStatus() {
-		return nonceStatus;
-	}
+	void setObjectCount(long objectCount) throws WriteAbortedException;
 }

@@ -255,16 +255,9 @@ public abstract class BaseReceivePack {
 	PushCertificateParser pushCertificateParser;
 
 	/**
-	 * Get the push certificate used to verify the pusher's identity.
-	 * <p>
-	 * Only valid after commands are read from the wire. If no certificate was
-	 * provided, or the certificate was invalid, methods on the certificate will
-	 * return null.
-	 *
-	 * @return the push certificate.
-	 * @since 4.1
+	 * @return the push certificate used to verify the pushers identity.
 	 */
-	public PushCertificate getPushCertificate() {
+	PushCertificate getPushCertificate() {
 		return pushCertificateParser;
 	}
 
