@@ -40,66 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.diff;
 
-package org.eclipse.jgit.internal.revwalk;
-
-import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
-import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
+import org.eclipse.jgit.errors.BinaryBlobException;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevFlag;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.junit.Assert;
+import org.junit.Test;
 
-/**
- * A RevFilter that adds the visited commits to {@code bitmap} as a side
- * effect.
- * <p>
- * When the walk hits a commit that is part of {@code bitmap}'s
- * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
- * commit and its parents are marked as SEEN so that the walk does not
- * have to visit its ancestors.  This ensures the walk is very short if
- * there is good bitmap coverage.
- */
-public class AddToBitmapFilter extends RevFilter {
-	private final BitmapBuilder bitmap;
+import java.io.IOException;
 
-	/**
-	 * Create a filter that adds visited commits to the given bitmap.
-	 *
-	 * @param bitmap bitmap to write visited commits to
-	 */
-	public AddToBitmapFilter(BitmapBuilder bitmap) {
-		this.bitmap = bitmap;
-	}
-
-	@Override
-	public final boolean include(RevWalk walker, RevCommit cmit) {
-		Bitmap visitedBitmap;
-
-		if (bitmap.contains(cmit)) {
-			// already included
-		} else if ((visitedBitmap = bitmap.getBitmapIndex()
-				.getBitmap(cmit)) != null) {
-			bitmap.or(visitedBitmap);
-		} else {
-			bitmap.addObject(cmit, Constants.OBJ_COMMIT);
-			return true;
+public class RawTextLoadTest extends RepositoryTestCase {
+	private static byte[] generate(int size, int nullAt) {
+		byte[] data = new byte[size];
+		for (int i = 0; i < data.length; i++) {
+			data[i] = (byte) ((i % 72 == 0) ? '\n' : (i%10) + '0');
 		}
-
-		for (RevCommit p : cmit.getParents()) {
-			p.add(RevFlag.SEEN);
+		if (nullAt >= 0) {
+			data[nullAt] = '\0';
 		}
-		return false;
+		return data;
 	}
 
-	@Override
-	public final RevFilter clone() {
-		throw new UnsupportedOperationException();
+	private RawText textFor(byte[] data, int limit) throws IOException, BinaryBlobException {
+		FileRepository repo = createBareRepository();
+		ObjectId id;
+		try (ObjectInserter ins = repo.getObjectDatabase().newInserter()) {
+			id = ins.insert(Constants.OBJ_BLOB, data);
+		}
+		ObjectLoader ldr = repo.open(id);
+		return RawText.load(ldr, limit);
 	}
 
-	@Override
-	public final boolean requiresCommitBody() {
-		return false;
+	@Test
+	public void testSmallOK() throws Exception {
+		byte[] data = generate(1000, -1);
+		RawText result = textFor(data, 1 << 20);
+		Assert.assertArrayEquals(result.content, data);
+	}
+
+	@Test(expected = BinaryBlobException.class)
+	public void testSmallNull() throws Exception {
+		byte[] data = generate(1000, 22);
+		textFor(data, 1 << 20);
+	}
+
+	@Test
+	public void testBigOK() throws Exception {
+		byte[] data = generate(10000, -1);
+		RawText result = textFor(data, 1 << 20);
+		Assert.assertArrayEquals(result.content, data);
+	}
+
+	@Test(expected = BinaryBlobException.class)
+	public void testBigWithNullAtStart() throws Exception {
+		byte[] data = generate(10000, 22);
+		textFor(data, 1 << 20);
+	}
+
+	@Test(expected = BinaryBlobException.class)
+	public void testBinaryThreshold() throws Exception {
+		byte[] data = generate(2 << 20, -1);
+		textFor(data, 1 << 20);
 	}
 }
