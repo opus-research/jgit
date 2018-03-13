@@ -1164,7 +1164,7 @@ public class GC {
 	/**
 	 * @return {@code true} if number of packs > gc.autopacklimit (default 50)
 	 */
-	boolean tooManyPacks() {
+	private boolean tooManyPacks() {
 		int autopacklimit = repo.getConfig().getInt(
 				ConfigConstants.CONFIG_GC_SECTION,
 				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT,
@@ -1183,7 +1183,7 @@ public class GC {
 	 *
 	 * @return {@code true} if number of loose objects > gc.auto (default 6700)
 	 */
-	boolean tooManyLooseObjects() {
+	private boolean tooManyLooseObjects() {
 		int auto = repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
 				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
 		if (auto <= 0) {
@@ -1204,9 +1204,9 @@ public class GC {
 								.matches();
 					}
 				})) {
-			for (Iterator<Path> iter = stream.iterator(); iter.hasNext();
-					iter.next()) {
-				if (++n > threshold) {
+			Iterator<Path> iter = stream.iterator();
+			while (iter.hasNext()) {
+				if (n++ > threshold) {
 					return true;
 				}
 			}
