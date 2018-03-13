@@ -950,7 +950,7 @@ public class GC {
 			} else {
 				if (base == null || !n.startsWith(base)) {
 					try {
-						Files.delete(FileUtils.toPath(new File(packDir.toFile(), n)));
+						Files.delete(new File(packDir.toFile(), n).toPath());
 					} catch (IOException e) {
 						LOG.error(e.getMessage(), e);
 					}
