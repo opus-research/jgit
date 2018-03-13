@@ -137,8 +137,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	abstract FS getFS();
 
-	abstract Set<ObjectId> getShallowCommits() throws IOException;
-
 	/**
 	 * Open an object from this database.
 	 * <p>
