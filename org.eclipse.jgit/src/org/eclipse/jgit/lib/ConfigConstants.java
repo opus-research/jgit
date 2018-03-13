@@ -291,20 +291,6 @@ public class ConfigConstants {
 	public static final String CONFIG_KEY_PRUNEPACKEXPIRE = "prunepackexpire";
 
 	/**
-	 * The "logexpiry" key
-	 * 
-	 * @since 4.8
-	 */
-	public static final String CONFIG_KEY_LOGEXPIRY = "logExpiry";
-
-	/**
-	 * The "autodetach" key
-	 * 
-	 * @since 4.8
-	 */
-	public static final String CONFIG_KEY_AUTODETACH = "autoDetach";
-
-	/**
 	 * The "aggressiveDepth" key
 	 * @since 3.6
 	 */
