@@ -177,17 +177,11 @@ public class BatchRefUpdate {
 	 * @return message the caller wants to include in the reflog; null if the
 	 *         update should not be logged.
 	 */
-	@Nullable
 	public String getRefLogMessage() {
 		return refLogMessage;
 	}
 
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 *
-	 * @return true if the message should include the result.
-	 */
+	/** @return {@code true} if the ref log message should show the result. */
 	public boolean isRefLogIncludingResult() {
 		return refLogIncludeResult;
 	}
@@ -196,11 +190,12 @@ public class BatchRefUpdate {
 	 * Set the message to include in the reflog.
 	 *
 	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
+	 *            the message to describe this change. It may be null if
+	 *            appendStatus is null in order not to append to the reflog
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
+	 *            forced-update) should be appended to the user supplied
+	 *            message.
 	 * @return {@code this}.
 	 */
 	public BatchRefUpdate setRefLogMessage(String msg, boolean appendStatus) {
@@ -218,8 +213,6 @@ public class BatchRefUpdate {
 
 	/**
 	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
 	 *
 	 * @return {@code this}.
 	 */
@@ -229,11 +222,7 @@ public class BatchRefUpdate {
 		return this;
 	}
 
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 */
+	/** @return true if log has been disabled by {@link #disableRefLog()}. */
 	public boolean isRefLogDisabled() {
 		return refLogMessage == null;
 	}
