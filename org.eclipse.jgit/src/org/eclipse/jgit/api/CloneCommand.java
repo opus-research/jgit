@@ -611,12 +611,10 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 *
 	 * @param callback
 	 *            the callback
-	 * @return {@code this}
 	 * @since 4.8
 	 */
-	public CloneCommand setCallback(Callback callback) {
+	public void setCallback(Callback callback) {
 		this.callback = callback;
-		return this;
 	}
 
 	private static void validateDirs(File directory, File gitDir, boolean bare)
