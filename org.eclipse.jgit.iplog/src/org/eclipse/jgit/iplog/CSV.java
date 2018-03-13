@@ -116,8 +116,6 @@ class CSV {
 			} else if (line.charAt(p) == ',') {
 				row.add("");
 				p++;
-				if (p == line.length())
-					row.add("");
 
 			} else {
 				int comma = line.indexOf(',', p);
