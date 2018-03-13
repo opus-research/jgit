@@ -74,6 +74,18 @@ public final class ChunkKey implements RowKey {
 	}
 
 	/**
+	 * @param d
+	 *            decoder to read key from current field from.
+	 * @return the key
+	 */
+	public static ChunkKey fromBytes(TinyProtobuf.Decoder d) {
+		int len = d.bytesLength();
+		int ptr = d.bytesOffset();
+		byte[] buf = d.bytesArray();
+		return fromBytes(buf, ptr, len);
+	}
+
+	/**
 	 * @param key
 	 * @param ptr
 	 * @param len

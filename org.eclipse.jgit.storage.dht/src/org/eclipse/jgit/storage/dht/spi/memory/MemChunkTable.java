@@ -43,26 +43,20 @@
 
 package org.eclipse.jgit.storage.dht.spi.memory;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ChunkMeta;
 import org.eclipse.jgit.storage.dht.AsyncCallback;
 import org.eclipse.jgit.storage.dht.ChunkKey;
+import org.eclipse.jgit.storage.dht.ChunkMeta;
 import org.eclipse.jgit.storage.dht.DhtException;
-import org.eclipse.jgit.storage.dht.DhtText;
 import org.eclipse.jgit.storage.dht.PackChunk;
 import org.eclipse.jgit.storage.dht.spi.ChunkTable;
 import org.eclipse.jgit.storage.dht.spi.Context;
 import org.eclipse.jgit.storage.dht.spi.WriteBuffer;
 import org.eclipse.jgit.storage.dht.spi.util.ColumnMatcher;
-
-import com.google.protobuf.InvalidProtocolBufferException;
 
 final class MemChunkTable implements ChunkTable {
 	private final MemTable table = new MemTable();
@@ -95,15 +89,8 @@ final class MemChunkTable implements ChunkTable {
 				m.setChunkIndex(cell.getValue());
 
 			cell = table.get(row, colMeta.name());
-			if (cell != null) {
-				try {
-					m.setMeta(ChunkMeta.parseFrom(cell.getValue()));
-				} catch (InvalidProtocolBufferException err) {
-					callback.onFailure(new DhtException(MessageFormat.format(
-							DhtText.get().invalidChunkMeta, chunk), err));
-					return;
-				}
-			}
+			if (cell != null)
+				m.setMeta(ChunkMeta.fromBytes(chunk, cell.getValue()));
 
 			out.add(m);
 		}
@@ -112,21 +99,15 @@ final class MemChunkTable implements ChunkTable {
 	}
 
 	public void getMeta(Context options, Set<ChunkKey> keys,
-			AsyncCallback<Map<ChunkKey, ChunkMeta>> callback) {
-		Map<ChunkKey, ChunkMeta> out = new HashMap<ChunkKey, ChunkMeta>();
+			AsyncCallback<Collection<ChunkMeta>> callback) {
+		int cnt = keys.size();
+		List<ChunkMeta> out = new ArrayList<ChunkMeta>(cnt);
 
 		for (ChunkKey chunk : keys) {
 			byte[] row = chunk.asBytes();
 			MemTable.Cell cell = table.get(row, colMeta.name());
-			if (cell != null) {
-				try {
-					out.put(chunk, ChunkMeta.parseFrom(cell.getValue()));
-				} catch (InvalidProtocolBufferException err) {
-					callback.onFailure(new DhtException(MessageFormat.format(
-							DhtText.get().invalidChunkMeta, chunk), err));
-					return;
-				}
-			}
+			if (cell != null)
+				out.add(ChunkMeta.fromBytes(chunk, cell.getValue()));
 		}
 
 		callback.onSuccess(out);
@@ -143,7 +124,7 @@ final class MemChunkTable implements ChunkTable {
 			table.put(row, colIndex.name(), chunk.getChunkIndex());
 
 		if (chunk.hasMeta())
-			table.put(row, colMeta.name(), chunk.getMeta().toByteArray());
+			table.put(row, colMeta.name(), chunk.getMeta().asBytes());
 	}
 
 	public void remove(ChunkKey key, WriteBuffer buffer) throws DhtException {

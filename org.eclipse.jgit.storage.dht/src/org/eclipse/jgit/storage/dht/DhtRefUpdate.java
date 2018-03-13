@@ -47,7 +47,6 @@ import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.RefData;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -107,7 +106,7 @@ class DhtRefUpdate extends RefUpdate {
 			dstRef = dstRef.getLeaf();
 
 		refKey = RefKey.create(repo, dstRef.getName());
-		oldData = RefDataUtil.fromRef(dstRef);
+		oldData = RefData.fromRef(dstRef);
 
 		if (dstRef.isSymbolic())
 			setOldObjectId(null);
@@ -158,7 +157,7 @@ class DhtRefUpdate extends RefUpdate {
 	@Override
 	protected Result doLink(String target) throws IOException {
 		try {
-			newData = RefDataUtil.symbolic(target);
+			newData = RefData.symbolic(target);
 			boolean r = db.ref().compareAndPut(refKey, oldData, newData);
 			if (r) {
 				getRefDatabase().stored(dstRef.getName(), newData);
@@ -182,19 +181,19 @@ class DhtRefUpdate extends RefUpdate {
 
 			ChunkKey key = ctx.findChunk(newId);
 			if (key != null)
-				newId = new RefDataUtil.IdWithChunk(newId, key);
+				newId = new RefData.IdWithChunk(newId, key);
 
 			if (obj instanceof RevTag) {
 				ObjectId pId = rw.peel(obj);
 				key = ctx.findChunk(pId);
-				pId = key != null ? new RefDataUtil.IdWithChunk(pId, key) : pId;
-				return RefDataUtil.peeled(newId, pId);
+				pId = key != null ? new RefData.IdWithChunk(pId, key) : pId;
+				return RefData.peeled(newId, pId);
 			} else if (obj != null)
-				return RefDataUtil.peeled(newId, null);
+				return RefData.peeled(newId, null);
 			else
-				return RefDataUtil.id(newId);
+				return RefData.id(newId);
 		} catch (MissingObjectException e) {
-			return RefDataUtil.id(newId);
+			return RefData.id(newId);
 		}
 	}
 }

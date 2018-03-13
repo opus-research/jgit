@@ -68,7 +68,7 @@ import org.eclipse.jgit.lib.ObjectReader;
  * accessed. This is necessary to improve access locality and prevent thrashing
  * of the local ChunkCache. It also causes {@link MissingObjectException} to be
  * thrown at the start of traversal, until the lookup queue is exhausted.
- * 
+ *
  * @param <T>
  *            type of object to associate with the loader.
  */
