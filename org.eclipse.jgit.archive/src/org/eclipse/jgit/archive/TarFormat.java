@@ -73,7 +73,7 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		if (FileMode.SYMLINK.equals(mode)) {
+		if (mode == FileMode.SYMLINK) {
 			final TarArchiveEntry entry = new TarArchiveEntry(
 					path, TarConstants.LF_SYMLINK);
 			entry.setLinkName(new String(
@@ -83,30 +83,13 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 			return;
 		}
 
-		// TarArchiveEntry detects directories by checking
-		// for '/' at the end of the filename.
-		if (path.endsWith("/") != FileMode.TREE.equals(mode)) {
-			throw new IllegalArgumentException(
-					"TarFormat.putEntry: path " //$NON-NLS-1$
-					+ path + " does not match mode " //$NON-NLS-1$
-					+ mode);
-		}
 		final TarArchiveEntry entry = new TarArchiveEntry(path);
-		if (FileMode.TREE.equals(mode)) {
-			out.putArchiveEntry(entry);
-			out.closeArchiveEntry();
-			return;
-		}
-
-		if (FileMode.REGULAR_FILE.equals(mode)) {
-			// ok
-		} else if (FileMode.EXECUTABLE_FILE.equals(mode)) {
+		if (mode == FileMode.REGULAR_FILE ||
+		    mode == FileMode.EXECUTABLE_FILE) {
 			entry.setMode(mode.getBits());
 		} else {
-			// Unsupported mode (e.g., GITLINK).
-			throw new IllegalArgumentException(
-					"TarFormat.putEntry: Unsupported mode " //$NON-NLS-1$
-					+ mode);
+			// TODO(jrn): Let the caller know the tree contained
+			// an entry with unsupported mode (e.g., a submodule).
 		}
 		entry.setSize(loader.getSize());
 		out.putArchiveEntry(entry);
