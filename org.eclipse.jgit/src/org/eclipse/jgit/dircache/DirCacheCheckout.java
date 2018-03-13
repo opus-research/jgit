@@ -243,7 +243,6 @@ public class DirCacheCheckout {
 		walk = new NameConflictTreeWalk(repo);
 		builder = dc.builder();
 
-		walk.reset();
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
@@ -285,7 +284,6 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
-		walk.reset();
 		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
@@ -313,8 +311,8 @@ public class DirCacheCheckout {
 		if (m != null) {
 			if (i == null || f == null || !m.idEqual(i)
 					|| (i.getDirCacheEntry() != null && (f.isModified(
-							i.getDirCacheEntry(), true, config_filemode(),
-							repo.getFS()) || i.getDirCacheEntry().getStage() != 0))) {
+							i.getDirCacheEntry(), true, config_filemode()) ||
+							i.getDirCacheEntry().getStage() != 0))) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else
@@ -577,9 +575,7 @@ public class DirCacheCheckout {
 			case 0xFFD: // 12 13 14
 				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
-					if (f == null
-							|| f.isModified(dce, true, config_filemode(),
-									repo.getFS()))
+					if (f == null || f.isModified(dce, true, config_filemode()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -646,7 +642,7 @@ public class DirCacheCheckout {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
 								&& (f == null || f.isModified(dce, true,
-										config_filemode(), repo.getFS())))
+										config_filemode())))
 							conflict(name, i.getDirCacheEntry(), h, m);
 						else
 							remove(name);
@@ -668,9 +664,7 @@ public class DirCacheCheckout {
 				 */
 
 				if (hId.equals(iId)) {
-					if (f == null
-							|| f.isModified(dce, true, config_filemode(),
-									repo.getFS()))
+					if (f == null || f.isModified(dce, true, config_filemode()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -682,7 +676,7 @@ public class DirCacheCheckout {
 				else if (hId.equals(iId) && !mId.equals(iId)) {
 					if (dce != null
 							&& (f == null || f.isModified(dce, true,
-									config_filemode(), repo.getFS())))
+									config_filemode())))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						update(name, mId, m.getEntryFileMode());
@@ -795,7 +789,6 @@ public class DirCacheCheckout {
 
 	private boolean isModified(String path) throws CorruptObjectException, IOException {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
-		tw.reset();
 		tw.addTree(new DirCacheIterator(dc));
 		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS(),
 				WorkingTreeOptions.createDefaultInstance()));
@@ -808,7 +801,8 @@ public class DirCacheCheckout {
 			wtIt = tw.getTree(1, WorkingTreeIterator.class);
 			if (dcIt == null || wtIt == null)
 				return true;
-			if (wtIt.isModified(dcIt.getDirCacheEntry(), true, config_filemode(), repo.getFS())) {
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true,
+					config_filemode())) {
 				return true;
 			}
 		}
