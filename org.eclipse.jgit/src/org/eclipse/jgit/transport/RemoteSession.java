@@ -1,5 +1,10 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
+ * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2009, Google, Inc.
+ * Copyright (C) 2009, JetBrains s.r.o.
+ * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,33 +50,37 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 
-/** Indicates UploadPack may not continue execution. */
-public class UploadPackMayNotContinueException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private boolean output;
-
-	/** Initialize with no message. */
-	public UploadPackMayNotContinueException() {
-		// Do not set a message.
-	}
+/**
+ * Create a remote "session" for executing remote commands.
+ * <p>
+ * Clients should subclass RemoteSession to create an alternate way for JGit to
+ * execute remote commands. (The client application may already have this
+ * functionality available.) Note that this class is just a factory for creating
+ * remote processes. If the application already has a persistent connection to
+ * the remote machine, RemoteSession may do nothing more than return a new
+ * RemoteProcess when exec is called.
+ */
+public interface RemoteSession {
+	/**
+	 * Generate a new remote process to execute the given command. This function
+	 * should also start execution and may need to create the streams prior to
+	 * execution.
+	 * @param commandName
+	 *            command to execute
+	 * @param timeout
+	 *            timeout value, in seconds, for command execution
+	 * @return a new remote process
+	 * @throws IOException
+	 *             may be thrown in several cases. For example, on problems
+	 *             opening input or output streams or on problems connecting or
+	 *             communicating with the remote host. For the latter two cases,
+	 *             a TransportException may be thrown (a subclass of
+	 *             IOException).
+	 */
+	public Process exec(String commandName, int timeout) throws IOException;
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * Disconnect the remote session
 	 */
-	public UploadPackMayNotContinueException(String msg) {
-		super(msg);
-	}
-
-	/** @return true if the message was already output to the client. */
-	public boolean isOutput() {
-		return output;
-	}
-
-	/** Mark this message has being sent to the client. */
-	public void setOutput() {
-		output = true;
-	}
+	public void disconnect();
 }
