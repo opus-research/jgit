@@ -48,6 +48,7 @@ import static org.eclipse.jgit.storage.pack.StoredObjectRepresentation.PACK_DELT
 import static org.eclipse.jgit.storage.pack.StoredObjectRepresentation.PACK_WHOLE;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -55,10 +56,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -76,7 +75,6 @@ import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -86,12 +84,12 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
-import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -390,18 +388,7 @@ public class PackWriter {
 	 * @return true if the object will appear in the output pack file.
 	 */
 	public boolean willInclude(final AnyObjectId id) {
-		return get(id) != null;
-	}
-
-	/**
-	 * Lookup the ObjectToPack object for a given ObjectId.
-	 *
-	 * @param id
-	 *            the object to find in the pack.
-	 * @return the object we are packing, or null.
-	 */
-	public ObjectToPack get(AnyObjectId id) {
-		return objectsMap.get(id);
+		return objectsMap.get(id) != null;
 	}
 
 	/**
@@ -490,7 +477,7 @@ public class PackWriter {
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
 		if ((reuseDeltas || config.isReuseObjects()) && reuseSupport != null)
-			searchForReuse(compressMonitor);
+			searchForReuse();
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
 
@@ -500,8 +487,7 @@ public class PackWriter {
 		int objCnt = getObjectsNumber();
 		writeMonitor.beginTask(JGitText.get().writingObjects, objCnt);
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
-		out.flush();
-		writeObjects(out);
+		writeObjects(writeMonitor, out);
 		writeChecksum(out);
 
 		reader.release();
@@ -517,11 +503,11 @@ public class PackWriter {
 		}
 	}
 
-	private void searchForReuse(ProgressMonitor monitor) throws IOException {
-		monitor.beginTask(JGitText.get().searchForReuse, getObjectsNumber());
-		for (List<ObjectToPack> list : objectsLists)
-			reuseSupport.selectObjectRepresentation(this, monitor, list);
-		monitor.endTask();
+	private void searchForReuse() throws IOException {
+		for (List<ObjectToPack> list : objectsLists) {
+			for (ObjectToPack otp : list)
+				reuseSupport.selectObjectRepresentation(this, otp);
+		}
 	}
 
 	private void searchForDeltas(ProgressMonitor monitor)
@@ -546,66 +532,20 @@ public class PackWriter {
 		// them in the search phase below.
 		//
 		for (ObjectToPack eo : edgeObjects) {
-			eo.setWeight(0);
-			list[cnt++] = eo;
-		}
-
-		// Compute the sizes of the objects so we can do a proper sort.
-		// We let the reader skip missing objects if it chooses. For
-		// some readers this can be a huge win. We detect missing objects
-		// by having set the weights above to 0 and allowing the delta
-		// search code to discover the missing object and skip over it, or
-		// abort with an exception if we actually had to have it.
-		//
-		monitor.beginTask(JGitText.get().compressingObjects, cnt);
-		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
-				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
-		try {
-			final long limit = config.getBigFileThreshold();
-			for (;;) {
-				monitor.update(1);
-
-				try {
-					if (!sizeQueue.next())
-						break;
-				} catch (MissingObjectException notFound) {
-					if (ignoreMissingUninteresting) {
-						ObjectToPack otp = sizeQueue.getCurrent();
-						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta(true);
-							continue;
-						}
-
-						otp = edgeObjects.get(notFound.getObjectId());
-						if (otp != null) {
-							otp.setDoNotDelta(true);
-							continue;
-						}
-					}
-					throw notFound;
-				}
-
-				ObjectToPack otp = sizeQueue.getCurrent();
-				if (otp == null) {
-					otp = objectsMap.get(sizeQueue.getObjectId());
-					if (otp == null)
-						otp = edgeObjects.get(sizeQueue.getObjectId());
-				}
-
-				long sz = sizeQueue.getSize();
-				if (limit <= sz || Integer.MAX_VALUE <= sz)
-					otp.setDoNotDelta(true); // too big, avoid costly files
-
-				else if (sz <= DeltaIndex.BLKSZ)
-					otp.setDoNotDelta(true); // too small, won't work
-
-				else
-					otp.setWeight((int) sz);
+			try {
+				if (loadSize(eo))
+					list[cnt++] = eo;
+			} catch (IOException notAvailable) {
+				// Skip this object. Since we aren't going to write it out
+				// the only consequence of it being unavailable to us is we
+				// may produce a larger data stream than we could have.
+				//
+				if (!ignoreMissingUninteresting)
+					throw notAvailable;
 			}
-		} finally {
-			sizeQueue.release();
 		}
-		monitor.endTask();
+
+		monitor.beginTask(JGitText.get().compressingObjects, cnt);
 
 		// Sort the objects by path hash so like files are near each other,
 		// and then by size descending so that bigger files are first. This
@@ -614,49 +554,50 @@ public class PackWriter {
 		//
 		Arrays.sort(list, 0, cnt, new Comparator<ObjectToPack>() {
 			public int compare(ObjectToPack a, ObjectToPack b) {
-				int cmp = (a.isDoNotDelta() ? 1 : 0)
-						- (b.isDoNotDelta() ? 1 : 0);
-				if (cmp != 0)
-					return cmp;
-
-				cmp = a.getType() - b.getType();
-				if (cmp != 0)
-					return cmp;
-
-				cmp = (a.getPathHash() >>> 1) - (b.getPathHash() >>> 1);
-				if (cmp != 0)
-					return cmp;
-
-				cmp = (a.getPathHash() & 1) - (b.getPathHash() & 1);
-				if (cmp != 0)
-					return cmp;
-
-				return b.getWeight() - a.getWeight();
+				int cmp = a.getType() - b.getType();
+				if (cmp == 0)
+					cmp = (a.getPathHash() >>> 1) - (b.getPathHash() >>> 1);
+				if (cmp == 0)
+					cmp = (a.getPathHash() & 1) - (b.getPathHash() & 1);
+				if (cmp == 0)
+					cmp = b.getWeight() - a.getWeight();
+				return cmp;
 			}
 		});
-
-		// Above we stored the objects we cannot delta onto the end.
-		// Remove them from the list so we don't waste time on them.
-		while (0 < cnt && list[cnt - 1].isDoNotDelta())
-			cnt--;
-		if (cnt == 0)
-			return;
-
-		monitor.beginTask(JGitText.get().compressingObjects, cnt);
 		searchForDeltas(monitor, list, cnt);
 		monitor.endTask();
 	}
 
-	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
+	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			IOException {
 		for (ObjectToPack otp : objectsLists[type]) {
 			if (otp.isDoNotDelta()) // delta is disabled for this path
 				continue;
 			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
-			otp.setWeight(0);
-			list[cnt++] = otp;
+			if (loadSize(otp))
+				list[cnt++] = otp;
 		}
 		return cnt;
+	}
+
+	private boolean loadSize(ObjectToPack e) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		long sz = reader.getObjectSize(e, e.getType());
+
+		// If its too big for us to handle, skip over it.
+		//
+		if (config.getBigFileThreshold() <= sz || Integer.MAX_VALUE <= sz)
+			return false;
+
+		// If its too tiny for the delta compression to work, skip it.
+		//
+		if (sz <= DeltaIndex.BLKSZ)
+			return false;
+
+		e.setWeight((int) sz);
+		return true;
 	}
 
 	private void searchForDeltas(final ProgressMonitor monitor,
@@ -811,19 +752,21 @@ public class PackWriter {
 		}
 	}
 
-	private void writeObjects(PackOutputStream out) throws IOException {
-		if (reuseSupport != null) {
-			for (List<ObjectToPack> list : objectsLists)
-				reuseSupport.writeObjects(out, list);
-		} else {
-			for (List<ObjectToPack> list : objectsLists) {
-				for (ObjectToPack otp : list)
-					out.writeObject(otp);
+	private void writeObjects(ProgressMonitor writeMonitor, PackOutputStream out)
+			throws IOException {
+		for (List<ObjectToPack> list : objectsLists) {
+			for (ObjectToPack otp : list) {
+				if (writeMonitor.isCancelled())
+					throw new IOException(
+							JGitText.get().packingCancelledDuringObjectsWriting);
+				if (!otp.isWritten())
+					writeObject(out, otp);
 			}
 		}
 	}
 
-	void writeObject(PackOutputStream out, ObjectToPack otp) throws IOException {
+	private void writeObject(PackOutputStream out, final ObjectToPack otp)
+			throws IOException {
 		if (otp.isWritten())
 			return; // We shouldn't be here.
 
@@ -896,8 +839,7 @@ public class PackWriter {
 			MissingObjectException {
 		otp.clearDeltaBase();
 		otp.clearReuseAsIs();
-		reuseSupport.selectObjectRepresentation(this,
-				NullProgressMonitor.INSTANCE, Collections.singleton(otp));
+		reuseSupport.selectObjectRepresentation(this, otp);
 	}
 
 	private void writeWholeObjectDeflate(PackOutputStream out,
@@ -955,12 +897,41 @@ public class PackWriter {
 
 	static byte[] buffer(PackConfig config, ObjectReader or, AnyObjectId objId)
 			throws IOException {
+		ObjectLoader ldr = or.open(objId);
+		if (!ldr.isLarge())
+			return ldr.getCachedBytes();
+
 		// PackWriter should have already pruned objects that
 		// are above the big file threshold, so our chances of
 		// the object being below it are very good. We really
 		// shouldn't be here, unless the implementation is odd.
 
-		return or.open(objId).getCachedBytes(config.getBigFileThreshold());
+		// If it really is too big to work with, abort out now.
+		//
+		long sz = ldr.getSize();
+		if (config.getBigFileThreshold() <= sz || Integer.MAX_VALUE < sz)
+			throw new LargeObjectException(objId.copy());
+
+		// Its considered to be large by the loader, but we really
+		// want it in byte array format. Try to make it happen.
+		//
+		byte[] buf;
+		try {
+			buf = new byte[(int) sz];
+		} catch (OutOfMemoryError noMemory) {
+			LargeObjectException e;
+
+			e = new LargeObjectException(objId.copy());
+			e.initCause(noMemory);
+			throw e;
+		}
+		InputStream in = ldr.openStream();
+		try {
+			IO.readFully(in, buf, 0, buf.length);
+		} finally {
+			in.close();
+		}
+		return buf;
 	}
 
 	private Deflater deflater() {
@@ -979,45 +950,28 @@ public class PackWriter {
 			final Collection<? extends ObjectId> uninterestingObjects)
 			throws MissingObjectException, IOException,
 			IncorrectObjectTypeException {
-		List<ObjectId> all = new ArrayList<ObjectId>(interestingObjects.size());
-		for (ObjectId id : interestingObjects)
-			all.add(id.copy());
-
-		final Set<ObjectId> not;
-		if (uninterestingObjects != null && !uninterestingObjects.isEmpty()) {
-			not = new HashSet<ObjectId>();
-			for (ObjectId id : uninterestingObjects)
-				not.add(id.copy());
-			all.addAll(not);
-		} else
-			not = Collections.emptySet();
-
 		final ObjectWalk walker = new ObjectWalk(reader);
 		walker.setRetainBody(false);
 		walker.sort(RevSort.COMMIT_TIME_DESC);
-		if (thin && !not.isEmpty())
+		if (thin)
 			walker.sort(RevSort.BOUNDARY, true);
 
-		AsyncRevObjectQueue q = walker.parseAny(all, true);
-		try {
-			for (;;) {
+		for (ObjectId id : interestingObjects) {
+			RevObject o = walker.parseAny(id);
+			walker.markStart(o);
+		}
+		if (uninterestingObjects != null) {
+			for (ObjectId id : uninterestingObjects) {
+				final RevObject o;
 				try {
-					RevObject o = q.next();
-					if (o == null)
-						break;
-					if (not.contains(o.copy()))
-						walker.markUninteresting(o);
-					else
-						walker.markStart(o);
-				} catch (MissingObjectException e) {
-					if (ignoreMissingUninteresting
-							&& not.contains(e.getObjectId()))
+					o = walker.parseAny(id);
+				} catch (MissingObjectException x) {
+					if (ignoreMissingUninteresting)
 						continue;
-					throw e;
+					throw x;
 				}
+				walker.markUninteresting(o);
 			}
-		} finally {
-			q.release();
 		}
 		return walker;
 	}
@@ -1065,7 +1019,7 @@ public class PackWriter {
 			case Constants.OBJ_BLOB:
 				ObjectToPack otp = new ObjectToPack(object);
 				otp.setPathHash(pathHashCode);
-				otp.setEdge();
+				otp.setDoNotDelta(true);
 				edgeObjects.add(otp);
 				thin = true;
 				break;

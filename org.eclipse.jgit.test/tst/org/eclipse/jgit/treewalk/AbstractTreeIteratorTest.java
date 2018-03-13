@@ -62,7 +62,7 @@ public class AbstractTreeIteratorTest extends TestCase {
 
 	public class FakeTreeIterator extends WorkingTreeIterator {
 		public FakeTreeIterator(String pathName, FileMode fileMode) {
-			super(prefix(pathName), new WorkingTreeOptions(false));
+			super(prefix(pathName));
 			mode = fileMode.getBits();
 
 			final int s = pathName.lastIndexOf('/');

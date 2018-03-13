@@ -71,7 +71,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String advertisementOfCameBefore;
 	/***/ public String amazonS3ActionFailed;
 	/***/ public String amazonS3ActionFailedGivingUp;
-	/***/ public String ambiguousObjectAbbreviation;
 	/***/ public String anExceptionOccurredWhileTryingToAddTheIdOfHEAD;
 	/***/ public String anSSHSessionHasBeenAlreadyCreated;
 	/***/ public String atLeastOnePathIsRequired;
@@ -170,7 +169,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
 	/***/ public String couldNotRenameDeleteOldIndex;
-	/***/ public String couldNotRenameTemporaryFile;
 	/***/ public String couldNotRenameTemporaryIndexFileToIndex;
 	/***/ public String couldNotURLEncodeToUTF8;
 	/***/ public String couldNotWriteFile;
@@ -182,7 +180,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String dirCacheDoesNotHaveABackingFile;
 	/***/ public String dirCacheFileIsNotLocked;
 	/***/ public String dirCacheIsNotLocked;
-	/***/ public String dirtyFilesExist;
 	/***/ public String doesNotHandleMode;
 	/***/ public String downloadCancelled;
 	/***/ public String downloadCancelledDuringIndexing;
@@ -206,7 +203,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccuredDuringReadingOfGIT_DIR;
 	/***/ public String expectedACKNAKFoundEOF;
@@ -244,7 +240,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexFileIsInUse;
 	/***/ public String indexFileIsTooLargeForJgit;
 	/***/ public String indexSignatureIsInvalid;
-	/***/ public String indexWriteException;
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
 	/***/ public String interruptedWriting;
@@ -385,15 +380,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryState_rebaseWithMerge;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
-	/***/ public String searchForReuse;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
 	/***/ public String shortSkipOfBlock;
-	/***/ public String signingNotSupportedOnTag;
 	/***/ public String similarityScoreMustBeWithinBounds;
-	/***/ public String sizeExceeds2GB;
 	/***/ public String smartHTTPPushDisabled;
 	/***/ public String sourceDestinationMustMatch;
 	/***/ public String sourceIsNotAWildcard;
@@ -404,8 +396,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
 	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
-	/***/ public String tagNameInvalid;
-	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
@@ -421,6 +411,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String truncatedHunkNewLinesMissing;
 	/***/ public String truncatedHunkOldLinesMissing;
 	/***/ public String unableToCheckConnectivity;
+	/***/ public String unableToLockTag;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;

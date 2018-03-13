@@ -52,7 +52,6 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -196,19 +195,37 @@ public class PersonIdent {
 	 *
 	 * @param in
 	 *            a Git internal format author/committer string.
-	 *
-	 * @deprecated Use {@link RawParseUtils#parsePersonIdent(String)} instead.
 	 */
 	public PersonIdent(final String in) {
-		final PersonIdent self = RawParseUtils.parsePersonIdent(in);
-		if (self == null)
+		final int lt = in.indexOf('<');
+		if (lt == -1) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().malformedpersonIdentString, in));
+		}
+		final int gt = in.indexOf('>', lt);
+		if (gt == -1) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().malformedpersonIdentString, in));
+		}
+		final int sp = in.indexOf(' ', gt + 2);
+		if (sp == -1) {
+			when = 0;
+			tzOffset = -1;
+		} else {
+			final String tzHoursStr = in.substring(sp + 1, sp + 4).trim();
+			final int tzHours;
+			if (tzHoursStr.charAt(0) == '+') {
+				tzHours = Integer.parseInt(tzHoursStr.substring(1));
+			} else {
+				tzHours = Integer.parseInt(tzHoursStr);
+			}
+			final int tzMins = Integer.parseInt(in.substring(sp + 4).trim());
+			when = Long.parseLong(in.substring(gt + 1, sp).trim()) * 1000;
+			tzOffset = tzHours * 60 + tzMins;
+		}
 
-		this.name = self.name;
-		this.emailAddress = self.emailAddress;
-		this.when = self.when;
-		this.tzOffset = self.tzOffset;
+		name = in.substring(0, lt).trim();
+		emailAddress = in.substring(lt + 1, gt).trim();
 	}
 
 	/**
@@ -251,10 +268,7 @@ public class PersonIdent {
 	}
 
 	public int hashCode() {
-		int hc = getEmailAddress().hashCode();
-		hc *= 31;
-		hc += (int) (when / 1000L);
-		return hc;
+		return getEmailAddress().hashCode() ^ (int) when;
 	}
 
 	public boolean equals(final Object o) {
@@ -262,7 +276,7 @@ public class PersonIdent {
 			final PersonIdent p = (PersonIdent) o;
 			return getName().equals(p.getName())
 					&& getEmailAddress().equals(p.getEmailAddress())
-					&& when / 1000L == p.when / 1000L;
+					&& when == p.when;
 		}
 		return false;
 	}
