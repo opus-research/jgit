@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2017 Two Sigma Open Source
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.revwalk;
+package org.eclipse.jgit.transport;
 
-import java.util.Locale;
+import java.io.Serializable;
 
-import org.eclipse.jgit.lib.Constants;
+/**
+ * Describes the expected value for a ref being pushed.
+ * @since 4.7
+ */
+public class RefLeaseSpec implements Serializable {
+	private static final long serialVersionUID = 1L;
 
-/** Case insensitive key for a {@link FooterLine}. */
-public final class FooterKey {
-	/** Standard {@code Signed-off-by} */
-	public static final FooterKey SIGNED_OFF_BY = new FooterKey("Signed-off-by"); //$NON-NLS-1$
+	/** Name of the ref whose value we want to check. */
+	private final String ref;
 
-	/** Standard {@code Acked-by} */
-	public static final FooterKey ACKED_BY = new FooterKey("Acked-by"); //$NON-NLS-1$
-
-	/** Standard {@code CC} */
-	public static final FooterKey CC = new FooterKey("CC"); //$NON-NLS-1$
-
-	private final String name;
-
-	final byte[] raw;
+	/** Local commitish to get expected value from. */
+	private final String expected;
 
 	/**
-	 * Create a key for a specific footer line.
 	 *
-	 * @param keyName
-	 *            name of the footer line.
+	 * @param ref
+	 *            ref being pushed
+	 * @param expected
+	 *            the expected value of the ref
 	 */
-	public FooterKey(final String keyName) {
-		name = keyName;
-		raw = Constants.encode(keyName.toLowerCase(Locale.ROOT));
+	public RefLeaseSpec(String ref, String expected) {
+		this.ref = ref;
+		this.expected = expected;
 	}
 
-	/** @return name of this footer line. */
-	public String getName() {
-		return name;
+	/**
+	 * Get the ref to protect.
+	 *
+	 * @return name of ref to check.
+	 */
+	public String getRef() {
+		return ref;
 	}
 
-	@SuppressWarnings("nls")
-	@Override
+	/**
+	 * Get the expected value of the ref, in the form
+	 * of a local committish
+	 *
+	 * @return expected ref value.
+	 */
+	public String getExpected() {
+		return expected;
+	}
+
 	public String toString() {
-		return "FooterKey[" + name + "]";
+		final StringBuilder r = new StringBuilder();
+		r.append(getRef());
+		r.append(':');
+		r.append(getExpected());
+		return r.toString();
 	}
 }
