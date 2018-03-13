@@ -94,8 +94,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	private List<Ref> commits = new LinkedList<Ref>();
 
-	private boolean squash;
-
 	/**
 	 * @param repo
 	 */
@@ -185,22 +183,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						srcCommit.getTree());
 				dco.setFailOnConflict(true);
 				dco.checkout();
-				String msg = null;
-				ObjectId newHead, base = null;
-				MergeStatus mergeStatus = null;
-				if (!squash) {
-					updateHead(refLogMessage, srcCommit, headId);
-					newHead = base = srcCommit;
-					mergeStatus = MergeStatus.FAST_FORWARD;
-				} else {
-					msg = JGitText.get().squashCommitNotUpdatingHEAD;
-					newHead = base = headId;
-					mergeStatus = MergeStatus.FAST_FORWARD_SQUASHED;
-				}
+
+				updateHead(refLogMessage, srcCommit, headId);
 				setCallable(false);
-				return new MergeResult(newHead, base, new ObjectId[] {
-						headCommit, srcCommit }, mergeStatus, mergeStrategy,
-						null, msg);
+				return new MergeResult(srcCommit, srcCommit, new ObjectId[] {
+						headCommit, srcCommit }, MergeStatus.FAST_FORWARD,
+						mergeStrategy, null, null);
 			} else {
 
 				String mergeMessage = new MergeMessageFormatter().format(
@@ -234,22 +222,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					dco.setFailOnConflict(true);
 					dco.checkout();
 
-					String msg = null;
-					RevCommit newHead = null;
-					MergeStatus mergeStatus = null;
-					if (!squash) {
-						newHead = new Git(getRepository()).commit()
+					RevCommit newHead = new Git(getRepository()).commit()
 							.setReflogComment(refLogMessage.toString()).call();
-						mergeStatus = MergeStatus.MERGED;
-					} else {
-						msg = JGitText.get().squashCommitNotUpdatingHEAD;
-						newHead = headCommit;
-						mergeStatus = MergeStatus.MERGED_SQUASHED;
-					}
-					return new MergeResult(newHead.getId(), null,
-							new ObjectId[] { headCommit.getId(),
-									srcCommit.getId() }, mergeStatus,
-							mergeStrategy, null, msg);
+					return new MergeResult(newHead.getId(),
+							null, new ObjectId[] {
+									headCommit.getId(), srcCommit.getId() },
+							MergeStatus.MERGED, mergeStrategy, null, null);
 				} else {
 					if (failingPaths != null) {
 						repo.writeMergeCommitMsg(null);
@@ -354,25 +332,5 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	public MergeCommand include(String name, AnyObjectId commit) {
 		return include(new ObjectIdRef.Unpeeled(Storage.LOOSE, name,
 				commit.copy()));
-	}
-
-	/**
-	 * If <code>true</code>, will prepare the next commit in working tree and
-	 * index as if a real merge happened, but do not make the commit or move the
-	 * HEAD. Otherwise, perform the merge and commit the result.
-	 * <p>
-	 * In case the merge was successful but this flag was set to
-	 * <code>true</code> a {@link MergeResult} with status
-	 * {@link MergeStatus#MERGED_SQUASHED} is returned.
-	 *
-	 * @param squash
-	 *            whether to squash commits or not
-	 * @return {@code this}
-	 * @since 2.0
-	 */
-	public MergeCommand setSquash(boolean squash) {
-		checkCallable();
-		this.squash = squash;
-		return this;
 	}
 }
