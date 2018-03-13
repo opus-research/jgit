@@ -256,8 +256,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		editor.commit();
 
 		Git.cloneRepository().setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository().close();
+				.setDirectory(new File(db.getWorkTree(), path)).call();
 
 		TreeWalk walk = new TreeWalk(db);
 		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
@@ -356,8 +355,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		editor.commit();
 
 		Git.cloneRepository().setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository().close();
+				.setDirectory(new File(db.getWorkTree(), path)).call();
 
 		TreeWalk walk = new TreeWalk(db);
 		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
@@ -390,8 +388,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		editor.commit();
 
 		Git.cloneRepository().setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository().close();
+				.setDirectory(new File(db.getWorkTree(), path)).call();
 
 		TreeWalk walk = new TreeWalk(db);
 		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
