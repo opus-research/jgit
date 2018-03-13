@@ -44,10 +44,13 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static org.eclipse.jgit.lib.RefDatabase.MAX_SYMBOLIC_REF_DEPTH;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.SymbolicRef;
@@ -62,16 +65,14 @@ public abstract class Reftable implements AutoCloseable {
 	public static Reftable from(Collection<Ref> refs) {
 		try {
 			ReftableConfig cfg = new ReftableConfig();
-			cfg.setRefBlockSize(refs.size() < 10000 ? (4 << 10) : (64 << 10));
 			cfg.setIndexObjects(false);
-
-			MemoryReftable buf = new MemoryReftable(cfg.getRefBlockSize());
+			ByteArrayOutputStream buf = new ByteArrayOutputStream();
 			new ReftableWriter()
 				.setConfig(cfg)
-				.begin(buf.getOutput())
+				.begin(buf)
 				.sortAndWriteRefs(refs)
 				.finish();
-			return new ReftableReader(buf.getBlockSource());
+			return new ReftableReader(BlockSource.from(buf.toByteArray()));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
