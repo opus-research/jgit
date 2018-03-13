@@ -247,7 +247,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
-		return FileUtils.lastModified(f);
+		return f.lastModified();
 	}
 
 	/**
@@ -260,7 +260,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
-		FileUtils.setLastModified(f, time);
+		f.setLastModified(time);
 	}
 
 	/**
@@ -273,7 +273,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
-		return FileUtils.getLength(path);
+		return path.length();
 	}
 
 	/**
@@ -630,7 +630,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
-		return FileUtils.isSymlink(path);
+		return false;
 	}
 
 	/**
@@ -642,7 +642,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean exists(File path) {
-		return FileUtils.exists(path);
+		return path.exists();
 	}
 
 	/**
@@ -654,7 +654,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
-		return FileUtils.isDirectory(path);
+		return path.isDirectory();
 	}
 
 	/**
@@ -666,7 +666,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
-		return FileUtils.isFile(path);
+		return path.isFile();
 	}
 
 	/**
@@ -677,7 +677,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
-		return FileUtils.isHidden(path);
+		return path.isHidden();
 	}
 
 	/**
@@ -689,7 +689,9 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtils.setHidden(path, hidden);
+		if (!path.getName().startsWith(".")) //$NON-NLS-1$
+			throw new IllegalArgumentException(
+					JGitText.get().hiddenFilesStartWithDot);
 	}
 
 	/**
