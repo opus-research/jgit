@@ -298,7 +298,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 *
 	 * @return id of stashed commit that was applied
 	 */
-	public ObjectId call() throws GitAPIException {
+	public ObjectId call() throws GitAPIException, JGitInternalException {
 		checkCallable();
 
 		if (repo.getRepositoryState() != RepositoryState.SAFE)
