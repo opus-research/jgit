@@ -81,7 +81,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	protected ObjectId doInsert(int type, byte[] data, int off, int len)
+	public ObjectId insert(int type, byte[] data, int off, int len)
 			throws IOException {
 		ObjectId id = idFor(type, data, off, len);
 		if (db.has(id)) {
@@ -93,7 +93,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	protected ObjectId doInsert(final int type, long len, final InputStream is)
+	public ObjectId insert(final int type, long len, final InputStream is)
 			throws IOException {
 		if (len <= buffer().length) {
 			byte[] buf = buffer();
@@ -131,7 +131,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	public void doFlush() throws IOException {
+	public void flush() throws IOException {
 		// Do nothing. Objects are immediately visible.
 	}
 

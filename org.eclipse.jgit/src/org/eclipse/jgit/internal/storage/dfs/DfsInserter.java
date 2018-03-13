@@ -102,7 +102,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	protected ObjectId doInsert(int type, byte[] data, int off, int len)
+	public ObjectId insert(int type, byte[] data, int off, int len)
 			throws IOException {
 		ObjectId id = idFor(type, data, off, len);
 		if (objectMap != null && objectMap.contains(id))
@@ -117,7 +117,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	protected ObjectId doInsert(int type, long len, InputStream in)
+	public ObjectId insert(int type, long len, InputStream in)
 			throws IOException {
 		byte[] buf = buffer();
 		if (len <= buf.length) {
@@ -145,7 +145,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	protected void doFlush() throws IOException {
+	public void flush() throws IOException {
 		if (packDsc == null)
 			return;
 
