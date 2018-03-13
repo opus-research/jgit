@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,57 +40,54 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.http.test;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
+import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
+import org.eclipse.jgit.lib.RefDatabase;
 
 /**
- * Exception thrown if a conflict occurs during a merge checkout.
+ * An {@link InMemoryRepository} whose refs can be made unreadable for testing
+ * purposes.
  */
-public class CheckoutConflictException extends IOException {
-	private static final long serialVersionUID = 1L;
+class RefsUnreadableInMemoryRepository extends InMemoryRepository {
 
-	private final String[] conflicting;
+	private final RefsUnreadableRefDatabase refs;
 
-	/**
-	 * Construct a CheckoutConflictException for the specified file
-	 *
-	 * @param file
-	 */
-	public CheckoutConflictException(String file) {
-		super(MessageFormat.format(JGitText.get().checkoutConflictWithFile, file));
-		conflicting = new String[] { file };
+	private volatile boolean failing;
+
+	RefsUnreadableInMemoryRepository(DfsRepositoryDescription repoDesc) {
+		super(repoDesc);
+		refs = new RefsUnreadableRefDatabase();
+		failing = false;
+	}
+
+	@Override
+	public RefDatabase getRefDatabase() {
+		return refs;
 	}
 
 	/**
-	 * Construct a CheckoutConflictException for the specified set of files
-	 *
-	 * @param files
+	 * Make the ref database unable to scan its refs.
+	 * <p>
+	 * It may be useful to follow a call to startFailing with a call to
+	 * {@link RefDatabase#refresh()}, ensuring the next ref read fails.
 	 */
-	public CheckoutConflictException(String[] files) {
-		super(MessageFormat.format(JGitText.get().checkoutConflictWithFiles, buildList(files)));
-		conflicting = files;
+	void startFailing() {
+		failing = true;
 	}
 
-	/**
-	 * @return the relative paths of the conflicting files (relative to the
-	 *         working directory root).
-	 * @since 4.4
-	 */
-	public String[] getConflictingFiles() {
-		return conflicting;
-	}
+	private class RefsUnreadableRefDatabase extends MemRefDatabase {
 
-	private static String buildList(String[] files) {
-		StringBuilder builder = new StringBuilder();
-		for (String f : files) {
-			builder.append("\n"); //$NON-NLS-1$
-			builder.append(f);
+		@Override
+		protected RefCache scanAllRefs() throws IOException {
+			if (failing) {
+				throw new IOException("disk failed, no refs found");
+			} else {
+				return super.scanAllRefs();
+			}
 		}
-		return builder.toString();
 	}
 }
