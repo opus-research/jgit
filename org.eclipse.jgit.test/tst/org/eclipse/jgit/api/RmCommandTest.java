@@ -44,80 +44,34 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
 
-public class CheckoutCommandTest extends RepositoryTestCase {
+public class RmCommandTest extends RepositoryTestCase {
+
 	private Git git;
 
-	RevCommit initialCommit;
-
-	RevCommit secondCommit;
+	private static final String FILE = "test.txt";
 
 	@Override
 	protected void setUp() throws Exception {
 		super.setUp();
 		git = new Git(db);
 		// commit something
-		writeTrashFile("Test.txt", "Hello world");
-		git.add().addFilepattern("Test.txt").call();
-		initialCommit = git.commit().setMessage("Initial commit").call();
-
-		// create a master branch and switch to it
-		git.branchCreate().setName("test").call();
-		RefUpdate rup = db.updateRef(Constants.HEAD);
-		rup.link("refs/heads/test");
-
-		// commit something on the test branch
-		writeTrashFile("Test.txt", "Some change");
-		git.add().addFilepattern("Test.txt").call();
-		secondCommit = git.commit().setMessage("Second commit").call();
+		writeTrashFile(FILE, "Hello world");
+		git.add().addFilepattern(FILE).call();
+		git.commit().setMessage("Initial commit").call();
 	}
 
-	public void testSimpleCheckout() {
-		try {
-			git.checkout().setName("test").call();
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public void testCheckout() {
-		try {
-			git.checkout().setName("test").call();
-			assertEquals("[Test.txt, mode:100644, content:Some change]",
-					indexState(CONTENT));
-			git.checkout().setName("master").call();
-			assertEquals("[Test.txt, mode:100644, content:Hello world]",
-					indexState(CONTENT));
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public void testCreateBranchOnCheckout() throws IOException {
-		try {
-			git.checkout().setCreateBranch(true).setName("test2").call();
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-		assertNotNull(db.getRef("test2"));
-	}
-
-	public void testCheckoutToNonExistingBranch() throws JGitInternalException,
-			RefAlreadyExistsException, InvalidRefNameException {
-		try {
-			git.checkout().setName("badbranch").call();
-			fail("Should have failed");
-		} catch (RefNotFoundException e) {
-			// except to hit here
-		}
+	public void testRemove() throws JGitInternalException,
+			NoFilepatternException, IllegalStateException, IOException {
+		assertEquals("[test.txt, mode:100644, content:Hello world]",
+				indexState(CONTENT));
+		RmCommand command = git.rm();
+		command.addFilepattern(FILE);
+		command.call();
+		assertEquals("", indexState(CONTENT));
 	}
 
 }
