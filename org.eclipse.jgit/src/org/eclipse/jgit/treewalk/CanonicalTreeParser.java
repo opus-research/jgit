@@ -397,9 +397,10 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 
 	private AttributesNode findAttributes(ObjectReader reader)
 			throws IOException {
-		RawTreeIterator itr = new RawTreeIterator(raw);
+		CanonicalTreeParser itr = new CanonicalTreeParser();
+		itr.reset(raw);
 		if (itr.findFile(ATTRS)) {
-			return loadAttributes(reader, itr.getObjectId());
+			return loadAttributes(reader, itr.getEntryObjectId());
 		}
 		return noAttributes();
 	}
