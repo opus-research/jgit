@@ -41,66 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.storage.dfs;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.eclipse.jgit.events.RepositoryEvent;
 
-import javaewah.EWAHCompressedBitmap;
+/**
+ * Describes the {@link DfsPackFile} just before its index is loaded. Currently,
+ * DfsPackFile directly dispatches the event on
+ * {@link org.eclipse.jgit.lib.Repository#getGlobalListenerList}. Which means
+ * the call to {@link #getRepository} will always return null.
+ */
+public class BeforeDfsPackIndexLoadedEvent
+		extends RepositoryEvent<BeforeDfsPackIndexLoadedListener> {
+	private final DfsPackFile pack;
 
-import org.junit.Test;
-
-public class InflatingBitSetTest {
-
-	@Test
-	public void testMaybeContains() {
-		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
-		ecb.set(63);
-		ecb.set(64);
-		ecb.set(128);
-
-		InflatingBitSet ibs = new InflatingBitSet(ecb);
-		assertTrue(ibs.maybeContains(0));
-		assertFalse(ibs.contains(0)); // Advance
-		assertFalse(ibs.maybeContains(0));
-		assertTrue(ibs.maybeContains(63));
-		assertTrue(ibs.maybeContains(64));
-		assertTrue(ibs.maybeContains(65));
-		assertFalse(ibs.maybeContains(129));
+	/**
+	 * A new event triggered before a PackFile index is loaded.
+	 *
+	 * @param pack
+	 *            the pack
+	 */
+	public BeforeDfsPackIndexLoadedEvent(DfsPackFile pack) {
+		this.pack = pack;
 	}
 
-	@Test
-	public void testContainsMany() {
-		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
-		ecb.set(64);
-		ecb.set(65);
-		ecb.set(1024);
-
-		InflatingBitSet ibs = new InflatingBitSet(ecb);
-		assertFalse(ibs.contains(0));
-		assertTrue(ibs.contains(64));
-		assertTrue(ibs.contains(65));
-		assertFalse(ibs.contains(66));
-		assertTrue(ibs.contains(1024));
-		assertFalse(ibs.contains(1025));
+	/** @return the PackFile containing the index that will be loaded. */
+	public DfsPackFile getPackFile() {
+		return pack;
 	}
 
-	@Test
-	public void testContainsOne() {
-		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
-		ecb.set(64);
-
-		InflatingBitSet ibs = new InflatingBitSet(ecb);
-		assertTrue(ibs.contains(64));
-		assertTrue(ibs.contains(64));
-		assertFalse(ibs.contains(65));
-		assertFalse(ibs.contains(63));
+	@Override
+	public Class<BeforeDfsPackIndexLoadedListener> getListenerType() {
+		return BeforeDfsPackIndexLoadedListener.class;
 	}
 
-	@Test
-	public void testContainsEmpty() {
-		InflatingBitSet ibs = new InflatingBitSet(new EWAHCompressedBitmap());
-		assertFalse(ibs.maybeContains(0));
-		assertFalse(ibs.contains(0));
+	@Override
+	public void dispatch(BeforeDfsPackIndexLoadedListener listener) {
+		listener.onBeforeDfsPackIndexLoaded(this);
 	}
 }

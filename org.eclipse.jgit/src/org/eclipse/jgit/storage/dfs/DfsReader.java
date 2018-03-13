@@ -61,6 +61,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -73,7 +74,6 @@ import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
-import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
@@ -83,8 +83,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.BitmapIndexImpl;
-import org.eclipse.jgit.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
@@ -141,16 +139,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	@Override
-	public BitmapIndex getBitmapIndex() throws IOException {
-		for (DfsPackFile pack : db.getPacks()) {
-			PackBitmapIndex bitmapIndex = pack.getPackBitmapIndex(this);
-			if (bitmapIndex != null)
-				return new BitmapIndexImpl(bitmapIndex);
-		}
-		return null;
-	}
-
-	@Override
 	public Collection<ObjectId> resolve(AbbreviatedObjectId id)
 			throws IOException {
 		if (id.isComplete())
@@ -202,6 +190,11 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (typeHint == OBJ_ANY)
 			throw new MissingObjectException(objectId.copy(), "unknown");
 		throw new MissingObjectException(objectId.copy(), typeHint);
+	}
+
+	@Override
+	public Set<ObjectId> getShallowCommits() {
+		return Collections.emptySet();
 	}
 
 	private static final Comparator<FoundObject<?>> FOUND_OBJECT_SORT = new Comparator<FoundObject<?>>() {

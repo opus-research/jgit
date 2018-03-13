@@ -52,6 +52,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -61,7 +62,6 @@ import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
@@ -103,16 +103,6 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	@Override
-	public BitmapIndex getBitmapIndex() throws IOException {
-		for (PackFile pack : db.getPacks()) {
-			PackBitmapIndex index = pack.getBitmapIndex();
-			if (index != null)
-				return new BitmapIndexImpl(index);
-		}
-		return null;
-	}
-
-	@Override
 	public Collection<ObjectId> resolve(AbbreviatedObjectId id)
 			throws IOException {
 		if (id.isComplete())
@@ -138,6 +128,11 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		if (typeHint != OBJ_ANY && ldr.getType() != typeHint)
 			throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
 		return ldr;
+	}
+
+	@Override
+	public Set<ObjectId> getShallowCommits() throws IOException {
+		return db.getShallowCommits();
 	}
 
 	public long getObjectSize(AnyObjectId objectId, int typeHint)

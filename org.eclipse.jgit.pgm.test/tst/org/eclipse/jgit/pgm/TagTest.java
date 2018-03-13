@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertEquals;
 
-/** Base object type accessed during bitmap expansion. */
-public abstract class BitmapObject {
-	/**
-	 * Get Git object type. See {@link Constants}.
-	 *
-	 * @return object type
-	 */
-	public abstract int getType();
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-	/**
-	 * Get the name of this object.
-	 *
-	 * @return unique hash of this object.
-	 */
-	public abstract ObjectId getObjectId();
+public class TagTest extends CLIRepositoryTestCase {
+	private Git git;
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		git.commit().setMessage("initial commit").call();
+	}
+
+	@Test
+	public void testTagTwice() throws Exception {
+		git.tag().setName("test").call();
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		git.commit().setMessage("commit").call();
+
+		assertEquals("fatal: tag 'test' already exists",
+				execute("git tag test")[0]);
+	}
 }

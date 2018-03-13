@@ -137,6 +137,8 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	abstract FS getFS();
 
+	abstract Set<ObjectId> getShallowCommits() throws IOException;
+
 	/**
 	 * Open an object from this database.
 	 * <p>
@@ -289,8 +291,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	abstract PackFile openPack(File pack, File idx) throws IOException;
 
 	abstract FileObjectDatabase newCachedFileObjectDatabase();
-
-	abstract Collection<PackFile> getPacks();
 
 	static class AlternateHandle {
 		final FileObjectDatabase db;
