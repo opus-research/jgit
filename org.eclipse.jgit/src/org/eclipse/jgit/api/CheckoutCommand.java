@@ -46,7 +46,6 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -136,7 +135,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		try {
 			if (checkoutAllPaths || !paths.isEmpty()) {
 				checkoutPaths();
-				status = new CheckoutResult(Status.OK, paths);
+				status = CheckoutResult.OK_RESULT;
 				setCallable(false);
 				return null;
 			}
@@ -216,14 +215,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
-
 			if (!dco.getToBeDeleted().isEmpty()) {
-				status = new CheckoutResult(Status.NONDELETED,
-						dco.getToBeDeleted());
-			} else
-				status = new CheckoutResult(new ArrayList<String>(dco
-						.getUpdated().keySet()), dco.getRemoved());
-
+				status = new CheckoutResult(Status.NONDELETED, dco
+						.getToBeDeleted());
+			}
+			else
+				status = CheckoutResult.OK_RESULT;
 			return ref;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
