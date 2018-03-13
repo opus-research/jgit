@@ -94,9 +94,8 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 
 	@After
 	public void tearDown() throws Exception {
-		if (reader != null) {
-			reader.close();
-		}
+		if (reader != null)
+			reader.release();
 	}
 
 	@Test

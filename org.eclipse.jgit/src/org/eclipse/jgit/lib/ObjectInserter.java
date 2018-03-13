@@ -63,7 +63,7 @@ import org.eclipse.jgit.transport.PackParser;
  * <p>
  * Objects written by an inserter may not be immediately visible for reading
  * after the insert method completes. Callers must invoke either
- * {@link #close()} or {@link #flush()} prior to updating references or
+ * {@link #release()} or {@link #flush()} prior to updating references or
  * otherwise making the returned ObjectIds visible to other code.
  */
 public abstract class ObjectInserter implements AutoCloseable {
@@ -91,7 +91,7 @@ public abstract class ObjectInserter implements AutoCloseable {
 		}
 
 		@Override
-		public void close() {
+		public void release() {
 			// Do nothing.
 		}
 	}
@@ -149,8 +149,8 @@ public abstract class ObjectInserter implements AutoCloseable {
 			delegate().flush();
 		}
 
-		public void close() {
-			delegate().close();
+		public void release() {
+			delegate().release();
 		}
 	}
 
@@ -420,10 +420,21 @@ public abstract class ObjectInserter implements AutoCloseable {
 	 * Release any resources used by this inserter.
 	 * <p>
 	 * An inserter that has been released can be used again, but may need to be
+	 * released after the subsequent usage. Use {@link #close()} instead
+	 */
+	@Deprecated
+	public abstract void release();
+
+	/**
+	 * Release any resources used by this inserter.
+	 * <p>
+	 * An inserter that has been released can be used again, but may need to be
 	 * released after the subsequent usage.
 	 *
 	 * @since 4.0
 	 */
 	@Override
-	public abstract void close();
+	public void close() {
+		release();
+	}
 }
