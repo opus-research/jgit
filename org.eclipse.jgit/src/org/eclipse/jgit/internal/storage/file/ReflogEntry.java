@@ -47,17 +47,15 @@ package org.eclipse.jgit.internal.storage.file;
 import java.io.Serializable;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.CheckoutEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Parsed reflog entry
  */
-public class ReflogEntryImpl implements Serializable, ReflogEntry {
+public class ReflogEntry implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private ObjectId oldId;
@@ -68,7 +66,7 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 
 	private String comment;
 
-	ReflogEntryImpl(byte[] raw, int pos) {
+	ReflogEntry(byte[] raw, int pos) {
 		oldId = ObjectId.fromString(raw, pos);
 		pos += Constants.OBJECT_ID_STRING_LENGTH;
 		if (raw[pos++] != ' ')
@@ -90,29 +88,29 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 		}
 	}
 
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getOldId()
+	/**
+	 * @return the commit id before the change
 	 */
 	public ObjectId getOldId() {
 		return oldId;
 	}
 
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getNewId()
+	/**
+	 * @return the commit id after the change
 	 */
 	public ObjectId getNewId() {
 		return newId;
 	}
 
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getWho()
+	/**
+	 * @return user performing the change
 	 */
 	public PersonIdent getWho() {
 		return who;
 	}
 
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getComment()
+	/**
+	 * @return textual description of the change
 	 */
 	public String getComment() {
 		return comment;
@@ -125,12 +123,13 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 				+ ", " + getComment() + "]";
 	}
 
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#parseCheckout()
+	/**
+	 * @return a {@link CheckoutEntry} with parsed information about a branch
+	 *         switch, or null if the entry is not a checkout
 	 */
 	public CheckoutEntry parseCheckout() {
-		if (getComment().startsWith(CheckoutEntryImpl.CHECKOUT_MOVING_FROM))
-			return new CheckoutEntryImpl(this);
+		if (getComment().startsWith(CheckoutEntry.CHECKOUT_MOVING_FROM))
+			return new CheckoutEntry(this);
 		else
 			return null;
 	}
