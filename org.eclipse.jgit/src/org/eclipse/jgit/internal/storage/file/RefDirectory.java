@@ -341,7 +341,7 @@ public class RefDirectory extends RefDatabase {
 	public List<Ref> getAdditionalRefs() throws IOException {
 		List<Ref> ret = new LinkedList<Ref>();
 		for (String name : additionalRefsNames) {
-			Ref r = exactRef(name);
+			Ref r = getRef(name);
 			if (r != null)
 				ret.add(r);
 		}
