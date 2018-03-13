@@ -92,16 +92,22 @@ public class RevCommit extends RevObject {
 
 	/**
 	 * Parse a commit from its canonical format.
-	 *
+	 * <p>
 	 * This method inserts the commit directly into the caller supplied revision
 	 * pool, making it appear as though the commit exists in the repository,
 	 * even if it doesn't. The repository under the pool is not affected.
+	 * <p>
+	 * The body of the commit (message, author, committer) is always retained in
+	 * the returned {@code RevCommit}, even if the supplied {@code RevWalk} has
+	 * been configured with {@code setRetainBody(false)}.
 	 *
 	 * @param rw
 	 *            the revision pool to allocate the commit within. The commit's
 	 *            tree and parent pointers will be obtained from this pool.
 	 * @param raw
-	 *            the canonical formatted commit to be parsed.
+	 *            the canonical formatted commit to be parsed. This buffer will
+	 *            be retained by the returned {@code RevCommit} and must not be
+	 *            modified by the caller.
 	 * @return the parsed commit, in an isolated revision pool that is not
 	 *         available to the caller.
 	 * @throws IOException
@@ -109,11 +115,9 @@ public class RevCommit extends RevObject {
 	 */
 	public static RevCommit parse(RevWalk rw, byte[] raw) throws IOException {
 		try (ObjectInserter.Formatter fmt = new ObjectInserter.Formatter()) {
-			boolean retain = rw.isRetainBody();
-			rw.setRetainBody(true);
 			RevCommit r = rw.lookupCommit(fmt.idFor(Constants.OBJ_COMMIT, raw));
 			r.parseCanonical(rw, raw);
-			rw.setRetainBody(retain);
+			r.buffer = raw;
 			return r;
 		}
 	}
@@ -605,7 +609,19 @@ public class RevCommit extends RevObject {
 		inDegree = 0;
 	}
 
-	final void disposeBody() {
+	/**
+	 * Discard the message buffer to reduce memory usage.
+	 * <p>
+	 * After discarding the memory usage of the {@code RevCommit} is reduced to
+	 * only the {@link #getTree()} and {@link #getParents()} pointers and the
+	 * time in {@link #getCommitTime()}. Accessing other properties such as
+	 * {@link #getAuthorIdent()}, {@link #getCommitterIdent()} or either message
+	 * function requires reloading the buffer by invoking
+	 * {@link RevWalk#parseBody(RevObject)}.
+	 *
+	 * @since 4.0
+	 */
+	public final void disposeBody() {
 		buffer = null;
 	}
 
