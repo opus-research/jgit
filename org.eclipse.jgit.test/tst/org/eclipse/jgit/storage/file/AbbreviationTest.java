@@ -56,7 +56,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -174,29 +173,16 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 			dst.close();
 		}
 		new FileOutputStream(packFile).close();
-		db.openPack(packFile, idxFile);
 
 		assertEquals(id.abbreviate(20), reader.abbreviate(id, 2));
 
-		AbbreviatedObjectId abbrev8 = id.abbreviate(8);
-		Collection<ObjectId> matches = reader.resolve(abbrev8);
+		Collection<ObjectId> matches = reader.resolve(id.abbreviate(8));
 		assertNotNull(matches);
 		assertEquals(objects.size(), matches.size());
 		for (PackedObjectInfo info : objects)
 			assertTrue("contains " + info.name(), matches.contains(info));
 
-		try {
-			db.resolve(abbrev8.name());
-			fail("did not throw AmbiguousObjectException");
-		} catch (AmbiguousObjectException err) {
-			assertEquals(abbrev8, err.getAbbreviatedObjectId());
-			matches = err.getCandidates();
-			assertNotNull(matches);
-			assertEquals(objects.size(), matches.size());
-			for (PackedObjectInfo info : objects)
-				assertTrue("contains " + info.name(), matches.contains(info));
-		}
-
+		assertNull("cannot resolve", db.resolve(id.abbreviate(8).name()));
 		assertEquals(id, db.resolve(id.abbreviate(20).name()));
 	}
 
