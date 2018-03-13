@@ -62,7 +62,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ObjectWriter;
@@ -76,6 +75,7 @@ import org.eclipse.jgit.lib.Tree;
 import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.LockFile;
 
 /**
  * Recreates a repository from another one's commit graph.
@@ -227,7 +227,7 @@ class RebuildCommitGraph extends TextBuiltin {
 		final ObjectId id = db.resolve(Constants.HEAD);
 		if (!ObjectId.isId(head) && id != null) {
 			final LockFile lf;
-			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD), db.getFS());
+			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD));
 			if (!lf.lock())
 				throw new IOException(MessageFormat.format(CLIText.get().cannotLock, Constants.HEAD));
 			lf.write(id);
@@ -254,7 +254,7 @@ class RebuildCommitGraph extends TextBuiltin {
 			protected void writeFile(final String name, final byte[] content)
 					throws IOException {
 				final File file = new File(db.getDirectory(), name);
-				final LockFile lck = new LockFile(file, db.getFS());
+				final LockFile lck = new LockFile(file);
 				if (!lck.lock())
 					throw new ObjectWritingException(MessageFormat.format(CLIText.get().cantWrite, file));
 				try {
@@ -297,6 +297,7 @@ class RebuildCommitGraph extends TextBuiltin {
 						name, id));
 			}
 		} finally {
+			rw.release();
 			br.close();
 		}
 		return refs;
