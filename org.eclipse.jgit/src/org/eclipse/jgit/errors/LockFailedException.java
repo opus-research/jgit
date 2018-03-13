@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.revwalk.filter;
+package org.eclipse.jgit.errors;
 
+import java.io.File;
 import java.io.IOException;
+import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * Limits the number of commits output.
+ * An exception occurring when a file cannot be locked
  */
-public class CommitMaxCountRevFilter extends RevFilter {
+public class LockFailedException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	private int maxCount;
-
-	private int count;
+	private File file;
 
 	/**
-	 * Create a new max count filter.
+	 * Construct a CannotLockException for the given file and message
 	 *
-	 * @param maxCount
-	 *            the limit
-	 * @return a new filter
+	 * @param file
+	 *            file that could not be locked
+	 * @param message
+	 *            exception message
 	 */
-	public static RevFilter create(int maxCount) {
-		if (maxCount < 0)
-			throw new IllegalArgumentException(
-					JGitText.get().maxCountMustBeNonNegative);
-		return new CommitMaxCountRevFilter(maxCount);
+	public LockFailedException(File file, String message) {
+		super(message);
+		this.file = file;
 	}
 
-	private CommitMaxCountRevFilter(int maxCount) {
-		this.count = 0;
-		this.maxCount = maxCount;
+	/**
+	 * Construct a CannotLockException for the given file
+	 *
+	 * @param file
+	 *            file that could not be locked
+	 */
+	public LockFailedException(File file) {
+		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
 	}
 
-	@Override
-	public boolean include(RevWalk walker, RevCommit cmit)
-			throws StopWalkException, MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		count++;
-		if (count > maxCount)
-			throw StopWalkException.INSTANCE;
-		return true;
-	}
-
-	@Override
-	public RevFilter clone() {
-		return new CommitMaxCountRevFilter(maxCount);
+	/**
+	 * Get the file that could not be locked
+	 *
+	 * @return file
+	 */
+	public File getFile() {
+		return file;
 	}
 }

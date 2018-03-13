@@ -116,10 +116,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotGet;
 	/***/ public String cannotListRefs;
 	/***/ public String cannotLock;
-	/***/ public String cannotLockFile;
 	/***/ public String cannotLockPackIn;
 	/***/ public String cannotMatchOnEmptyString;
-	/***/ public String maxCountMustBeNonNegative;
 	/***/ public String cannotMoveIndexTo;
 	/***/ public String cannotMovePackTo;
 	/***/ public String cannotOpenService;
@@ -311,6 +309,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidPacketLineHeader;
 	/***/ public String invalidPath;
 	/***/ public String invalidRemote;
+	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
@@ -427,7 +426,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String refAlreadyExists;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
-	/***/ public String reflogsNotYetSupportedByRevisionParser;
+	/***/ public String reflogEntryNotFound;
 	/***/ public String remoteConfigHasNoURIAssociated;
 	/***/ public String remoteDoesNotHaveSpec;
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
