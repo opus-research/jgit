@@ -54,10 +54,8 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Input/Output utilities
@@ -144,13 +142,7 @@ public class IO {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
 			final byte[] buf = new byte[(int) sz];
-			int actSz = IO.readFully(in, buf, 0);
-
-			if (actSz == sz) {
-				byte[] ret = new byte[actSz];
-				System.arraycopy(buf, 0, ret, 0, actSz);
-				return ret;
-			}
+			IO.readFully(in, buf, 0);
 			return buf;
 		} finally {
 			try {
@@ -311,42 +303,6 @@ public class IO {
 				throw new EOFException(JGitText.get().shortSkipOfBlock);
 			toSkip -= r;
 		}
-	}
-
-	/**
-	 * Divides the given string into lines.
-	 *
-	 * @param s
-	 *            the string to read
-	 * @return the string divided into lines
-	 */
-	public static List<String> readLines(final String s) {
-		List<String> l = new ArrayList<String>();
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < s.length(); i++) {
-			char c = s.charAt(i);
-			if (c == '\n') {
-				l.add(sb.toString());
-				sb.setLength(0);
-				continue;
-			}
-			if (c == '\r') {
-				if (i + 1 < s.length()) {
-					c = s.charAt(++i);
-					l.add(sb.toString());
-					sb.setLength(0);
-					if (c != '\n')
-						sb.append(c);
-					continue;
-				} else { // EOF
-					l.add(sb.toString());
-					break;
-				}
-			}
-			sb.append(c);
-		}
-		l.add(sb.toString());
-		return l;
 	}
 
 	private IO() {
