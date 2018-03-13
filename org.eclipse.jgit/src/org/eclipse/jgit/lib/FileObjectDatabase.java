@@ -188,7 +188,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 		final FileRepository repository;
 
 		AlternateRepository(FileRepository r) {
-			super(r.getObjectDatabase());
+			super((FileObjectDatabase)r.getObjectDatabase());
 			repository = r;
 		}
 

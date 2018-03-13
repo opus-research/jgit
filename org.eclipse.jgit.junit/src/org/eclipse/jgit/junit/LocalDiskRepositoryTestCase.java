@@ -260,7 +260,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	protected FileRepository createBareRepository() throws IOException {
+	protected Repository createBareRepository() throws IOException {
 		return createRepository(true /* bare */);
 	}
 
@@ -271,7 +271,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	protected FileRepository createWorkRepository() throws IOException {
+	protected Repository createWorkRepository() throws IOException {
 		return createRepository(false /* not bare */);
 	}
 
@@ -285,11 +285,11 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	private FileRepository createRepository(boolean bare) throws IOException {
+	private Repository createRepository(boolean bare) throws IOException {
 		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
 		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + Constants.DOT_GIT;
 		File gitdir = new File(trash, gitdirName).getCanonicalFile();
-		FileRepository db = new FileRepository(gitdir);
+		Repository db = new FileRepository(gitdir);
 
 		assertFalse(gitdir.exists());
 		db.create();
