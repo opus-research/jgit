@@ -49,15 +49,11 @@ import org.osgi.framework.BundleContext;
 public class FormatActivator implements BundleActivator {
 	public void start(BundleContext context) throws Exception {
 		ArchiveCommand.registerFormat("tar", new TarFormat());
-		ArchiveCommand.registerFormat("tgz", new TgzFormat());
-		ArchiveCommand.registerFormat("txz", new TxzFormat());
 		ArchiveCommand.registerFormat("zip", new ZipFormat());
 	}
 
 	public void stop(BundleContext context) throws Exception {
 		ArchiveCommand.unregisterFormat("zip");
-		ArchiveCommand.unregisterFormat("txz");
-		ArchiveCommand.unregisterFormat("tgz");
 		ArchiveCommand.unregisterFormat("tar");
 	}
 }
