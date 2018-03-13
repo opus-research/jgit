@@ -53,7 +53,6 @@ import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.reftable.MergedReftable;
 import org.eclipse.jgit.internal.storage.reftable.RefCursor;
 import org.eclipse.jgit.internal.storage.reftable.Reftable;
-import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -103,13 +102,6 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		return new ReftableBatchRefUpdate(this, odb);
 	}
 
-	/** @return configuration to write new reftables with. */
-	public ReftableConfig getReftableConfig() {
-		ReftableConfig cfg = new ReftableConfig();
-		cfg.fromConfig(getRepository().getConfig());
-		return cfg;
-	}
-
 	/** @return the lock protecting this instance's state. */
 	protected ReentrantLock getLock() {
 		return lock;
@@ -131,7 +123,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	 * @throws IOException
 	 *             if tables cannot be opened.
 	 */
-	protected Reftable read() throws IOException {
+	protected Reftable reader() throws IOException {
 		lock.lock();
 		try {
 			if (mergedTables == null) {
@@ -158,10 +150,8 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 				if (ctx == null) {
 					ctx = odb.newReader();
 				}
-				if (tableStack == null) {
-					tableStack = ReftableStack.open(ctx,
-							Arrays.asList(odb.getReftables()));
-				}
+				tableStack = ReftableStack.open(ctx,
+						Arrays.asList(odb.getReftables()));
 			}
 			return tableStack;
 		} finally {
@@ -173,7 +163,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	public boolean isNameConflicting(String refName) throws IOException {
 		lock.lock();
 		try {
-			Reftable table = read();
+			Reftable table = reader();
 
 			// Cannot be nested within an existing reference.
 			int lastSlash = refName.lastIndexOf('/');
@@ -195,7 +185,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	public Ref exactRef(String name) throws IOException {
 		lock.lock();
 		try {
-			Reftable table = read();
+			Reftable table = reader();
 			Ref ref = table.exactRef(name);
 			if (ref != null && ref.isSymbolic()) {
 				return table.resolve(ref);
@@ -222,7 +212,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		RefList.Builder<Ref> all = new RefList.Builder<>();
 		lock.lock();
 		try {
-			Reftable table = read();
+			Reftable table = reader();
 			try (RefCursor rc = ALL.equals(prefix) ? table.allRefs()
 					: table.seekRef(prefix)) {
 				while (rc.next()) {
@@ -271,11 +261,6 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		} finally {
 			lock.unlock();
 		}
-	}
-
-	@Override
-	protected RefCache scanAllRefs() throws IOException {
-		throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -352,6 +337,11 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	@Override
 	protected boolean compareAndRemove(Ref oldRef) throws IOException {
 		return compareAndPut(oldRef, null);
+	}
+
+	@Override
+	protected RefCache scanAllRefs() throws IOException {
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
