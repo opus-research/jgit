@@ -62,7 +62,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class FileBasedConfig extends Config {
 	private final File configFile;
-	private long lastModified;
 
 	/**
 	 * Create a configuration with no default fallback.
@@ -115,7 +114,6 @@ public class FileBasedConfig extends Config {
 		} catch (ConfigInvalidException e) {
 			throw new ConfigInvalidException("Cannot read " + getFile(), e);
 		}
-		lastModified = getFile().lastModified();
 	}
 
 	/**
@@ -142,19 +140,10 @@ public class FileBasedConfig extends Config {
 		} finally {
 			lf.unlock();
 		}
-		lastModified = getFile().lastModified();
 	}
 
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + "[" + getFile().getPath() + "]";
-	}
-
-	/**
-	 * @return returns true if the currently loaded configuration file is older
-	 * than the file on disk
-	 */
-	public boolean isOutdated() {
-		return getFile().lastModified() != lastModified;
 	}
 }
