@@ -54,14 +54,14 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 
-public class DfsRefUpdate extends RefUpdate {
+final class DfsRefUpdate extends RefUpdate {
 	private final DfsRefDatabase refdb;
 
 	private Ref dstRef;
 
 	private RevWalk rw;
 
-	public DfsRefUpdate(DfsRefDatabase refdb, Ref ref) {
+	DfsRefUpdate(DfsRefDatabase refdb, Ref ref) {
 		super(ref);
 		this.refdb = refdb;
 	}
