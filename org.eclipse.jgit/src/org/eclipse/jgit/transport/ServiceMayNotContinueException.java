@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2011-2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,16 +41,37 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.debug;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.GC;
+import java.io.IOException;
 
-class Gc extends TextBuiltin {
-	@Override
-	protected void run() throws Exception {
-		GC gc = new GC((FileRepository) db);
-		gc.gc();
+/** Indicates a transport service may not continue execution. */
+public class ServiceMayNotContinueException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	private boolean output;
+
+	/** Initialize with no message. */
+	public ServiceMayNotContinueException() {
+		// Do not set a message.
+	}
+
+	/**
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
+	 */
+	public ServiceMayNotContinueException(String msg) {
+		super(msg);
+	}
+
+	/** @return true if the message was already output to the client. */
+	public boolean isOutput() {
+		return output;
+	}
+
+	/** Mark this message has being sent to the client. */
+	public void setOutput() {
+		output = true;
 	}
 }
