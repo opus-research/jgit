@@ -95,25 +95,25 @@ public class FsckError {
 
 	/** Represents a corrupt pack index file. */
 	public static class CorruptIndex {
-		String packName;
+		String fileName;
 
 		CorruptPackIndexException.ErrorType errorType;
 
 		/**
-		 * @param packName
-		 *            the file name of the pack.
+		 * @param fileName
+		 *            the file name of the pack index.
 		 * @param errorType
 		 *            the type of error as reported in
 		 *            {@link CorruptPackIndexException}.
 		 */
-		public CorruptIndex(String packName, ErrorType errorType) {
-			this.packName = packName;
+		public CorruptIndex(String fileName, ErrorType errorType) {
+			this.fileName = fileName;
 			this.errorType = errorType;
 		}
 
-		/** @return the file name of the pack. */
-		public String getPackName() {
-			return packName;
+		/** @return the file name of the index file. */
+		public String getFileName() {
+			return fileName;
 		}
 
 		/** @return the error type of the corruption. */
@@ -128,7 +128,7 @@ public class FsckError {
 
 	private final Set<CorruptIndex> corruptIndices = new HashSet<>();
 
-	/** @return corrupted objects from all pack files. */
+	/** @return corrupt objects from all pack files. */
 	public Set<CorruptObject> getCorruptObjects() {
 		return corruptObjects;
 	}
@@ -138,7 +138,7 @@ public class FsckError {
 		return missingObjects;
 	}
 
-	/** @return corrupted index files associated with the packs. */
+	/** @return corrupt index files associated with the packs. */
 	public Set<CorruptIndex> getCorruptIndices() {
 		return corruptIndices;
 	}

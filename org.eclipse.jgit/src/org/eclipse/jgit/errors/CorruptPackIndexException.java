@@ -46,14 +46,14 @@ package org.eclipse.jgit.errors;
 import org.eclipse.jgit.annotations.Nullable;
 
 /**
- * Exception thrown when the pack index file is corrupted.
+ * Exception thrown when encounters a corrupt pack index file.
  *
  * @since 4.9
  */
 public class CorruptPackIndexException extends Exception {
 	private static final long serialVersionUID = 1L;
 
-	/** The error type of an corrupted index file. */
+	/** The error type of a corrupt index file. */
 	public enum ErrorType {
 		/** Offset doesn't match with pack file. */
 		MISMATCH_OFFSET,
@@ -83,7 +83,7 @@ public class CorruptPackIndexException extends Exception {
 	}
 
 	/**
-	 * Specific error condition of why the index file is corrupted.
+	 * Specific the reason of the corrupt index file.
 	 *
 	 * @return error condition or null.
 	 */

@@ -83,7 +83,6 @@ public class FsckPackParser extends PackParser {
 	private int blockSize;
 
 	/**
-	 *
 	 * @param db
 	 *            the object database which stores repository's data.
 	 * @param channel
@@ -257,7 +256,7 @@ public class FsckPackParser extends PackParser {
 	}
 
 	/**
-	 * @return corrupted objects that reported by {@link ObjectChecker}.
+	 * @return corrupt objects that reported by {@link ObjectChecker}.
 	 */
 	public Set<CorruptObject> getCorruptObjects() {
 		return corruptObjects;
@@ -271,7 +270,7 @@ public class FsckPackParser extends PackParser {
 	 * @param idx
 	 *            index file associate with the pack
 	 * @throws CorruptPackIndexException
-	 *             when the index file is corrupted.
+	 *             when the index file is corrupt.
 	 */
 	public void verifyIndex(List<PackedObjectInfo> entries, PackIndex idx)
 			throws CorruptPackIndexException {
