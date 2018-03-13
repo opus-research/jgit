@@ -87,7 +87,6 @@ import java.text.Normalizer;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 
 import org.eclipse.jgit.annotations.NonNull;
@@ -360,13 +359,7 @@ public class ObjectChecker {
 			checkTree(id, raw);
 			break;
 		case OBJ_BLOB:
-			BlobObjectChecker checker = newBlobObjectChecker().orElse(null);
-			if (checker == null) {
-				checkBlob(raw);
-			} else {
-				checker.update(raw, 0, raw.length);
-				checker.endBlob(id);
-			}
+			checkBlob(raw);
 			break;
 		default:
 			report(UNKNOWN_TYPE, id, MessageFormat.format(
@@ -1074,19 +1067,7 @@ public class ObjectChecker {
 	}
 
 	/**
-	 * Create a new {@link BlobObjectChecker}.
-	 *
-	 * @return new BlobObjectChecker.
-	 */
-	public Optional<BlobObjectChecker> newBlobObjectChecker() {
-		return Optional.empty();
-	}
-
-	/**
 	 * Check a blob for errors.
-	 *
-	 * <p>This may not be called from PackParser in some cases. Use {@link
-	 * #newBlobObjectChecker} instead.
 	 *
 	 * @param raw
 	 *            the blob data. The array is never modified.
