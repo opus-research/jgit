@@ -82,7 +82,6 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.DepthWalk;
@@ -705,22 +704,22 @@ public class UploadPack {
 		return statistics;
 	}
 
-	private Map<String, Ref> getAdvertisedOrDefaultRefs() throws IOException {
+	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
 		if (refs == null)
-			setAdvertisedRefs(db.getRefDatabase().getRefs(RefDatabase.ALL));
+			setAdvertisedRefs(null);
 		return refs;
 	}
 
 	private void service() throws IOException {
+		if (biDirectionalPipe)
+			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
+		else if (requestValidator instanceof AnyRequestValidator)
+			advertised = Collections.emptySet();
+		else
+			advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
+
 		boolean sendPack;
 		try {
-			if (biDirectionalPipe)
-				sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
-			else if (requestValidator instanceof AnyRequestValidator)
-				advertised = Collections.emptySet();
-			else
-				advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
-
 			recvWants();
 			if (wantIds.isEmpty()) {
 				preUploadHook.onBeginNegotiateRound(this, wantIds, 0);
