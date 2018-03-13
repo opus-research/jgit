@@ -118,8 +118,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private boolean wantReadAhead;
 
-	private boolean avoidUnreachable;
-
 	private List<ReadAheadTask.BlockFuture> pendingReadAhead;
 
 	DfsReader(DfsObjDatabase db) {
@@ -143,11 +141,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public ObjectReader newReader() {
 		return new DfsReader(db);
-	}
-
-	@Override
-	public void setAvoidUnreachableObjects(boolean avoid) {
-		avoidUnreachable = avoid;
 	}
 
 	@Override
@@ -176,11 +169,8 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			throws IOException {
 		if (id.isComplete())
 			return Collections.singleton(id.toObjectId());
-		boolean noGarbage = avoidUnreachable;
 		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
 		for (DfsPackFile pack : db.getPacks()) {
-			if (noGarbage && pack.isGarbage())
-				continue;
 			pack.resolve(this, matches, id, 256);
 			if (256 <= matches.size())
 				break;
@@ -192,9 +182,8 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	public boolean has(AnyObjectId objectId) throws IOException {
 		if (last != null && last.hasObject(this, objectId))
 			return true;
-		boolean noGarbage = avoidUnreachable;
 		for (DfsPackFile pack : db.getPacks()) {
-			if (pack == last || (noGarbage && pack.isGarbage()))
+			if (last == pack)
 				continue;
 			if (pack.hasObject(this, objectId)) {
 				last = pack;
@@ -214,9 +203,8 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				return ldr;
 		}
 
-		boolean noGarbage = avoidUnreachable;
 		for (DfsPackFile pack : db.getPacks()) {
-			if (pack == last || (noGarbage && pack.isGarbage()))
+			if (pack == last)
 				continue;
 			ObjectLoader ldr = pack.get(this, objectId);
 			if (ldr != null) {
@@ -277,7 +265,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 		int lastIdx = 0;
 		DfsPackFile lastPack = packList[lastIdx];
-		boolean noGarbage = avoidUnreachable;
 
 		OBJECT_SCAN: for (T t : objectIds) {
 			try {
@@ -294,8 +281,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				if (i == lastIdx)
 					continue;
 				DfsPackFile pack = packList[i];
-				if (noGarbage && pack.isGarbage())
-					continue;
 				try {
 					long p = pack.findOffset(this, t);
 					if (0 < p) {
