@@ -78,17 +78,17 @@ public class TestProtocol<C> extends TransportProtocol {
 	private static final String SCHEME = "test"; //$NON-NLS-1$
 
 	private class Handle {
-		final C req;
-		final Repository remote;
+		private final C req;
+		private final Repository remote;
 
-		Handle(C req, Repository remote) {
+		private Handle(C req, Repository remote) {
 			this.req = req;
 			this.remote = remote;
 		}
 	}
 
-	final UploadPackFactory<C> uploadPackFactory;
-	final ReceivePackFactory<C> receivePackFactory;
+	private final UploadPackFactory<C> uploadPackFactory;
+	private final ReceivePackFactory<C> receivePackFactory;
 	private final HashMap<URIish, Handle> handles;
 
 	/**
@@ -165,7 +165,7 @@ public class TestProtocol<C> extends TransportProtocol {
 	private class TransportInternal extends Transport implements PackTransport {
 		private final Handle handle;
 
-		TransportInternal(Repository local, URIish uri, Handle handle) {
+		private TransportInternal(Repository local, URIish uri, Handle handle) {
 			super(local, uri);
 			this.handle = handle;
 		}
