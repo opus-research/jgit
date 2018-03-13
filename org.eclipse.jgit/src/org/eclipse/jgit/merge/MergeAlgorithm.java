@@ -51,7 +51,6 @@ import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.Sequence;
-import org.eclipse.jgit.diff.SequenceComparator;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 
 /**
@@ -75,24 +74,21 @@ public final class MergeAlgorithm {
 	/**
 	 * Does the three way merge between a common base and two sequences.
 	 *
-	 * @param <S>
-	 *            type of sequence.
-	 * @param cmp comparison method for this execution.
 	 * @param base the common base sequence
 	 * @param ours the first sequence to be merged
 	 * @param theirs the second sequence to be merged
 	 * @return the resulting content
 	 */
-	public static <S extends Sequence> MergeResult<S> merge(
-			SequenceComparator<S> cmp, S base, S ours, S theirs) {
-		List<S> sequences = new ArrayList<S>(3);
+	public static MergeResult merge(Sequence base, Sequence ours,
+			Sequence theirs) {
+		List<Sequence> sequences = new ArrayList<Sequence>(3);
 		sequences.add(base);
 		sequences.add(ours);
 		sequences.add(theirs);
-		MergeResult result = new MergeResult<S>(sequences);
-		EditList oursEdits = new MyersDiff<S>(cmp, base, ours).getEdits();
+		MergeResult result = new MergeResult(sequences);
+		EditList oursEdits = new MyersDiff(base, ours).getEdits();
 		Iterator<Edit> baseToOurs = oursEdits.iterator();
-		EditList theirsEdits = new MyersDiff<S>(cmp, base, theirs).getEdits();
+		EditList theirsEdits = new MyersDiff(base, theirs).getEdits();
 		Iterator<Edit> baseToTheirs = theirsEdits.iterator();
 		int current = 0; // points to the next line (first line is 0) of base
 		                 // which was not handled yet
@@ -205,13 +201,13 @@ public final class MergeAlgorithm {
 						- theirsBeginB);
 				int commonPrefix = 0;
 				while (commonPrefix < conflictLen
-						&& cmp.equals(ours, oursBeginB + commonPrefix, theirs,
+						&& ours.equals(oursBeginB + commonPrefix, theirs,
 								theirsBeginB + commonPrefix))
 					commonPrefix++;
 				conflictLen -= commonPrefix;
 				int commonSuffix = 0;
 				while (commonSuffix < conflictLen
-						&& cmp.equals(ours, oursEndB - commonSuffix - 1, theirs,
+						&& ours.equals(oursEndB - commonSuffix - 1, theirs,
 								theirsEndB - commonSuffix - 1))
 					commonSuffix++;
 				conflictLen -= commonSuffix;

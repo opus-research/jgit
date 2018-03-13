@@ -58,7 +58,10 @@ import java.util.Set;
 import java.util.TimeZone;
 
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.diff.RawTextIgnoreAllWhitespace;
+import org.eclipse.jgit.diff.RawTextIgnoreLeadingWhitespace;
+import org.eclipse.jgit.diff.RawTextIgnoreTrailingWhitespace;
+import org.eclipse.jgit.diff.RawTextIgnoreWhitespaceChange;
 import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -103,22 +106,22 @@ class Log extends RevWalkTextBuiltin {
 
 	@Option(name = "--ignore-space-at-eol")
 	void ignoreSpaceAtEol(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_TRAILING);
+		diffFmt.setRawTextFactory(RawTextIgnoreTrailingWhitespace.FACTORY);
 	}
 
 	@Option(name = "--ignore-leading-space")
 	void ignoreLeadingSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_LEADING);
+		diffFmt.setRawTextFactory(RawTextIgnoreLeadingWhitespace.FACTORY);
 	}
 
 	@Option(name = "-b", aliases = { "--ignore-space-change" })
 	void ignoreSpaceChange(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_CHANGE);
+		diffFmt.setRawTextFactory(RawTextIgnoreWhitespaceChange.FACTORY);
 	}
 
 	@Option(name = "-w", aliases = { "--ignore-all-space" })
 	void ignoreAllSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_ALL);
+		diffFmt.setRawTextFactory(RawTextIgnoreAllWhitespace.FACTORY);
 	}
 
 	@Option(name = "-U", aliases = { "--unified" }, metaVar = "metaVar_linesOfContext")
@@ -134,6 +137,22 @@ class Log extends RevWalkTextBuiltin {
 	@Option(name = "--full-index")
 	void abbrev(@SuppressWarnings("unused") boolean on) {
 		diffFmt.setAbbreviationLength(Constants.OBJECT_ID_STRING_LENGTH);
+	}
+
+	@Option(name = "--src-prefix", usage = "usage_srcPrefix")
+	void sourcePrefix(String path) {
+		diffFmt.setOldPrefix(path);
+	}
+
+	@Option(name = "--dst-prefix", usage = "usage_dstPrefix")
+	void dstPrefix(String path) {
+		diffFmt.setNewPrefix(path);
+	}
+
+	@Option(name = "--no-prefix", usage = "usage_noPrefix")
+	void noPrefix(@SuppressWarnings("unused") boolean on) {
+		diffFmt.setOldPrefix("");
+		diffFmt.setNewPrefix("");
 	}
 
 	// END -- Options shared with Diff
@@ -215,10 +234,10 @@ class Log extends RevWalkTextBuiltin {
 		if (showNameAndStatusOnly)
 			Diff.nameStatus(out, diffFmt.scan(a, b));
 		else {
+			out.flush();
 			diffFmt.format(a, b);
 			diffFmt.flush();
 		}
 		out.println();
-		out.flush();
 	}
 }
