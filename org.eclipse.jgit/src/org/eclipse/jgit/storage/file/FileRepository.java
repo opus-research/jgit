@@ -178,8 +178,7 @@ public class FileRepository extends Repository {
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
-				getFS(), //
-				new File(getDirectory(), Constants.SHALLOW));
+				getFS());
 
 		if (objectDatabase.exists()) {
 			final long repositoryFormatVersion = getConfig().getLong(
