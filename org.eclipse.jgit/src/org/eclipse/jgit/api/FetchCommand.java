@@ -128,8 +128,7 @@ public class FetchCommand extends GitCommand<FetchResult> {
 			if (tagOption != null)
 				transport.setTagOpt(tagOption);
 			transport.setFetchThin(thin);
-			if (credentialsProvider != null)
-				transport.setCredentialsProvider(credentialsProvider);
+			transport.setCredentialsProvider(credentialsProvider);
 
 			try {
 				FetchResult result = transport.fetch(monitor, refSpecs);
