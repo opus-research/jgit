@@ -574,7 +574,7 @@ public class DirCache {
 			// if they have been modified "now". Ideally we'd
 			// want the timestamp when we're done writing the index,
 			// so we use the current timestamp as a approximation.
-			myLock.createCommitSmapshot();
+			myLock.createCommitSnapshot();
 			snapshot = myLock.getCommitSnapshot();
 			smudge_s = (int) (snapshot.lastModified() / 1000);
 			smudge_ns = ((int) (snapshot.lastModified() % 1000)) * 1000000;

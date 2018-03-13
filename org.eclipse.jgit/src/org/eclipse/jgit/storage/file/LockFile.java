@@ -508,7 +508,7 @@ public class LockFile {
 	 * This may be necessary if you need time stamp before commit occurs, e.g
 	 * while writing the index.
 	 */
-	public void createCommitSmapshot() {
+	public void createCommitSnapshot() {
 		saveStatInformation();
 	}
 
