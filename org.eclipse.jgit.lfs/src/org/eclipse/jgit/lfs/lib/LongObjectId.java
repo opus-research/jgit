@@ -43,23 +43,17 @@
 
 package org.eclipse.jgit.lfs.lib;
 
-import java.io.BufferedInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
 
 import org.eclipse.jgit.lfs.errors.InvalidLongObjectIdException;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
- * A SHA-1 abstraction.
+ * A SHA-256 abstraction.
  *
  * @since 4.1
  */
@@ -76,9 +70,9 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Get the special all-null ObjectId.
+	 * Get the special all-null LongObjectId.
 	 *
-	 * @return the all-null ObjectId, often used to stand-in for no object.
+	 * @return the all-null LongObjectId, often used to stand-in for no object.
 	 */
 	public static final LongObjectId zeroId() {
 		return ZEROID;
@@ -91,7 +85,7 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	 *
 	 * @param id
 	 *            the string to test.
-	 * @return true if the string can converted into an ObjectId.
+	 * @return true if the string can converted into an LongObjectId.
 	 */
 	public static final boolean isId(final String id) {
 		if (id.length() != Constants.LONG_OBJECT_ID_STRING_LENGTH)
@@ -107,7 +101,7 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId into a hex string representation.
+	 * Convert a LongObjectId into a hex string representation.
 	 *
 	 * @param i
 	 *            the id to convert. May be null.
@@ -122,12 +116,12 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	 *
 	 * @param firstBuffer
 	 *            the first buffer to compare against. Must have at least 32
-	 *            bytes from position ai through the end of the buffer.
+	 *            bytes from position fi through the end of the buffer.
 	 * @param fi
 	 *            first offset within firstBuffer to begin testing.
 	 * @param secondBuffer
 	 *            the second buffer to compare against. Must have at least 32
-	 *            bytes from position bi through the end of the buffer.
+	 *            bytes from position si through the end of the buffer.
 	 * @param si
 	 *            first offset within secondBuffer to begin testing.
 	 * @return true if the two identifiers are the same.
@@ -169,7 +163,7 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId from raw binary representation.
+	 * Convert a LongObjectId from raw binary representation.
 	 *
 	 * @param bs
 	 *            the raw byte buffer to read from. At least 32 bytes must be
@@ -181,10 +175,10 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId from raw binary representation.
+	 * Convert a LongObjectId from raw binary representation.
 	 *
 	 * @param bs
-	 *            the raw byte buffer to read from. At least 20 bytes after p
+	 *            the raw byte buffer to read from. At least 32 bytes after p
 	 *            must be available within this byte array.
 	 * @param p
 	 *            position to read the first byte of data from.
@@ -199,10 +193,10 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId from raw binary representation.
+	 * Convert a LongObjectId from raw binary representation.
 	 *
 	 * @param is
-	 *            the raw integers buffer to read from. At least 4 longs must be
+	 *            the raw long buffer to read from. At least 4 longs must be
 	 *            available within this long array.
 	 * @return the converted object id.
 	 */
@@ -211,13 +205,13 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId from raw binary representation.
+	 * Convert a LongObjectId from raw binary representation.
 	 *
 	 * @param is
 	 *            the raw long buffer to read from. At least 4 longs after p
 	 *            must be available within this long array.
 	 * @param p
-	 *            position to read the first integer of data from.
+	 *            position to read the first long of data from.
 	 * @return the converted object id.
 	 */
 	public static final LongObjectId fromRaw(final long[] is, final int p) {
@@ -225,7 +219,7 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId from hex characters (US-ASCII).
+	 * Convert a LongObjectId from hex characters (US-ASCII).
 	 *
 	 * @param buf
 	 *            the US-ASCII buffer to read from. At least 64 bytes after
@@ -239,7 +233,7 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Convert an ObjectId from hex characters.
+	 * Convert a LongObjectId from hex characters.
 	 *
 	 * @param str
 	 *            the string to read from. Must be 64 characters long.
@@ -265,39 +259,6 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 		}
 	}
 
-	/**
-	 * Create id as hash of a file content
-	 *
-	 * @param file
-	 *            the file to hash
-	 * @return id calculated by hashing file content
-	 * @throws FileNotFoundException
-	 *             if file doesn't exist
-	 * @throws IOException
-	 */
-	public static LongObjectId hash(Path file)
-			throws FileNotFoundException, IOException {
-		MessageDigest md = Constants.newMessageDigest();
-		try (InputStream is = new BufferedInputStream(
-				Files.newInputStream(file))) {
-			final byte[] buffer = new byte[4096];
-			for (int read = 0; (read = is.read(buffer)) != -1;) {
-				md.update(buffer, 0, read);
-			}
-		}
-		return fromRaw(md.digest());
-	}
-
-	/**
-	 * @param s
-	 *            the string to hash
-	 * @return id calculated by hashing string
-	 */
-	public static LongObjectId hash(String s) {
-		MessageDigest md = Constants.newMessageDigest();
-		md.update(s.getBytes());
-		return fromRaw(md.digest());
-	}
 	LongObjectId(final long new_1, final long new_2, final long new_3,
 			final long new_4) {
 		w1 = new_1;
@@ -309,12 +270,12 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	/**
 	 * Initialize this instance by copying another existing LongObjectId.
 	 * <p>
-	 * This constructor is mostly useful for subclasses which want to extend an
-	 * ObjectId with more properties, but initialize from an existing ObjectId
-	 * instance acquired by other means.
+	 * This constructor is mostly useful for subclasses which want to extend a
+	 * LongObjectId with more properties, but initialize from an existing
+	 * LongObjectId instance acquired by other means.
 	 *
 	 * @param src
-	 *            another already parsed ObjectId to copy the value out of.
+	 *            another already parsed LongObjectId to copy the value out of.
 	 */
 	protected LongObjectId(final AnyLongObjectId src) {
 		w1 = src.w1;

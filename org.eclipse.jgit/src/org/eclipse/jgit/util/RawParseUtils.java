@@ -365,7 +365,7 @@ public final class RawParseUtils {
 	 * Parse 16 character base 16 (hex) formatted string to unsigned long.
 	 * <p>
 	 * The number is read in network byte order, that is, most significant
-	 * nybble first.
+	 * nibble first.
 	 *
 	 * @param bs
 	 *            buffer to parse digits from; positions {@code [p, p+16)} will

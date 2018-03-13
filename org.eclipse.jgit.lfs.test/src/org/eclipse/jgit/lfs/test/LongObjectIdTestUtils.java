@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,53 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lfs.test;
 
-package org.eclipse.jgit.lfs.errors;
+import java.io.BufferedInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
 
-import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
+import org.eclipse.jgit.lfs.lib.Constants;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
 
-/**
- * Thrown when an invalid long object id is passed in as an argument.
- */
-public class CorruptLongObjectException extends IllegalArgumentException {
-
-	private static final long serialVersionUID = 1L;
-
-	private AnyLongObjectId id;
-
-	private AnyLongObjectId contentHash;
+public class LongObjectIdTestUtils {
 
 	/**
-	 * Corrupt long object detected.
-	 *
-	 * @param id
-	 *            id of the long object
-	 * @param contentHash
-	 *            hash of the long object's content
-	 *
-	 * @param message
+	 * @param s
+	 *            the string to hash
+	 * @return id calculated by hashing string
 	 */
-	public CorruptLongObjectException(AnyLongObjectId id,
-			AnyLongObjectId contentHash,
-			String message) {
-		super(message);
-		this.id = id;
-		this.contentHash = contentHash;
+	public static LongObjectId hash(String s) {
+		MessageDigest md = Constants.newMessageDigest();
+		md.update(s.getBytes(StandardCharsets.UTF_8));
+		return LongObjectId.fromRaw(md.digest());
 	}
 
 	/**
-	 * @return the id of the object
+	 * Create id as hash of a file content
+	 *
+	 * @param file
+	 *            the file to hash
+	 * @return id calculated by hashing file content
+	 * @throws FileNotFoundException
+	 *             if file doesn't exist
+	 * @throws IOException
 	 */
-	public AnyLongObjectId getId() {
-		return id;
-	}
-
-	/**
-	 * @return the hash of the object content which doesn't match the object's
-	 *         id when this exception is thrown which signals that the object
-	 *         has been corrupted
-	 */
-	public AnyLongObjectId getContentHash() {
-		return contentHash;
+	public static LongObjectId hash(Path file)
+			throws FileNotFoundException, IOException {
+		MessageDigest md = Constants.newMessageDigest();
+		try (InputStream is = new BufferedInputStream(
+				Files.newInputStream(file))) {
+			final byte[] buffer = new byte[4096];
+			for (int read = 0; (read = is.read(buffer)) != -1;) {
+				md.update(buffer, 0, read);
+			}
+		}
+		return LongObjectId.fromRaw(md.digest());
 	}
 }

@@ -48,7 +48,11 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.lfs.internal.LfsText;
 
-/** Misc. constants used throughout JGit LFS extension. */
+/**
+ * Misc. constants used throughout JGit LFS extension.
+ *
+ * @since 4.1
+ **/
 @SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git LFS extension for large objects. */
@@ -95,16 +99,4 @@ public final class Constants {
 			throw new LinkageError(
 					LfsText.get().incorrectLONG_OBJECT_ID_LENGTH);
 	}
-
-	/**
-	 * Content type used by LFS REST API as defined in
-	 * {@link "https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md"}
-	 */
-	public static String CONTENT_TYPE_GIT_LFS_JSON = "application/vnd.git-lfs+json";
-
-	/**
-	 * "arbitrary binary data" as defined in RFC 2046
-	 * {@link "https://www.ietf.org/rfc/rfc2046.txt"}
-	 */
-	public static String HDR_APPLICATION_OCTET_STREAM = "application/octet-stream";
 }

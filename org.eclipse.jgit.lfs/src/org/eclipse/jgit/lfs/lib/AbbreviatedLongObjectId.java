@@ -63,6 +63,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  * <p>
  * This class converts the hex string into a binary form, to make it more
  * efficient for matching against an object.
+ *
+ * @since 4.1
  */
 public final class AbbreviatedLongObjectId implements Serializable {
 	private static final long serialVersionUID = 1L;

@@ -60,6 +60,7 @@ import java.nio.file.Path;
 
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.lfs.errors.InvalidLongObjectIdException;
+import org.eclipse.jgit.lfs.test.LongObjectIdTestUtils;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.AfterClass;
@@ -99,7 +100,7 @@ public class LongObjectIdTest {
 		final LongObjectId a = LongObjectId.fromString(x);
 		final LongObjectId b = LongObjectId.fromString(x);
 		assertEquals(a.hashCode(), b.hashCode());
-		assertEquals("a and b are same", b, a);
+		assertEquals("a and b should be equal", b, a);
 	}
 
 	@Test
@@ -216,18 +217,18 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testEquals() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		assertTrue("id should equal itself", id1.equals(id1));
 		AnyLongObjectId id2 = new LongObjectId(id1);
 		assertEquals("objects should be equals", id1, id2);
 
-		id2 = LongObjectId.hash("other");
+		id2 = LongObjectIdTestUtils.hash("other");
 		assertNotEquals("objects should be not equal", id1, id2);
 	}
 
 	@Test
 	public void testCopyRawBytes() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		AnyLongObjectId id2 = new LongObjectId(id1);
 
 		byte[] buf = new byte[64];
@@ -251,7 +252,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyFromStringInvalid() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		try {
 			LongObjectId.fromString(id1.name() + "01234");
 			fail("expected InvalidLongObjectIdException");
@@ -263,7 +264,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyFromStringByte() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		byte[] buf = new byte[64];
 		Charset cs = StandardCharsets.US_ASCII;
 		cs.encode(id1.name()).get(buf);
@@ -273,10 +274,10 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testHashFile() throws IOException {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		Path f = tmp.resolve("test");
 		JGitTestUtil.write(f.toFile(), "test");
-		AnyLongObjectId id2 = LongObjectId.hash(f);
+		AnyLongObjectId id2 = LongObjectIdTestUtils.hash(f);
 		assertEquals("objects should be equals", id1, id2);
 	}
 
@@ -344,7 +345,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyToByte() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		byte[] buf = new byte[64];
 		id1.copyTo(buf, 0);
 		assertEquals(id1, LongObjectId.fromString(buf, 0));
@@ -352,7 +353,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyRawToByteBuffer() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		ByteBuffer buf = ByteBuffer.allocate(32);
 		id1.copyRawTo(buf);
 		assertEquals(id1, LongObjectId.fromRaw(buf.array(), 0));
@@ -360,7 +361,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyToByteBuffer() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		ByteBuffer buf = ByteBuffer.allocate(64);
 		id1.copyTo(buf);
 		assertEquals(id1, LongObjectId.fromString(buf.array(), 0));
@@ -368,7 +369,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyRawToOutputStream() throws IOException {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		ByteArrayOutputStream os = new ByteArrayOutputStream(32);
 		id1.copyRawTo(os);
 		assertEquals(id1, LongObjectId.fromRaw(os.toByteArray(), 0));
@@ -376,7 +377,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyToOutputStream() throws IOException {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		ByteArrayOutputStream os = new ByteArrayOutputStream(64);
 		id1.copyTo(os);
 		assertEquals(id1, LongObjectId.fromString(os.toByteArray(), 0));
@@ -384,7 +385,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyToWriter() throws IOException {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		ByteArrayOutputStream os = new ByteArrayOutputStream(64);
 		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
 		id1.copyTo(w);
@@ -394,7 +395,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyToWriterWithBuf() throws IOException {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		ByteArrayOutputStream os = new ByteArrayOutputStream(64);
 		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
 		char[] buf = new char[64];
@@ -405,7 +406,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopyToStringBuilder() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		StringBuilder sb = new StringBuilder();
 		char[] buf = new char[64];
 		id1.copyTo(buf, sb);
@@ -414,7 +415,7 @@ public class LongObjectIdTest {
 
 	@Test
 	public void testCopy() {
-		AnyLongObjectId id1 = LongObjectId.hash("test");
+		AnyLongObjectId id1 = LongObjectIdTestUtils.hash("test");
 		assertEquals(id1.copy(), id1);
 		MutableLongObjectId id2 = new MutableLongObjectId();
 		id2.fromObjectId(id1);

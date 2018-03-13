@@ -52,6 +52,8 @@ import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A mutable SHA-256 abstraction.
+ *
+ * @since 4.1
  */
 public class MutableLongObjectId extends AnyLongObjectId {
 	/**

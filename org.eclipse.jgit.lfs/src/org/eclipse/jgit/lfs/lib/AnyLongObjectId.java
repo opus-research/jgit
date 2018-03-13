@@ -50,16 +50,16 @@ import java.nio.ByteBuffer;
 
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
-//import org.eclipse.jgit.lib.AnyObjectId;
-//import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.util.NB;
 
 /**
- * A (possibly mutable) SHA-1 abstraction.
+ * A (possibly mutable) SHA-256 abstraction.
  * <p>
  * If this is an instance of {@link MutableLongObjectId} the concept of equality
  * with this instance can alter at any time, if this instance is modified to
  * represent a different object name.
+ *
+ * @since 4.1
  */
 public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 
@@ -118,7 +118,7 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	 *         signed byte range of [-128, 127].
 	 */
 	public final int getSecondByte() {
-		return (int) ((w1 >>> 112) & 0xff);
+		return (int) ((w1 >>> 48) & 0xff);
 	}
 
 	/**
@@ -260,7 +260,7 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	public final int hashCode() {
-		return (int) (w2 >>> 32);
+		return (int) (w2);
 	}
 
 	/**

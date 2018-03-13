@@ -51,6 +51,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.eclipse.jgit.lfs.test.LongObjectIdTestUtils;
 import org.junit.Test;
 
 public class AbbreviatedLongObjectIdTest {
@@ -458,7 +459,7 @@ public class AbbreviatedLongObjectIdTest {
 
 	@Test
 	public void testAbbreviate() {
-		AnyLongObjectId id = LongObjectId.hash("test");
+		AnyLongObjectId id = LongObjectIdTestUtils.hash("test");
 		assertEquals(
 				"abbreviated id should match the id it was abbreviated from", 0,
 				id.abbreviate(10).prefixCompare(id));
@@ -477,7 +478,7 @@ public class AbbreviatedLongObjectIdTest {
 
 	@Test
 	public void testFromStringWrongLength() {
-		AnyLongObjectId id = LongObjectId.hash("test");
+		AnyLongObjectId id = LongObjectIdTestUtils.hash("test");
 		try {
 			AbbreviatedLongObjectId.fromString(id.name() + "c0ffee");
 			fail("expected IllegalArgumentException for too long AbbreviatedLongObjectId");
@@ -488,7 +489,7 @@ public class AbbreviatedLongObjectIdTest {
 
 	@Test
 	public void testFromLongObjectId() {
-		AnyLongObjectId id = LongObjectId.hash("test");
+		AnyLongObjectId id = LongObjectIdTestUtils.hash("test");
 		assertEquals(0,
 				AbbreviatedLongObjectId.fromLongObjectId(id).prefixCompare(id));
 	}
