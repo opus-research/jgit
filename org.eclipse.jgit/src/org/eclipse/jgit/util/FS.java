@@ -67,7 +67,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -248,7 +247,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
-		return f.lastModified();
+		return FileUtils.lastModified(f);
 	}
 
 	/**
@@ -261,7 +260,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
-		f.setLastModified(time);
+		FileUtils.setLastModified(f, time);
 	}
 
 	/**
@@ -274,7 +273,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
-		return path.length();
+		return FileUtils.getLength(path);
 	}
 
 	/**
@@ -286,9 +285,7 @@ public abstract class FS {
 	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
+		FileUtils.delete(f);
 	}
 
 	/**
@@ -623,8 +620,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
-		throw new SymlinksNotSupportedException(
-				JGitText.get().errorSymlinksNotSupported);
+		return FileUtils.readSymLink(path);
 	}
 
 	/**
@@ -634,7 +630,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
-		return false;
+		return FileUtils.isSymlink(path);
 	}
 
 	/**
@@ -646,7 +642,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean exists(File path) {
-		return path.exists();
+		return FileUtils.exists(path);
 	}
 
 	/**
@@ -658,7 +654,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
-		return path.isDirectory();
+		return FileUtils.isDirectory(path);
 	}
 
 	/**
@@ -670,7 +666,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
-		return path.isFile();
+		return FileUtils.isFile(path);
 	}
 
 	/**
@@ -681,7 +677,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
-		return path.isHidden();
+		return FileUtils.isHidden(path);
 	}
 
 	/**
@@ -693,9 +689,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
-		if (!path.getName().startsWith(".")) //$NON-NLS-1$
-			throw new IllegalArgumentException(
-					JGitText.get().hiddenFilesStartWithDot);
+		FileUtils.setHidden(path, hidden);
 	}
 
 	/**
@@ -707,8 +701,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
-		throw new SymlinksNotSupportedException(
-				JGitText.get().errorSymlinksNotSupported);
+		FileUtils.createSymLink(path, target);
 	}
 
 	/**
@@ -866,7 +859,10 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public File findHook(Repository repository, final String hookName) {
-		final File hookFile = new File(new File(repository.getDirectory(),
+		File gitDir = repository.getDirectory();
+		if (gitDir == null)
+			return null;
+		final File hookFile = new File(new File(gitDir,
 				Constants.HOOKS), hookName);
 		return hookFile.isFile() ? hookFile : null;
 	}
@@ -1067,28 +1063,28 @@ public abstract class FS {
 			return lastModifiedTime;
 		}
 
-		private boolean isDirectory;
+		private final boolean isDirectory;
 
-		private boolean isSymbolicLink;
+		private final boolean isSymbolicLink;
 
-		private boolean isRegularFile;
+		private final boolean isRegularFile;
 
-		private long creationTime;
+		private final long creationTime;
 
-		private long lastModifiedTime;
+		private final long lastModifiedTime;
 
-		private boolean isExecutable;
+		private final boolean isExecutable;
 
-		private File file;
+		private final File file;
 
-		private boolean exists;
+		private final boolean exists;
 
 		/**
 		 * file length
 		 */
 		protected long length = -1;
 
-		FS fs;
+		final FS fs;
 
 		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
 				boolean isExecutable, boolean isSymbolicLink,
@@ -1107,14 +1103,14 @@ public abstract class FS {
 		}
 
 		/**
-		 * Constructor when there are issues with reading
+		 * Constructor when there are issues with reading. All attributes except
+		 * given will be set to the default values.
 		 *
 		 * @param fs
 		 * @param path
 		 */
 		public Attributes(File path, FS fs) {
-			this.file = path;
-			this.fs = fs;
+			this(fs, path, false, false, false, false, false, 0L, 0L, 0L);
 		}
 
 		/**
