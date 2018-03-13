@@ -45,6 +45,7 @@
 package org.eclipse.jgit.lib;
 
 import org.eclipse.jgit.errors.InvalidObjectIdException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -52,6 +53,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.text.MessageFormat;
 
 /**
  * A SHA-1 abstraction.
@@ -111,16 +113,16 @@ public class ObjectId extends AnyObjectId implements Serializable {
 	}
 
 	/**
-	 * Compare two object identifier byte sequences for equality.
+	 * Compare to object identifier byte sequences for equality.
 	 *
 	 * @param firstBuffer
 	 *            the first buffer to compare against. Must have at least 20
-	 *            bytes from position fi through the end of the buffer.
+	 *            bytes from position ai through the end of the buffer.
 	 * @param fi
 	 *            first offset within firstBuffer to begin testing.
 	 * @param secondBuffer
-	 *            the second buffer to compare against. Must have at least 20
-	 *            bytes from position si through the end of the buffer.
+	 *            the second buffer to compare against. Must have at least 2
+	 *            bytes from position bi through the end of the buffer.
 	 * @param si
 	 *            first offset within secondBuffer to begin testing.
 	 * @return true if the two identifiers are the same.
@@ -228,9 +230,9 @@ public class ObjectId extends AnyObjectId implements Serializable {
 	 * @return the converted object id.
 	 */
 	public static ObjectId fromString(final String str) {
-		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH) {
-			throw new InvalidObjectIdException(str);
-		}
+		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
+			throw new IllegalArgumentException(
+					MessageFormat.format(JGitText.get().invalidId, str));
 		return fromHexString(Constants.encodeASCII(str), 0);
 	}
 

@@ -48,7 +48,6 @@ import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -364,8 +363,9 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/A", A);
 		write(new File(diskRepo.getDirectory(), "refs/heads/bad"), "FAIL\n");
 
-		Ref a = refdir.firstExactRef("refs/heads/bad", "refs/heads/A");
-		assertEquals("refs/heads/A", a.getName());
+		Ref a = refdir.getObjectDatabase()
+				.firstExactRef("refs/heads/bad", "refs/heads/A");
+		assertEquals("refs/heads/A", a.getName();
 		assertEquals(A, a.getObjectId());
 	}
 
@@ -374,13 +374,13 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/A", A);
 		write(new File(diskRepo.getDirectory(), "refs/heads/bad"), "FAIL\n");
 
-		Map<String, Ref> refs =
-				refdir.exactRef("refs/heads/bad", "refs/heads/A");
+		Map<String, Ref> refs = refdir.getObjectDatabase()
+				.exactRef("refs/heads/bad", "refs/heads/A");
 
 		assertNull("no refs/heads/bad", refs.get("refs/heads/bad"));
 
 		Ref a = refs.get("refs/heads/A");
-		assertEquals("refs/heads/A", a.getName());
+		assertEquals("refs/heads/A", a.getName();
 		assertEquals(A, a.getObjectId());
 
 		assertEquals(1, refs.size());
@@ -859,36 +859,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testFindRef_CycleInSymbolicRef() throws IOException {
-		Ref r;
-
-		writeLooseRef("refs/1", "ref: refs/2\n");
-		writeLooseRef("refs/2", "ref: refs/3\n");
-		writeLooseRef("refs/3", "ref: refs/4\n");
-		writeLooseRef("refs/4", "ref: refs/5\n");
-		writeLooseRef("refs/5", "ref: refs/end\n");
-		writeLooseRef("refs/end", A);
-
-		r = refdir.findRef("1");
-		assertEquals("refs/1", r.getName());
-		assertEquals(A, r.getObjectId());
-		assertTrue(r.isSymbolic());
-
-		writeLooseRef("refs/5", "ref: refs/6\n");
-		writeLooseRef("refs/6", "ref: refs/end\n");
-
-		r = refdir.findRef("1");
-		assertNull("missing 1 due to cycle", r);
-
-		writeLooseRef("refs/heads/1", B);
-
-		r = refdir.findRef("1");
-		assertEquals("refs/heads/1", r.getName());
-		assertEquals(B, r.getObjectId());
-		assertFalse(r.isSymbolic());
-	}
-
-	@Test
 	public void testGetRefs_PackedNotPeeled_Sorted() throws IOException {
 		Map<String, Ref> all;
 
@@ -1053,47 +1023,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(refdir.findRef("NOT.A.REF.NAME"));
 		assertNull(refdir.findRef("master"));
 		assertNull(refdir.findRef("v1.0"));
-	}
-
-	@Test
-	public void testExactRef_EmptyDatabase() throws IOException {
-		Ref r;
-
-		r = refdir.exactRef(HEAD);
-		assertTrue(r.isSymbolic());
-		assertSame(LOOSE, r.getStorage());
-		assertEquals("refs/heads/master", r.getTarget().getName());
-		assertSame(NEW, r.getTarget().getStorage());
-		assertNull(r.getTarget().getObjectId());
-
-		assertNull(refdir.exactRef("refs/heads/master"));
-		assertNull(refdir.exactRef("refs/tags/v1.0"));
-		assertNull(refdir.exactRef("FETCH_HEAD"));
-		assertNull(refdir.exactRef("NOT.A.REF.NAME"));
-		assertNull(refdir.exactRef("master"));
-		assertNull(refdir.exactRef("v1.0"));
-	}
-
-	@Test
-	public void testGetAdditionalRefs_OrigHead() throws IOException {
-		writeLooseRef("ORIG_HEAD", A);
-
-		List<Ref> refs = refdir.getAdditionalRefs();
-		assertEquals(1, refs.size());
-
-		Ref r = refs.get(0);
-		assertFalse(r.isSymbolic());
-		assertEquals(A, r.getObjectId());
-		assertEquals("ORIG_HEAD", r.getName());
-		assertFalse(r.isPeeled());
-		assertNull(r.getPeeledObjectId());
-	}
-
-	@Test
-	public void testGetAdditionalRefs_OrigHeadBranch() throws IOException {
-		writeLooseRef("refs/heads/ORIG_HEAD", A);
-		List<Ref> refs = refdir.getAdditionalRefs();
-		assertArrayEquals(new Ref[0], refs.toArray());
 	}
 
 	@Test
