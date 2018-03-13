@@ -5,8 +5,6 @@ genrule(
     testonly = 1,
     srcs = [
         "//org.eclipse.jgit:jgit",
-        "//org.eclipse.jgit.pgm:pgm",
-        "//org.eclipse.jgit.ui:ui",
         "//org.eclipse.jgit.archive:jgit-archive",
         "//org.eclipse.jgit.http.apache:http-apache",
         "//org.eclipse.jgit.http.server:jgit-servlet",
