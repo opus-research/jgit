@@ -141,6 +141,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
+	/** If there is a .gitattributes file present, the parsed rules from it. */
+	private AttributesNode attributesNode;
+
 	private String cleanFilterCommand;
 
 	/** Repository that is the root level being iterated over */
@@ -396,7 +399,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return new ByteArrayInputStream(raw, 0, n);
 		}
 
-		// @TODO: fix autocrlf causing mightneedcleaning
+		// TODO: fix autocrlf causing mightneedcleaning
 		if (!mightNeedCleaning && isBinary(e)) {
 			canonLen = len;
 			return is;

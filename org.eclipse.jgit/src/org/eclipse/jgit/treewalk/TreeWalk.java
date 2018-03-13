@@ -45,6 +45,7 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,6 +54,7 @@ import java.util.Set;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -1139,29 +1141,16 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 					"The tree walk should have one AttributesNodeProvider set in order to compute the git attributes."); //$NON-NLS-1$
 		}
 
-		// Gets matching tree iterators. Those iterators are used to retrieve
-		// the attribute node so they need to match the current head.
 		WorkingTreeIterator workingTreeIterator = getTree(WorkingTreeIterator.class);
-		if (workingTreeIterator != null
-				&& workingTreeIterator.matches != currentHead) {
-			workingTreeIterator = null;
-		}
-
 		DirCacheIterator dirCacheIterator = getTree(DirCacheIterator.class);
-		if (dirCacheIterator != null
-				&& ((AbstractTreeIterator) dirCacheIterator).matches != currentHead) {
-			// May happen if the entry is not in the index
-			dirCacheIterator = null;
-		}
-
 		CanonicalTreeParser other = getTree(CanonicalTreeParser.class);
-		if (other != null && other.matches != currentHead) {
-			// May happen if the entry is not in the tree
-			other = null;
-		}
 
-		// TODO: check if we aren't mixing iterators for the entry with
-		// iterators to find attributes
+		if (workingTreeIterator == null && dirCacheIterator == null
+				&& other == null) {
+			// Can not retrieve the attributes without at least one of the above
+			// iterators.
+			return Collections.<String, Attribute> emptyMap();
+		}
 
 		String path = currentHead.getEntryPathString();
 		final boolean isDir = FileMode.TREE.equals(currentHead.mode);
