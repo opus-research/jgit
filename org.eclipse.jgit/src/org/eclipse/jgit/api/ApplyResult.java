@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011, 2012 IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,43 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.api;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.pgm.CLIGitCommand;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.junit.Before;
+/**
+ * Encapsulates the result of a {@link ApplyCommand}
+ */
+public class ApplyResult {
 
-public class RepositoryTestCase extends LocalDiskRepositoryTestCase {
-	/** Test repository, initialized for this test case. */
-	protected FileRepository db;
+	private List<File> updatedFiles = new ArrayList<File>();
 
-	/** Working directory of {@link #db}. */
-	protected File trash;
+	/**
+	 * @param f
+	 *            an updated file
+	 * @return this instance
+	 */
+	public ApplyResult addUpdatedFile(File f) {
+		updatedFiles.add(f);
+		return this;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		db = createWorkRepository();
-		trash = db.getWorkTree();
 	}
 
-	protected String[] execute(String... cmds) throws Exception {
-		List<String> result = new ArrayList<String>(cmds.length);
-		for (String cmd : cmds)
-			result.addAll(CLIGitCommand.execute(cmd, db));
-		return result.toArray(new String[0]);
-	}
-
-	protected File writeTrashFile(final String name, final String data)
-			throws IOException {
-		return JGitTestUtil.writeTrashFile(db, name, data);
+	/**
+	 * @return updated files
+	 */
+	public List<File> getUpdatedFiles() {
+		return updatedFiles;
 	}
 }

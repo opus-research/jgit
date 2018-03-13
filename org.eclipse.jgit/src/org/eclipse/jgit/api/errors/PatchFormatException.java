@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,30 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.api.errors;
 
-import static org.junit.Assert.assertArrayEquals;
+import java.text.MessageFormat;
+import java.util.List;
 
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Test;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.patch.FormatError;
 
-public class CommitAndLogCommandTests extends RepositoryTestCase {
-	@Test
-	public void testCommitAmend() throws Exception {
-		assertArrayEquals(new String[] { // commit
-						"[master 101cffba0364877df1942891eba7f465f628a3d2] first comit", //
-						"", // amend
-						"[master d2169869dadf16549be20dcf8c207349d2ed6c62] first commit", //
-						"", // log
-						"commit d2169869dadf16549be20dcf8c207349d2ed6c62", //
-						"Author: GIT_COMMITTER_NAME <GIT_COMMITTER_EMAIL>", //
-						"Date:   Sat Aug 15 20:12:58 2009 -0330", //
-						"", //
-						"    first commit", //
-						"", //
-						"" //
-				}, execute("git commit -m 'first comit'", //
-						"git commit --amend -m 'first commit'", //
-						"git log"));
+/**
+ * Exception thrown when applying a patch fails due to an invalid format
+ * 
+ * @since 2.0
+ * 
+ */
+public class PatchFormatException extends GitAPIException {
+	private static final long serialVersionUID = 1L;
+
+	private List<FormatError> errors;
+
+	/**
+	 * @param errors
+	 */
+	public PatchFormatException(List<FormatError> errors) {
+		super(MessageFormat.format(JGitText.get().patchFormatException, errors));
+		this.errors = errors;
 	}
+
+	/**
+	 * @return all the errors where unresolved conflicts have been detected
+	 */
+	public List<FormatError> getErrors() {
+		return errors;
+	}
+
 }

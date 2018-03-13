@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011-2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.transport;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 
-import org.junit.Before;
-import org.junit.Test;
+/** Indicates a transport service may not continue execution. */
+public class ServiceMayNotContinueException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-public class ReadLinesTest {
-	List<String> l = new ArrayList<String>();
+	private boolean output;
 
-	@Before
-	public void clearList() {
-		l.clear();
+	/** Initialize with no message. */
+	public ServiceMayNotContinueException() {
+		// Do not set a message.
 	}
 
-	@Test
-	public void testReadLines_singleLine() {
-		l.add("[0]");
-		assertEquals(l, IO.readLines("[0]"));
+	/**
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
+	 */
+	public ServiceMayNotContinueException(String msg) {
+		super(msg);
 	}
 
-	@Test
-	public void testReadLines_LF() {
-		l.add("[0]");
-		l.add("[1]");
-		assertEquals(l, IO.readLines("[0]\n[1]"));
+	/** @return true if the message was already output to the client. */
+	public boolean isOutput() {
+		return output;
 	}
 
-	@Test
-	public void testReadLines_CRLF() {
-		l.add("[0]");
-		l.add("[1]");
-		assertEquals(l, IO.readLines("[0]\r\n[1]"));
-	}
-
-	@Test
-	public void testReadLines_endLF() {
-		l.add("[0]");
-		l.add("");
-		assertEquals(l, IO.readLines("[0]\n"));
-	}
-
-	@Test
-	public void testReadLines_endCRLF() {
-		l.add("[0]");
-		l.add("");
-		assertEquals(l, IO.readLines("[0]\r\n"));
-	}
-
-	@Test
-	public void testReadLines_mixed() {
-		l.add("[0]");
-		l.add("[1]");
-		l.add("[2]");
-		assertEquals(l, IO.readLines("[0]\r\n[1]\n[2]"));
+	/** Mark this message has being sent to the client. */
+	public void setOutput() {
+		output = true;
 	}
 }

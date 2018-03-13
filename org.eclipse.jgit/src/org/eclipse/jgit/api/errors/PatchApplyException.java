@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,25 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.api.errors;
 
-import static org.junit.Assert.assertEquals;
+/**
+ * Exception thrown when applying a patch fails
+ * 
+ * @since 2.0
+ * 
+ */
+public class PatchApplyException extends GitAPIException {
+	private static final long serialVersionUID = 1L;
 
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
-
-public class BranchCommandTest extends RepositoryTestCase {
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
+	/**
+	 * @param message
+	 * @param cause
+	 */
+	public PatchApplyException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
-	@Test
-	public void testList() throws Exception {
-		assertEquals("* master 6fd41be initial commit",
-				execute("git branch -v")[0]);
+	/**
+	 * @param message
+	 */
+	public PatchApplyException(String message) {
+		super(message);
 	}
+
 }
