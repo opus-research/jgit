@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2008-2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,66 +41,32 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.transport;
 
-import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
 
 /**
- * This exception will be thrown from the {@link NoteMerger} when a conflict on
- * Notes content is found during merge.
+ * The standard "transfer", "fetch" and "receive" configuration parameters.
  */
-public class NotesMergeConflictException extends IOException {
-	private static final long serialVersionUID = 1L;
+public class TransferConfig {
+	/** Key for {@link Config#get(SectionParser)}. */
+	public static final Config.SectionParser<TransferConfig> KEY = new SectionParser<TransferConfig>() {
+		public TransferConfig parse(final Config cfg) {
+			return new TransferConfig(cfg);
+		}
+	};
 
-	/**
-	 * Construct a NotesMergeConflictException for the specified base, ours and
-	 * theirs note versions.
-	 *
-	 * @param base
-	 *            note version
-	 * @param ours
-	 *            note version
-	 * @param theirs
-	 *            note version
-	 */
-	public NotesMergeConflictException(Note base, Note ours, Note theirs) {
-		super(MessageFormat.format(JGitText.get().mergeConflictOnNotes,
-				noteOn(base, ours, theirs), noteData(base), noteData(ours),
-				noteData(theirs)));
+	private final boolean fsckObjects;
+
+	private TransferConfig(final Config rc) {
+		fsckObjects = rc.getBoolean("receive", "fsckobjects", false);
 	}
 
 	/**
-	 * Constructs a NotesMergeConflictException for the specified base, ours and
-	 * theirs versions of the root note tree.
-	 *
-	 * @param base
-	 *            version of the root note tree
-	 * @param ours
-	 *            version of the root note tree
-	 * @param theirs
-	 *            version of the root note tree
+	 * @return strictly verify received objects?
 	 */
-	public NotesMergeConflictException(NonNoteEntry base, NonNoteEntry ours,
-			NonNoteEntry theirs) {
-		super(MessageFormat.format(
-				JGitText.get().mergeConflictOnNonNoteEntries, base.name(),
-				ours.name(), theirs.name()));
-	}
-
-	private static String noteOn(Note base, Note ours, Note theirs) {
-		if (base != null)
-			return base.name();
-		if (ours != null)
-			return ours.name();
-		return theirs.name();
-	}
-
-	private static String noteData(Note n) {
-		if (n != null)
-			return n.getData().name();
-		return "";
+	public boolean isFsckObjects() {
+		return fsckObjects;
 	}
 }

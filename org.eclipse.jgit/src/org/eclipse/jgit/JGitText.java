@@ -129,6 +129,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadHEAD;
 	/***/ public String cannotReadObject;
 	/***/ public String cannotReadTree;
+	/***/ public String cannotRebaseWithoutCurrentHead;
 	/***/ public String cannotResolveLocalTrackingRefForUpdating;
 	/***/ public String cannotStoreObjects;
 	/***/ public String cannotUnloadAModifiedTree;
@@ -315,8 +316,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String lockOnNotClosed;
 	/***/ public String lockOnNotHeld;
 	/***/ public String malformedpersonIdentString;
-	/***/ public String mergeConflictOnNotes;
-	/***/ public String mergeConflictOnNonNoteEntries;
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
@@ -329,6 +328,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String missingRequiredParameter;
 	/***/ public String missingSecretkey;
 	/***/ public String mixedStagesNotAllowed;
+	/***/ public String mkDirFailed;
+	/***/ public String mkDirsFailed;
 	/***/ public String multipleMergeBasesFor;
 	/***/ public String need2Arguments;
 	/***/ public String needPackOut;
@@ -487,6 +488,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownRepositoryFormat;
 	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
+	/***/ public String unmergedPaths;
 	/***/ public String unpackException;
 	/***/ public String unreadablePackIndex;
 	/***/ public String unrecognizedRef;
