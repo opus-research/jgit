@@ -409,6 +409,10 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	}
 
 	protected static void assertEquals(AnyObjectId exp, AnyObjectId act) {
+		if (exp != null)
+			exp = exp.copy();
+		if (act != null)
+			act = act.copy();
 		Assert.assertEquals(exp, act);
 	}
 

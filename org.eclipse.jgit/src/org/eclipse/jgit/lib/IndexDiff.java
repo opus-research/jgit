@@ -53,11 +53,8 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
@@ -103,7 +100,6 @@ public class IndexDiff {
 	 * @param repository
 	 * @param revstr
 	 *            symbolic name e.g. HEAD
-	 *            An EmptyTreeIterator is used if <code>revstr</code> cannot be resolved.
 	 * @param workingTreeIterator
 	 *            iterator for working directory
 	 * @throws IOException
@@ -112,10 +108,7 @@ public class IndexDiff {
 			WorkingTreeIterator workingTreeIterator) throws IOException {
 		this.repository = repository;
 		ObjectId objectId = repository.resolve(revstr);
-		if (objectId != null)
-			tree = new RevWalk(repository).parseTree(objectId);
-		else
-			tree = null;
+		tree = new RevWalk(repository).parseTree(objectId);
 		this.initialWorkingTreeIterator = workingTreeIterator;
 	}
 
@@ -124,7 +117,7 @@ public class IndexDiff {
 	 *
 	 * @param repository
 	 * @param objectId
-	 *            tree id. If null, an EmptyTreeIterator is used.
+	 *            tree id
 	 * @param workingTreeIterator
 	 *            iterator for working directory
 	 * @throws IOException
@@ -132,13 +125,9 @@ public class IndexDiff {
 	public IndexDiff(Repository repository, ObjectId objectId,
 			WorkingTreeIterator workingTreeIterator) throws IOException {
 		this.repository = repository;
-		if (objectId != null)
-			tree = new RevWalk(repository).parseTree(objectId);
-		else
-			tree = null;
+		tree = new RevWalk(repository).parseTree(objectId);
 		this.initialWorkingTreeIterator = workingTreeIterator;
 	}
-
 
 	/**
 	 * Run the diff operation. Until this is called, all lists will be empty
@@ -153,15 +142,10 @@ public class IndexDiff {
 		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		// add the trees (tree, dirchache, workdir)
-		if (tree != null)
-			treeWalk.addTree(tree);
-		else
-			treeWalk.addTree(new EmptyTreeIterator());
+		treeWalk.addTree(tree);
 		treeWalk.addTree(new DirCacheIterator(dirCache));
 		treeWalk.addTree(initialWorkingTreeIterator);
 		treeWalk.setFilter(TreeFilter.ANY_DIFF);
-		treeWalk.setFilter(AndTreeFilter.create(TreeFilter.ANY_DIFF,
-				new NotIgnoredFilter(WORKDIR)));
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
 					AbstractTreeIterator.class);
@@ -259,5 +243,4 @@ public class IndexDiff {
 	public HashSet<String> getUntracked() {
 		return untracked;
 	}
-
 }

@@ -508,14 +508,14 @@ public class RenameDetector {
 				List<DiffEntry> dels = (List<DiffEntry>) o;
 				long[] matrix = new long[dels.size() * adds.size()];
 				int mNext = 0;
-				for (int delIdx = 0; delIdx < dels.size(); delIdx++) {
-					String deletedName = dels.get(delIdx).oldPath;
+				for (int addIdx = 0; addIdx < adds.size(); addIdx++) {
+					String addedName = adds.get(addIdx).newPath;
 
-					for (int addIdx = 0; addIdx < adds.size(); addIdx++) {
-						String addedName = adds.get(addIdx).newPath;
+					for (int delIdx = 0; delIdx < dels.size(); delIdx++) {
+						String deletedName = dels.get(delIdx).oldPath;
 
 						int score = SimilarityRenameDetector.nameScore(addedName, deletedName);
-						matrix[mNext] = SimilarityRenameDetector.encode(score, delIdx, addIdx);
+						matrix[mNext] = SimilarityRenameDetector.encode(score, addIdx, delIdx);
 						mNext++;
 					}
 				}
