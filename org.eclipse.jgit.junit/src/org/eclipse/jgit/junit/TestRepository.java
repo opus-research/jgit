@@ -575,8 +575,8 @@ public class TestRepository<R extends Repository> {
 	/**
 	 * Soft-reset HEAD to a different commit.
 	 * <p>
-	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but not the index or
-	 * the working tree of a non-bare repository.
+	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but
+	 * not the index or the working tree of a non-bare repository.
 	 *
 	 * @param name
 	 *            revision string; either an existing ref name, or something that
@@ -585,17 +585,12 @@ public class TestRepository<R extends Repository> {
 	 */
 	public void reset(String name) throws Exception {
 		RefUpdate.Result result;
-		Ref ref = db.getRef(name);
-		if (ref != null)
-			result = db.updateRef(Constants.HEAD).link(ref.getName());
-		else {
-			ObjectId id = db.resolve(name);
-			if (id == null)
-				throw new IOException("Not a revision: " + name);
-			RefUpdate ru = db.updateRef(Constants.HEAD, true);
-			ru.setNewObjectId(id);
-			result = ru.forceUpdate();
-		}
+		ObjectId id = db.resolve(name);
+		if (id == null)
+			throw new IOException("Not a revision: " + name);
+		RefUpdate ru = db.updateRef(Constants.HEAD, false);
+		ru.setNewObjectId(id);
+		result = ru.forceUpdate();
 		switch (result) {
 			case FAST_FORWARD:
 			case FORCED:
@@ -920,10 +915,6 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public List<RevCommit> parents() {
-			return Collections.unmodifiableList(parents);
-		}
-
 		public CommitBuilder noParents() {
 			parents.clear();
 			return this;
@@ -974,10 +965,6 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public String message() {
-			return message;
-		}
-
 		public CommitBuilder tick(int secs) {
 			tick = secs;
 			return this;
@@ -994,17 +981,9 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public PersonIdent author() {
-			return author;
-		}
-
 		public CommitBuilder committer(PersonIdent c) {
 			committer = c;
 			return this;
-		}
-
-		public PersonIdent committer() {
-			return committer;
 		}
 
 		public CommitBuilder insertChangeId() {
