@@ -55,8 +55,6 @@ artifacts = [group,
              group + '.http.server',
              group + '.junit',
              group + '.junit.http',
-             group + '.lfs',
-             group + '.lfs.server',
              group + '.pgm',
              group + '.ui']
 
