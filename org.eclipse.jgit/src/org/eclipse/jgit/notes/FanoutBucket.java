@@ -254,7 +254,7 @@ class FanoutBucket extends InMemoryNoteBucket {
 
 		for (; e != null; e = e.next)
 			e.format(fmt);
-		return inserter.insert(fmt);
+		return fmt.insert(inserter);
 	}
 
 	private int treeSize() {

@@ -177,23 +177,10 @@ public abstract class ObjectInserter {
 	}
 
 	/**
-	 * Insert a single tree into the store, returning its unique name.
-	 *
-	 * @param formatter
-	 *            the formatter containing the proposed tree's data.
-	 * @return the name of the tree object.
-	 * @throws IOException
-	 *             the object could not be stored.
-	 */
-	public final ObjectId insert(TreeFormatter formatter) throws IOException {
-		// Delegate to the formatter, as then it can pass the raw internal
-		// buffer back to this inserter, avoiding unnecessary data copying.
-		//
-		return formatter.insertTo(this);
-	}
-
-	/**
 	 * Insert a single commit into the store, returning its unique name.
+	 *
+	 * As a side effect, {@link CommitBuilder#getCommitId()} will also be
+	 * populated with the returned ObjectId.
 	 *
 	 * @param builder
 	 *            the builder containing the proposed commit's data.
@@ -202,11 +189,14 @@ public abstract class ObjectInserter {
 	 *             the object could not be stored.
 	 */
 	public final ObjectId insert(CommitBuilder builder) throws IOException {
-		return insert(Constants.OBJ_COMMIT, builder.build());
+		return insert(Constants.OBJ_COMMIT, builder.build(this));
 	}
 
 	/**
 	 * Insert a single annotated tag into the store, returning its unique name.
+	 *
+	 * As a side effect, {@link TagBuilder#getTagId()} will also be populated
+	 * with the returned ObjectId.
 	 *
 	 * @param builder
 	 *            the builder containing the proposed tag's data.
@@ -215,7 +205,7 @@ public abstract class ObjectInserter {
 	 *             the object could not be stored.
 	 */
 	public final ObjectId insert(TagBuilder builder) throws IOException {
-		return insert(Constants.OBJ_TAG, builder.build());
+		return insert(Constants.OBJ_TAG, builder.build(this));
 	}
 
 	/**

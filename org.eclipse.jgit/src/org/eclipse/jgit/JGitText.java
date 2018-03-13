@@ -193,6 +193,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String daemonAlreadyRunning;
 	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deleteFileFailed;
+	/***/ public String deleteFileWithRepetitionsFailed;
 	/***/ public String deletingNotSupported;
 	/***/ public String destinationIsNotAWildcard;
 	/***/ public String detachedHeadDetected;
