@@ -81,7 +81,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
@@ -109,41 +108,43 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private String path;
 	private String uri;
 	private String groups;
-	private String branch;
 	private PersonIdent author;
-	private GetHeadFromUri callback;
+	private RemoteReader callback;
 
 	private List<Project> bareProjects;
 	private Git git;
 	private ProgressMonitor monitor;
 
 	/**
-	 * A callback to get ref sha1 of a repository from its uri.
+	 * A callback to get head sha1 of a repository from its uri.
 	 *
-	 * We provided a default implementation {@link #DefaultGetHeadFromUri} to
+	 * We provided a default implementation {@link DefaultRemoteReader} to
 	 * use ls-remote command to read the sha1 from the repository. Callers may
 	 * have their own quicker implementation.
 	 */
-	public interface GetHeadFromUri {
-		public ObjectId sha1(String uri, String ref) throws GitAPIException;
+	public interface RemoteReader {
+		/**
+		 * Read a remote repository's HEAD sha1.
+		 *
+		 * @param uri
+		 *            The URI of the remote repository
+		 * @return the sha1 of the HEAD of the remote repository
+		 */
+		public ObjectId sha1(String uri) throws GitAPIException;
 	}
 
-	/** A default implementation of {@link GetHeadFromUri} callback. */
-	public static class DefaultGetHeadFromUri implements GetHeadFromUri {
-		@Override
-		public ObjectId sha1(String uri, String ref) throws GitAPIException {
+	/** A default implementation of {@link RemoteReader} callback. */
+	public static class DefaultRemoteReader implements RemoteReader {
+		public ObjectId sha1(String uri) throws GitAPIException {
 			Collection<Ref> refs = Git
 					.lsRemoteRepository()
 					.setRemote(uri)
 					.call();
-			// Since LsRemoteCommand.call() only returned Map.values() to us, we
-			// have to rebuild the map here.
-			Map<String, Ref> map = new HashMap<String, Ref>();
-			for (Ref r : refs)
-				map.put(r.getName(), r);
-
-			Ref r = RefDatabase.findRef(map, ref);
-			return r != null ? r.getObjectId() : null;
+			for (Ref ref : refs) {
+				if (Constants.HEAD.equals(ref.getName()))
+					return ref.getObjectId();
+			}
+			return null;
 		}
 	}
 
@@ -179,12 +180,10 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		final String path;
 		final Set<String> groups;
 		final List<CopyFile> copyfiles;
-		String revision;
 
-		Project(String name, String path, String revision, String groups) {
+		Project(String name, String path, String groups) {
 			this.name = name;
 			this.path = path;
-			this.revision = revision;
 			this.groups = new HashSet<String>();
 			if (groups != null && groups.length() > 0)
 				this.groups.addAll(Arrays.asList(groups.split(","))); //$NON-NLS-1$
@@ -205,7 +204,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		private final Set<String> plusGroups;
 		private final Set<String> minusGroups;
 		private String defaultRemote;
-		private String defaultRevision;
 		private Project currentProject;
 
 		XmlManifest(RepoCommand command, String filename, String baseUrl, String groups) {
@@ -260,16 +258,12 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				currentProject = new Project( //$NON-NLS-1$
 						attributes.getValue("name"), //$NON-NLS-1$
 						attributes.getValue("path"), //$NON-NLS-1$
-						attributes.getValue("revision"), //$NON-NLS-1$
 						attributes.getValue("groups")); //$NON-NLS-1$
 			} else if ("remote".equals(qName)) { //$NON-NLS-1$
 				remotes.put(attributes.getValue("name"), //$NON-NLS-1$
 						attributes.getValue("fetch")); //$NON-NLS-1$
 			} else if ("default".equals(qName)) { //$NON-NLS-1$
 				defaultRemote = attributes.getValue("remote"); //$NON-NLS-1$
-				defaultRevision = attributes.getValue("revision"); //$NON-NLS-1$
-				if (defaultRevision == null)
-					defaultRevision = command.branch;
 			} else if ("copyfile".equals(qName)) { //$NON-NLS-1$
 				if (currentProject == null)
 					throw new SAXException(RepoText.get().invalidManifest);
@@ -307,10 +301,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			}
 			for (Project proj : projects) {
 				if (inGroups(proj)) {
-					if (proj.revision == null)
-						proj.revision = defaultRevision;
 					String url = remoteUrl + proj.name;
-					command.addSubmodule(url, proj.path, proj.revision);
+					command.addSubmodule(url, proj.path);
 					for (CopyFile copyfile : proj.copyfiles) {
 						try {
 							copyfile.copy();
@@ -357,8 +349,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	private static class RemoteUnavailableException extends GitAPIException {
-		RemoteUnavailableException(String uri) {
-			super(MessageFormat.format(RepoText.get().errorRemoteUnavailable, uri));
+		RemoteUnavailableException(String uri, Throwable cause) {
+			super(MessageFormat.format(RepoText.get().errorRemoteUnavailable, uri), cause);
 		}
 	}
 
@@ -404,21 +396,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set default branch.
-	 *
-	 * This is generally the name of the branch the manifest file was in. If
-	 * there's no default revision (branch) specified in manifest and no
-	 * revision specified in project, this branch will be used.
-	 *
-	 * @param branch
-	 * @return this command
-	 */
-	public RepoCommand setBranch(final String branch) {
-		this.branch = branch;
-		return this;
-	}
-
-	/**
 	 * The progress monitor associated with the clone operation. By default,
 	 * this is set to <code>NullProgressMonitor</code>
 	 *
@@ -452,7 +429,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @param callback
 	 * @return this command
 	 */
-	public RepoCommand setGetHeadFromUri(final GetHeadFromUri callback) {
+	public RepoCommand setRemoteReader(final RemoteReader callback) {
 		this.callback = callback;
 		return this;
 	}
@@ -470,7 +447,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			if (author == null)
 				author = new PersonIdent(repo);
 			if (callback == null)
-				callback = new DefaultGetHeadFromUri();
+				callback = new DefaultRemoteReader();
 		} else
 			git = new Git(repo);
 
@@ -485,6 +462,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			DirCache index = DirCache.newInCore();
 			DirCacheBuilder builder = index.builder();
 			ObjectInserter inserter = repo.newObjectInserter();
+			RevWalk rw = new RevWalk(repo);
 
 			try {
 				Config cfg = new Config();
@@ -496,13 +474,17 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					// create gitlink
 					final DirCacheEntry dcEntry = new DirCacheEntry(name);
 					ObjectId objectId;
-					if (ObjectId.isId(proj.revision))
-						objectId = ObjectId.fromString(proj.revision);
-					else {
-						objectId = callback.sha1(uri, proj.revision);
+					try {
+						objectId = callback.sha1(uri);
+					} catch (GitAPIException e) {
+						// Something wrong getting the head sha1
+						throw new RemoteUnavailableException(uri, e);
+					} catch (IllegalArgumentException e) {
+						// The revision from the manifest is malformed.
+						throw new ManifestErrorException(e);
 					}
 					if (objectId == null)
-						throw new RemoteUnavailableException(uri);
+						throw new RemoteUnavailableException(uri, null);
 					dcEntry.setObjectId(objectId);
 					dcEntry.setFileMode(FileMode.GITLINK);
 					builder.add(dcEntry);
@@ -512,7 +494,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				// create a new DirCacheEntry for .gitmodules file.
 				final DirCacheEntry dcEntry = new DirCacheEntry(Constants.DOT_GIT_MODULES);
 				ObjectId objectId = inserter.insert(Constants.OBJ_BLOB,
-						content.getBytes(Charset.forName(Constants.CHARACTER_ENCODING)));
+						content.getBytes(Constants.CHARACTER_ENCODING));
 				dcEntry.setObjectId(objectId);
 				dcEntry.setFileMode(FileMode.REGULAR_FILE);
 				builder.add(dcEntry);
@@ -532,7 +514,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 				ObjectId commitId = inserter.insert(commit);
 				inserter.flush();
-				RevWalk rw = new RevWalk(repo);
 
 				RefUpdate ru = repo.updateRef(Constants.HEAD);
 				ru.setNewObjectId(commitId);
@@ -559,6 +540,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				return rw.parseCommit(commitId);
 			} catch (IOException e) {
 				throw new ManifestErrorException(e);
+			} finally {
+				rw.release();
 			}
 		} else {
 			return git
@@ -568,9 +551,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 	}
 
-	private void addSubmodule(String url, String name, String revision) throws SAXException {
+	private void addSubmodule(String url, String name) throws SAXException {
 		if (repo.isBare()) {
-			Project proj = new Project(url, name, revision, null);
+			Project proj = new Project(url, name, null);
 			bareProjects.add(proj);
 		} else {
 			SubmoduleAddCommand add = git
@@ -579,23 +562,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				.setURI(url);
 			if (monitor != null)
 				add.setProgressMonitor(monitor);
-
 			try {
-				Repository subRepo = add.call();
-				if (revision != null) {
-					Git git = new Git(subRepo);
-					if (!ObjectId.isId(revision)) {
-						Ref ref = subRepo.getRef(
-								Constants.DEFAULT_REMOTE_NAME + "/" + revision);
-						if (ref != null)
-							revision = ref.getName();
-					}
-					git.checkout().setName(revision).call();
-					git.add().addFilepattern(name).call();
-				}
+				add.call();
 			} catch (GitAPIException e) {
-				throw new SAXException(e);
-			} catch (IOException e) {
 				throw new SAXException(e);
 			}
 		}
