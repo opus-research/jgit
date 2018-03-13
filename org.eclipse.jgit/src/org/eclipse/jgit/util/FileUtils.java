@@ -514,4 +514,17 @@ public class FileUtils {
 		}
 		return builder.toString();
 	}
+
+	/**
+	 * Determine if an IOException is a Stale NFS File Handle
+	 *
+	 * @param ioe
+	 * @return a boolean true if the IOException is a Stale NFS FIle Handle
+	 * @since 4.1
+	 */
+	public static boolean isStaleFileHandle(IOException ioe) {
+		String msg = ioe.getMessage();
+		return msg != null
+				&& msg.toLowerCase().matches("stale .*file .*handle"); //$NON-NLS-1$
+	}
 }
