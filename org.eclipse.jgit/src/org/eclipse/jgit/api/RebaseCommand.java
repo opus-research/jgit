@@ -824,7 +824,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return true;
 	}
 
-	List<Step> loadSteps() throws IOException {
+	private List<Step> loadSteps() throws IOException {
 		byte[] buf = IO.readFully(new File(rebaseDir, GIT_REBASE_TODO));
 		int ptr = 0;
 		int tokenBegin = 0;
@@ -832,12 +832,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		while (ptr < buf.length) {
 			tokenBegin = ptr;
 			ptr = RawParseUtils.nextLF(buf, ptr);
-			int nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
+			int nextSpace = 0;
 			int tokenCount = 0;
 			Step current = null;
 			while (tokenCount < 3 && nextSpace < ptr) {
 				switch (tokenCount) {
 				case 0:
+					nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
 					String actionToken = new String(buf, tokenBegin, nextSpace
 							- tokenBegin - 1);
 					tokenBegin = nextSpace;
@@ -955,11 +956,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			return this.token;
 		}
 
-		@Override
-		public String toString() {
-			return "Action[" + token + "]";
-		}
-
 		static Action parse(String token) {
 			if (token.equals("pick") || token.equals("p"))
 				return PICK;
@@ -978,15 +974,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		Step(Action action) {
 			this.action = action;
-		}
-
-		@Override
-		public String toString() {
-			return "Step[" + action + ", "
-					+ ((commit == null) ? "null" : commit)
-					+ ", "
-					+ ((shortMessage == null) ? "null" : new String(
-							shortMessage)) + "]";
 		}
 	}
 

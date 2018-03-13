@@ -281,7 +281,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setURI(uri);
 		Repository repo = command.call();
 		assertNotNull(repo);
-		addRepoToClose(repo);
 		git.add().addFilepattern(path)
 				.addFilepattern(Constants.DOT_GIT_MODULES).call();
 		git.commit().setMessage("adding submodule").call();
@@ -343,19 +342,15 @@ public class CloneCommandTest extends RepositoryTestCase {
 		assertNotNull(sub2Head);
 
 		// Add submodule 2 to submodule 1
-		Repository r = sub1Git.submoduleAdd().setPath(path)
-				.setURI(sub2.getDirectory().toURI().toString()).call();
-		assertNotNull(r);
-		addRepoToClose(r);
+		assertNotNull(sub1Git.submoduleAdd().setPath(path)
+				.setURI(sub2.getDirectory().toURI().toString()).call());
 		RevCommit sub1Head = sub1Git.commit().setAll(true)
 				.setMessage("Adding submodule").call();
 		assertNotNull(sub1Head);
 
 		// Add submodule 1 to default repository
-		r = git.submoduleAdd().setPath(path)
-				.setURI(sub1.getDirectory().toURI().toString()).call();
-		assertNotNull(r);
-		addRepoToClose(r);
+		assertNotNull(git.submoduleAdd().setPath(path)
+				.setURI(sub1.getDirectory().toURI().toString()).call());
 		assertNotNull(git.commit().setAll(true).setMessage("Adding submodule")
 				.call());
 
@@ -388,7 +383,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 		SubmoduleWalk walk = SubmoduleWalk.forIndex(git2.getRepository());
 		assertTrue(walk.next());
 		Repository clonedSub1 = walk.getRepository();
-		addRepoToClose(clonedSub1);
 		assertNotNull(clonedSub1);
 		status = new SubmoduleStatusCommand(clonedSub1);
 		statuses = status.call();
