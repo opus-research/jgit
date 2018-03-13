@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2011, Chris Aniszczyk <zx@redhat.com>
+ * Copyright (C) 2011, Abhishek Bhatnagar <abhatnag@redhat.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,72 +43,66 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
+import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Set;
 
-import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.util.FileUtils;
 
-public class GitConstructionTest extends RepositoryTestCase {
-	private Repository bareRepo;
+/**
+ * Remove untracked files from the working tree
+ *
+ * @see <a
+ *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
+ *      >Git documentation about Clean</a>
+ */
+public class CleanCommand extends GitCommand<Set<String>> {
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		Git git = new Git(db);
-		git.commit().setMessage("initial commit").call();
-		writeTrashFile("Test.txt", "Hello world");
-		git.add().addFilepattern("Test.txt").call();
-		git.commit().setMessage("Initial commit").call();
+	private Set<String> paths = Collections.emptySet();
 
-		bareRepo = Git.cloneRepository().setBare(true)
-				.setURI(db.getDirectory().toURI().toString())
-				.setDirectory(createUniqueTestGitDir(true)).call()
-				.getRepository();
+	/**
+	 * @param repo
+	 */
+	protected CleanCommand(Repository repo) {
+		super(repo);
 	}
 
-	@Test
-	public void testWrap() {
-		Git git = Git.wrap(db);
-		assertEquals(1, git.branchList().call().size());
-
-		git = Git.wrap(bareRepo);
-		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
-				.size());
-
+	/**
+	 * Executes the {@code clean} command with all the options and parameters
+	 * collected by the setter methods of this class. Each instance of this
+	 * class should only be used for one invocation of the command (means: one
+	 * call to {@link #call()})
+	 *
+	 * @return a set of strings representing each file cleaned.
+	 */
+	public Set<String> call() {
+		Set<String> files = Collections.emptySet();
 		try {
-			Git.wrap(null);
-			fail("Expected exception has not been thrown");
-		} catch (NullPointerException e) {
-			// should not get here
+			StatusCommand command = new StatusCommand(repo);
+			Status status = command.call();
+			files = status.getUntracked();
+
+			for (String file : files) {
+				if (paths.isEmpty() || paths.contains(file))
+					FileUtils.delete(new File(file));
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		}
+		return files;
 	}
 
-	@Test
-	public void testOpen() throws IOException {
-		Git git = Git.open(db.getDirectory());
-		assertEquals(1, git.branchList().call().size());
-
-		git = Git.open(bareRepo.getDirectory());
-		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
-				.size());
-
-		git = Git.open(db.getWorkTree());
-		assertEquals(1, git.branchList().setListMode(ListMode.ALL).call()
-				.size());
-
-		try {
-			Git.open(db.getObjectsDirectory());
-			fail("Expected exception has not been thrown");
-		} catch (RepositoryNotFoundException e) {
-			// should not get here
-		}
+	/**
+	 * If paths are set, only these paths are affected by the cleaning.
+	 *
+	 * @param paths
+	 *            the paths to set
+	 */
+	public void setPaths(Set<String> paths) {
+		this.paths = paths;
 	}
+
 }
