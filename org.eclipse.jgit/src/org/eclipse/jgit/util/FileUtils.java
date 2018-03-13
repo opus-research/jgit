@@ -84,14 +84,6 @@ public class FileUtils {
 	public static final int IGNORE_ERRORS = 8;
 
 	/**
-	 * Option to only delete empty directories. This option can be combined with
-	 * {@link #RECURSIVE}
-	 *
-	 * @since 2.4
-	 */
-	public static final int EMPTY_DIRECTORIES_ONLY = 16;
-
-	/**
 	 * Delete file or empty folder
 	 *
 	 * @param f
@@ -134,22 +126,7 @@ public class FileUtils {
 					delete(c, options);
 			}
 		}
-
-		boolean delete = false;
-		if ((options & EMPTY_DIRECTORIES_ONLY) != 0) {
-			if (f.isDirectory()) {
-				delete = true;
-			} else {
-				if ((options & IGNORE_ERRORS) == 0)
-					throw new IOException(MessageFormat.format(
-							JGitText.get().deleteFileFailed,
-							f.getAbsolutePath()));
-			}
-		} else {
-			delete = true;
-		}
-
-		if (delete && !f.delete()) {
+		if (!f.delete()) {
 			if ((options & RETRY) != 0 && f.exists()) {
 				for (int i = 1; i < 10; i++) {
 					try {
@@ -165,39 +142,6 @@ public class FileUtils {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 		}
-	}
-
-	/**
-	 * Rename a file or folder. If the rename fails and if we are running on a
-	 * filesystem where it makes sense to repeat a failing rename then repeat
-	 * the rename operation up to 9 times with 100ms sleep time between two
-	 * calls
-	 *
-	 * @see FS#retryFailedLockFileCommit()
-	 * @param src
-	 *            the old {@code File}
-	 * @param dst
-	 *            the new {@code File}
-	 * @throws IOException
-	 *             if the rename has failed
-	 */
-	public static void rename(final File src, final File dst)
-			throws IOException {
-		int attempts = FS.DETECTED.retryFailedLockFileCommit() ? 10 : 1;
-		while (--attempts >= 0) {
-			if (src.renameTo(dst))
-				return;
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().renameFileFailed, src.getAbsolutePath(),
-						dst.getAbsolutePath()));
-			}
-		}
-		throw new IOException(MessageFormat.format(
-				JGitText.get().renameFileFailed, src.getAbsolutePath(),
-				dst.getAbsolutePath()));
 	}
 
 	/**
