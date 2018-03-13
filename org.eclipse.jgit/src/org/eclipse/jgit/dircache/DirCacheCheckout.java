@@ -375,6 +375,16 @@ public class DirCacheCheckout {
 	 * @throws IOException
 	 */
 	public boolean checkout() throws IOException {
+		try {
+			return doCheckout();
+		} finally {
+			dc.unlock();
+		}
+	}
+
+	private boolean doCheckout() throws CorruptObjectException, IOException,
+			MissingObjectException, IncorrectObjectTypeException,
+			CheckoutConflictException, IndexWriteException {
 		toBeDeleted.clear();
 		if (headCommitTree != null)
 			preScanTwoTrees();
@@ -404,7 +414,7 @@ public class DirCacheCheckout {
 					toBeDeleted.add(r);
 			else {
 				if (!isSamePrefix(r, last))
-					removeEmptyParents(file);
+					removeEmptyParents(new File(repo.getWorkTree(), last));
 				last = r;
 			}
 		}

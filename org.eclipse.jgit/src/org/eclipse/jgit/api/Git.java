@@ -443,6 +443,45 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command object to execute a {@code clean} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
+	 *      >Git documentation about Clean</a>
+	 * @return a {@link CleanCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code clean} command
+	 */
+	public CleanCommand clean() {
+		return new CleanCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code blame} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-blame.html"
+	 *      >Git documentation about Blame</a>
+	 * @return a {@link BlameCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code blame} command
+	 */
+	public BlameCommand blame() {
+		return new BlameCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code reflog} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reflog.html"
+	 *      >Git documentation about reflog</a>
+	 * @return a {@link ReflogCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code reflog} command
+	 */
+	public ReflogCommand reflog() {
+		return new ReflogCommand(repo);
+	}
+
+	/**
 	 * @return the git repository this class is interacting with
 	 */
 	public Repository getRepository() {
