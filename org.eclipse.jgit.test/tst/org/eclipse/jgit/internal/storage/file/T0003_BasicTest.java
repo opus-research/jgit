@@ -354,14 +354,14 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void test007_Open() throws IOException {
-		try (final FileRepository db2 = new FileRepository(db.getDirectory())) {
-			assertEquals(db.getDirectory(), db2.getDirectory());
-			assertEquals(db.getObjectDatabase().getDirectory(), db2
-					.getObjectDatabase().getDirectory());
-			assertNotSame(db.getConfig(), db2.getConfig());
-		}
+		final FileRepository db2 = new FileRepository(db.getDirectory());
+		assertEquals(db.getDirectory(), db2.getDirectory());
+		assertEquals(db.getObjectDatabase().getDirectory(), db2
+				.getObjectDatabase().getDirectory());
+		assertNotSame(db.getConfig(), db2.getConfig());
 	}
 
+	@SuppressWarnings("unused")
 	@Test
 	public void test008_FailOnWrongVersion() throws IOException {
 		final File cfg = new File(db.getDirectory(), Constants.CONFIG);
@@ -370,7 +370,8 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 				+ badvers + "\n";
 		write(cfg, configStr);
 
-		try (FileRepository unused = new FileRepository(db.getDirectory())) {
+		try {
+			new FileRepository(db.getDirectory());
 			fail("incorrectly opened a bad repository");
 		} catch (IllegalArgumentException ioe) {
 			assertNotNull(ioe.getMessage());
@@ -532,10 +533,9 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 	public void test025_computeSha1NoStore() throws IOException {
 		byte[] data = "test025 some data, more than 16 bytes to get good coverage"
 				.getBytes("ISO-8859-1");
-		try (ObjectInserter.Formatter formatter = new ObjectInserter.Formatter()) {
-			final ObjectId id = formatter.idFor(Constants.OBJ_BLOB, data);
-			assertEquals("4f561df5ecf0dfbd53a0dc0f37262fef075d9dde", id.name());
-		}
+		final ObjectId id = new ObjectInserter.Formatter().idFor(
+				Constants.OBJ_BLOB, data);
+		assertEquals("4f561df5ecf0dfbd53a0dc0f37262fef075d9dde", id.name());
 	}
 
 	@Test
