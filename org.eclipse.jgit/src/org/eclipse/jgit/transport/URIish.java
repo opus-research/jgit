@@ -50,8 +50,6 @@ import java.net.URL;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.jgit.lib.Constants;
-
 /**
  * This URI like construct used for referencing Git archives over the net, as
  * well as locally stored archives. The most important difference compared to
@@ -59,6 +57,8 @@ import org.eclipse.jgit.lib.Constants;
  * any special character is written as-is.
  */
 public class URIish {
+	private static final String DOT_GIT = ".git";
+
 	private static final Pattern FULL_URI = Pattern
 			.compile("^(?:([a-z][a-z0-9+-]+)://(?:([^/]+?)(?::([^/]+?))?@)?(?:([^/]+?))?(?::(\\d+))?)?((?:[A-Za-z]:)?/.+)$");
 
@@ -408,11 +408,10 @@ public class URIish {
 		if (elements.length == 0)
 			throw new IllegalArgumentException();
 		String result = elements[elements.length - 1];
-		if (Constants.DOT_GIT.equals(result))
+		if (DOT_GIT.equals(result))
 			result = elements[elements.length - 2];
-		else if (result.endsWith(Constants.DOT_GIT_EXT))
-			result = result.substring(0, result.length()
-					- Constants.DOT_GIT_EXT.length());
+		else if (result.endsWith(DOT_GIT))
+			result = result.substring(0, result.length() - DOT_GIT.length());
 		return result;
 	}
 
