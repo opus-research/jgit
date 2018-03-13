@@ -49,7 +49,6 @@ package org.eclipse.jgit.util;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.security.AccessControlException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.DateFormat;
@@ -113,22 +112,7 @@ public abstract class SystemReader {
 
 		public FileBasedConfig openUserConfig(Config parent, FS fs) {
 			final File home = fs.userHome();
-			File userConfig = new File(home, ".gitconfig");
-			try {
-				userConfig.canRead();
-			} catch (AccessControlException e) {
-				return new FileBasedConfig(null, fs) {
-					public void load() {
-						// empty, do not load
-					}
-
-					public boolean isOutdated() {
-						// regular class would bomb here
-						return false;
-					}
-				};
-			}
-			return new FileBasedConfig(parent, userConfig, fs); //$NON-NLS-1$
+			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs); //$NON-NLS-1$
 		}
 
 		public String getHostname() {
