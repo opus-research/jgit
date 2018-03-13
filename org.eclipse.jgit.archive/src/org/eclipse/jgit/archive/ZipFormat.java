@@ -60,7 +60,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 /**
  * PKWARE's ZIP format.
  */
-public final class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	private static final List<String> SUFFIXES = Collections
 			.unmodifiableList(Arrays.asList(".zip")); //$NON-NLS-1$
 
@@ -104,15 +104,5 @@ public final class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStrea
 
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		return (other instanceof ZipFormat);
-	}
-
-	@Override
-	public int hashCode() {
-		return getClass().hashCode();
 	}
 }
