@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,30 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.lfs.errors;
 
-import java.io.IOException;
-
 /**
- * Something went wrong while transporting lfs objects
+ * Thrown when the bandwidth limit for the user or repository has been exceeded.
  *
  * @since 4.5
+ *
  */
-public class LfsTransportException extends IOException {
+public class LfsBandwidthLimitExceeded extends LfsException {
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * @param message
-	 * @param cause
+	 *            error message, which may be shown to an end-user.
 	 */
-	public LfsTransportException(String message, Throwable cause) {
-		super(message, cause);
-	}
-
-	/**
-	 * @param message
-	 */
-	public LfsTransportException(String message) {
+	public LfsBandwidthLimitExceeded(String message) {
 		super(message);
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016 Ericsson
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,64 +40,68 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server.fs;
 
+package org.eclipse.jgit.lib;
+
+import static org.eclipse.jgit.lib.RepositoryCacheConfig.AUTO_CLEANUP_DELAY;
+import static org.eclipse.jgit.lib.RepositoryCacheConfig.NO_CLEANUP;
 import static org.junit.Assert.assertEquals;
 
-import java.io.File;
-import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.lfs.CleanFilter;
-import org.eclipse.jgit.lfs.SmudgeFilter;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.junit.Before;
 import org.junit.Test;
 
-public class CheckoutTest extends LfsServerTest {
+public class RepositoryCacheConfigTest {
 
-	@Override
-	public void setup() throws Exception {
-		CleanFilter.register();
-		SmudgeFilter.register();
-		super.setup();
+	private RepositoryCacheConfig config;
 
+	@Before
+	public void setUp() {
+		config = new RepositoryCacheConfig();
 	}
 
 	@Test
-	public void testCheckout() throws Exception {
-		Path tempDirectory = getTempDirectory();
-		Path repoPath = tempDirectory.resolve("client");
-		try (Git git = Git.init().setDirectory(repoPath.toFile()).setBare(false)
-				.call()) {
-			StoredConfig config = git.getRepository().getConfig();
-			config.setString("lfs", null, "url", server.getURI().toString());
-			config.setBoolean("filter", "lfs", "useJGitBuiltin", true);
-			config.save();
-			JGitTestUtil.writeTrashFile(git.getRepository(), ".gitattributes",
-					"*.txt filter=lfs");
-			git.add().addFilepattern(".gitattributes").call();
-			git.commit().setMessage("initial").call();
+	public void testDefaultValues() {
+		assertEquals(TimeUnit.HOURS.toMillis(1), config.getExpireAfter());
+		assertEquals(config.getExpireAfter() / 10, config.getCleanupDelay());
+	}
 
-			JGitTestUtil.writeTrashFile(git.getRepository(), "a.txt", "foo");
-			git.add().addFilepattern("a.txt").call();
-			RevCommit commit = git.commit().setMessage("add a").call();
-			putContent(repoPath.resolve("a.txt"));
+	@Test
+	public void testCleanupDelay() {
+		config.setCleanupDelay(TimeUnit.HOURS.toMillis(1));
+		assertEquals(TimeUnit.HOURS.toMillis(1), config.getCleanupDelay());
+	}
 
-			JGitTestUtil.writeTrashFile(git.getRepository(), "a.txt", "bar");
-			git.add().addFilepattern("a.txt").call();
-			git.commit().setMessage("modify a").call();
+	@Test
+	public void testAutoCleanupDelay() {
+		config.setExpireAfter(TimeUnit.MINUTES.toMillis(20));
+		config.setCleanupDelay(AUTO_CLEANUP_DELAY);
+		assertEquals(TimeUnit.MINUTES.toMillis(20), config.getExpireAfter());
+		assertEquals(config.getExpireAfter() / 10, config.getCleanupDelay());
+	}
 
-			FileUtils.delete(new File(repoPath.toFile(), ".git/lfs/objects"),
-					FileUtils.RECURSIVE);
+	@Test
+	public void testAutoCleanupDelayShouldBeMax10minutes() {
+		config.setExpireAfter(TimeUnit.HOURS.toMillis(10));
+		assertEquals(TimeUnit.HOURS.toMillis(10), config.getExpireAfter());
+		assertEquals(TimeUnit.MINUTES.toMillis(10), config.getCleanupDelay());
+	}
 
-			git.checkout().setName(commit.getName()).call();
-			assertEquals("foo",
-					JGitTestUtil.read(git.getRepository(), "a.txt"));
+	@Test
+	public void testDisabledCleanupDelay() {
+		config.setCleanupDelay(NO_CLEANUP);
+		assertEquals(NO_CLEANUP, config.getCleanupDelay());
+	}
 
-		}
-
+	@Test
+	public void testFromConfig() throws ConfigInvalidException {
+		Config otherConfig = new Config();
+		otherConfig.fromText("[core]\nrepositoryCacheExpireAfter=1000\n"
+				+ "repositoryCacheCleanupDelay=500");
+		config.fromConfig(otherConfig);
+		assertEquals(1000, config.getExpireAfter());
+		assertEquals(500, config.getCleanupDelay());
 	}
 }
