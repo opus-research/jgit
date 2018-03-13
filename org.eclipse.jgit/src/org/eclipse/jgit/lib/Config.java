@@ -387,13 +387,6 @@ public class Config {
 		if (value == null)
 			return defaultValue;
 
-		if (defaultValue instanceof ConfigEnum) {
-			for (T t : all) {
-				if (((ConfigEnum) t).matchConfigValue(value))
-					return t;
-			}
-		}
-
 		String n = value.replace(' ', '_');
 
 		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
@@ -735,12 +728,7 @@ public class Config {
 	 */
 	public <T extends Enum<?>> void setEnum(final String section,
 			final String subsection, final String name, final T value) {
-		String n = null;
-		if (value instanceof ConfigEnum) {
-			n = ((ConfigEnum) value).toConfigValue();
-		} else {
-			n = value.name().toLowerCase().replace('_', ' ');
-		}
+		String n = value.name().toLowerCase().replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
