@@ -51,7 +51,7 @@ import org.eclipse.jgit.lfs.lib.LongObjectId;
 /**
  * Class which represents the lfs folder hierarchy inside a .git folder
  *
- * @since 4.5
+ * @since 4.6
  */
 public class Lfs {
 	private Path root;

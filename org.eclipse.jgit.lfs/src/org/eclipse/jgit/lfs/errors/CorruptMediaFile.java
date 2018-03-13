@@ -51,7 +51,7 @@ import org.eclipse.jgit.lfs.internal.LfsText;
 /**
  * Thrown when a LFS mediafile is found which doesn't have the expected size
  *
- * @since 4.5
+ * @since 4.6
  */
 public class CorruptMediaFile extends IOException {
 	private static final long serialVersionUID = 1L;
