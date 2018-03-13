@@ -43,14 +43,9 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Test;
 
 public class WindowCacheReconfigureTest extends RepositoryTestCase {
-	@Test
 	public void testConfigureCache_PackedGitLimit_0() {
 		try {
 			final WindowCacheConfig cfg = new WindowCacheConfig();
@@ -62,7 +57,6 @@ public class WindowCacheReconfigureTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testConfigureCache_PackedGitWindowSize_0() {
 		try {
 			final WindowCacheConfig cfg = new WindowCacheConfig();
@@ -74,7 +68,6 @@ public class WindowCacheReconfigureTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testConfigureCache_PackedGitWindowSize_512() {
 		try {
 			final WindowCacheConfig cfg = new WindowCacheConfig();
@@ -86,7 +79,6 @@ public class WindowCacheReconfigureTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testConfigureCache_PackedGitWindowSize_4097() {
 		try {
 			final WindowCacheConfig cfg = new WindowCacheConfig();
@@ -98,7 +90,6 @@ public class WindowCacheReconfigureTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testConfigureCache_PackedGitOpenFiles_0() {
 		try {
 			final WindowCacheConfig cfg = new WindowCacheConfig();
@@ -110,7 +101,6 @@ public class WindowCacheReconfigureTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testConfigureCache_PackedGitWindowSizeAbovePackedGitLimit() {
 		try {
 			final WindowCacheConfig cfg = new WindowCacheConfig();
@@ -123,7 +113,6 @@ public class WindowCacheReconfigureTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testConfigureCache_Limits1() {
 		// This test is just to force coverage over some lower bounds for
 		// the table. We don't want the table to wind up with too small

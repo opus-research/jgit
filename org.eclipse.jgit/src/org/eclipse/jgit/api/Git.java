@@ -80,32 +80,6 @@ public class Git {
 	private final Repository repo;
 
 	/**
-	 * Returns a command object to execute a {@code clone} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
-	 *      >Git documentation about clone</a>
-	 * @return a {@link CloneCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code clone} command
-	 */
-	static public CloneCommand cloneRepository() {
-		return new CloneCommand();
-	}
-
-	/**
-	 * Returns a command object to execute a {@code init} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
-	 *      >Git documentation about init</a>
-	 * @return a {@link InitCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code init} command
-	 */
-	public static InitCommand init() {
-		return new InitCommand();
-	}
-
-	/**
 	 * Constructs a new {@link Git} object which can interact with the specified
 	 * git repository. All command classes returned by methods of this class
 	 * will always interact with this git repository.
@@ -270,19 +244,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code revert} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-revert.html"
-	 *      >Git documentation about reverting changes</a>
-	 * @return a {@link RevertCommand} used to collect all optional
-	 *         parameters and to finally execute the {@code cherry-pick} command
-	 */
-	public RevertCommand revert() {
-		return new RevertCommand(repo);
-	}
-
-	/**
 	 * Returns a command object to execute a {@code Rebase} command
 	 *
 	 * @see <a
@@ -297,7 +258,7 @@ public class Git {
 
 	/**
 	 * Returns a command object to execute a {@code rm} command
-	 *
+	 * 
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rm.html"
 	 *      >Git documentation about rm</a>

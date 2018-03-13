@@ -44,15 +44,9 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import junit.framework.TestCase;
 
-import org.junit.Test;
-
-public class EditTest {
-	@Test
+public class EditTest extends TestCase {
 	public void testCreate() {
 		final Edit e = new Edit(1, 2, 3, 4);
 		assertEquals(1, e.getBeginA());
@@ -61,7 +55,6 @@ public class EditTest {
 		assertEquals(4, e.getEndB());
 	}
 
-	@Test
 	public void testCreateEmpty() {
 		final Edit e = new Edit(1, 3);
 		assertEquals(1, e.getBeginA());
@@ -72,7 +65,6 @@ public class EditTest {
 		assertSame(Edit.Type.EMPTY, e.getType());
 	}
 
-	@Test
 	public void testSwap() {
 		final Edit e = new Edit(1, 2, 3, 4);
 		e.swap();
@@ -82,7 +74,6 @@ public class EditTest {
 		assertEquals(2, e.getEndB());
 	}
 
-	@Test
 	public void testType_Insert() {
 		final Edit e = new Edit(1, 1, 1, 2);
 		assertSame(Edit.Type.INSERT, e.getType());
@@ -91,7 +82,6 @@ public class EditTest {
 		assertEquals(1, e.getLengthB());
 	}
 
-	@Test
 	public void testType_Delete() {
 		final Edit e = new Edit(1, 2, 1, 1);
 		assertSame(Edit.Type.DELETE, e.getType());
@@ -100,7 +90,6 @@ public class EditTest {
 		assertEquals(0, e.getLengthB());
 	}
 
-	@Test
 	public void testType_Replace() {
 		final Edit e = new Edit(1, 2, 1, 4);
 		assertSame(Edit.Type.REPLACE, e.getType());
@@ -109,7 +98,6 @@ public class EditTest {
 		assertEquals(3, e.getLengthB());
 	}
 
-	@Test
 	public void testType_Empty() {
 		final Edit e = new Edit(1, 1, 2, 2);
 		assertSame(Edit.Type.EMPTY, e.getType());
@@ -119,13 +107,11 @@ public class EditTest {
 		assertEquals(0, e.getLengthB());
 	}
 
-	@Test
 	public void testToString() {
 		final Edit e = new Edit(1, 2, 1, 4);
 		assertEquals("REPLACE(1-2,1-4)", e.toString());
 	}
 
-	@Test
 	public void testEquals1() {
 		final Edit e1 = new Edit(1, 2, 3, 4);
 		final Edit e2 = new Edit(1, 2, 3, 4);
@@ -137,27 +123,22 @@ public class EditTest {
 		assertFalse(e1.equals(""));
 	}
 
-	@Test
 	public void testNotEquals1() {
 		assertFalse(new Edit(1, 2, 3, 4).equals(new Edit(0, 2, 3, 4)));
 	}
 
-	@Test
 	public void testNotEquals2() {
 		assertFalse(new Edit(1, 2, 3, 4).equals(new Edit(1, 0, 3, 4)));
 	}
 
-	@Test
 	public void testNotEquals3() {
 		assertFalse(new Edit(1, 2, 3, 4).equals(new Edit(1, 2, 0, 4)));
 	}
 
-	@Test
 	public void testNotEquals4() {
 		assertFalse(new Edit(1, 2, 3, 4).equals(new Edit(1, 2, 3, 0)));
 	}
 
-	@Test
 	public void testExtendA() {
 		final Edit e = new Edit(1, 2, 1, 1);
 
@@ -168,7 +149,6 @@ public class EditTest {
 		assertEquals(new Edit(1, 4, 1, 1), e);
 	}
 
-	@Test
 	public void testExtendB() {
 		final Edit e = new Edit(1, 2, 1, 1);
 
@@ -179,7 +159,6 @@ public class EditTest {
 		assertEquals(new Edit(1, 2, 1, 3), e);
 	}
 
-	@Test
 	public void testBeforeAfterCuts() {
 		final Edit whole = new Edit(1, 8, 2, 9);
 		final Edit mid = new Edit(4, 5, 3, 6);

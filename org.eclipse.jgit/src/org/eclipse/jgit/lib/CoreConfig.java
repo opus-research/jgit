@@ -80,10 +80,16 @@ public class CoreConfig {
 
 	private final boolean logAllRefUpdates;
 
+	private final boolean fileMode;
+
+	private final AutoCRLF autoCRLF;
+
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
 		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
+		fileMode = rc.getBoolean("core", "filemode", true);
+		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
 	}
 
 	/**
@@ -95,6 +101,7 @@ public class CoreConfig {
 
 	/**
 	 * @return the preferred pack index file format; 0 for oldest possible.
+	 * @see org.eclipse.jgit.transport.IndexPack
 	 */
 	public int getPackIndexVersion() {
 		return packIndexVersion;
@@ -105,5 +112,19 @@ public class CoreConfig {
 	 */
 	public boolean isLogAllRefUpdates() {
 		return logAllRefUpdates;
+	}
+
+	/**
+	 * @return whether to trust file modes
+	 */
+	public boolean isFileMode() {
+		return fileMode;
+	}
+
+	/**
+	 * @return whether automatic CRLF conversion has been configured
+	 */
+	public AutoCRLF getAutoCRLF() {
+		return autoCRLF;
 	}
 }
