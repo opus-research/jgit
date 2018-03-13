@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_MODIFIED;
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ETAG;
 import static org.eclipse.jgit.util.HttpSupport.HDR_IF_MODIFIED_SINCE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_IF_NONE_MATCH;
@@ -62,6 +59,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.Repository;
+import static javax.servlet.http.HttpServletResponse.*;
+import static org.eclipse.jgit.http.server.ServletUtils.*;
 
 /** Sends any object from {@code GIT_DIR/objects/??/0 38}, or any pack file. */
 abstract class ObjectFileServlet extends HttpServlet {
@@ -137,13 +136,14 @@ abstract class ObjectFileServlet extends HttpServlet {
 		try {
 			sender = new FileSender(obj);
 		} catch (FileNotFoundException e) {
+			nocache(rsp);
 			rsp.sendError(SC_NOT_FOUND);
 			return;
 		}
 
 		try {
 			final String etag = etag(sender);
-			final long lastModified = (sender.getLastModified() / 1000) * 1000;
+			final long lastModified = sender.getLastModified() / 1000 * 1000;
 
 			String ifNoneMatch = req.getHeader(HDR_IF_NONE_MATCH);
 			if (etag != null && etag.equals(ifNoneMatch)) {
@@ -157,6 +157,7 @@ abstract class ObjectFileServlet extends HttpServlet {
 				return;
 			}
 
+			cacheForever(rsp);
 			if (etag != null)
 				rsp.setHeader(HDR_ETAG, etag);
 			if (0 < lastModified)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,6 +45,7 @@ package org.eclipse.jgit.http.server;
 
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.http.server.ServletUtils.nocache;
 import static org.eclipse.jgit.http.server.ServletUtils.send;
 
 import java.io.File;
@@ -55,7 +56,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 
 /** Sends a small text meta file from the repository. */
@@ -71,7 +71,8 @@ class TextFileServlet extends HttpServlet {
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
 		try {
-			rsp.setContentType(HttpSupport.TEXT_PLAIN);
+			nocache(rsp);
+			rsp.setContentType("text/plain");
 			send(read(req), req, rsp);
 		} catch (FileNotFoundException noFile) {
 			rsp.sendError(SC_NOT_FOUND);

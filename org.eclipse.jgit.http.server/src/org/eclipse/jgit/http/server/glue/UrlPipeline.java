@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -60,24 +60,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-/**
- * Encapsulates the entire serving stack for a single URL.
- * <p>
- * Subclasses provide the implementation of {@link #match(HttpServletRequest)},
- * which is called by {@link MetaServlet} in registration order to determine the
- * pipeline that will be used to handle a request.
- * <p>
- * The very bottom of each pipeline is a single {@link HttpServlet} that will
- * handle producing the response for this pipeline's URL. {@link Filter}s may
- * also be registered and applied around the servlet's processing, to manage
- * request attributes, set standard response headers, or completely override the
- * response generation.
- */
 abstract class UrlPipeline {
-	/** Filters to apply around {@link #servlet}; may be empty but never null. */
 	private final Filter[] filters;
 
-	/** Instance that must generate the response; never null. */
 	private final HttpServlet servlet;
 
 	UrlPipeline(final Filter[] filters, final HttpServlet servlet) {
@@ -85,21 +70,6 @@ abstract class UrlPipeline {
 		this.servlet = servlet;
 	}
 
-	/**
-	 * Initialize all contained filters and servlets.
-	 *
-	 * @param context
-	 *            the servlet container context our {@link MetaServlet} is
-	 *            running within.
-	 * @param inited
-	 *            <i>(input/output)</i> the set of filters and servlets which
-	 *            have already been initialized within the container context. If
-	 *            those same instances appear in this pipeline they are not
-	 *            initialized a second time. Filters and servlets that are first
-	 *            initialized by this pipeline will be added to this set.
-	 * @throws ServletException
-	 *             a filter or servlet is unable to initialize.
-	 */
 	void init(final ServletContext context, final Set<Object> inited)
 			throws ServletException {
 		for (Filter ref : filters)
@@ -173,16 +143,6 @@ abstract class UrlPipeline {
 		}
 	}
 
-	/**
-	 * Destroy all contained filters and servlets.
-	 *
-	 * @param destroyed
-	 *            <i>(input/output)</i> the set of filters and servlets which
-	 *            have already been destroyed within the container context. If
-	 *            those same instances appear in this pipeline they are not
-	 *            destroyed a second time. Filters and servlets that are first
-	 *            destroyed by this pipeline will be added to this set.
-	 */
 	void destroy(final Set<Object> destroyed) {
 		for (Filter ref : filters)
 			destroyFilter(ref, destroyed);
@@ -203,36 +163,8 @@ abstract class UrlPipeline {
 		}
 	}
 
-	/**
-	 * Determine if this pipeline handles the request's URL.
-	 * <p>
-	 * This method should match on the request's {@code getPathInfo()} method,
-	 * as {@link MetaServlet} passes the request along as-is to each pipeline's
-	 * match method.
-	 *
-	 * @param req
-	 *            current HTTP request being considered by {@link MetaServlet}.
-	 * @return {@code true} if this pipeline is configured to handle the
-	 *         request; {@code false} otherwise.
-	 */
 	abstract boolean match(HttpServletRequest req);
 
-	/**
-	 * Execute the filters and the servlet on the request.
-	 * <p>
-	 * Invoked by {@link MetaServlet} once {@link #match(HttpServletRequest)}
-	 * has determined this pipeline is the correct pipeline to handle the
-	 * current request.
-	 *
-	 * @param req
-	 *            current HTTP request.
-	 * @param rsp
-	 *            current HTTP response.
-	 * @throws ServletException
-	 *             request cannot be completed.
-	 * @throws IOException
-	 *             IO error prevents the request from being completed.
-	 */
 	void service(HttpServletRequest req, HttpServletResponse rsp)
 			throws ServletException, IOException {
 		if (0 < filters.length)

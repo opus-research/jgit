@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,6 +46,7 @@ package org.eclipse.jgit.http.server;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.http.server.ServletUtils.nocache;
 import static org.eclipse.jgit.http.server.ServletUtils.send;
 
 import java.io.ByteArrayOutputStream;
@@ -88,6 +89,7 @@ abstract class SmartServiceInfoRefs implements Filter {
 
 		if (svc.equals(req.getParameter("service"))) {
 			final HttpServletResponse rsp = (HttpServletResponse) response;
+			nocache(rsp);
 			try {
 				final Repository db = getRepository(req);
 				final ByteArrayOutputStream buf = new ByteArrayOutputStream();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,9 +43,9 @@
 
 package org.eclipse.jgit.http.server;
 
-import static org.eclipse.jgit.util.HttpSupport.HDR_CACHE_CONTROL;
-import static org.eclipse.jgit.util.HttpSupport.HDR_EXPIRES;
-import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
+import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
+import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
 import java.io.IOException;
 
@@ -55,10 +55,21 @@ import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-/** Adds HTTP response headers to prevent caching by proxies/browsers. */
-class NoCacheFilter implements Filter {
+import org.eclipse.jgit.http.server.resolver.GetAnyFile;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.lib.Repository;
+
+class GetAnyFileFilter implements Filter {
+	private final GetAnyFile getAnyFile;
+
+	GetAnyFileFilter(final GetAnyFile getAnyFile) {
+		this.getAnyFile = getAnyFile;
+	}
+
 	public void init(FilterConfig config) throws ServletException {
 		// Do nothing.
 	}
@@ -69,14 +80,14 @@ class NoCacheFilter implements Filter {
 
 	public void doFilter(ServletRequest request, ServletResponse response,
 			FilterChain chain) throws IOException, ServletException {
-		HttpServletResponse rsp = (HttpServletResponse) response;
-
-		rsp.setHeader(HDR_EXPIRES, "Fri, 01 Jan 1980 00:00:00 GMT");
-		rsp.setHeader(HDR_PRAGMA, "no-cache");
-
-		final String nocache = "no-cache, max-age=0, must-revalidate";
-		rsp.setHeader(HDR_CACHE_CONTROL, nocache);
-
-		chain.doFilter(request, response);
+		try {
+			final Repository db = getRepository(request);
+			getAnyFile.access((HttpServletRequest) request, db);
+			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
+		}
 	}
 }

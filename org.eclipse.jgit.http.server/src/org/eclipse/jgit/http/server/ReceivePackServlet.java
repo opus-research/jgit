@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,6 +49,7 @@ import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.http.server.ServletUtils.nocache;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -129,6 +130,7 @@ class ReceivePackServlet extends HttpServlet {
 
 	private void reply(final HttpServletResponse rsp, final byte[] result)
 			throws IOException {
+		nocache(rsp);
 		rsp.setContentType(RSP_TYPE);
 		rsp.setContentLength(result.length);
 		final OutputStream os = rsp.getOutputStream();

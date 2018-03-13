@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -65,9 +65,6 @@ public class HttpSupport {
 	/** The {@code Pragma} header. */
 	public static final String HDR_PRAGMA = "Pragma";
 
-	/** The {@code User-Agent} header. */
-	public static final String HDR_USER_AGENT = "User-Agent";
-
 	/** The {@code Date} header. */
 	public static final String HDR_DATE = "Date";
 
@@ -86,14 +83,8 @@ public class HttpSupport {
 	/** The {@code If-Modified-Since} header. */
 	public static final String HDR_IF_MODIFIED_SINCE = "If-Modified-Since";
 
-	/** The {@code Accept} header. */
-	public static final String HDR_ACCEPT = "Accept";
-
 	/** The {@code Content-Type} header. */
 	public static final String HDR_CONTENT_TYPE = "Content-Type";
-
-	/** The {@code Content-Length} header. */
-	public static final String HDR_CONTENT_LENGTH = "Content-Length";
 
 	/** The {@code Content-Encoding} header. */
 	public static final String HDR_CONTENT_ENCODING = "Content-Encoding";
@@ -115,9 +106,6 @@ public class HttpSupport {
 
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_GZIP = "gzip";
-
-	/** The standard {@code text/plain} MIME type. */
-	public static final String TEXT_PLAIN = "text/plain";
 
 	/**
 	 * URL encode a value string into an output buffer.

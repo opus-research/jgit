@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,6 +44,7 @@
 package org.eclipse.jgit.http.server;
 
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.http.server.ServletUtils.nocache;
 import static org.eclipse.jgit.http.server.ServletUtils.sendPlainText;
 
 import java.io.IOException;
@@ -62,6 +63,7 @@ class InfoPacksServlet extends HttpServlet {
 
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
+		nocache(rsp);
 		sendPlainText(packList(req), req, rsp);
 	}
 

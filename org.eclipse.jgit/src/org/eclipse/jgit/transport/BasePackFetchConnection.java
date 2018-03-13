@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -55,7 +55,6 @@ import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PackLock;
@@ -149,9 +148,6 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 	/** Marks a commit known to both sides of the connection. */
 	final RevFlag COMMON;
 
-	/** Like {@link #COMMON} but means its also in {@link #pckState}. */
-	private final RevFlag STATE;
-
 	/** Marks a commit listed in the advertised refs. */
 	final RevFlag ADVERTISED;
 
@@ -186,7 +182,6 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 		reachableCommits = new RevCommitList<RevCommit>();
 		REACHABLE = walk.newFlag("REACHABLE");
 		COMMON = walk.newFlag("COMMON");
-		STATE = walk.newFlag("STATE");
 		ADVERTISED = walk.newFlag("ADVERTISED");
 
 		walk.carry(COMMON);
@@ -591,16 +586,8 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 
 	private void markCommon(final RevObject obj, final AckNackResult anr)
 			throws IOException {
-		if (statelessRPC && anr == AckNackResult.ACK_COMMON && !obj.has(STATE)) {
-			StringBuilder s;
-
-			s = new StringBuilder(6 + Constants.OBJECT_ID_STRING_LENGTH);
-			s.append("have "); //$NON-NLS-1$
-			s.append(obj.name());
-			s.append('\n');
-			pckState.writeString(s.toString());
-			obj.add(STATE);
-		}
+		if (statelessRPC && anr == AckNackResult.ACK_COMMON && !obj.has(COMMON))
+			pckState.writeString("have " + obj.name() + "\n");
 		obj.add(COMMON);
 		if (obj instanceof RevCommit)
 			((RevCommit) obj).carry(COMMON);

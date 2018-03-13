@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -56,26 +56,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-/**
- * Selects requests by matching the URI against a regular expression.
- * <p>
- * The pattern is bound and matched against the path info of the servlet
- * request, as this class assumes it is invoked by {@link MetaServlet}.
- * <p>
- * If there are capture groups in the regular expression, the matched ranges of
- * the capture groups are stored as an array of modified HttpServetRequests,
- * into the request attribute {@link MetaServlet#REGEX_GROUPS}.
- * <p>
- * Each servlet request has been altered to have its {@code getPathInfo()}
- * method return the matched text of the corresponding capture group. A
- * {@link RegexGroupFilter} can be applied in the pipeline to switch the current
- * HttpServletRequest to reference a different capture group before running
- * additional filters, or the final servlet.
- * <p>
- * This class dispatches the remainder of the pipeline using the first capture
- * group as the current request, making {@code RegexGroupFilter} required only
- * to access capture groups beyond the first.
- */
 class RegexPipeline extends UrlPipeline {
 	static class Binder extends ServletBinderImpl {
 		private final Pattern pattern;
@@ -125,6 +105,7 @@ class RegexPipeline extends UrlPipeline {
 				// build a request for them so RegexGroupFilter can pick
 				// a different capture group later. Continue using the
 				// first capture group as the path info.
+				//
 				WrappedRequest groups[] = new WrappedRequest[cur.groupCount()];
 				for (int groupId = 1; groupId <= cur.groupCount(); groupId++) {
 					final int s = cur.start(groupId);
@@ -139,6 +120,7 @@ class RegexPipeline extends UrlPipeline {
 
 			} else {
 				// No capture groups were present, service the whole request.
+				//
 				final String path = reqPath + reqInfo;
 				final String info = null;
 				super.service(new WrappedRequest(req, path, info), rsp);

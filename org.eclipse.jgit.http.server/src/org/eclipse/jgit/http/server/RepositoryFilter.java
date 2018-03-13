@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,7 +46,6 @@ package org.eclipse.jgit.http.server;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_REPOSITORY;
 
 import java.io.IOException;
@@ -63,7 +62,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
 
@@ -131,9 +129,6 @@ public class RepositoryFilter implements Filter {
 			db = resolver.open(req, name);
 		} catch (RepositoryNotFoundException e) {
 			((HttpServletResponse) rsp).sendError(SC_NOT_FOUND);
-			return;
-		} catch (ServiceNotAuthorizedException e) {
-			((HttpServletResponse) rsp).sendError(SC_UNAUTHORIZED);
 			return;
 		} catch (ServiceNotEnabledException e) {
 			((HttpServletResponse) rsp).sendError(SC_FORBIDDEN);

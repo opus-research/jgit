@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -59,9 +59,9 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  * configuration setting, can be used by {@link GitServlet} to control whether
  * or not these older clients are permitted to read these direct files.
  */
-public class AsIsFileService {
+public class GetAnyFile {
 	/** Always throws {@link ServiceNotEnabledException}. */
-	public static final AsIsFileService DISABLED = new AsIsFileService() {
+	public static final GetAnyFile DISABLED = new GetAnyFile() {
 		@Override
 		public void access(HttpServletRequest req, Repository db)
 				throws ServiceNotEnabledException {

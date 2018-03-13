@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2009-2010, Google Inc.
+   Copyright (C) 2009, Google Inc.
    Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
    and other copyright owners as documented in the project's IP log.
 
@@ -88,6 +88,29 @@
     </resources>
 
     <plugins>
+      <plugin>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>maven-bundle-plugin</artifactId>
+        <configuration>
+          <instructions>
+            <Import-Package>
+              javax.servlet;version="${servlet-api-version}",
+              javax.servlet.http;version="${servlet-api-version}",
+              *
+            </Import-Package>
+          </instructions>
+        </configuration>
+        <executions>
+          <execution>
+            <id>bundle-manifest</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>manifest</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>

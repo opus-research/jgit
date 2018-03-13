@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,10 +44,12 @@
 package org.eclipse.jgit.http.server;
 
 import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
-import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
+import static org.eclipse.jgit.util.HttpSupport.HDR_CACHE_CONTROL;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
+import static org.eclipse.jgit.util.HttpSupport.HDR_DATE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ETAG;
-import static org.eclipse.jgit.util.HttpSupport.TEXT_PLAIN;
+import static org.eclipse.jgit.util.HttpSupport.HDR_EXPIRES;
+import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -106,12 +108,43 @@ public final class ServletUtils {
 			throws IOException {
 		InputStream in = req.getInputStream();
 		final String enc = req.getHeader(HDR_CONTENT_ENCODING);
-		if (ENCODING_GZIP.equals(enc) || "x-gzip".equals(enc)) //$NON-NLS-1$
+		if (ENCODING_GZIP.equals(enc) || "x-gzip".equals(enc))
 			in = new GZIPInputStream(in);
 		else if (enc != null)
 			throw new IOException(HDR_CONTENT_ENCODING + " \"" + enc + "\""
 					+ ": not supported by this library.");
 		return in;
+	}
+
+	/**
+	 * Disallow caching of the HTTP response.
+	 *
+	 * @param rsp
+	 *            the response whose content must not be cached.
+	 */
+	public static void nocache(final HttpServletResponse rsp) {
+		rsp.setHeader(HDR_EXPIRES, "Fri, 01 Jan 1980 00:00:00 GMT");
+		rsp.setHeader(HDR_PRAGMA, "no-cache");
+
+		final String nocache = "no-cache, max-age=0, must-revalidate";
+		rsp.setHeader(HDR_CACHE_CONTROL, nocache);
+	}
+
+	/**
+	 * Allow caching of the HTTP response for an indefinite period.
+	 * <p>
+	 * The server will set cache control headers such that the content may be
+	 * cached by any proxy server for a very long period of time, potentially
+	 * for many years.
+	 *
+	 * @param rsp
+	 *            the response whose content can be cached for a long time.
+	 */
+	public static void cacheForever(final HttpServletResponse rsp) {
+		final long now = System.currentTimeMillis();
+		rsp.setDateHeader(HDR_DATE, now);
+		rsp.setDateHeader(HDR_EXPIRES, now + 31536000000L);
+		rsp.setHeader(HDR_CACHE_CONTROL, "public, max-age=31536000");
 	}
 
 	/**
@@ -125,7 +158,9 @@ public final class ServletUtils {
 	 * The {@code ETag} and {@code Content-Length} headers are automatically set
 	 * by this method. {@code Content-Encoding} is conditionally set if the user
 	 * agent supports a compressed transfer. Callers are responsible for setting
-	 * any cache control headers.
+	 * any cache control headers (
+	 * {@link ServletUtils#cacheForever(HttpServletResponse)} or
+	 * {@link ServletUtils#nocache(HttpServletResponse)}).
 	 *
 	 * @param content
 	 *            to return to the user agent as this entity's body.
@@ -139,9 +174,10 @@ public final class ServletUtils {
 	public static void sendPlainText(final String content,
 			final HttpServletRequest req, final HttpServletResponse rsp)
 			throws IOException {
-		final byte[] raw = content.getBytes(Constants.CHARACTER_ENCODING);
-		rsp.setContentType(TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
+		final String enc = Constants.CHARACTER_ENCODING;
+		final byte[] raw = content.getBytes(enc);
+		rsp.setContentType("text/plain");
+		rsp.setCharacterEncoding(enc);
 		send(raw, req, rsp);
 	}
 
@@ -154,7 +190,9 @@ public final class ServletUtils {
 	 * The {@code ETag} and {@code Content-Length} headers are automatically set
 	 * by this method. {@code Content-Encoding} is conditionally set if the user
 	 * agent supports a compressed transfer. Callers are responsible for setting
-	 * {@code Content-Type} and any cache control headers.
+	 * {@code Content-Type} and any cache control headers (
+	 * {@link ServletUtils#cacheForever(HttpServletResponse)} or
+	 * {@link ServletUtils#nocache(HttpServletResponse)}).
 	 *
 	 * @param content
 	 *            to return to the user agent as this entity's body.
@@ -190,7 +228,7 @@ public final class ServletUtils {
 	}
 
 	private static boolean acceptsGzipEncoding(final HttpServletRequest req) {
-		final String accepts = req.getHeader(HDR_ACCEPT_ENCODING);
+		final String accepts = req.getHeader(HDR_CONTENT_ENCODING);
 		return accepts != null && 0 <= accepts.indexOf(ENCODING_GZIP);
 	}
 
