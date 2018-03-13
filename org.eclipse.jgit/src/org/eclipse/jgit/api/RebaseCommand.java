@@ -434,8 +434,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				case NO_CHANGE:
 					break;
 				default:
-					throw new JGitInternalException(
-							JGitText.get().abortingRebaseFailed);
+					throw new IOException("Could not abort rebase");
 				}
 			}
 			// cleanup the files
