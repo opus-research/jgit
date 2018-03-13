@@ -62,6 +62,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.Proxy;
@@ -428,7 +429,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			throws NotSupportedException, TransportException {
 		SubscribeConnection conn = new SmartHttpSubscribeConnection();
 		try {
-			conn.doSubscribeAdvertisement(subscriber);
+			conn.sendSubscribeAdvertisement(subscriber);
+		} catch (TransportException e) {
+			throw e;
 		} catch (IOException e) {
 			throw new TransportException(uri, e.getMessage(), e);
 		}
@@ -797,25 +800,25 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		@Override
-		public void doSubscribeAdvertisement(Subscriber subscriber)
+		public void sendSubscribeAdvertisement(Subscriber subscriber)
 				throws IOException {
 			Service svc = new LongPollService(SVC_PUBLISH_SUBSCRIBE);
 			svc.setHandleAuth(true);
 			start(svc.getInputStream(), svc.getOutputStream());
-			super.doSubscribeAdvertisement(subscriber);
+			super.sendSubscribeAdvertisement(subscriber);
 		}
 
 		@Override
-		public void doSubscribe(Subscriber subscriber,
+		public void subscribe(Subscriber subscriber,
 				Map<String, List<SubscribeCommand>> subscribeCommands,
-				ProgressMonitor monitor)
+				PrintWriter output)
 				throws InterruptedException, TransportException, IOException {
 
 			Service svc = new LongPollService(SVC_PUBLISH_SUBSCRIBE);
 			InputStream bufferedInput = new BufferedInputStream(svc
 					.getInputStream(), 8192);
 			start(bufferedInput, svc.getOutputStream());
-			super.doSubscribe(subscriber, subscribeCommands, monitor);
+			super.subscribe(subscriber, subscribeCommands, output);
 		}
 	}
 

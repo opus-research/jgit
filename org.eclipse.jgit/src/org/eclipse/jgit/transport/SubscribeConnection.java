@@ -44,41 +44,50 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.ProgressMonitor;
 
 /**
- * Subscribe connections send a list of repository names with a list of
+ * SubscribeConnection sends a list of repository names with a list of
  * SubscribeCommands and ref states for each repository to a Publisher instance.
  * The connection is left open, and the Publisher responds by sending any
  * matching ref updates in packs.
  */
 public interface SubscribeConnection extends Connection {
 	/**
-	 * Send the initial advertisement to determine authentication.
+	 * Do the initial advertisement with only repository names to determine if
+	 * authentication is needed for this request.
 	 *
 	 * @param subscriber
 	 * @throws IOException
+	 * @throws TransportException
+	 *             thrown if the client is unauthorized to view the remote
+	 *             repository, the remote repository does not exist, or a
+	 *             protocol level error occurred.
 	 */
-	void doSubscribeAdvertisement(Subscriber subscriber) throws IOException;
+	void sendSubscribeAdvertisement(Subscriber subscriber)
+			throws IOException, TransportException;
 
 	/**
-	 * Subscribe using this connection.
+	 * Subscribe to a remote Publisher instance by sending the server a list of
+	 * repositories and refspecs it wants to receive updates for. It also sends
+	 * the client's state for all locally-matching refs, and optionally a
+	 * restart token to reconnect a dropped connection.
 	 *
 	 * @param subscriber
 	 * @param subscribeCommands
 	 *            map from repository name to a list of SubscribeCommands to
 	 *            execute for that repository
-	 * @param monitor
+	 * @param output
 	 * @throws InterruptedException
 	 * @throws IOException
 	 * @throws TransportException
 	 */
-	void doSubscribe(Subscriber subscriber,
+	void subscribe(Subscriber subscriber,
 			Map<String, List<SubscribeCommand>> subscribeCommands,
-			ProgressMonitor monitor)
+			PrintWriter output)
 			throws InterruptedException, TransportException, IOException;
 }
