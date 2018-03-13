@@ -181,15 +181,16 @@
     <javaewah-version>0.7.9</javaewah-version>
     <junit-version>4.11</junit-version>
     <test-fork-count>1C</test-fork-count>
-    <!-- TODO: update Maven dependency for args4j to 2.0.21 as soon as available on Maven Central -->
-    <args4j-version>2.0.12</args4j-version>
+    <args4j-version>2.0.15</args4j-version>
     <commons-compress-version>1.6</commons-compress-version>
     <osgi-core-version>4.3.1</osgi-core-version>
     <servlet-api-version>2.5</servlet-api-version>
     <jetty-version>7.6.14.v20131031</jetty-version>
     <clirr-version>2.6.1</clirr-version>
     <httpclient-version>4.1.3</httpclient-version>
-    <maven-javadoc-plugin-version>2.9.1</maven-javadoc-plugin-version>
+    <slf4j-version>1.7.2</slf4j-version>
+    <log4j-version>1.2.15</log4j-version>
+    <maven-javadoc-plugin-version>2.10.1</maven-javadoc-plugin-version>
 
     <!-- Properties to enable jacoco code coverage analysis -->
     <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
@@ -217,7 +218,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.5</version>
+          <version>2.6</version>
           <configuration>
             <archive>
               <manifestEntries>
@@ -236,12 +237,17 @@
 
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.1</version>
+          <version>3.2</version>
+          <configuration>
+            <encoding>UTF-8</encoding>
+            <source>1.7</source>
+            <target>1.7</target>
+          </configuration>
         </plugin>
 
         <plugin>
           <artifactId>maven-clean-plugin</artifactId>
-          <version>2.5</version>
+          <version>2.6.1</version>
         </plugin>
 
         <plugin>
@@ -253,19 +259,19 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-antrun-plugin</artifactId>
-          <version>1.7</version>
+          <version>1.8</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>2.8</version>
+          <version>2.10</version>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
-          <version>2.3</version>
+          <version>2.4</version>
         </plugin>
 
         <plugin>
@@ -277,7 +283,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.17</version>
+          <version>2.18.1</version>
           <configuration>
             <forkCount>${test-fork-count}</forkCount>
             <reuseForks>true</reuseForks>
@@ -310,11 +316,11 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
-          <version>3.2</version>
+          <version>3.4</version>
           <configuration>
             <sourceEncoding>utf-8</sourceEncoding>
             <minimumTokens>100</minimumTokens>
-            <targetJdk>1.5</targetJdk>
+            <targetJdk>1.7</targetJdk>
             <format>xml</format>
             <failOnViolation>false</failOnViolation>
           </configuration>
@@ -375,11 +381,6 @@
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>1.5</source>
-          <target>1.5</target>
-          <encoding>UTF-8</encoding>
-        </configuration>
       </plugin>
 
       <plugin>
@@ -426,7 +427,7 @@
           <encoding>${project.build.sourceEncoding}</encoding>
           <quiet>true</quiet>
           <links>
-            <link>http://java.sun.com/j2se/1.5.0/docs/api</link>
+            <link>http://docs.oracle.com/javase/7/docs/api</link>
           </links>
         </configuration>
         <executions>
@@ -543,6 +544,24 @@
         <artifactId>httpclient</artifactId>
         <version>${httpclient-version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-log4j12</artifactId>
+        <version>${slf4j-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>${log4j-version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -567,23 +586,10 @@
 
   <profiles>
     <profile>
-      <id>jgit.java6</id>
-      <activation>
-        <jdk>[1.6,)</jdk>
-      </activation>
-      <modules>
-        <module>org.eclipse.jgit.console</module>
-      </modules>
-    </profile>
-    <profile>
       <id>jgit.java7</id>
       <activation>
         <jdk>[1.7,)</jdk>
       </activation>
-      <modules>
-        <module>org.eclipse.jgit.java7</module>
-        <module>org.eclipse.jgit.java7.test</module>
-      </modules>
     </profile>
     <profile>
       <id>jgit.java8</id>
@@ -691,9 +697,11 @@
     <module>org.eclipse.jgit.http.apache</module>
     <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.pgm</module>
+    <module>org.eclipse.jgit.java7</module>
     <module>org.eclipse.jgit.junit</module>
     <module>org.eclipse.jgit.junit.http</module>
 
+    <module>org.eclipse.jgit.java7.test</module>
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.ant.test</module>
     <module>org.eclipse.jgit.http.test</module>

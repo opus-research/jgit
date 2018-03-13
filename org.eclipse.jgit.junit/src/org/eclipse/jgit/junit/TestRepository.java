@@ -96,6 +96,7 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
@@ -106,9 +107,9 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  *            type of Repository the test data is stored on.
  */
 public class TestRepository<R extends Repository> {
-	private static final PersonIdent author;
+	private static final PersonIdent defaultAuthor;
 
-	private static final PersonIdent committer;
+	private static final PersonIdent defaultCommitter;
 
 	static {
 		final MockSystemReader m = new MockSystemReader();
@@ -117,11 +118,11 @@ public class TestRepository<R extends Repository> {
 
 		final String an = "J. Author";
 		final String ae = "jauthor@example.com";
-		author = new PersonIdent(an, ae, now, tz);
+		defaultAuthor = new PersonIdent(an, ae, now, tz);
 
 		final String cn = "J. Committer";
 		final String ce = "jcommitter@example.com";
-		committer = new PersonIdent(cn, ce, now, tz);
+		defaultCommitter = new PersonIdent(cn, ce, now, tz);
 	}
 
 	private final R db;
@@ -191,8 +192,8 @@ public class TestRepository<R extends Repository> {
 	 *            the commit builder to store.
 	 */
 	public void setAuthorAndCommitter(org.eclipse.jgit.lib.CommitBuilder c) {
-		c.setAuthor(new PersonIdent(author, new Date(now)));
-		c.setCommitter(new PersonIdent(committer, new Date(now)));
+		c.setAuthor(new PersonIdent(defaultAuthor, new Date(now)));
+		c.setCommitter(new PersonIdent(defaultCommitter, new Date(now)));
 	}
 
 	/**
@@ -217,11 +218,9 @@ public class TestRepository<R extends Repository> {
 	 */
 	public RevBlob blob(final byte[] content) throws Exception {
 		ObjectId id;
-		try {
-			id = inserter.insert(Constants.OBJ_BLOB, content);
-			inserter.flush();
-		} finally {
-			inserter.release();
+		try (ObjectInserter ins = inserter) {
+			id = ins.insert(Constants.OBJ_BLOB, content);
+			ins.flush();
 		}
 		return pool.lookupBlob(id);
 	}
@@ -260,11 +259,9 @@ public class TestRepository<R extends Repository> {
 			b.add(e);
 		b.finish();
 		ObjectId root;
-		try {
-			root = dc.writeTree(inserter);
-			inserter.flush();
-		} finally {
-			inserter.release();
+		try (ObjectInserter ins = inserter) {
+			root = dc.writeTree(ins);
+			ins.flush();
 		}
 		return pool.lookupTree(root);
 	}
@@ -281,18 +278,19 @@ public class TestRepository<R extends Repository> {
 	 */
 	public RevObject get(final RevTree tree, final String path)
 			throws Exception {
-		final TreeWalk tw = new TreeWalk(pool.getObjectReader());
-		tw.setFilter(PathFilterGroup.createFromStrings(Collections
-				.singleton(path)));
-		tw.reset(tree);
-		while (tw.next()) {
-			if (tw.isSubtree() && !path.equals(tw.getPathString())) {
-				tw.enterSubtree();
-				continue;
+		try (TreeWalk tw = new TreeWalk(pool.getObjectReader())) {
+			tw.setFilter(PathFilterGroup.createFromStrings(Collections
+					.singleton(path)));
+			tw.reset(tree);
+			while (tw.next()) {
+				if (tw.isSubtree() && !path.equals(tw.getPathString())) {
+					tw.enterSubtree();
+					continue;
+				}
+				final ObjectId entid = tw.getObjectId(0);
+				final FileMode entmode = tw.getFileMode(0);
+				return pool.lookupAny(entid, entmode.getObjectType());
 			}
-			final ObjectId entid = tw.getObjectId(0);
-			final FileMode entmode = tw.getFileMode(0);
-			return pool.lookupAny(entid, entmode.getObjectType());
 		}
 		fail("Can't find " + path + " in tree " + tree.name());
 		return null; // never reached.
@@ -373,15 +371,13 @@ public class TestRepository<R extends Repository> {
 		c = new org.eclipse.jgit.lib.CommitBuilder();
 		c.setTreeId(tree);
 		c.setParentIds(parents);
-		c.setAuthor(new PersonIdent(author, new Date(now)));
-		c.setCommitter(new PersonIdent(committer, new Date(now)));
+		c.setAuthor(new PersonIdent(defaultAuthor, new Date(now)));
+		c.setCommitter(new PersonIdent(defaultCommitter, new Date(now)));
 		c.setMessage("");
 		ObjectId id;
-		try {
-			id = inserter.insert(c);
-			inserter.flush();
-		} finally {
-			inserter.release();
+		try (ObjectInserter ins = inserter) {
+			id = ins.insert(c);
+			ins.flush();
 		}
 		return pool.lookupCommit(id);
 	}
@@ -411,14 +407,12 @@ public class TestRepository<R extends Repository> {
 		final TagBuilder t = new TagBuilder();
 		t.setObjectId(dst);
 		t.setTag(name);
-		t.setTagger(new PersonIdent(committer, new Date(now)));
+		t.setTagger(new PersonIdent(defaultCommitter, new Date(now)));
 		t.setMessage("");
 		ObjectId id;
-		try {
-			id = inserter.insert(t);
-			inserter.flush();
-		} finally {
-			inserter.release();
+		try (ObjectInserter ins = inserter) {
+			id = ins.insert(t);
+			ins.flush();
 		}
 		return (RevTag) pool.lookupAny(id, Constants.OBJ_TAG);
 	}
@@ -442,6 +436,72 @@ public class TestRepository<R extends Repository> {
 	}
 
 	/**
+	 * Amend an existing ref.
+	 *
+	 * @param ref
+	 *            the name of the reference to amend, which must already exist.
+	 *            If {@code ref} does not start with {@code refs/} and is not the
+	 *            magic names {@code HEAD} {@code FETCH_HEAD} or {@code
+	 *            MERGE_HEAD}, then {@code refs/heads/} will be prefixed in front
+	 *            of the given name, thereby assuming it is a branch.
+	 * @return commit builder that amends the branch on commit.
+	 * @throws Exception
+	 */
+	public CommitBuilder amendRef(String ref) throws Exception {
+		String name = normalizeRef(ref);
+		Ref r = db.getRef(name);
+		if (r == null)
+			throw new IOException("Not a ref: " + ref);
+		return amend(pool.parseCommit(r.getObjectId()), branch(name).commit());
+	}
+
+	/**
+	 * Amend an existing commit.
+	 *
+	 * @param id
+	 *            the id of the commit to amend.
+	 * @return commit builder.
+	 * @throws Exception
+	 */
+	public CommitBuilder amend(AnyObjectId id) throws Exception {
+		return amend(pool.parseCommit(id), commit());
+	}
+
+	private CommitBuilder amend(RevCommit old, CommitBuilder b) throws Exception {
+		pool.parseBody(old);
+		b.author(old.getAuthorIdent());
+		b.committer(old.getCommitterIdent());
+		b.message(old.getFullMessage());
+		// Use the committer name from the old commit, but update it after ticking
+		// the clock in CommitBuilder#create().
+		b.updateCommitterTime = true;
+
+		// Reset parents to original parents.
+		b.noParents();
+		for (int i = 0; i < old.getParentCount(); i++)
+			b.parent(old.getParent(i));
+
+		// Reset tree to original tree; resetting parents reset tree contents to the
+		// first parent.
+		b.tree.clear();
+		try (TreeWalk tw = new TreeWalk(db)) {
+			tw.reset(old.getTree());
+			tw.setRecursive(true);
+			while (tw.next()) {
+				b.edit(new PathEdit(tw.getPathString()) {
+					@Override
+					public void apply(DirCacheEntry ent) {
+						ent.setFileMode(tw.getFileMode(0));
+						ent.setObjectId(tw.getObjectId(0));
+					}
+				});
+			}
+		}
+
+		return b;
+	}
+
+	/**
 	 * Update a reference to point to an object.
 	 *
 	 * @param <T>
@@ -458,17 +518,7 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public <T extends AnyObjectId> T update(String ref, T obj) throws Exception {
-		if (Constants.HEAD.equals(ref)) {
-			// nothing
-		} else if ("FETCH_HEAD".equals(ref)) {
-			// nothing
-		} else if ("MERGE_HEAD".equals(ref)) {
-			// nothing
-		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
-		} else
-			ref = Constants.R_HEADS + ref;
-
+		ref = normalizeRef(ref);
 		RefUpdate u = db.updateRef(ref);
 		u.setNewObjectId(obj);
 		switch (u.forceUpdate()) {
@@ -481,6 +531,75 @@ public class TestRepository<R extends Repository> {
 
 		default:
 			throw new IOException("Cannot write " + ref + " " + u.getResult());
+		}
+	}
+
+	private static String normalizeRef(String ref) {
+		if (Constants.HEAD.equals(ref)) {
+			// nothing
+		} else if ("FETCH_HEAD".equals(ref)) {
+			// nothing
+		} else if ("MERGE_HEAD".equals(ref)) {
+			// nothing
+		} else if (ref.startsWith(Constants.R_REFS)) {
+			// nothing
+		} else
+			ref = Constants.R_HEADS + ref;
+		return ref;
+	}
+
+	/**
+	 * Soft-reset HEAD to a detached state.
+	 * <p>
+	 * @param id
+	 *            ID of detached head.
+	 * @throws Exception
+	 * @see #reset(String)
+	 */
+	public void reset(AnyObjectId id) throws Exception {
+		RefUpdate ru = db.updateRef(Constants.HEAD, true);
+		ru.setNewObjectId(id);
+		RefUpdate.Result result = ru.forceUpdate();
+		switch (result) {
+			case FAST_FORWARD:
+			case FORCED:
+			case NEW:
+			case NO_CHANGE:
+				break;
+			default:
+				throw new IOException(String.format(
+						"Checkout \"%s\" failed: %s", id.name(), result));
+		}
+	}
+
+	/**
+	 * Soft-reset HEAD to a different commit.
+	 * <p>
+	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but
+	 * not the index or the working tree of a non-bare repository.
+	 *
+	 * @param name
+	 *            revision string; either an existing ref name, or something that
+	 *            can be parsed to an object ID.
+	 * @throws Exception
+	 */
+	public void reset(String name) throws Exception {
+		RefUpdate.Result result;
+		ObjectId id = db.resolve(name);
+		if (id == null)
+			throw new IOException("Not a revision: " + name);
+		RefUpdate ru = db.updateRef(Constants.HEAD, false);
+		ru.setNewObjectId(id);
+		result = ru.forceUpdate();
+		switch (result) {
+			case FAST_FORWARD:
+			case FORCED:
+			case NEW:
+			case NO_CHANGE:
+				break;
+			default:
+				throw new IOException(String.format(
+						"Checkout \"%s\" failed: %s", name, result));
 		}
 	}
 
@@ -581,34 +700,35 @@ public class TestRepository<R extends Repository> {
 	 */
 	public void fsck(RevObject... tips) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
-		ObjectWalk ow = new ObjectWalk(db);
-		if (tips.length != 0) {
-			for (RevObject o : tips)
-				ow.markStart(ow.parseAny(o));
-		} else {
-			for (Ref r : db.getAllRefs().values())
-				ow.markStart(ow.parseAny(r.getObjectId()));
-		}
+		try (ObjectWalk ow = new ObjectWalk(db)) {
+			if (tips.length != 0) {
+				for (RevObject o : tips)
+					ow.markStart(ow.parseAny(o));
+			} else {
+				for (Ref r : db.getAllRefs().values())
+					ow.markStart(ow.parseAny(r.getObjectId()));
+			}
 
-		ObjectChecker oc = new ObjectChecker();
-		for (;;) {
-			final RevCommit o = ow.next();
-			if (o == null)
-				break;
+			ObjectChecker oc = new ObjectChecker();
+			for (;;) {
+				final RevCommit o = ow.next();
+				if (o == null)
+					break;
 
-			final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-			oc.checkCommit(bin);
-			assertHash(o, bin);
-		}
+				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
+				oc.checkCommit(bin);
+				assertHash(o, bin);
+			}
 
-		for (;;) {
-			final RevObject o = ow.nextObject();
-			if (o == null)
-				break;
+			for (;;) {
+				final RevObject o = ow.nextObject();
+				if (o == null)
+					break;
 
-			final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-			oc.check(o.getType(), bin);
-			assertHash(o, bin);
+				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
+				oc.check(o.getType(), bin);
+				assertHash(o, bin);
+			}
 		}
 	}
 
@@ -636,35 +756,27 @@ public class TestRepository<R extends Repository> {
 			NullProgressMonitor m = NullProgressMonitor.INSTANCE;
 
 			final File pack, idx;
-			PackWriter pw = new PackWriter(db);
-			try {
+			try (PackWriter pw = new PackWriter(db)) {
 				Set<ObjectId> all = new HashSet<ObjectId>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
 				pw.preparePack(m, all, Collections.<ObjectId> emptySet());
 
 				final ObjectId name = pw.computeName();
-				OutputStream out;
 
 				pack = nameFor(odb, name, ".pack");
-				out = new SafeBufferedOutputStream(new FileOutputStream(pack));
-				try {
+				try (OutputStream out =
+						new SafeBufferedOutputStream(new FileOutputStream(pack))) {
 					pw.writePack(m, m, out);
-				} finally {
-					out.close();
 				}
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
-				out = new SafeBufferedOutputStream(new FileOutputStream(idx));
-				try {
+				try (OutputStream out =
+						new SafeBufferedOutputStream(new FileOutputStream(idx))) {
 					pw.writeIndex(out);
-				} finally {
-					out.close();
 				}
 				idx.setReadOnly();
-			} finally {
-				pw.release();
 			}
 
 			odb.openPack(pack);
@@ -760,6 +872,13 @@ public class TestRepository<R extends Repository> {
 
 		private RevCommit self;
 
+		private PersonIdent author;
+		private PersonIdent committer;
+
+		private String changeId;
+
+		private boolean updateCommitterTime;
+
 		CommitBuilder() {
 			branch = null;
 		}
@@ -768,9 +887,8 @@ public class TestRepository<R extends Repository> {
 			branch = b;
 
 			Ref ref = db.getRef(branch.ref);
-			if (ref != null) {
+			if (ref != null && ref.getObjectId() != null)
 				parent(pool.parseCommit(ref.getObjectId()));
-			}
 		}
 
 		CommitBuilder(CommitBuilder prior) throws Exception {
@@ -794,6 +912,10 @@ public class TestRepository<R extends Repository> {
 			}
 			parents.add(p);
 			return this;
+		}
+
+		public List<RevCommit> parents() {
+			return Collections.unmodifiableList(parents);
 		}
 
 		public CommitBuilder noParents() {
@@ -846,8 +968,48 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
+		public String message() {
+			return message;
+		}
+
 		public CommitBuilder tick(int secs) {
 			tick = secs;
+			return this;
+		}
+
+		public CommitBuilder ident(PersonIdent ident) {
+			author = ident;
+			committer = ident;
+			return this;
+		}
+
+		public CommitBuilder author(PersonIdent a) {
+			author = a;
+			return this;
+		}
+
+		public PersonIdent author() {
+			return author;
+		}
+
+		public CommitBuilder committer(PersonIdent c) {
+			committer = c;
+			return this;
+		}
+
+		public PersonIdent committer() {
+			return committer;
+		}
+
+		public CommitBuilder insertChangeId() {
+			changeId = "";
+			return this;
+		}
+
+		public CommitBuilder insertChangeId(String c) {
+			// Validate, but store as a string so we can use "" as a sentinel.
+			ObjectId.fromString(c);
+			changeId = c;
 			return this;
 		}
 
@@ -860,18 +1022,24 @@ public class TestRepository<R extends Repository> {
 				c = new org.eclipse.jgit.lib.CommitBuilder();
 				c.setParentIds(parents);
 				setAuthorAndCommitter(c);
-				c.setMessage(message);
+				if (author != null)
+					c.setAuthor(author);
+				if (committer != null) {
+					if (updateCommitterTime)
+						committer = new PersonIdent(committer, new Date(now));
+					c.setCommitter(committer);
+				}
 
 				ObjectId commitId;
-				try {
+				try (ObjectInserter ins = inserter) {
 					if (topLevelTree != null)
 						c.setTreeId(topLevelTree);
 					else
-						c.setTreeId(tree.writeTree(inserter));
-					commitId = inserter.insert(c);
-					inserter.flush();
-				} finally {
-					inserter.release();
+						c.setTreeId(tree.writeTree(ins));
+					insertChangeId(c);
+					c.setMessage(message);
+					commitId = ins.insert(c);
+					ins.flush();
 				}
 				self = pool.lookupCommit(commitId);
 
@@ -879,6 +1047,31 @@ public class TestRepository<R extends Repository> {
 					branch.update(self);
 			}
 			return self;
+		}
+
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
+				throws IOException {
+			if (changeId == null)
+				return;
+			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");
+			if (idx >= 0)
+				return;
+
+			ObjectId firstParentId = null;
+			if (!parents.isEmpty())
+				firstParentId = parents.get(0);
+
+			ObjectId cid;
+			if (changeId.equals(""))
+				cid = ChangeIdUtil.computeChangeId(c.getTreeId(), firstParentId,
+						c.getAuthor(), c.getCommitter(), message);
+			else
+				cid = ObjectId.fromString(changeId);
+			message = ChangeIdUtil.insertId(message, cid);
+			if (cid != null)
+				message = message.replaceAll("\nChange-Id: I" //$NON-NLS-1$
+						+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I" //$NON-NLS-1$ //$NON-NLS-2$
+						+ cid.getName() + "\n"); //$NON-NLS-1$
 		}
 
 		public CommitBuilder child() throws Exception {

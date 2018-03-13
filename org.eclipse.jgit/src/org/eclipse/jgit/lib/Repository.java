@@ -99,7 +99,7 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * <p>
  * This class is thread-safe.
  */
-public abstract class Repository {
+public abstract class Repository implements AutoCloseable {
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -1349,6 +1349,40 @@ public abstract class Repository {
 	public void writeMergeCommitMsg(String msg) throws IOException {
 		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
 		writeCommitMsg(mergeMsgFile, msg);
+	}
+
+	/**
+	 * Return the information stored in the file $GIT_DIR/COMMIT_EDITMSG. In
+	 * this file hooks triggered by an operation may read or modify the current
+	 * commit message.
+	 *
+	 * @return a String containing the content of the COMMIT_EDITMSG file or
+	 *         {@code null} if this file doesn't exist
+	 * @throws IOException
+	 * @throws NoWorkTreeException
+	 *             if this is bare, which implies it has no working directory.
+	 *             See {@link #isBare()}.
+	 * @since 4.0
+	 */
+	public String readCommitEditMsg() throws IOException, NoWorkTreeException {
+		return readCommitMsgFile(Constants.COMMIT_EDITMSG);
+	}
+
+	/**
+	 * Write new content to the file $GIT_DIR/COMMIT_EDITMSG. In this file hooks
+	 * triggered by an operation may read or modify the current commit message.
+	 * If {@code null} is specified as message the file will be deleted.
+	 *
+	 * @param msg
+	 *            the message which should be written or {@code null} to delete
+	 *            the file
+	 *
+	 * @throws IOException
+	 * @since 4.0
+	 */
+	public void writeCommitEditMsg(String msg) throws IOException {
+		File commiEditMsgFile = new File(gitDir, Constants.COMMIT_EDITMSG);
+		writeCommitMsg(commiEditMsgFile, msg);
 	}
 
 	/**
