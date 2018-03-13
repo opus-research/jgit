@@ -1,6 +1,5 @@
 /.project
 /target
-.DS_Store
 infer-out
 bazel-*
 *~

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,72 +40,55 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+
+package org.eclipse.jgit.errors;
+
+import org.eclipse.jgit.annotations.Nullable;
 
 /**
- * Parsed reflog entry
+ * Exception thrown when encounters a corrupt pack index file.
  *
- * @since 3.0
+ * @since 4.9
  */
-public interface ReflogEntry {
+public class CorruptPackIndexException extends Exception {
+	private static final long serialVersionUID = 1L;
+
+	/** The error type of a corrupt index file. */
+	public enum ErrorType {
+		/** Offset does not match index in pack file. */
+		MISMATCH_OFFSET,
+		/** CRC does not match CRC of the object data in pack file. */
+		MISMATCH_CRC,
+		/** CRC is not present in index file. */
+		MISSING_CRC,
+		/** Object in pack is not present in index file. */
+		MISSING_OBJ,
+		/** Object in index file is not present in pack file. */
+		UNKNOWN_OBJ,
+	}
+
+	private ErrorType errorType;
 
 	/**
-	 * Prefix used in reflog messages when the ref was first created.
-	 * <p>
-	 * Does not have a corresponding constant in C git, but is untranslated like
-	 * the other constants.
+	 * Report a specific error condition discovered in an index file.
 	 *
-	 * @since 4.9
+	 * @param message
+	 *            the error message.
+	 * @param errorType
+	 *            the error type of corruption.
 	 */
-	public static final String PREFIX_CREATED = "created"; //$NON-NLS-1$
+	public CorruptPackIndexException(String message, ErrorType errorType) {
+		super(message);
+		this.errorType = errorType;
+	}
 
 	/**
-	 * Prefix used in reflog messages when the ref was updated with a fast
-	 * forward.
-	 * <p>
-	 * Untranslated, and exactly matches the
-	 * <a href="https://git.kernel.org/pub/scm/git/git.git/tree/builtin/fetch.c?id=f3da2b79be9565779e4f76dc5812c68e156afdf0#n680">
-	 * untranslated string in C git</a>.
+	 * Specific the reason of the corrupt index file.
 	 *
-	 * @since 4.9
+	 * @return error condition or null.
 	 */
-	public static final String PREFIX_FAST_FORWARD = "fast-forward"; //$NON-NLS-1$
-
-	/**
-	 * Prefix used in reflog messages when the ref was force updated.
-	 * <p>
-	 * Untranslated, and exactly matches the
-	 * <a href="https://git.kernel.org/pub/scm/git/git.git/tree/builtin/fetch.c?id=f3da2b79be9565779e4f76dc5812c68e156afdf0#n695">
-	 * untranslated string in C git</a>.
-	 *
-	 * @since 4.9
-	 */
-	public static final String PREFIX_FORCED_UPDATE = "forced-update"; //$NON-NLS-1$
-
-	/**
-	 * @return the commit id before the change
-	 */
-	public abstract ObjectId getOldId();
-
-	/**
-	 * @return the commit id after the change
-	 */
-	public abstract ObjectId getNewId();
-
-	/**
-	 * @return user performing the change
-	 */
-	public abstract PersonIdent getWho();
-
-	/**
-	 * @return textual description of the change
-	 */
-	public abstract String getComment();
-
-	/**
-	 * @return a {@link CheckoutEntry} with parsed information about a branch
-	 *         switch, or null if the entry is not a checkout
-	 */
-	public abstract CheckoutEntry parseCheckout();
-
+	@Nullable
+	public ErrorType getErrorType() {
+		return errorType;
+	}
 }
