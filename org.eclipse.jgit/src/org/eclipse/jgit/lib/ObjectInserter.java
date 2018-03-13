@@ -379,13 +379,11 @@ public abstract class ObjectInserter {
 			w.write("\n");
 
 			w.write("tagger ");
-			if(tag.getTagger() != null)
-				w.write(tag.getTagger().toExternalString());
+			w.write(tag.getTagger().toExternalString());
 			w.write('\n');
 
 			w.write('\n');
-			if(tag.getMessage() != null)
-				w.write(tag.getMessage());
+			w.write(tag.getMessage());
 			w.close();
 		} catch (IOException err) {
 			// This should never occur, the only way to get it above is
