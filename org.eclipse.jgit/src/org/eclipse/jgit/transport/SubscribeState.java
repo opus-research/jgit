@@ -43,57 +43,90 @@
 
 package org.eclipse.jgit.transport;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.eclipse.jgit.errors.NotSupportedException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Repository;
+import java.util.Set;
 
 /**
- * Resolve from Repository back to the unique, human-readable name for that
- * repository.
+ * The state of a SubscribeConnection to a single remote Publisher process with
+ * multiple repositories.
  */
-public class PublisherReverseResolver {
-	/** Object needs to implement hashCode() and equals() */
-	private final Map<Object, String> repositoryNameLookup;
+public class SubscribeState {
+	private final Map<String, SubscribedRepository>
+			repoSubscriptions = new HashMap<String, SubscribedRepository>();
 
-	/** Create a new resolver. */
-	public PublisherReverseResolver() {
-		repositoryNameLookup = new ConcurrentHashMap<Object, String>();
+	private String restartToken;
+
+	private String lastPackId;
+
+	/** @return fast restart token, or null if none. */
+	public String getRestartToken() {
+		return restartToken;
+	}
+
+	/** @param restart */
+	public void setRestartToken(String restart) {
+		restartToken = restart;
+	}
+
+	/** @return the last pack id. */
+	public String getLastPackId() {
+		return lastPackId;
 	}
 
 	/**
-	 * Register a name to a repository.
+	 * Set the last pack id.
 	 *
-	 * @param r
-	 * @param name
-	 * @throws NotSupportedException
+	 * @param id
 	 */
-	public void register(Repository r, String name)
-			throws NotSupportedException {
-		repositoryNameLookup.put(getKey(r), name);
+	public void setLastPackId(String id) {
+		lastPackId = id;
 	}
 
 	/**
 	 * @param r
-	 * @return the human-readable name for this repository
-	 * @throws NotSupportedException
+	 * @param repository
 	 */
-	public String find(Repository r) throws NotSupportedException {
-		return repositoryNameLookup.get(getKey(r));
+	public void putRepository(String r, SubscribedRepository repository) {
+		repoSubscriptions.put(r, repository);
 	}
 
 	/**
 	 * @param r
-	 * @return an Object that uniquely identifies this repository with respect
-	 *         to {@link #hashCode()} and {#link {@link #equals(Object)}.
-	 * @throws NotSupportedException
+	 * @return the repository with this key, or null.
 	 */
-	protected Object getKey(Repository r) throws NotSupportedException {
-		if (r.getDirectory() == null)
-			throw new NotSupportedException(JGitText
-					.get().repositoryMustHaveDirectory);
-		return r.getDirectory().getAbsolutePath();
+	public SubscribedRepository getRepository(String r) {
+		return repoSubscriptions.get(r);
+	}
+
+	/**
+	 * @return the set of all repository names this subscriber will connect to.
+	 */
+	public Set<String> getAllRepositories() {
+		return Collections.unmodifiableSet(repoSubscriptions.keySet());
+	}
+
+	/**
+	 * Reset the state of this subscriber and clear the subscribe specs of all
+	 * SubscribedRepositories.
+	 */
+	public void reset() {
+		List<RefSpec> clearSpecs = Collections.emptyList();
+		for (SubscribedRepository sr : repoSubscriptions.values())
+			sr.setSubscribeSpecs(clearSpecs);
+		setRestartToken(null);
+		setLastPackId(null);
+	}
+
+	/**
+	 * Release all resources used by this Subscriber and close all
+	 * SubscribedRepositories.
+	 */
+	public void close() {
+		for (SubscribedRepository sr : repoSubscriptions.values())
+			sr.close();
+		repoSubscriptions.clear();
 	}
 }

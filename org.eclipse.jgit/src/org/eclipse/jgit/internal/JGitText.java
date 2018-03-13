@@ -314,7 +314,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
 	/***/ public String invalidStageForPath;
-	/***/ public String invalidSubscribeRequest;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
 	/***/ public String invalidURL;
@@ -453,7 +452,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
 	/***/ public String repositoryIsRequired;
-	/***/ public String repositoryMustHaveDirectory;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
 	/***/ public String repositoryState_bisecting;
@@ -506,7 +504,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String subscribeNewUpdate;
 	/***/ public String subscribeNotSupported;
-	/***/ public String subscribeStart;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
 	/***/ public String tagNameInvalid;

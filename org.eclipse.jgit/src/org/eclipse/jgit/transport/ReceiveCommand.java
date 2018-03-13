@@ -341,7 +341,7 @@ public class ReceiveCommand {
 		}
 	}
 
-	void setName(String n) {
+	void setRefName(String n) {
 		name = n;
 	}
 
