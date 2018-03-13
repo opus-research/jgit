@@ -109,7 +109,7 @@ public class PushCommand extends
 	 */
 	protected PushCommand(Repository repo) {
 		super(repo);
-		refSpecs = new ArrayList<>(3);
+		refSpecs = new ArrayList<RefSpec>(3);
 		refLeaseSpecs = new HashMap<>();
 	}
 
@@ -126,13 +126,12 @@ public class PushCommand extends
 	 *             when an error occurs with the transport
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Iterable<PushResult> call() throws GitAPIException,
 			InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
 
-		ArrayList<PushResult> pushResults = new ArrayList<>(3);
+		ArrayList<PushResult> pushResults = new ArrayList<PushResult>(3);
 
 		try {
 			if (refSpecs.isEmpty()) {
@@ -283,7 +282,7 @@ public class PushCommand extends
 	 * @since 4.7
 	 */
 	public List<RefLeaseSpec> getRefLeaseSpecs() {
-		return new ArrayList<>(refLeaseSpecs.values());
+		return new ArrayList<RefLeaseSpec>(refLeaseSpecs.values());
 	}
 
 	/**

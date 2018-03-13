@@ -147,7 +147,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		HttpTransport.setConnectionFactory(cf);
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -194,7 +193,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		ServletContextHandler broken = server.addContext("/bad");
 		broken.addFilter(new FilterHolder(new Filter() {
 
-			@Override
 			public void doFilter(ServletRequest request,
 					ServletResponse response, FilterChain chain)
 					throws IOException, ServletException {
@@ -206,13 +204,11 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				w.close();
 			}
 
-			@Override
 			public void init(FilterConfig filterConfig)
 					throws ServletException {
 				// empty
 			}
 
-			@Override
 			public void destroy() {
 				// empty
 			}
@@ -437,7 +433,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Create a new commit on the remote.
 		//
-		b = new TestRepository<>(remoteRepository).branch(master);
+		b = new TestRepository<Repository>(remoteRepository).branch(master);
 		RevCommit Z = b.commit().message("Z").create();
 
 		// Now incrementally update.
@@ -497,7 +493,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Create a new commit on the remote.
 		//
-		b = new TestRepository<>(remoteRepository).branch(master);
+		b = new TestRepository<Repository>(remoteRepository).branch(master);
 		RevCommit Z = b.commit().message("Z").create();
 
 		// Now incrementally update.
@@ -562,7 +558,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			} catch (TransportException err) {
 				String exp = brokenURI + ": expected"
 						+ " Content-Type application/x-git-upload-pack-result;"
-						+ " received Content-Type text/plain;charset=utf-8";
+						+ " received Content-Type text/plain; charset=UTF-8";
 				assertEquals(exp, err.getMessage());
 			}
 		}
@@ -584,7 +580,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(join(brokenURI, "git-upload-pack"), service.getPath());
 		assertEquals(0, service.getParameters().size());
 		assertEquals(200, service.getStatus());
-		assertEquals("text/plain;charset=utf-8",
+		assertEquals("text/plain; charset=UTF-8",
 				service.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
@@ -614,7 +610,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			final String repoName = "refs-unreadable";
 			RefsUnreadableInMemoryRepository badRefsRepo = new RefsUnreadableInMemoryRepository(
 					new DfsRepositoryDescription(repoName));
-			final TestRepository<Repository> repo = new TestRepository<>(
+			final TestRepository<Repository> repo = new TestRepository<Repository>(
 					badRefsRepo);
 
 			ServletContextHandler app = noRefServer.addContext("/git");
@@ -835,7 +831,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			this.repoName = repoName;
 		}
 
-		@Override
 		public Repository open(HttpServletRequest req, String name)
 				throws RepositoryNotFoundException, ServiceNotEnabledException {
 			if (!name.equals(repoName))

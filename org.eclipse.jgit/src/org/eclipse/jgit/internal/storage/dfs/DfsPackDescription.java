@@ -102,7 +102,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		this.repoDesc = repoDesc;
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
-		this.sizeMap = new HashMap<>(PackExt.values().length * 2);
+		this.sizeMap = new HashMap<PackExt, Long>(PackExt.values().length * 2);
 	}
 
 	/** @return description of the repository. */
@@ -309,7 +309,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @param b
 	 *            the other pack.
 	 */
-	@Override
 	public int compareTo(DfsPackDescription b) {
 		// Cluster by PackSource, pushing UNREACHABLE_GARBAGE to the end.
 		PackSource as = getPackSource();

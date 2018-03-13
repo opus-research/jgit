@@ -91,7 +91,7 @@ public class Main {
 	private TextBuiltin subcommand;
 
 	@Argument(index = 1, metaVar = "metaVar_arg")
-	private List<String> arguments = new ArrayList<>();
+	private List<String> arguments = new ArrayList<String>();
 
 	PrintWriter writer;
 
