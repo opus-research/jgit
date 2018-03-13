@@ -74,16 +74,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 		return new ObjectDirectoryInserter(this, getConfig());
 	}
 
-  @Override
-  public boolean equals(Object o) {
-    return o instanceof FileObjectDatabase
-            && ((FileObjectDatabase)o).getDirectory().equals(this.getDirectory());
-  }
-
-  @Override
-  public int hashCode() {
-    return 19 + (3 * this.getDirectory().hashCode());
-  }
 	/**
 	 * Does the requested object exist in this database?
 	 * <p>
@@ -95,8 +85,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	 *         of the alternate databases.
 	 */
 	public boolean has(final AnyObjectId objectId) {
-		return hasObjectImpl1(objectId, null)
-				|| hasObjectImpl2(objectId.name(), null);
+		return hasObjectImpl1(objectId) || hasObjectImpl2(objectId.name());
 	}
 
 	/**
@@ -116,38 +105,24 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 		return new File(new File(getDirectory(), d), f);
 	}
 
-	final boolean hasObjectImpl1(final AnyObjectId objectId,
-			final FileObjectDatabase primary) {
+	final boolean hasObjectImpl1(final AnyObjectId objectId) {
 		if (hasObject1(objectId))
 			return true;
 
 		for (final AlternateHandle alt : myAlternates()) {
-			if (primary != null) {
-				if (!primary.equals(this) && !alt.in(primary.myAlternates())) {
-					primary.addAlternate(alt);
-					if (alt.db.hasObjectImpl1(objectId, primary))
-						return true;
-				}
-			} else if (alt.db.hasObjectImpl1(objectId, this))
+			if (alt.db.hasObjectImpl1(objectId))
 				return true;
 		}
 
 		return tryAgain1() && hasObject1(objectId);
 	}
 
-	final boolean hasObjectImpl2(final String objectId,
-			final FileObjectDatabase primary) {
+	final boolean hasObjectImpl2(final String objectId) {
 		if (hasObject2(objectId))
 			return true;
 
 		for (final AlternateHandle alt : myAlternates()) {
-			if (primary != null) {
-				if (!primary.equals(this) && !alt.in(primary.myAlternates())) {
-					primary.addAlternate(alt);
-					if (alt.db.hasObjectImpl2(objectId, primary))
-						return true;
-				}
-			} else if (alt.db.hasObjectImpl2(objectId, this))
+			if (alt.db.hasObjectImpl2(objectId))
 				return true;
 		}
 
@@ -180,11 +155,11 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			throws IOException {
 		ObjectLoader ldr;
 
-		ldr = openObjectImpl1(curs, objectId, null);
+		ldr = openObjectImpl1(curs, objectId);
 		if (ldr != null)
 			return ldr;
 
-		ldr = openObjectImpl2(curs, objectId.name(), objectId, null);
+		ldr = openObjectImpl2(curs, objectId.name(), objectId);
 		if (ldr != null)
 			return ldr;
 
@@ -192,8 +167,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	}
 
 	final ObjectLoader openObjectImpl1(final WindowCursor curs,
-			final AnyObjectId objectId,
-			final FileObjectDatabase primary) throws IOException {
+			final AnyObjectId objectId) throws IOException {
 		ObjectLoader ldr;
 
 		ldr = openObject1(curs, objectId);
@@ -201,17 +175,11 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			return ldr;
 
 		for (final AlternateHandle alt : myAlternates()) {
-			if (primary != null) {
-				if (!primary.equals(this) && !alt.in(primary.myAlternates())) {
-					primary.addAlternate(alt);
-					ldr = alt.db.openObjectImpl1(curs, objectId, primary);
-				}
-			} else
-				ldr = alt.db.openObjectImpl1(curs, objectId, this);
-
+			ldr = alt.db.openObjectImpl1(curs, objectId);
 			if (ldr != null)
 				return ldr;
 		}
+
 		if (tryAgain1()) {
 			ldr = openObject1(curs, objectId);
 			if (ldr != null)
@@ -222,8 +190,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	}
 
 	final ObjectLoader openObjectImpl2(final WindowCursor curs,
-			final String objectName, final AnyObjectId objectId,
-			final FileObjectDatabase primary)
+			final String objectName, final AnyObjectId objectId)
 			throws IOException {
 		ObjectLoader ldr;
 
@@ -232,14 +199,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			return ldr;
 
 		for (final AlternateHandle alt : myAlternates()) {
-			if (primary != null) {
-				if (!primary.equals(this) && !alt.in(primary.myAlternates())) {
-					primary.addAlternate(alt);
-					ldr = alt.db.openObjectImpl2(curs, objectName, objectId, primary);
-				}
-			} else
-				ldr = alt.db.openObjectImpl2(curs, objectName, objectId, this);
-
+			ldr = alt.db.openObjectImpl2(curs, objectName, objectId);
 			if (ldr != null)
 				return ldr;
 		}
@@ -249,15 +209,14 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	long getObjectSize(WindowCursor curs, AnyObjectId objectId)
 			throws IOException {
-		long sz = getObjectSizeImpl1(curs, objectId, null);
+		long sz = getObjectSizeImpl1(curs, objectId);
 		if (0 <= sz)
 			return sz;
-		return getObjectSizeImpl2(curs, objectId.name(), objectId, null);
+		return getObjectSizeImpl2(curs, objectId.name(), objectId);
 	}
 
 	final long getObjectSizeImpl1(final WindowCursor curs,
-			final AnyObjectId objectId, final FileObjectDatabase primary)
-			throws IOException {
+			final AnyObjectId objectId) throws IOException {
 		long sz;
 
 		sz = getObjectSize1(curs, objectId);
@@ -265,13 +224,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			return sz;
 
 		for (final AlternateHandle alt : myAlternates()) {
-			if (primary != null) {
-				if (!primary.equals(this) && alt.in(primary.myAlternates())) {
-					primary.addAlternate(alt);
-					sz = alt.db.getObjectSizeImpl1(curs, objectId, primary);
-				}
-			} else
-				sz = alt.db.getObjectSizeImpl1(curs, objectId, this);
+			sz = alt.db.getObjectSizeImpl1(curs, objectId);
 			if (0 <= sz)
 				return sz;
 		}
@@ -286,8 +239,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	}
 
 	final long getObjectSizeImpl2(final WindowCursor curs,
-			final String objectName, final AnyObjectId objectId,
-			final FileObjectDatabase primary)
+			final String objectName, final AnyObjectId objectId)
 			throws IOException {
 		long sz;
 
@@ -296,15 +248,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			return sz;
 
 		for (final AlternateHandle alt : myAlternates()) {
-			if (primary != null) {
-				if (!primary.equals(this) && alt.in(primary.myAlternates())) {
-					primary.addAlternate(alt);
-					sz = alt.db.getObjectSizeImpl2(curs, objectName, objectId,
-							primary);
-				}
-			} else
-				sz = alt.db
-						.getObjectSizeImpl2(curs, objectName, objectId, this);
+			sz = alt.db.getObjectSizeImpl2(curs, objectName, objectId);
 			if (0 <= sz)
 				return sz;
 		}
@@ -318,8 +262,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	abstract File getDirectory();
 
 	abstract AlternateHandle[] myAlternates();
-
-	abstract void addAlternate(AlternateHandle alt);
 
 	abstract boolean tryAgain1();
 
@@ -357,24 +299,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 		void close() {
 			db.close();
-		}
-
-		boolean in(AlternateHandle[] alts) {
-			for (AlternateHandle a : alts) {
-				if (this.equals(a)) return true;
-			}
-			return false;
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			return o instanceof AlternateHandle
-				&& this.db.equals(((AlternateHandle) o).db);
-		}
-
-		@Override
-		public int hashCode() {
-			return 17 + (3 * this.db.getDirectory().hashCode());
 		}
 	}
 
