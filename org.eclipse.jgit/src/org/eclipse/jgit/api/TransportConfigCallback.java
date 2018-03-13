@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, Roberto Tyley <roberto.tyley@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,17 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.events.RepositoryListener;
+import org.eclipse.jgit.transport.Transport;
 
-/** Receives {@link DfsPacksChangedEvent}s. */
-public interface DfsPacksChangedListener extends RepositoryListener {
+/**
+ * Receives a callback allowing type-specific configuration to be set
+ * on the Transport instance after it's been created.
+ * <p>
+ * This allows consumers of the JGit command API to perform custom
+ * configuration that would be difficult anticipate and expose on the
+ * API command builders.
+ * <p>
+ * For instance, if a client needs to replace the SshSessionFactorys
+ * on any SSHTransport used (eg to control available SSH identities),
+ * they can set the TransportConfigCallback on the JGit API command -
+ * once the transport has been created by the command, the callback
+ * will be invoked and passed the transport instance, which the
+ * client can then inspect and configure as necessary.
+ */
+public interface TransportConfigCallback {
+
 	/**
-	 * Invoked when all packs in a repository are listed.
-	 *
-	 * @param event
-	 *            information about the packs.
+	 * Add any additional transport-specific configuration required.
+	 * @param transport
 	 */
-	void onPacksChanged(DfsPacksChangedEvent event);
+	public void configure(Transport transport);
 }
