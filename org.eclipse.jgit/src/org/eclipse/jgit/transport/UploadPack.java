@@ -45,8 +45,8 @@ package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
+import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_INCLUDE_TAG;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK_DETAILED;
@@ -177,7 +177,7 @@ public class UploadPack {
 		 */
 		public FirstLine(String line) {
 			if (line.length() > 45) {
-				final HashSet<String> opts = new HashSet<>();
+				final HashSet<String> opts = new HashSet<String>();
 				String opt = line.substring(45);
 				if (opt.startsWith(" ")) //$NON-NLS-1$
 					opt = opt.substring(1);
@@ -263,19 +263,19 @@ public class UploadPack {
 	String userAgent;
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
-	private final Set<ObjectId> wantIds = new HashSet<>();
+	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
 
 	/** Objects the client wants to obtain. */
-	private final Set<RevObject> wantAll = new HashSet<>();
+	private final Set<RevObject> wantAll = new HashSet<RevObject>();
 
 	/** Objects on both sides, these don't have to be sent. */
-	private final Set<RevObject> commonBase = new HashSet<>();
+	private final Set<RevObject> commonBase = new HashSet<RevObject>();
 
 	/** Shallow commits the client already has. */
-	private final Set<ObjectId> clientShallowCommits = new HashSet<>();
+	private final Set<ObjectId> clientShallowCommits = new HashSet<ObjectId>();
 
 	/** Shallow commits on the client which are now becoming unshallow */
-	private final List<ObjectId> unshallowCommits = new ArrayList<>();
+	private final List<ObjectId> unshallowCommits = new ArrayList<ObjectId>();
 
 	/** Desired depth from the client on a shallow request. */
 	private int depth;
@@ -313,7 +313,6 @@ public class UploadPack {
 
 	private PackStatistics statistics;
 
-	@SuppressWarnings("deprecation")
 	private UploadPackLogger logger = UploadPackLogger.NULL;
 
 	/**
@@ -776,7 +775,7 @@ public class UploadPack {
 	}
 
 	private static Set<ObjectId> refIdSet(Collection<Ref> refs) {
-		Set<ObjectId> ids = new HashSet<>(refs.size());
+		Set<ObjectId> ids = new HashSet<ObjectId>(refs.size());
 		for (Ref ref : refs) {
 			ObjectId id = ref.getObjectId();
 			if (id != null) {
@@ -1018,7 +1017,7 @@ public class UploadPack {
 		okToGiveUp = Boolean.FALSE;
 
 		ObjectId last = ObjectId.zeroId();
-		List<ObjectId> peerHas = new ArrayList<>(64);
+		List<ObjectId> peerHas = new ArrayList<ObjectId>(64);
 		for (;;) {
 			String line;
 			try {
@@ -1172,7 +1171,7 @@ public class UploadPack {
 		for (ObjectId obj : wantIds) {
 			if (!advertised.contains(obj)) {
 				if (notAdvertisedWants == null)
-					notAdvertisedWants = new ArrayList<>();
+					notAdvertisedWants = new ArrayList<ObjectId>();
 				notAdvertisedWants.add(obj);
 			}
 		}
@@ -1215,7 +1214,6 @@ public class UploadPack {
 	 */
 	public static final class AdvertisedRequestValidator
 			implements RequestValidator {
-		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1232,7 +1230,6 @@ public class UploadPack {
 	 */
 	public static final class ReachableCommitRequestValidator
 			implements RequestValidator {
-		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			checkNotAdvertisedWants(up.getRevWalk(), wants,
@@ -1246,7 +1243,6 @@ public class UploadPack {
 	 * @since 3.1
 	 */
 	public static final class TipRequestValidator implements RequestValidator {
-		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1269,7 +1265,6 @@ public class UploadPack {
 	 */
 	public static final class ReachableCommitTipRequestValidator
 			implements RequestValidator {
-		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			checkNotAdvertisedWants(up.getRevWalk(), wants,
@@ -1283,7 +1278,6 @@ public class UploadPack {
 	 * @since 3.1
 	 */
 	public static final class AnyRequestValidator implements RequestValidator {
-		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			// All requests are valid.
@@ -1434,7 +1428,6 @@ public class UploadPack {
 		}
 	}
 
-	@SuppressWarnings("deprecation")
 	private void sendPack(final boolean sideband) throws IOException {
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
@@ -1488,7 +1481,7 @@ public class UploadPack {
 			pw.setReuseValidatingObjects(false);
 
 			if (commonBase.isEmpty() && refs != null) {
-				Set<ObjectId> tagTargets = new HashSet<>();
+				Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 				for (Ref ref : refs.values()) {
 					if (ref.getPeeledObjectId() != null)
 						tagTargets.add(ref.getPeeledObjectId());

@@ -62,7 +62,6 @@ import java.util.Collection;
 public interface PostReceiveHook {
 	/** A simple no-op hook. */
 	public static final PostReceiveHook NULL = new PostReceiveHook() {
-		@Override
 		public void onPostReceive(final ReceivePack rp,
 				final Collection<ReceiveCommand> commands) {
 			// Do nothing.

@@ -138,17 +138,14 @@ public interface DepthWalk {
 			return new Commit(id);
 		}
 
-		@Override
 		public int getDepth() {
 			return depth;
 		}
 
-		@Override
 		public RevFlag getUnshallowFlag() {
 			return UNSHALLOW;
 		}
 
-		@Override
 		public RevFlag getReinterestingFlag() {
 			return REINTERESTING;
 		}
@@ -242,17 +239,14 @@ public interface DepthWalk {
 			return new Commit(id);
 		}
 
-		@Override
 		public int getDepth() {
 			return depth;
 		}
 
-		@Override
 		public RevFlag getUnshallowFlag() {
 			return UNSHALLOW;
 		}
 
-		@Override
 		public RevFlag getReinterestingFlag() {
 			return REINTERESTING;
 		}
