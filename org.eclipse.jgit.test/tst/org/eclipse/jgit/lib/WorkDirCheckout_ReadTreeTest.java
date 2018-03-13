@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,58 +40,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
- * A tree entry representing a gitlink entry used for submodules.
- *
- * Note. Java cannot really handle these as file system objects.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
+ * Test cases for ReadTree operations as implemented in WorkDirCheckout
  */
-@Deprecated
-public class GitlinkTreeEntry extends TreeEntry {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
-	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
-	 */
-	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
+public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
+	private WorkDirCheckout wdc;
+	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkTree(), head, db.getIndex(), merge);
+		wdc.prescanTwoTrees();
 	}
 
-	public FileMode getMode() {
-		return FileMode.GITLINK;
+	public void checkout() throws IOException {
+		GitIndex index = db.getIndex();
+		wdc = new WorkDirCheckout(db, db.getWorkTree(), theHead, index, theMerge);
+		wdc.checkout();
+		index.write();
 	}
 
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitGitlink(this);
+	public ArrayList<String> getRemoved() {
+		return wdc.getRemoved();
 	}
 
-	@Override
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(" G ");
-		r.append(getFullName());
-		return r.toString();
+	public HashMap<String, ObjectId> getUpdated() {
+		return wdc.updated;
+	}
+
+	public ArrayList<String> getConflicts() {
+		return wdc.getConflicts();
 	}
 }
+

@@ -47,78 +47,22 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 
 /**
- * A representation of a file (blob) object in a {@link Tree}.
+ * Tree-ish is an interface for tree-like Git objects.
  *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
+ * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk} to parse objects
+ * and resolve to a {@link org.eclipse.jgit.revwalk.RevTree}.  See the method
+ * {@link org.eclipse.jgit.revwalk.RevWalk#parseTree(AnyObjectId)}.
  */
 @Deprecated
-public class FileTreeEntry extends TreeEntry {
-	private FileMode mode;
-
+public interface Treeish {
 	/**
-	 * Constructor for a File (blob) object.
-	 *
-	 * @param parent
-	 *            The {@link Tree} holding this object (or null)
-	 * @param id
-	 *            the SHA-1 of the blob (or null for a yet unhashed file)
-	 * @param nameUTF8
-	 *            raw object name in the parent tree
-	 * @param execute
-	 *            true if the executable flag is set
+	 * @return the id of this tree
 	 */
-	public FileTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8, final boolean execute) {
-		super(parent, id, nameUTF8);
-		setExecutable(execute);
-	}
-
-	public FileMode getMode() {
-		return mode;
-	}
+	public ObjectId getTreeId();
 
 	/**
-	 * @return true if this file is executable
-	 */
-	public boolean isExecutable() {
-		return getMode().equals(FileMode.EXECUTABLE_FILE);
-	}
-
-	/**
-	 * @param execute set/reset the executable flag
-	 */
-	public void setExecutable(final boolean execute) {
-		mode = execute ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-	}
-
-	/**
-	 * @return an {@link ObjectLoader} that will return the data
+	 * @return the tree of this tree-ish object
 	 * @throws IOException
 	 */
-	public ObjectLoader openReader() throws IOException {
-		return getRepository().open(getId(), Constants.OBJ_BLOB);
-	}
-
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitFile(this);
-	}
-
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(' ');
-		r.append(isExecutable() ? 'X' : 'F');
-		r.append(' ');
-		r.append(getFullName());
-		return r.toString();
-	}
+	public Tree getTree() throws IOException;
 }
