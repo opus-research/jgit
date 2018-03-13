@@ -96,8 +96,6 @@ import org.eclipse.jgit.util.NB;
  * one instance per created pack. Subsequent calls to writePack result in
  * undefined behavior.
  * </p>
- * In order to release system resources held by this, the {@link #close()} method
- * should be called if this is no longer needed.
  */
 public class PackWriter {
 	/**
@@ -242,13 +240,6 @@ public class PackWriter {
 		writeMonitor = wmonitor == null ? NullProgressMonitor.INSTANCE : wmonitor;
 		this.deflater = new Deflater(db.getConfig().getCore().getCompression());
 		outputVersion = repo.getConfig().getCore().getPackIndexVersion();
-	}
-
-	/**
-	 * Releases system resource held by this instance
-	 */
-	public void close() {
-		this.deflater.end();
 	}
 
 	/**

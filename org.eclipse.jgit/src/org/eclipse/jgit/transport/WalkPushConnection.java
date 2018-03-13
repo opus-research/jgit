@@ -275,7 +275,6 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			infoPacks.add(packName);
 			infoPacks.addAll(packNames.keySet());
 			dest.writeInfoPacks(infoPacks);
-			pw.close();
 
 		} catch (IOException err) {
 			safeDelete(pathIdx);

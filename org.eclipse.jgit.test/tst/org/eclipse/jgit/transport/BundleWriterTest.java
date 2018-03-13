@@ -154,7 +154,6 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 			bw.assume(assume);
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		bw.writeBundle(out);
-		bw.close();
 		return out.toByteArray();
 	}
 

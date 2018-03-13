@@ -451,7 +451,6 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 			if (n > 0)
 				tinyPack.write(buf, 0, n);
 		} while (!deflater.finished());
-		deflater.end();
 	}
 
 	private void digest(TemporaryBuffer.Heap buf) throws IOException {
