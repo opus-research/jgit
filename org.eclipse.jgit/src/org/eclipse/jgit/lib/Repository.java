@@ -49,7 +49,6 @@ package org.eclipse.jgit.lib;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,7 +59,13 @@ import java.util.Vector;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
+import org.eclipse.jgit.revwalk.RevBlob;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FS;
 
 /**
@@ -119,6 +124,16 @@ public abstract class Repository {
 	 */
 	public abstract ObjectDatabase getObjectDatabase();
 
+	/** @return a new inserter to create objects in {@link #getObjectDatabase()} */
+	public ObjectInserter newObjectInserter() {
+		return getObjectDatabase().newInserter();
+	}
+
+	/** @return a new inserter to create objects in {@link #getObjectDatabase()} */
+	public ObjectReader newObjectReader() {
+		return getObjectDatabase().newReader();
+	}
+
 	/** @return the reference database which stores the reference namespace. */
 	public abstract RefDatabase getRefDatabase();
 
@@ -150,7 +165,12 @@ public abstract class Repository {
 	 *         known shared repositories.
 	 */
 	public boolean hasObject(AnyObjectId objectId) {
-		return getObjectDatabase().hasObject(objectId);
+		try {
+			return getObjectDatabase().hasObject(objectId);
+		} catch (IOException e) {
+			// Legacy API, assume error means "no"
+			return false;
+		}
 	}
 
 	/**
@@ -163,11 +183,11 @@ public abstract class Repository {
 	 */
 	public ObjectLoader openObject(final AnyObjectId id)
 			throws IOException {
-		final WindowCursor wc = new WindowCursor();
 		try {
-			return openObject(wc, id);
-		} finally {
-			wc.release();
+			return getObjectDatabase().openObject(id);
+		} catch (MissingObjectException notFound) {
+			// Legacy API, return null
+			return null;
 		}
 	}
 
@@ -180,42 +200,17 @@ public abstract class Repository {
 	 * @return a {@link ObjectLoader} for accessing the data of the named
 	 *         object, or null if the object does not exist.
 	 * @throws IOException
+	 * @deprecated Use {code newObjectReader().open(id)}.
 	 */
-	public ObjectLoader openObject(WindowCursor curs, AnyObjectId id)
+	@Deprecated
+	public ObjectLoader openObject(ObjectReader curs, AnyObjectId id)
 			throws IOException {
-		return getObjectDatabase().openObject(curs, id);
+		try {
+			return curs.openObject(id);
+		} catch (MissingObjectException notFound) {
+			return null;
+		}
 	}
-
-	/**
-	 * Open object in all packs containing specified object.
-	 *
-	 * @param objectId
-	 *            id of object to search for
-	 * @param curs
-	 *            temporary working space associated with the calling thread.
-	 * @return collection of loaders for this object, from all packs containing
-	 *         this object
-	 * @throws IOException
-	 */
-	public abstract Collection<PackedObjectLoader> openObjectInAllPacks(
-			AnyObjectId objectId, WindowCursor curs)
-			throws IOException;
-
-	/**
-	 * Open object in all packs containing specified object.
-	 *
-	 * @param objectId
-	 *            id of object to search for
-	 * @param resultLoaders
-	 *            result collection of loaders for this object, filled with
-	 *            loaders from all packs containing specified object
-	 * @param curs
-	 *            temporary working space associated with the calling thread.
-	 * @throws IOException
-	 */
-	abstract void openObjectInAllPacks(final AnyObjectId objectId,
-			final Collection<PackedObjectLoader> resultLoaders,
-			final WindowCursor curs) throws IOException;
 
 	/**
 	 * @param id
@@ -440,36 +435,37 @@ public abstract class Repository {
 	 *
 	 * Currently supported is combinations of these.
 	 * <ul>
-	 *  <li>SHA-1 - a SHA-1</li>
-	 *  <li>refs/... - a ref name</li>
-	 *  <li>ref^n - nth parent reference</li>
-	 *  <li>ref~n - distance via parent reference</li>
-	 *  <li>ref@{n} - nth version of ref</li>
-	 *  <li>ref^{tree} - tree references by ref</li>
-	 *  <li>ref^{commit} - commit references by ref</li>
+	 * <li>SHA-1 - a SHA-1</li>
+	 * <li>refs/... - a ref name</li>
+	 * <li>ref^n - nth parent reference</li>
+	 * <li>ref~n - distance via parent reference</li>
+	 * <li>ref@{n} - nth version of ref</li>
+	 * <li>ref^{tree} - tree references by ref</li>
+	 * <li>ref^{commit} - commit references by ref</li>
 	 * </ul>
 	 *
-	 * Not supported is
+	 * Not supported is:
 	 * <ul>
 	 * <li>timestamps in reflogs, ref@{full or relative timestamp}</li>
 	 * <li>abbreviated SHA-1's</li>
 	 * </ul>
 	 *
-	 * @param revstr A git object references expression
+	 * @param revstr
+	 *            A git object references expression
 	 * @return an ObjectId or null if revstr can't be resolved to any ObjectId
-	 * @throws IOException on serious errors
+	 * @throws IOException
+	 *             on serious errors
 	 */
 	public ObjectId resolve(final String revstr) throws IOException {
 		char[] rev = revstr.toCharArray();
-		Object ref = null;
-		ObjectId refId = null;
+		RevObject ref = null;
+		RevWalk rw = new RevWalk(this);
 		for (int i = 0; i < rev.length; ++i) {
 			switch (rev[i]) {
 			case '^':
-				if (refId == null) {
-					String refstr = new String(rev,0,i);
-					refId = resolveSimple(refstr);
-					if (refId == null)
+				if (ref == null) {
+					ref = parseSimple(rw, new String(rev, 0, i));
+					if (ref == null)
 						return null;
 				}
 				if (i + 1 < rev.length) {
@@ -485,19 +481,12 @@ public abstract class Repository {
 					case '8':
 					case '9':
 						int j;
-						ref = mapObject(refId, null);
-						while (ref instanceof Tag) {
-							Tag tag = (Tag)ref;
-							refId = tag.getObjId();
-							ref = mapObject(refId, null);
-						}
-						if (!(ref instanceof Commit))
-							throw new IncorrectObjectTypeException(refId, Constants.TYPE_COMMIT);
-						for (j=i+1; j<rev.length; ++j) {
+						ref = rw.parseCommit(ref);
+						for (j = i + 1; j < rev.length; ++j) {
 							if (!Character.isDigit(rev[j]))
 								break;
 						}
-						String parentnum = new String(rev, i+1, j-i-1);
+						String parentnum = new String(rev, i + 1, j - i - 1);
 						int pnum;
 						try {
 							pnum = Integer.parseInt(parentnum);
@@ -507,123 +496,86 @@ public abstract class Repository {
 									revstr);
 						}
 						if (pnum != 0) {
-							final ObjectId parents[] = ((Commit) ref)
-									.getParentIds();
-							if (pnum > parents.length)
-								refId = null;
+							RevCommit commit = (RevCommit) ref;
+							if (pnum > commit.getParentCount())
+								ref = null;
 							else
-								refId = parents[pnum - 1];
+								ref = commit.getParent(pnum - 1);
 						}
 						i = j - 1;
 						break;
 					case '{':
 						int k;
 						String item = null;
-						for (k=i+2; k<rev.length; ++k) {
+						for (k = i + 2; k < rev.length; ++k) {
 							if (rev[k] == '}') {
-								item = new String(rev, i+2, k-i-2);
+								item = new String(rev, i + 2, k - i - 2);
 								break;
 							}
 						}
 						i = k;
 						if (item != null)
 							if (item.equals("tree")) {
-								ref = mapObject(refId, null);
-								while (ref instanceof Tag) {
-									Tag t = (Tag)ref;
-									refId = t.getObjId();
-									ref = mapObject(refId, null);
-								}
-								if (ref instanceof Treeish)
-									refId = ((Treeish)ref).getTreeId();
-								else
-									throw new IncorrectObjectTypeException(refId,  Constants.TYPE_TREE);
-							}
-							else if (item.equals("commit")) {
-								ref = mapObject(refId, null);
-								while (ref instanceof Tag) {
-									Tag t = (Tag)ref;
-									refId = t.getObjId();
-									ref = mapObject(refId, null);
-								}
-								if (!(ref instanceof Commit))
-									throw new IncorrectObjectTypeException(refId,  Constants.TYPE_COMMIT);
-							}
-							else if (item.equals("blob")) {
-								ref = mapObject(refId, null);
-								while (ref instanceof Tag) {
-									Tag t = (Tag)ref;
-									refId = t.getObjId();
-									ref = mapObject(refId, null);
-								}
-								if (!(ref instanceof byte[]))
-									throw new IncorrectObjectTypeException(refId,  Constants.TYPE_BLOB);
-							}
-							else if (item.equals("")) {
-								ref = mapObject(refId, null);
-								while (ref instanceof Tag) {
-									Tag t = (Tag)ref;
-									refId = t.getObjId();
-									ref = mapObject(refId, null);
-								}
-							}
-							else
+								ref = rw.parseTree(ref);
+							} else if (item.equals("commit")) {
+								ref = rw.parseCommit(ref);
+							} else if (item.equals("blob")) {
+								ref = rw.parseAny(ref);
+								ref = peelTag(rw, ref);
+								if (!(ref instanceof RevBlob))
+									throw new IncorrectObjectTypeException(ref,
+											Constants.TYPE_BLOB);
+							} else if (item.equals("")) {
+								ref = rw.parseAny(ref);
+								ref = peelTag(rw, ref);
+							} else
 								throw new RevisionSyntaxException(revstr);
 						else
 							throw new RevisionSyntaxException(revstr);
 						break;
 					default:
-						ref = mapObject(refId, null);
-						if (ref instanceof Commit) {
-							final ObjectId parents[] = ((Commit) ref)
-									.getParentIds();
-							if (parents.length == 0)
-								refId = null;
+						ref = rw.parseAny(ref);
+						if (ref instanceof RevCommit) {
+							RevCommit commit = ((RevCommit) ref);
+							if (commit.getParentCount() == 0)
+								ref = null;
 							else
-								refId = parents[0];
+								ref = commit.getParent(0);
 						} else
-							throw new IncorrectObjectTypeException(refId,  Constants.TYPE_COMMIT);
+							throw new IncorrectObjectTypeException(ref,
+									Constants.TYPE_COMMIT);
 
 					}
 				} else {
-					ref = mapObject(refId, null);
-					while (ref instanceof Tag) {
-						Tag tag = (Tag)ref;
-						refId = tag.getObjId();
-						ref = mapObject(refId, null);
-					}
-					if (ref instanceof Commit) {
-						final ObjectId parents[] = ((Commit) ref)
-								.getParentIds();
-						if (parents.length == 0)
-							refId = null;
+					ref = rw.parseAny(ref);
+					ref = peelTag(rw, ref);
+					if (ref instanceof RevCommit) {
+						RevCommit commit = ((RevCommit) ref);
+						if (commit.getParentCount() == 0)
+							ref = null;
 						else
-							refId = parents[0];
+							ref = commit.getParent(0);
 					} else
-						throw new IncorrectObjectTypeException(refId,  Constants.TYPE_COMMIT);
+						throw new IncorrectObjectTypeException(ref,
+								Constants.TYPE_COMMIT);
 				}
 				break;
 			case '~':
 				if (ref == null) {
-					String refstr = new String(rev,0,i);
-					refId = resolveSimple(refstr);
-					if (refId == null)
+					ref = parseSimple(rw, new String(rev, 0, i));
+					if (ref == null)
 						return null;
-					ref = mapObject(refId, null);
 				}
-				while (ref instanceof Tag) {
-					Tag tag = (Tag)ref;
-					refId = tag.getObjId();
-					ref = mapObject(refId, null);
-				}
-				if (!(ref instanceof Commit))
-					throw new IncorrectObjectTypeException(refId, Constants.TYPE_COMMIT);
+				ref = peelTag(rw, ref);
+				if (!(ref instanceof RevCommit))
+					throw new IncorrectObjectTypeException(ref,
+							Constants.TYPE_COMMIT);
 				int l;
 				for (l = i + 1; l < rev.length; ++l) {
 					if (!Character.isDigit(rev[l]))
 						break;
 				}
-				String distnum = new String(rev, i+1, l-i-1);
+				String distnum = new String(rev, i + 1, l - i - 1);
 				int dist;
 				try {
 					dist = Integer.parseInt(distnum);
@@ -632,13 +584,14 @@ public abstract class Repository {
 							JGitText.get().invalidAncestryLength, revstr);
 				}
 				while (dist > 0) {
-					final ObjectId[] parents = ((Commit) ref).getParentIds();
-					if (parents.length == 0) {
-						refId = null;
+					RevCommit commit = (RevCommit) ref;
+					if (commit.getParentCount() == 0) {
+						ref = null;
 						break;
 					}
-					refId = parents[0];
-					ref = mapCommit(refId);
+					commit = commit.getParent(0);
+					rw.parseHeaders(commit);
+					ref = commit;
 					--dist;
 				}
 				i = l - 1;
@@ -646,31 +599,43 @@ public abstract class Repository {
 			case '@':
 				int m;
 				String time = null;
-				for (m=i+2; m<rev.length; ++m) {
+				for (m = i + 2; m < rev.length; ++m) {
 					if (rev[m] == '}') {
-						time = new String(rev, i+2, m-i-2);
+						time = new String(rev, i + 2, m - i - 2);
 						break;
 					}
 				}
 				if (time != null)
-					throw new RevisionSyntaxException(JGitText.get().reflogsNotYetSupportedByRevisionParser, revstr);
+					throw new RevisionSyntaxException(
+							JGitText.get().reflogsNotYetSupportedByRevisionParser,
+							revstr);
 				i = m - 1;
 				break;
 			default:
-				if (refId != null)
+				if (ref != null)
 					throw new RevisionSyntaxException(revstr);
 			}
 		}
-		if (refId == null)
-			refId = resolveSimple(revstr);
-		return refId;
+		return ref != null ? ref.copy() : resolveSimple(revstr);
+	}
+
+	private RevObject parseSimple(RevWalk rw, String revstr) throws IOException {
+		ObjectId id = resolveSimple(revstr);
+		return id != null ? rw.parseAny(id) : null;
 	}
 
 	private ObjectId resolveSimple(final String revstr) throws IOException {
 		if (ObjectId.isId(revstr))
 			return ObjectId.fromString(revstr);
-		final Ref r = getRef(revstr);
+		final Ref r = getRefDatabase().getRef(revstr);
 		return r != null ? r.getObjectId() : null;
+	}
+
+	private RevObject peelTag(RevWalk rw, RevObject ref)
+			throws MissingObjectException, IOException {
+		while (ref instanceof RevTag)
+			ref = rw.parseAny(((RevTag) ref).getObject());
+		return ref;
 	}
 
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
@@ -737,6 +702,20 @@ public abstract class Repository {
 		if (name != null)
 			return shortenRefName(name);
 		return name;
+	}
+
+	/**
+	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
+	 * <p>
+	 * When a repository borrows objects from another repository, it can
+	 * advertise that it safely has that other repository's references, without
+	 * exposing any other details about the other repository.  This may help
+	 * a client trying to push changes avoid pushing more than it needs to.
+	 *
+	 * @return unmodifiable collection of other known objects.
+	 */
+	public Set<ObjectId> getAdditionalHaves() {
+		return Collections.emptySet();
 	}
 
 	/**
