@@ -3,7 +3,6 @@
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2009, Google, Inc.
  * Copyright (C) 2009, JetBrains s.r.o.
- * Copyright (C) 2009, Mykola Nikishov <mn@mn.com.ua>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -76,8 +75,6 @@ import com.jcraft.jsch.UserInfo;
  * to supply appropriate {@link UserInfo} to the session.
  */
 public abstract class SshConfigSessionFactory extends SshSessionFactory {
-	private static final String SSH_USERDIR = ".ssh";
-
 	private final Map<String, JSch> byIdentityFile = new HashMap<String, JSch>();
 
 	private JSch defaultJSch;
@@ -200,7 +197,7 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 		final File home = FS.userHome();
 		if (home == null)
 			return;
-		final File known_hosts = new File(getSshUserDir(home), "known_hosts");
+		final File known_hosts = new File(new File(home, ".ssh"), "known_hosts");
 		try {
 			final FileInputStream in = new FileInputStream(known_hosts);
 			try {
@@ -215,20 +212,11 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 		}
 	}
 
-	/**
-	 * @param home
-	 * @return directory where user's SSH stuff (public/private keys, list of
-	 *         known sites etc.) located)
-	 */
-	static File getSshUserDir(final File home) {
-		return new File(home, SSH_USERDIR);
-	}
-
 	private static void identities(final JSch sch) {
 		final File home = FS.userHome();
 		if (home == null)
 			return;
-		final File sshdir = getSshUserDir(home);
+		final File sshdir = new File(home, ".ssh");
 		if (sshdir.isDirectory()) {
 			loadIdentity(sch, new File(sshdir, "identity"));
 			loadIdentity(sch, new File(sshdir, "id_rsa"));
