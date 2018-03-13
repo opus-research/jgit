@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,52 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
 
-/**
- * Constants for use with the Configuration classes: section names,
- * configuration keys
- */
-public class ConfigConstants {
-	/** The "core" section */
-	public static final String CONFIG_CORE_SECTION = "core";
+package org.eclipse.jgit.diff;
 
-	/** The "branch" section */
-	public static final String CONFIG_BRANCH_SECTION = "branch";
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
 
-	/** The "remote" section */
-	public static final String CONFIG_REMOTE_SECTION = "remote";
+public class PatienceDiffTest extends AbstractDiffTestCase {
+	@Override
+	protected DiffAlgorithm algorithm() {
+		PatienceDiff pd = new PatienceDiff();
+		pd.setFallbackAlgorithm(null);
+		return pd;
+	}
 
-	/** The "autocrlf" key */
-	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
+	public void testEdit_NoUniqueMiddleSideA() {
+		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 5, 1, 5), r.get(0));
+	}
 
-	/** The "bare" key */
-	public static final String CONFIG_KEY_BARE = "bare";
+	public void testEdit_NoUniqueMiddleSideB() {
+		EditList r = diff(t("aRSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 3, 1, 5), r.get(0));
+	}
 
-	/** The "filemode" key */
-	public static final String CONFIG_KEY_FILEMODE = "filemode";
-
-	/** The "logallrefupdates" key */
-	public static final String CONFIG_KEY_LOGALLREFUPDATES = "logallrefupdates";
-
-	/** The "repositoryformatversion" key */
-	public static final String CONFIG_KEY_REPO_FORMAT_VERSION = "repositoryformatversion";
-
-	/** The "worktree" key */
-	public static final String CONFIG_KEY_WORKTREE = "worktree";
-
-	/** The "remote" key */
-	public static final String CONFIG_KEY_REMOTE = "remote";
-
-	/** The "merge" key */
-	public static final String CONFIG_KEY_MERGE = "merge";
-
-	/** The "rebase" key */
-	public static final String CONFIG_KEY_REBASE = "rebase";
-
-	/** The "url" key */
-	public static final String CONFIG_KEY_URL = "url";
-
-	/** The "autosetupmerge" key */
-	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
+	public void testPerformanceTestDeltaLength() {
+		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
+		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharArray ac = new CharArray(a);
+		CharArray bc = new CharArray(b);
+		EditList r = algorithm().diff(new CharCmp(), ac, bc);
+		assertEquals(25, r.size());
+	}
 }
