@@ -169,6 +169,7 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		Repository subRepo = gen.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(modulesGitDir, subRepo.getDirectory());
 		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
@@ -217,6 +218,7 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		Repository subRepo = gen.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(modulesGitDir, subRepo.getDirectory());
 		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
@@ -297,13 +299,13 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		final Config gitmodules = new Config();
 		gitmodules.setString(CONFIG_SUBMODULE_SECTION, path, CONFIG_KEY_PATH,
 				"sub");
-		gitmodules.setString(CONFIG_SUBMODULE_SECTION, path, CONFIG_KEY_URL,
-				"git://example.com/sub");
-		final RevBlob gitmodulesBlob = testDb.blob(gitmodules.toText());
-
-		// Different config in the working tree.
+		// Different config in the index should be overridden by the working tree.
 		gitmodules.setString(CONFIG_SUBMODULE_SECTION, path, CONFIG_KEY_URL,
 				"git://example.com/bad");
+		final RevBlob gitmodulesBlob = testDb.blob(gitmodules.toText());
+
+		gitmodules.setString(CONFIG_SUBMODULE_SECTION, path, CONFIG_KEY_URL,
+				"git://example.com/sub");
 		writeTrashFile(DOT_GIT_MODULES, gitmodules.toText());
 
 		DirCache cache = db.lockDirCache();
