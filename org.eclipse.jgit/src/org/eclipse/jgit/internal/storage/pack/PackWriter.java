@@ -710,11 +710,52 @@ public class PackWriter implements AutoCloseable {
 	public void preparePack(ProgressMonitor countingMonitor,
 			@NonNull Set<? extends ObjectId> want,
 			@NonNull Set<? extends ObjectId> have) throws IOException {
+		preparePack(countingMonitor,
+				want, have, Collections.<ObjectId> emptySet());
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Like {@link #preparePack(ProgressMonitor, Set, Set)} but also allows
+	 * specifying commits that should not be walked past ("shallow" commits).
+	 * The caller is responsible for filtering out commits that should not
+	 * be shallow any more ("unshallow" commits as in {@link #setShallowPack})
+	 * from the shallow set.
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param want
+	 *            objects of interest, ancestors of which will be included in
+	 *            the pack. Must not be {@code null}.
+	 * @param have
+	 *            objects whose ancestors (up to and including
+	 *            {@code shallow} commits) do not need to be included in the
+	 *            pack because they are already available from elsewhere.
+	 *            Must not be {@code null}.
+	 * @param shallow
+	 *            commits indicating the boundary of the history marked with
+	 *            {@code have}. Shallow commits have parents but those
+	 *            parents are considered not to be already available.
+	 *            Parents of {@code shallow} commits and earlier generations
+	 *            will be included in the pack if requested by {@code want}.
+	 *            Must not be {@code null}.
+	 * @param IOException
+	 *            an I/O problem occured while reading objects.
+	 *
+	 * @since 4.5
+	 */
+	public void preparePack(ProgressMonitor countingMonitor,
+			@NonNull Set<? extends ObjectId> want,
+			@NonNull Set<? extends ObjectId> have,
+			@NonNull Set<? extends ObjectId> shallow) throws IOException {
 		ObjectWalk ow;
-		if (shallowPack)
+		if (shallowPack) {
 			ow = new DepthWalk.ObjectWalk(reader, depth - 1);
-		else
+		} else {
 			ow = new ObjectWalk(reader);
+		}
+		ow.assumeShallow(shallow);
 		preparePack(countingMonitor, ow, want, have);
 	}
 
