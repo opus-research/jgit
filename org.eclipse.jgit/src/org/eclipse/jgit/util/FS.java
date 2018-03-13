@@ -535,9 +535,9 @@ public abstract class FS {
 		private final String desc;
 		private final String dir;
 		private final boolean debug = LOG.isDebugEnabled();
-		private final AtomicBoolean fail = new AtomicBoolean();
+		final AtomicBoolean fail = new AtomicBoolean();
 
-		private GobblerThread(Process p, String[] command, File dir) {
+		GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
 			if (debug) {
 				this.desc = Arrays.asList(command).toString();
@@ -598,6 +598,14 @@ public abstract class FS {
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
 		if (gitExe == null) {
+			return null;
+		}
+
+		// Bug 480782: Check if the discovered git executable is JGit CLI
+		String v = readPipe(gitExe.getParentFile(),
+				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
+				Charset.defaultCharset().name());
+		if (v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
