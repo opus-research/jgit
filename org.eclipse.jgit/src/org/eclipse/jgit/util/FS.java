@@ -285,7 +285,9 @@ public abstract class FS {
 	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
-		FileUtils.delete(f);
+		if (!f.delete())
+			throw new IOException(MessageFormat.format(
+					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
@@ -861,7 +863,10 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public File findHook(Repository repository, final String hookName) {
-		final File hookFile = new File(new File(repository.getDirectory(),
+		File gitDir = repository.getDirectory();
+		if (gitDir == null)
+			return null;
+		final File hookFile = new File(new File(gitDir,
 				Constants.HOOKS), hookName);
 		return hookFile.isFile() ? hookFile : null;
 	}
