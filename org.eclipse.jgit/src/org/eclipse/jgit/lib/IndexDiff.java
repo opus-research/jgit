@@ -65,6 +65,7 @@ import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
+import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -188,31 +189,6 @@ public class IndexDiff {
 				return null;
 			}
 		}
-	}
-
-	/**
-	 * The values for the config param submodule.<name>.ignore
-	 */
-	public enum IgnoreSubmoduleMode {
-		/**
-		 * Ignore all modifications to submodules
-		 */
-		ALL,
-
-		/**
-		 * Ignore changes to the workingtree of a submodule
-		 */
-		DIRTY,
-
-		/**
-		 * Ignore changes to untracked files in the workingtree of a submodule
-		 */
-		UNTRACKED,
-
-		/**
-		 * Ignore nothing. That's the default
-		 */
-		NONE;
 	}
 
 	private static final class ProgressReportingFilter extends TreeFilter {

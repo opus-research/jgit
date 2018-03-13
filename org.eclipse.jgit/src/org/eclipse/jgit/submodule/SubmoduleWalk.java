@@ -60,7 +60,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.IndexDiff.IgnoreSubmoduleMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -78,6 +77,31 @@ import org.eclipse.jgit.util.FS;
  * Walker that visits all submodule entries found in a tree
  */
 public class SubmoduleWalk {
+
+	/**
+	 * The values for the config param submodule.<name>.ignore
+	 */
+	public enum IgnoreSubmoduleMode {
+		/**
+		 * Ignore all modifications to submodules
+		 */
+		ALL,
+
+		/**
+		 * Ignore changes to the working tree of a submodule
+		 */
+		DIRTY,
+
+		/**
+		 * Ignore changes to untracked files in the working tree of a submodule
+		 */
+		UNTRACKED,
+
+		/**
+		 * Ignore nothing. That's the default
+		 */
+		NONE;
+	}
 
 	/**
 	 * Create a generator to walk over the submodule entries currently in the
@@ -601,8 +625,8 @@ public class SubmoduleWalk {
 	}
 
 	/**
-	 * Get the configured ignore field for current entry. This will be the value
-	 * from the .gitmodules file in the current repository's working tree.
+	 * Get the configured ignore field for the current entry. This will be the
+	 * value from the .gitmodules file in the current repository's working tree.
 	 *
 	 * @return ignore value
 	 * @throws ConfigInvalidException
