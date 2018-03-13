@@ -283,27 +283,23 @@ public class RefDirectory extends RefDatabase {
 
 	@Override
 	public Ref exactRef(String name) throws IOException {
-		try {
-			return readAndResolve(name, getPackedRefs());
-		} finally {
-			fireRefsChanged();
-		}
+		Ref ref = readAndResolve(name, getPackedRefs());
+		fireRefsChanged();
+		return ref;
 	}
 
 	@Override
 	public Ref getRef(final String needle) throws IOException {
-		try {
-			RefList<Ref> packed = getPackedRefs();
-			for (String prefix : SEARCH_PATH) {
-				Ref ref = readAndResolve(prefix + needle, packed);
-				if (ref != null) {
-					return ref;
-				}
+		final RefList<Ref> packed = getPackedRefs();
+		Ref ref = null;
+		for (String prefix : SEARCH_PATH) {
+			ref = readAndResolve(prefix + needle, packed);
+			if (ref != null) {
+				break;
 			}
-			return null;
-		} finally {
-			fireRefsChanged();
 		}
+		fireRefsChanged();
+		return ref;
 	}
 
 	@Override
