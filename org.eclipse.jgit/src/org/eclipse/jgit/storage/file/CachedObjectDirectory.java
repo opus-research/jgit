@@ -187,15 +187,15 @@ class CachedObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	boolean hasObject2(String objectId) {
-		return unpackedObjects.contains(ObjectId.fromString(objectId));
+		// This method should never be invoked.
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	ObjectLoader openObject2(WindowCursor curs, String objectName,
 			AnyObjectId objectId) throws IOException {
-		if (unpackedObjects.contains(objectId))
-			return wrapped.openObject2(curs, objectName, objectId);
-		return null;
+		// This method should never be invoked.
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -208,28 +208,13 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	long getObjectSize2(WindowCursor curs, String objectName, AnyObjectId objectId)
 			throws IOException {
-		if (unpackedObjects.contains(objectId))
-			return wrapped.getObjectSize2(curs, objectName, objectId);
-		return -1;
+		// This method should never be invoked.
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId objectId,
-			boolean createDuplicate) {
-		InsertLooseObjectResult result = wrapped.insertUnpackedObject(tmp,
-				objectId, createDuplicate);
-		switch (result) {
-		case INSERTED:
-		case EXISTS_LOOSE:
-			if (!unpackedObjects.contains(objectId))
-				unpackedObjects.add(objectId);
-			break;
-
-		case EXISTS_PACKED:
-		case FAILURE:
-			break;
-		}
-		return result;
+	boolean insertUnpackedObject(File tmp, ObjectId objectId, boolean force) {
+		return wrapped.insertUnpackedObject(tmp, objectId, force);
 	}
 
 	@Override

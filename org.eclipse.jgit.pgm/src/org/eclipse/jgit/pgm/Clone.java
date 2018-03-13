@@ -114,9 +114,7 @@ class Clone extends AbstractFetchCommand {
 		dst.getConfig().save();
 		db = dst;
 
-		out.print(MessageFormat.format(
-				CLIText.get().initializedEmptyGitRepositoryIn, gitdir
-						.getAbsolutePath()));
+		out.format(CLIText.get().initializedEmptyGitRepositoryIn, gitdir.getAbsolutePath());
 		out.println();
 		out.flush();
 
@@ -146,7 +144,7 @@ class Clone extends AbstractFetchCommand {
 		} finally {
 			tn.close();
 		}
-		showFetchResult(r);
+		showFetchResult(tn, r);
 		return r;
 	}
 
