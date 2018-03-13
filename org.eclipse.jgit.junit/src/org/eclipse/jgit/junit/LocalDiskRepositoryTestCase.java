@@ -91,10 +91,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	/** A fake (but stable) identity for committer fields in the test. */
 	protected PersonIdent committer;
 
-	/**
-	 * A {@link SystemReader} used to coordinate time, envars, etc.
-	 * @since 4.2
-	 */
+	/** A {@link SystemReader} used to coordinate time, envars, etc. */
 	protected MockSystemReader mockSystemReader;
 
 	private final List<Repository> toClose = new ArrayList<Repository>();

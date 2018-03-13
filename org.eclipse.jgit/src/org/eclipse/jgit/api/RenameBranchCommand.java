@@ -51,7 +51,6 @@ import org.eclipse.jgit.api.errors.DetachedHeadException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.internal.JGitText;
@@ -122,10 +121,6 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 				fullOldName = ref.getName();
 			} else {
 				fullOldName = repo.getFullBranch();
-				if (fullOldName == null) {
-					throw new NoHeadException(
-							JGitText.get().invalidRepositoryStateNoHead);
-				}
 				if (ObjectId.isId(fullOldName))
 					throw new DetachedHeadException();
 			}

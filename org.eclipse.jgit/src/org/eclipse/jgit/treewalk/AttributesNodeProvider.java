@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,59 +40,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.internal.storage.reftree;
+package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.CoreConfig;
 
-/** Update that always rejects with {@code LOCK_FAILURE}. */
-class AlwaysFailUpdate extends RefUpdate {
-	private final RefTreeDatabase refdb;
+/**
+ * An internal interface use to retrieve {@link AttributesNode}s.
+ * <p>
+ * Implementor of this interface should be able to retrieve the global
+ * {@link AttributesNode} and the info {@link AttributesNode}
+ * </p>
+ *
+ * @since 4.2
+ *
+ */
+public interface AttributesNodeProvider {
 
-	AlwaysFailUpdate(RefTreeDatabase refdb, String name) {
-		super(new ObjectIdRef.Unpeeled(Ref.Storage.NEW, name, null));
-		this.refdb = refdb;
-		setCheckConflicting(false);
-	}
+	/**
+	 * Retrieves the {@link AttributesNode} that holds the information located
+	 * in $GIT_DIR/info/attributes file.
+	 *
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         $GIT_DIR/info/attributes file.
+	 * @throws IOException
+	 *             if an error is raised while parsing the attributes file
+	 */
+	public AttributesNode getInfoAttributesNode() throws IOException;
 
-	@Override
-	protected RefDatabase getRefDatabase() {
-		return refdb;
-	}
+	/**
+	 * Retrieves the {@link AttributesNode} that holds the information located
+	 * in system-wide file.
+	 *
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         system-wide file.
+	 * @throws IOException
+	 *             IOException if an error is raised while parsing the
+	 *             attributes file
+	 * @see CoreConfig#getAttributesFile()
+	 */
+	public AttributesNode getGlobalAttributesNode() throws IOException;
 
-	@Override
-	protected Repository getRepository() {
-		return refdb.getRepository();
-	}
-
-	@Override
-	protected boolean tryLock(boolean deref) throws IOException {
-		return false;
-	}
-
-	@Override
-	protected void unlock() {
-		// No locks are held here.
-	}
-
-	@Override
-	protected Result doUpdate(Result desiredResult) {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doDelete(Result desiredResult) {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doLink(String target) {
-		return Result.LOCK_FAILURE;
-	}
 }

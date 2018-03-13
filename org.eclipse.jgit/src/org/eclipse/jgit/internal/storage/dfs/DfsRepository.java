@@ -49,7 +49,6 @@ import java.text.MessageFormat;
 import java.util.Collections;
 
 import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -57,6 +56,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.treewalk.AttributesNodeProvider;
 
 /** A Git repository on a DFS. */
 public abstract class DfsRepository extends Repository {
@@ -79,6 +79,9 @@ public abstract class DfsRepository extends Repository {
 	@Override
 	public abstract DfsObjDatabase getObjectDatabase();
 
+	@Override
+	public abstract DfsRefDatabase getRefDatabase();
+
 	/** @return a description of this repository. */
 	public DfsRepositoryDescription getDescription() {
 		return description;
@@ -92,10 +95,7 @@ public abstract class DfsRepository extends Repository {
 	 *             the repository cannot be checked.
 	 */
 	public boolean exists() throws IOException {
-		if (getRefDatabase() instanceof DfsRefDatabase) {
-			return ((DfsRefDatabase) getRefDatabase()).exists();
-		}
-		return true;
+		return getRefDatabase().exists();
 	}
 
 	@Override
@@ -117,7 +117,7 @@ public abstract class DfsRepository extends Repository {
 
 	@Override
 	public void scanForRepoChanges() throws IOException {
-		getRefDatabase().refresh();
+		getRefDatabase().clearCache();
 		getObjectDatabase().clearCache();
 	}
 
@@ -133,7 +133,7 @@ public abstract class DfsRepository extends Repository {
 	}
 
 	@Override
-	public AttributesNodeProvider createAttributesNodeProvider() {
+	public AttributesNodeProvider newAttributesNodeProvider() {
 		// TODO Check if the implementation used in FileRepository can be used
 		// for this kind of repository
 		return new EmptyAttributesNodeProvider();

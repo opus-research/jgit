@@ -136,7 +136,7 @@ class DiffAlgorithms extends TextBuiltin {
 	protected void run() throws Exception {
 		mxBean = ManagementFactory.getThreadMXBean();
 		if (!mxBean.isCurrentThreadCpuTimeSupported())
-			throw die("Current thread CPU time not supported on this JRE"); //$NON-NLS-1$
+			throw die("Current thread CPU time not supported on this JRE");
 
 		if (gitDirs.isEmpty()) {
 			RepositoryBuilder rb = new RepositoryBuilder() //
@@ -242,24 +242,23 @@ class DiffAlgorithms extends TextBuiltin {
 			}
 		});
 
-		File directory = db.getDirectory();
-		if (directory != null) {
-			String name = directory.getName();
-			File parent = directory.getParentFile();
+		if (db.getDirectory() != null) {
+			String name = db.getDirectory().getName();
+			File parent = db.getDirectory().getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
-			outw.println(name + ": start at " + startId.name()); //$NON-NLS-1$
+			outw.println(name + ": start at " + startId.name());
 		}
 
-		outw.format("  %12d files,     %8d commits\n", valueOf(files), //$NON-NLS-1$
+		outw.format("  %12d files,     %8d commits\n", valueOf(files),
 				valueOf(commits));
-		outw.format("  N=%10d min lines, %8d max lines\n", valueOf(minN), //$NON-NLS-1$
+		outw.format("  N=%10d min lines, %8d max lines\n", valueOf(minN),
 				valueOf(maxN));
 
-		outw.format("%-25s %12s ( %12s  %12s )\n", //$NON-NLS-1$
-				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-		outw.format("%-25s %12s ( %12s  %12s )\n", //$NON-NLS-1$
-				"", "", "N=" + minN, "N=" + maxN); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		outw.format("%-25s %12s ( %12s  %12s )\n", //
+				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
+		outw.format("%-25s %12s ( %12s  %12s )\n", //
+				"", "", "N=" + minN, "N=" + maxN);
 		outw.println("-----------------------------------------------------" //$NON-NLS-1$
 				+ "----------------"); //$NON-NLS-1$
 
@@ -335,9 +334,9 @@ class DiffAlgorithms extends TextBuiltin {
 				}
 			}
 		} catch (IllegalArgumentException e) {
-			throw die("Cannot determine names", e); //$NON-NLS-1$
+			throw die("Cannot determine names", e);
 		} catch (IllegalAccessException e) {
-			throw die("Cannot determine names", e); //$NON-NLS-1$
+			throw die("Cannot determine names", e);
 		}
 
 		return all;

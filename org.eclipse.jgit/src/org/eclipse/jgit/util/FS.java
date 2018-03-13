@@ -58,14 +58,12 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -107,53 +105,6 @@ public abstract class FS {
 			} else {
 				return new FS_POSIX();
 			}
-		}
-	}
-
-	/**
-	 * Result of an executed process. The caller is responsible to close the
-	 * contained {@link TemporaryBuffer}s
-	 *
-	 * @since 4.2
-	 */
-	public static class ExecutionResult {
-		private TemporaryBuffer stdout;
-
-		private TemporaryBuffer stderr;
-
-		private int rc;
-
-		/**
-		 * @param stdout
-		 * @param stderr
-		 * @param rc
-		 */
-		public ExecutionResult(TemporaryBuffer stdout, TemporaryBuffer stderr,
-				int rc) {
-			this.stdout = stdout;
-			this.stderr = stderr;
-			this.rc = rc;
-		}
-
-		/**
-		 * @return buffered standard output stream
-		 */
-		public TemporaryBuffer getStdout() {
-			return stdout;
-		}
-
-		/**
-		 * @return buffered standard error stream
-		 */
-		public TemporaryBuffer getStderr() {
-			return stderr;
-		}
-
-		/**
-		 * @return the return code of the process
-		 */
-		public int getRc() {
-			return rc;
 		}
 	}
 
@@ -451,10 +402,8 @@ public abstract class FS {
 	 *            as component array
 	 * @param encoding
 	 *            to be used to parse the command's output
-	 * @return the one-line output of the command or {@code null} if there is
-	 *         none
+	 * @return the one-line output of the command
 	 */
-	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding) {
 		return readPipe(dir, command, encoding, null);
 	}
@@ -471,11 +420,9 @@ public abstract class FS {
 	 * @param env
 	 *            Map of environment variables to be merged with those of the
 	 *            current process
-	 * @return the one-line output of the command or {@code null} if there is
-	 *         none
+	 * @return the one-line output of the command
 	 * @since 4.0
 	 */
-	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
 		try {
@@ -489,30 +436,36 @@ public abstract class FS {
 				pb.environment().putAll(env);
 			}
 			Process p = pb.start();
+			BufferedReader lineRead = new BufferedReader(
+					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
 			String r = null;
-			try (BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), encoding))) {
+			try {
 				r = lineRead.readLine();
 				if (debug) {
 					LOG.debug("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-					LOG.debug("remaining output:\n"); //$NON-NLS-1$
-					String l;
-					while ((l = lineRead.readLine()) != null) {
+					LOG.debug("(ignoring remaing output:"); //$NON-NLS-1$
+				}
+				String l;
+				while ((l = lineRead.readLine()) != null) {
+					if (debug) {
 						LOG.debug(l);
 					}
 				}
+			} finally {
+				p.getErrorStream().close();
+				lineRead.close();
 			}
 
 			for (;;) {
 				try {
 					int rc = p.waitFor();
 					gobbler.join();
-					if (rc == 0 && !gobbler.fail.get()) {
+					if (rc == 0 && r != null && r.length() > 0
+							&& !gobbler.fail.get())
 						return r;
-					}
 					if (debug) {
 						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
 					}
@@ -522,7 +475,7 @@ public abstract class FS {
 				}
 			}
 		} catch (IOException e) {
-			LOG.error("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
+			LOG.debug("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
 		}
 		if (debug) {
 			LOG.debug("readpipe returns null"); //$NON-NLS-1$
@@ -534,39 +487,52 @@ public abstract class FS {
 		private final Process p;
 		private final String desc;
 		private final String dir;
-		final AtomicBoolean fail = new AtomicBoolean();
+		private final boolean debug = LOG.isDebugEnabled();
+		private final AtomicBoolean fail = new AtomicBoolean();
 
-		GobblerThread(Process p, String[] command, File dir) {
+		private GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
-			this.desc = Arrays.toString(command);
-			this.dir = Objects.toString(dir);
+			if (debug) {
+				this.desc = Arrays.asList(command).toString();
+				this.dir = dir.toString();
+			} else {
+				this.desc = null;
+				this.dir = null;
+			}
 		}
 
 		public void run() {
-			StringBuilder err = new StringBuilder();
-			try (InputStream is = p.getErrorStream()) {
+			InputStream is = p.getErrorStream();
+			try {
 				int ch;
-				while ((ch = is.read()) != -1) {
-					err.append((char) ch);
+				if (debug) {
+					while ((ch = is.read()) != -1) {
+						System.err.print((char) ch);
+					}
+				} else {
+					while (is.read() != -1) {
+						// ignore
+					}
 				}
 			} catch (IOException e) {
-				if (p.exitValue() != 0) {
-					logError(e);
-					fail.set(true);
-				} else {
-					// ignore. git terminated faster and stream was just closed
-				}
-			} finally {
-				if (err.length() > 0) {
-					LOG.error(err.toString());
-				}
+				logError(e);
+				fail.set(true);
+			}
+			try {
+				is.close();
+			} catch (IOException e) {
+				logError(e);
+				fail.set(true);
 			}
 		}
 
 		private void logError(Throwable t) {
+			if (!debug) {
+				return;
+			}
 			String msg = MessageFormat.format(
 					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
-			LOG.error(msg, t);
+			LOG.debug(msg, t);
 		}
 	}
 
@@ -585,14 +551,6 @@ public abstract class FS {
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
 		if (gitExe == null) {
-			return null;
-		}
-
-		// Bug 480782: Check if the discovered git executable is JGit CLI
-		String v = readPipe(gitExe.getParentFile(),
-				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
-				Charset.defaultCharset().name());
-		if (v != null && v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
@@ -949,7 +907,9 @@ public abstract class FS {
 	 * @param outRedirect
 	 *            An OutputStream on which to redirect the processes stdout. Can
 	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost.
+	 *            output will be lost. If binary is set to <code>false</code>
+	 *            then it is expected that the process emits text data which
+	 *            should be processed line by line.
 	 * @param errRedirect
 	 *            An OutputStream on which to redirect the processes stderr. Can
 	 *            be <code>null</code>, in which case the processes standard
@@ -957,9 +917,9 @@ public abstract class FS {
 	 * @param inRedirect
 	 *            An InputStream from which to redirect the processes stdin. Can
 	 *            be <code>null</code>, in which case the process doesn't get
-	 *            any data over stdin. It is assumed that the whole InputStream
-	 *            will be consumed by the process. The method will close the
-	 *            inputstream after all bytes are read.
+	 *            any data over stdin. If binary is set to
+	 *            <code>false</code> then it is expected that the process
+	 *            expects text data which should be processed line by line.
 	 * @return the return code of this process.
 	 * @throws IOException
 	 *             if an I/O error occurs while executing this process.
@@ -1009,9 +969,6 @@ public abstract class FS {
 				// A process doesn't clean its own resources even when destroyed
 				// Explicitly try and close all three streams, preserving the
 				// outer I/O exception if any.
-				if (inRedirect != null) {
-					inRedirect.close();
-				}
 				try {
 					process.getErrorStream().close();
 				} catch (IOException e) {
@@ -1052,10 +1009,10 @@ public abstract class FS {
 		pool.shutdown(); // Disable new tasks from being submitted
 		try {
 			// Wait a while for existing tasks to terminate
-			if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+			if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
 				pool.shutdownNow(); // Cancel currently executing tasks
 				// Wait a while for tasks to respond to being canceled
-				if (!pool.awaitTermination(60, TimeUnit.SECONDS))
+				if (!pool.awaitTermination(5, TimeUnit.SECONDS))
 					hasShutdown = false;
 			}
 		} catch (InterruptedException ie) {
@@ -1081,31 +1038,6 @@ public abstract class FS {
 	 *         populating directory, environment, and then start the process.
 	 */
 	public abstract ProcessBuilder runInShell(String cmd, String[] args);
-
-	/**
-	 * Execute a command defined by a {@link ProcessBuilder}.
-	 *
-	 * @param pb
-	 *            The command to be executed
-	 * @param in
-	 *            The standard input stream passed to the process
-	 * @return The result of the executed command
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public ExecutionResult execute(ProcessBuilder pb, InputStream in)
-			throws IOException, InterruptedException {
-		TemporaryBuffer stdout = new TemporaryBuffer.LocalFile(null);
-		TemporaryBuffer stderr = new TemporaryBuffer.Heap(1024, 1024 * 1024);
-		try {
-			int rc = runProcess(pb, stdout, stderr, in);
-			return new ExecutionResult(stdout, stderr, rc);
-		} finally {
-			stdout.close();
-			stderr.close();
-		}
-	}
 
 	private static class Holder<V> {
 		final V value;

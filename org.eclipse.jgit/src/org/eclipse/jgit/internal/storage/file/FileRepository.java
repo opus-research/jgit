@@ -57,13 +57,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateRepository;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
@@ -79,6 +77,7 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.treewalk.AttributesNodeProvider;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.StringUtils;
@@ -202,22 +201,7 @@ public class FileRepository extends Repository {
 			}
 		});
 
-		final long repositoryFormatVersion = getConfig().getLong(
-				ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
-
-		String reftype = repoConfig.getString(
-				"extensions", null, "refsStorage"); //$NON-NLS-1$ //$NON-NLS-2$
-		if (repositoryFormatVersion >= 1 && reftype != null) {
-			if (StringUtils.equalsIgnoreCase(reftype, "reftree")) { //$NON-NLS-1$
-				refs = new RefTreeDatabase(this, new RefDirectory(this));
-			} else {
-				throw new IOException(JGitText.get().unknownRepositoryFormat);
-			}
-		} else {
-			refs = new RefDirectory(this);
-		}
-
+		refs = new RefDirectory(this);
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
@@ -225,7 +209,10 @@ public class FileRepository extends Repository {
 				new File(getDirectory(), Constants.SHALLOW));
 
 		if (objectDatabase.exists()) {
-			if (repositoryFormatVersion > 1)
+			final long repositoryFormatVersion = getConfig().getLong(
+					ConfigConstants.CONFIG_CORE_SECTION, null,
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
+			if (repositoryFormatVersion > 0)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
 						Long.valueOf(repositoryFormatVersion)));
@@ -498,7 +485,7 @@ public class FileRepository extends Repository {
 	}
 
 	@Override
-	public AttributesNodeProvider createAttributesNodeProvider() {
+	public AttributesNodeProvider newAttributesNodeProvider() {
 		return new AttributesNodeProviderImpl(this);
 	}
 

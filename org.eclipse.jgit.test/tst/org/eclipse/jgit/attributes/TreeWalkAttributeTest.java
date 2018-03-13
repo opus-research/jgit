@@ -49,7 +49,6 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -244,36 +243,6 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEntry(F, "level1/level2/l2.txt",
 
 		asSet(CUSTOM_ROOT, TEXT_SET, DELTA_UNSET));
-
-		endWalk();
-	}
-
-	/**
-	 * Check that we search in the working tree for attributes although the file
-	 * we are currently inspecting does not exist anymore in the working tree.
-	 *
-	 * @throws IOException
-	 * @throws NoFilepatternException
-	 * @throws GitAPIException
-	 */
-	@Test
-	public void testIndexOnly2()
-			throws IOException, NoFilepatternException, GitAPIException {
-		File l2 = writeTrashFile("level1/level2/l2.txt", "");
-		writeTrashFile("level1/level2/l1.txt", "");
-
-		git.add().addFilepattern(".").call();
-
-		writeAttributesFile(".gitattributes", "*.txt custom=root");
-		assertTrue(l2.delete());
-
-		beginWalk();
-
-		assertEntry(F, ".gitattributes");
-		assertEntry(D, "level1");
-		assertEntry(D, "level1/level2");
-		assertEntry(F, "level1/level2/l1.txt", asSet(CUSTOM_ROOT));
-		assertEntry(M, "level1/level2/l2.txt", asSet(CUSTOM_ROOT));
 
 		endWalk();
 	}
@@ -579,53 +548,6 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 	}
 
 	/**
-	 * Checks the precedence on a hierarchy with multiple attributes.
-	 * <p>
-	 * In this test all file are present only in the working tree.
-	 * </p>
-	 *
-	 * @throws IOException
-	 * @throws GitAPIException
-	 * @throws NoFilepatternException
-	 */
-	@Test
-	public void testHierarchyWorktreeOnly()
-			throws IOException, NoFilepatternException, GitAPIException {
-		writeAttributesFile(".git/info/attributes", "*.global eol=crlf");
-		writeAttributesFile(".gitattributes", "*.local eol=lf");
-		writeAttributesFile("level1/.gitattributes", "*.local text");
-		writeAttributesFile("level1/level2/.gitattributes", "*.local -text");
-
-		writeTrashFile("l0.global", "");
-		writeTrashFile("l0.local", "");
-
-		writeTrashFile("level1/l1.global", "");
-		writeTrashFile("level1/l1.local", "");
-
-		writeTrashFile("level1/level2/l2.global", "");
-		writeTrashFile("level1/level2/l2.local", "");
-
-		beginWalk();
-
-		assertEntry(F, ".gitattributes");
-		assertEntry(F, "l0.global", asSet(EOL_CRLF));
-		assertEntry(F, "l0.local", asSet(EOL_LF));
-
-		assertEntry(D, "level1");
-		assertEntry(F, "level1/.gitattributes");
-		assertEntry(F, "level1/l1.global", asSet(EOL_CRLF));
-		assertEntry(F, "level1/l1.local", asSet(EOL_LF, TEXT_SET));
-
-		assertEntry(D, "level1/level2");
-		assertEntry(F, "level1/level2/.gitattributes");
-		assertEntry(F, "level1/level2/l2.global", asSet(EOL_CRLF));
-		assertEntry(F, "level1/level2/l2.local", asSet(EOL_LF, TEXT_UNSET));
-
-		endWalk();
-
-	}
-
-	/**
 	 * Checks that the list of attributes is an aggregation of all the
 	 * attributes from the attributes files hierarchy.
 	 *
@@ -801,23 +723,13 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEquals(pathName, walk.getPathString());
 		assertEquals(type, walk.getFileMode(0));
 
-		assertEquals(checkinAttributes,
-				asSet(ci_walk.getAttributes().getAll()));
-		assertEquals(checkoutAttributes,
-				asSet(walk.getAttributes().getAll()));
+		assertEquals(checkinAttributes, ci_walk.getAttributes());
+		assertEquals(checkoutAttributes, walk.getAttributes());
 
 		if (D.equals(type)) {
 			walk.enterSubtree();
 			ci_walk.enterSubtree();
 		}
-	}
-
-	private static Set<Attribute> asSet(Collection<Attribute> attributes) {
-		Set<Attribute> ret = new HashSet<Attribute>();
-		for (Attribute a : attributes) {
-			ret.add(a);
-		}
-		return (ret);
 	}
 
 	private File writeAttributesFile(String name, String... rules)

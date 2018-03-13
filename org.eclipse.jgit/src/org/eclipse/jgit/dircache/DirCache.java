@@ -63,7 +63,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IndexReadException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
@@ -71,11 +70,9 @@ import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.FileSnapshot;
 import org.eclipse.jgit.internal.storage.file.LockFile;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -146,28 +143,6 @@ public class DirCache {
 	 */
 	public static DirCache newInCore() {
 		return new DirCache(null, null);
-	}
-
-	/**
-	 * Create a new in memory index read from the contents of a tree.
-	 *
-	 * @param reader
-	 *            reader to access the tree objects from a repository.
-	 * @param treeId
-	 *            tree to read. Must identify a tree, not a tree-ish.
-	 * @return a new cache which has no backing store file, but contains the
-	 *         contents of {@code treeId}.
-	 * @throws IOException
-	 *             one or more trees not available from the ObjectReader.
-	 * @since 4.2
-	 */
-	public static DirCache read(ObjectReader reader, AnyObjectId treeId)
-			throws IOException {
-		DirCache d = newInCore();
-		DirCacheBuilder b = d.builder();
-		b.addTree(null, DirCacheEntry.STAGE_0, reader, treeId);
-		b.finish();
-		return d;
 	}
 
 	/**
@@ -443,12 +418,6 @@ public class DirCache {
 					}
 				}
 			} catch (FileNotFoundException fnfe) {
-				if (liveFile.exists()) {
-					// Panic: the index file exists but we can't read it
-					throw new IndexReadException(
-							MessageFormat.format(JGitText.get().cannotReadIndex,
-									liveFile.getAbsolutePath(), fnfe));
-				}
 				// Someone must have deleted it between our exists test
 				// and actually opening the path. That's fine, its empty.
 				//
@@ -800,11 +769,8 @@ public class DirCache {
 	 *         information. If &lt; 0 the entry does not exist in the index.
 	 * @since 3.4
 	 */
-	public int findEntry(byte[] p, int pLen) {
-		return findEntry(0, p, pLen);
-	}
-
-	int findEntry(int low, byte[] p, int pLen) {
+	public int findEntry(final byte[] p, final int pLen) {
+		int low = 0;
 		int high = entryCnt;
 		while (low < high) {
 			int mid = (low + high) >>> 1;
@@ -904,8 +870,8 @@ public class DirCache {
 	 */
 	public DirCacheEntry[] getEntriesWithin(String path) {
 		if (path.length() == 0) {
-			DirCacheEntry[] r = new DirCacheEntry[entryCnt];
-			System.arraycopy(sortedEntries, 0, r, 0, entryCnt);
+			final DirCacheEntry[] r = new DirCacheEntry[sortedEntries.length];
+			System.arraycopy(sortedEntries, 0, r, 0, sortedEntries.length);
 			return r;
 		}
 		if (!path.endsWith("/")) //$NON-NLS-1$
@@ -1010,7 +976,6 @@ public class DirCache {
 			FileTreeIterator fIter = new FileTreeIterator(repository);
 			walk.addTree(iIter);
 			walk.addTree(fIter);
-			fIter.setDirCacheIterator(walk, 0);
 			walk.setRecursive(true);
 			while (walk.next()) {
 				iIter = walk.getTree(0, DirCacheIterator.class);
