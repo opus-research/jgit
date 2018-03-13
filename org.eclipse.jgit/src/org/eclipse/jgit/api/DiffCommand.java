@@ -49,12 +49,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -64,7 +64,6 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.io.NullOutputStream;
 
 /**
  * Show changes between commits, commit and working tree, etc.
@@ -109,11 +108,8 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return a DiffEntry for each path which is different
 	 */
 	public List<DiffEntry> call() throws GitAPIException, IOException {
-		final DiffFormatter diffFmt;
-		if (out != null && !showNameAndStatusOnly)
-			diffFmt = new DiffFormatter(new BufferedOutputStream(out));
-		else
-			diffFmt = new DiffFormatter(NullOutputStream.INSTANCE);
+		final DiffFormatter diffFmt = new DiffFormatter(
+				new BufferedOutputStream(out));
 		diffFmt.setRepository(repo);
 		diffFmt.setProgressMonitor(monitor);
 		try {
@@ -140,17 +136,17 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 			}
 
 			diffFmt.setPathFilter(pathFilter);
+			if (contextLines >= 0)
+				diffFmt.setContext(contextLines);
+			if (destinationPrefix != null)
+				diffFmt.setNewPrefix(destinationPrefix);
+			if (sourcePrefix != null)
+				diffFmt.setOldPrefix(sourcePrefix);
 
 			List<DiffEntry> result = diffFmt.scan(oldTree, newTree);
-			if (showNameAndStatusOnly)
+			if (showNameAndStatusOnly) {
 				return result;
-			else {
-				if (contextLines >= 0)
-					diffFmt.setContext(contextLines);
-				if (destinationPrefix != null)
-					diffFmt.setNewPrefix(destinationPrefix);
-				if (sourcePrefix != null)
-					diffFmt.setOldPrefix(sourcePrefix);
+			} else {
 				diffFmt.format(result);
 				diffFmt.flush();
 				return result;

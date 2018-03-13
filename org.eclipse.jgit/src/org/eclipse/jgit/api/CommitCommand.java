@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -63,7 +64,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -357,11 +357,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							// insert object
 							if (inserter == null)
 								inserter = repo.newObjectInserter();
-							long contentLength = fTree.getEntryContentLength();
+
 							InputStream inputStream = fTree.openEntryStream();
 							try {
 								dcEntry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, contentLength,
+										Constants.OBJ_BLOB, entryLength,
 										inputStream));
 							} finally {
 								inputStream.close();

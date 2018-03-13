@@ -42,25 +42,21 @@
 
 package org.eclipse.jgit.transport;
 
-/**
- * Hook to allow callers to take over advertising refs to the client.
- *
- * @since 2.0
- */
+/** Hook to allow callers to take over advertising refs to the client. */
 public interface AdvertiseRefsHook {
 	/**
 	 * A simple hook that advertises the default refs.
 	 * <p>
 	 * The method implementations do nothing to preserve the default behavior; see
 	 * {@link UploadPack#setAdvertisedRefs(java.util.Map)} and
-	 * {@link BaseReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}.
+	 * {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}.
 	 */
 	public static final AdvertiseRefsHook DEFAULT = new AdvertiseRefsHook() {
 		public void advertiseRefs(UploadPack uploadPack) {
 			// Do nothing.
 		}
 
-		public void advertiseRefs(BaseReceivePack receivePack) {
+		public void advertiseRefs(ReceivePack receivePack) {
 			// Do nothing.
 		}
 	};
@@ -81,11 +77,11 @@ public interface AdvertiseRefsHook {
 	 * Advertise refs for receive-pack.
 	 *
 	 * @param receivePack instance on which to call
-	 *            {@link BaseReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}
+	 *            {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}
 	 *            if necessary.
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void advertiseRefs(BaseReceivePack receivePack)
+	public void advertiseRefs(ReceivePack receivePack)
 			throws ServiceMayNotContinueException;
 }

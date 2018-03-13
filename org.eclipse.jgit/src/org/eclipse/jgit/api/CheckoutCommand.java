@@ -49,8 +49,8 @@ import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.CheckoutResult.Status;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -62,7 +62,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -124,8 +124,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @return the newly created branch
 	 */
 	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
-			RefNotFoundException, InvalidRefNameException,
-			CheckoutConflictException {
+			RefNotFoundException, InvalidRefNameException {
 		checkCallable();
 		processOptions();
 		try {
@@ -160,21 +159,15 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					.parseCommit(headId);
 			RevCommit newCommit = revWalk.parseCommit(branch);
 			RevTree headTree = headCommit == null ? null : headCommit.getTree();
-			DirCacheCheckout dco;
-			DirCache dc = repo.lockDirCache();
+			DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
+					repo.lockDirCache(), newCommit.getTree());
+			dco.setFailOnConflict(true);
 			try {
-				dco = new DirCacheCheckout(repo, headTree, dc,
-						newCommit.getTree());
-				dco.setFailOnConflict(true);
-				try {
-					dco.checkout();
-				} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
-					status = new CheckoutResult(Status.CONFLICTS,
-							dco.getConflicts());
-					throw new CheckoutConflictException(dco.getConflicts(), e);
-				}
-			} finally {
-				dc.unlock();
+				dco.checkout();
+			} catch (CheckoutConflictException e) {
+				status = new CheckoutResult(Status.CONFLICTS, dco
+						.getConflicts());
+				throw e;
 			}
 			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
@@ -253,7 +246,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @param all
 	 *            true to checkout all paths, false otherwise
 	 * @return {@code this}
-	 * @since 2.0
 	 */
 	public CheckoutCommand setAllPaths(boolean all) {
 		checkoutAllPaths = all;

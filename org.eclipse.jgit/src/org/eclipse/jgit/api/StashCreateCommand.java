@@ -48,6 +48,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -58,7 +59,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -85,7 +85,6 @@ import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
- * @since 2.0
  */
 public class StashCreateCommand extends GitCommand<RevCommit> {
 
@@ -143,11 +142,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * Set the person to use as the author and committer in the commits made
 	 *
 	 * @param person
-	 * @return {@code this}
 	 */
-	public StashCreateCommand setPerson(PersonIdent person) {
+	public void setPerson(PersonIdent person) {
 		this.person = person;
-		return this;
 	}
 
 	/**
@@ -156,11 +153,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * This value defaults to {@link Constants#R_STASH}
 	 *
 	 * @param ref
-	 * @return {@code this}
 	 */
-	public StashCreateCommand setRef(String ref) {
+	public void setRef(String ref) {
 		this.ref = ref;
-		return this;
 	}
 
 	private RevCommit parseCommit(final ObjectReader reader,
@@ -181,13 +176,10 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 		return builder;
 	}
 
-	private void updateStashRef(ObjectId commitId, PersonIdent refLogIdent,
-			String refLogMessage) throws IOException {
+	private void updateStashRef(ObjectId commitId) throws IOException {
 		Ref currentRef = repo.getRef(ref);
 		RefUpdate refUpdate = repo.updateRef(ref);
 		refUpdate.setNewObjectId(commitId);
-		refUpdate.setRefLogIdent(refLogIdent);
-		refUpdate.setRefLogMessage(refLogMessage, false);
 		if (currentRef != null)
 			refUpdate.setExpectedOldObjectId(currentRef.getObjectId());
 		else
@@ -255,11 +247,11 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 						entry.setLength(wtIter.getEntryLength());
 						entry.setLastModified(wtIter.getEntryLastModified());
 						entry.setFileMode(wtIter.getEntryFileMode());
-						long contentLength = wtIter.getEntryContentLength();
 						InputStream in = wtIter.openEntryStream();
 						try {
 							entry.setObjectId(inserter.insert(
-									Constants.OBJ_BLOB, contentLength, in));
+									Constants.OBJ_BLOB,
+									wtIter.getEntryLength(), in));
 						} finally {
 							in.close();
 						}
@@ -304,8 +296,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 				commitId = inserter.insert(builder);
 				inserter.flush();
 
-				updateStashRef(commitId, builder.getAuthor(),
-						builder.getMessage());
+				updateStashRef(commitId);
 			} finally {
 				inserter.release();
 				cache.unlock();

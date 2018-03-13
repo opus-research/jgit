@@ -51,8 +51,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
 
 /** Misc. constants used throughout JGit. */
@@ -375,8 +375,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
 		}
 	}
 
@@ -400,8 +399,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return ENCODED_TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
 		}
 	}
 
