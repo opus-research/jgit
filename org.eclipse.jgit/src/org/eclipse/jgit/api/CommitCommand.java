@@ -48,6 +48,7 @@ import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -67,7 +68,10 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
+import org.eclipse.jgit.hooks.CommitMsgHook;
 import org.eclipse.jgit.hooks.Hooks;
+import org.eclipse.jgit.hooks.PostCommitHook;
+import org.eclipse.jgit.hooks.PreCommitHook;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -108,7 +112,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	private boolean all;
 
-	private List<String> only = new ArrayList<String>();
+	private List<String> only = new ArrayList<>();
 
 	private boolean[] onlyProcessed;
 
@@ -120,7 +124,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * parents this commit should have. The current HEAD will be in this list
 	 * and also all commits mentioned in .git/MERGE_HEAD
 	 */
-	private List<ObjectId> parents = new LinkedList<ObjectId>();
+	private List<ObjectId> parents = new LinkedList<>();
 
 	private String reflogComment;
 
@@ -131,7 +135,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	private boolean noVerify;
 
-	private PrintStream hookOutRedirect;
+	private HashMap<String, PrintStream> hookOutRedirect = new HashMap<>(3);
 
 	private Boolean allowEmpty;
 
@@ -164,6 +168,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             if there are either pre-commit or commit-msg hooks present in
 	 *             the repository and one of them rejects the commit.
 	 */
+	@Override
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
 			ConcurrentRefUpdateException, WrongRepositoryStateException,
@@ -179,7 +184,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						state.name()));
 
 			if (!noVerify) {
-				Hooks.preCommit(repo, hookOutRedirect).call();
+				Hooks.preCommit(repo, hookOutRedirect.get(PreCommitHook.NAME))
+						.call();
 			}
 
 			processOptions(state, rw);
@@ -218,7 +224,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				}
 
 			if (!noVerify) {
-				message = Hooks.commitMsg(repo, hookOutRedirect)
+				message = Hooks
+						.commitMsg(repo,
+								hookOutRedirect.get(CommitMsgHook.NAME))
 						.setCommitMessage(message).call();
 			}
 
@@ -292,6 +300,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						repo.writeMergeCommitMsg(null);
 						repo.writeRevertHead(null);
 					}
+					Hooks.postCommit(repo,
+							hookOutRedirect.get(PostCommitHook.NAME)).call();
+
 					return revCommit;
 				}
 				case REJECTED:
@@ -822,8 +833,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set the output stream for hook scripts executed by this command. If not
-	 * set it defaults to {@code System.out}.
+	 * Set the output stream for all hook scripts executed by this command
+	 * (pre-commit, commit-msg, post-commit). If not set it defaults to
+	 * {@code System.out}.
 	 *
 	 * @param hookStdOut
 	 *            the output stream for hook scripts executed by this command
@@ -831,7 +843,34 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @since 3.7
 	 */
 	public CommitCommand setHookOutputStream(PrintStream hookStdOut) {
-		this.hookOutRedirect = hookStdOut;
+		setHookOutputStream(PreCommitHook.NAME, hookStdOut);
+		setHookOutputStream(CommitMsgHook.NAME, hookStdOut);
+		setHookOutputStream(PostCommitHook.NAME, hookStdOut);
+		return this;
+	}
+
+	/**
+	 * Set the output stream for a selected hook script executed by this command
+	 * (pre-commit, commit-msg, post-commit). If not set it defaults to
+	 * {@code System.out}.
+	 *
+	 * @param hookName
+	 *            name of the hook to set the output stream for
+	 * @param hookStdOut
+	 *            the output stream to use for the selected hook
+	 * @return {@code this}
+	 * @since 4.5
+	 */
+	public CommitCommand setHookOutputStream(String hookName,
+			PrintStream hookStdOut) {
+		if (!(PreCommitHook.NAME.equals(hookName)
+				|| CommitMsgHook.NAME.equals(hookName)
+				|| PostCommitHook.NAME.equals(hookName))) {
+			throw new IllegalArgumentException(
+					MessageFormat.format(JGitText.get().illegalHookName,
+							hookName));
+		}
+		hookOutRedirect.put(hookName, hookStdOut);
 		return this;
 	}
 }

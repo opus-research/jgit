@@ -45,8 +45,8 @@ package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
+import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_INCLUDE_TAG;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK_DETAILED;
@@ -58,6 +58,7 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_SIDE_BAND;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_THIN_PACK;
 
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -177,7 +178,7 @@ public class UploadPack {
 		 */
 		public FirstLine(String line) {
 			if (line.length() > 45) {
-				final HashSet<String> opts = new HashSet<String>();
+				final HashSet<String> opts = new HashSet<>();
 				String opt = line.substring(45);
 				if (opt.startsWith(" ")) //$NON-NLS-1$
 					opt = opt.substring(1);
@@ -235,7 +236,7 @@ public class UploadPack {
 
 	private InputStream rawIn;
 
-	private OutputStream rawOut;
+	private ResponseBufferedOutputStream rawOut;
 
 	private PacketLineIn pckIn;
 
@@ -263,19 +264,19 @@ public class UploadPack {
 	String userAgent;
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
-	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
+	private final Set<ObjectId> wantIds = new HashSet<>();
 
 	/** Objects the client wants to obtain. */
-	private final Set<RevObject> wantAll = new HashSet<RevObject>();
+	private final Set<RevObject> wantAll = new HashSet<>();
 
 	/** Objects on both sides, these don't have to be sent. */
-	private final Set<RevObject> commonBase = new HashSet<RevObject>();
+	private final Set<RevObject> commonBase = new HashSet<>();
 
 	/** Shallow commits the client already has. */
-	private final Set<ObjectId> clientShallowCommits = new HashSet<ObjectId>();
+	private final Set<ObjectId> clientShallowCommits = new HashSet<>();
 
 	/** Shallow commits on the client which are now becoming unshallow */
-	private final List<ObjectId> unshallowCommits = new ArrayList<ObjectId>();
+	private final List<ObjectId> unshallowCommits = new ArrayList<>();
 
 	/** Desired depth from the client on a shallow request. */
 	private int depth;
@@ -313,6 +314,7 @@ public class UploadPack {
 
 	private PackStatistics statistics;
 
+	@SuppressWarnings("deprecation")
 	private UploadPackLogger logger = UploadPackLogger.NULL;
 
 	/**
@@ -643,11 +645,10 @@ public class UploadPack {
 	 *            other network connections this should be null.
 	 * @throws IOException
 	 */
-	public void upload(final InputStream input, final OutputStream output,
+	public void upload(final InputStream input, OutputStream output,
 			final OutputStream messages) throws IOException {
 		try {
 			rawIn = input;
-			rawOut = output;
 			if (messages != null)
 				msgOut = messages;
 
@@ -655,11 +656,17 @@ public class UploadPack {
 				final Thread caller = Thread.currentThread();
 				timer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
 				TimeoutInputStream i = new TimeoutInputStream(rawIn, timer);
-				TimeoutOutputStream o = new TimeoutOutputStream(rawOut, timer);
+				@SuppressWarnings("resource")
+				TimeoutOutputStream o = new TimeoutOutputStream(output, timer);
 				i.setTimeout(timeout * 1000);
 				o.setTimeout(timeout * 1000);
 				rawIn = i;
-				rawOut = o;
+				output = o;
+			}
+
+			rawOut = new ResponseBufferedOutputStream(output);
+			if (biDirectionalPipe) {
+				rawOut.stopBuffering();
 			}
 
 			pckIn = new PacketLineIn(rawIn);
@@ -682,7 +689,7 @@ public class UploadPack {
 	 * Get the PackWriter's statistics if a pack was sent to the client.
 	 *
 	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         was sent, such as during the negotiation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
 	 * @since 3.0
 	 * @deprecated Use {@link #getStatistics()}.
@@ -697,7 +704,7 @@ public class UploadPack {
 	 * Get the PackWriter's statistics if a pack was sent to the client.
 	 *
 	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         was sent, such as during the negotiation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
 	 * @since 4.1
 	 */
@@ -713,6 +720,8 @@ public class UploadPack {
 
 	private void service() throws IOException {
 		boolean sendPack;
+		// If it's a non-bidi request, we need to read the entire request before
+		// writing a response. Buffer the response until then.
 		try {
 			if (biDirectionalPipe)
 				sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
@@ -768,6 +777,8 @@ public class UploadPack {
 				throw new UploadPackInternalServerErrorException(err);
 			}
 			throw err;
+		} finally {
+			rawOut.stopBuffering();
 		}
 
 		if (sendPack)
@@ -775,17 +786,24 @@ public class UploadPack {
 	}
 
 	private static Set<ObjectId> refIdSet(Collection<Ref> refs) {
-		Set<ObjectId> ids = new HashSet<ObjectId>(refs.size());
+		Set<ObjectId> ids = new HashSet<>(refs.size());
 		for (Ref ref : refs) {
-			if (ref.getObjectId() != null)
-				ids.add(ref.getObjectId());
+			ObjectId id = ref.getObjectId();
+			if (id != null) {
+				ids.add(id);
+			}
+			id = ref.getPeeledObjectId();
+			if (id != null) {
+				ids.add(id);
+			}
 		}
 		return ids;
 	}
 
 	private void processShallow() throws IOException {
+		int walkDepth = depth - 1;
 		try (DepthWalk.RevWalk depthWalk = new DepthWalk.RevWalk(
-				walk.getObjectReader(), depth)) {
+				walk.getObjectReader(), walkDepth)) {
 
 			// Find all the commits which will be shallow
 			for (ObjectId o : wantIds) {
@@ -802,12 +820,14 @@ public class UploadPack {
 
 				// Commits at the boundary which aren't already shallow in
 				// the client need to be marked as such
-				if (c.getDepth() == depth && !clientShallowCommits.contains(c))
+				if (c.getDepth() == walkDepth
+						&& !clientShallowCommits.contains(c))
 					pckOut.writeString("shallow " + o.name()); //$NON-NLS-1$
 
 				// Commits not on the boundary which are shallow in the client
 				// need to become unshallowed
-				if (c.getDepth() < depth && clientShallowCommits.remove(c)) {
+				if (c.getDepth() < walkDepth
+						&& clientShallowCommits.remove(c)) {
 					unshallowCommits.add(c.copy());
 					pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
 				}
@@ -942,6 +962,11 @@ public class UploadPack {
 
 			if (line.startsWith("deepen ")) { //$NON-NLS-1$
 				depth = Integer.parseInt(line.substring(7));
+				if (depth <= 0) {
+					throw new PackProtocolException(
+							MessageFormat.format(JGitText.get().invalidDepth,
+									Integer.valueOf(depth)));
+				}
 				continue;
 			}
 
@@ -968,7 +993,8 @@ public class UploadPack {
 	}
 
 	/**
-	 * Returns the clone/fetch depth. Valid only after calling recvWants().
+	 * Returns the clone/fetch depth. Valid only after calling recvWants(). A
+	 * depth of 1 means return only the wants.
 	 *
 	 * @return the depth requested by the client, or 0 if unbounded.
 	 * @since 4.0
@@ -1002,7 +1028,7 @@ public class UploadPack {
 		okToGiveUp = Boolean.FALSE;
 
 		ObjectId last = ObjectId.zeroId();
-		List<ObjectId> peerHas = new ArrayList<ObjectId>(64);
+		List<ObjectId> peerHas = new ArrayList<>(64);
 		for (;;) {
 			String line;
 			try {
@@ -1142,7 +1168,6 @@ public class UploadPack {
 
 		if (multiAck == MultiAck.DETAILED && !didOkToGiveUp && okToGiveUp()) {
 			ObjectId id = peerHas.get(peerHas.size() - 1);
-			sentReady = true;
 			pckOut.writeString("ACK " + id.name() + " ready\n"); //$NON-NLS-1$ //$NON-NLS-2$
 			sentReady = true;
 		}
@@ -1157,7 +1182,7 @@ public class UploadPack {
 		for (ObjectId obj : wantIds) {
 			if (!advertised.contains(obj)) {
 				if (notAdvertisedWants == null)
-					notAdvertisedWants = new ArrayList<ObjectId>();
+					notAdvertisedWants = new ArrayList<>();
 				notAdvertisedWants.add(obj);
 			}
 		}
@@ -1200,6 +1225,7 @@ public class UploadPack {
 	 */
 	public static final class AdvertisedRequestValidator
 			implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1216,6 +1242,7 @@ public class UploadPack {
 	 */
 	public static final class ReachableCommitRequestValidator
 			implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			checkNotAdvertisedWants(up.getRevWalk(), wants,
@@ -1229,6 +1256,7 @@ public class UploadPack {
 	 * @since 3.1
 	 */
 	public static final class TipRequestValidator implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1251,6 +1279,7 @@ public class UploadPack {
 	 */
 	public static final class ReachableCommitTipRequestValidator
 			implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			checkNotAdvertisedWants(up.getRevWalk(), wants,
@@ -1264,6 +1293,7 @@ public class UploadPack {
 	 * @since 3.1
 	 */
 	public static final class AnyRequestValidator implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			// All requests are valid.
@@ -1414,6 +1444,7 @@ public class UploadPack {
 		}
 	}
 
+	@SuppressWarnings("deprecation")
 	private void sendPack(final boolean sideband) throws IOException {
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
@@ -1467,7 +1498,7 @@ public class UploadPack {
 			pw.setReuseValidatingObjects(false);
 
 			if (commonBase.isEmpty() && refs != null) {
-				Set<ObjectId> tagTargets = new HashSet<ObjectId>();
+				Set<ObjectId> tagTargets = new HashSet<>();
 				for (Ref ref : refs.values()) {
 					if (ref.getPeeledObjectId() != null)
 						tagTargets.add(ref.getPeeledObjectId());
@@ -1479,17 +1510,20 @@ public class UploadPack {
 				pw.setTagTargets(tagTargets);
 			}
 
-			if (depth > 0)
-				pw.setShallowPack(depth, unshallowCommits);
-
 			RevWalk rw = walk;
+			if (depth > 0) {
+				pw.setShallowPack(depth, unshallowCommits);
+				rw = new DepthWalk.RevWalk(walk.getObjectReader(), depth - 1);
+				rw.assumeShallow(clientShallowCommits);
+			}
+
 			if (wantAll.isEmpty()) {
-				pw.preparePack(pm, wantIds, commonBase);
+				pw.preparePack(pm, wantIds, commonBase, clientShallowCommits);
 			} else {
 				walk.reset();
 
-				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
-				pw.preparePack(pm, ow, wantAll, commonBase);
+				ObjectWalk ow = rw.toObjectWalkWithSameObjects();
+				pw.preparePack(pm, ow, wantAll, commonBase, PackWriter.NONE);
 				rw = ow;
 			}
 
@@ -1546,6 +1580,49 @@ public class UploadPack {
 		Ref head = refs.get(Constants.HEAD);
 		if (head != null && head.isSymbolic()) {
 			adv.addSymref(Constants.HEAD, head.getLeaf().getName());
+		}
+	}
+
+	private static class ResponseBufferedOutputStream extends OutputStream {
+		private final OutputStream rawOut;
+
+		private OutputStream out;
+
+		ResponseBufferedOutputStream(OutputStream rawOut) {
+			this.rawOut = rawOut;
+			this.out = new ByteArrayOutputStream();
+		}
+
+		@Override
+		public void write(int b) throws IOException {
+			out.write(b);
+		}
+
+		@Override
+		public void write(byte b[]) throws IOException {
+			out.write(b);
+		}
+
+		@Override
+		public void write(byte b[], int off, int len) throws IOException {
+			out.write(b, off, len);
+		}
+
+		@Override
+		public void flush() throws IOException {
+			out.flush();
+		}
+
+		@Override
+		public void close() throws IOException {
+			out.close();
+		}
+
+		void stopBuffering() throws IOException {
+			if (out != rawOut) {
+				((ByteArrayOutputStream) out).writeTo(rawOut);
+				out = rawOut;
+			}
 		}
 	}
 }

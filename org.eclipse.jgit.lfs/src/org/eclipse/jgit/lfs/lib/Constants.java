@@ -55,8 +55,19 @@ import org.eclipse.jgit.lfs.internal.LfsText;
  **/
 @SuppressWarnings("nls")
 public final class Constants {
-	/** Hash function used natively by Git LFS extension for large objects. */
-	private static final String LONG_HASH_FUNCTION = "SHA-256";
+	/**
+	 * lfs folder
+	 *
+	 * @since 4.6
+	 */
+	public static final String LFS = "lfs";
+
+	/**
+	 * Hash function used natively by Git LFS extension for large objects.
+	 *
+	 * @since 4.6
+	 */
+	public static final String LONG_HASH_FUNCTION = "SHA-256";
 
 	/**
 	 * A Git LFS large object hash is 256 bits, i.e. 32 bytes.
@@ -74,6 +85,27 @@ public final class Constants {
 	 */
 	public static final int LONG_OBJECT_ID_STRING_LENGTH = LONG_OBJECT_ID_LENGTH
 			* 2;
+
+	/**
+	 * LFS upload operation.
+	 *
+	 * @since 4.7
+	 */
+	public static final String UPLOAD = "upload";
+
+	/**
+	 * LFS download operation.
+	 *
+	 * @since 4.7
+	 */
+	public static final String DOWNLOAD = "download";
+
+	/**
+	 * LFS verify operation.
+	 *
+	 * @since 4.7
+	 */
+	public static final String VERIFY = "verify";
 
 	/**
 	 * Create a new digest function for objects.
@@ -102,13 +134,13 @@ public final class Constants {
 
 	/**
 	 * Content type used by LFS REST API as defined in
-	 * {@link "https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md"}
+	 * {@link "https://github.com/github/git-lfs/blob/master/docs/api/v1/http-v1-batch.md"}
 	 */
-	public static String CONTENT_TYPE_GIT_LFS_JSON = "application/vnd.git-lfs+json";
+	public static final String CONTENT_TYPE_GIT_LFS_JSON = "application/vnd.git-lfs+json";
 
 	/**
 	 * "arbitrary binary data" as defined in RFC 2046
 	 * {@link "https://www.ietf.org/rfc/rfc2046.txt"}
 	 */
-	public static String HDR_APPLICATION_OCTET_STREAM = "application/octet-stream";
+	public static final String HDR_APPLICATION_OCTET_STREAM = "application/octet-stream";
 }

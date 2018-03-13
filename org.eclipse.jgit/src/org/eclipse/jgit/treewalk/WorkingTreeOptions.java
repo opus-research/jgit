@@ -44,8 +44,8 @@
 package org.eclipse.jgit.treewalk;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.lib.CoreConfig.EOL;
@@ -56,6 +56,7 @@ import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 public class WorkingTreeOptions {
 	/** Key for {@link Config#get(SectionParser)}. */
 	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
+		@Override
 		public WorkingTreeOptions parse(final Config cfg) {
 			return new WorkingTreeOptions(cfg);
 		}

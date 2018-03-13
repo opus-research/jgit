@@ -58,8 +58,15 @@ public class LfsText extends TranslationBundle {
 	}
 
 	// @formatter:off
+	/***/ public String corruptLongObject;
+	/***/ public String inconsistentMediafileLength;
 	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
 	/***/ public String invalidLongId;
 	/***/ public String invalidLongIdLength;
 	/***/ public String requiredHashFunctionNotAvailable;
+	/***/ public String repositoryNotFound;
+	/***/ public String repositoryReadOnly;
+	/***/ public String lfsUnavailable;
+	/***/ public String lfsUnathorized;
+	/***/ public String lfsFailedToGetRepository;
 }

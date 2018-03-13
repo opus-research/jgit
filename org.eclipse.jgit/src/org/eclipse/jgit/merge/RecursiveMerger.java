@@ -61,7 +61,9 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -111,6 +113,17 @@ public class RecursiveMerger extends ResolveMerger {
 	}
 
 	/**
+	 * Normal recursive merge, implies inCore.
+	 *
+	 * @param inserter
+	 * @param config
+	 * @since 4.8
+	 */
+	protected RecursiveMerger(ObjectInserter inserter, Config config) {
+		super(inserter, config);
+	}
+
+	/**
 	 * Get a single base commit for two given commits. If the two source commits
 	 * have more than one base commit recursively merge the base commits
 	 * together until you end up with a single base commit.
@@ -147,7 +160,7 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	protected RevCommit getBaseCommit(RevCommit a, RevCommit b, int callDepth)
 			throws IOException {
-		ArrayList<RevCommit> baseCommits = new ArrayList<RevCommit>();
+		ArrayList<RevCommit> baseCommits = new ArrayList<>();
 		walk.reset();
 		walk.setRevFilter(RevFilter.MERGE_BASE);
 		walk.markStart(a);
@@ -181,7 +194,7 @@ public class RecursiveMerger extends ResolveMerger {
 			dircache = DirCache.read(reader, currentBase.getTree());
 			inCore = true;
 
-			List<RevCommit> parents = new ArrayList<RevCommit>();
+			List<RevCommit> parents = new ArrayList<>();
 			parents.add(currentBase);
 			for (int commitIdx = 1; commitIdx < baseCommits.size(); commitIdx++) {
 				RevCommit nextBase = baseCommits.get(commitIdx);

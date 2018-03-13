@@ -43,13 +43,18 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_REPORT_STATUS;
+import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.RemoteRefUpdate.Status.REJECTED_OTHER_REASON;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.Constants;
@@ -125,19 +130,70 @@ public class PushConnectionTest {
 		Map<String, RemoteRefUpdate> updates = new HashMap<>();
 		updates.put(rru.getRemoteName(), rru);
 
-		Transport tn = testProtocol.open(uri, client, "server");
-		try {
-			PushConnection connection = tn.openPush();
-			try {
-				connection.push(NullProgressMonitor.INSTANCE, updates);
-			} finally {
-				connection.close();
-			}
-		} finally {
-			tn.close();
+		try (Transport tn = testProtocol.open(uri, client, "server");
+				PushConnection connection = tn.openPush()) {
+			connection.push(NullProgressMonitor.INSTANCE, updates);
 		}
 
 		assertEquals(REJECTED_OTHER_REASON, rru.getStatus());
 		assertEquals("invalid old id sent", rru.getMessage());
+	}
+
+	@Test
+	public void invalidCommand() throws IOException {
+		try (Transport tn = testProtocol.open(uri, client, "server");
+				InternalPushConnection c = (InternalPushConnection) tn.openPush()) {
+			StringWriter msgs = new StringWriter();
+			PacketLineOut pckOut = c.pckOut;
+
+			@SuppressWarnings("resource")
+			SideBandInputStream in = new SideBandInputStream(c.in,
+					NullProgressMonitor.INSTANCE, msgs, null);
+
+			// Explicitly invalid command, but sane enough capabilities.
+			StringBuilder buf = new StringBuilder();
+			buf.append("42");
+			buf.append(' ');
+			buf.append(obj2.name());
+			buf.append(' ');
+			buf.append("refs/heads/A" + obj2.name());
+			buf.append('\0').append(CAPABILITY_SIDE_BAND_64K);
+			buf.append(' ').append(CAPABILITY_REPORT_STATUS);
+			buf.append('\n');
+			pckOut.writeString(buf.toString());
+			pckOut.end();
+
+			try {
+				in.read();
+				fail("expected TransportException");
+			} catch (TransportException e) {
+				assertEquals(
+						"remote: error: invalid protocol: wanted 'old new ref'",
+						e.getMessage());
+			}
+		}
+	}
+
+	@Test
+	public void limitCommandBytes() throws IOException {
+		Map<String, RemoteRefUpdate> updates = new HashMap<>();
+		for (int i = 0; i < 4; i++) {
+			RemoteRefUpdate rru = new RemoteRefUpdate(
+					null, null, obj2, "refs/test/T" + i,
+					false, null, ObjectId.zeroId());
+			updates.put(rru.getRemoteName(), rru);
+		}
+
+		server.getConfig().setInt("receive", null, "maxCommandBytes", 190);
+		try (Transport tn = testProtocol.open(uri, client, "server");
+				PushConnection connection = tn.openPush()) {
+			try {
+				connection.push(NullProgressMonitor.INSTANCE, updates);
+				fail("server did not abort");
+			} catch (TransportException e) {
+				String msg = e.getMessage();
+				assertEquals("remote: Too many commands", msg);
+			}
+		}
 	}
 }
