@@ -223,7 +223,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		objects = new ObjectIdOwnerMap<RevObject>();
 		roots = new ArrayList<RevCommit>();
 		queue = new DateRevQueue();
-		pending = new StartGenerator(this, true);
+		pending = new StartGenerator(this);
 		sorting = EnumSet.of(RevSort.NONE);
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
@@ -1188,7 +1188,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 		roots.clear();
 		queue = new DateRevQueue();
-		pending = new StartGenerator(this, true);
+		pending = new StartGenerator(this);
 	}
 
 	/**
@@ -1208,7 +1208,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		reader.release();
 		roots.clear();
 		queue = new DateRevQueue();
-		pending = new StartGenerator(this, false);
+		pending = new StartGenerator(this);
 	}
 
 	/**
