@@ -65,8 +65,6 @@ import java.util.Comparator;
 import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesRule;
-import org.eclipse.jgit.attributes.FilterCommand;
-import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -88,7 +86,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
+import org.eclipse.jgit.util.BuiltinCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.Holder;
@@ -272,9 +270,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 							DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL
-						&& ((ent.getFileMode().getBits()
-								& FileMode.TYPE_MASK) != FileMode.TYPE_GITLINK)) {
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
 					contentIdOffset = i.idOffset();
 					contentIdFromPtr = ptr;
 					return contentId = i.idBuffer();
@@ -368,8 +364,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				state.initializeDigestAndReadBuffer();
 
 				final long len = e.getLength();
-				InputStream filteredIs = possiblyFilteredInputStream(e, is, len,
-						OperationType.CHECKIN_OP);
+				InputStream filteredIs = possiblyFilteredInputStream(e, is, len);
 				return computeHash(filteredIs, canonLen);
 			} finally {
 				safeClose(is);
@@ -382,15 +377,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private InputStream possiblyFilteredInputStream(final Entry e,
 			final InputStream is, final long len) throws IOException {
-		return possiblyFilteredInputStream(e, is, len, null);
-
-	}
-
-	private InputStream possiblyFilteredInputStream(final Entry e,
-			final InputStream is, final long len, OperationType opType)
-			throws IOException {
 		if (getCleanFilterCommand() == null
-				&& getEolStreamType(opType) == EolStreamType.DIRECT) {
+				&& getEolStreamType() == EolStreamType.DIRECT) {
 			canonLen = len;
 			return is;
 		}
@@ -400,7 +388,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			byte[] raw = rawbuf.array();
 			int n = rawbuf.limit();
 			if (!isBinary(raw, n)) {
-				rawbuf = filterClean(raw, n, opType);
+				rawbuf = filterClean(raw, n);
 				raw = rawbuf.array();
 				n = rawbuf.limit();
 			}
@@ -413,14 +401,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				return is;
 			}
 
-		final InputStream lenIs = filterClean(e.openInputStream(),
-				opType);
+		final InputStream lenIs = filterClean(e.openInputStream());
 		try {
 			canonLen = computeLength(lenIs);
 		} finally {
 			safeClose(lenIs);
 		}
-		return filterClean(is, opType);
+		return filterClean(is);
 	}
 
 	private static void safeClose(final InputStream in) {
@@ -446,64 +433,56 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private ByteBuffer filterClean(byte[] src, int n, OperationType opType)
-			throws IOException {
+	private ByteBuffer filterClean(byte[] src, int n) throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
-			return IO.readWholeStream(filterClean(in, opType), n);
+			return IO.readWholeStream(filterClean(in), n);
 		} finally {
 			safeClose(in);
 		}
 	}
 
 	private InputStream filterClean(InputStream in) throws IOException {
-		return filterClean(in, null);
-	}
-
-	private InputStream filterClean(InputStream in, OperationType opType)
-			throws IOException {
-		in = handleAutoCRLF(in, opType);
+		in = handleAutoCRLF(in);
 		String filterCommand = getCleanFilterCommand();
 		if (filterCommand != null) {
-			if (FilterCommandRegistry.isRegistered(filterCommand)) {
+			if (repository.isRegistered(filterCommand)) {
 				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
-				FilterCommand command = FilterCommandRegistry
-						.createFilterCommand(filterCommand, repository, in,
-								buffer);
-				while (command.run() != -1) {
-					// loop as long as command.run() tells there is work to do
-				}
+				BuiltinCommand command = repository.getCommand(filterCommand, repository,
+						in, buffer);
+				while (command.run() != -1)
+					;
 				return buffer.openInputStream();
+			} else {
+				FS fs = repository.getFS();
+				ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
+						new String[0]);
+				filterProcessBuilder.directory(repository.getWorkTree());
+				filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+						repository.getDirectory().getAbsolutePath());
+				ExecutionResult result;
+				try {
+					result = fs.execute(filterProcessBuilder, in);
+				} catch (IOException | InterruptedException e) {
+					throw new IOException(new FilterFailedException(e,
+							filterCommand, getEntryPathString()));
+				}
+				int rc = result.getRc();
+				if (rc != 0) {
+					throw new IOException(new FilterFailedException(rc,
+							filterCommand, getEntryPathString(),
+							result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+							RawParseUtils.decode(result.getStderr()
+									.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+				}
+				return result.getStdout().openInputStream();
 			}
-			FS fs = repository.getFS();
-			ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
-					new String[0]);
-			filterProcessBuilder.directory(repository.getWorkTree());
-			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-					repository.getDirectory().getAbsolutePath());
-			ExecutionResult result;
-			try {
-				result = fs.execute(filterProcessBuilder, in);
-			} catch (IOException | InterruptedException e) {
-				throw new IOException(new FilterFailedException(e,
-						filterCommand, getEntryPathString()));
-			}
-			int rc = result.getRc();
-			if (rc != 0) {
-				throw new IOException(new FilterFailedException(rc,
-						filterCommand, getEntryPathString(),
-						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-						RawParseUtils.decode(result.getStderr()
-								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-			}
-			return result.getStdout().openInputStream();
 		}
 		return in;
 	}
 
-	private InputStream handleAutoCRLF(InputStream in, OperationType opType)
-			throws IOException {
-		return EolStreamTypeUtil.wrapInputStream(in, getEolStreamType(opType));
+	private InputStream handleAutoCRLF(InputStream in) throws IOException {
+		return EolStreamTypeUtil.wrapInputStream(in, getEolStreamType());
 	}
 
 	/**
@@ -859,15 +838,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isUpdateNeeded())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (isModeDifferent(entry.getRawMode()))
+		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		// Don't check for length or lastmodified on folders
-		int type = mode & FileMode.TYPE_MASK;
-		if (type == FileMode.TYPE_TREE || type == FileMode.TYPE_GITLINK)
-			return MetadataDiff.EQUAL;
-
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
+		if (isModeDifferent(entry.getRawMode()))
 			return MetadataDiff.DIFFER_BY_METADATA;
 
 		// Git under windows only stores seconds so we round the timestamp
@@ -936,9 +910,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Lets do a content check
 			return contentCheck(entry, reader);
 		case EQUAL:
-			if (mode == FileMode.SYMLINK.getBits()) {
-				return contentCheck(entry, reader);
-			}
 			return false;
 		case DIFFER_BY_METADATA:
 			if (mode == FileMode.SYMLINK.getBits())
@@ -1373,28 +1344,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @since 4.3
 	 */
 	public EolStreamType getEolStreamType() throws IOException {
-		return getEolStreamType(null);
-	}
-
-	/**
-	 * @param opType
-	 *            The operationtype (checkin/checkout) which should be used
-	 * @return the eol stream type for the current entry or <code>null</code> if
-	 *         it cannot be determined. When state or state.walk is null or the
-	 *         {@link TreeWalk} is not based on a {@link Repository} then null
-	 *         is returned.
-	 * @throws IOException
-	 */
-	private EolStreamType getEolStreamType(OperationType opType)
-			throws IOException {
 		if (eolStreamTypeHolder == null) {
 			EolStreamType type=null;
 			if (state.walk != null) {
-				if (opType != null) {
-					type = state.walk.getEolStreamType(opType);
-				} else {
-					type=state.walk.getEolStreamType();
-				}
+				type=state.walk.getEolStreamType();
 			} else {
 				switch (getOptions().getAutoCRLF()) {
 				case FALSE:

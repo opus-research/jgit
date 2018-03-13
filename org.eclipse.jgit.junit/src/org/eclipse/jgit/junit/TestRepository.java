@@ -211,6 +211,17 @@ public class TestRepository<R extends Repository> {
 		return new Date(mockSystemReader.getCurrentTime());
 	}
 
+	/**
+	 * @return current date.
+	 *
+	 * @deprecated Use {@link #getDate()} instead.
+	 */
+	@Deprecated
+	public Date getClock() {
+		// Remove once Gitiles and Gerrit are using the updated JGit.
+		return getDate();
+	}
+
 	/** @return timezone used for default identities. */
 	public TimeZone getTimeZone() {
 		return mockSystemReader.getTimeZone();
@@ -490,7 +501,7 @@ public class TestRepository<R extends Repository> {
 	 */
 	public CommitBuilder amendRef(String ref) throws Exception {
 		String name = normalizeRef(ref);
-		Ref r = db.exactRef(name);
+		Ref r = db.getRef(name);
 		if (r == null)
 			throw new IOException("Not a ref: " + ref);
 		return amend(pool.parseCommit(r.getObjectId()), branch(name).commit());
@@ -572,31 +583,6 @@ public class TestRepository<R extends Repository> {
 
 		default:
 			throw new IOException("Cannot write " + ref + " " + u.getResult());
-		}
-	}
-
-	/**
-	 * Delete a reference.
-	 *
-	 * @param ref
-	 *	      the name of the reference to delete. This is normalized
-	 *	      in the same way as {@link #update(String, AnyObjectId)}.
-	 * @throws Exception
-	 * @since 4.4
-	 */
-	public void delete(String ref) throws Exception {
-		ref = normalizeRef(ref);
-		RefUpdate u = db.updateRef(ref);
-		switch (u.delete()) {
-		case FAST_FORWARD:
-		case FORCED:
-		case NEW:
-		case NO_CHANGE:
-			updateServerInfo();
-			return;
-
-		default:
-			throw new IOException("Cannot delete " + ref + " " + u.getResult());
 		}
 	}
 
@@ -692,7 +678,7 @@ public class TestRepository<R extends Repository> {
 		RevCommit parent = commit.getParent(0);
 		pool.parseHeaders(parent);
 
-		Ref headRef = db.exactRef(Constants.HEAD);
+		Ref headRef = db.getRef(Constants.HEAD);
 		if (headRef == null)
 			throw new IOException("Missing HEAD");
 		RevCommit head = pool.parseCommit(headRef.getObjectId());
@@ -973,15 +959,6 @@ public class TestRepository<R extends Repository> {
 		public RevCommit update(RevCommit to) throws Exception {
 			return TestRepository.this.update(ref, to);
 		}
-
-		/**
-		 * Delete this branch.
-		 * @throws Exception
-		 * @since 4.4
-		 */
-		public void delete() throws Exception {
-			TestRepository.this.delete(ref);
-		}
 	}
 
 	/** Helper to generate a commit. */
@@ -1014,7 +991,7 @@ public class TestRepository<R extends Repository> {
 		CommitBuilder(BranchBuilder b) throws Exception {
 			branch = b;
 
-			Ref ref = db.exactRef(branch.ref);
+			Ref ref = db.getRef(branch.ref);
 			if (ref != null && ref.getObjectId() != null)
 				parent(pool.parseCommit(ref.getObjectId()));
 		}
