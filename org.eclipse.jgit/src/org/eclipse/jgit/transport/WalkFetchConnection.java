@@ -115,10 +115,10 @@ import org.eclipse.jgit.util.FileUtils;
  */
 class WalkFetchConnection extends BaseFetchConnection {
 	/** The repository this transport fetches into, or pushes out of. */
-	final Repository local;
+	private final Repository local;
 
 	/** If not null the validator for received objects. */
-	final ObjectChecker objCheck;
+	private final ObjectChecker objCheck;
 
 	/**
 	 * List of all remote repositories we may need to get objects out of.
@@ -180,12 +180,12 @@ class WalkFetchConnection extends BaseFetchConnection {
 	 */
 	private final HashMap<ObjectId, List<Throwable>> fetchErrors;
 
-	String lockMessage;
+	private String lockMessage;
 
-	final List<PackLock> packLocks;
+	private final List<PackLock> packLocks;
 
 	/** Inserter to write objects onto {@link #local}. */
-	final ObjectInserter inserter;
+	private final ObjectInserter inserter;
 
 	/** Inserter to read objects from {@link #local}. */
 	private final ObjectReader reader;
@@ -267,10 +267,6 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final HashSet<ObjectId> inWorkQueue = new HashSet<ObjectId>();
 		for (final Ref r : want) {
 			final ObjectId id = r.getObjectId();
-			if (id == null) {
-				throw new NullPointerException(MessageFormat.format(
-						JGitText.get().transportProvidedRefWithNoObjectId, r.getName()));
-			}
 			try {
 				final RevObject obj = revWalk.parseAny(id);
 				if (obj.has(COMPLETE))
@@ -637,11 +633,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final byte[] raw = uol.getCachedBytes();
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, raw);
+				objCheck.check(type, raw);
 			} catch (CorruptObjectException e) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().transportExceptionInvalid,
-						Constants.typeString(type), id.name(), e.getMessage()));
+				throw new TransportException(MessageFormat.format(JGitText.get().transportExceptionInvalid
+						, Constants.typeString(type), id.name(), e.getMessage()));
 			}
 		}
 
