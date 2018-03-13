@@ -414,7 +414,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 		if (wantCapability(line, OPTION_MULTI_ACK_DETAILED)) {
 			multiAck = MultiAck.DETAILED;
-			noDone = wantCapability(line, OPTION_NO_DONE);
+			if (statelessRPC)
+				noDone = wantCapability(line, OPTION_NO_DONE);
 		} else if (wantCapability(line, OPTION_MULTI_ACK))
 			multiAck = MultiAck.CONTINUE;
 		else

@@ -444,13 +444,14 @@ public class UploadPack {
 		adv.init(db);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK_DETAILED);
-		adv.advertiseCapability(OPTION_NO_DONE);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
 		adv.advertiseCapability(OPTION_OFS_DELTA);
 		adv.advertiseCapability(OPTION_SIDE_BAND);
 		adv.advertiseCapability(OPTION_SIDE_BAND_64K);
 		adv.advertiseCapability(OPTION_THIN_PACK);
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
+		if (!biDirectionalPipe)
+			adv.advertiseCapability(OPTION_NO_DONE);
 		adv.setDerefTags(true);
 		advertised = adv.send(getAdvertisedRefs());
 		adv.end();
