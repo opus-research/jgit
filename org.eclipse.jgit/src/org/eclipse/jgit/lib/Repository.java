@@ -806,14 +806,27 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
 	public void incrementOpen() {
-		useCnt.incrementAndGet();
+		synchronized (useCnt) {
+			useCnt.incrementAndGet();
+		}
 	}
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		if (useCnt.decrementAndGet() == 0) {
-			doClose();
+		synchronized (useCnt) {
+			if (isClosed() || useCnt.decrementAndGet() > 0) {
+				return;
+			}
 		}
+		doClose();
+	}
+
+	/**
+	 * @return true if this repository is closed
+	 * @since 4.2
+	 */
+	public boolean isClosed() {
+		return useCnt.get() == 0;
 	}
 
 	/**
