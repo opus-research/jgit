@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,59 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
+
+package org.eclipse.jgit.http.server;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.hasPushStatusBug;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.invalidVersion;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
 
-import java.io.File;
-
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.util.FileUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
-public class ResolveMergerTest extends RepositoryTestCase {
-
+public class ClientVersionUtilTest {
 	@Test
-	public void failingPathsShouldNotResultInOKReturnValue() throws Exception {
-		File folder1 = new File(db.getWorkTree(), "folder1");
-		FileUtils.mkdir(folder1);
-		File file = new File(folder1, "file1.txt");
-		write(file, "folder1--file1.txt");
-		file = new File(folder1, "file2.txt");
-		write(file, "folder1--file2.txt");
+	public void testParse() {
+		assertEquals("1.6.5", parseVersion("git/1.6.6-rc0"));
+		assertEquals("1.6.6", parseVersion("git/1.6.6"));
+		assertEquals("1.7.5", parseVersion("git/1.7.5.GIT"));
+		assertEquals("1.7.6.1", parseVersion("git/1.7.6.1.45.gbe0cc"));
 
-		Git git = new Git(db);
-		git.add().addFilepattern(folder1.getName()).call();
-		RevCommit base = git.commit().setMessage("adding folder").call();
+		assertEquals("1.5.4.3", parseVersion("git/1.5.4.3,gzip(proxy)"));
+		assertEquals("1.7.0.2", parseVersion("git/1.7.0.2.msysgit.0.14.g956d7,gzip"));
+		assertEquals("1.7.10.2", parseVersion("git/1.7.10.2 (Apple Git-33)"));
 
-		recursiveDelete(folder1);
-		git.rm().addFilepattern("folder1/file1.txt")
-				.addFilepattern("folder1/file2.txt").call();
-		RevCommit other = git.commit()
-				.setMessage("removing folders on 'other'").call();
-
-		git.checkout().setName(base.name()).call();
-
-		file = new File(db.getWorkTree(), "unrelated.txt");
-		write(file, "unrelated");
-
-		git.add().addFilepattern("unrelated").call();
-		RevCommit head = git.commit().setMessage("Adding another file").call();
-
-		// Untracked file to cause failing path for delete() of folder1
-		file = new File(folder1, "file3.txt");
-		write(file, "folder1--file3.txt");
-
-		ResolveMerger merger = new ResolveMerger(db, false);
-		merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
-		merger.setWorkingTreeIterator(new FileTreeIterator(db));
-		boolean ok = merger.merge(head.getId(), other.getId());
-
-		assertFalse(merger.getFailingPaths().isEmpty());
-		assertFalse(ok);
+		assertEquals(ClientVersionUtil.toString(invalidVersion()), parseVersion("foo"));
 	}
 
+	@Test
+	public void testPushStatusBug() {
+		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6")));
+		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6.1")));
+		assertTrue(hasPushStatusBug(parseVersion("git/1.7.9")));
+
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.8.6")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.1")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.2")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.10")));
+	}
+
+	private static void assertEquals(String exp, int[] act) {
+		Assert.assertEquals(exp, ClientVersionUtil.toString(act));
+	}
 }
