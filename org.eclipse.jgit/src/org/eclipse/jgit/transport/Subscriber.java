@@ -175,7 +175,7 @@ public class Subscriber {
 		connection = transport.openSubscribe();
 		transport.setTimeout(timeout);
 		try {
-			connection.doSubscribeAdvertisment(this);
+			connection.doSubscribeAdvertisement(this);
 			connection.doSubscribe(this, commands, monitor);
 		} finally {
 			close();
