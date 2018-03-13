@@ -80,8 +80,8 @@ public class RenameDetector {
 			// the old name.
 			//
 			if (ent.changeType == ChangeType.DELETE)
-				return ent.oldPath;
-			return ent.newPath;
+				return ent.oldName;
+			return ent.newName;
 		}
 
 		private int sortOf(ChangeType changeType) {
@@ -369,18 +369,18 @@ public class RenameDetector {
 				+ deleted.size());
 
 		for (DiffEntry src : deleted) {
-			nameMap.put(src.oldPath, src);
+			nameMap.put(src.oldName, src);
 			pm.update(1);
 		}
 
 		for (DiffEntry dst : added) {
-			DiffEntry src = nameMap.remove(dst.newPath);
+			DiffEntry src = nameMap.remove(dst.newName);
 			if (src != null) {
 				if (sameType(src.oldMode, dst.newMode)) {
 					entries.add(DiffEntry.pair(ChangeType.MODIFY, src, dst,
 							src.score));
 				} else {
-					nameMap.put(src.oldPath, src);
+					nameMap.put(src.oldName, src);
 					newAdded.add(dst);
 				}
 			} else {
@@ -509,10 +509,10 @@ public class RenameDetector {
 				long[] matrix = new long[dels.size() * adds.size()];
 				int mNext = 0;
 				for (int addIdx = 0; addIdx < adds.size(); addIdx++) {
-					String addedName = adds.get(addIdx).newPath;
+					String addedName = adds.get(addIdx).newName;
 
 					for (int delIdx = 0; delIdx < dels.size(); delIdx++) {
-						String deletedName = dels.get(delIdx).oldPath;
+						String deletedName = dels.get(delIdx).oldName;
 
 						int score = SimilarityRenameDetector.nameScore(addedName, deletedName);
 						matrix[mNext] = SimilarityRenameDetector.encode(score, addIdx, delIdx);
@@ -625,7 +625,7 @@ public class RenameDetector {
 	}
 
 	private static String path(DiffEntry de) {
-		return de.changeType == ChangeType.DELETE ? de.oldPath : de.newPath;
+		return de.changeType == ChangeType.DELETE ? de.oldName : de.newName;
 	}
 
 	private static FileMode mode(DiffEntry de) {
