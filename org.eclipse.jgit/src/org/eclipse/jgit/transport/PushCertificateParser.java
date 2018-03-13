@@ -45,7 +45,6 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.BaseReceivePack.parseCommand;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_CERT;
 
-import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.Reader;
@@ -153,9 +152,6 @@ public class PushCertificateParser {
 	 */
 	public static PushCertificate fromReader(Reader r)
 			throws PackProtocolException, IOException {
-		if (!r.markSupported()) {
-			r = new BufferedReader(r);
-		}
 		PushCertificateParser parser = new PushCertificateParser();
 		StreamReader reader = new StreamReader(r);
 		parser.receiveHeader(reader);
@@ -284,7 +280,7 @@ public class PushCertificateParser {
 				|| !s.startsWith(header)
 				|| s.charAt(header.length()) != ' ') {
 			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidField, header));
+					JGitText.get().pushCertificateInvalidHeader, header));
 		}
 		return s.substring(header.length() + 1);
 	}
