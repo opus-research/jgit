@@ -56,6 +56,8 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +84,7 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.junit.http.AccessEvent;
 import org.eclipse.jgit.junit.http.HttpTestCase;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -98,11 +101,18 @@ import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.transport.http.HttpConnectionFactory;
+import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
+import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
+@RunWith(Parameterized.class)
 public class SmartClientSmartServerTest extends HttpTestCase {
 	private static final String HDR_TRANSFER_ENCODING = "Transfer-Encoding";
 
@@ -116,12 +126,28 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 	private RevCommit A, B;
 
+	@Parameters
+	public static Collection<Object[]> data() {
+		// run all tests with both connection factories we have
+		return Arrays.asList(new Object[][] {
+				{ new JDKHttpConnectionFactory() },
+				{ new HttpClientConnectionFactory() } });
+	}
+
+	public SmartClientSmartServerTest(HttpConnectionFactory cf) {
+		HttpTransport.setConnectionFactory(cf);
+	}
+
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
 		final TestRepository<Repository> src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
+		src.getRepository()
+				.getConfig()
+				.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+						ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();

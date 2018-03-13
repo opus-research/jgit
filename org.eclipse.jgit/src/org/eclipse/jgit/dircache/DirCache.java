@@ -607,7 +607,8 @@ public class DirCache {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
 		try {
-			writeTo(new SafeBufferedOutputStream(tmp.getOutputStream()));
+			writeTo(liveFile.getParentFile(),
+					new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -620,7 +621,7 @@ public class DirCache {
 		}
 	}
 
-	void writeTo(final OutputStream os) throws IOException {
+	void writeTo(File dir, final OutputStream os) throws IOException {
 		final MessageDigest foot = Constants.newMessageDigest();
 		final DigestOutputStream dos = new DigestOutputStream(os, foot);
 
@@ -670,14 +671,18 @@ public class DirCache {
 		}
 
 		if (writeTree) {
-			final TemporaryBuffer bb = new TemporaryBuffer.LocalFile();
-			tree.write(tmp, bb);
-			bb.close();
+			TemporaryBuffer bb = new TemporaryBuffer.LocalFile(dir, 5 << 20);
+			try {
+				tree.write(tmp, bb);
+				bb.close();
 
-			NB.encodeInt32(tmp, 0, EXT_TREE);
-			NB.encodeInt32(tmp, 4, (int) bb.length());
-			dos.write(tmp, 0, 8);
-			bb.writeTo(dos, null);
+				NB.encodeInt32(tmp, 0, EXT_TREE);
+				NB.encodeInt32(tmp, 4, (int) bb.length());
+				dos.write(tmp, 0, 8);
+				bb.writeTo(dos, null);
+			} finally {
+				bb.destroy();
+			}
 		}
 		writeIndexChecksum = foot.digest();
 		os.write(writeIndexChecksum);
@@ -730,6 +735,21 @@ public class DirCache {
 	}
 
 	/**
+	 * Locate the position a path's entry is at in the index. For details refer
+	 * to #findEntry(byte[], int).
+	 *
+	 * @param path
+	 *            the path to search for.
+	 * @return if &gt;= 0 then the return value is the position of the entry in
+	 *         the index; pass to {@link #getEntry(int)} to obtain the entry
+	 *         information. If &lt; 0 the entry does not exist in the index.
+	 */
+	public int findEntry(final String path) {
+		final byte[] p = Constants.encode(path);
+		return findEntry(p, p.length);
+	}
+
+	/**
 	 * Locate the position a path's entry is at in the index.
 	 * <p>
 	 * If there is at least one entry in the index for this path the position of
@@ -739,18 +759,16 @@ public class DirCache {
 	 * If no path matches the entry -(position+1) is returned, where position is
 	 * the location it would have gone within the index.
 	 *
-	 * @param path
-	 *            the path to search for.
-	 * @return if >= 0 then the return value is the position of the entry in the
-	 *         index; pass to {@link #getEntry(int)} to obtain the entry
-	 *         information. If < 0 the entry does not exist in the index.
+	 * @param p
+	 *            the byte array starting with the path to search for.
+	 * @param pLen
+	 *            the length of the path in bytes
+	 * @return if &gt;= 0 then the return value is the position of the entry in
+	 *         the index; pass to {@link #getEntry(int)} to obtain the entry
+	 *         information. If &lt; 0 the entry does not exist in the index.
+	 * @since 3.4
 	 */
-	public int findEntry(final String path) {
-		final byte[] p = Constants.encode(path);
-		return findEntry(p, p.length);
-	}
-
-	int findEntry(final byte[] p, final int pLen) {
+	public int findEntry(final byte[] p, final int pLen) {
 		int low = 0;
 		int high = entryCnt;
 		while (low < high) {
@@ -904,7 +922,7 @@ public class DirCache {
 	 *            returned tree identity.
 	 * @return identity for the root tree.
 	 * @throws UnmergedPathException
-	 *             one or more paths contain higher-order stages (stage > 0),
+	 *             one or more paths contain higher-order stages (stage &gt; 0),
 	 *             which cannot be stored in a tree object.
 	 * @throws IllegalStateException
 	 *             one or more paths contain an invalid mode which should never

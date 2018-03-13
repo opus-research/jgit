@@ -272,7 +272,14 @@ public final class Constants {
 	 */
 	public static final String INFO_EXCLUDE = "info/exclude";
 
-	/** The environment variable that contains the system user name */
+	/**
+	 * The system property that contains the system user name
+	 *
+	 * @since 3.6
+	 */
+	public static final String OS_USER_DIR = "user.dir";
+
+	/** The system property that contains the system user name */
 	public static final String OS_USER_NAME_KEY = "user.name";
 
 	/** The environment variable that contains the author's name */
@@ -287,7 +294,11 @@ public final class Constants {
 	/** The environment variable that contains the commiter's email */
 	public static final String GIT_COMMITTER_EMAIL_KEY = "GIT_COMMITTER_EMAIL";
 
-	/** The environment variable that blocks use of the system config file */
+	/**
+	 * The environment variable that blocks use of the system config file
+	 *
+	 * @since 3.3
+	 */
 	public static final String GIT_CONFIG_NOSYSTEM_KEY = "GIT_CONFIG_NOSYSTEM";
 
 	/**
@@ -345,6 +356,13 @@ public final class Constants {
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
 
+	/**
+	 * Name of the attributes file
+	 *
+	 * @since 3.7
+	 */
+	public static final String DOT_GIT_ATTRIBUTES = ".gitattributes";
+
 	/** Name of the ignore file */
 	public static final String DOT_GIT_IGNORE = ".gitignore";
 
@@ -353,6 +371,20 @@ public final class Constants {
 
 	/** Name of the .git/shallow file */
 	public static final String SHALLOW = "shallow";
+
+	/**
+	 * Prefix of the first line in a ".git" file
+	 *
+	 * @since 3.6
+	 */
+	public static final String GITDIR = "gitdir: ";
+
+	/**
+	 * Name of the folder (inside gitDir) where submodules are stored
+	 *
+	 * @since 3.6
+	 */
+	public static final String MODULES = "modules";
 
 	/**
 	 * Create a new digest function for objects.

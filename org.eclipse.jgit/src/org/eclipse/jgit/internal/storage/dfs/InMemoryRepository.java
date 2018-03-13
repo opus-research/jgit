@@ -1,5 +1,6 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -13,8 +14,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.RefList;
 
 /**
@@ -116,7 +119,7 @@ public class InMemoryRepository extends DfsRepository {
 		protected DfsOutputStream writeFile(
 				DfsPackDescription desc, final PackExt ext) throws IOException {
 			final MemPack memPack = (MemPack) desc;
-			return new InMemoryOutputStream() {
+			return new Out() {
 				@Override
 				public void flush() {
 					memPack.fileMap.put(ext, getData());
@@ -132,6 +135,43 @@ public class InMemoryRepository extends DfsRepository {
 		MemPack(String name, DfsRepositoryDescription repoDesc) {
 			super(repoDesc, name);
 		}
+	}
+
+	private abstract static class Out extends DfsOutputStream {
+		private final ByteArrayOutputStream dst = new ByteArrayOutputStream();
+
+		private byte[] data;
+
+		@Override
+		public void write(byte[] buf, int off, int len) {
+			data = null;
+			dst.write(buf, off, len);
+		}
+
+		@Override
+		public int read(long position, ByteBuffer buf) {
+			byte[] d = getData();
+			int n = Math.min(buf.remaining(), d.length - (int) position);
+			if (n == 0)
+				return -1;
+			buf.put(d, (int) position, n);
+			return n;
+		}
+
+		byte[] getData() {
+			if (data == null)
+				data = dst.toByteArray();
+			return data;
+		}
+
+		@Override
+		public abstract void flush();
+
+		@Override
+		public void close() {
+			flush();
+		}
+
 	}
 
 	private static class ByteArrayReadableChannel implements ReadableChannel {
@@ -203,6 +243,17 @@ public class InMemoryRepository extends DfsRepository {
 		@Override
 		protected boolean compareAndPut(Ref oldRef, Ref newRef)
 				throws IOException {
+			ObjectId id = newRef.getObjectId();
+			if (id != null) {
+				RevWalk rw = new RevWalk(getRepository());
+				try {
+					// Validate that the target exists in a new RevWalk, as the RevWalk
+					// from the RefUpdate might be reading back unflushed objects.
+					rw.parseAny(id);
+				} finally {
+					rw.release();
+				}
+			}
 			String name = newRef.getName();
 			if (oldRef == null || oldRef.getStorage() == Storage.NEW)
 				return refs.putIfAbsent(name, newRef) == null;

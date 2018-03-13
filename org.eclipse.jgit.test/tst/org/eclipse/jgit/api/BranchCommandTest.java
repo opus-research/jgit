@@ -197,6 +197,20 @@ public class BranchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testListBranchesWithContains() throws Exception {
+		git.branchCreate().setName("foo").setStartPoint(secondCommit).call();
+
+		List<Ref> refs = git.branchList().call();
+		assertEquals(2, refs.size());
+
+		List<Ref> refsContainingSecond = git.branchList()
+				.setContains(secondCommit.name()).call();
+		assertEquals(1, refsContainingSecond.size());
+		// master is on initial commit, so it should not be returned
+		assertEquals("refs/heads/foo", refsContainingSecond.get(0).getName());
+	}
+
+	@Test
 	public void testCreateFromCommit() throws Exception {
 		Ref branch = git.branchCreate().setName("FromInitial").setStartPoint(
 				initialCommit).call();
@@ -459,9 +473,16 @@ public class BranchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCreationImplicitStart() throws JGitInternalException,
-			GitAPIException {
+	public void testCreationImplicitStart() throws Exception {
 		git.branchCreate().setName("topic").call();
+		assertEquals(db.resolve("HEAD"), db.resolve("topic"));
+	}
+
+	@Test
+	public void testCreationNullStartPoint() throws Exception {
+		String startPoint = null;
+		git.branchCreate().setName("topic").setStartPoint(startPoint).call();
+		assertEquals(db.resolve("HEAD"), db.resolve("topic"));
 	}
 
 	public Ref createBranch(Git actGit, String name, boolean force,

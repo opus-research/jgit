@@ -60,7 +60,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 /**
  * PKWARE's ZIP format.
  */
-public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+public final class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	private static final List<String> SUFFIXES = Collections
 			.unmodifiableList(Arrays.asList(".zip")); //$NON-NLS-1$
 
@@ -73,11 +73,11 @@ public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 			throws IOException {
 		// ZipArchiveEntry detects directories by checking
 		// for '/' at the end of the filename.
-		if (path.endsWith("/") && mode != FileMode.TREE)
+		if (path.endsWith("/") && mode != FileMode.TREE) //$NON-NLS-1$
 			throw new IllegalArgumentException(MessageFormat.format(
 					ArchiveText.get().pathDoesNotMatchMode, path, mode));
-		if (!path.endsWith("/") && mode == FileMode.TREE)
-			path = path + "/";
+		if (!path.endsWith("/") && mode == FileMode.TREE) //$NON-NLS-1$
+			path = path + "/"; //$NON-NLS-1$
 
 		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
 		if (mode == FileMode.TREE) {
@@ -104,5 +104,15 @@ public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return (other instanceof ZipFormat);
+	}
+
+	@Override
+	public int hashCode() {
+		return getClass().hashCode();
 	}
 }

@@ -93,6 +93,7 @@ import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
@@ -116,6 +117,8 @@ public class GC {
 	private long expireAgeMillis = -1;
 
 	private Date expire;
+
+	private PackConfig pconfig = null;
 
 	/**
 	 * the refs which existed during the last call to {@link #repack()}. This is
@@ -481,7 +484,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	public void packRefs() throws IOException {
-		Collection<Ref> refs = repo.getRefDatabase().getRefs(ALL).values();
+		Collection<Ref> refs = repo.getRefDatabase().getRefs(Constants.R_REFS).values();
 		List<String> refsToBePacked = new ArrayList<String>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
@@ -686,7 +689,7 @@ public class GC {
 					}
 
 				});
-		PackWriter pw = new PackWriter(repo);
+		PackWriter pw = new PackWriter((pconfig == null) ? new PackConfig(repo) : pconfig, repo.newObjectReader());
 		try {
 			// prepare the PackWriter
 			pw.setDeltaBaseAsOffset(true);
@@ -714,26 +717,27 @@ public class GC {
 						JGitText.get().cannotCreateIndexfile, tmpIdx.getPath()));
 
 			// write the packfile
-			@SuppressWarnings("resource" /* java 7 */)
-			FileChannel channel = new FileOutputStream(tmpPack).getChannel();
+			FileOutputStream fos = new FileOutputStream(tmpPack);
+			FileChannel channel = fos.getChannel();
 			OutputStream channelStream = Channels.newOutputStream(channel);
 			try {
 				pw.writePack(pm, pm, channelStream);
 			} finally {
 				channel.force(true);
 				channelStream.close();
-				channel.close();
+				fos.close();
 			}
 
 			// write the packindex
-			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
+			fos = new FileOutputStream(tmpIdx);
+			FileChannel idxChannel = fos.getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);
 			try {
 				pw.writeIndex(idxStream);
 			} finally {
 				idxChannel.force(true);
 				idxStream.close();
-				idxChannel.close();
+				fos.close();
 			}
 
 			if (pw.prepareBitmapIndex(pm)) {
@@ -745,14 +749,15 @@ public class GC {
 							JGitText.get().cannotCreateIndexfile,
 							tmpBitmapIdx.getPath()));
 
-				idxChannel = new FileOutputStream(tmpBitmapIdx).getChannel();
+				fos = new FileOutputStream(tmpBitmapIdx);
+				idxChannel = fos.getChannel();
 				idxStream = Channels.newOutputStream(idxChannel);
 				try {
 					pw.writeBitmapIndex(idxStream);
 				} finally {
 					idxChannel.force(true);
 					idxStream.close();
-					idxChannel.close();
+					fos.close();
 				}
 			}
 
@@ -943,6 +948,19 @@ public class GC {
 	public void setExpireAgeMillis(long expireAgeMillis) {
 		this.expireAgeMillis = expireAgeMillis;
 		expire = null;
+	}
+
+	/**
+	 * Set the PackConfig used when (re-)writing packfiles. This allows to
+	 * influence how packs are written and to implement something similar to
+	 * "git gc --aggressive"
+	 *
+	 * @since 3.6
+	 * @param pconfig
+	 *            the {@link PackConfig} used when writing packs
+	 */
+	public void setPackConfig(PackConfig pconfig) {
+		this.pconfig = pconfig;
 	}
 
 	/**

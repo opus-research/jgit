@@ -684,6 +684,8 @@ public class UploadPack {
 
 			if (depth != 0)
 				processShallow();
+			if (!clientShallowCommits.isEmpty())
+				walk.assumeShallow(clientShallowCommits);
 			sendPack = negotiate();
 		} catch (PackProtocolException err) {
 			reportErrorDuringNegotiate(err.getMessage());
@@ -756,7 +758,7 @@ public class UploadPack {
 
 			// Commits not on the boundary which are shallow in the client
 			// need to become unshallowed
-			if (c.getDepth() < depth && clientShallowCommits.contains(c)) {
+			if (c.getDepth() < depth && clientShallowCommits.remove(c)) {
 				unshallowCommits.add(c.copy());
 				pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
 			}
@@ -805,7 +807,9 @@ public class UploadPack {
 				|| policy == null)
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
-		advertised = adv.send(getAdvertisedOrDefaultRefs());
+		Map<String, Ref> refs = getAdvertisedOrDefaultRefs();
+		findSymrefs(adv, refs);
+		advertised = adv.send(refs);
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
@@ -1350,7 +1354,7 @@ public class UploadPack {
 		try {
 			pw.setIndexDisabled(true);
 			pw.setUseCachedPacks(true);
-			pw.setUseBitmaps(true);
+			pw.setUseBitmaps(depth == 0 && clientShallowCommits.isEmpty());
 			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
@@ -1411,7 +1415,6 @@ public class UploadPack {
 			}
 
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-			statistics = pw.getStatistics();
 
 			if (msgOut != NullOutputStream.INSTANCE) {
 				String msg = pw.getStatistics().getMessage() + '\n';
@@ -1420,13 +1423,21 @@ public class UploadPack {
 			}
 
 		} finally {
+			statistics = pw.getStatistics();
+			if (statistics != null)
+				logger.onPackStatistics(statistics);
 			pw.release();
 		}
 
 		if (sideband)
 			pckOut.end();
+	}
 
-		if (statistics != null)
-			logger.onPackStatistics(statistics);
+	private void findSymrefs(
+			final RefAdvertiser adv, final Map<String, Ref> refs) {
+		Ref head = refs.get(Constants.HEAD);
+		if (head != null && head.isSymbolic()) {
+			adv.addSymref(Constants.HEAD, head.getLeaf().getName());
+		}
 	}
 }

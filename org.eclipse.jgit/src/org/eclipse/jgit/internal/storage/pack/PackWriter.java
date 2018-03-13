@@ -132,11 +132,13 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * <li>by providing iterator of {@link RevObject} specifying exact list and
  * order of objects in pack</li>
  * </ul>
+ * <p>
  * Typical usage consists of creating instance intended for some pack,
  * configuring options, preparing the list of objects by calling
  * {@link #preparePack(Iterator)} or
  * {@link #preparePack(ProgressMonitor, Collection, Collection)}, and finally
- * producing the stream with {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
+ * producing the stream with
+ * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
  * </p>
  * <p>
  * Class provide set of configurable options and {@link ProgressMonitor}
@@ -1027,43 +1029,44 @@ public class PackWriter {
 		stats.totalObjects = objCnt;
 		beginPhase(PackingPhase.WRITING, writeMonitor, objCnt);
 		long writeStart = System.currentTimeMillis();
+		try {
+			out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
+			out.flush();
 
-		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
-		out.flush();
+			writeObjects(out);
+			if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
+				for (Statistics.ObjectType typeStat : stats.objectTypes) {
+					if (typeStat == null)
+						continue;
+					stats.thinPackBytes += typeStat.bytes;
+				}
+			}
 
-		writeObjects(out);
-		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
+			stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
+			for (CachedPack pack : cachedPacks) {
+				long deltaCnt = pack.getDeltaCount();
+				stats.reusedObjects += pack.getObjectCount();
+				stats.reusedDeltas += deltaCnt;
+				stats.totalDeltas += deltaCnt;
+				reuseSupport.copyPackAsIs(out, pack, reuseValidate);
+			}
+			writeChecksum(out);
+			out.flush();
+		} finally {
+			stats.timeWriting = System.currentTimeMillis() - writeStart;
+			stats.depth = depth;
+
 			for (Statistics.ObjectType typeStat : stats.objectTypes) {
 				if (typeStat == null)
 					continue;
-				stats.thinPackBytes += typeStat.bytes;
+				typeStat.cntDeltas += typeStat.reusedDeltas;
+				stats.reusedObjects += typeStat.reusedObjects;
+				stats.reusedDeltas += typeStat.reusedDeltas;
+				stats.totalDeltas += typeStat.cntDeltas;
 			}
 		}
 
-		for (CachedPack pack : cachedPacks) {
-			long deltaCnt = pack.getDeltaCount();
-			stats.reusedObjects += pack.getObjectCount();
-			stats.reusedDeltas += deltaCnt;
-			stats.totalDeltas += deltaCnt;
-			reuseSupport.copyPackAsIs(out, pack, reuseValidate);
-		}
-		writeChecksum(out);
-		out.flush();
-		stats.timeWriting = System.currentTimeMillis() - writeStart;
 		stats.totalBytes = out.length();
-		stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
-		stats.depth = depth;
-
-		for (Statistics.ObjectType typeStat : stats.objectTypes) {
-			if (typeStat == null)
-				continue;
-			typeStat.cntDeltas += typeStat.reusedDeltas;
-
-			stats.reusedObjects += typeStat.reusedObjects;
-			stats.reusedDeltas += typeStat.reusedDeltas;
-			stats.totalDeltas += typeStat.cntDeltas;
-		}
-
 		reader.release();
 		endPhase(writeMonitor);
 	}
@@ -1844,9 +1847,10 @@ public class PackWriter {
 			Set<? extends ObjectId> have)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null);
+		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null, true);
 		bitmapWalker.reset();
-		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap);
+		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap,
+				false);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
 		if (useCachedPacks && reuseSupport != null
@@ -2046,7 +2050,7 @@ public class PackWriter {
 				walker = bitmapPreparer.newBitmapWalker();
 
 			BitmapBuilder bitmap = walker.findObjects(
-					Collections.singleton(cmit), null);
+					Collections.singleton(cmit), null, false);
 
 			if (last != null && cmit.isReuseWalker() && !bitmap.contains(last))
 				throw new IllegalStateException(MessageFormat.format(

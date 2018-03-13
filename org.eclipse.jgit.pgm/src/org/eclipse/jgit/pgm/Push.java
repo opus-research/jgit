@@ -113,7 +113,7 @@ class Push extends TextBuiltin {
 		PushCommand push = git.push();
 		push.setDryRun(dryRun);
 		push.setForce(force);
-		push.setProgressMonitor(new TextProgressMonitor());
+		push.setProgressMonitor(new TextProgressMonitor(errw));
 		push.setReceivePack(receivePack);
 		push.setRefSpecs(refSpecs);
 		if (all)
@@ -161,7 +161,7 @@ class Push extends TextBuiltin {
 				printRefUpdateResult(reader, uri, result, rru);
 		}
 
-		AbstractFetchCommand.showRemoteMessages(result.getMessages());
+		AbstractFetchCommand.showRemoteMessages(errw, result.getMessages());
 		if (everythingUpToDate)
 			outw.println(CLIText.get().everythingUpToDate);
 	}
