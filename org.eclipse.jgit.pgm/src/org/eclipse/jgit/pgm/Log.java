@@ -80,7 +80,7 @@ class Log extends RevWalkTextBuiltin {
 			Format.DEFAULT);
 
 	private final DiffFormatter diffFmt = new DiffFormatter( //
-			new BufferedOutputStream(outs));
+			new BufferedOutputStream(System.out));
 
 	private Map<AnyObjectId, Set<Ref>> allRefsByPeeledObjectId;
 
@@ -231,43 +231,43 @@ class Log extends RevWalkTextBuiltin {
 
 	@Override
 	protected void show(final RevCommit c) throws Exception {
-		outw.print(CLIText.get().commitLabel);
-		outw.print(" ");
-		c.getId().copyTo(outbuffer, outw);
+		out.print(CLIText.get().commitLabel);
+		out.print(" ");
+		c.getId().copyTo(outbuffer, out);
 		if (decorate) {
 			Collection<Ref> list = allRefsByPeeledObjectId.get(c);
 			if (list != null) {
-				outw.print(" (");
+				out.print(" (");
 				for (Iterator<Ref> i = list.iterator(); i.hasNext(); ) {
-					outw.print(i.next().getName());
+					out.print(i.next().getName());
 					if (i.hasNext())
-						outw.print(" ");
+						out.print(" ");
 				}
-				outw.print(")");
+				out.print(")");
 			}
 		}
-		outw.println();
+		out.println();
 
 		final PersonIdent author = c.getAuthorIdent();
-		outw.println(MessageFormat.format(CLIText.get().authorInfo, author.getName(), author.getEmailAddress()));
-		outw.println(MessageFormat.format(CLIText.get().dateInfo,
+		out.println(MessageFormat.format(CLIText.get().authorInfo, author.getName(), author.getEmailAddress()));
+		out.println(MessageFormat.format(CLIText.get().dateInfo,
 				dateFormatter.formatDate(author)));
 
-		outw.println();
+		out.println();
 		final String[] lines = c.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    ");
-			outw.print(s);
-			outw.println();
+			out.print("    ");
+			out.print(s);
+			out.println();
 		}
 
-		outw.println();
+		out.println();
 		if (showNotes(c))
-			outw.println();
+			out.println();
 
 		if (c.getParentCount() == 1 && (showNameAndStatusOnly || showPatch))
 			showDiff(c);
-		outw.flush();
+		out.flush();
 	}
 
 	/**
@@ -315,23 +315,23 @@ class Log extends RevWalkTextBuiltin {
 		if (blobId == null)
 			return false;
 		if (emptyLine)
-			outw.println();
-		outw.print("Notes");
+			out.println();
+		out.print("Notes");
 		if (label != null) {
-			outw.print(" (");
-			outw.print(label);
-			outw.print(")");
+			out.print(" (");
+			out.print(label);
+			out.print(")");
 		}
-		outw.println(":");
+		out.println(":");
 		try {
 			RawText rawText = new RawText(argWalk.getObjectReader()
 					.open(blobId).getCachedBytes(Integer.MAX_VALUE));
 			for (int i = 0; i < rawText.size(); i++) {
-				outw.print("    ");
-				outw.println(rawText.getString(i));
+				out.print("    ");
+				out.println(rawText.getString(i));
 			}
 		} catch (LargeObjectException e) {
-			outw.println(MessageFormat.format(
+			out.println(MessageFormat.format(
 					CLIText.get().noteObjectTooLargeToPrint, blobId.name()));
 		}
 		return true;
@@ -342,12 +342,12 @@ class Log extends RevWalkTextBuiltin {
 		final RevTree b = c.getTree();
 
 		if (showNameAndStatusOnly)
-			Diff.nameStatus(outw, diffFmt.scan(a, b));
+			Diff.nameStatus(out, diffFmt.scan(a, b));
 		else {
-			outw.flush();
+			out.flush();
 			diffFmt.format(a, b);
 			diffFmt.flush();
 		}
-		outw.println();
+		out.println();
 	}
 }

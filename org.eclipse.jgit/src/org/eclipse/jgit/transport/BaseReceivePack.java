@@ -136,10 +136,10 @@ public abstract class BaseReceivePack {
 	}
 
 	/** Database we write the stored objects into. */
-	private final Repository db;
+	protected final Repository db;
 
 	/** Revision traversal support over {@link #db}. */
-	private final RevWalk walk;
+	protected final RevWalk walk;
 
 	/**
 	 * Is the client connection a bi-directional socket or pipe?
@@ -152,22 +152,22 @@ public abstract class BaseReceivePack {
 	 * If false, this class runs in a read everything then output results mode,
 	 * making it suitable for single round-trip systems RPCs such as HTTP.
 	 */
-	private boolean biDirectionalPipe = true;
+	protected boolean biDirectionalPipe = true;
 
 	/** Expecting data after the pack footer */
-	private boolean expectDataAfterPackFooter;
+	protected boolean expectDataAfterPackFooter;
 
 	/** Should an incoming transfer validate objects? */
-	private boolean checkReceivedObjects;
+	protected boolean checkReceivedObjects;
 
 	/** Should an incoming transfer permit create requests? */
-	private boolean allowCreates;
+	protected boolean allowCreates;
 
 	/** Should an incoming transfer permit delete requests? */
-	private boolean allowDeletes;
+	protected boolean allowDeletes;
 
 	/** Should an incoming transfer permit non-fast-forward requests? */
-	private boolean allowNonFastForwards;
+	protected boolean allowNonFastForwards;
 
 	private boolean allowOfsDelta;
 
@@ -212,20 +212,23 @@ public abstract class BaseReceivePack {
 	private PackParser parser;
 
 	/** The refs we advertised as existing at the start of the connection. */
-	private Map<String, Ref> refs;
+	protected Map<String, Ref> refs;
 
 	/** All SHA-1s shown to the client, which can be possible edges. */
-	private Set<ObjectId> advertisedHaves;
+	protected Set<ObjectId> advertisedHaves;
 
 	/** Capabilities requested by the client. */
-	private Set<String> enabledCapabilities;
+	protected Set<String> enabledCapabilities;
 
 	private List<ReceiveCommand> commands;
 
 	private StringBuilder advertiseError;
 
+	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
+	protected boolean reportStatus;
+
 	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
-	private boolean sideBand;
+	protected boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -869,7 +872,9 @@ public abstract class BaseReceivePack {
 
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
-		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
+		reportStatus = enabledCapabilities.contains(CAPABILITY_REPORT_STATUS);
+
+		sideBand = enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -879,17 +884,6 @@ public abstract class BaseReceivePack {
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
 		}
-	}
-
-	/**
-	 * Check if the peer requested a capability.
-	 *
-	 * @param name
-	 *            protocol name identifying the capability.
-	 * @return true if the peer requested the capability to be enabled.
-	 */
-	protected boolean isCapabilityEnabled(String name) {
-		return enabledCapabilities.contains(name);
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */
