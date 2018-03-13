@@ -110,7 +110,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 
 	/**
 	 * @return the parent of this tree parser
-	 * @deprecated internal use only
+	 * @internal
 	 */
 	public CanonicalTreeParser getParent() {
 		return (CanonicalTreeParser) parent;
