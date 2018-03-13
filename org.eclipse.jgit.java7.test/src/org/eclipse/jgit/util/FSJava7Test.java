@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -78,7 +78,7 @@ public class FSJava7Test {
 	 * reason the executable attribute seems to always look at the target, but
 	 * for the other attributes like lastModified, hidden and exists we must
 	 * differ between the link and the target.
-	 * 
+	 *
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
