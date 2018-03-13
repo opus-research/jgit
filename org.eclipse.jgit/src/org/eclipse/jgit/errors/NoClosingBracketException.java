@@ -46,10 +46,6 @@
 
 package org.eclipse.jgit.errors;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
-
 /**
  * Thrown when a pattern contains a character group which is open to the right
  * side or a character class which is open to the right side.
@@ -76,7 +72,7 @@ public class NoClosingBracketException extends InvalidPatternException {
 
 	private static String createMessage(final int indexOfOpeningBracket,
 			final String openingBracket, final String closingBracket) {
-		return MessageFormat.format(JGitText.get().noClosingBracket,
+		return String.format("No closing %s found for %s at index %s.",
 				closingBracket, openingBracket,
 				Integer.valueOf(indexOfOpeningBracket));
 	}

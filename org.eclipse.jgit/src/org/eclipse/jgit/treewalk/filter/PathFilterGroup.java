@@ -48,7 +48,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -83,7 +82,7 @@ public class PathFilterGroup {
 	 */
 	public static TreeFilter createFromStrings(final Collection<String> paths) {
 		if (paths.isEmpty())
-			throw new IllegalArgumentException(JGitText.get().atLeastOnePathIsRequired);
+			throw new IllegalArgumentException("At least one path is required.");
 		final PathFilter[] p = new PathFilter[paths.size()];
 		int i = 0;
 		for (final String s : paths)
@@ -104,7 +103,7 @@ public class PathFilterGroup {
 	 */
 	public static TreeFilter create(final Collection<PathFilter> paths) {
 		if (paths.isEmpty())
-			throw new IllegalArgumentException(JGitText.get().atLeastOnePathIsRequired);
+			throw new IllegalArgumentException("At least one path is required.");
 		final PathFilter[] p = new PathFilter[paths.size()];
 		paths.toArray(p);
 		return create(p);
@@ -193,7 +192,7 @@ public class PathFilterGroup {
 		}
 
 		public String toString() {
-			final StringBuilder r = new StringBuilder();
+			final StringBuffer r = new StringBuffer();
 			r.append("FAST(");
 			for (int i = 0; i < paths.length; i++) {
 				if (i > 0)

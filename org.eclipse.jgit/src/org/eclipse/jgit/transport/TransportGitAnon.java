@@ -45,18 +45,13 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
 
@@ -108,7 +103,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 				// ignore a failure during close, we're already failing
 			}
 			if (c instanceof UnknownHostException)
-				throw new TransportException(uri, JGitText.get().unknownHost);
+				throw new TransportException(uri, "unknown host");
 			if (c instanceof ConnectException)
 				throw new TransportException(uri, c.getMessage());
 			throw new TransportException(uri, c.getMessage(), c);
@@ -141,18 +136,12 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 			super(TransportGitAnon.this);
 			sock = openConnection();
 			try {
-				InputStream sIn = sock.getInputStream();
-				OutputStream sOut = sock.getOutputStream();
-
-				sIn = new BufferedInputStream(sIn);
-				sOut = new BufferedOutputStream(sOut);
-
-				init(sIn, sOut);
+				init(sock.getInputStream(), sock.getOutputStream());
 				service("git-upload-pack", pckOut);
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 			readAdvertisedRefs();
 		}
@@ -180,18 +169,12 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 			super(TransportGitAnon.this);
 			sock = openConnection();
 			try {
-				InputStream sIn = sock.getInputStream();
-				OutputStream sOut = sock.getOutputStream();
-
-				sIn = new BufferedInputStream(sIn);
-				sOut = new BufferedOutputStream(sOut);
-
-				init(sIn, sOut);
+				init(sock.getInputStream(), sock.getOutputStream());
 				service("git-receive-pack", pckOut);
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 			readAdvertisedRefs();
 		}

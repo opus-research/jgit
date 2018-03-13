@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.iplog;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -94,6 +93,6 @@ class Contributor {
 
 	@Override
 	public String toString() {
-		return MessageFormat.format(IpLogText.get().contributorString, getName());
+		return "Contributor " + getName();
 	}
 }

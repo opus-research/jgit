@@ -44,7 +44,6 @@
 package org.eclipse.jgit.http.server;
 
 import java.io.File;
-import java.text.MessageFormat;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -170,7 +169,7 @@ public class GitServlet extends MetaServlet {
 
 	private void assertNotInitialized() {
 		if (initialized)
-			throw new IllegalStateException(HttpServerText.get().alreadyInitializedByContainer);
+			throw new IllegalStateException("Already initialized by container");
 	}
 
 	@Override
@@ -185,7 +184,7 @@ public class GitServlet extends MetaServlet {
 
 		initialized = true;
 
-		if (uploadPackFactory != UploadPackFactory.DISABLED) {
+		if (uploadPackFactory != ReceivePackFactory.DISABLED) {
 			serve("*/git-upload-pack")//
 					.with(new UploadPackServlet(uploadPackFactory));
 		}
@@ -260,11 +259,11 @@ public class GitServlet extends MetaServlet {
 	private File getFile(final String param) throws ServletException {
 		String n = getInitParameter(param);
 		if (n == null || "".equals(n))
-			throw new ServletException(MessageFormat.format(HttpServerText.get().parameterNotSet, param));
+			throw new ServletException("Parameter " + param + " not set");
 
 		File path = new File(n);
 		if (!path.exists())
-			throw new ServletException(MessageFormat.format(HttpServerText.get().pathForParamNotFound, path, param));
+			throw new ServletException(path + " (for " + param + ") not found");
 		return path;
 	}
 
@@ -275,14 +274,14 @@ public class GitServlet extends MetaServlet {
 		try {
 			return StringUtils.toBoolean(n);
 		} catch (IllegalArgumentException err) {
-			throw new ServletException(MessageFormat.format(HttpServerText.get().invalidBoolean, param, n));
+			throw new ServletException("Invalid boolean " + param + " = " + n);
 		}
 	}
 
 	@Override
 	protected ServletBinder register(ServletBinder binder) {
 		if (resolver == null)
-			throw new IllegalStateException(HttpServerText.get().noResolverAvailable);
+			throw new IllegalStateException("No resolver available");
 		binder = binder.through(new NoCacheFilter());
 		binder = binder.through(new RepositoryFilter(resolver));
 		return binder;

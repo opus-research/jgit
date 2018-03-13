@@ -44,16 +44,11 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.SideBandOutputStream.HDR_SIZE;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Writer;
-import java.text.MessageFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
@@ -74,30 +69,26 @@ import org.eclipse.jgit.util.RawParseUtils;
  * Channel 3 results in an exception being thrown, as the remote side has issued
  * an unrecoverable error.
  *
- * @see SideBandOutputStream
+ * @see PacketLineIn#sideband(ProgressMonitor)
  */
 class SideBandInputStream extends InputStream {
-	private static final String PFX_REMOTE = JGitText.get().prefixRemote;
-
 	static final int CH_DATA = 1;
 
 	static final int CH_PROGRESS = 2;
 
 	static final int CH_ERROR = 3;
 
-	private static Pattern P_UNBOUNDED = Pattern
-			.compile("^([\\w ]+): +(\\d+)(?:, done\\.)? *[\r\n]$");
+	private static Pattern P_UNBOUNDED = Pattern.compile(
+			"^([\\w ]+): (\\d+)( |, done)?.*", Pattern.DOTALL);
 
-	private static Pattern P_BOUNDED = Pattern
-			.compile("^([\\w ]+): +\\d+% +\\( *(\\d+)/ *(\\d+)\\)(?:, done\\.)? *[\r\n]$");
-
-	private final InputStream rawIn;
+	private static Pattern P_BOUNDED = Pattern.compile(
+			"^([\\w ]+):.*\\((\\d+)/(\\d+)\\).*", Pattern.DOTALL);
 
 	private final PacketLineIn pckIn;
 
-	private final ProgressMonitor monitor;
+	private final InputStream in;
 
-	private final Writer messages;
+	private final ProgressMonitor monitor;
 
 	private String progressBuffer = "";
 
@@ -111,12 +102,11 @@ class SideBandInputStream extends InputStream {
 
 	private int available;
 
-	SideBandInputStream(final InputStream in, final ProgressMonitor progress,
-			final Writer messageStream) {
-		rawIn = in;
-		pckIn = new PacketLineIn(rawIn);
-		monitor = progress;
-		messages = messageStream;
+	SideBandInputStream(final PacketLineIn aPckIn, final InputStream aIn,
+			final ProgressMonitor aProgress) {
+		pckIn = aPckIn;
+		in = aIn;
+		monitor = aProgress;
 		currentTask = "";
 	}
 
@@ -126,7 +116,7 @@ class SideBandInputStream extends InputStream {
 		if (eof)
 			return -1;
 		available--;
-		return rawIn.read();
+		return in.read();
 	}
 
 	@Override
@@ -136,7 +126,7 @@ class SideBandInputStream extends InputStream {
 			needDataPacket();
 			if (eof)
 				break;
-			final int n = rawIn.read(b, off, Math.min(len, available));
+			final int n = in.read(b, off, Math.min(len, available));
 			if (n < 0)
 				break;
 			r += n;
@@ -157,8 +147,8 @@ class SideBandInputStream extends InputStream {
 				return;
 			}
 
-			channel = rawIn.read() & 0xff;
-			available -= HDR_SIZE; // length header plus channel indicator
+			channel = in.read();
+			available -= 5; // length header plus channel indicator
 			if (available == 0)
 				continue;
 
@@ -167,17 +157,18 @@ class SideBandInputStream extends InputStream {
 				return;
 			case CH_PROGRESS:
 				progress(readString(available));
+
 				continue;
 			case CH_ERROR:
 				eof = true;
-				throw new TransportException(PFX_REMOTE + readString(available));
+				throw new TransportException("remote: " + readString(available));
 			default:
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().invalidChannel, channel));
+				throw new PackProtocolException("Invalid channel " + channel);
 			}
 		}
 	}
 
-	private void progress(String pkt) throws IOException {
+	private void progress(String pkt) {
 		pkt = progressBuffer + pkt;
 		for (;;) {
 			final int lf = pkt.indexOf('\n');
@@ -192,13 +183,16 @@ class SideBandInputStream extends InputStream {
 			else
 				break;
 
-			doProgressLine(pkt.substring(0, s + 1));
-			pkt = pkt.substring(s + 1);
+			final String msg = pkt.substring(0, s);
+			if (doProgressLine(msg))
+				pkt = pkt.substring(s + 1);
+			else
+				break;
 		}
 		progressBuffer = pkt;
 	}
 
-	private void doProgressLine(final String msg) throws IOException {
+	private boolean doProgressLine(final String msg) {
 		Matcher matcher;
 
 		matcher = P_BOUNDED.matcher(msg);
@@ -207,12 +201,13 @@ class SideBandInputStream extends InputStream {
 			if (!currentTask.equals(taskname)) {
 				currentTask = taskname;
 				lastCnt = 0;
-				beginTask(Integer.parseInt(matcher.group(3)));
+				final int tot = Integer.parseInt(matcher.group(3));
+				monitor.beginTask(currentTask, tot);
 			}
 			final int cnt = Integer.parseInt(matcher.group(2));
 			monitor.update(cnt - lastCnt);
 			lastCnt = cnt;
-			return;
+			return true;
 		}
 
 		matcher = P_UNBOUNDED.matcher(msg);
@@ -221,24 +216,20 @@ class SideBandInputStream extends InputStream {
 			if (!currentTask.equals(taskname)) {
 				currentTask = taskname;
 				lastCnt = 0;
-				beginTask(ProgressMonitor.UNKNOWN);
+				monitor.beginTask(currentTask, ProgressMonitor.UNKNOWN);
 			}
 			final int cnt = Integer.parseInt(matcher.group(2));
 			monitor.update(cnt - lastCnt);
 			lastCnt = cnt;
-			return;
+			return true;
 		}
 
-		messages.write(msg);
-	}
-
-	private void beginTask(final int totalWorkUnits) {
-		monitor.beginTask(PFX_REMOTE + currentTask, totalWorkUnits);
+		return false;
 	}
 
 	private String readString(final int len) throws IOException {
 		final byte[] raw = new byte[len];
-		IO.readFully(rawIn, raw, 0, len);
+		IO.readFully(in, raw, 0, len);
 		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 }

@@ -62,14 +62,12 @@ import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileBasedConfig;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.WindowCache;
-import org.eclipse.jgit.storage.file.WindowCacheConfig;
-import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.lib.WindowCache;
+import org.eclipse.jgit.lib.WindowCacheConfig;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -114,28 +112,22 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	protected void setUp() throws Exception {
 		super.setUp();
 
-		synchronized(this) {
-			if (shutdownHook == null) {
-				shutdownHook = new Thread() {
-					@Override
-					public void run() {
-						// On windows accidentally open files or memory
-						// mapped regions may prevent files from being deleted.
-						// Suggesting a GC increases the likelihood that our
-						// test repositories actually get removed after the
-						// tests, even in the case of failure.
-						System.gc();
-						recursiveDelete("SHUTDOWN", trash, false, false);
-					}
-				};
-				Runtime.getRuntime().addShutdownHook(shutdownHook);
-			}
+		if (shutdownHook == null) {
+			shutdownHook = new Thread() {
+				@Override
+				public void run() {
+					System.gc();
+					recursiveDelete("SHUTDOWN", trash, false, false);
+				}
+			};
+			Runtime.getRuntime().addShutdownHook(shutdownHook);
 		}
+
 		recursiveDelete(testName(), trash, true, false);
 
 		mockSystemReader = new MockSystemReader();
 		mockSystemReader.userGitConfig = new FileBasedConfig(new File(trash,
-				"usergitconfig"), FS.DETECTED);
+				"usergitconfig"));
 		ceilTestDirectories(getCeilings());
 		SystemReader.setInstance(mockSystemReader);
 
@@ -267,7 +259,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	protected FileRepository createBareRepository() throws IOException {
+	protected Repository createBareRepository() throws IOException {
 		return createRepository(true /* bare */);
 	}
 
@@ -278,7 +270,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	protected FileRepository createWorkRepository() throws IOException {
+	protected Repository createWorkRepository() throws IOException {
 		return createRepository(false /* not bare */);
 	}
 
@@ -292,11 +284,11 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	private FileRepository createRepository(boolean bare) throws IOException {
+	private Repository createRepository(boolean bare) throws IOException {
 		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
 		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + Constants.DOT_GIT;
 		File gitdir = new File(trash, gitdirName).getCanonicalFile();
-		FileRepository db = new FileRepository(gitdir);
+		Repository db = new Repository(gitdir);
 
 		assertFalse(gitdir.exists());
 		db.create();
@@ -331,7 +323,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 		putPersonIdent(env, "AUTHOR", author);
 		putPersonIdent(env, "COMMITTER", committer);
 
-		final File cwd = db.getWorkTree();
+		final File cwd = db.getWorkDir();
 		final Process p = Runtime.getRuntime().exec(argv, toEnvArray(env), cwd);
 		p.getOutputStream().close();
 		p.getErrorStream().close();
@@ -415,6 +407,10 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	}
 
 	protected static void assertEquals(AnyObjectId exp, AnyObjectId act) {
+		if (exp != null)
+			exp = exp.copy();
+		if (act != null)
+			act = act.copy();
 		Assert.assertEquals(exp, act);
 	}
 

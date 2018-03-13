@@ -49,7 +49,6 @@ import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
-import java.io.Serializable;
 
 import org.eclipse.jgit.awtui.CommitGraphPane.GraphCellRender;
 import org.eclipse.jgit.awtui.SwingCommitList.SwingLane;
@@ -58,13 +57,11 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revplot.AbstractPlotRenderer;
 import org.eclipse.jgit.revplot.PlotCommit;
 
-final class AWTPlotRenderer extends AbstractPlotRenderer<SwingLane, Color>
-		implements Serializable {
-	private static final long serialVersionUID = 1L;
+final class AWTPlotRenderer extends AbstractPlotRenderer<SwingLane, Color> {
 
 	final GraphCellRender cell;
 
-	transient Graphics2D g;
+	Graphics2D g;
 
 	AWTPlotRenderer(final GraphCellRender c) {
 		cell = c;

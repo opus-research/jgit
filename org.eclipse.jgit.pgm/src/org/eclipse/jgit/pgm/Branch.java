@@ -44,7 +44,6 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,7 +52,6 @@ import java.util.Map.Entry;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.RefRename;
@@ -66,28 +64,28 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.ExampleMode;
 import org.kohsuke.args4j.Option;
 
-@Command(common = true, usage = "usage_listCreateOrDeleteBranches")
+@Command(common = true, usage = "List, create, or delete branches")
 class Branch extends TextBuiltin {
 
-	@Option(name = "--remote", aliases = { "-r" }, usage = "usage_actOnRemoteTrackingBranches")
+	@Option(name = "--remote", aliases = { "-r" }, usage = "act on remote-tracking branches")
 	private boolean remote = false;
 
-	@Option(name = "--all", aliases = { "-a" }, usage = "usage_listBothRemoteTrackingAndLocalBranches")
+	@Option(name = "--all", aliases = { "-a" }, usage = "list both remote-tracking and local branches")
 	private boolean all = false;
 
-	@Option(name = "--delete", aliases = { "-d" }, usage = "usage_deleteFullyMergedBranch")
+	@Option(name = "--delete", aliases = { "-d" }, usage = "delete fully merged branch")
 	private boolean delete = false;
 
-	@Option(name = "--delete-force", aliases = { "-D" }, usage = "usage_deleteBranchEvenIfNotMerged")
+	@Option(name = "--delete-force", aliases = { "-D" }, usage = "delete branch (even if not merged)")
 	private boolean deleteForce = false;
 
-	@Option(name = "--create-force", aliases = { "-f" }, usage = "usage_forceCreateBranchEvenExists")
+	@Option(name = "--create-force", aliases = { "-f" }, usage = "force create branch even exists")
 	private boolean createForce = false;
 
-	@Option(name = "-m", usage = "usage_moveRenameABranch")
+	@Option(name = "-m", usage = "move/rename a branch")
 	private boolean rename = false;
 
-	@Option(name = "--verbose", aliases = { "-v" }, usage = "usage_beVerbose")
+	@Option(name = "--verbose", aliases = { "-v" }, usage = "be verbose")
 	private boolean verbose = false;
 
 	@Argument
@@ -106,7 +104,7 @@ class Branch extends TextBuiltin {
 			delete(deleteForce);
 		else {
 			if (branches.size() > 2)
-				throw die(CLIText.get().tooManyRefsGiven + new CmdLineParser(this).printExample(ExampleMode.ALL));
+				throw die("Too many refs given\n" + new CmdLineParser(this).printExample(ExampleMode.ALL));
 
 			if (rename) {
 				String src, dst;
@@ -115,15 +113,15 @@ class Branch extends TextBuiltin {
 					if (head != null && head.isSymbolic())
 						src = head.getLeaf().getName();
 					else
-						throw die(CLIText.get().cannotRenameDetachedHEAD);
+						throw die("Cannot rename detached HEAD");
 					dst = branches.get(0);
 				} else {
 					src = branches.get(0);
 					final Ref old = db.getRef(src);
 					if (old == null)
-						throw die(MessageFormat.format(CLIText.get().doesNotExist, src));
+						throw die(String.format("%s does not exist", src));
 					if (!old.getName().startsWith(Constants.R_HEADS))
-						throw die(MessageFormat.format(CLIText.get().notABranch, src));
+						throw die(String.format("%s is not a branch", src));
 					src = old.getName();
 					dst = branches.get(1);
 				}
@@ -131,11 +129,11 @@ class Branch extends TextBuiltin {
 				if (!dst.startsWith(Constants.R_HEADS))
 					dst = Constants.R_HEADS + dst;
 				if (!Repository.isValidRefName(dst))
-					throw die(MessageFormat.format(CLIText.get().notAValidRefName, dst));
+					throw die(String.format("%s is not a valid ref name", dst));
 
 				RefRename r = db.renameRef(src, dst);
 				if (r.rename() != Result.RENAMED)
-					throw die(MessageFormat.format(CLIText.get().cannotBeRenamed, src));
+					throw die(String.format("%s cannot be renamed", src));
 
 			} else if (branches.size() > 0) {
 				String newHead = branches.get(0);
@@ -150,21 +148,21 @@ class Branch extends TextBuiltin {
 					startBranch = startRef.getName();
 				else
 					startBranch = startAt.name();
-				startBranch = Repository.shortenRefName(startBranch);
+				startBranch = db.shortenRefName(startBranch);
 				String newRefName = newHead;
 				if (!newRefName.startsWith(Constants.R_HEADS))
 					newRefName = Constants.R_HEADS + newRefName;
 				if (!Repository.isValidRefName(newRefName))
-					throw die(MessageFormat.format(CLIText.get().notAValidRefName, newRefName));
+					throw die(String.format("%s is not a valid ref name", newRefName));
 				if (!createForce && db.resolve(newRefName) != null)
-					throw die(MessageFormat.format(CLIText.get().branchAlreadyExists, newHead));
+					throw die(String.format("branch %s already exists", newHead));
 				RefUpdate updateRef = db.updateRef(newRefName);
 				updateRef.setNewObjectId(startAt);
 				updateRef.setForceUpdate(createForce);
-				updateRef.setRefLogMessage(MessageFormat.format(CLIText.get().branchCreatedFrom, startBranch), false);
+				updateRef.setRefLogMessage("branch: Created from " + startBranch, false);
 				Result update = updateRef.update();
 				if (update == Result.REJECTED)
-					throw die(MessageFormat.format(CLIText.get().couldNotCreateBranch, newHead, update.toString()));
+					throw die(String.format("Could not create branch %s: %s", newHead, update.toString()));
 			} else {
 				if (verbose)
 					rw = new RevWalk(db);
@@ -183,16 +181,9 @@ class Branch extends TextBuiltin {
 				addRef("(no branch)", head);
 			addRefs(refs, Constants.R_HEADS, !remote);
 			addRefs(refs, Constants.R_REMOTES, remote);
-
-			ObjectReader reader = db.newObjectReader();
-			try {
-				for (final Entry<String, Ref> e : printRefs.entrySet()) {
-					final Ref ref = e.getValue();
-					printHead(reader, e.getKey(),
-							current.equals(ref.getName()), ref);
-				}
-			} finally {
-				reader.release();
+			for (final Entry<String, Ref> e : printRefs.entrySet()) {
+				final Ref ref = e.getValue();
+				printHead(e.getKey(), current.equals(ref.getName()), ref);
 			}
 		}
 	}
@@ -213,16 +204,16 @@ class Branch extends TextBuiltin {
 		maxNameLength = Math.max(maxNameLength, name.length());
 	}
 
-	private void printHead(final ObjectReader reader, final String ref,
-			final boolean isCurrent, final Ref refObj) throws Exception {
+	private void printHead(final String ref, final boolean isCurrent,
+			final Ref refObj) throws Exception {
 		out.print(isCurrent ? '*' : ' ');
 		out.print(' ');
 		out.print(ref);
 		if (verbose) {
 			final int spaces = maxNameLength - ref.length() + 1;
-			out.format("%" + spaces + "s", "");
+			out.print(String.format("%" + spaces + "s", ""));
 			final ObjectId objectId = refObj.getObjectId();
-			out.print(reader.abbreviate(objectId).name());
+			out.print(objectId.abbreviate(db).name());
 			out.print(' ');
 			out.print(rw.parseCommit(objectId).getShortMessage());
 		}
@@ -234,7 +225,8 @@ class Branch extends TextBuiltin {
 		ObjectId head = db.resolve(Constants.HEAD);
 		for (String branch : branches) {
 			if (current.equals(branch)) {
-				throw die(MessageFormat.format(CLIText.get().cannotDeleteTheBranchWhichYouAreCurrentlyOn, branch));
+				String err = "Cannot delete the branch '%s' which you are currently on.";
+				throw die(String.format(err, branch));
 			}
 			RefUpdate update = db.updateRef((remote ? Constants.R_REMOTES
 					: Constants.R_HEADS)
@@ -243,13 +235,15 @@ class Branch extends TextBuiltin {
 			update.setForceUpdate(force || remote);
 			Result result = update.delete();
 			if (result == Result.REJECTED) {
-				throw die(MessageFormat.format(CLIText.get().branchIsNotAnAncestorOfYourCurrentHEAD, branch));
+				String err = "The branch '%s' is not an ancestor of your current HEAD.\n"
+						+ "If you are sure you want to delete it, run 'jgit branch -D %1$s'.";
+				throw die(String.format(err, branch));
 			} else if (result == Result.NEW)
-				throw die(MessageFormat.format(CLIText.get().branchNotFound, branch));
+				throw die(String.format("branch '%s' not found.", branch));
 			if (remote)
-				out.println(MessageFormat.format(CLIText.get().deletedRemoteBranch, branch));
+				out.println(String.format("Deleted remote branch %s", branch));
 			else if (verbose)
-				out.println(MessageFormat.format(CLIText.get().deletedBranch, branch));
+				out.println(String.format("Deleted branch %s", branch));
 		}
 	}
 }

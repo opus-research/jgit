@@ -48,7 +48,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -56,25 +55,25 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
-import org.eclipse.jgit.lib.CommitBuilder;
+import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.lib.Tree;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.LockFile;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 
 /**
  * Recreates a repository from another one's commit graph.
@@ -95,15 +94,15 @@ import org.kohsuke.args4j.Option;
  * <p>
  */
 class RebuildCommitGraph extends TextBuiltin {
-	private static final String REALLY = "--destroy-this-repository";
+	private final String REALLY = "--destroy-this-repository";
 
-	@Option(name = REALLY, usage = "usage_approveDestructionOfRepository")
+	@Option(name = REALLY, usage = "approve destruction of repository")
 	boolean really;
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_refs", usage = "usage_forEachRefOutput")
+	@Argument(index = 0, required = true, metaVar = "REFS", usage = "for-each-ref output")
 	File refList;
 
-	@Argument(index = 1, required = true, metaVar = "metaVar_refs", usage = "usage_logAllPretty")
+	@Argument(index = 1, required = true, metaVar = "DAG", usage = "log --all '--pretty=format:%H %ct %P' output")
 	File graph;
 
 	private final ProgressMonitor pm = new TextProgressMonitor();
@@ -113,15 +112,28 @@ class RebuildCommitGraph extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		if (!really && !db.getAllRefs().isEmpty()) {
-			System.err.println(
-				MessageFormat.format(CLIText.get().fatalThisProgramWillDestroyTheRepository
-					, db.getDirectory().getAbsolutePath(), REALLY));
-			throw die(CLIText.get().needApprovalToDestroyCurrentRepository);
+			final StringBuilder m = new StringBuilder();
+			m.append("fatal: ");
+			m.append("This program will destroy the repository:");
+			m.append("\n");
+			m.append("fatal:\n");
+			m.append("fatal:    ");
+			m.append(db.getDirectory().getAbsolutePath());
+			m.append("\n");
+			m.append("fatal:\n");
+			m.append("fatal: ");
+			m.append("To continue, add ");
+			m.append(REALLY);
+			m.append(" to the command line");
+			m.append("\n");
+			m.append("fatal:");
+			System.err.println(m);
+			throw die("Need approval to destroy current repository");
 		}
 		if (!refList.isFile())
-			throw die(MessageFormat.format(CLIText.get().noSuchFile, refList.getPath()));
+			throw die("no such file: " + refList.getPath());
 		if (!graph.isFile())
-			throw die(MessageFormat.format(CLIText.get().noSuchFile, graph.getPath()));
+			throw die("no such file: " + graph.getPath());
 
 		recreateCommitGraph();
 		detachHead();
@@ -163,8 +175,8 @@ class RebuildCommitGraph extends TextBuiltin {
 		}
 
 		pm.beginTask("Rewriting commits", queue.size());
-		final ObjectInserter oi = db.newObjectInserter();
-		final ObjectId emptyTree = oi.insert(Constants.OBJ_TREE, new byte[] {});
+		final ObjectWriter ow = new ObjectWriter(db);
+		final ObjectId emptyTree = ow.writeTree(new Tree(db));
 		final PersonIdent me = new PersonIdent("jgit rebuild-commitgraph",
 				"rebuild-commitgraph@localhost");
 		while (!queue.isEmpty()) {
@@ -191,19 +203,17 @@ class RebuildCommitGraph extends TextBuiltin {
 					}
 				}
 
-				final CommitBuilder newc = new CommitBuilder();
+				final Commit newc = new Commit(db);
 				newc.setTreeId(emptyTree);
 				newc.setAuthor(new PersonIdent(me, new Date(t.commitTime)));
 				newc.setCommitter(newc.getAuthor());
 				newc.setParentIds(newParents);
 				newc.setMessage("ORIGINAL " + t.oldId.name() + "\n");
-				t.newId = oi.insert(newc);
+				t.newId = ow.writeCommit(newc);
 				rewrites.put(t.oldId, t.newId);
 				pm.update(1);
 			}
 		}
-		oi.flush();
-		oi.release();
 		pm.endTask();
 	}
 
@@ -228,12 +238,12 @@ class RebuildCommitGraph extends TextBuiltin {
 		final ObjectId id = db.resolve(Constants.HEAD);
 		if (!ObjectId.isId(head) && id != null) {
 			final LockFile lf;
-			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD), db.getFS());
+			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD));
 			if (!lf.lock())
-				throw new IOException(MessageFormat.format(CLIText.get().cannotLock, Constants.HEAD));
+				throw new IOException("Cannot lock HEAD");
 			lf.write(id);
 			if (!lf.commit())
-				throw new IOException(CLIText.get().cannotDeatchHEAD);
+				throw new IOException("Cannot deatch HEAD");
 		}
 	}
 
@@ -255,16 +265,16 @@ class RebuildCommitGraph extends TextBuiltin {
 			protected void writeFile(final String name, final byte[] content)
 					throws IOException {
 				final File file = new File(db.getDirectory(), name);
-				final LockFile lck = new LockFile(file, db.getFS());
+				final LockFile lck = new LockFile(file);
 				if (!lck.lock())
-					throw new ObjectWritingException(MessageFormat.format(CLIText.get().cantWrite, file));
+					throw new ObjectWritingException("Can't write " + file);
 				try {
 					lck.write(content);
 				} catch (IOException ioe) {
-					throw new ObjectWritingException(MessageFormat.format(CLIText.get().cantWrite, file));
+					throw new ObjectWritingException("Can't write " + file);
 				}
 				if (!lck.commit())
-					throw new ObjectWritingException(MessageFormat.format(CLIText.get().cantWrite, file));
+					throw new ObjectWritingException("Can't write " + file);
 			}
 		}.writePackedRefs();
 	}
@@ -289,7 +299,7 @@ class RebuildCommitGraph extends TextBuiltin {
 					rw.parseAny(id);
 				} catch (MissingObjectException mue) {
 					if (!Constants.TYPE_COMMIT.equals(type)) {
-						System.err.println(MessageFormat.format(CLIText.get().skippingObject, type, name));
+						System.err.println("skipping " + type + " " + name);
 						continue;
 					}
 					throw new MissingObjectException(id, type);
@@ -298,7 +308,6 @@ class RebuildCommitGraph extends TextBuiltin {
 						name, id));
 			}
 		} finally {
-			rw.release();
 			br.close();
 		}
 		return refs;

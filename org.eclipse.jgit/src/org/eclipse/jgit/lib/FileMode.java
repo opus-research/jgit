@@ -82,7 +82,7 @@ public abstract class FileMode {
 	/** Bit pattern for {@link #TYPE_MASK} matching {@link #MISSING}. */
 	public static final int TYPE_MISSING = 0000000;
 
-	/** Mode indicating an entry is a tree (aka directory). */
+	/** Mode indicating an entry is a {@link Tree}. */
 	@SuppressWarnings("synthetic-access")
 	public static final FileMode TREE = new FileMode(TYPE_TREE,
 			Constants.OBJ_TREE) {
@@ -91,7 +91,7 @@ public abstract class FileMode {
 		}
 	};
 
-	/** Mode indicating an entry is a symbolic link. */
+	/** Mode indicating an entry is a {@link SymlinkTreeEntry}. */
 	@SuppressWarnings("synthetic-access")
 	public static final FileMode SYMLINK = new FileMode(TYPE_SYMLINK,
 			Constants.OBJ_BLOB) {
@@ -100,7 +100,7 @@ public abstract class FileMode {
 		}
 	};
 
-	/** Mode indicating an entry is a non-executable file. */
+	/** Mode indicating an entry is a non-executable {@link FileTreeEntry}. */
 	@SuppressWarnings("synthetic-access")
 	public static final FileMode REGULAR_FILE = new FileMode(0100644,
 			Constants.OBJ_BLOB) {
@@ -109,7 +109,7 @@ public abstract class FileMode {
 		}
 	};
 
-	/** Mode indicating an entry is an executable file. */
+	/** Mode indicating an entry is an executable {@link FileTreeEntry}. */
 	@SuppressWarnings("synthetic-access")
 	public static final FileMode EXECUTABLE_FILE = new FileMode(0100755,
 			Constants.OBJ_BLOB) {
@@ -220,23 +220,6 @@ public abstract class FileMode {
 	 */
 	public void copyTo(final OutputStream os) throws IOException {
 		os.write(octalBytes);
-	}
-
-	/**
-	 * Copy this mode as a sequence of octal US-ASCII bytes.
-	 *
-	 * The mode is copied as a sequence of octal digits using the US-ASCII
-	 * character encoding. The sequence does not use a leading '0' prefix to
-	 * indicate octal notation. This method is suitable for generation of a mode
-	 * string within a GIT tree object.
-	 *
-	 * @param buf
-	 *            buffer to copy the mode to.
-	 * @param ptr
-	 *            position within {@code buf} for first digit.
-	 */
-	public void copyTo(byte[] buf, int ptr) {
-		System.arraycopy(octalBytes, 0, buf, ptr, octalBytes.length);
 	}
 
 	/**

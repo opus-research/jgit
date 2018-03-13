@@ -45,7 +45,6 @@ package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.Constants;
@@ -69,7 +68,7 @@ public class PathSuffixFilter extends TreeFilter {
 	 */
 	public static PathSuffixFilter create(String path) {
 		if (path.length() == 0)
-			throw new IllegalArgumentException(JGitText.get().emptyPathNotPermitted);
+			throw new IllegalArgumentException("Empty path not permitted.");
 		return new PathSuffixFilter(path);
 	}
 

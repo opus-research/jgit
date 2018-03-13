@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import java.io.IOException;
-
 import javax.servlet.http.HttpServletRequestWrapper;
 
 import org.eclipse.jetty.server.Request;
@@ -55,7 +53,6 @@ import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.transport.ReceivePack;
 
 public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
@@ -130,11 +127,8 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(author.getWhen(), id.getWhen());
 	}
 
-	public void testCreate_Disabled() throws ServiceNotAuthorizedException,
-			IOException {
-		final StoredConfig cfg = db.getConfig();
-		cfg.setBoolean("http", null, "receivepack", false);
-		cfg.save();
+	public void testCreate_Disabled() throws ServiceNotAuthorizedException {
+		db.getConfig().setBoolean("http", null, "receivepack", false);
 
 		try {
 			factory.create(new R(null, "localhost"), db);
@@ -159,11 +153,8 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	public void testCreate_Enabled() throws ServiceNotEnabledException,
-			ServiceNotAuthorizedException, IOException {
-		final StoredConfig cfg = db.getConfig();
-		cfg.setBoolean("http", null, "receivepack", true);
-		cfg.save();
-
+			ServiceNotAuthorizedException {
+		db.getConfig().setBoolean("http", null, "receivepack", true);
 		ReceivePack rp;
 
 		rp = factory.create(new R(null, "1.2.3.4"), db);
@@ -183,7 +174,7 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 		assertNotNull("have ReceivePack", rp);
 	}
 
-	private static final class R extends HttpServletRequestWrapper {
+	private final class R extends HttpServletRequestWrapper {
 		private final String user;
 
 		private final String host;

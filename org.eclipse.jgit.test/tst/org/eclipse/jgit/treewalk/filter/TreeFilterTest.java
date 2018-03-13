@@ -44,13 +44,11 @@
 package org.eclipse.jgit.treewalk.filter;
 
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
 public class TreeFilterTest extends RepositoryTestCase {
 	public void testALL_IncludesAnything() throws Exception {
 		final TreeWalk tw = new TreeWalk(db);
-		tw.addTree(new EmptyTreeIterator());
 		assertTrue(TreeFilter.ALL.include(tw));
 	}
 
@@ -64,13 +62,11 @@ public class TreeFilterTest extends RepositoryTestCase {
 
 	public void testNotALL_IncludesNothing() throws Exception {
 		final TreeWalk tw = new TreeWalk(db);
-		tw.addTree(new EmptyTreeIterator());
 		assertFalse(TreeFilter.ALL.negate().include(tw));
 	}
 
 	public void testANY_DIFF_IncludesSingleTreeCase() throws Exception {
 		final TreeWalk tw = new TreeWalk(db);
-		tw.addTree(new EmptyTreeIterator());
 		assertTrue(TreeFilter.ANY_DIFF.include(tw));
 	}
 

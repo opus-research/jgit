@@ -50,7 +50,9 @@ import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -83,12 +85,7 @@ class ReceivePackServlet extends HttpServlet {
 		protected void advertise(HttpServletRequest req, Repository db,
 				PacketLineOutRefAdvertiser pck) throws IOException,
 				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			ReceivePack rp = receivePackFactory.create(req, db);
-			try {
-				rp.sendAdvertisedRefs(pck);
-			} finally {
-				rp.getRevWalk().release();
-			}
+			receivePackFactory.create(req, db).sendAdvertisedRefs(pck);
 		}
 	}
 
@@ -107,14 +104,11 @@ class ReceivePackServlet extends HttpServlet {
 		}
 
 		final Repository db = getRepository(req);
+		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
 			final ReceivePack rp = receivePackFactory.create(req, db);
 			rp.setBiDirectionalPipe(false);
-			rsp.setContentType(RSP_TYPE);
-
-			final SmartOutputStream out = new SmartOutputStream(req, rsp);
 			rp.receive(getInputStream(req), out, null);
-			out.close();
 
 		} catch (ServiceNotAuthorizedException e) {
 			rsp.sendError(SC_UNAUTHORIZED);
@@ -125,9 +119,24 @@ class ReceivePackServlet extends HttpServlet {
 			return;
 
 		} catch (IOException e) {
-			getServletContext().log(HttpServerText.get().internalErrorDuringReceivePack, e);
+			getServletContext().log("Internal error during receive-pack", e);
 			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;
+		}
+
+		reply(rsp, out.toByteArray());
+	}
+
+	private void reply(final HttpServletResponse rsp, final byte[] result)
+			throws IOException {
+		rsp.setContentType(RSP_TYPE);
+		rsp.setContentLength(result.length);
+		final OutputStream os = rsp.getOutputStream();
+		try {
+			os.write(result);
+			os.flush();
+		} finally {
+			os.close();
 		}
 	}
 }

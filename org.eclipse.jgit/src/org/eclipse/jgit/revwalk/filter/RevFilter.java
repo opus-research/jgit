@@ -45,7 +45,6 @@ package org.eclipse.jgit.revwalk.filter;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
@@ -94,9 +93,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  */
 public abstract class RevFilter {
 	/** Default filter that always returns true (thread safe). */
-	public static final RevFilter ALL = new AllFilter();
-
-	private static final class AllFilter extends RevFilter {
+	public static final RevFilter ALL = new RevFilter() {
 		@Override
 		public boolean include(final RevWalk walker, final RevCommit c) {
 			return true;
@@ -111,12 +108,10 @@ public abstract class RevFilter {
 		public String toString() {
 			return "ALL";
 		}
-	}
+	};
 
 	/** Default filter that always returns false (thread safe). */
-	public static final RevFilter NONE = new NoneFilter();
-
-	private static final class NoneFilter extends RevFilter {
+	public static final RevFilter NONE = new RevFilter() {
 		@Override
 		public boolean include(final RevWalk walker, final RevCommit c) {
 			return false;
@@ -131,12 +126,10 @@ public abstract class RevFilter {
 		public String toString() {
 			return "NONE";
 		}
-	}
+	};
 
 	/** Excludes commits with more than one parent (thread safe). */
-	public static final RevFilter NO_MERGES = new NoMergesFilter();
-
-	private static final class NoMergesFilter extends RevFilter {
+	public static final RevFilter NO_MERGES = new RevFilter() {
 		@Override
 		public boolean include(final RevWalk walker, final RevCommit c) {
 			return c.getParentCount() < 2;
@@ -151,7 +144,7 @@ public abstract class RevFilter {
 		public String toString() {
 			return "NO_MERGES";
 		}
-	}
+	};
 
 	/**
 	 * Selects only merge bases of the starting points (thread safe).
@@ -161,12 +154,10 @@ public abstract class RevFilter {
 	 * information beyond the arguments is necessary to determine if the
 	 * supplied commit is a merge base.
 	 */
-	public static final RevFilter MERGE_BASE = new MergeBaseFilter();
-
-	private static final class MergeBaseFilter extends RevFilter {
+	public static final RevFilter MERGE_BASE = new RevFilter() {
 		@Override
 		public boolean include(final RevWalk walker, final RevCommit c) {
-			throw new UnsupportedOperationException(JGitText.get().cannotBeCombined);
+			throw new UnsupportedOperationException("Cannot be combined.");
 		}
 
 		@Override
@@ -178,7 +169,7 @@ public abstract class RevFilter {
 		public String toString() {
 			return "MERGE_BASE";
 		}
-	}
+	};
 
 	/**
 	 * Create a new filter that does the opposite of this filter.

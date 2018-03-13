@@ -46,15 +46,10 @@ package org.eclipse.jgit.treewalk;
 import java.io.File;
 import java.security.MessageDigest;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 
 public class FileTreeIteratorTest extends RepositoryTestCase {
@@ -82,8 +77,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 	public void testEmptyIfRootIsFile() throws Exception {
 		final File r = new File(trash, paths[0]);
 		assertTrue(r.isFile());
-		final FileTreeIterator fti = new FileTreeIterator(r, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+		final FileTreeIterator fti = new FileTreeIterator(r);
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
 	}
@@ -91,8 +85,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 	public void testEmptyIfRootDoesNotExist() throws Exception {
 		final File r = new File(trash, "not-existing-file");
 		assertFalse(r.exists());
-		final FileTreeIterator fti = new FileTreeIterator(r, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+		final FileTreeIterator fti = new FileTreeIterator(r);
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
 	}
@@ -103,15 +96,13 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		r.mkdir();
 		assertTrue(r.isDirectory());
 
-		final FileTreeIterator fti = new FileTreeIterator(r, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+		final FileTreeIterator fti = new FileTreeIterator(r);
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
 	}
 
 	public void testSimpleIterate() throws Exception {
-		final FileTreeIterator top = new FileTreeIterator(trash, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+		final FileTreeIterator top = new FileTreeIterator(trash);
 
 		assertTrue(top.first());
 		assertFalse(top.eof());
@@ -133,8 +124,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		assertFalse(top.eof());
 		assertEquals(FileMode.TREE.getBits(), top.mode);
 
-		final ObjectReader reader = db.newObjectReader();
-		final AbstractTreeIterator sub = top.createSubtreeIterator(reader);
+		final AbstractTreeIterator sub = top.createSubtreeIterator(db);
 		assertTrue(sub instanceof FileTreeIterator);
 		final FileTreeIterator subfti = (FileTreeIterator) sub;
 		assertTrue(sub.first());
@@ -159,8 +149,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 	}
 
 	public void testComputeFileObjectId() throws Exception {
-		final FileTreeIterator top = new FileTreeIterator(trash, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+		final FileTreeIterator top = new FileTreeIterator(trash);
 
 		final MessageDigest md = Constants.newMessageDigest();
 		md.update(Constants.encodeASCII(Constants.TYPE_BLOB));
@@ -174,26 +163,8 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 
 		// Verify it was cached by removing the file and getting it again.
 		//
-		FileUtils.delete(new File(trash, paths[0]));
+		new File(trash, paths[0]).delete();
 		assertEquals(expect, top.getEntryObjectId());
-	}
-
-	public void testIsModifiedSymlink() throws Exception {
-		File f = writeTrashFile("symlink", "content");
-		Git git = new Git(db);
-		git.add().addFilepattern("symlink").call();
-		git.commit().setMessage("commit").call();
-
-		// Modify previously committed DirCacheEntry and write it back to disk
-		DirCacheEntry dce = db.readDirCache().getEntry("symlink");
-		dce.setFileMode(FileMode.SYMLINK);
-		DirCacheCheckout.checkoutEntry(db, f, dce);
-
-		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
-				.getConfig().get(WorkingTreeOptions.KEY));
-		while (!fti.getEntryPathString().equals("symlink"))
-			fti.next(1);
-		assertFalse(fti.isModified(dce, false));
 	}
 
 	private static String nameOf(final AbstractTreeIterator i) {
