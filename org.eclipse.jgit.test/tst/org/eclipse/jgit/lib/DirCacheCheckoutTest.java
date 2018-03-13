@@ -1705,8 +1705,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 							+ " in workDir. ", buffer, i.get(path).getBytes());
 					nrFiles++;
 				} else if (file.isDirectory()) {
-					String[] files = file.list();
-					if (files != null && files.length == 0) {
+					if (file.list().length == 0) {
 						assertEquals("found unexpected empty folder for path "
 								+ path + " in workDir. ", "/", i.get(path));
 						nrFiles++;
