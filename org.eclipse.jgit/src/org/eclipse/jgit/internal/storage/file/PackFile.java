@@ -56,8 +56,6 @@ import java.io.InterruptedIOException;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.NoSuchFileException;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,12 +70,9 @@ import java.util.zip.Inflater;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.NoPackSignatureException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.errors.UnpackException;
-import org.eclipse.jgit.errors.UnsupportedPackVersionException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -647,22 +642,15 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// max open files)
 			openFail(!packFile.exists());
 			throw fn;
-		} catch (EOFException | AccessDeniedException | NoSuchFileException
-				| CorruptObjectException | NoPackSignatureException
-				| PackMismatchException | UnpackException
-				| UnsupportedPackVersionException pe) {
-			// exceptions signaling permanent problems with a pack
+		} catch (IOException ioe) {
 			openFail(true);
-			throw pe;
-		} catch (IOException | RuntimeException ge) {
-			// generic exceptions could be transient so we should not mark the
-			// pack invalid to avoid false MissingObjectExceptions
-			openFail(false);
-			throw ge;
-		} catch (Error e) {
-			// don't try to recover from fatal errors
+			throw ioe;
+		} catch (RuntimeException re) {
 			openFail(true);
-			throw e;
+			throw re;
+		} catch (Error re) {
+			openFail(true);
+			throw re;
 		}
 	}
 
@@ -729,32 +717,28 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 		fd.seek(0);
 		fd.readFully(buf, 0, 12);
-		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4) {
-			throw new NoPackSignatureException(JGitText.get().notAPACKFile);
-		}
+		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4)
+			throw new IOException(JGitText.get().notAPACKFile);
 		final long vers = NB.decodeUInt32(buf, 4);
 		final long packCnt = NB.decodeUInt32(buf, 8);
-		if (vers != 2 && vers != 3) {
-			throw new UnsupportedPackVersionException(MessageFormat.format(
+		if (vers != 2 && vers != 3)
+			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
-		}
 
-		if (packCnt != idx.getObjectCount()) {
+		if (packCnt != idx.getObjectCount())
 			throw new PackMismatchException(MessageFormat.format(
 					JGitText.get().packObjectCountMismatch,
 					Long.valueOf(packCnt), Long.valueOf(idx.getObjectCount()),
 					getPackFile()));
-		}
 
 		fd.seek(length - 20);
 		fd.readFully(buf, 0, 20);
-		if (!Arrays.equals(buf, packChecksum)) {
+		if (!Arrays.equals(buf, packChecksum))
 			throw new PackMismatchException(MessageFormat.format(
 					JGitText.get().packObjectCountMismatch
 					, ObjectId.fromRaw(buf).name()
 					, ObjectId.fromRaw(idx.packChecksum).name()
 					, getPackFile()));
-		}
 	}
 
 	ObjectLoader load(final WindowCursor curs, long pos)
