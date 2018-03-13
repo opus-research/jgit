@@ -1,5 +1,45 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <component id="org.eclipse.jgit" version="2">
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.FileTreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.FileTreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.GitlinkTreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.GitlinkTreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.SymlinkTreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.SymlinkTreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.Tree">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.Tree"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.TreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.TreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/org/eclipse/jgit/attributes/AttributesNode.java" type="org.eclipse.jgit.attributes.AttributesNode">
         <filter comment="attributes weren't really usable in earlier versions" id="338792546">
             <message_arguments>
@@ -27,16 +67,6 @@
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.lib.Repository"/>
                 <message_argument value="createAttributesNodeProvider()"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/lib/RepositoryCache.java" type="org.eclipse.jgit.lib.RepositoryCache">
-        <filter id="647004193">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.lib.RepositoryCache.getKeys()"/>
-                <message_argument value="ConcurrentHashMap"/>
-                <message_argument value="keySet()"/>
-                <message_argument value="JavaSE-1.7"/>
             </message_arguments>
         </filter>
     </resource>
