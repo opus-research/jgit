@@ -128,7 +128,7 @@ public class InitCommand implements Callable<Git> {
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
-	 *             E.g. if for a non-bare repo directory and seperateGitDir is
+	 *             E.g. if for a non-bare repo directory and separateGitDir is
 	 *             specified.
 	 */
 	public InitCommand setDirectory(File directory)
@@ -144,7 +144,7 @@ public class InitCommand implements Callable<Git> {
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
-	 *             E.g. if for a non-bare repo directory and seperateGitDir is
+	 *             E.g. if for a non-bare repo directory and separateGitDir is
 	 *             specified.
 	 * @since 3.6
 	 */
@@ -177,7 +177,7 @@ public class InitCommand implements Callable<Git> {
 	 *            whether the repository is bare or not
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
-	 *             E.g. if for a non-bare repo directory and seperateGitDir is
+	 *             E.g. if for a non-bare repo directory and separateGitDir is
 	 *             specified.
 	 * @return this instance
 	 */
