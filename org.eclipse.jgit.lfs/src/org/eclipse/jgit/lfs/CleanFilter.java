@@ -129,7 +129,7 @@ public class CleanFilter extends FilterCommand {
 	public CleanFilter(Repository db, InputStream in, OutputStream out)
 			throws IOException {
 		super(in, out);
-		lfsUtil = new Lfs(db);
+		lfsUtil = new Lfs(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
 		Files.createDirectories(lfsUtil.getLfsTmpDir());
 		tmpFile = lfsUtil.createTmpFile();
 		tmpOut = Files.newOutputStream(tmpFile,
