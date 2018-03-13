@@ -114,6 +114,8 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.transport.ObjectCountCallback;
+import org.eclipse.jgit.transport.WriteAbortedException;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -289,6 +291,8 @@ public class PackWriter implements AutoCloseable {
 
 	private CRC32 crc32;
 
+	private ObjectCountCallback callback;
+
 	/**
 	 * Create writer for specified repository.
 	 * <p>
@@ -356,6 +360,23 @@ public class PackWriter implements AutoCloseable {
 		state = new MutableState();
 		selfRef = new WeakReference<PackWriter>(this);
 		instances.put(selfRef, Boolean.TRUE);
+	}
+
+	/**
+	 * Set the {@code ObjectCountCallback}.
+	 * <p>
+	 * It should be set before calling
+	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
+	 *
+	 * @param callback
+	 *            the callback to set
+	 *
+	 * @return this object for chaining.
+	 * @since 4.1
+	 */
+	public PackWriter setObjectCountCallback(ObjectCountCallback callback) {
+		this.callback = callback;
+		return this;
 	}
 
 	/**
@@ -906,6 +927,9 @@ public class PackWriter implements AutoCloseable {
 	 *             an error occurred reading a local object's data to include in
 	 *             the pack, or writing compressed object data to the output
 	 *             stream.
+	 * @throws WriteAbortedException
+	 *             the write operation is aborted by
+	 *             {@link ObjectCountCallback}.
 	 */
 	public void writePack(ProgressMonitor compressMonitor,
 			ProgressMonitor writeMonitor, OutputStream packStream)
@@ -947,6 +971,8 @@ public class PackWriter implements AutoCloseable {
 
 		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
+		if (callback != null)
+			callback.setObjectCount(objCnt);
 		beginPhase(PackingPhase.WRITING, writeMonitor, objCnt);
 		long writeStart = System.currentTimeMillis();
 		try {
