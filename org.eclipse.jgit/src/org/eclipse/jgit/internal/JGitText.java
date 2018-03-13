@@ -186,6 +186,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
 	/***/ public String couldNotGetAdvertisedRef;
+	/***/ public String couldNotGetRepoStatistics;
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
 	/***/ public String couldNotReadObjectWhileParsingCommit;
@@ -394,8 +395,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String notAuthorized;
 	/***/ public String notAValidPack;
 	/***/ public String notFound;
-	/***/ public String noNativeLibraryIn;
-	/***/ public String notValid;
 	/***/ public String nothingToFetch;
 	/***/ public String nothingToPush;
 	/***/ public String notMergedExceptionMessage;
