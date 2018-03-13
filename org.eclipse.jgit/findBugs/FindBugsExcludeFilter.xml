@@ -4,7 +4,7 @@
           memory mapped segments if the JVM heap is out of address space.
        -->
      <Match>
-       <Class name="org.eclipse.jgit.storage.file.PackFile" />
+       <Class name="org.eclipse.jgit.lib.PackFile" />
        <Method name="mmap" />
        <Bug pattern="DM_GC" />
      </Match>
@@ -21,14 +21,7 @@
           here with == assuming .equals() style equality.
        -->
      <Match>
-       <Class name="org.eclipse.jgit.util.StringUtils" />
+       <Class name="org.eclipse.jgit.lib.util.StringUtils" />
        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
-     </Match>
-
-     <!-- We want complete control over clone behavior and
-          don't want to use Object's clone implementation.
-       -->
-     <Match>
-       <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE" />
      </Match>
 </FindBugsFilter>
