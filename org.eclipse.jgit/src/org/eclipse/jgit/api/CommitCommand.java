@@ -177,7 +177,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// determine the current HEAD and the commit it is referring to
 			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
 			if (headId == null && amend)
-				throw new JGitInternalException(
+				throw new WrongRepositoryStateException(
 						JGitText.get().commitAmendOnInitialNotPossible);
 
 			if (headId != null)
@@ -187,8 +187,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					RevCommit[] p = previousCommit.getParents();
 					for (int i = 0; i < p.length; i++)
 						parents.add(0, p[i].getId());
-					if (author == null)
-						author = previousCommit.getAuthorIdent();
 				} else {
 					parents.add(0, headId);
 				}
@@ -473,7 +471,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	private void processOptions(RepositoryState state) throws NoMessageException {
 		if (committer == null)
 			committer = new PersonIdent(repo);
-		if (author == null && !amend)
+		if (author == null)
 			author = committer;
 
 		// when doing a merge commit parse MERGE_HEAD and MERGE_MSG files
@@ -576,8 +574,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	/**
 	 * Sets the author for this {@code commit}. If no author is explicitly
 	 * specified because this method is never called or called with {@code null}
-	 * value then the author will be set to the committer or to the original
-	 * author when amending.
+	 * value then the author will be set to the committer.
 	 *
 	 * @param author
 	 *            the author used for the {@code commit}
@@ -592,8 +589,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	/**
 	 * Sets the author for this {@code commit}. If no author is explicitly
 	 * specified because this method is never called or called with {@code null}
-	 * value then the author will be set to the committer or to the original
-	 * author when amending.
+	 * value then the author will be set to the committer.
 	 *
 	 * @param name
 	 *            the name of the author used for the {@code commit}
