@@ -93,7 +93,7 @@ final class DeltaWindow {
 	/** If we have a delta for {@link #res}, this is the shortest found yet. */
 	private TemporaryBuffer.Heap bestDelta;
 
-	/** If we have {@link #bestDelta}, the window entry it was created from. */
+	/** If we have {@link #bestDelta}, the window position it was created by. */
 	private DeltaWindowEntry bestBase;
 
 	/** Used to compress cached deltas. */
@@ -455,11 +455,12 @@ final class DeltaWindow {
 			return;
 
 		DeltaWindowEntry n = res.next;
-		for (; maxMemory < loaded + need; n = n.next) {
+		while (maxMemory < loaded + need) {
 			clear(n);
 			if (n == ent)
 				throw new LargeObjectException.ExceedsLimit(
 						maxMemory, loaded + need);
+			n = n.next;
 		}
 	}
 
