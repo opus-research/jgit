@@ -104,7 +104,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 /**
  * Format a Git style patch script.
  */
-public class DiffFormatter {
+public class DiffFormatter implements AutoCloseable {
 	private static final int DEFAULT_BINARY_FILE_THRESHOLD = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 
 	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
@@ -173,7 +173,7 @@ public class DiffFormatter {
 	 */
 	public void setRepository(Repository repository) {
 		if (reader != null)
-			reader.release();
+			reader.close();
 
 		db = repository;
 		reader = db.newObjectReader();
@@ -380,10 +380,15 @@ public class DiffFormatter {
 		out.flush();
 	}
 
-	/** Release the internal ObjectReader state. */
-	public void release() {
+	/**
+	 * Release the internal ObjectReader state.
+	 *
+	 * @since 4.0
+	 */
+	@Override
+	public void close() {
 		if (reader != null)
-			reader.release();
+			reader.close();
 	}
 
 	/**
@@ -409,10 +414,11 @@ public class DiffFormatter {
 			throws IOException {
 		assertHaveRepository();
 
-		RevWalk rw = new RevWalk(reader);
-		RevTree aTree = a != null ? rw.parseTree(a) : null;
-		RevTree bTree = b != null ? rw.parseTree(b) : null;
-		return scan(aTree, bTree);
+		try (RevWalk rw = new RevWalk(reader)) {
+			RevTree aTree = a != null ? rw.parseTree(a) : null;
+			RevTree bTree = b != null ? rw.parseTree(b) : null;
+			return scan(aTree, bTree);
+		}
 	}
 
 	/**

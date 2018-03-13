@@ -99,7 +99,7 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * <p>
  * This class is thread-safe.
  */
-public abstract class Repository {
+public abstract class Repository implements AutoCloseable {
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -120,9 +120,6 @@ public abstract class Repository {
 	/** If not bare, the top level directory of the working files. */
 	private final File workTree;
 
-	// TODO: docs
-	private final DirectoryFlags directoryFlags;
-
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
@@ -137,7 +134,6 @@ public abstract class Repository {
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
-		directoryFlags = options.getDirectoryFlags();
 	}
 
 	/** @return listeners observing only events on this repository. */
@@ -383,8 +379,7 @@ public abstract class Repository {
 	public ObjectId resolve(final String revstr)
 			throws AmbiguousObjectException, IncorrectObjectTypeException,
 			RevisionSyntaxException, IOException {
-		RevWalk rw = new RevWalk(this);
-		try {
+		try (RevWalk rw = new RevWalk(this)) {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
 				final Ref ref = getRef((String)resolved);
@@ -392,8 +387,6 @@ public abstract class Repository {
 			} else {
 				return (ObjectId) resolved;
 			}
-		} finally {
-			rw.release();
 		}
 	}
 
@@ -410,8 +403,7 @@ public abstract class Repository {
 	 */
 	public String simplify(final String revstr)
 			throws AmbiguousObjectException, IOException {
-		RevWalk rw = new RevWalk(this);
-		try {
+		try (RevWalk rw = new RevWalk(this)) {
 			Object resolved = resolve(rw, revstr);
 			if (resolved != null)
 				if (resolved instanceof String)
@@ -419,8 +411,6 @@ public abstract class Repository {
 				else
 					return ((AnyObjectId) resolved).getName();
 			return null;
-		} finally {
-			rw.release();
 		}
 	}
 
@@ -761,8 +751,11 @@ public abstract class Repository {
 
 	private String resolveReflogCheckout(int checkoutNo)
 			throws IOException {
-		List<ReflogEntry> reflogEntries = getReflogReader(Constants.HEAD)
-				.getReverseEntries();
+		ReflogReader reader = getReflogReader(Constants.HEAD);
+		if (reader == null) {
+			return null;
+		}
+		List<ReflogEntry> reflogEntries = reader.getReverseEntries();
 		for (ReflogEntry entry : reflogEntries) {
 			CheckoutEntry checkout = entry.parseCheckout();
 			if (checkout != null)
@@ -783,6 +776,11 @@ public abstract class Repository {
 		}
 		assert number >= 0;
 		ReflogReader reader = getReflogReader(ref.getName());
+		if (reader == null) {
+			throw new RevisionSyntaxException(
+					MessageFormat.format(JGitText.get().reflogEntryNotFound,
+							Integer.valueOf(number), ref.getName()));
+		}
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
 			throw new RevisionSyntaxException(MessageFormat.format(
@@ -795,8 +793,7 @@ public abstract class Repository {
 	private ObjectId resolveAbbreviation(final String revstr) throws IOException,
 			AmbiguousObjectException {
 		AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
-		ObjectReader reader = newObjectReader();
-		try {
+		try (ObjectReader reader = newObjectReader()) {
 			Collection<ObjectId> matches = reader.resolve(id);
 			if (matches.size() == 0)
 				return null;
@@ -804,8 +801,6 @@ public abstract class Repository {
 				return matches.iterator().next();
 			else
 				throw new AmbiguousObjectException(id, matches);
-		} finally {
-			reader.release();
 		}
 	}
 
@@ -1250,11 +1245,6 @@ public abstract class Repository {
 		return workTree;
 	}
 
-	// TODO: docs
-	public DirectoryFlags getDirectoryFlags() {
-		return directoryFlags;
-	}
-
 	/**
 	 * Force a scan for changed refs.
 	 *
@@ -1358,6 +1348,40 @@ public abstract class Repository {
 	public void writeMergeCommitMsg(String msg) throws IOException {
 		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
 		writeCommitMsg(mergeMsgFile, msg);
+	}
+
+	/**
+	 * Return the information stored in the file $GIT_DIR/COMMIT_EDITMSG. In
+	 * this file hooks triggered by an operation may read or modify the current
+	 * commit message.
+	 *
+	 * @return a String containing the content of the COMMIT_EDITMSG file or
+	 *         {@code null} if this file doesn't exist
+	 * @throws IOException
+	 * @throws NoWorkTreeException
+	 *             if this is bare, which implies it has no working directory.
+	 *             See {@link #isBare()}.
+	 * @since 4.0
+	 */
+	public String readCommitEditMsg() throws IOException, NoWorkTreeException {
+		return readCommitMsgFile(Constants.COMMIT_EDITMSG);
+	}
+
+	/**
+	 * Write new content to the file $GIT_DIR/COMMIT_EDITMSG. In this file hooks
+	 * triggered by an operation may read or modify the current commit message.
+	 * If {@code null} is specified as message the file will be deleted.
+	 *
+	 * @param msg
+	 *            the message which should be written or {@code null} to delete
+	 *            the file
+	 *
+	 * @throws IOException
+	 * @since 4.0
+	 */
+	public void writeCommitEditMsg(String msg) throws IOException {
+		File commiEditMsgFile = new File(gitDir, Constants.COMMIT_EDITMSG);
+		writeCommitMsg(commiEditMsgFile, msg);
 	}
 
 	/**

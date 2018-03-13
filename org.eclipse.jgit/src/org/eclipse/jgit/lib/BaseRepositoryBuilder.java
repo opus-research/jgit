@@ -135,8 +135,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 
 	private File workTree;
 
-	private DirectoryFlags directoryFlags = DirectoryFlags.DEFAULTS;
-
 	/** Directories limiting the search for a Git repository. */
 	private List<File> ceilingDirectories;
 
@@ -324,17 +322,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	/** @return the work tree directory, or null if not set. */
 	public File getWorkTree() {
 		return workTree;
-	}
-
-	// TODO: docs
-	public B setDirectoryFlags(DirectoryFlags directoryFlags) {
-		this.directoryFlags = directoryFlags;
-		return self();
-	}
-
-	// TODO: docs
-	public DirectoryFlags getDirectoryFlags() {
-		return directoryFlags;
 	}
 
 	/**
@@ -578,14 +565,16 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 * based on other options. If insufficient information is available, an
 	 * exception is thrown to the caller.
 	 *
-	 * @return a repository matching this configuration.
+	 * @return a repository matching this configuration. The caller is
+	 *         responsible to close the repository instance when it is no longer
+	 *         needed.
 	 * @throws IllegalArgumentException
 	 *             insufficient parameters were set.
 	 * @throws IOException
 	 *             the repository could not be accessed to configure the rest of
 	 *             the builder's parameters.
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "resource" })
 	public R build() throws IOException {
 		R repo = (R) new FileRepository(setup());
 		if (isMustExist() && !repo.getObjectDatabase().exists())

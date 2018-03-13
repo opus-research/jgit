@@ -67,6 +67,7 @@ import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
@@ -94,7 +95,7 @@ public class DfsPackCompactor {
 
 	private final List<DfsPackDescription> newPacks;
 
-	private final List<PackWriter.Statistics> newStats;
+	private final List<PackStatistics> newStats;
 
 	private int autoAddSize;
 
@@ -114,7 +115,7 @@ public class DfsPackCompactor {
 		srcPacks = new ArrayList<DfsPackFile>();
 		exclude = new ArrayList<PackWriter.ObjectIdSet>(4);
 		newPacks = new ArrayList<DfsPackDescription>(1);
-		newStats = new ArrayList<PackWriter.Statistics>(1);
+		newStats = new ArrayList<PackStatistics>(1);
 	}
 
 	/**
@@ -179,11 +180,8 @@ public class DfsPackCompactor {
 	 */
 	public DfsPackCompactor exclude(DfsPackFile pack) throws IOException {
 		final PackIndex idx;
-		DfsReader ctx = (DfsReader) repo.newObjectReader();
-		try {
+		try (DfsReader ctx = (DfsReader) repo.newObjectReader()) {
 			idx = pack.getPackIndex(ctx);
-		} finally {
-			ctx.release();
 		}
 		return exclude(new PackWriter.ObjectIdSet() {
 			public boolean contains(AnyObjectId id) {
@@ -206,8 +204,7 @@ public class DfsPackCompactor {
 			pm = NullProgressMonitor.INSTANCE;
 
 		DfsObjDatabase objdb = repo.getObjectDatabase();
-		DfsReader ctx = (DfsReader) objdb.newReader();
-		try {
+		try (DfsReader ctx = (DfsReader) objdb.newReader()) {
 			PackConfig pc = new PackConfig(repo);
 			pc.setIndexVersion(2);
 			pc.setDeltaCompress(false);
@@ -235,8 +232,8 @@ public class DfsPackCompactor {
 					writePack(objdb, pack, pw, pm);
 					writeIndex(objdb, pack, pw);
 
-					PackWriter.Statistics stats = pw.getStatistics();
-					pw.release();
+					PackStatistics stats = pw.getStatistics();
+					pw.close();
 					pw = null;
 
 					pack.setPackStats(stats);
@@ -250,11 +247,10 @@ public class DfsPackCompactor {
 				}
 			} finally {
 				if (pw != null)
-					pw.release();
+					pw.close();
 			}
 		} finally {
 			rw = null;
-			ctx.release();
 		}
 	}
 
@@ -269,7 +265,7 @@ public class DfsPackCompactor {
 	}
 
 	/** @return statistics corresponding to the {@link #getNewPacks()}. */
-	public List<PackWriter.Statistics> getNewPackStatistics() {
+	public List<PackStatistics> getNewPackStatistics() {
 		return newStats;
 	}
 
