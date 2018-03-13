@@ -77,7 +77,7 @@ public final class NB {
 	 * @param b
 	 *            the second value to compare.
 	 * @return &lt; 0 if a &lt; b; 0 if a == b; &gt; 0 if a &gt; b.
-	 * @since 4.1
+	 * @since 4.2
 	 */
 	public static int compareUInt64(final long a, final long b) {
 		long cmp = (a >>> 1) - (b >>> 1);

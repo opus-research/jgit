@@ -63,6 +63,7 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 /**
@@ -355,6 +356,56 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testSlashMatchesDirectory() throws IOException {
+		writeIgnoreFile(".gitignore", "out2/");
+
+		writeTrashFile("out1/out1", "");
+		writeTrashFile("out1/out2", "");
+		writeTrashFile("out2/out1", "");
+		writeTrashFile("out2/out2", "");
+
+		beginWalk();
+		assertEntry(F, tracked, ".gitignore");
+		assertEntry(D, tracked, "out1");
+		assertEntry(F, tracked, "out1/out1");
+		assertEntry(F, tracked, "out1/out2");
+		assertEntry(D, ignored, "out2");
+		assertEntry(F, ignored, "out2/out1");
+		assertEntry(F, ignored, "out2/out2");
+		endWalk();
+	}
+
+	@Test
+	public void testWildcardWithSlashMatchesDirectory() throws IOException {
+		writeIgnoreFile(".gitignore", "out2*/");
+
+		writeTrashFile("out1/out1.txt", "");
+		writeTrashFile("out1/out2", "");
+		writeTrashFile("out1/out2.txt", "");
+		writeTrashFile("out1/out2x/a", "");
+		writeTrashFile("out2/out1.txt", "");
+		writeTrashFile("out2/out2.txt", "");
+		writeTrashFile("out2x/out1.txt", "");
+		writeTrashFile("out2x/out2.txt", "");
+
+		beginWalk();
+		assertEntry(F, tracked, ".gitignore");
+		assertEntry(D, tracked, "out1");
+		assertEntry(F, tracked, "out1/out1.txt");
+		assertEntry(F, tracked, "out1/out2");
+		assertEntry(F, tracked, "out1/out2.txt");
+		assertEntry(D, ignored, "out1/out2x");
+		assertEntry(F, ignored, "out1/out2x/a");
+		assertEntry(D, ignored, "out2");
+		assertEntry(F, ignored, "out2/out1.txt");
+		assertEntry(F, ignored, "out2/out2.txt");
+		assertEntry(D, ignored, "out2x");
+		assertEntry(F, ignored, "out2x/out1.txt");
+		assertEntry(F, ignored, "out2x/out2.txt");
+		endWalk();
+	}
+
+	@Test
 	public void testWithSlashDoesNotMatchInSubDirectory() throws IOException {
 		writeIgnoreFile(".gitignore", "a/b");
 		writeTrashFile("a/a", "");
@@ -418,6 +469,9 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 
 	@Test
 	public void testTrailingSpaces() throws IOException {
+		// Windows can't create files with trailing spaces
+		// If this assumption fails the test is halted and ignored.
+		org.junit.Assume.assumeFalse(SystemReader.getInstance().isWindows());
 		writeTrashFile("a  /a", "");
 		writeTrashFile("a  /a ", "");
 		writeTrashFile("a  /a  ", "");

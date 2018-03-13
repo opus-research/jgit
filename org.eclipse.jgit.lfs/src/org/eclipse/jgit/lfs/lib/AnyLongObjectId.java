@@ -59,12 +59,14 @@ import org.eclipse.jgit.util.NB;
  * with this instance can alter at any time, if this instance is modified to
  * represent a different object name.
  *
+ * Ported to SHA-256 from {@link AnyObjectId}
+ *
  * @since 4.1
  */
 public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 
 	/**
-	 * Compare to object identifier byte sequences for equality.
+	 * Compare two object identifier byte sequences for equality.
 	 *
 	 * @param firstObjectId
 	 *            the first identifier to compare. Must not be null.
@@ -249,11 +251,12 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	/**
-	 * Tests if this ObjectId starts with the given abbreviation.
+	 * Tests if this LongObjectId starts with the given abbreviation.
 	 *
 	 * @param abbr
 	 *            the abbreviation.
-	 * @return true if this ObjectId begins with the abbreviation; else false.
+	 * @return true if this LongObjectId begins with the abbreviation; else
+	 *         false.
 	 */
 	public boolean startsWith(final AbbreviatedLongObjectId abbr) {
 		return abbr.prefixCompare(this) == 0;
@@ -520,7 +523,7 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	/**
-	 * Obtain an immutable copy of this current object name value.
+	 * Obtain an immutable copy of this current object.
 	 * <p>
 	 * Only returns <code>this</code> if this instance is an unsubclassed
 	 * instance of {@link LongObjectId}; otherwise a new instance is returned
@@ -539,14 +542,14 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	/**
-	 * Obtain an immutable copy of this current object name value.
+	 * Obtain an immutable copy of this current object.
 	 * <p>
 	 * See {@link #copy()} if <code>this</code> is a possibly subclassed (but
 	 * immutable) identity and the application needs a lightweight identity
 	 * <i>only</i> reference.
 	 *
-	 * @return an immutable copy. May be <code>this</code> if this is already
-	 *         an immutable instance.
+	 * @return an immutable copy. May be <code>this</code> if this is already an
+	 *         immutable instance.
 	 */
 	public abstract LongObjectId toObjectId();
 }

@@ -67,6 +67,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+/*
+ * Ported to SHA-256 from org.eclipse.jgit.lib.ObjectIdTest
+ */
 public class LongObjectIdTest {
 	private static Path tmp;
 

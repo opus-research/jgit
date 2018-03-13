@@ -375,7 +375,7 @@ public final class RawParseUtils {
 	 * @return the integer value.
 	 * @throws ArrayIndexOutOfBoundsException
 	 *             if the string is not hex formatted.
-	 * @since 4.1
+	 * @since 4.2
 	 */
 	public static final long parseHexInt64(final byte[] bs, final int p) {
 		long r = digits16[bs[p]] << 4;

@@ -57,6 +57,8 @@ import org.eclipse.jgit.lfs.lib.LongObjectId;
 public class LongObjectIdTestUtils {
 
 	/**
+	 * Create id as hash of the given string.
+	 *
 	 * @param s
 	 *            the string to hash
 	 * @return id calculated by hashing string

@@ -49,11 +49,14 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 import org.eclipse.jgit.lfs.errors.InvalidLongObjectIdException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A SHA-256 abstraction.
+ *
+ * Ported to SHA-256 from {@link ObjectId}
  *
  * @since 4.1
  */
@@ -70,16 +73,17 @@ public class LongObjectId extends AnyLongObjectId implements Serializable {
 	}
 
 	/**
-	 * Get the special all-null LongObjectId.
+	 * Get the special all-zero LongObjectId.
 	 *
-	 * @return the all-null LongObjectId, often used to stand-in for no object.
+	 * @return the all-zero LongObjectId, often used to stand-in for no object.
 	 */
 	public static final LongObjectId zeroId() {
 		return ZEROID;
 	}
 
 	/**
-	 * Test a string of characters to verify it is a hex format.
+	 * Test a string of characters to verify that it can be interpreted as
+	 * LongObjectId.
 	 * <p>
 	 * If true the string can be parsed with {@link #fromString(String)}.
 	 *
