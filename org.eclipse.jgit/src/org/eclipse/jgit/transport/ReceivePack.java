@@ -55,8 +55,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -74,7 +72,9 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
@@ -155,13 +155,13 @@ public class ReceivePack {
 
 	private OutputStream rawOut;
 
+	private OutputStream msgOut;
+
 	private PacketLineIn pckIn;
 
 	private PacketLineOut pckOut;
 
-	private Writer msgs;
-
-	private IndexPack ip;
+	private PackParser parser;
 
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
@@ -504,8 +504,8 @@ public class ReceivePack {
 			advertiseError.append(what).append('\n');
 		} else {
 			try {
-				if (msgs != null)
-					msgs.write("error: " + what + "\n");
+				if (msgOut != null)
+					msgOut.write(Constants.encode("error: " + what + "\n"));
 			} catch (IOException e) {
 				// Ignore write failures.
 			}
@@ -524,8 +524,8 @@ public class ReceivePack {
 	 */
 	public void sendMessage(final String what) {
 		try {
-			if (msgs != null)
-				msgs.write(what + "\n");
+			if (msgOut != null)
+				msgOut.write(Constants.encode(what + "\n"));
 		} catch (IOException e) {
 			// Ignore write failures.
 		}
@@ -554,6 +554,7 @@ public class ReceivePack {
 		try {
 			rawIn = input;
 			rawOut = output;
+			msgOut = messages;
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
@@ -568,8 +569,7 @@ public class ReceivePack {
 
 			pckIn = new PacketLineIn(rawIn);
 			pckOut = new PacketLineOut(rawOut);
-			if (messages != null)
-				msgs = new OutputStreamWriter(messages, Constants.CHARSET);
+			pckOut.setFlushOnEnd(false);
 
 			enabledCapablities = new HashSet<String>();
 			commands = new ArrayList<ReceiveCommand>();
@@ -578,11 +578,6 @@ public class ReceivePack {
 		} finally {
 			walk.release();
 			try {
-				if (pckOut != null)
-					pckOut.flush();
-				if (msgs != null)
-					msgs.flush();
-
 				if (sideBand) {
 					// If we are using side band, we need to send a final
 					// flush-pkt to tell the remote peer the side band is
@@ -590,16 +585,31 @@ public class ReceivePack {
 					// use the original output stream as rawOut is now the
 					// side band data channel.
 					//
-					new PacketLineOut(output).end();
+					((SideBandOutputStream) msgOut).flushBuffer();
+					((SideBandOutputStream) rawOut).flushBuffer();
+
+					PacketLineOut plo = new PacketLineOut(output);
+					plo.setFlushOnEnd(false);
+					plo.end();
+				}
+
+				if (biDirectionalPipe) {
+					// If this was a native git connection, flush the pipe for
+					// the caller. For smart HTTP we don't do this flush and
+					// instead let the higher level HTTP servlet code do it.
+					//
+					if (!sideBand && msgOut != null)
+						msgOut.flush();
+					rawOut.flush();
 				}
 			} finally {
 				unlockPack();
 				timeoutIn = null;
 				rawIn = null;
 				rawOut = null;
+				msgOut = null;
 				pckIn = null;
 				pckOut = null;
-				msgs = null;
 				refs = null;
 				enabledCapablities = null;
 				commands = null;
@@ -615,9 +625,10 @@ public class ReceivePack {
 	}
 
 	private void service() throws IOException {
-		if (biDirectionalPipe)
+		if (biDirectionalPipe) {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
-		else
+			pckOut.flush();
+		} else
 			refs = refFilter.filter(db.getAllRefs());
 		if (advertiseError != null)
 			return;
@@ -630,7 +641,7 @@ public class ReceivePack {
 					receivePack();
 					if (needCheckConnectivity())
 						checkConnectivity();
-					ip = null;
+					parser = null;
 					unpackError = null;
 				} catch (IOException err) {
 					unpackError = err;
@@ -654,10 +665,10 @@ public class ReceivePack {
 					}
 				});
 				pckOut.end();
-			} else if (msgs != null) {
+			} else if (msgOut != null) {
 				sendStatusReport(false, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgs.write(s + "\n");
+						msgOut.write(Constants.encode(s + "\n"));
 					}
 				});
 			}
@@ -690,8 +701,7 @@ public class ReceivePack {
 			return;
 		}
 
-		final RevFlag advertised = walk.newFlag("ADVERTISED");
-		adv.init(walk, advertised);
+		adv.init(db);
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
@@ -757,9 +767,10 @@ public class ReceivePack {
 			OutputStream out = rawOut;
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
+			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
+
 			pckOut = new PacketLineOut(rawOut);
-			msgs = new OutputStreamWriter(new SideBandOutputStream(CH_PROGRESS,
-					MAX_BUF, out), Constants.CHARSET);
+			pckOut.setFlushOnEnd(false);
 		}
 	}
 
@@ -779,17 +790,28 @@ public class ReceivePack {
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(10 * timeout * 1000);
 
-		ip = IndexPack.create(db, rawIn);
-		ip.setFixThin(true);
-		ip.setNeedNewObjectIds(checkReferencedIsReachable);
-		ip.setNeedBaseObjectIds(checkReferencedIsReachable);
-		ip.setObjectChecking(isCheckReceivedObjects());
-		ip.index(NullProgressMonitor.INSTANCE);
+		ProgressMonitor receiving = NullProgressMonitor.INSTANCE;
+		ProgressMonitor resolving = NullProgressMonitor.INSTANCE;
+		if (sideBand)
+			resolving = new SideBandProgressMonitor(msgOut);
 
-		String lockMsg = "jgit receive-pack";
-		if (getRefLogIdent() != null)
-			lockMsg += " from " + getRefLogIdent().toExternalString();
-		packLock = ip.renameAndOpenPack(lockMsg);
+		ObjectInserter ins = db.newObjectInserter();
+		try {
+			String lockMsg = "jgit receive-pack";
+			if (getRefLogIdent() != null)
+				lockMsg += " from " + getRefLogIdent().toExternalString();
+
+			parser = ins.newPackParser(rawIn);
+			parser.setAllowThin(true);
+			parser.setNeedNewObjectIds(checkReferencedIsReachable);
+			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
+			parser.setObjectChecking(isCheckReceivedObjects());
+			parser.setLockMessage(lockMsg);
+			packLock = parser.parse(receiving, resolving);
+			ins.flush();
+		} finally {
+			ins.release();
+		}
 
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(timeout * 1000);
@@ -805,10 +827,10 @@ public class ReceivePack {
 		ObjectIdSubclassMap<ObjectId> providedObjects = null;
 
 		if (checkReferencedIsReachable) {
-			baseObjects = ip.getBaseObjectIds();
-			providedObjects = ip.getNewObjectIds();
+			baseObjects = parser.getBaseObjectIds();
+			providedObjects = parser.getNewObjectIds();
 		}
-		ip = null;
+		parser = null;
 
 		final ObjectWalk ow = new ObjectWalk(db);
 		ow.setRetainBody(false);

@@ -65,7 +65,7 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 			throws IllegalStateException, IOException {
 		DirCache dc = db.lockDirCache();
 		try {
-			dco = new DirCacheCheckout(db, head.getTreeId(), dc, merge.getTreeId());
+			dco = new DirCacheCheckout(db, head.getId(), dc, merge.getId());
 			dco.preScanTwoTrees();
 		} finally {
 			dc.unlock();
@@ -76,7 +76,7 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 	public void checkout() throws IOException {
 		DirCache dc = db.lockDirCache();
 		try {
-			dco = new DirCacheCheckout(db, theHead.getTreeId(), dc, theMerge.getTreeId());
+			dco = new DirCacheCheckout(db, theHead.getId(), dc, theMerge.getId());
 			dco.checkout();
 		} finally {
 			dc.unlock();
@@ -128,11 +128,14 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 		RevCommit topic = git.commit().setMessage("topic-1").call();
 		assertIndex(mkmap("f", "f()\nside", "G/i", "i()"));
 
+		writeTrashFile("untracked", "untracked");
+
 		resetHard(master);
 		assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
 		resetHard(topic);
 		assertIndex(mkmap("f", "f()\nside", "G/i", "i()"));
-		assertWorkDir(mkmap("f", "f()\nside", "G/i", "i()"));
+		assertWorkDir(mkmap("f", "f()\nside", "G/i", "i()", "untracked",
+				"untracked"));
 
 		assertEquals(MergeStatus.CONFLICTING, git.merge().include(master)
 				.call().getMergeStatus());
@@ -143,7 +146,7 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 		resetHard(master);
 		assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
 		assertWorkDir(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h",
-				"h()"));
+				"h()", "untracked", "untracked"));
 	}
 
 	private DirCacheCheckout resetHard(RevCommit commit)

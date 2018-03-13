@@ -48,6 +48,7 @@ package org.eclipse.jgit.treewalk;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -64,12 +65,15 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
@@ -181,6 +185,24 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ignoreNode = new RootIgnoreNode(entry, repo);
 	}
 
+	/**
+	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
+	 *
+	 * Once the DirCacheIterator has been set this iterator must only be
+	 * advanced by the TreeWalk that is supplied, as it assumes that itself and
+	 * the corresponding DirCacheIterator are positioned on the same file path
+	 * whenever {@link #idBuffer()} is invoked.
+	 *
+	 * @param walk
+	 *            the walk that will be advancing this iterator.
+	 * @param treeId
+	 *            index of the matching {@link DirCacheIterator}.
+	 */
+	public void setDirCacheIterator(TreeWalk walk, int treeId) {
+		state.walk = walk;
+		state.dirCacheTree = treeId;
+	}
+
 	@Override
 	public boolean hasId() {
 		if (contentIdFromPtr == ptr)
@@ -192,6 +214,21 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public byte[] idBuffer() {
 		if (contentIdFromPtr == ptr)
 			return contentId;
+
+		if (state.walk != null) {
+			// If there is a matching DirCacheIterator, we can reuse
+			// its idBuffer, but only if we appear to be clean against
+			// the cached index information for the path.
+			//
+			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
+					DirCacheIterator.class);
+			if (i != null) {
+				DirCacheEntry ent = i.getDirCacheEntry();
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL)
+					return i.idBuffer();
+			}
+		}
+
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -863,7 +900,27 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				r = new IgnoreNode();
 			}
 
-			File exclude = new File(repository.getDirectory(), "info/exclude");
+			FS fs = repository.getFS();
+			String path = repository.getConfig().get(CoreConfig.KEY)
+					.getExcludesFile();
+			if (path != null) {
+				File excludesfile;
+				if (path.startsWith("~/"))
+					excludesfile = fs.resolve(fs.userHome(), path.substring(2));
+				else
+					excludesfile = fs.resolve(null, path);
+				loadRulesFromFile(r, excludesfile);
+			}
+
+			File exclude = fs
+					.resolve(repository.getDirectory(), "info/exclude");
+			loadRulesFromFile(r, exclude);
+
+			return r.getRules().isEmpty() ? null : r;
+		}
+
+		private void loadRulesFromFile(IgnoreNode r, File exclude)
+				throws FileNotFoundException, IOException {
 			if (exclude.exists()) {
 				FileInputStream in = new FileInputStream(exclude);
 				try {
@@ -872,8 +929,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					in.close();
 				}
 			}
-
-			return r.getRules().isEmpty() ? null : r;
 		}
 	}
 
@@ -889,6 +944,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
+
+		/** TreeWalk with a (supposedly) matching DirCacheIterator. */
+		TreeWalk walk;
+
+		/** Position of the matching {@link DirCacheIterator}. */
+		int dirCacheTree;
 
 		IteratorState(WorkingTreeOptions options) {
 			this.options = options;

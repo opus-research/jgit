@@ -53,10 +53,16 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
+import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -80,20 +86,52 @@ import com.jcraft.jsch.JSchException;
  * enumeration, save file modification and hook execution.
  */
 public class TransportGitSsh extends SshTransport implements PackTransport {
-	static boolean canHandle(final URIish uri) {
-		if (!uri.isRemote())
-			return false;
-		final String scheme = uri.getScheme();
-		if ("ssh".equals(scheme))
-			return true;
-		if ("ssh+git".equals(scheme))
-			return true;
-		if ("git+ssh".equals(scheme))
-			return true;
-		if (scheme == null && uri.getHost() != null && uri.getPath() != null)
-			return true;
-		return false;
-	}
+	static final TransportProtocol PROTO_SSH = new TransportProtocol() {
+		private final String[] schemeNames = { "ssh", "ssh+git", "git+ssh" }; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+
+		private final Set<String> schemeSet = Collections
+				.unmodifiableSet(new LinkedHashSet<String>(Arrays
+						.asList(schemeNames)));
+
+		public String getName() {
+			return JGitText.get().transportProtoSSH;
+		}
+
+		public Set<String> getSchemes() {
+			return schemeSet;
+		}
+
+		public Set<URIishField> getRequiredFields() {
+			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
+					URIishField.PATH));
+		}
+
+		public Set<URIishField> getOptionalFields() {
+			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
+					URIishField.PASS, URIishField.PORT));
+		}
+
+		public int getDefaultPort() {
+			return 22;
+		}
+
+		@Override
+		public boolean canHandle(URIish uri, Repository local, String remoteName) {
+			if (uri.getScheme() == null) {
+				// scp-style URI "host:path" does not have scheme.
+				return uri.getHost() != null
+					&& uri.getPath() != null
+					&& uri.getHost().length() != 0
+					&& uri.getPath().length() != 0;
+			}
+			return super.canHandle(uri, local, remoteName);
+		}
+
+		public Transport open(URIish uri, Repository local, String remoteName)
+				throws NotSupportedException {
+			return new TransportGitSsh(local, uri);
+		}
+	};
 
 	TransportGitSsh(final Repository local, final URIish uri) {
 		super(local, uri);
@@ -115,44 +153,15 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new JschConnection();
 	}
 
-	private static void sqMinimal(final StringBuilder cmd, final String val) {
-		if (val.matches("^[a-zA-Z0-9._/-]*$")) {
-			// If the string matches only generally safe characters
-			// that the shell is not going to evaluate specially we
-			// should leave the string unquoted. Not all systems
-			// actually run a shell and over-quoting confuses them
-			// when it comes to the command name.
-			//
-			cmd.append(val);
-		} else {
-			sq(cmd, val);
-		}
-	}
-
-	private static void sqAlways(final StringBuilder cmd, final String val) {
-		sq(cmd, val);
-	}
-
-	private static void sq(final StringBuilder cmd, final String val) {
-		if (val.length() > 0)
-			cmd.append(QuotedString.BOURNE.quote(val));
-	}
-
 	String commandFor(final String exe) {
 		String path = uri.getPath();
 		if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
 			path = (uri.getPath().substring(1));
 
 		final StringBuilder cmd = new StringBuilder();
-		final int gitspace = exe.indexOf("git ");
-		if (gitspace >= 0) {
-			sqMinimal(cmd, exe.substring(0, gitspace + 3));
-			cmd.append(' ');
-			sqMinimal(cmd, exe.substring(gitspace + 4));
-		} else
-			sqMinimal(cmd, exe);
+		cmd.append(exe);
 		cmd.append(' ');
-		sqAlways(cmd, path);
+		cmd.append(QuotedString.BOURNE.quote(path));
 		return cmd.toString();
 	}
 
@@ -178,7 +187,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 		final StringBuilder pfx = new StringBuilder();
 		pfx.append("fatal: ");
-		sqAlways(pfx, path);
+		pfx.append(QuotedString.BOURNE.quote(path));
 		pfx.append(": ");
 		if (why.startsWith(pfx.toString()))
 			why = why.substring(pfx.length());
