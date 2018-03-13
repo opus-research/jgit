@@ -141,8 +141,6 @@ class PackWriterBitmapPreparer {
 	 *
 	 * @param expectedCommitCount
 	 *            count of commits in the pack
-	 * @param excludeFromBitmapSelection
-	 *            commits that should be excluded from bitmap selection
 	 * @return commit objects for which bitmap indices should be built
 	 * @throws IncorrectObjectTypeException
 	 *             if any of the processed objects is not a commit
@@ -151,8 +149,7 @@ class PackWriterBitmapPreparer {
 	 * @throws MissingObjectException
 	 *             if an expected object is missing
 	 */
-	Collection<BitmapCommit> selectCommits(int expectedCommitCount,
-			Set<? extends ObjectId> excludeFromBitmapSelection)
+	Collection<BitmapCommit> selectCommits(int expectedCommitCount)
 			throws IncorrectObjectTypeException, IOException,
 			MissingObjectException {
 		/*
@@ -167,7 +164,7 @@ class PackWriterBitmapPreparer {
 		RevWalk rw = new RevWalk(reader);
 		rw.setRetainBody(false);
 		CommitSelectionHelper selectionHelper = setupTipCommitBitmaps(rw,
-				expectedCommitCount, excludeFromBitmapSelection);
+				expectedCommitCount);
 		pm.endTask();
 
 		int totCommits = selectionHelper.getCommitCount();
@@ -366,8 +363,6 @@ class PackWriterBitmapPreparer {
 	 * @param expectedCommitCount
 	 *            expected count of commits. The actual count may be less due to
 	 *            unreachable garbage.
-	 * @param excludeFromBitmapSelection
-	 *            commits that should be excluded from bitmap selection
 	 * @return a {@link CommitSelectionHelper} containing bitmaps for the tip
 	 *         commits
 	 * @throws IncorrectObjectTypeException
@@ -378,10 +373,8 @@ class PackWriterBitmapPreparer {
 	 *             if an expected object is missing
 	 */
 	private CommitSelectionHelper setupTipCommitBitmaps(RevWalk rw,
-			int expectedCommitCount,
-			Set<? extends ObjectId> excludeFromBitmapSelection)
-			throws IncorrectObjectTypeException, IOException,
-			MissingObjectException {
+			int expectedCommitCount) throws IncorrectObjectTypeException,
+					IOException, MissingObjectException {
 		BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
 		List<BitmapCommit> reuseCommits = new ArrayList<>();
 		for (PackBitmapIndexRemapper.Entry entry : bitmapRemapper) {
@@ -405,13 +398,12 @@ class PackWriterBitmapPreparer {
 
 		// Add branch tips that are not represented in old bitmap indices. Set
 		// up the RevWalk to walk the new commits not in the old packs.
-		int totalWants = want.size();
-		List<BitmapBuilderEntry> tipCommitBitmaps = new ArrayList<>(totalWants);
-		Set<RevCommit> peeledWant = new HashSet<>(totalWants);
+		List<BitmapBuilderEntry> tipCommitBitmaps = new ArrayList<>(
+				want.size());
+		Set<RevCommit> peeledWant = new HashSet<>(want.size());
 		for (AnyObjectId objectId : want) {
 			RevObject ro = rw.peel(rw.parseAny(objectId));
-			if (!(ro instanceof RevCommit) || reuse.contains(ro)
-					|| excludeFromBitmapSelection.contains(ro)) {
+			if (!(ro instanceof RevCommit) || reuse.contains(ro)) {
 				continue;
 			}
 
