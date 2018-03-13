@@ -41,70 +41,91 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
-public class FSTest {
+/**
+ * FS for Java7 on Windows with Cygwin
+ */
+public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 
-	private final File trash = new File(new File("target"), "trash");
-
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
+	FS_Win32_Java7Cygwin(FS src) {
+		super(src);
 	}
 
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+	FS_Win32_Java7Cygwin() {
 	}
 
-	/**
-	 * The old File methods traverses symbolic links and look at the targets. With
-	 * symbolic links we usually want to modify/look at the link. For some reason
-	 * the executable attribute seems to always look at the target, but for the
-	 * other attributes like lastModified, hidden and exists we must differ between
-	 * the link and the target.
-	 *
-	 * @throws IOException
-	 * @throws InterruptedException
-	 */
-	@Test
-	public void testSymlinkAttributes() throws IOException, InterruptedException {
-		FS fs = FS.DETECTED;
-		File link = new File(trash, "x");
-		fs.createSymLink(link, "y");
-		assertTrue(fs.exists(link));
-		String target = fs.readSymLink(link);
-		assertEquals("y", target);
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.exists(link));
-		assertFalse(fs.canExecute(link));
-		assertEquals(1, fs.length(link));
-
-		RepositoryTestCase.fsTick(link);
-		// Now create the link target
-		File targetFile = new File(trash, "y");
-		FileUtils.createNewFile(targetFile);
-		assertTrue(fs.exists(link));
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.lastModified(targetFile) > fs.lastModified(link));
-		assertFalse(fs.canExecute(link));
-		fs.setExecute(targetFile, true);
-		assertFalse(fs.canExecute(link));
+	@Override
+	public FS newInstance() {
+		return new FS_Win32_Java7Cygwin(this);
 	}
 
+	@Override
+	public boolean supportsSymlinks() {
+		return true;
+	}
+
+	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		Path nioPath = path.toPath();
+		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
+	}
 }
