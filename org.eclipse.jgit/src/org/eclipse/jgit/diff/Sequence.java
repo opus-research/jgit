@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
+ * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +41,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk.filter;
 
-import java.io.IOException;
-
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+package org.eclipse.jgit.diff;
 
 /**
- * Skip {@link WorkingTreeIterator} entries that appear in gitignore files.
+ * Arbitrary sequence of elements.
+ *
+ * A sequence of elements is defined to contain elements in the index range
+ * <code>[0, {@link #size()})</code>, like a standard Java List implementation.
+ * Unlike a List, the members of the sequence are not directly obtainable.
+ *
+ * Implementations of Sequence are primarily intended for use in content
+ * difference detection algorithms, to produce an {@link EditList} of
+ * {@link Edit} instances describing how two Sequence instances differ.
+ *
+ * To be compared against another Sequence of the same type, a supporting
+ * {@link SequenceComparator} must also be supplied.
  */
-public class NotIgnoredFilter extends TreeFilter {
-	private final int index;
-
-	/**
-	 * Construct a filter to ignore paths known to a particular iterator.
-	 *
-	 * @param workdirTreeIndex
-	 *            index of the workdir tree in the tree walk
-	 */
-	public NotIgnoredFilter(final int workdirTreeIndex) {
-		this.index = workdirTreeIndex;
-	}
-
-	@Override
-	public boolean include(TreeWalk tw) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		WorkingTreeIterator i = tw.getTree(index, WorkingTreeIterator.class);
-		return i == null || !i.isEntryIgnored();
-	}
-
-	@Override
-	public boolean shouldBeRecursive() {
-		return false;
-	}
-
-	@Override
-	public TreeFilter clone() {
-		// immutable
-		return this;
-	}
-
-	@Override
-	public String toString() {
-		return "NotIgnored(" + index + ")";
-	}
+public abstract class Sequence {
+	/** @return total number of items in the sequence. */
+	public abstract int size();
 }

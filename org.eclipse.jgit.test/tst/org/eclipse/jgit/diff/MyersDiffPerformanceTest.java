@@ -114,98 +114,35 @@ public class MyersDiffPerformanceTest extends TestCase {
 		};
 	}
 
-	public void testMyers() {
+	public void test() {
 		if (stopwatch!=null) {
 			// run some tests without recording to let JIT do its optimization
-			testMyers(10000);
-			testMyers(20000);
-			testMyers(10000);
-			testMyers(20000);
+			test(10000);
+			test(20000);
+			test(10000);
+			test(20000);
 
-			List<PerfData> myersPerfData = new LinkedList<PerfData>();
-			myersPerfData.add(testMyers(10000));
-			myersPerfData.add(testMyers(20000));
-			myersPerfData.add(testMyers(40000));
-			myersPerfData.add(testMyers(80000));
-			myersPerfData.add(testMyers(160000));
-			myersPerfData.add(testMyers(320000));
-			myersPerfData.add(testMyers(640000));
-			myersPerfData.add(testMyers(1280000));
+			List<PerfData> perfData = new LinkedList<PerfData>();
+			perfData.add(test(10000));
+			perfData.add(test(20000));
+			perfData.add(test(40000));
+			perfData.add(test(80000));
+			perfData.add(test(160000));
+			perfData.add(test(320000));
+			perfData.add(test(640000));
+			perfData.add(test(1280000));
 
 			Comparator<PerfData> c = getComparator(1);
-			double factor = Collections.max(myersPerfData, c).perf1()
-					/ Collections.min(myersPerfData, c).perf1();
+			double factor = Collections.max(perfData, c).perf1()
+					/ Collections.min(perfData, c).perf1();
 			assertTrue(
 					"minimun and maximum of performance-index t/(N*D) differed too much. Measured factor of "
 							+ factor
 							+ " (maxFactor="
 							+ maxFactor
-							+ "). Perfdata=<" + myersPerfData.toString() + ">",
+							+ "). Perfdata=<" + perfData.toString() + ">",
 					factor < maxFactor);
 		}
-	}
-
-	public void testPatience() {
-		if (stopwatch != null) {
-			// run some tests without recording to let JIT do its optimization
-			testPatience(10000);
-			testPatience(20000);
-			testPatience(10000);
-			testPatience(20000);
-
-			List<PerfData> myersPerfData = new LinkedList<PerfData>();
-			myersPerfData.add(testPatience(10000));
-			myersPerfData.add(testPatience(20000));
-			myersPerfData.add(testPatience(40000));
-			myersPerfData.add(testPatience(80000));
-			myersPerfData.add(testPatience(160000));
-			myersPerfData.add(testPatience(320000));
-			myersPerfData.add(testPatience(640000));
-			myersPerfData.add(testPatience(1280000));
-
-			Comparator<PerfData> c = getComparator(1);
-			double factor = Collections.max(myersPerfData, c).perf1()
-					/ Collections.min(myersPerfData, c).perf1();
-			assertTrue(
-					"minimun and maximum of performance-index t/(N*D) differed too much. Measured factor of "
-							+ factor
-							+ " (maxFactor="
-							+ maxFactor
-							+ "). Perfdata=<" + myersPerfData.toString() + ">",
-					factor < maxFactor);
-		}
-	}
-
-	private PerfData testPatience(int characters) {
-		PerfData ret = new PerfData();
-		String a = DiffTestDataGenerator.generateSequence(characters, 971, 3);
-		String b = DiffTestDataGenerator.generateSequence(characters, 1621, 5);
-		CharArray ac = new CharArray(a);
-		CharArray bc = new CharArray(b);
-		CharCmp cmp = new CharCmp();
-		int cpuTimeChanges = 0;
-		long lastReadout = 0;
-		long interimTime = 0;
-		int repetitions = 0;
-		stopwatch.start();
-		EditList diff = null;
-		while (cpuTimeChanges < minCPUTimerTicks
-				&& interimTime < longTaskBoundary) {
-			diff = PatienceDiff.diff(cmp, ac, bc);
-			repetitions++;
-			interimTime = stopwatch.readout();
-			if (interimTime != lastReadout) {
-				cpuTimeChanges++;
-				lastReadout = interimTime;
-			}
-		}
-		ret.runningTime = stopwatch.stop() / repetitions;
-		ret.N = cmp.size(ac) + cmp.size(bc);
-		ret.D = diff.size();
-
-		// to be removed
-		System.out.println(ret.toString());
-		return ret;
 	}
 
 	/**
@@ -220,7 +157,7 @@ public class MyersDiffPerformanceTest extends TestCase {
 	 *            the size of the diffed character sequences.
 	 * @return performance data
 	 */
-	private PerfData testMyers(int characters) {
+	private PerfData test(int characters) {
 		PerfData ret = new PerfData();
 		String a = DiffTestDataGenerator.generateSequence(characters, 971, 3);
 		String b = DiffTestDataGenerator.generateSequence(characters, 1621, 5);
@@ -243,28 +180,26 @@ public class MyersDiffPerformanceTest extends TestCase {
 			}
 		}
 		ret.runningTime = stopwatch.stop() / repetitions;
-		ret.N = cmp.size(ac) + cmp.size(bc);
+		ret.N = ac.size() + bc.size();
 		ret.D = myersDiff.getEdits().size();
 
-		// to be removed
-		System.out.println(ret.toString());
 		return ret;
 	}
 
-	private static class CharArray {
-		char[] array;
+	private static class CharArray extends Sequence {
+		final char[] array;
 
 		public CharArray(String s) {
 			array = s.toCharArray();
 		}
+
+		@Override
+		public int size() {
+			return array.length;
+		}
 	}
 
-	private static class CharCmp extends DiffComparator<CharArray> {
-		@Override
-		public int size(CharArray seq) {
-			return seq.array.length;
-		}
-
+	private static class CharCmp extends SequenceComparator<CharArray> {
 		@Override
 		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
 			return a.array[ai] == b.array[bi];

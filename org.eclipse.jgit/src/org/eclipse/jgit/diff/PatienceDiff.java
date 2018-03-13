@@ -51,32 +51,81 @@ import org.eclipse.jgit.util.LongList;
  * An implementation of the patience difference algorithm.
  *
  * This implementation was derived by using the 4 rules that are outlined in
- * Bram Cohen's <a href="http://bramcohen.livejournal.com/73318.html">post</a>
- * on LiveJournal.
+ * Bram Cohen's <a href="http://bramcohen.livejournal.com/73318.html">blog</a>.
+ *
+ * Because this algorithm requires finding a unique common point to center the
+ * longest common subsequence around, input sequences which have no unique
+ * elements create a degenerate Edit that simply replaces all of one sequence
+ * with all of the other sequence. For many source code files and other human
+ * maintained text, this isn't likely to occur. When it does occur, it can be
+ * easier to read the resulting large-scale replace than to navigate through a
+ * lot of slices of common-but-not-unique lines, like curly braces on lone
+ * lines, or XML close tags. Consequently this algorithm is willing to create a
+ * degenerate Edit in the worst case, in exchange for what may still be
+ * perceived to be an easier to read patch script.
+ *
+ * In a nutshell, the implementation defines an Edit that replaces all of
+ * sequence {@code a} with all of {@code b}. This Edit is reduced and/or split
+ * to remove common elements, until only Edits spanning non-common elements
+ * remain. Those {@link Edit}s are the differences.
+ *
+ * A slightly more detailed description of the implementation is:
+ *
+ * <ol>
+ * <li>Define an Edit that spans the entire two sequences. This edit replaces
+ * all of {@code a} with all of {@code b}.</li>
+ *
+ * <li>Shrink the Edit by shifting the starting points later in the sequence to
+ * skip over any elements that are common between {@code a} and {@code b}.
+ * Likewise shift the ending points earlier in the sequence to skip any trailing
+ * elements that are common. The first and last element of the edit are now not
+ * common, however there may be common content within interior of the Edit that
+ * hasn't been discovered yet.</li>
+ *
+ * <li>Find unique elements within the Edit region that are in both sequences.
+ * This is currently accomplished by hashing the elements, sorting the hash
+ * codes, and performing a merge-join on the sorted lists.</li>
+ *
+ * <li>Order the common unique elements by their position within {@code b}.</li>
+ *
+ * <li>For each unique element, stretch an Edit around it in both directions,
+ * consuming neighboring elements that are common to both sequences. Select the
+ * longest such Edit out of the unique element list. During this stretching,
+ * some subsequent unique elements may be consumed into an earlier's common
+ * Edit. This means not all unique elements are evaluated.</li>
+ *
+ * <li>Split the Edit region at the longest common edit. Because step 2 shrank
+ * the initial region, there must be at least one element before, and at least
+ * one element after the split.</li>
+ *
+ * <li>Recurse on the before and after split points, starting from step 3. Step
+ * 2 doesn't need to be done again because any common part was already removed
+ * by the prior step 2 or 5.</li>
+ * </ol>
  *
  * @param <S>
  *            type of sequence.
  */
-public class PatienceDiff<S> {
+public class PatienceDiff<S extends Sequence> {
 	private static final int HASH_SHIFT = 32;
 
 	/**
-	 * Compute the difference between two files.
+	 * Compute the difference between two sequences.
 	 *
 	 * @param <S>
 	 *            type of sequence.
-	 *
 	 * @param cmp
 	 *            equivalence function to compare the two sequences.
 	 * @param a
-	 *            the first (aka old) file.
+	 *            the first (aka old) sequence.
 	 * @param b
-	 *            the second (aka new) file.
+	 *            the second (aka new) sequence.
 	 * @return the differences describing how to edit {@code a} to become
 	 *         {@code b}. The list is empty if they are identical.
 	 */
-	public static <S> EditList diff(DiffComparator<S> cmp, S a, S b) {
-		Edit e = new Edit(0, cmp.size(a), 0, cmp.size(b));
+	public static <S extends Sequence> EditList diff(SequenceComparator<S> cmp,
+			S a, S b) {
+		Edit e = new Edit(0, a.size(), 0, b.size());
 		e = cmp.reduceCommonStartEnd(a, b, e);
 
 		PatienceDiff<S> d = new PatienceDiff<S>(cmp, a, b);
@@ -84,7 +133,7 @@ public class PatienceDiff<S> {
 		return d.edits;
 	}
 
-	private final DiffComparator<S> cmp;
+	private final SequenceComparator<S> cmp;
 
 	private final S a;
 
@@ -92,7 +141,7 @@ public class PatienceDiff<S> {
 
 	private final EditList edits;
 
-	private PatienceDiff(DiffComparator<S> cmp, S a, S b) {
+	private PatienceDiff(SequenceComparator<S> cmp, S a, S b) {
 		this.cmp = cmp;
 		this.a = a;
 		this.b = b;
@@ -113,8 +162,8 @@ public class PatienceDiff<S> {
 			return;
 		}
 
-		LongList matchPoints = match(index(a, e.beginA, e.endA),
-				index(b, e.beginB, e.endB));
+		LongList matchPoints = match(index(a, e.beginA, e.endA), index(b,
+				e.beginB, e.endB));
 		if (matchPoints.size() == 0) {
 			// If we have no unique common lines, replace the entire region
 			// on the one side with the region from the other. But can this
@@ -142,7 +191,7 @@ public class PatienceDiff<S> {
 			long rec = matchPoints.get(i);
 
 			int bs = hashOf(rec);
-			if (bs < lcs.beginB)
+			if (bs < lcs.endB)
 				continue;
 
 			int as = lineOf(rec);
@@ -225,16 +274,29 @@ public class PatienceDiff<S> {
 	}
 
 	private boolean isUnique(S raw, long[] hashes, int ptr) {
-		long rec = hashes[ptr++];
+		long rec = hashes[ptr];
 		final int hash = hashOf(rec);
 		final int line = lineOf(rec);
-		while (ptr < hashes.length) {
-			rec = hashes[ptr++];
+
+		// We might be in the middle of the range of values that match
+		// our hash. If a prior record matches us, we aren't unique.
+		//
+		for (int i = ptr - 1; 0 <= i; i--) {
+			rec = hashes[i];
+			if (hashOf(rec) != hash)
+				break;
+			if (cmp.equals(raw, line, raw, lineOf(rec)))
+				return false;
+		}
+
+		while (++ptr < hashes.length) {
+			rec = hashes[ptr];
 			if (hashOf(rec) != hash)
 				return true;
 			if (cmp.equals(raw, line, raw, lineOf(rec)))
 				return false;
 		}
+
 		return true;
 	}
 

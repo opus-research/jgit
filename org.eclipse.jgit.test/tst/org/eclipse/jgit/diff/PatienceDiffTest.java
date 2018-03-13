@@ -141,6 +141,36 @@ public class PatienceDiffTest extends TestCase {
 		assertEquals(new Edit(6, 8, 6, 8), r.get(1));
 	}
 
+	public void testEdit_NoUniqueMiddleSideA() {
+		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 5, 1, 5), r.get(0));
+	}
+
+	public void testEdit_NoUniqueMiddleSideB() {
+		EditList r = diff(t("aRSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 3, 1, 5), r.get(0));
+	}
+
+	public void testEdit_UniqueCommonLargerThanMatchPoint() {
+		// We are testing 3 unique common matches, but two of
+		// them are consumed as part of the 1st's LCS region.
+		EditList r = diff(t("AbdeZ"), t("PbdeQR"));
+		assertEquals(2, r.size());
+		assertEquals(new Edit(0, 1, 0, 1), r.get(0));
+		assertEquals(new Edit(4, 5, 4, 6), r.get(1));
+	}
+
+	public void testEdit_CommonGrowsPrefixAndSuffix() {
+		// Here there is only one common unique point, but we can grow it
+		// in both directions to find the LCS in the middle.
+		EditList r = diff(t("AaabccZ"), t("PaabccR"));
+		assertEquals(2, r.size());
+		assertEquals(new Edit(0, 1, 0, 1), r.get(0));
+		assertEquals(new Edit(6, 7, 6, 7), r.get(1));
+	}
+
 	private static EditList diff(RawText a, RawText b) {
 		return PatienceDiff.diff(RawTextComparator.DEFAULT, a, b);
 	}
