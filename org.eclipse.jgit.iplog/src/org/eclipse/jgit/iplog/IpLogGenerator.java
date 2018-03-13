@@ -211,12 +211,6 @@ public class IpLogGenerator {
 					+ " is invalid", e);
 		}
 
-		if (meta.getProjects().isEmpty()) {
-			throw new ConfigInvalidException("Configuration file "
-					+ log.getPathString() + " in commit " + commit.name()
-					+ " has no projects declared.");
-		}
-
 		for (Project p : meta.getProjects()) {
 			p.setVersion(version);
 			projects.put(p.getName(), p);
