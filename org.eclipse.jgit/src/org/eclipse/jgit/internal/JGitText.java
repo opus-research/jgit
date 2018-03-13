@@ -99,7 +99,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
-	/***/ public String bSizeMustBePowerOf2;
 	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cachedPacksPreventsListingObjects;
