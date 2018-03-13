@@ -249,9 +249,6 @@ public final class Constants {
 	/** Prefix for any ref */
 	public static final String R_REFS = "refs/";
 
-	/** Standard stash ref */
-	public static final String R_STASH = R_REFS + "stash";
-
 	/** Logs folder name */
 	public static final String LOGS = "logs";
 

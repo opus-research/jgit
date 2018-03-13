@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,74 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.ArrayList;
+package org.eclipse.jgit.transport;
+
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-
 /**
- * Command class to list the stashed commits in a repository.
- *
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
- *      >Git documentation about Stash</a>
+ * {@link PreReceiveHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor.
  */
-public class StashListCommand extends GitCommand<Collection<RevCommit>> {
+public class PreReceiveHookChain implements PreReceiveHook {
+	private final PreReceiveHook[] hooks;
+	private final int count;
 
 	/**
-	 * Create a new stash list command
+	 * Create a new hook chaining the given hooks together.
 	 *
-	 * @param repo
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
 	 */
-	public StashListCommand(final Repository repo) {
-		super(repo);
+	public static PreReceiveHook newChain(List<? extends PreReceiveHook> hooks) {
+		PreReceiveHook[] newHooks = new PreReceiveHook[hooks.size()];
+		int i = 0;
+		for (PreReceiveHook hook : hooks)
+			if (hook != PreReceiveHook.NULL)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return PreReceiveHook.NULL;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new PreReceiveHookChain(newHooks, i);
 	}
 
-	public Collection<RevCommit> call() throws Exception {
-		checkCallable();
+	public void onPreReceive(ReceivePack rp,
+			Collection<ReceiveCommand> commands) {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPreReceive(rp, commands);
+	}
 
-		try {
-			if (repo.getRef(Constants.R_STASH) == null)
-				return Collections.emptyList();
-		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, Constants.R_STASH), e);
-		}
-
-		final ReflogCommand refLog = new ReflogCommand(repo);
-		refLog.setRef(Constants.R_STASH);
-		final Collection<ReflogEntry> stashEntries = refLog.call();
-		if (stashEntries.isEmpty())
-			return Collections.emptyList();
-
-		final List<RevCommit> stashCommits = new ArrayList<RevCommit>(
-				stashEntries.size());
-		final RevWalk walk = new RevWalk(repo);
-		walk.setRetainBody(true);
-		try {
-			for (ReflogEntry entry : stashEntries)
-				try {
-					stashCommits.add(walk.parseCommit(entry.getNewId()));
-				} catch (IOException e) {
-					throw new JGitInternalException(MessageFormat.format(
-							JGitText.get().cannotReadCommit, entry.getNewId()),
-							e);
-				}
-		} finally {
-			walk.dispose();
-		}
-		return stashCommits;
+	private PreReceiveHookChain(PreReceiveHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
 	}
 }
