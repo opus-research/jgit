@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
- * Copyright (C) 2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,66 +40,26 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api.errors;
 
-package org.eclipse.jgit.diff;
+/**
+ * The commit to be cherry-pick'ed did not have exactly one parent
+ */
+public class MultipleParentsNotAllowedException extends GitAPIException {
+	private static final long serialVersionUID = 1L;
 
-import org.eclipse.jgit.lib.Constants;
-
-import junit.framework.TestCase;
-
-public class RawTextIgnoreWhitespaceChangeTest extends TestCase {
-	private final RawTextComparator cmp = RawTextComparator.WS_IGNORE_CHANGE;
-
-	public void testEqualsWithoutWhitespace() {
-		final RawText a = new RawText(Constants
-				.encodeASCII("foo-a\nfoo-b\nfoo\n"));
-		final RawText b = new RawText(Constants
-				.encodeASCII("foo-b\nfoo-c\nf\n"));
-
-		assertEquals(3, a.size());
-		assertEquals(3, b.size());
-
-		// foo-a != foo-b
-		assertFalse(cmp.equals(a, 0, b, 0));
-		assertFalse(cmp.equals(b, 0, a, 0));
-
-		// foo-b == foo-b
-		assertTrue(cmp.equals(a, 1, b, 0));
-		assertTrue(cmp.equals(b, 0, a, 1));
-
-		// foo != f
-		assertFalse(cmp.equals(a, 2, b, 2));
-		assertFalse(cmp.equals(b, 2, a, 2));
+	/**
+	 * @param message
+	 * @param cause
+	 */
+	public MultipleParentsNotAllowedException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
-	public void testEqualsWithWhitespace() {
-		final RawText a = new RawText(Constants
-				.encodeASCII("foo-a\n         \n a b c\na      \n  foo\na  b  c\n"));
-		final RawText b = new RawText(Constants
-				.encodeASCII("foo-a        b\n\nab  c\na\nfoo\na b     c  \n"));
-
-		// "foo-a" != "foo-a        b"
-		assertFalse(cmp.equals(a, 0, b, 0));
-		assertFalse(cmp.equals(b, 0, a, 0));
-
-		// "         " == ""
-		assertTrue(cmp.equals(a, 1, b, 1));
-		assertTrue(cmp.equals(b, 1, a, 1));
-
-		// " a b c" != "ab  c"
-		assertFalse(cmp.equals(a, 2, b, 2));
-		assertFalse(cmp.equals(b, 2, a, 2));
-
-		// "a      " == "a"
-		assertTrue(cmp.equals(a, 3, b, 3));
-		assertTrue(cmp.equals(b, 3, a, 3));
-
-		// "  foo" != "foo"
-		assertFalse(cmp.equals(a, 4, b, 4));
-		assertFalse(cmp.equals(b, 4, a, 4));
-
-		// "a  b  c" == "a b     c  "
-		assertTrue(cmp.equals(a, 5, b, 5));
-		assertTrue(cmp.equals(b, 5, a, 5));
+	/**
+	 * @param message
+	 */
+	public MultipleParentsNotAllowedException(String message) {
+		super(message);
 	}
 }
