@@ -61,9 +61,6 @@ public class StreamCopyThread extends Thread {
 
 	private final AtomicInteger flushCount = new AtomicInteger(0);
 
-	/** Lock held by flush to avoid interrupting a write. */
-	private final Object writeLock;
-
 	/**
 	 * Create a thread to copy data from an input stream to an output stream.
 	 *
@@ -78,7 +75,6 @@ public class StreamCopyThread extends Thread {
 		setName(Thread.currentThread().getName() + "-StreamCopy"); //$NON-NLS-1$
 		src = i;
 		dst = o;
-		writeLock = new Object();
 	}
 
 	/**
@@ -90,9 +86,7 @@ public class StreamCopyThread extends Thread {
 	 */
 	public void flush() {
 		flushCount.incrementAndGet();
-		synchronized (writeLock) {
-			interrupt();
-		}
+		interrupt();
 	}
 
 	/**
@@ -124,12 +118,12 @@ public class StreamCopyThread extends Thread {
 			for (;;) {
 				try {
 					if (readInterrupted) {
-						synchronized (writeLock) {
-							boolean interruptedAgain = Thread.interrupted();
+						try {
 							dst.flush();
-							if (interruptedAgain) {
-								interrupt();
-							}
+						} catch (InterruptedIOException e) {
+							// There was a new flush() call during flush previous bytes
+							// need continue read/write/flush for the new bytes
+							continue;
 						}
 						readInterrupted = false;
 						if (!flushCount.compareAndSet(flushCountBeforeRead, 0)) {
@@ -154,27 +148,20 @@ public class StreamCopyThread extends Thread {
 					if (n < 0)
 						break;
 
-					synchronized (writeLock) {
-						if (Thread.interrupted()) {
-							interrupt();
+					boolean writeInterrupted = false;
+					for (;;) {
+						try {
+							dst.write(buf, 0, n);
+						} catch (InterruptedIOException wakey) {
+							writeInterrupted = true;
 							continue;
 						}
 
-						boolean writeInterrupted = false;
-						for (;;) {
-							try {
-								dst.write(buf, 0, n);
-							} catch (InterruptedIOException wakey) {
-								writeInterrupted = true;
-								continue;
-							}
-
-							// set interrupt status, which will be checked
-							// when we block in src.read
-							if (writeInterrupted || flushCount.get() > 0)
-								interrupt();
-							break;
-						}
+						// set interrupt status, which will be checked
+						// when we block in src.read
+						if (writeInterrupted || flushCount.get() > 0)
+							interrupt();
+						break;
 					}
 				} catch (IOException e) {
 					break;
