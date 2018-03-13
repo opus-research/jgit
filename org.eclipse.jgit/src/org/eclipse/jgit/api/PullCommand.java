@@ -98,8 +98,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 
 	private TagOpt tagOption;
 
-	private FastForwardMode fastForwardMode;
-
 	private FetchRecurseSubmodulesMode submoduleRecurseMode = null;
 
 	/**
@@ -351,9 +349,11 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			result = new PullResult(fetchRes, remote, rebaseRes);
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
-			MergeResult mergeRes = merge.include(upstreamName, commitToMerge)
-					.setStrategy(strategy).setProgressMonitor(monitor)
-					.setFastForward(getFastForwardMode()).call();
+			merge.include(upstreamName, commitToMerge);
+			merge.setStrategy(strategy);
+			merge.setProgressMonitor(monitor);
+			merge.setFastForward(getFastForwardMode());
+			MergeResult mergeRes = merge.call();
 			monitor.update(1);
 			result = new PullResult(fetchRes, remote, mergeRes);
 		}
@@ -436,22 +436,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	/**
-	 * Sets the fast forward mode. If set here takes precedence over the mode
-	 * configured in git config
-	 *
-	 * @param fastForwardMode
-	 *            corresponds to the --ff/--no-ff/--ff-only options. --ff is the
-	 *            default option.
-	 * @return {@code this}
-	 * @since 4.9
-	 */
-	public PullCommand setFastForward(FastForwardMode fastForwardMode) {
-		checkCallable();
-		this.fastForwardMode = fastForwardMode;
-		return this;
-	}
-
-	/**
 	 * Set the mode to be used for recursing into submodules.
 	 *
 	 * @param recurse
@@ -491,18 +475,10 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	private FastForwardMode getFastForwardMode() {
-		if (fastForwardMode != null) {
-			return fastForwardMode;
-		}
 		Config config = repo.getConfig();
 		Merge ffMode = config.getEnum(Merge.values(),
 				ConfigConstants.CONFIG_PULL_SECTION, null,
 				ConfigConstants.CONFIG_KEY_FF, null);
-		if (ffMode == null) {
-			ffMode = config.getEnum(Merge.values(),
-					ConfigConstants.CONFIG_MERGE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_FF, null);
-		}
 		return ffMode != null ? FastForwardMode.valueOf(ffMode) : null;
 	}
 }
