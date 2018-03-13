@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2013, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -55,9 +55,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 
 import org.eclipse.jgit.util.Base64;
@@ -71,8 +69,6 @@ import org.eclipse.jgit.util.Base64;
 abstract class HttpAuthMethod {
 	/** No authentication is configured. */
 	static final HttpAuthMethod NONE = new None();
-	static final String EMPTY_STRING = ""; //$NON-NLS-1$
-	static final String SCHEMA_NAME_SEPARATOR = " "; //$NON-NLS-1$
 
 	/**
 	 * Handle an authentication failure and possibly return a new response.
@@ -81,39 +77,22 @@ abstract class HttpAuthMethod {
 	 *            the connection that failed.
 	 * @return new authentication method to try.
 	 */
-	static HttpAuthMethod scanResponse(final HttpURLConnection conn) {
-		final Map<String, List<String>> headers = conn.getHeaderFields();
-		HttpAuthMethod authentication = NONE;
+	static HttpAuthMethod scanResponse(HttpURLConnection conn) {
+		String hdr = conn.getHeaderField(HDR_WWW_AUTHENTICATE);
+		if (hdr == null || hdr.length() == 0)
+			return NONE;
 
-		for (final Entry<String, List<String>> entry : headers.entrySet()) {
-			if (HDR_WWW_AUTHENTICATE.equalsIgnoreCase(entry.getKey())) {
-				if (entry.getValue() != null) {
-					for (final String value : entry.getValue()) {
-						if (value != null && value.length() != 0) {
-							final String[] valuePart = value.split(
-									SCHEMA_NAME_SEPARATOR, 2);
+		int sp = hdr.indexOf(' ');
+		if (sp < 0)
+			return NONE;
 
-							if (Digest.NAME.equalsIgnoreCase(valuePart[0])) {
-								final String param;
-								if (valuePart.length == 1)
-									param = EMPTY_STRING;
-								else
-									param = valuePart[1];
-
-								authentication = new Digest(param);
-								break;
-							}
-
-							if (Basic.NAME.equalsIgnoreCase(valuePart[0]))
-								authentication = new Basic();
-						}
-					}
-				}
-				break;
-			}
-		}
-
-		return authentication;
+		String type = hdr.substring(0, sp);
+		if (Basic.NAME.equalsIgnoreCase(type))
+			return new Basic();
+		else if (Digest.NAME.equalsIgnoreCase(type))
+			return new Digest(hdr.substring(sp + 1));
+		else
+			return NONE;
 	}
 
 	/**
