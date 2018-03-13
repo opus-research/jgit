@@ -123,7 +123,8 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();
 
-		try (RevWalk revWalk = new RevWalk(repo)) {
+		RevWalk revWalk = new RevWalk(repo);
+		try {
 
 			// get the head commit
 			Ref headRef = repo.getRef(Constants.HEAD);
@@ -152,7 +153,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				ResolveMerger merger = (ResolveMerger) strategy.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
-				merger.setCommitNames(new String[] { "BASE", ourName, //$NON-NLS-1$
+				merger.setCommitNames(new String[] { "BASE", ourName,
 						cherryPickName });
 				if (merger.merge(newHead, srcCommit)) {
 					if (AnyObjectId.equals(newHead.getTree().getId(), merger
@@ -193,6 +194,8 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 					MessageFormat.format(
 							JGitText.get().exceptionCaughtDuringExecutionOfCherryPickCommand,
 							e), e);
+		} finally {
+			revWalk.release();
 		}
 		return new CherryPickResult(newHead, cherryPickedRefs);
 	}

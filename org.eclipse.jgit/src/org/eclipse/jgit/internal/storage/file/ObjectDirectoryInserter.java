@@ -55,12 +55,10 @@ import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
 import org.eclipse.jgit.errors.ObjectWritingException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -125,8 +123,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 
 		final File dst = db.fileFor(id);
-		throw new ObjectWritingException(MessageFormat
-				.format(JGitText.get().unableToCreateNewObject, dst));
+		throw new ObjectWritingException("Unable to create new object: " + dst);
 	}
 
 	@Override
@@ -245,7 +242,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	private static EOFException shortInput(long missing) {
-		return new EOFException(MessageFormat.format(
-				JGitText.get().inputDidntMatchLength, Long.valueOf(missing)));
+		return new EOFException("Input did not match supplied length. "
+				+ missing + " bytes are missing.");
 	}
 }

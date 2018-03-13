@@ -47,14 +47,12 @@ package org.eclipse.jgit.merge;
 import static org.eclipse.jgit.lib.Constants.CHARACTER_ENCODING;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -90,7 +88,6 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -794,25 +791,25 @@ public class ResolveMerger extends ThreeWayMerger {
 		File parentFolder = of.getParentFile();
 		if (!fs.exists(parentFolder))
 			parentFolder.mkdirs();
-		try (OutputStream os = new BufferedOutputStream(
-				new FileOutputStream(of))) {
-			new MergeFormatter().formatMerge(os, result,
+		FileOutputStream fos = new FileOutputStream(of);
+		try {
+			new MergeFormatter().formatMerge(fos, result,
 					Arrays.asList(commitNames), CHARACTER_ENCODING);
+		} finally {
+			fos.close();
 		}
 		return of;
 	}
 
 	private ObjectId insertMergeResult(MergeResult<RawText> result)
 			throws IOException {
-		TemporaryBuffer.LocalFile buf = new TemporaryBuffer.LocalFile(
-				db.getDirectory(), 10 << 20);
+		TemporaryBuffer.LocalFile buf = new TemporaryBuffer.LocalFile(10 << 20);
 		try {
 			new MergeFormatter().formatMerge(buf, result,
 					Arrays.asList(commitNames), CHARACTER_ENCODING);
 			buf.close();
-			try (InputStream in = buf.openInputStream()) {
-				return getObjectInserter().insert(OBJ_BLOB, buf.length(), in);
-			}
+			return getObjectInserter().insert(OBJ_BLOB, buf.length(),
+					buf.openInputStream());
 		} finally {
 			buf.destroy();
 		}
@@ -1009,7 +1006,6 @@ public class ResolveMerger extends ThreeWayMerger {
 		DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
 		tw = new NameConflictTreeWalk(reader);
-		tw.setFilter(TreeFilter.ANY_DIFF);
 		tw.addTree(baseTree);
 		tw.addTree(headTree);
 		tw.addTree(mergeTree);
