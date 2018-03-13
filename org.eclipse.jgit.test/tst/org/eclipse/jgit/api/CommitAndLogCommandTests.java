@@ -67,10 +67,8 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
 
 public class CommitAndLogCommandTests extends RepositoryTestCase {
-	@Test
 	public void testSomeCommits() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
@@ -105,7 +103,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	// try to do a commit without specifying a message. Should fail!
-	@Test
 	public void testWrongParams() throws UnmergedPathException,
 			NoHeadException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
@@ -120,7 +117,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	// try to work with Commands after command has been invoked. Should throw
 	// exceptions
-	@Test
 	public void testMultipleInvocations() throws NoHeadException,
 			ConcurrentRefUpdateException, NoMessageException,
 			UnmergedPathException, JGitInternalException,
@@ -146,7 +142,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testMergeEmptyBranches() throws IOException, NoHeadException,
 			NoMessageException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
@@ -170,7 +165,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		assertTrue(parents.length==2);
 	}
 
-	@Test
 	public void testAddUnstagedChanges() throws IOException, NoHeadException,
 			NoMessageException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
@@ -203,7 +197,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 				tw.getObjectId(0).getName());
 	}
 
-	@Test
 	public void testCommitRange() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
