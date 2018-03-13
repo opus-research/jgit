@@ -881,8 +881,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			try {
 				dco.checkout();
 			} catch (org.eclipse.jgit.errors.CheckoutConflictException cce) {
-				throw new CheckoutConflictException(new ArrayList<String>(dco
-						.getConflicts().keySet()), cce);
+				throw new CheckoutConflictException(dco.getConflicts(), cce);
 			}
 			// update the HEAD
 			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, true);
