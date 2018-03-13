@@ -153,7 +153,6 @@ class TransportLocal extends Transport implements PackTransport {
 	TransportLocal(Repository local, URIish uri, File gitDir) {
 		super(local, uri);
 		remoteGitDir = gitDir;
-		System.out.println("TransportLocal: gitDir = " + gitDir.toString());
 	}
 
 	TransportLocal(URIish uri, File gitDir) {
