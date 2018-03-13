@@ -41,92 +41,94 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.util.io;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.zip.InflaterInputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectStream;
+import org.eclipse.jgit.util.TemporaryBuffer;
 
-class LargePackedWholeObject extends ObjectLoader {
-	private final int type;
+/**
+ * Input stream that copies data read to another output stream.
+ *
+ * This stream is primarily useful with a {@link TemporaryBuffer}, where any
+ * data read or skipped by the caller is also duplicated into the temporary
+ * buffer. Later the temporary buffer can then be used instead of the original
+ * source stream.
+ *
+ * During close this stream copies any remaining data from the source stream
+ * into the destination stream.
+ */
+public class TeeInputStream extends InputStream {
+	private byte[] skipBuffer;
 
-	private final long size;
+	private InputStream src;
 
-	private final long objectOffset;
+	private OutputStream dst;
 
-	private final int headerLength;
-
-	private final PackFile pack;
-
-	private final FileObjectDatabase db;
-
-	LargePackedWholeObject(int type, long size, long objectOffset,
-			int headerLength, PackFile pack, FileObjectDatabase db) {
-		this.type = type;
-		this.size = size;
-		this.objectOffset = objectOffset;
-		this.headerLength = headerLength;
-		this.pack = pack;
-		this.db = db;
+	/**
+	 * Initialize a tee input stream.
+	 *
+	 * @param src
+	 *            source stream to consume.
+	 * @param dst
+	 *            destination to copy the source to as it is consumed. Typically
+	 *            this is a {@link TemporaryBuffer}.
+	 */
+	public TeeInputStream(InputStream src, OutputStream dst) {
+		this.src = src;
+		this.dst = dst;
 	}
 
 	@Override
-	public int getType() {
-		return type;
+	public int read() throws IOException {
+		byte[] b = skipBuffer();
+		int n = read(b, 0, 1);
+		return n == 1 ? b[0] & 0xff : -1;
 	}
 
 	@Override
-	public long getSize() {
-		return size;
-	}
-
-	@Override
-	public boolean isLarge() {
-		return true;
-	}
-
-	@Override
-	public byte[] getCachedBytes() throws LargeObjectException {
-		try {
-			throw new LargeObjectException(getObjectId());
-		} catch (IOException cannotObtainId) {
-			LargeObjectException err = new LargeObjectException();
-			err.initCause(cannotObtainId);
-			throw err;
+	public long skip(long cnt) throws IOException {
+		long skipped = 0;
+		byte[] b = skipBuffer();
+		while (0 < cnt) {
+			int n = src.read(b, 0, (int) Math.min(b.length, cnt));
+			if (n <= 0)
+				break;
+			dst.write(b, 0, n);
+			skipped += n;
+			cnt -= n;
 		}
+		return skipped;
 	}
 
 	@Override
-	public ObjectStream openStream() throws MissingObjectException, IOException {
-		WindowCursor wc = new WindowCursor(db);
-		InputStream in;
-		try {
-			in = new PackInputStream(pack, objectOffset + headerLength, wc);
-		} catch (IOException packGone) {
-			// If the pack file cannot be pinned into the cursor, it
-			// probably was repacked recently. Go find the object
-			// again and open the stream from that location instead.
-			//
-			return wc.open(getObjectId(), type).openStream();
-		}
+	public int read(byte[] b, int off, int len) throws IOException {
+		if (len == 0)
+			return 0;
 
-		in = new BufferedInputStream( //
-				new InflaterInputStream( //
-						in, //
-						wc.inflater(), //
-						8192), //
-				8192);
-		return new ObjectStream.Filter(type, size, in);
+		int n = src.read(b, off, len);
+		if (0 < n)
+			dst.write(b, off, len);
+		return n;
 	}
 
-	private ObjectId getObjectId() throws IOException {
-		return pack.findObjectForOffset(objectOffset);
+	public void close() throws IOException {
+		byte[] b = skipBuffer();
+		for (;;) {
+			int n = src.read(b);
+			if (n <= 0)
+				break;
+			dst.write(b, 0, n);
+		}
+		dst.close();
+		src.close();
+	}
+
+	private byte[] skipBuffer() {
+		if (skipBuffer == null)
+			skipBuffer = new byte[2048];
+		return skipBuffer;
 	}
 }

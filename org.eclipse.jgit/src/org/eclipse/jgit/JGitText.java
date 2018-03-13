@@ -206,6 +206,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
+	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccuredDuringReadingOfGIT_DIR;
 	/***/ public String expectedACKNAKFoundEOF;
@@ -275,6 +276,10 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidWindowSize;
 	/***/ public String isAStaticFlagAndHasNorevWalkInstance;
 	/***/ public String kNotInRange;
+	/***/ public String largeObjectException;
+	/***/ public String largeObjectOutOfMemory;
+	/***/ public String largeObjectExceedsByteArray;
+	/***/ public String largeObjectExceedsLimit;
 	/***/ public String lengthExceedsMaximumArraySize;
 	/***/ public String listingAlternates;
 	/***/ public String localObjectsIncomplete;
@@ -390,6 +395,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
 	/***/ public String shortSkipOfBlock;
+	/***/ public String signingNotSupportedOnTag;
 	/***/ public String similarityScoreMustBeWithinBounds;
 	/***/ public String sizeExceeds2GB;
 	/***/ public String smartHTTPPushDisabled;
@@ -402,6 +408,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
 	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
+	/***/ public String tagNameInvalid;
+	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
@@ -429,12 +437,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;
+	/***/ public String unknownObject;
 	/***/ public String unknownObjectType;
 	/***/ public String unknownRepositoryFormat2;
 	/***/ public String unknownRepositoryFormat;
 	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
-	/***/ public String unpackError;
 	/***/ public String unreadablePackIndex;
 	/***/ public String unrecognizedRef;
 	/***/ public String unsupportedCommand0;
