@@ -46,7 +46,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.channels.FileChannel;
@@ -115,7 +114,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private String branch;
 	private PersonIdent author;
 	private RemoteReader callback;
-	private InputStream inputStream;
 
 	private List<Project> bareProjects;
 	private Git git;
@@ -251,7 +249,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	private static class XmlManifest extends DefaultHandler {
 		private final RepoCommand command;
-		private final InputStream inputStream;
 		private final String filename;
 		private final String baseUrl;
 		private final Map<String, String> remotes;
@@ -262,10 +259,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		private String defaultRevision;
 		private Project currentProject;
 
-		XmlManifest(RepoCommand command, InputStream inputStream,
-				String filename, String baseUrl, String groups) {
+		XmlManifest(RepoCommand command, String filename, String baseUrl, String groups) {
 			this.command = command;
-			this.inputStream = inputStream;
 			this.filename = filename;
 			this.baseUrl = baseUrl;
 			remotes = new HashMap<String, String>();
@@ -293,13 +288,16 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				throw new IOException(JGitText.get().noXMLParserAvailable);
 			}
 			xr.setContentHandler(this);
+			final FileInputStream in = new FileInputStream(filename);
 			try {
-				xr.parse(new InputSource(inputStream));
+				xr.parse(new InputSource(in));
 			} catch (SAXException e) {
-				IOException error = new IOException(
-							RepoText.get().errorParsingManifestFile);
+				IOException error = new IOException(MessageFormat.format(
+							RepoText.get().errorParsingManifestFile, filename));
 				error.initCause(e);
 				throw error;
+			} finally {
+				in.close();
 			}
 		}
 
@@ -348,16 +346,13 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		@Override
 		public void endDocument() throws SAXException {
 			if (defaultRemote == null) {
-				if (filename != null)
-					throw new SAXException(MessageFormat.format(
-							RepoText.get().errorNoDefaultFilename, filename));
-				else
-					throw new SAXException(RepoText.get().errorNoDefault);
+				throw new SAXException(MessageFormat.format(
+						RepoText.get().errorNoDefault, filename));
 			}
 			final String remoteUrl;
 			try {
-				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote))); //$NON-NLS-1$
-				remoteUrl = uri.normalize().toString();
+				URI uri = new URI(baseUrl);
+				remoteUrl = uri.resolve(remotes.get(defaultRemote)).toString();
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
 			}
@@ -411,9 +406,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set path to the manifest XML file.
-	 *
-	 * Calling {@link #setInputStream} will ignore the path set here.
+	 * Set path to the manifest XML file
 	 *
 	 * @param path
 	 *            (with <code>/</code> as separator)
@@ -421,20 +414,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 */
 	public RepoCommand setPath(final String path) {
 		this.path = path;
-		return this;
-	}
-
-	/**
-	 * Set the input stream to the manifest XML.
-	 *
-	 * Setting inputStream will ignore the path set.
-	 * It will be closed in {@link #call}.
-	 *
-	 * @param inputStream
-	 * @return this command
-	 */
-	public RepoCommand setInputStream(final InputStream inputStream) {
-		this.inputStream = inputStream;
 		return this;
 	}
 
@@ -517,46 +496,26 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	@Override
 	public RevCommit call() throws GitAPIException {
+		checkCallable();
+		if (path == null || path.length() == 0)
+			throw new IllegalArgumentException(JGitText.get().pathNotConfigured);
+		if (uri == null || uri.length() == 0)
+			throw new IllegalArgumentException(JGitText.get().uriNotConfigured);
+
+		if (repo.isBare()) {
+			bareProjects = new ArrayList<Project>();
+			if (author == null)
+				author = new PersonIdent(repo);
+			if (callback == null)
+				callback = new DefaultRemoteReader();
+		} else
+			git = new Git(repo);
+
+		XmlManifest manifest = new XmlManifest(this, path, uri, groups);
 		try {
-			checkCallable();
-			if (uri == null || uri.length() == 0)
-				throw new IllegalArgumentException(
-						JGitText.get().uriNotConfigured);
-			if (inputStream == null) {
-				if (path == null || path.length() == 0)
-					throw new IllegalArgumentException(
-							JGitText.get().pathNotConfigured);
-				try {
-					inputStream = new FileInputStream(path);
-				} catch (IOException e) {
-					throw new IllegalArgumentException(
-							JGitText.get().pathNotConfigured);
-				}
-			}
-
-			if (repo.isBare()) {
-				bareProjects = new ArrayList<Project>();
-				if (author == null)
-					author = new PersonIdent(repo);
-				if (callback == null)
-					callback = new DefaultRemoteReader();
-			} else
-				git = new Git(repo);
-
-			XmlManifest manifest = new XmlManifest(
-					this, inputStream, path, uri, groups);
-			try {
-				manifest.read();
-			} catch (IOException e) {
-				throw new ManifestErrorException(e);
-			}
-		} finally {
-			try {
-				if (inputStream != null)
-					inputStream.close();
-			} catch (IOException e) {
-				// Just ignore it, it's not important.
-			}
+			manifest.read();
+		} catch (IOException e) {
+			throw new ManifestErrorException(e);
 		}
 
 		if (repo.isBare()) {
