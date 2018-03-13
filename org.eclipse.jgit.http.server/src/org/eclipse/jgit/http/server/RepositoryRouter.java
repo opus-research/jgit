@@ -157,9 +157,11 @@ public class RepositoryRouter implements Filter {
 				receivePackFactory));
 		bind("^/(.*)/objects/info/packs$", new InfoPacksServlet());
 		bind("^/(.*)/objects/([0-9a-f]{2}/[0-9a-f]{38})$",
-				new LooseObjectFileServlet());
-		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.(?:pack|idx))$",
-				new PackFileServlet());
+				new ObjectFileServlet.Loose());
+		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.pack)$",
+				new ObjectFileServlet.Pack());
+		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.idx)$",
+				new ObjectFileServlet.PackIdx());
 
 		bind("^/(.*)/git-upload-pack$", //
 				new UploadPackServlet(uploadPackFactory));

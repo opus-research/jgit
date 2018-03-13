@@ -46,7 +46,6 @@ package org.eclipse.jgit.http.server;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -77,21 +76,8 @@ class InfoRefsServlet extends RepositoryServlet {
 		this.receivePackFactory = receivePackFactory;
 	}
 
-	@Override
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		serve(req, rsp, true);
-	}
-
-	@Override
-	protected void doHead(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws ServletException, IOException {
-		serve(req, rsp, false);
-	}
-
-	private void serve(final HttpServletRequest req,
-			final HttpServletResponse rsp, final boolean sendBody)
-			throws IOException {
 		final byte[] raw;
 		try {
 			final Repository db = getRepository(req);
@@ -133,7 +119,7 @@ class InfoRefsServlet extends RepositoryServlet {
 			return;
 		}
 
-		send(raw, req, rsp, sendBody);
+		send(raw, req, rsp);
 	}
 
 	private byte[] dumbHttp(final Repository db) throws IOException {
