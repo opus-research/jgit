@@ -83,8 +83,7 @@ public class RebaseTodoFile {
 	 * @throws IOException
 	 */
 	public List<RebaseTodoLine> readRebaseTodo(String path,
-			boolean includeComments)
-			throws IOException {
+			boolean includeComments) throws IOException {
 		byte[] buf = IO.readFully(new File(repo.getDirectory(), path));
 		int ptr = 0;
 		int tokenBegin = 0;
@@ -99,59 +98,64 @@ public class RebaseTodoFile {
 			// Handle comments
 			if (buf[tokenBegin] == '#') {
 				if (includeComments) {
-					RebaseTodoLine line = null;
-					String commentString = RawParseUtils.decode(buf,
-							tokenBegin, lineEnd + 1);
-					try {
-						int skip = tokenBegin + 1; // skip '#'
-						skip = nextParsableToken(buf, skip, lineEnd);
-						if (skip != -1) {
-							// try to parse the line as non-comment
-							line = parseLine(buf, skip, lineEnd);
-							// successfully parsed as non-comment line
-							// mark this line as a comment explicitly
-							line.setAction(Action.COMMENT);
-							// use the read line as comment string
-							line.setComment(commentString);
-						}
-					} catch (Exception e) {
-						// parsing as non-comment line failed
-						line = null;
-					} finally {
-						if (line == null)
-							line = new RebaseTodoLine(commentString);
-						r.add(line);
-					}
+					parseComments(buf, tokenBegin, r, lineEnd);
 				}
-				continue;
+			} else {
+				// skip leading spaces+tabs+cr
+				tokenBegin = nextParsableToken(buf, tokenBegin, lineEnd);
+				// Handle empty lines (maybe empty after skipping leading
+				// whitespace)
+				if (tokenBegin == -1) {
+					if (includeComments)
+						r.add(new RebaseTodoLine(RawParseUtils.decode(buf,
+								lineStart, 1 + lineEnd)));
+					continue;
+				}
+				RebaseTodoLine line = parseLine(buf, tokenBegin, lineEnd);
+				if (line == null)
+					continue;
+				r.add(line);
 			}
-			// skip leading spaces+tabs+cr
-			tokenBegin = nextParsableToken(buf, tokenBegin, lineEnd);
-			// Handle empty lines (maybe empty after skipping leading
-			// whitespace)
-			if (tokenBegin == -1) {
-				if (includeComments)
-					r.add(new RebaseTodoLine(RawParseUtils.decode(buf,
-							lineStart, 1 + lineEnd)));
-				continue;
-			}
-			RebaseTodoLine line = parseLine(buf, tokenBegin, lineEnd);
-			if (line == null)
-				continue;
-			r.add(line);
 		}
 		return r;
 	}
 
+	private static void parseComments(byte[] buf, int tokenBegin,
+			List<RebaseTodoLine> r, int lineEnd) {
+		RebaseTodoLine line = null;
+		String commentString = RawParseUtils.decode(buf,
+				tokenBegin, lineEnd + 1);
+		try {
+			int skip = tokenBegin + 1; // skip '#'
+			skip = nextParsableToken(buf, skip, lineEnd);
+			if (skip != -1) {
+				// try to parse the line as non-comment
+				line = parseLine(buf, skip, lineEnd);
+				// successfully parsed as non-comment line
+				// mark this line as a comment explicitly
+				line.setAction(Action.COMMENT);
+				// use the read line as comment string
+				line.setComment(commentString);
+			}
+		} catch (Exception e) {
+			// parsing as non-comment line failed
+			line = null;
+		} finally {
+			if (line == null)
+				line = new RebaseTodoLine(commentString);
+			r.add(line);
+		}
+	}
+
 	/**
-	 * skip leading spaces, tabs and cr
+	 * Skip leading space, tab, CR and LF characters
 	 *
 	 * @param buf
 	 * @param tokenBegin
 	 * @param lineEnd
-	 * @return the token within the range of the given <code>buf</code> that
-	 *         doesn't need to be skipped, <code>-1</code> if no such token
-	 *         found within the range (i.e. empty line)
+	 * @return the token within the range of the given {@code buf} that doesn't
+	 *         need to be skipped, {@code -1} if no such token found within the
+	 *         range (i.e. empty line)
 	 */
 	private static int nextParsableToken(byte[] buf, int tokenBegin, int lineEnd) {
 		while (tokenBegin <= lineEnd

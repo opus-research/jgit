@@ -1639,6 +1639,57 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testRebaseShouldNotFailIfUserAddCommentLinesInPrepareSteps()
+			throws Exception {
+		commitFile(FILE1, FILE1, "master");
+		RevCommit c2 = commitFile("file2", "file2", "master");
+
+		// update files on master
+		commitFile(FILE1, "blah", "master");
+		RevCommit c4 = commitFile("file2", "more change", "master");
+
+		RebaseResult res = git.rebase().setUpstream("HEAD~2")
+				.runInteractively(new InteractiveHandler() {
+					public void prepareSteps(List<RebaseTodoLine> steps) {
+						steps.add(0, new RebaseTodoLine(
+								"# Comment that should not be processed"));
+					}
+
+					public String modifyCommitMessage(String commit) {
+						fail("modifyCommitMessage() was not expected to be called");
+						return commit;
+					}
+				}).call();
+
+		assertEquals(RebaseResult.Status.FAST_FORWARD, res.getStatus());
+
+		RebaseResult res2 = git.rebase().setUpstream("HEAD~2")
+				.runInteractively(new InteractiveHandler() {
+					public void prepareSteps(List<RebaseTodoLine> steps) {
+						steps.get(0).setAction(Action.COMMENT); // delete
+																// RevCommit c4
+					}
+
+					public String modifyCommitMessage(String commit) {
+						fail("modifyCommitMessage() was not expected to be called");
+						return commit;
+					}
+				}).call();
+
+		assertEquals(RebaseResult.Status.OK, res2.getStatus());
+
+		ObjectId headId = db.resolve(Constants.HEAD);
+		RevWalk rw = new RevWalk(db);
+		RevCommit rc = rw.parseCommit(headId);
+
+		ObjectId head1Id = db.resolve(Constants.HEAD + "~1");
+		RevCommit rc1 = rw.parseCommit(head1Id);
+
+		assertEquals(rc.getFullMessage(), c4.getFullMessage());
+		assertEquals(rc1.getFullMessage(), c2.getFullMessage());
+	}
+
+	@Test
 	public void testParseRewordCommand() throws Exception {
 		String todo = "pick 1111111 Commit 1\n"
 				+ "reword 2222222 Commit 2\n";
