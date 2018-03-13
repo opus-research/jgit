@@ -48,12 +48,12 @@ import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.CannotDeleteCurrentBranchException;
 import org.eclipse.jgit.api.errors.DetachedHeadException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NotMergedException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -287,6 +287,16 @@ public class BranchCommandTest extends RepositoryTestCase {
 		// the pull configuration should be gone after deletion
 		assertNull(localGit.getRepository().getConfig().getString("branch",
 				"newFromRemote", "remote"));
+
+		createBranch(localGit, "newFromRemote", false, remote.getName(), null);
+		assertEquals("origin", localGit.getRepository().getConfig().getString(
+				"branch", "newFromRemote", "remote"));
+		localGit.branchDelete().setBranchNames("refs/heads/newFromRemote")
+				.call();
+		// the pull configuration should be gone after deletion
+		assertNull(localGit.getRepository().getConfig().getString("branch",
+				"newFromRemote", "remote"));
+
 		// use --no-track
 		createBranch(localGit, "newFromRemote", false, remote.getName(),
 				SetupUpstreamMode.NOTRACK);
@@ -307,7 +317,8 @@ public class BranchCommandTest extends RepositoryTestCase {
 				SetupUpstreamMode.TRACK);
 		assertEquals(".", localGit.getRepository().getConfig().getString(
 				"branch", "newFromMaster", "remote"));
-		localGit.branchDelete().setBranchNames("newFromMaster").call();
+		localGit.branchDelete().setBranchNames("refs/heads/newFromMaster")
+				.call();
 		// the pull configuration should be gone after deletion
 		assertNull(localGit.getRepository().getConfig().getString("branch",
 				"newFromRemote", "remote"));
@@ -401,10 +412,15 @@ public class BranchCommandTest extends RepositoryTestCase {
 		assertEquals(Constants.R_REMOTES + "newRemote", renamed.getName());
 	}
 
+	public void testCreationImplicitStart() throws JGitInternalException,
+			GitAPIException {
+		git.branchCreate().setName("topic").call();
+	}
+
 	public Ref createBranch(Git actGit, String name, boolean force,
 			String startPoint, SetupUpstreamMode mode)
 			throws JGitInternalException, RefAlreadyExistsException,
-			AmbiguousObjectException, RefNotFoundException,
+			RefNotFoundException,
 			InvalidRefNameException {
 		CreateBranchCommand cmd = actGit.branchCreate();
 		cmd.setName(name);
