@@ -81,24 +81,22 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 		FileRepository submoduleStandalone = createWorkRepository();
 		JGitTestUtil.writeTrashFile(submoduleStandalone, "fileInSubmodule",
 				"submodule");
-		try (Git submoduleStandaloneGit = new Git(submoduleStandalone)) {
-			submoduleStandaloneGit.add().addFilepattern("fileInSubmodule")
-					.call();
-			submoduleStandaloneGit.commit().setMessage("add file to submodule")
-					.call();
+		Git submoduleStandaloneGit = Git.wrap(submoduleStandalone);
+		submoduleStandaloneGit.add().addFilepattern("fileInSubmodule").call();
+		submoduleStandaloneGit.commit().setMessage("add file to submodule")
+				.call();
 
-			submodule_db = (FileRepository) Git.wrap(db).submoduleAdd()
-					.setPath("modules/submodule").setURI(submoduleStandalone
-							.getDirectory().toURI().toString())
-					.call();
-		}
+		submodule_db = (FileRepository) Git.wrap(db).submoduleAdd()
+				.setPath("modules/submodule")
+				.setURI(submoduleStandalone.getDirectory().toURI().toString())
+				.call();
+		submoduleStandalone.close();
 		submodule_trash = submodule_db.getWorkTree();
 		addRepoToClose(submodule_db);
 		writeTrashFile("fileInRoot", "root");
-		try (Git rootGit = new Git(db)) {
-			rootGit.add().addFilepattern("fileInRoot").call();
-			rootGit.commit().setMessage("add submodule and root file").call();
-		}
+		Git rootGit = Git.wrap(db);
+		rootGit.add().addFilepattern("fileInRoot").call();
+		rootGit.commit().setMessage("add submodule and root file").call();
 	}
 
 	@Theory
