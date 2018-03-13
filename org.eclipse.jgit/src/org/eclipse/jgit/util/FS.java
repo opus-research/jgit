@@ -275,10 +275,11 @@ public abstract class FS {
 
 	/**
 	 * Delete a file. Throws an exception if delete fails.
-	 *
+	 * 
 	 * @param f
 	 * @throws IOException
 	 *             this may be a Java7 subclass with detailed information
+	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
 		if (!f.delete())
@@ -636,6 +637,8 @@ public abstract class FS {
 
 	/**
 	 * File attributes we typically care for.
+	 *
+	 * @since 3.3
 	 */
 	public static class Attributes {
 
@@ -763,6 +766,7 @@ public abstract class FS {
 	/**
 	 * @param path
 	 * @return the file attributes we care for
+	 * @since 3.3
 	 */
 	public Attributes getAttributes(File path) {
 		boolean isDirectory = isDirectory(path);
@@ -775,25 +779,5 @@ public abstract class FS {
 		long createTime = 0L;
 		return new Attributes(this, path, exists, isDirectory, canExecute,
 				isSymlink, isFile, createTime, lastModified, -1);
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param file
-	 * @return NFC-format File
-	 */
-	public File normalize(File file) {
-		return file;
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param name
-	 * @return NFC-format string
-	 */
-	public String normalize(String name) {
-		return name;
 	}
 }
