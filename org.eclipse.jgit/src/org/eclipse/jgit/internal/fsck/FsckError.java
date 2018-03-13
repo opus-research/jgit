@@ -128,8 +128,6 @@ public class FsckError {
 
 	private final Set<CorruptIndex> corruptIndices = new HashSet<>();
 
-	private final Set<String> nonCommitHeads = new HashSet<>();
-
 	/** @return corrupt objects from all pack files. */
 	public Set<CorruptObject> getCorruptObjects() {
 		return corruptObjects;
@@ -143,10 +141,5 @@ public class FsckError {
 	/** @return corrupt index files associated with the packs. */
 	public Set<CorruptIndex> getCorruptIndices() {
 		return corruptIndices;
-	}
-
-	/** @return refs/heads/* point to non-commit object. */
-	public Set<String> getNonCommitHeads() {
-		return nonCommitHeads;
 	}
 }
