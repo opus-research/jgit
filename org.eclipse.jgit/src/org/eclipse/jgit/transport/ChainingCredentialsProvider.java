@@ -114,6 +114,9 @@ public class ChainingCredentialsProvider extends CredentialsProvider {
 		for (CredentialsProvider p : credentialProviders) {
 			if (p.supports(items)) {
 				if (!p.get(uri, items)) {
+					if (p.isInteractive()) {
+						return false; // user cancelled the request
+					}
 					continue;
 				}
 				if (isAnyNull(items)) {
@@ -122,13 +125,6 @@ public class ChainingCredentialsProvider extends CredentialsProvider {
 				return true;
 			}
 		}
-		return false;
-	}
-
-	private boolean isAnyNull(CredentialItem... items) {
-		for (CredentialItem i : items)
-			if (i == null)
-				return true;
 		return false;
 	}
 }
