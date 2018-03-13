@@ -46,7 +46,6 @@ package org.eclipse.jgit.internal.storage.pack;
 import java.io.IOException;
 import java.util.Set;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.BitmapIndex;
@@ -118,7 +117,7 @@ final class PackWriterBitmapWalker {
 						new AddUnseenToBitmapFilter(seen, bitmapResult));
 			}
 
-			while (next(walker, ignoreMissingStart) != null) {
+			while (walker.next() != null) {
 				// Iterate through all of the commits. The BitmapRevFilter does
 				// the work.
 				//
@@ -133,7 +132,7 @@ final class PackWriterBitmapWalker {
 			}
 
 			RevObject ro;
-			while ((ro = nextObject(walker, ignoreMissingStart)) != null) {
+			while ((ro = walker.nextObject()) != null) {
 				bitmapResult.addObject(ro, ro.getType());
 				pm.update(1);
 			}
@@ -144,48 +143,6 @@ final class PackWriterBitmapWalker {
 
 	void reset() {
 		walker.reset();
-	}
-
-	/**
-	 * Walk the next most recent commit.
-	 *
-	 * @return null when the walk has finished.
-	 * @throws MissingObjectException Only when throw the exception when
-	 * ignoreMissing flag is set false. Otherwise, continue the walk.
-	 */
-	@Nullable
-	private static RevCommit next(ObjectWalk walker, boolean ignoreMissing)
-			throws IOException {
-		while (true) {
-			try {
-				return walker.next();
-			} catch (MissingObjectException e) {
-				if (!ignoreMissing) {
-					throw e;
-				}
-			}
-		}
-	}
-
-	/**
-	 * Walk the next most recent object.
-	 *
-	 * @return null when the walk has finished.
-	 * @throws MissingObjectException Only when throw the exception when
-	 * ignoreMissing flag is set false. Otherwise, continue the walk.
-	 */
-	@Nullable
-	private static RevObject nextObject(ObjectWalk walker,
-			boolean ignoreMissing) throws IOException {
-		while (true) {
-			try {
-				return walker.nextObject();
-			} catch (MissingObjectException e) {
-				if (!ignoreMissing) {
-					throw e;
-				}
-			}
-		}
 	}
 
 	/**
