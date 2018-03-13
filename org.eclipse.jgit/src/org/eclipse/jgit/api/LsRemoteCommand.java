@@ -149,7 +149,8 @@ public class LsRemoteCommand extends
 	 *             exception can be retrieved by calling
 	 *             {@link Exception#getCause()}.
 	 */
-	public Collection<Ref> call() throws GitAPIException, JGitInternalException {
+	public Collection<Ref> call() throws GitAPIException,
+			JGitInternalException {
 		checkCallable();
 
 		Transport transport = null;
