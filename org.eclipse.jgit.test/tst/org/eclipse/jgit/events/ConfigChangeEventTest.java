@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.events;
 
-package org.eclipse.jgit.lib;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
-import java.io.IOException;
+public class ConfigChangeEventTest extends RepositoryTestCase {
+	public void testFileRepository_ChangeEventsOnlyOnSave() throws Exception {
+		final ConfigChangedEvent[] events = new ConfigChangedEvent[1];
+		db.getListenerList().addConfigChangedListener(
+				new ConfigChangedListener() {
+					public void onConfigChanged(ConfigChangedEvent event) {
+						events[0] = event;
+					}
+				});
+		FileBasedConfig config = db.getConfig();
+		assertNull(events[0]);
 
-import org.eclipse.jgit.errors.MissingObjectException;
+		// set a value to some arbitrary key
+		config.setString("test", "section", "event", "value");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 
-/**
- * Queue to examine object sizes asynchronously.
- *
- * A queue may perform background lookup of object sizes and supply them
- * (possibly out-of-order) to the application.
- *
- * @param <T>
- *            type of identifier supplied to the call that made the queue.
- */
-public interface AsyncObjectSizeQueue<T extends ObjectId> extends
-		AsyncOperation {
+		// reset for the next test
+		events[0] = null;
 
-	/**
-	 * Position this queue onto the next available result.
-	 *
-	 * @return true if there is a result available; false if the queue has
-	 *         finished its input iteration.
-	 * @throws MissingObjectException
-	 *             the object does not exist. If the implementation is retaining
-	 *             the application's objects {@link #getCurrent()} will be the
-	 *             current object that is missing. There may be more results
-	 *             still available, so the caller should continue invoking next
-	 *             to examine another result.
-	 * @throws IOException
-	 *             the object store cannot be accessed.
-	 */
-	public boolean next() throws MissingObjectException, IOException;
-
-	/**
-	 * @return the current object, null if the implementation lost track.
-	 *         Implementations may for performance reasons discard the caller's
-	 *         ObjectId and provider their own through {@link #getObjectId()}.
-	 */
-	public T getCurrent();
-
-	/** @return the ObjectId of the current object. Never null. */
-	public ObjectId getObjectId();
-
-	/** @return the size of the current object. */
-	public long getSize();
+		// unset the value we have just set above
+		config.unset("test", "section", "event");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
+	}
 }

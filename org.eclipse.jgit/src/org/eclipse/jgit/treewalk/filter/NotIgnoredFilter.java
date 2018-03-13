@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,31 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.revwalk;
+package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.AsyncOperation;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
- * Queue to lookup and parse objects asynchronously.
- *
- * A queue may perform background lookup of objects and supply them (possibly
- * out-of-order) to the application.
+ * This filter includes workdir entries that are not ignored. This class is
+ * immutable.
  */
-public interface AsyncRevObjectQueue extends AsyncOperation {
+public class NotIgnoredFilter extends TreeFilter {
+
+	private final int workdirTreeIndex;
+
 	/**
-	 * Obtain the next object.
+	 * constructor
 	 *
-	 * @return the object; null if there are no more objects remaining.
-	 * @throws MissingObjectException
-	 *             the object does not exist. There may be more objects
-	 *             remaining in the iteration, the application should call
-	 *             {@link #next()} again.
-	 * @throws IOException
-	 *             the object store cannot be accessed.
+	 * @param workdirTreeIndex
+	 *            index of the workdir tree in the tree walk
 	 */
-	public RevObject next() throws MissingObjectException, IOException;
+	public NotIgnoredFilter(final int workdirTreeIndex) {
+		this.workdirTreeIndex = workdirTreeIndex;
+	}
+
+	@Override
+	public boolean include(TreeWalk walker) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		WorkingTreeIterator workingTreeIterator = walker.getTree(
+				workdirTreeIndex, WorkingTreeIterator.class);
+		if (workingTreeIterator != null)
+			// do not include ignored entries
+			return !workingTreeIterator.isEntryIgnored();
+		return true;
+	}
+
+	@Override
+	public boolean shouldBeRecursive() {
+		return false;
+	}
+
+	@Override
+	public TreeFilter clone() {
+		// immutable
+		return this;
+	}
+
 }
