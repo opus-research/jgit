@@ -62,30 +62,24 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
@@ -256,10 +250,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		switch (mode & FileMode.TYPE_MASK) {
-		case FileMode.TYPE_SYMLINK:
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
 			return contentId = idBufferBlob(entries[ptr]);
+		case FileMode.TYPE_SYMLINK:
+			// Java does not support symbolic links, so we should not
+			// have reached this particular part of the walk code.
+			//
+			return zeroid;
 		case FileMode.TYPE_GITLINK:
 			contentIdFromPtr = ptr;
 			return contentId = idSubmodule(entries[ptr]);
@@ -401,11 +399,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private static boolean isBinary(byte[] content, int sz) {
+	private boolean isBinary(byte[] content, int sz) {
 		return RawText.isBinary(content, sz);
 	}
 
-	private static boolean isBinary(Entry entry) throws IOException {
+	private boolean isBinary(Entry entry) throws IOException {
 		InputStream in = entry.openInputStream();
 		try {
 			return RawText.isBinary(in);
@@ -414,7 +412,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private static ByteBuffer filterClean(byte[] src, int n)
+	private ByteBuffer filterClean(byte[] src, int n)
 			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
@@ -424,7 +422,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private static InputStream filterClean(InputStream in) {
+	private InputStream filterClean(InputStream in) {
 		return new EolCanonicalizingInputStream(in, true);
 	}
 
@@ -465,6 +463,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
 		if (!eof()) {
+			canonLen = -1;
 			parseEntry();
 		}
 	}
@@ -483,7 +482,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ensurePathCapacity(pathOffset + nameLen, pathOffset);
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
-		canonLen = -1;
 	}
 
 	/**
@@ -723,9 +721,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return false;
 
 		// Do not rely on filemode differences in case of symbolic links
-		if (getOptions().getSymLinks() == SymLinks.FALSE)
-			if (FileMode.SYMLINK.equals(rawMode))
-				return false;
+		if (FileMode.SYMLINK.equals(rawMode))
+			return false;
 
 		// Ignore the executable file bits if WorkingTreeOptions tell me to
 		// do so. Ignoring is done by setting the bits representing a
@@ -799,58 +796,25 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
 	 * @return true if content is most likely different.
-	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
 	 */
-	@Deprecated
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
-		try {
-			return isModified(entry, forceContentCheck,
-					repository.newObjectReader());
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
-	}
-
-	/**
-	 * Checks whether this entry differs from a given entry from the
-	 * {@link DirCache}.
-	 *
-	 * File status information is used and if status is same we consider the
-	 * file identical to the state in the working directory. Native git uses
-	 * more stat fields than we have accessible in Java.
-	 *
-	 * @param entry
-	 *            the entry from the dircache we want to compare against
-	 * @param forceContentCheck
-	 *            True if the actual file content should be checked if
-	 *            modification time differs.
-	 * @param reader
-	 *            access to repository objects if necessary. Should not be null.
-	 * @return true if content is most likely different.
-	 * @throws IOException
-	 * @since 3.3
-	 */
-	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
-			ObjectReader reader) throws IOException {
 		MetadataDiff diff = compareMetadata(entry);
 		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
 			if (forceContentCheck)
 				// But we are told to look at content even though timestamps
 				// tell us about modification
-				return contentCheck(entry, reader);
+				return contentCheck(entry);
 			else
 				// We are told to assume a modification if timestamps differs
 				return true;
 		case SMUDGED:
 			// The file is clean by timestamps but the entry was smudged.
 			// Lets do a content check
-			return contentCheck(entry, reader);
+			return contentCheck(entry);
 		case EQUAL:
 			return false;
 		case DIFFER_BY_METADATA:
-			if (mode == FileMode.SYMLINK.getBits())
-				return contentCheck(entry, reader);
 			return true;
 		default:
 			throw new IllegalStateException(MessageFormat.format(
@@ -890,14 +854,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *
 	 * @param entry
 	 *            the entry to be checked
-	 * @param reader
-	 *            acccess to repository data if necessary
-	 * @return <code>true</code> if the content doesn't match,
-	 *         <code>false</code> if it matches
-	 * @throws IOException
+	 * @return <code>true</code> if the content matches, <code>false</code>
+	 *         otherwise
 	 */
-	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader)
-			throws IOException {
+	private boolean contentCheck(DirCacheEntry entry) {
 		if (getEntryObjectId().equals(entry.getObjectId())) {
 			// Content has not changed
 
@@ -913,74 +873,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 			return false;
 		} else {
-			if (mode == FileMode.SYMLINK.getBits())
-				return !new File(readContentAsNormalizedString(current()))
-						.equals(new File((readContentAsNormalizedString(entry,
-								reader))));
-			// Content differs: that's a real change, perhaps
-			if (reader == null) // deprecated use, do no further checks
-				return true;
-			switch (getOptions().getAutoCRLF()) {
-			case INPUT:
-			case TRUE:
-				InputStream dcIn = null;
-				try {
-					ObjectLoader loader = reader.open(entry.getObjectId());
-					if (loader == null)
-						return true;
-
-					// We need to compute the length, but only if it is not
-					// a binary stream.
-					dcIn = new EolCanonicalizingInputStream(
-							loader.openStream(), true, true /* abort if binary */);
-					long dcInLen;
-					try {
-						dcInLen = computeLength(dcIn);
-					} catch (EolCanonicalizingInputStream.IsBinaryException e) {
-						return true;
-					} finally {
-						dcIn.close();
-					}
-
-					dcIn = new EolCanonicalizingInputStream(
-							loader.openStream(), true);
-					byte[] autoCrLfHash = computeHash(dcIn, dcInLen);
-					boolean changed = getEntryObjectId().compareTo(
-							autoCrLfHash, 0) != 0;
-					return changed;
-				} catch (IOException e) {
-					return true;
-				} finally {
-					if (dcIn != null)
-						try {
-							dcIn.close();
-						} catch (IOException e) {
-							// empty
-						}
-				}
-			case FALSE:
-				break;
-			}
+			// Content differs: that's a real change!
 			return true;
 		}
 	}
 
-	private static String readContentAsNormalizedString(DirCacheEntry entry,
-			ObjectReader reader) throws MissingObjectException, IOException {
-		ObjectLoader open = reader.open(entry.getObjectId());
-		byte[] cachedBytes = open.getCachedBytes();
-		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
-	}
-
-	private static String readContentAsNormalizedString(Entry entry) throws IOException {
-		long length = entry.getLength();
-		byte[] content = new byte[(int) length];
-		InputStream is = entry.openInputStream();
-		IO.readFully(is, content, 0, (int) length);
-		return FS.detect().normalize(RawParseUtils.decode(content));
-	}
-
-	private static long computeLength(InputStream in) throws IOException {
+	private long computeLength(InputStream in) throws IOException {
 		// Since we only care about the length, use skip. The stream
 		// may be able to more efficiently wade through its data.
 		//
@@ -1183,9 +1081,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return r.getRules().isEmpty() ? null : r;
 		}
 
-		private static void loadRulesFromFile(IgnoreNode r, File exclude)
+		private void loadRulesFromFile(IgnoreNode r, File exclude)
 				throws FileNotFoundException, IOException {
-			if (FS.DETECTED.exists(exclude)) {
+			if (exclude.exists()) {
 				FileInputStream in = new FileInputStream(exclude);
 				try {
 					r.parse(in);

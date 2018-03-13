@@ -90,13 +90,6 @@ public class ConfigConstants {
 	/** The "pack" section */
 	public static final String CONFIG_PACK_SECTION = "pack";
 
-	/**
-	 * The "fetch" section
-	 *
-	 * @since 3.3
-	 */
-	public static final String CONFIG_FETCH_SECTION = "fetch";
-
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
@@ -129,13 +122,6 @@ public class ConfigConstants {
 
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
-
-	/**
-	 * The "symlinks" key
-	 *
-	 * @since 3.3
-	 */
-	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
 
 	/** The "streamFileThreshold" key */
 	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
@@ -254,11 +240,4 @@ public class ConfigConstants {
          * @since 3.0
          */
 	public static final String CONFIG_KEY_RENAMES = "renames";
-
-	/**
-	 * The "prune" key
-	 *
-	 * @since 3.3
-	 */
-	public static final String CONFIG_KEY_PRUNE = "prune";
 }
