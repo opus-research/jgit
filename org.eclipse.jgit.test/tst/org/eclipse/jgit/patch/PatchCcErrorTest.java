@@ -57,7 +57,6 @@ import org.eclipse.jgit.junit.JGitTestUtil;
 import org.junit.Test;
 
 public class PatchCcErrorTest {
-	@SuppressWarnings("boxing")
 	@Test
 	public void testError_CcTruncatedOld() throws IOException {
 		final Patch p = parseTestPatchFile();

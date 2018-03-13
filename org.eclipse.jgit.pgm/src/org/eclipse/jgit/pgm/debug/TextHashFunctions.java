@@ -290,7 +290,6 @@ class TextHashFunctions extends TextBuiltin {
 		}
 	}
 
-	@SuppressWarnings("boxing")
 	private void run(Repository db) throws Exception {
 		List<Function> all = init();
 

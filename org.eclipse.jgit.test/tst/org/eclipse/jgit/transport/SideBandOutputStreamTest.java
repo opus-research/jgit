@@ -209,7 +209,6 @@ public class SideBandOutputStreamTest {
 		}
 	}
 
-	@SuppressWarnings("boxing")
 	@Test
 	public void testConstructor_RejectsBadBufferSize() {
 		try {

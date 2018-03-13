@@ -192,7 +192,6 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		assertEquals("refs/heads/a", ref.getName());
 	}
 
-	@SuppressWarnings("boxing")
 	@Test
 	public void testResolvedSymRef() throws IOException {
 		Ref ref = db.getRef(Constants.HEAD);
