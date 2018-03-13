@@ -230,8 +230,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						ru.setRefLogMessage(reflogComment, false);
 					} else {
 						String prefix = amend ? "commit (amend): " //$NON-NLS-1$
-								: parents.size() == 0 ? "commit (initial): "
-										: "commit: ";
+								: parents.size() == 0 ? "commit (initial): " //$NON-NLS-1$
+										: "commit: "; //$NON-NLS-1$
 						ru.setRefLogMessage(
 								prefix + revCommit.getShortMessage(), false);
 					}
@@ -667,14 +667,14 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Commit dedicated path only
-	 *
+	 * Commit dedicated path only.
+	 * <p>
 	 * This method can be called several times to add multiple paths. Full file
 	 * paths are supported as well as directory paths; in the latter case this
-	 * commits all files/ directories below the specified path.
+	 * commits all files/directories below the specified path.
 	 *
 	 * @param only
-	 *            path to commit
+	 *            path to commit (with <code>/</code> as separator)
 	 * @return {@code this}
 	 */
 	public CommitCommand setOnly(String only) {

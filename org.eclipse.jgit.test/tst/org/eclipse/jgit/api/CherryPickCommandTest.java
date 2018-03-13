@@ -46,6 +46,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,11 +56,13 @@ import org.eclipse.jgit.api.CherryPickResult.CherryPickStatus;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
@@ -110,6 +113,42 @@ public class CherryPickCommandTest extends RepositoryTestCase {
 		assertEquals("create a", history.next().getFullMessage());
 		assertFalse(history.hasNext());
 	}
+
+    @Test
+    public void testSequentialCherryPick() throws IOException, JGitInternalException,
+            GitAPIException {
+        Git git = new Git(db);
+
+        writeTrashFile("a", "first line\nsec. line\nthird line\n");
+        git.add().addFilepattern("a").call();
+        RevCommit firstCommit = git.commit().setMessage("create a").call();
+
+        writeTrashFile("a", "first line\nsec. line\nthird line\nfourth line\n");
+        git.add().addFilepattern("a").call();
+        RevCommit enlargingA = git.commit().setMessage("enlarged a").call();
+
+        writeTrashFile("a",
+                "first line\nsecond line\nthird line\nfourth line\n");
+        git.add().addFilepattern("a").call();
+        RevCommit fixingA = git.commit().setMessage("fixed a").call();
+
+        git.branchCreate().setName("side").setStartPoint(firstCommit).call();
+        checkoutBranch("refs/heads/side");
+
+        writeTrashFile("b", "nothing to do with a");
+        git.add().addFilepattern("b").call();
+        git.commit().setMessage("create b").call();
+
+        CherryPickResult result = git.cherryPick().include(enlargingA).include(fixingA).call();
+        assertEquals(CherryPickResult.CherryPickStatus.OK, result.getStatus());
+
+        Iterator<RevCommit> history = git.log().call().iterator();
+        assertEquals("fixed a", history.next().getFullMessage());
+        assertEquals("enlarged a", history.next().getFullMessage());
+        assertEquals("create b", history.next().getFullMessage());
+        assertEquals("create a", history.next().getFullMessage());
+        assertFalse(history.hasNext());
+    }
 
 	@Test
 	public void testCherryPickDirtyIndex() throws Exception {
@@ -299,5 +338,60 @@ public class CherryPickCommandTest extends RepositoryTestCase {
 			assertTrue(reader.getLastEntry().getComment()
 					.startsWith("cherry-pick: "));
 		}
+	}
+
+	/**
+	 * Cherry-picking merge commit M onto T
+	 * <pre>
+	 *    M
+	 *    |\
+	 *    C D
+	 *    |/
+	 * T  B
+	 * | /
+	 * A
+	 * </pre>
+	 * @throws Exception
+	 */
+	@Test
+	public void testCherryPickMerge() throws Exception {
+		Git git = new Git(db);
+
+		commitFile("file", "1\n2\n3\n", "master");
+		commitFile("file", "1\n2\n3\n", "side");
+		checkoutBranch("refs/heads/side");
+		RevCommit commitD = commitFile("file", "1\n2\n3\n4\n5\n", "side2");
+		commitFile("file", "a\n2\n3\n", "side");
+		MergeResult mergeResult = git.merge().include(commitD).call();
+		ObjectId commitM = mergeResult.getNewHead();
+		checkoutBranch("refs/heads/master");
+		RevCommit commitT = commitFile("another", "t", "master");
+
+		try {
+			git.cherryPick().include(commitM).call();
+			fail("merges should not be cherry-picked by default");
+		} catch (MultipleParentsNotAllowedException e) {
+			// expected
+		}
+		try {
+			git.cherryPick().include(commitM).setMainlineParentNumber(3).call();
+			fail("specifying a non-existent parent should fail");
+		} catch (JGitInternalException e) {
+			// expected
+			assertTrue(e.getMessage().endsWith(
+					"does not have a parent number 3."));
+		}
+
+		CherryPickResult result = git.cherryPick().include(commitM)
+				.setMainlineParentNumber(1).call();
+		assertEquals(CherryPickStatus.OK, result.getStatus());
+		checkFile(new File(db.getWorkTree(), "file"), "1\n2\n3\n4\n5\n");
+
+		git.reset().setMode(ResetType.HARD).setRef(commitT.getName()).call();
+
+		CherryPickResult result2 = git.cherryPick().include(commitM)
+				.setMainlineParentNumber(2).call();
+		assertEquals(CherryPickStatus.OK, result2.getStatus());
+		checkFile(new File(db.getWorkTree(), "file"), "a\n2\n3\n");
 	}
 }
