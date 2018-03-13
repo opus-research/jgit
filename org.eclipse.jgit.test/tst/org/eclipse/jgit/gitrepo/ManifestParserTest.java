@@ -77,7 +77,7 @@ public class ManifestParserTest {
 			.append("</manifest>");
 
 		ManifestParser parser = new ManifestParser(
-				null, null, "master", baseUrl, null, null, false);
+				null, null, "master", baseUrl, null, null);
 		parser.read(new ByteArrayInputStream(xmlContent.toString().getBytes(UTF_8)));
 		// Unfiltered projects should have them all.
 		results.clear();
