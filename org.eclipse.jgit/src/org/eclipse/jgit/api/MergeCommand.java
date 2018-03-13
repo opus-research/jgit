@@ -72,7 +72,6 @@ import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.MergeConfig;
 import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.Merger;
@@ -100,9 +99,9 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	private List<Ref> commits = new LinkedList<Ref>();
 
-	private Boolean squash;
+	private boolean squash;
 
-	private FastForwardMode fastForwardMode;
+	private FastForwardMode fastForwardMode = FastForwardMode.FF;
 
 	/**
 	 * The modes available for fast forward merges corresponding to the
@@ -196,7 +195,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		}
 	}
 
-	private Boolean commit;
+	private boolean commit = true;
 
 	/**
 	 * @param repo
@@ -213,12 +212,10 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 *
 	 * @return the result of the merge
 	 */
-	@SuppressWarnings("boxing")
 	public MergeResult call() throws GitAPIException, NoHeadException,
 			ConcurrentRefUpdateException, CheckoutConflictException,
 			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
 		checkCallable();
-		fallBackToConfiguration();
 		checkParameters();
 
 		RevWalk revWalk = null;
@@ -416,7 +413,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	}
 
 	private void checkParameters() throws InvalidMergeHeadsException {
-		if (squash.booleanValue() && fastForwardMode == FastForwardMode.NO_FF) {
+		if (squash && fastForwardMode == FastForwardMode.NO_FF) {
 			throw new JGitInternalException(
 					JGitText.get().cannotCombineSquashWithNoff);
 		}
@@ -428,20 +425,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 									JGitText.get().mergeStrategyDoesNotSupportHeads,
 									mergeStrategy.getName(),
 									Integer.valueOf(commits.size())));
-	}
-
-	/**
-	 * use values from the configuation if they have not been explcitly defined
-	 * via the setters
-	 */
-	private void fallBackToConfiguration() {
-		MergeConfig config = MergeConfig.getConfigForCurrentBranch(repo);
-		if (squash == null)
-			squash = Boolean.valueOf(config.isSquash());
-		if (commit == null)
-			commit = Boolean.valueOf(config.isCommit());
-		if (fastForwardMode == null)
-			fastForwardMode = config.getFastfForwardMode();
 	}
 
 	private void updateHead(StringBuilder refLogMessage, ObjectId newHeadId,
@@ -528,7 +511,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 */
 	public MergeCommand setSquash(boolean squash) {
 		checkCallable();
-		this.squash = Boolean.valueOf(squash);
+		this.squash = squash;
 		return this;
 	}
 
@@ -562,7 +545,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * @since 3.0
 	 */
 	public MergeCommand setCommit(boolean commit) {
-		this.commit = Boolean.valueOf(commit);
+		this.commit = commit;
 		return this;
 	}
 }
