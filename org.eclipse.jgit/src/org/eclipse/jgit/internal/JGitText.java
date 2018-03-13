@@ -290,7 +290,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String fileIsTooBigForThisConvenienceMethod;
 	/***/ public String fileIsTooLarge;
 	/***/ public String fileModeNotSetForPath;
-	/***/ public String findingGarbage;
 	/***/ public String flagIsDisposed;
 	/***/ public String flagNotFromThis;
 	/***/ public String flagsAlreadyCreated;
@@ -318,6 +317,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String initFailedBareRepoDifferentDirs;
 	/***/ public String initFailedNonBareRepoSameDirs;
 	/***/ public String inMemoryBufferLimitExceeded;
+	/***/ public String inputDidntMatchLength;
 	/***/ public String inputStreamMustSupportMark;
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
@@ -562,7 +562,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
-	/***/ public String supportOnlyPackIndexVersion2;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
 	/***/ public String tagAlreadyExists;
@@ -597,6 +596,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String truncatedHunkOldLinesMissing;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String unableToCheckConnectivity;
+	/***/ public String unableToCreateNewObject;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;
