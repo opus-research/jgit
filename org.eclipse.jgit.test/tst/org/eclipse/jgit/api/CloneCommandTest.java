@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -52,7 +51,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -65,12 +63,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevBlob;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.submodule.SubmoduleStatus;
-import org.eclipse.jgit.submodule.SubmoduleStatusType;
-import org.eclipse.jgit.submodule.SubmoduleWalk;
-import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 public class CloneCommandTest extends RepositoryTestCase {
@@ -243,200 +235,5 @@ public class CloneCommandTest extends RepositoryTestCase {
 			assertTrue(e.getMessage().contains("not an empty directory"));
 			assertTrue(e.getMessage().contains(dirName));
 		}
-	}
-
-	@Test
-	public void testCloneRepositoryWithMultipleHeadBranches() throws Exception {
-		git.checkout().setName(Constants.MASTER).call();
-		git.branchCreate().setName("a").call();
-
-		File directory = createTempDirectory("testCloneRepositoryWithMultipleHeadBranches");
-		CloneCommand clone = Git.cloneRepository();
-		clone.setDirectory(directory);
-		clone.setURI("file://" + git.getRepository().getWorkTree().getPath());
-		Git git2 = clone.call();
-		addRepoToClose(git2.getRepository());
-		assertNotNull(git2);
-
-		assertEquals(Constants.MASTER, git2.getRepository().getBranch());
-	}
-
-	@Test
-	public void testCloneRepositoryWithSubmodules() throws Exception {
-		git.checkout().setName(Constants.MASTER).call();
-
-		String file = "file.txt";
-		writeTrashFile(file, "content");
-		git.add().addFilepattern(file).call();
-		RevCommit commit = git.commit().setMessage("create file").call();
-
-		SubmoduleAddCommand command = new SubmoduleAddCommand(db);
-		String path = "sub";
-		command.setPath(path);
-		String uri = db.getDirectory().toURI().toString();
-		command.setURI(uri);
-		Repository repo = command.call();
-		assertNotNull(repo);
-		git.add().addFilepattern(path)
-				.addFilepattern(Constants.DOT_GIT_MODULES).call();
-		git.commit().setMessage("adding submodule").call();
-
-		File directory = createTempDirectory("testCloneRepositoryWithSubmodules");
-		CloneCommand clone = Git.cloneRepository();
-		clone.setDirectory(directory);
-		clone.setCloneSubmodules(true);
-		clone.setURI("file://" + git.getRepository().getWorkTree().getPath());
-		Git git2 = clone.call();
-		addRepoToClose(git2.getRepository());
-		assertNotNull(git2);
-
-		assertEquals(Constants.MASTER, git2.getRepository().getBranch());
-		assertTrue(new File(git2.getRepository().getWorkTree(), path
-				+ File.separatorChar + file).exists());
-
-		SubmoduleStatusCommand status = new SubmoduleStatusCommand(
-				git2.getRepository());
-		Map<String, SubmoduleStatus> statuses = status.call();
-		SubmoduleStatus pathStatus = statuses.get(path);
-		assertNotNull(pathStatus);
-		assertEquals(SubmoduleStatusType.INITIALIZED, pathStatus.getType());
-		assertEquals(commit, pathStatus.getHeadId());
-		assertEquals(commit, pathStatus.getIndexId());
-	}
-
-	@Test
-	public void testCloneRepositoryWithNestedSubmodules() throws Exception {
-		git.checkout().setName(Constants.MASTER).call();
-
-		// Create submodule 1
-		File submodule1 = createTempDirectory("testCloneRepositoryWithNestedSubmodules1");
-		Git sub1Git = Git.init().setDirectory(submodule1).call();
-		assertNotNull(sub1Git);
-		Repository sub1 = sub1Git.getRepository();
-		assertNotNull(sub1);
-		addRepoToClose(sub1);
-
-		String file = "file.txt";
-		String path = "sub";
-
-		write(new File(sub1.getWorkTree(), file), "content");
-		sub1Git.add().addFilepattern(file).call();
-		RevCommit commit = sub1Git.commit().setMessage("create file").call();
-		assertNotNull(commit);
-
-		// Create submodule 2
-		File submodule2 = createTempDirectory("testCloneRepositoryWithNestedSubmodules2");
-		Git sub2Git = Git.init().setDirectory(submodule2).call();
-		assertNotNull(sub2Git);
-		Repository sub2 = sub2Git.getRepository();
-		assertNotNull(sub2);
-		addRepoToClose(sub2);
-
-		write(new File(sub2.getWorkTree(), file), "content");
-		sub2Git.add().addFilepattern(file).call();
-		RevCommit sub2Head = sub2Git.commit().setMessage("create file").call();
-		assertNotNull(sub2Head);
-
-		// Add submodule 2 to submodule 1
-		assertNotNull(sub1Git.submoduleAdd().setPath(path)
-				.setURI(sub2.getDirectory().toURI().toString()).call());
-		RevCommit sub1Head = sub1Git.commit().setAll(true)
-				.setMessage("Adding submodule").call();
-		assertNotNull(sub1Head);
-
-		// Add submodule 1 to default repository
-		assertNotNull(git.submoduleAdd().setPath(path)
-				.setURI(sub1.getDirectory().toURI().toString()).call());
-		assertNotNull(git.commit().setAll(true).setMessage("Adding submodule")
-				.call());
-
-		// Clone default repository and include submodules
-		File directory = createTempDirectory("testCloneRepositoryWithNestedSubmodules");
-		CloneCommand clone = Git.cloneRepository();
-		clone.setDirectory(directory);
-		clone.setCloneSubmodules(true);
-		clone.setURI(git.getRepository().getDirectory().toURI().toString());
-		Git git2 = clone.call();
-		addRepoToClose(git2.getRepository());
-		assertNotNull(git2);
-
-		assertEquals(Constants.MASTER, git2.getRepository().getBranch());
-		assertTrue(new File(git2.getRepository().getWorkTree(), path
-				+ File.separatorChar + file).exists());
-		assertTrue(new File(git2.getRepository().getWorkTree(), path
-				+ File.separatorChar + path + File.separatorChar + file)
-				.exists());
-
-		SubmoduleStatusCommand status = new SubmoduleStatusCommand(
-				git2.getRepository());
-		Map<String, SubmoduleStatus> statuses = status.call();
-		SubmoduleStatus pathStatus = statuses.get(path);
-		assertNotNull(pathStatus);
-		assertEquals(SubmoduleStatusType.INITIALIZED, pathStatus.getType());
-		assertEquals(sub1Head, pathStatus.getHeadId());
-		assertEquals(sub1Head, pathStatus.getIndexId());
-
-		SubmoduleWalk walk = SubmoduleWalk.forIndex(git2.getRepository());
-		assertTrue(walk.next());
-		Repository clonedSub1 = walk.getRepository();
-		assertNotNull(clonedSub1);
-		status = new SubmoduleStatusCommand(clonedSub1);
-		statuses = status.call();
-		pathStatus = statuses.get(path);
-		assertNotNull(pathStatus);
-		assertEquals(SubmoduleStatusType.INITIALIZED, pathStatus.getType());
-		assertEquals(sub2Head, pathStatus.getHeadId());
-		assertEquals(sub2Head, pathStatus.getIndexId());
-		assertFalse(walk.next());
-	}
-
-	@Test
-	public void testCloneWithAutoSetupRebase() throws Exception {
-		File directory = createTempDirectory("testCloneRepository1");
-		CloneCommand command = Git.cloneRepository();
-		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
-		Git git2 = command.call();
-		addRepoToClose(git2.getRepository());
-		assertFalse(git2
-				.getRepository()
-				.getConfig()
-				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
-						ConfigConstants.CONFIG_KEY_REBASE, false));
-
-		FileBasedConfig userConfig = SystemReader.getInstance().openUserConfig(
-				null, git.getRepository().getFS());
-		userConfig.setString(ConfigConstants.CONFIG_BRANCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE,
-				ConfigConstants.CONFIG_KEY_ALWAYS);
-		userConfig.save();
-		directory = createTempDirectory("testCloneRepository2");
-		command = Git.cloneRepository();
-		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
-		git2 = command.call();
-		addRepoToClose(git2.getRepository());
-		assertTrue(git2
-				.getRepository()
-				.getConfig()
-				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
-						ConfigConstants.CONFIG_KEY_REBASE, false));
-
-		userConfig.setString(ConfigConstants.CONFIG_BRANCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE,
-				ConfigConstants.CONFIG_KEY_REMOTE);
-		userConfig.save();
-		directory = createTempDirectory("testCloneRepository2");
-		command = Git.cloneRepository();
-		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
-		git2 = command.call();
-		addRepoToClose(git2.getRepository());
-		assertTrue(git2
-				.getRepository()
-				.getConfig()
-				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
-						ConfigConstants.CONFIG_KEY_REBASE, false));
-
 	}
 }
