@@ -91,7 +91,6 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.RefDirectory;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -231,13 +230,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	};
 
-	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
-		@Override
-		public HttpConfig parse(final Config cfg) {
-			return new HttpConfig(cfg);
-		}
-	};
-
 	private static class HttpConfig {
 		final int postBuffer;
 
@@ -279,7 +271,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (MalformedURLException e) {
 			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
 		}
-		http = local.getConfig().get(HTTP_KEY);
+		http = local.getConfig().get(HttpConfig::new);
 		proxySelector = ProxySelector.getDefault();
 	}
 
@@ -469,7 +461,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private HttpConnection connect(final String service)
 			throws TransportException, NotSupportedException {
-		URL u;
+		final URL u;
 		try {
 			final StringBuilder b = new StringBuilder();
 			b.append(baseUrl);
@@ -539,14 +531,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				case HttpConnection.HTTP_FORBIDDEN:
 					throw new TransportException(uri, MessageFormat.format(
 							JGitText.get().serviceNotPermitted, service));
-
-				case HttpConnection.HTTP_MOVED_PERM:
-					String locationHeader = HttpSupport.responseHeader(conn, HDR_LOCATION);
-					if (locationHeader == null) {
-						throw new TransportException(uri, JGitText.get().noLocationHeader);
-					}
-					u = new URL(locationHeader);
-					continue;
 
 				default:
 					String err = status + " " + conn.getResponseMessage(); //$NON-NLS-1$
