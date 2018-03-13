@@ -1111,6 +1111,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	private boolean hasExt(PackExt ext) {
-		return (extensions & ext.getBit()) == ext.getBit();
+		return (extensions & ext.getBit()) != 0;
 	}
 }

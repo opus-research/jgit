@@ -46,7 +46,6 @@ package org.eclipse.jgit.storage.pack;
 /** A pack file extension. */
 public class PackExt {
 	private static volatile PackExt[] VALUES = new PackExt[] {};
-	private static final Object lock = new Object();
 
 	/** A pack file extension. */
 	public static final PackExt PACK = newPackExt("pack"); //$NON-NLS-1$
@@ -70,21 +69,22 @@ public class PackExt {
 	 *            the file extension.
 	 * @return the PackExt for the ext
 	 */
-	public static PackExt newPackExt(String ext) {
-		synchronized (lock) {
-			PackExt[] dst = new PackExt[VALUES.length + 1];
-			for (int i = 0; i < VALUES.length; i++) {
-				PackExt packExt = VALUES[i];
-				if (packExt.getExtension().equals(ext))
-					return packExt;
-				dst[i] = packExt;
-			}
-
-			PackExt value = new PackExt(ext, VALUES.length);
-			dst[VALUES.length] = value;
-			VALUES = dst;
-			return value;
+	public synchronized static PackExt newPackExt(String ext) {
+		PackExt[] dst = new PackExt[VALUES.length + 1];
+		for (int i = 0; i < VALUES.length; i++) {
+			PackExt packExt = VALUES[i];
+			if (packExt.getExtension().equals(ext))
+				return packExt;
+			dst[i] = packExt;
 		}
+		if (VALUES.length >= 32)
+			throw new IllegalStateException(
+					"maximum number of pack extensions exceeded"); //$NON-NLS-1$
+
+		PackExt value = new PackExt(ext, VALUES.length);
+		dst[VALUES.length] = value;
+		VALUES = dst;
+		return value;
 	}
 
 	private final String ext;
