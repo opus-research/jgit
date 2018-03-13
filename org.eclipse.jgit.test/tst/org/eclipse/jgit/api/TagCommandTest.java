@@ -63,8 +63,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testTaggingOnHead() throws GitAPIException, IOException {
 		Git git = new Git(db);
-		RevCommit commit = git.commit().setMessage("initial commit")
-				.setAllowEmpty(true).call();
+		RevCommit commit = git.commit().setMessage("initial commit").call();
 		Ref tagRef = git.tag().setName("tag").call();
 		assertEquals(commit.getId(), db.peel(tagRef).getPeeledObjectId());
 		RevWalk walk = new RevWalk(db);
@@ -74,10 +73,9 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testTagging() throws GitAPIException, JGitInternalException {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
-		RevCommit commit = git.commit().setMessage("second commit")
-				.setAllowEmpty(true).call();
-		git.commit().setMessage("third commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
+		RevCommit commit = git.commit().setMessage("second commit").call();
+		git.commit().setMessage("third commit").call();
 		Ref tagRef = git.tag().setObjectId(commit).setName("tag").call();
 		assertEquals(commit.getId(), db.peel(tagRef).getPeeledObjectId());
 	}
@@ -85,7 +83,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testEmptyTagName() throws GitAPIException {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		try {
 			// forget to tag name
 			git.tag().setMessage("some message").call();
@@ -98,7 +96,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testInvalidTagName() throws GitAPIException {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		try {
 			git.tag().setName("bad~tag~name").setMessage("some message").call();
 			fail("We should have failed due to a bad tag name");
@@ -110,7 +108,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testFailureOnSignedTags() throws GitAPIException {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		try {
 			git.tag().setSigned(true).setName("tag").call();
 			fail("We should have failed with an UnsupportedOperationException due to signed tag");
@@ -122,7 +120,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testDelete() throws Exception {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		Ref tagRef = git.tag().setName("tag").call();
 		assertEquals(1, db.getTags().size());
 
@@ -144,7 +142,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testDeleteFullName() throws Exception {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		Ref tagRef = git.tag().setName("tag").call();
 		assertEquals(1, db.getTags().size());
 
@@ -158,7 +156,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testDeleteEmptyTagNames() throws Exception {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 
 		List<String> deleted = git.tagDelete().setTags().call();
 		assertEquals(0, deleted.size());
@@ -167,7 +165,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testDeleteNonExisting() throws Exception {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 
 		List<String> deleted = git.tagDelete().setTags("tag").call();
 		assertEquals(0, deleted.size());
@@ -176,7 +174,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	@Test
 	public void testDeleteBadName() throws Exception {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 
 		List<String> deleted = git.tagDelete().setTags("bad~tag~name")
 				.call();
@@ -188,7 +186,7 @@ public class TagCommandTest extends RepositoryTestCase {
 			throws Exception {
 		Git git = new Git(db);
 		git.add().addFilepattern("*").call();
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		List<Ref> list = git.tagList().call();
 		assertEquals(0, list.size());
 	}
@@ -205,7 +203,7 @@ public class TagCommandTest extends RepositoryTestCase {
 	public void testListAllTagsInRepositoryInOrder() throws Exception {
 		Git git = new Git(db);
 		git.add().addFilepattern("*").call();
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 
 		git.tag().setName("v3").call();
 		git.tag().setName("v2").call();

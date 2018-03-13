@@ -90,7 +90,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 	@Test
 	public void testMergeInItself() throws Exception {
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 
 		MergeResult result = git.merge().include(db.getRef(Constants.HEAD)).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
@@ -106,12 +106,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 	@Test
 	public void testAlreadyUpToDate() throws Exception {
 		Git git = new Git(db);
-		RevCommit first = git.commit().setMessage("initial commit")
-				.setAllowEmpty(true).call();
+		RevCommit first = git.commit().setMessage("initial commit").call();
 		createBranch(first, "refs/heads/branch1");
 
-		RevCommit second = git.commit().setMessage("second commit")
-				.setAllowEmpty(true).call();
+		RevCommit second = git.commit().setMessage("second commit").call();
 		MergeResult result = git.merge().include(db.getRef("refs/heads/branch1")).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
@@ -125,12 +123,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 	@Test
 	public void testFastForward() throws Exception {
 		Git git = new Git(db);
-		RevCommit first = git.commit().setMessage("initial commit")
-				.setAllowEmpty(true).call();
+		RevCommit first = git.commit().setMessage("initial commit").call();
 		createBranch(first, "refs/heads/branch1");
 
-		RevCommit second = git.commit().setMessage("second commit")
-				.setAllowEmpty(true).call();
+		RevCommit second = git.commit().setMessage("second commit").call();
 
 		checkoutBranch("refs/heads/branch1");
 
@@ -212,8 +208,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 			throws Exception {
 		Git git = new Git(db);
 
-		RevCommit first = git.commit().setMessage("first").setAllowEmpty(true)
-				.call();
+		RevCommit first = git.commit().setMessage("first").call();
 		createBranch(first, "refs/heads/side");
 
 		writeTrashFile("a", "a");
@@ -1345,7 +1340,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 	private RevCommit addAllAndCommit(final Git git) throws Exception {
 		git.add().addFilepattern(".").call();
-		return git.commit().setMessage("message").setAllowEmpty(true).call();
+		return git.commit().setMessage("message").call();
 	}
 
 	private void checkMergeFailedResult(final MergeResult result,
