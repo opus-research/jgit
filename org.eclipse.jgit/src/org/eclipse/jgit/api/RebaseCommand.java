@@ -302,7 +302,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				RevCommit commitToPick = walk
 						.parseCommit(ids.iterator().next());
 				if (monitor.isCancelled())
-					return new RebaseResult(commitToPick, Status.STOPPED);
+					return new RebaseResult(commitToPick);
 				try {
 					monitor.beginTask(MessageFormat.format(
 							JGitText.get().applyingCommit,
@@ -328,9 +328,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 								return abort(new RebaseResult(
 										cherryPickResult.getFailingPaths()));
 							else
-								return stop(commitToPick, Status.STOPPED);
+								return stop(commitToPick);
 						case CONFLICTING:
-							return stop(commitToPick, Status.STOPPED);
+							return stop(commitToPick);
 						case OK:
 							newHead = cherryPickResult.getNewHead();
 						}
@@ -348,7 +348,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						continue;
 					case EDIT:
 						rebaseState.createFile(AMEND, commitToPick.name());
-						return stop(commitToPick, Status.EDIT);
+						return stop(commitToPick);
 					case COMMENT:
 						break;
 					case SQUASH:
@@ -679,8 +679,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return parseAuthor(raw);
 	}
 
-	private RebaseResult stop(RevCommit commitToPick, RebaseResult.Status status)
-			throws IOException {
+	private RebaseResult stop(RevCommit commitToPick) throws IOException {
 		PersonIdent author = commitToPick.getAuthorIdent();
 		String authorScript = toAuthorScript(author);
 		rebaseState.createFile(AUTHOR_SCRIPT, authorScript);
@@ -698,7 +697,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// Remove cherry pick state file created by CherryPickCommand, it's not
 		// needed for rebase
 		repo.writeCherryPickHead(null);
-		return new RebaseResult(commitToPick, status);
+		return new RebaseResult(commitToPick);
 	}
 
 	String toAuthorScript(PersonIdent author) {
@@ -1139,12 +1138,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	/**
-	 * Enables interactive rebase<br>
-	 * <br>
+	 * Enables interactive rebase
+	 * <p>
 	 * Does not stop after initialization of interactive rebase. This is
 	 * equivalent to
 	 * {@link RebaseCommand#runInteractively(InteractiveHandler, boolean)
 	 * runInteractively(handler, false)};
+	 * </p>
 	 *
 	 * @param handler
 	 * @return this
@@ -1154,15 +1154,16 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	/**
-	 * Enables interactive rebase<br>
-	 * <br>
-	 * If stopAfterRebaseInteractiveInitialization is true the rebase stops
-	 * after initialization of interactive rebase returning
+	 * Enables interactive rebase
+	 * <p>
+	 * If stopAfterRebaseInteractiveInitialization is {@code true} the rebase
+	 * stops after initialization of interactive rebase returning
 	 * {@link RebaseResult#INTERACTIVE_PREPARED_RESULT}
+	 * </p>
 	 *
 	 * @param handler
 	 * @param stopAfterRebaseInteractiveInitialization
-	 *            if true the rebase stops after initialization
+	 *            if {@code true} the rebase stops after initialization
 	 * @return this instance
 	 */
 	public RebaseCommand runInteractively(InteractiveHandler handler,
