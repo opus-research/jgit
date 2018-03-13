@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2013 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm.archive;
 
-package org.eclipse.jgit.nls;
+import org.osgi.framework.BundleActivator;
+import org.osgi.framework.BundleContext;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
-
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+@SuppressWarnings("unused") public class FormatActivator
+					implements BundleActivator {
+	public void start(BundleContext context) throws Exception {
+		ArchiveCommand.registerFormat("tar", new TarFormat());
+		ArchiveCommand.registerFormat("zip", new ZipFormat());
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
-	}
-
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
-
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
-
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
+	public void stop(BundleContext context) throws Exception {
+		ArchiveCommand.unregisterFormat("zip");
+		ArchiveCommand.unregisterFormat("tar");
 	}
 }

@@ -43,10 +43,10 @@
 
 package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.archive.ArchiveCommand;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.pgm.archive.ArchiveCommand;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -56,7 +56,7 @@ class Archive extends TextBuiltin {
 	private ObjectId tree;
 
 	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private ArchiveCommand.Format format = ArchiveCommand.Format.ZIP;
+	private String format = "zip";
 
 	@Override
 	protected void run() throws Exception {

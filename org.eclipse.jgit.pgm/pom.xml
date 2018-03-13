@@ -72,6 +72,11 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>
       <version>${project.version}</version>
@@ -79,14 +84,13 @@
 
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.archive</artifactId>
+      <artifactId>org.eclipse.jgit.ui</artifactId>
       <version>${project.version}</version>
     </dependency>
 
     <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.ui</artifactId>
-      <version>${project.version}</version>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.core</artifactId>
     </dependency>
   </dependencies>
 
