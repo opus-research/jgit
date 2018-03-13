@@ -42,21 +42,16 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.eclipse.jgit.attributes.Attributes.hasIdentSet;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -78,7 +73,6 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
@@ -87,7 +81,6 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
-import org.eclipse.jgit.util.io.IdentOutputStream;
 
 /**
  * This class handles checking out one or two trees merging with the index.
@@ -96,8 +89,6 @@ public class DirCacheCheckout {
 	private Repository repo;
 
 	private HashMap<String, ObjectId> updated = new HashMap<String, ObjectId>();
-
-	private HashMap<String, Set<Attribute>> updatedAttr = new HashMap<String, Set<Attribute>>();
 
 	private ArrayList<String> conflicts = new ArrayList<String>();
 
@@ -263,8 +254,7 @@ public class DirCacheCheckout {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
 					walk.getTree(1, CanonicalTreeParser.class),
 					walk.getTree(2, DirCacheBuildIterator.class),
-					walk.getTree(3, WorkingTreeIterator.class),
-					walk.getAttributes(OperationType.CHECKOUT_OP));
+					walk.getTree(3, WorkingTreeIterator.class));
 			if (walk.isSubtree())
 				walk.enterSubtree();
 		}
@@ -303,8 +293,7 @@ public class DirCacheCheckout {
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
 					walk.getTree(1, DirCacheBuildIterator.class),
-					walk.getTree(2, WorkingTreeIterator.class),
-					walk.getAttributes(OperationType.CHECKOUT_OP));
+					walk.getTree(2, WorkingTreeIterator.class));
 			if (walk.isSubtree())
 				walk.enterSubtree();
 		}
@@ -318,12 +307,10 @@ public class DirCacheCheckout {
 	 * @param m the tree to merge
 	 * @param i the index
 	 * @param f the working tree
-	 * @param attributes Set of attributes for a checkout operation.
 	 * @throws IOException
 	 */
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
-			WorkingTreeIterator f, Set<Attribute> attributes)
-			throws IOException {
+			WorkingTreeIterator f) throws IOException {
 		if (m != null) {
 			checkValidPath(m);
 			// There is an entry in the merge commit. Means: we want to update
@@ -336,12 +323,12 @@ public class DirCacheCheckout {
 					conflicts.add(walk.getPathString());
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
-							m.getEntryFileMode(), attributes);
+						m.getEntryFileMode());
 			} else if (f == null || !m.idEqual(i)) {
 				// The working tree file is missing or the merge content differs
 				// from index content
 				update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode(), attributes);
+						m.getEntryFileMode());
 			} else if (i.getDirCacheEntry() != null) {
 				// The index contains a file (and not a folder)
 				if (f.isModified(i.getDirCacheEntry(), true,
@@ -350,7 +337,7 @@ public class DirCacheCheckout {
 					// The working tree file is dirty or the index contains a
 					// conflict
 					update(m.getEntryPathString(), m.getEntryObjectId(),
-							m.getEntryFileMode(), attributes);
+							m.getEntryFileMode());
 				else {
 					// update the timestamp of the index with the one from the
 					// file if not set, as we are sure to be in sync here.
@@ -471,8 +458,8 @@ public class DirCacheCheckout {
 				// submodules are handled with separate operations
 				if (FileMode.GITLINK.equals(entry.getRawMode()))
 					continue;
-				Set<Attribute> attributes = updatedAttr.get(path);
-				checkoutEntry(repo, file, entry, objectReader, attributes);
+
+				checkoutEntry(repo, file, entry, objectReader);
 			}
 
 			// commit the index builder - a new index is persisted
@@ -531,13 +518,11 @@ public class DirCacheCheckout {
 	 *            the entry for the index
 	 * @param f
 	 *            the file in the working tree
-	 * @param attributes Set of attributes for this entry
 	 * @throws IOException
 	 */
 
 	void processEntry(CanonicalTreeParser h, CanonicalTreeParser m,
-			DirCacheBuildIterator i, WorkingTreeIterator f,
-			Set<Attribute> attributes) throws IOException {
+			DirCacheBuildIterator i, WorkingTreeIterator f) throws IOException {
 		DirCacheEntry dce = i != null ? i.getDirCacheEntry() : null;
 
 		String name = walk.getPathString();
@@ -631,7 +616,7 @@ public class DirCacheCheckout {
 				if (f != null && isModifiedSubtree_IndexWorkingtree(name)) {
 					conflict(name, dce, h, m); // 1
 				} else {
-					update(name, mId, mMode, attributes); // 2
+					update(name, mId, mMode); // 2
 				}
 
 				break;
@@ -657,7 +642,7 @@ public class DirCacheCheckout {
 				// are found later
 				break;
 			case 0xD0F: // 19
-				update(name, mId, mMode, attributes);
+				update(name, mId, mMode);
 				break;
 			case 0xDF0: // conflict without a rule
 			case 0x0FD: // 15
@@ -668,7 +653,7 @@ public class DirCacheCheckout {
 					if (isModifiedSubtree_IndexWorkingtree(name))
 						conflict(name, dce, h, m); // 8
 					else
-						update(name, mId, mMode, attributes); // 7
+						update(name, mId, mMode); // 7
 				} else
 					conflict(name, dce, h, m); // 9
 				break;
@@ -688,7 +673,7 @@ public class DirCacheCheckout {
 				break;
 			case 0x0DF: // 16 17
 				if (!isModifiedSubtree_IndexWorkingtree(name))
-					update(name, mId, mMode, attributes);
+					update(name, mId, mMode);
 				else
 					conflict(name, dce, h, m);
 				break;
@@ -746,7 +731,7 @@ public class DirCacheCheckout {
 				// At least one of Head, Index, Merge is not empty
 				// -> only Merge contains something for this path. Use it!
 				// Potentially update the file
-				update(name, mId, mMode, attributes); // 1
+				update(name, mId, mMode); // 1
 			else if (m == null)
 				// Nothing in Merge
 				// Something in Head
@@ -764,7 +749,7 @@ public class DirCacheCheckout {
 				// find in Merge. Potentially updates the file.
 				if (equalIdAndMode(hId, hMode, mId, mMode)) {
 					if (emptyDirCache)
-						update(name, mId, mMode, attributes);
+						update(name, mId, mMode);
 					else
 						keep(dce);
 				} else
@@ -944,7 +929,7 @@ public class DirCacheCheckout {
 
 						// TODO check that we don't overwrite some unsaved
 						// file content
-						update(name, mId, mMode, attributes);
+						update(name, mId, mMode);
 					} else if (dce != null
 							&& (f != null && f.isModified(dce, true,
 									this.walk.getObjectReader()))) {
@@ -963,7 +948,7 @@ public class DirCacheCheckout {
 						// -> Standard case when switching between branches:
 						// Nothing new in index but something different in
 						// Merge. Update index and file
-						update(name, mId, mMode, attributes);
+						update(name, mId, mMode);
 					}
 				} else {
 					// Head differs from index or merge is same as index
@@ -1025,11 +1010,9 @@ public class DirCacheCheckout {
 		removed.add(path);
 	}
 
-	private void update(String path, ObjectId mId, FileMode mode,
-			Set<Attribute> attributes) {
+	private void update(String path, ObjectId mId, FileMode mode) {
 		if (!FileMode.TREE.equals(mode)) {
 			updated.put(path, mId);
-			updatedAttr.put(path, attributes);
 			DirCacheEntry entry = new DirCacheEntry(path, DirCacheEntry.STAGE_0);
 			entry.setObjectId(mId);
 			entry.setFileMode(mode);
@@ -1179,16 +1162,13 @@ public class DirCacheCheckout {
 	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
-	 * @param attributes
-	 *            Set of attributes to be used for checkout
 	 * @throws IOException
 	 */
 	public static void checkoutEntry(final Repository repository, File f,
-			DirCacheEntry entry, Set<Attribute> attributes) throws IOException {
+			DirCacheEntry entry) throws IOException {
 		ObjectReader or = repository.newObjectReader();
 		try {
-			checkoutEntry(repository, f, entry, repository.newObjectReader(),
-					attributes);
+			checkoutEntry(repository, f, entry, repository.newObjectReader());
 		} finally {
 			or.release();
 		}
@@ -1214,13 +1194,10 @@ public class DirCacheCheckout {
 	 *            the entry containing new mode and content
 	 * @param or
 	 *            object reader to use for checkout
-	 * @param attributes
-	 *            attributes to be used for checkout
 	 * @throws IOException
 	 */
 	public static void checkoutEntry(final Repository repo, File f,
-			DirCacheEntry entry, ObjectReader or, Set<Attribute> attributes)
-			throws IOException {
+			DirCacheEntry entry, ObjectReader or) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File parentDir = f.getParentFile();
 		parentDir.mkdirs();
@@ -1242,11 +1219,6 @@ public class DirCacheCheckout {
 				channel = new AutoCRLFOutputStream(rawChannel);
 			else
 				channel = rawChannel;
-
-			if (hasIdentSet(attributes)) {
-				channel = new IdentOutputStream(channel, entry.getObjectId()
-						.name().getBytes());
-			}
 			try {
 				ol.copyTo(channel);
 			} finally {
@@ -1270,72 +1242,10 @@ public class DirCacheCheckout {
 			}
 		}
 		entry.setLastModified(f.lastModified());
-		if (opt.getAutoCRLF() != AutoCRLF.FALSE || hasIdentSet(attributes))
+		if (opt.getAutoCRLF() != AutoCRLF.FALSE)
 			entry.setLength(f.length()); // AutoCRLF wants on-disk-size
 		else
 			entry.setLength((int) ol.getSize());
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename. Use this method only for checkout of a single entry.
-	 * Otherwise use
-	 * {@code checkoutEntry(Repository, File f, DirCacheEntry, ObjectReader)}
-	 * instead which allows to reuse one {@code ObjectReader} for multiple
-	 * entries.
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repository
-	 * @param f
-	 *            the file to be modified. The parent directory for this file
-	 *            has to exist already
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @throws IOException
-	 * @deprecated prefer the method
-	 *             {@link #checkoutEntry(Repository, File, DirCacheEntry, Set)}
-	 *             which handles attributes
-	 */
-	public static void checkoutEntry(final Repository repository, File f,
-			DirCacheEntry entry) throws IOException {
-		checkoutEntry(repository, f, entry, Collections.<Attribute> emptySet());
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 * @param f
-	 *            the file to be modified. The parent directory for this file
-	 *            has to exist already
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @throws IOException
-	 * @deprecated prefer the method
-	 *             {@link #checkoutEntry(Repository, File, DirCacheEntry, ObjectReader, Set)}
-	 *             which handles attributes
-	 */
-	public static void checkoutEntry(final Repository repo, File f,
-			DirCacheEntry entry, ObjectReader or) throws IOException {
-		checkoutEntry(repo, f, entry, or, Collections.<Attribute> emptySet());
 	}
 
 	private static void checkValidPath(CanonicalTreeParser t)
