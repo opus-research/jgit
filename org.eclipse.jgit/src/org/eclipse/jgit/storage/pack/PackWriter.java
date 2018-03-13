@@ -174,8 +174,6 @@ public class PackWriter {
 
 	private final Statistics stats;
 
-	private final MutableState state;
-
 	private Statistics.ObjectType typeStats;
 
 	private List<ObjectToPack> sortedByName;
@@ -268,7 +266,6 @@ public class PackWriter {
 		reuseDeltas = config.isReuseDeltas();
 		reuseValidate = true; // be paranoid by default
 		stats = new Statistics();
-		state = new MutableState();
 	}
 
 	/**
@@ -747,37 +744,6 @@ public class PackWriter {
 		return sortedByName;
 	}
 
-	private void beginPhase(PackingPhase phase, ProgressMonitor monitor,
-			int cnt) {
-		state.phase = phase;
-		String task;
-		switch (phase) {
-		case COUNTING:
-			task = JGitText.get().countingObjects;
-			break;
-		case GETTING_SIZES:
-			task = JGitText.get().searchForSizes;
-			break;
-		case FINDING_SOURCES:
-			task = JGitText.get().searchForReuse;
-			break;
-		case COMPRESSING:
-			task = JGitText.get().compressingObjects;
-			break;
-		case WRITING:
-			task = JGitText.get().writingObjects;
-			break;
-		default:
-			throw new IllegalArgumentException(
-					MessageFormat.format(JGitText.get().illegalPackingPhase, phase));
-		}
-		monitor.beginTask(task, cnt);
-	}
-
-	private void endPhase(ProgressMonitor monitor) {
-		monitor.endTask();
-	}
-
 	/**
 	 * Write the prepared pack to the supplied stream.
 	 * <p>
@@ -837,7 +803,7 @@ public class PackWriter {
 
 		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
-		beginPhase(PackingPhase.WRITING, writeMonitor, (int) objCnt);
+		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
@@ -877,7 +843,7 @@ public class PackWriter {
 		}
 
 		reader.release();
-		endPhase(writeMonitor);
+		writeMonitor.endTask();
 	}
 
 	/**
@@ -887,11 +853,6 @@ public class PackWriter {
 	 */
 	public Statistics getStatistics() {
 		return stats;
-	}
-
-	/** @return snapshot of the current state of this PackWriter. */
-	public State getState() {
-		return state.snapshot();
 	}
 
 	/** Release all resources used by this writer. */
@@ -911,7 +872,7 @@ public class PackWriter {
 		cnt += objectsLists[Constants.OBJ_TAG].size();
 
 		long start = System.currentTimeMillis();
-		beginPhase(PackingPhase.FINDING_SOURCES, monitor, cnt);
+		monitor.beginTask(JGitText.get().searchForReuse, cnt);
 
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
@@ -936,7 +897,7 @@ public class PackWriter {
 			searchForReuse(monitor, objectsLists[Constants.OBJ_TAG]);
 		}
 
-		endPhase(monitor);
+		monitor.endTask();
 		stats.timeSearchingForReuse = System.currentTimeMillis() - start;
 	}
 
@@ -983,7 +944,7 @@ public class PackWriter {
 		// abort with an exception if we actually had to have it.
 		//
 		final long sizingStart = System.currentTimeMillis();
-		beginPhase(PackingPhase.GETTING_SIZES, monitor, cnt);
+		monitor.beginTask(JGitText.get().searchForSizes, cnt);
 		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
 				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
 		try {
@@ -1028,7 +989,7 @@ public class PackWriter {
 		} finally {
 			sizeQueue.release();
 		}
-		endPhase(monitor);
+		monitor.endTask();
 		stats.timeSearchingForSizes = System.currentTimeMillis() - sizingStart;
 
 		// Sort the objects by path hash so like files are near each other,
@@ -1074,9 +1035,9 @@ public class PackWriter {
 			return;
 
 		final long searchStart = System.currentTimeMillis();
-		beginPhase(PackingPhase.COMPRESSING, monitor, nonEdgeCnt);
+		monitor.beginTask(JGitText.get().compressingObjects, nonEdgeCnt);
 		searchForDeltas(monitor, list, cnt);
-		endPhase(monitor);
+		monitor.endTask();
 		stats.deltaSearchNonEdgeObjects = nonEdgeCnt;
 		stats.timeCompressing = System.currentTimeMillis() - searchStart;
 
@@ -1439,7 +1400,8 @@ public class PackWriter {
 			throws MissingObjectException, IOException,
 			IncorrectObjectTypeException {
 		final long countingStart = System.currentTimeMillis();
-		beginPhase(PackingPhase.COUNTING, countingMonitor, ProgressMonitor.UNKNOWN);
+		countingMonitor.beginTask(JGitText.get().countingObjects,
+				ProgressMonitor.UNKNOWN);
 
 		if (have == null)
 			have = Collections.emptySet();
@@ -1485,7 +1447,7 @@ public class PackWriter {
 					cachedPacks.addAll(shortCircuit);
 					for (CachedPack pack : shortCircuit)
 						countingMonitor.update((int) pack.getObjectCount());
-					endPhase(countingMonitor);
+					countingMonitor.endTask();
 					stats.timeCounting = System.currentTimeMillis() - countingStart;
 					return;
 				}
@@ -1575,8 +1537,8 @@ public class PackWriter {
 							wantObjs, haveObjs, pack);
 					commits = new BlockList<RevCommit>();
 
-					endPhase(countingMonitor);
-					beginPhase(PackingPhase.COUNTING, countingMonitor,
+					countingMonitor.endTask();
+					countingMonitor.beginTask(JGitText.get().countingObjects,
 							ProgressMonitor.UNKNOWN);
 					continue;
 				}
@@ -1663,7 +1625,7 @@ public class PackWriter {
 
 		for (CachedPack pack : cachedPacks)
 			countingMonitor.update((int) pack.getObjectCount());
-		endPhase(countingMonitor);
+		countingMonitor.endTask();
 		stats.timeCounting = System.currentTimeMillis() - countingStart;
 	}
 
@@ -2135,60 +2097,6 @@ public class PackWriter {
 			return MessageFormat.format(JGitText.get().packWriterStatistics, //
 					totalObjects, totalDeltas, //
 					reusedObjects, reusedDeltas);
-		}
-	}
-
-	private class MutableState {
-		private volatile PackingPhase phase;
-
-		MutableState() {
-			phase = PackingPhase.COUNTING;
-		}
-
-		State snapshot() {
-			return new State(phase);
-		}
-	}
-
-	/** Possible states that a PackWriter can be in. */
-	public static enum PackingPhase {
-		/** Counting objects phase. */
-		COUNTING,
-
-		/** Getting sizes phase. */
-		GETTING_SIZES,
-
-		/** Finding sources phase. */
-		FINDING_SOURCES,
-
-		/** Compressing objects phase. */
-		COMPRESSING,
-
-		/** Writing objects phase. */
-		WRITING;
-	}
-
-	/** Summary of the current state of a PackWriter. */
-	public class State {
-		private final PackingPhase phase;
-
-		State(PackingPhase phase) {
-			this.phase = phase;
-		}
-
-		/** @return the PackConfig used to build the writer. */
-		public PackConfig getConfig() {
-			return config;
-		}
-
-		/** @return the current phase of the writer. */
-		public PackingPhase getPhase() {
-			return phase;
-		}
-
-		@Override
-		public String toString() {
-			return "PackWriter.State[" + phase + "]";
 		}
 	}
 }
