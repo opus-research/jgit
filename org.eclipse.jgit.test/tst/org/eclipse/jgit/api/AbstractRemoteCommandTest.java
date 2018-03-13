@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,83 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertEquals;
 
-/**
- * A reference that indirectly points at another {@link Ref}.
- * <p>
- * A symbolic reference always derives its current value from the target
- * reference.
- */
-public class SymbolicRef implements Ref {
-	private final String name;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-	private final Ref target;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-	/**
-	 * Create a new ref pairing.
-	 *
-	 * @param refName
-	 *            name of this ref.
-	 * @param target
-	 *            the ref we reference and derive our value from.
-	 */
-	public SymbolicRef(String refName, Ref target) {
-		this.name = refName;
-		this.target = target;
+public class AbstractRemoteCommandTest extends RepositoryTestCase {
+
+	protected static final String REMOTE_NAME = "test";
+
+	protected RemoteConfig setupRemote()
+			throws IOException, URISyntaxException {
+		// create another repository
+		Repository remoteRepository = createWorkRepository();
+
+		// set it up as a remote to this repository
+		final StoredConfig config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, REMOTE_NAME);
+
+		RefSpec refSpec = new RefSpec();
+		refSpec = refSpec.setForceUpdate(true);
+		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*",
+				Constants.R_REMOTES + REMOTE_NAME + "/*");
+		remoteConfig.addFetchRefSpec(refSpec);
+
+		URIish uri = new URIish(
+				remoteRepository.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+
+		remoteConfig.update(config);
+		config.save();
+
+		return remoteConfig;
 	}
 
-	public String getName() {
-		return name;
+	protected void assertRemoteConfigEquals(RemoteConfig expected,
+			RemoteConfig actual) {
+		assertEquals(expected.getName(), actual.getName());
+		assertEquals(expected.getURIs(), actual.getURIs());
+		assertEquals(expected.getPushURIs(), actual.getPushURIs());
+		assertEquals(expected.getFetchRefSpecs(), actual.getFetchRefSpecs());
+		assertEquals(expected.getPushRefSpecs(), actual.getPushRefSpecs());
 	}
 
-	public boolean isSymbolic() {
-		return true;
-	}
-
-	public Ref getLeaf() {
-		Ref dst = getTarget();
-		while (dst.isSymbolic())
-			dst = dst.getTarget();
-		return dst;
-	}
-
-	public Ref getTarget() {
-		return target;
-	}
-
-	public ObjectId getObjectId() {
-		return getLeaf().getObjectId();
-	}
-
-	public Storage getStorage() {
-		return Storage.LOOSE;
-	}
-
-	public ObjectId getPeeledObjectId() {
-		return getLeaf().getPeeledObjectId();
-	}
-
-	public boolean isPeeled() {
-		return getLeaf().isPeeled();
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		StringBuilder r = new StringBuilder();
-		r.append("SymbolicRef[");
-		Ref cur = this;
-		while (cur.isSymbolic()) {
-			r.append(cur.getName());
-			r.append(" -> ");
-			cur = cur.getTarget();
-		}
-		r.append(cur.getName());
-		r.append('=');
-		r.append(ObjectId.toString(cur.getObjectId()));
-		r.append("]");
-		return r.toString();
-	}
 }

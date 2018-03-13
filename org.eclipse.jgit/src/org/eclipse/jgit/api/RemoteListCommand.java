@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,83 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.lib;
+import java.net.URISyntaxException;
+import java.util.List;
+
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.RemoteConfig;
 
 /**
- * A reference that indirectly points at another {@link Ref}.
- * <p>
- * A symbolic reference always derives its current value from the target
- * reference.
+ * Used to obtain the list of remotes.
+ *
+ * This class has setters for all supported options and arguments of this
+ * command and a {@link #call()} method to finally execute the command.
+ *
+ * @see <a href=
+ *      "http://www.kernel.org/pub/software/scm/git/docs/git-remote.html" > Git
+ *      documentation about Remote</a>
+ *
+ * @since 4.2
  */
-public class SymbolicRef implements Ref {
-	private final String name;
-
-	private final Ref target;
+public class RemoteListCommand extends GitCommand<List<RemoteConfig>> {
 
 	/**
-	 * Create a new ref pairing.
-	 *
-	 * @param refName
-	 *            name of this ref.
-	 * @param target
-	 *            the ref we reference and derive our value from.
+	 * @param repo
 	 */
-	public SymbolicRef(String refName, Ref target) {
-		this.name = refName;
-		this.target = target;
+	protected RemoteListCommand(Repository repo) {
+		super(repo);
 	}
 
-	public String getName() {
-		return name;
-	}
-
-	public boolean isSymbolic() {
-		return true;
-	}
-
-	public Ref getLeaf() {
-		Ref dst = getTarget();
-		while (dst.isSymbolic())
-			dst = dst.getTarget();
-		return dst;
-	}
-
-	public Ref getTarget() {
-		return target;
-	}
-
-	public ObjectId getObjectId() {
-		return getLeaf().getObjectId();
-	}
-
-	public Storage getStorage() {
-		return Storage.LOOSE;
-	}
-
-	public ObjectId getPeeledObjectId() {
-		return getLeaf().getPeeledObjectId();
-	}
-
-	public boolean isPeeled() {
-		return getLeaf().isPeeled();
-	}
-
-	@SuppressWarnings("nls")
+	/**
+	 * Executes the {@code remote} command with all the options and parameters
+	 * collected by the setter methods of this class.
+	 *
+	 * @return a list of {@link RemoteConfig} objects.
+	 */
 	@Override
-	public String toString() {
-		StringBuilder r = new StringBuilder();
-		r.append("SymbolicRef[");
-		Ref cur = this;
-		while (cur.isSymbolic()) {
-			r.append(cur.getName());
-			r.append(" -> ");
-			cur = cur.getTarget();
+	public List<RemoteConfig> call() throws GitAPIException {
+		checkCallable();
+
+		try {
+			return RemoteConfig.getAllRemoteConfigs(repo.getConfig());
+		} catch (URISyntaxException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		}
-		r.append(cur.getName());
-		r.append('=');
-		r.append(ObjectId.toString(cur.getObjectId()));
-		r.append("]");
-		return r.toString();
 	}
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,83 +40,61 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
-/**
- * A reference that indirectly points at another {@link Ref}.
- * <p>
- * A symbolic reference always derives its current value from the target
- * reference.
- */
-public class SymbolicRef implements Ref {
-	private final String name;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
+import org.junit.Test;
 
-	private final Ref target;
+public class RemoteSetUrlCommandTest extends AbstractRemoteCommandTest {
 
-	/**
-	 * Create a new ref pairing.
-	 *
-	 * @param refName
-	 *            name of this ref.
-	 * @param target
-	 *            the ref we reference and derive our value from.
-	 */
-	public SymbolicRef(String refName, Ref target) {
-		this.name = refName;
-		this.target = target;
+	@Test
+	public void testSetUrl() throws Exception {
+		// setup an initial remote
+		setupRemote();
+
+		// execute the command to change the fetch url
+		RemoteSetUrlCommand cmd = Git.wrap(db).remoteSetUrl();
+		cmd.setName(REMOTE_NAME);
+		URIish newUri = new URIish("git://test.com/test");
+		cmd.setUri(newUri);
+		RemoteConfig remote = cmd.call();
+
+		// assert that the changed remote has the new fetch url
+		assertEquals(REMOTE_NAME, remote.getName());
+		assertArrayEquals(new URIish[] { newUri }, remote.getURIs().toArray());
+
+		// assert that the changed remote is available in the git configuration
+		assertRemoteConfigEquals(remote,
+				new RemoteConfig(db.getConfig(), REMOTE_NAME));
 	}
 
-	public String getName() {
-		return name;
+	@Test
+	public void testSetPushUrl() throws Exception {
+		// setup an initial remote
+		RemoteConfig remoteConfig = setupRemote();
+
+		// execute the command to change the push url
+		RemoteSetUrlCommand cmd = Git.wrap(db).remoteSetUrl();
+		cmd.setName(REMOTE_NAME);
+		URIish newUri = new URIish("git://test.com/test");
+		cmd.setUri(newUri);
+		cmd.setPush(true);
+		RemoteConfig remote = cmd.call();
+
+		// assert that the changed remote has the old fetch url and the new push
+		// url
+		assertEquals(REMOTE_NAME, remote.getName());
+		assertEquals(remoteConfig.getURIs(), remote.getURIs());
+		assertArrayEquals(new URIish[] { newUri },
+				remote.getPushURIs().toArray());
+
+		// assert that the changed remote is available in the git configuration
+		assertRemoteConfigEquals(remote,
+				new RemoteConfig(db.getConfig(), REMOTE_NAME));
 	}
 
-	public boolean isSymbolic() {
-		return true;
-	}
-
-	public Ref getLeaf() {
-		Ref dst = getTarget();
-		while (dst.isSymbolic())
-			dst = dst.getTarget();
-		return dst;
-	}
-
-	public Ref getTarget() {
-		return target;
-	}
-
-	public ObjectId getObjectId() {
-		return getLeaf().getObjectId();
-	}
-
-	public Storage getStorage() {
-		return Storage.LOOSE;
-	}
-
-	public ObjectId getPeeledObjectId() {
-		return getLeaf().getPeeledObjectId();
-	}
-
-	public boolean isPeeled() {
-		return getLeaf().isPeeled();
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		StringBuilder r = new StringBuilder();
-		r.append("SymbolicRef[");
-		Ref cur = this;
-		while (cur.isSymbolic()) {
-			r.append(cur.getName());
-			r.append(" -> ");
-			cur = cur.getTarget();
-		}
-		r.append(cur.getName());
-		r.append('=');
-		r.append(ObjectId.toString(cur.getObjectId()));
-		r.append("]");
-		return r.toString();
-	}
 }

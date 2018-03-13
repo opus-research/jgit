@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,83 +40,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertEquals;
 
-/**
- * A reference that indirectly points at another {@link Ref}.
- * <p>
- * A symbolic reference always derives its current value from the target
- * reference.
- */
-public class SymbolicRef implements Ref {
-	private final String name;
+import java.util.List;
 
-	private final Ref target;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.junit.Test;
 
-	/**
-	 * Create a new ref pairing.
-	 *
-	 * @param refName
-	 *            name of this ref.
-	 * @param target
-	 *            the ref we reference and derive our value from.
-	 */
-	public SymbolicRef(String refName, Ref target) {
-		this.name = refName;
-		this.target = target;
+public class RemoteListCommandTest extends AbstractRemoteCommandTest {
+
+	@Test
+	public void testList() throws Exception {
+		// setup an initial remote
+		RemoteConfig remoteConfig = setupRemote();
+
+		// execute the command to list the remotes
+		List<RemoteConfig> remotes = Git.wrap(db).remoteList().call();
+
+		// assert that there is only one remote
+		assertEquals(1, remotes.size());
+		// assert that the available remote is the initial remote
+		assertRemoteConfigEquals(remoteConfig, remotes.get(0));
 	}
 
-	public String getName() {
-		return name;
-	}
-
-	public boolean isSymbolic() {
-		return true;
-	}
-
-	public Ref getLeaf() {
-		Ref dst = getTarget();
-		while (dst.isSymbolic())
-			dst = dst.getTarget();
-		return dst;
-	}
-
-	public Ref getTarget() {
-		return target;
-	}
-
-	public ObjectId getObjectId() {
-		return getLeaf().getObjectId();
-	}
-
-	public Storage getStorage() {
-		return Storage.LOOSE;
-	}
-
-	public ObjectId getPeeledObjectId() {
-		return getLeaf().getPeeledObjectId();
-	}
-
-	public boolean isPeeled() {
-		return getLeaf().isPeeled();
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		StringBuilder r = new StringBuilder();
-		r.append("SymbolicRef[");
-		Ref cur = this;
-		while (cur.isSymbolic()) {
-			r.append(cur.getName());
-			r.append(" -> ");
-			cur = cur.getTarget();
-		}
-		r.append(cur.getName());
-		r.append('=');
-		r.append(ObjectId.toString(cur.getObjectId()));
-		r.append("]");
-		return r.toString();
-	}
 }

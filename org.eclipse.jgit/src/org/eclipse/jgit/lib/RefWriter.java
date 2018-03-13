@@ -48,12 +48,9 @@ package org.eclipse.jgit.lib;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Map;
 
-import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.RefDirectory;
 import org.eclipse.jgit.util.RefList;
 import org.eclipse.jgit.util.RefMap;
@@ -122,19 +119,13 @@ public abstract class RefWriter {
 				continue;
 			}
 
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				throw new TransportException(MessageFormat
-						.format(JGitText.get().cannotRead, r.getName()));
-			}
-			objectId.copyTo(tmp, w);
+			r.getObjectId().copyTo(tmp, w);
 			w.write('\t');
 			w.write(r.getName());
 			w.write('\n');
 
-			ObjectId peeledObjectId = r.getPeeledObjectId();
-			if (peeledObjectId != null) {
-				peeledObjectId.copyTo(tmp, w);
+			if (r.getPeeledObjectId() != null) {
+				r.getPeeledObjectId().copyTo(tmp, w);
 				w.write('\t');
 				w.write(r.getName());
 				w.write("^{}\n"); //$NON-NLS-1$
@@ -176,20 +167,14 @@ public abstract class RefWriter {
 			if (r.getStorage() != Ref.Storage.PACKED)
 				continue;
 
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				throw new TransportException(MessageFormat
-						.format(JGitText.get().cannotRead, r.getName()));
-			}
-			objectId.copyTo(tmp, w);
+			r.getObjectId().copyTo(tmp, w);
 			w.write(' ');
 			w.write(r.getName());
 			w.write('\n');
 
-			ObjectId peeledObjectId = r.getPeeledObjectId();
-			if (peeledObjectId != null) {
+			if (r.getPeeledObjectId() != null) {
 				w.write('^');
-				peeledObjectId.copyTo(tmp, w);
+				r.getPeeledObjectId().copyTo(tmp, w);
 				w.write('\n');
 			}
 		}

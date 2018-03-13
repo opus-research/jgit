@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,83 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.lib;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.RemoteConfig;
 
 /**
- * A reference that indirectly points at another {@link Ref}.
- * <p>
- * A symbolic reference always derives its current value from the target
- * reference.
+ * Used to remove an existing remote.
+ *
+ * This class has setters for all supported options and arguments of this
+ * command and a {@link #call()} method to finally execute the command.
+ *
+ * @see <a href=
+ *      "http://www.kernel.org/pub/software/scm/git/docs/git-remote.html" > Git
+ *      documentation about Remote</a>
+ *
+ * @since 4.2
  */
-public class SymbolicRef implements Ref {
-	private final String name;
+public class RemoteRemoveCommand extends GitCommand<RemoteConfig> {
 
-	private final Ref target;
+	private String name;
 
 	/**
-	 * Create a new ref pairing.
-	 *
-	 * @param refName
-	 *            name of this ref.
-	 * @param target
-	 *            the ref we reference and derive our value from.
+	 * @param repo
 	 */
-	public SymbolicRef(String refName, Ref target) {
-		this.name = refName;
-		this.target = target;
+	protected RemoteRemoveCommand(Repository repo) {
+		super(repo);
 	}
 
-	public String getName() {
-		return name;
+	/**
+	 * The name of the remote to remove.
+	 *
+	 * @param name
+	 *            a remote name
+	 */
+	public void setName(String name) {
+		this.name = name;
 	}
 
-	public boolean isSymbolic() {
-		return true;
-	}
-
-	public Ref getLeaf() {
-		Ref dst = getTarget();
-		while (dst.isSymbolic())
-			dst = dst.getTarget();
-		return dst;
-	}
-
-	public Ref getTarget() {
-		return target;
-	}
-
-	public ObjectId getObjectId() {
-		return getLeaf().getObjectId();
-	}
-
-	public Storage getStorage() {
-		return Storage.LOOSE;
-	}
-
-	public ObjectId getPeeledObjectId() {
-		return getLeaf().getPeeledObjectId();
-	}
-
-	public boolean isPeeled() {
-		return getLeaf().isPeeled();
-	}
-
-	@SuppressWarnings("nls")
+	/**
+	 * Executes the {@code remote} command with all the options and parameters
+	 * collected by the setter methods of this class.
+	 *
+	 * @return the {@link RemoteConfig} object of the removed remote
+	 */
 	@Override
-	public String toString() {
-		StringBuilder r = new StringBuilder();
-		r.append("SymbolicRef[");
-		Ref cur = this;
-		while (cur.isSymbolic()) {
-			r.append(cur.getName());
-			r.append(" -> ");
-			cur = cur.getTarget();
+	public RemoteConfig call() throws GitAPIException {
+		checkCallable();
+
+		try {
+			StoredConfig config = repo.getConfig();
+			RemoteConfig remote = new RemoteConfig(config, name);
+			config.unsetSection(ConfigConstants.CONFIG_KEY_REMOTE, name);
+			config.save();
+			return remote;
+		} catch (IOException | URISyntaxException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		}
-		r.append(cur.getName());
-		r.append('=');
-		r.append(ObjectId.toString(cur.getObjectId()));
-		r.append("]");
-		return r.toString();
+
 	}
+
 }
