@@ -172,9 +172,7 @@ class SideBandInputStream extends InputStream {
 				eof = true;
 				throw new TransportException(PFX_REMOTE + readString(available));
 			default:
-				throw new PackProtocolException(
-						MessageFormat.format(JGitText.get().invalidChannel,
-								Integer.valueOf(channel)));
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().invalidChannel, channel));
 			}
 		}
 	}

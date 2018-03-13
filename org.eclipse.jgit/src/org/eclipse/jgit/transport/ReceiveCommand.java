@@ -129,9 +129,8 @@ public class ReceiveCommand {
 	 *            commands to filter.
 	 * @param want
 	 *            desired status to filter by.
-	 * @return a copy of the command list containing only those commands with
-	 *         the desired status.
-	 * @since 2.0
+	 * @return a copy of the command list containing only those commands with the
+	 *         desired status.
 	 */
 	public static List<ReceiveCommand> filter(List<ReceiveCommand> commands,
 			final Result want) {
@@ -196,7 +195,6 @@ public class ReceiveCommand {
 	 *            name of the ref being affected.
 	 * @param type
 	 *            type of the command.
-	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
@@ -271,7 +269,6 @@ public class ReceiveCommand {
 	 *
 	 * @param rp
 	 *            receive-pack session.
-	 * @since 2.0
 	 */
 	public void execute(final ReceivePack rp) {
 		try {
