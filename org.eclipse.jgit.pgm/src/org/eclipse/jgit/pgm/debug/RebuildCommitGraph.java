@@ -117,9 +117,12 @@ class RebuildCommitGraph extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		if (!really && !db.getRefDatabase().getRefs(ALL).isEmpty()) {
+			File directory = db.getDirectory();
+			String absolutePath = directory == null ? "null" //$NON-NLS-1$
+					: directory.getAbsolutePath();
 			errw.println(
 				MessageFormat.format(CLIText.get().fatalThisProgramWillDestroyTheRepository
-					, db.getDirectory().getAbsolutePath(), REALLY));
+					, absolutePath, REALLY));
 			throw die(CLIText.get().needApprovalToDestroyCurrentRepository);
 		}
 		if (!refList.isFile())
@@ -164,7 +167,7 @@ class RebuildCommitGraph extends TextBuiltin {
 			}
 		}
 
-		pm.beginTask("Rewriting commits", queue.size());
+		pm.beginTask("Rewriting commits", queue.size()); //$NON-NLS-1$
 		try (ObjectInserter oi = db.newObjectInserter()) {
 			final ObjectId emptyTree = oi.insert(Constants.OBJ_TREE,
 					new byte[] {});
@@ -200,7 +203,7 @@ class RebuildCommitGraph extends TextBuiltin {
 					newc.setAuthor(new PersonIdent(me, new Date(t.commitTime)));
 					newc.setCommitter(newc.getAuthor());
 					newc.setParentIds(newParents);
-					newc.setMessage("ORIGINAL " + t.oldId.name() + "\n"); //$NON-NLS-2$
+					newc.setMessage("ORIGINAL " + t.oldId.name() + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
 					t.newId = oi.insert(newc);
 					rewrites.put(t.oldId, t.newId);
 					pm.update(1);
@@ -232,7 +235,7 @@ class RebuildCommitGraph extends TextBuiltin {
 		final ObjectId id = db.resolve(Constants.HEAD);
 		if (!ObjectId.isId(head) && id != null) {
 			final LockFile lf;
-			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD), db.getFS());
+			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD));
 			if (!lf.lock())
 				throw new IOException(MessageFormat.format(CLIText.get().cannotLock, Constants.HEAD));
 			lf.write(id);
@@ -260,7 +263,7 @@ class RebuildCommitGraph extends TextBuiltin {
 			protected void writeFile(final String name, final byte[] content)
 					throws IOException {
 				final File file = new File(db.getDirectory(), name);
-				final LockFile lck = new LockFile(file, db.getFS());
+				final LockFile lck = new LockFile(file);
 				if (!lck.lock())
 					throw new ObjectWritingException(MessageFormat.format(CLIText.get().cantWrite, file));
 				try {

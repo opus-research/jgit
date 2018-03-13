@@ -56,6 +56,7 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -89,6 +90,8 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdRef;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.ReflogReader;
@@ -211,8 +214,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals("http", remoteURI.getScheme());
 
 		Map<String, Ref> map;
-		Transport t = Transport.open(dst, remoteURI);
-		try {
+		try (Transport t = Transport.open(dst, remoteURI)) {
 			// I didn't make up these public interface names, I just
 			// approved them for inclusion into the code base. Sorry.
 			// --spearce
@@ -226,8 +228,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			} finally {
 				c.close();
 			}
-		} finally {
-			t.close();
 		}
 
 		assertNotNull("have map of refs", map);
@@ -257,8 +257,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	public void testListRemote_BadName() throws IOException, URISyntaxException {
 		Repository dst = createBareRepository();
 		URIish uri = new URIish(this.remoteURI.toString() + ".invalid");
-		Transport t = Transport.open(dst, uri);
-		try {
+		try (Transport t = Transport.open(dst, uri)) {
 			try {
 				t.openFetch();
 				fail("fetch connection opened");
@@ -266,8 +265,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				assertEquals(uri + ": Git repository not found",
 						notFound.getMessage());
 			}
-		} finally {
-			t.close();
 		}
 
 		List<AccessEvent> requests = getRequests();
@@ -288,15 +285,12 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
 
-		Transport t = Transport.open(dst, remoteURI);
-		try {
+		try (Transport t = Transport.open(dst, remoteURI)) {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
-		} finally {
-			t.close();
 		}
 
 		assertTrue(dst.hasObject(A_txt));
-		assertEquals(B, dst.getRef(master).getObjectId());
+		assertEquals(B, dst.exactRef(master).getObjectId());
 		fsck(dst, B);
 
 		List<AccessEvent> requests = getRequests();
@@ -331,13 +325,10 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		// Bootstrap by doing the clone.
 		//
 		TestRepository dst = createTestRepository();
-		Transport t = Transport.open(dst.getRepository(), remoteURI);
-		try {
+		try (Transport t = Transport.open(dst.getRepository(), remoteURI)) {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
-		} finally {
-			t.close();
 		}
-		assertEquals(B, dst.getRepository().getRef(master).getObjectId());
+		assertEquals(B, dst.getRepository().exactRef(master).getObjectId());
 		List<AccessEvent> cloneRequests = getRequests();
 
 		// Only create a few new commits.
@@ -352,13 +343,10 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Now incrementally update.
 		//
-		t = Transport.open(dst.getRepository(), remoteURI);
-		try {
+		try (Transport t = Transport.open(dst.getRepository(), remoteURI)) {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
-		} finally {
-			t.close();
 		}
-		assertEquals(Z, dst.getRepository().getRef(master).getObjectId());
+		assertEquals(Z, dst.getRepository().exactRef(master).getObjectId());
 
 		List<AccessEvent> requests = getRequests();
 		requests.removeAll(cloneRequests);
@@ -394,13 +382,10 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		// Bootstrap by doing the clone.
 		//
 		TestRepository dst = createTestRepository();
-		Transport t = Transport.open(dst.getRepository(), remoteURI);
-		try {
+		try (Transport t = Transport.open(dst.getRepository(), remoteURI)) {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
-		} finally {
-			t.close();
 		}
-		assertEquals(B, dst.getRepository().getRef(master).getObjectId());
+		assertEquals(B, dst.getRepository().exactRef(master).getObjectId());
 		List<AccessEvent> cloneRequests = getRequests();
 
 		// Force enough into the local client that enumeration will
@@ -418,13 +403,10 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Now incrementally update.
 		//
-		t = Transport.open(dst.getRepository(), remoteURI);
-		try {
+		try (Transport t = Transport.open(dst.getRepository(), remoteURI)) {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
-		} finally {
-			t.close();
 		}
-		assertEquals(Z, dst.getRepository().getRef(master).getObjectId());
+		assertEquals(Z, dst.getRepository().exactRef(master).getObjectId());
 
 		List<AccessEvent> requests = getRequests();
 		requests.removeAll(cloneRequests);
@@ -474,8 +456,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
 
-		Transport t = Transport.open(dst, brokenURI);
-		try {
+		try (Transport t = Transport.open(dst, brokenURI)) {
 			try {
 				t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
 				fail("fetch completed despite upload-pack being broken");
@@ -485,8 +466,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 						+ " received Content-Type text/plain; charset=UTF-8";
 				assertEquals(exp, err.getMessage());
 			}
-		} finally {
-			t.close();
 		}
 
 		List<AccessEvent> requests = getRequests();
@@ -511,18 +490,35 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	}
 
 	@Test
+	public void testInvalidWant() throws Exception {
+		@SuppressWarnings("resource")
+		ObjectId id = new ObjectInserter.Formatter().idFor(Constants.OBJ_BLOB,
+				"testInvalidWant".getBytes(StandardCharsets.UTF_8));
+
+		Repository dst = createBareRepository();
+		try (Transport t = Transport.open(dst, remoteURI);
+				FetchConnection c = t.openFetch()) {
+			Ref want = new ObjectIdRef.Unpeeled(Ref.Storage.NETWORK, id.name(),
+					id);
+			c.fetch(NullProgressMonitor.INSTANCE, Collections.singleton(want),
+					Collections.<ObjectId> emptySet());
+			fail("Server accepted want " + id.name());
+		} catch (TransportException err) {
+			assertEquals("want " + id.name() + " not valid", err.getMessage());
+		}
+	}
+
+	@Test
 	public void testPush_NotAuthorized() throws Exception {
 		final TestRepository src = createTestRepository();
 		final RevBlob Q_txt = src.blob("new text");
 		final RevCommit Q = src.commit().add("Q", Q_txt).create();
 		final Repository db = src.getRepository();
 		final String dstName = Constants.R_HEADS + "new.branch";
-		Transport t;
 
 		// push anonymous shouldn't be allowed.
 		//
-		t = Transport.open(db, remoteURI);
-		try {
+		try (Transport t = Transport.open(db, remoteURI)) {
 			final String srcExpr = Q.name();
 			final boolean forceUpdate = false;
 			final String localName = null;
@@ -538,8 +534,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 						+ JGitText.get().authenticationNotSupported;
 				assertEquals(exp, e.getMessage());
 			}
-		} finally {
-			t.close();
 		}
 
 		List<AccessEvent> requests = getRequests();
@@ -560,12 +554,10 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		final RevCommit Q = src.commit().add("Q", Q_txt).create();
 		final Repository db = src.getRepository();
 		final String dstName = Constants.R_HEADS + "new.branch";
-		Transport t;
 
 		enableReceivePack();
 
-		t = Transport.open(db, remoteURI);
-		try {
+		try (Transport t = Transport.open(db, remoteURI)) {
 			final String srcExpr = Q.name();
 			final boolean forceUpdate = false;
 			final String localName = null;
@@ -574,13 +566,11 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			RemoteRefUpdate u = new RemoteRefUpdate(src.getRepository(),
 					srcExpr, dstName, forceUpdate, localName, oldId);
 			t.push(NullProgressMonitor.INSTANCE, Collections.singleton(u));
-		} finally {
-			t.close();
 		}
 
 		assertTrue(remoteRepository.hasObject(Q_txt));
-		assertNotNull("has " + dstName, remoteRepository.getRef(dstName));
-		assertEquals(Q, remoteRepository.getRef(dstName).getObjectId());
+		assertNotNull("has " + dstName, remoteRepository.exactRef(dstName));
+		assertEquals(Q, remoteRepository.exactRef(dstName).getObjectId());
 		fsck(remoteRepository, Q);
 
 		final ReflogReader log = remoteRepository.getReflogReader(dstName);
@@ -633,7 +623,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		final RevCommit Q = src.commit().add("Q", Q_bin).create();
 		final Repository db = src.getRepository();
 		final String dstName = Constants.R_HEADS + "new.branch";
-		Transport t;
 
 		enableReceivePack();
 
@@ -642,8 +631,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		cfg.setInt("http", null, "postbuffer", 8 * 1024);
 		cfg.save();
 
-		t = Transport.open(db, remoteURI);
-		try {
+		try (Transport t = Transport.open(db, remoteURI)) {
 			final String srcExpr = Q.name();
 			final boolean forceUpdate = false;
 			final String localName = null;
@@ -652,13 +640,11 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			RemoteRefUpdate u = new RemoteRefUpdate(src.getRepository(),
 					srcExpr, dstName, forceUpdate, localName, oldId);
 			t.push(NullProgressMonitor.INSTANCE, Collections.singleton(u));
-		} finally {
-			t.close();
 		}
 
 		assertTrue(remoteRepository.hasObject(Q_bin));
-		assertNotNull("has " + dstName, remoteRepository.getRef(dstName));
-		assertEquals(Q, remoteRepository.getRef(dstName).getObjectId());
+		assertNotNull("has " + dstName, remoteRepository.exactRef(dstName));
+		assertEquals(Q, remoteRepository.exactRef(dstName).getObjectId());
 		fsck(remoteRepository, Q);
 
 		List<AccessEvent> requests = getRequests();
