@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -77,7 +76,6 @@ import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
-import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
@@ -153,7 +151,7 @@ public abstract class PackParser {
 
 	private int entryCount;
 
-	private ObjectIdOwnerMap<DeltaChain> baseById;
+	private ObjectIdSubclassMap<DeltaChain> baseById;
 
 	/**
 	 * Objects referenced by their name from deltas, that aren't in this pack.
@@ -167,7 +165,7 @@ public abstract class PackParser {
 	private LongMap<UnresolvedDelta> baseByPos;
 
 	/** Blobs whose contents need to be double-checked after indexing. */
-	private BlockList<PackedObjectInfo> deferredCheckBlobs;
+	private List<PackedObjectInfo> deferredCheckBlobs;
 
 	private MessageDigest packDigest;
 
@@ -439,9 +437,9 @@ public abstract class PackParser {
 			readPackHeader();
 
 			entries = new PackedObjectInfo[(int) objectCount];
-			baseById = new ObjectIdOwnerMap<DeltaChain>();
+			baseById = new ObjectIdSubclassMap<DeltaChain>();
 			baseByPos = new LongMap<UnresolvedDelta>();
-			deferredCheckBlobs = new BlockList<PackedObjectInfo>();
+			deferredCheckBlobs = new ArrayList<PackedObjectInfo>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
@@ -1370,7 +1368,7 @@ public abstract class PackParser {
 		return inflater;
 	}
 
-	private static class DeltaChain extends ObjectIdOwnerMap.Entry {
+	private static class DeltaChain extends ObjectId {
 		UnresolvedDelta head;
 
 		DeltaChain(final AnyObjectId id) {

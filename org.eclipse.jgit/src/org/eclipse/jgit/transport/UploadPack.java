@@ -511,12 +511,10 @@ public class UploadPack {
 				try {
 					obj = q.next();
 				} catch (MissingObjectException notFound) {
-					ObjectId id = notFound.getObjectId();
-					if (wantIds.contains(id)) {
-						String msg = MessageFormat.format(
-								JGitText.get().wantNotValid, id.name());
-						pckOut.writeString("ERR " + msg);
-						throw new PackProtocolException(msg, notFound);
+					if (wantIds.contains(notFound.getObjectId())) {
+						throw new PackProtocolException(
+								MessageFormat.format(JGitText.get().notValid,
+										notFound.getMessage()), notFound);
 					}
 					continue;
 				}
@@ -528,10 +526,8 @@ public class UploadPack {
 				//
 				if (wantIds.remove(obj)) {
 					if (!advertised.contains(obj)) {
-						String msg = MessageFormat.format(
-								JGitText.get().wantNotValid, obj.name());
-						pckOut.writeString("ERR " + msg);
-						throw new PackProtocolException(msg);
+						throw new PackProtocolException(MessageFormat.format(
+								JGitText.get().notValid, obj.name()));
 					}
 
 					if (!obj.has(WANT)) {
@@ -595,11 +591,9 @@ public class UploadPack {
 		// create a pack at this point, let the client know so it stops
 		// telling us about its history.
 		//
-		boolean didOkToGiveUp = false;
 		for (int i = peerHas.size() - 1; i >= 0; i--) {
 			ObjectId id = peerHas.get(i);
 			if (walk.lookupOrNull(id) == null) {
-				didOkToGiveUp = true;
 				if (okToGiveUp()) {
 					switch (multiAck) {
 					case OFF:
@@ -614,11 +608,6 @@ public class UploadPack {
 				}
 				break;
 			}
-		}
-
-		if (multiAck == MultiAck.DETAILED && !didOkToGiveUp && okToGiveUp()) {
-			ObjectId id = peerHas.get(peerHas.size() - 1);
-			pckOut.writeString("ACK " + id.name() + " ready\n");
 		}
 
 		peerHas.clear();

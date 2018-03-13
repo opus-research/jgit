@@ -213,7 +213,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String duplicateRemoteRefUpdateIsIllegal;
 	/***/ public String duplicateStagesNotAllowed;
 	/***/ public String eitherGitDirOrWorkTreeRequired;
-	/***/ public String emptyCommit;
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String encryptionError;
 	/***/ public String endOfFileInEscape;
@@ -240,8 +239,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfRevertCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfRmCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
-	/***/ public String exceptionOccurredDuringAddingOfOptionToALogCommand;
-	/***/ public String exceptionOccurredDuringReadingOfGIT_DIR;
+	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
+	/***/ public String exceptionOccuredDuringReadingOfGIT_DIR;
 	/***/ public String expectedACKNAKFoundEOF;
 	/***/ public String expectedACKNAKGot;
 	/***/ public String expectedBooleanStringValue;
@@ -268,7 +267,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkDisconnectedFromFile;
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
-	/***/ public String illegalCombinationOfArguments;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
 	/***/ public String inMemoryBufferLimitExceeded;
@@ -363,6 +361,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String notAuthorized;
 	/***/ public String notAValidPack;
 	/***/ public String notFound;
+	/***/ public String notValid;
 	/***/ public String nothingToFetch;
 	/***/ public String nothingToPush;
 	/***/ public String notMergedExceptionMessage;
@@ -478,14 +477,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportExceptionInvalid;
 	/***/ public String transportExceptionMissingAssumed;
 	/***/ public String transportExceptionReadRef;
-	/***/ public String transportProtoAmazonS3;
-	/***/ public String transportProtoBundleFile;
-	/***/ public String transportProtoFTP;
-	/***/ public String transportProtoGitAnon;
-	/***/ public String transportProtoHTTP;
-	/***/ public String transportProtoLocal;
-	/***/ public String transportProtoSFTP;
-	/***/ public String transportProtoSSH;
 	/***/ public String treeEntryAlreadyExists;
 	/***/ public String treeIteratorDoesNotSupportRemove;
 	/***/ public String truncatedHunkLinesMissingForAncestor;
@@ -525,7 +516,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String uriNotFound;
 	/***/ public String userConfigFileInvalid;
 	/***/ public String walkFailure;
-	/***/ public String wantNotValid;
 	/***/ public String windowSizeMustBeLesserThanLimit;
 	/***/ public String windowSizeMustBePowerOf2;
 	/***/ public String writeTimedOut;
