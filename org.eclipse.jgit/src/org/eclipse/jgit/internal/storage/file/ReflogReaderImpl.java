@@ -96,9 +96,6 @@ class ReflogReaderImpl implements ReflogReader {
 		try {
 			log = IO.readFully(logName);
 		} catch (FileNotFoundException e) {
-			if (logName.exists()) {
-				throw e;
-			}
 			return null;
 		}
 
@@ -121,9 +118,6 @@ class ReflogReaderImpl implements ReflogReader {
 		try {
 			log = IO.readFully(logName);
 		} catch (FileNotFoundException e) {
-			if (logName.exists()) {
-				throw e;
-			}
 			return Collections.emptyList();
 		}
 

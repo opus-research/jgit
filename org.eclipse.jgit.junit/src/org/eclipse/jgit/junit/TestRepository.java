@@ -175,7 +175,6 @@ public class TestRepository<R extends Repository> {
 	 *            the MockSystemReader to use for clock and other system
 	 *            operations.
 	 * @throws IOException
-	 * @since 4.2
 	 */
 	public TestRepository(R db, RevWalk rw, MockSystemReader reader)
 			throws IOException {
@@ -204,10 +203,7 @@ public class TestRepository<R extends Repository> {
 		return git;
 	}
 
-	/**
-	 * @return current date.
-	 * @since 4.2
-	 */
+	/** @return current date. */
 	public Date getDate() {
 		return new Date(mockSystemReader.getCurrentTime());
 	}
