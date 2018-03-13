@@ -170,8 +170,6 @@ public abstract class LocalDiskRepositoryTestCase {
 			recursiveDelete(tmp, false, true);
 		if (tmp != null && !tmp.exists())
 			CleanupThread.removed(tmp);
-
-		SystemReader.setInstance(null);
 	}
 
 	/** Increment the {@link #author} and {@link #committer} times. */

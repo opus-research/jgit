@@ -198,7 +198,6 @@ public class IgnoreRule {
 			}
 
 		} else {
-			matcher.reset();
 			matcher.append(target);
 			if (matcher.isMatch())
 				return true;

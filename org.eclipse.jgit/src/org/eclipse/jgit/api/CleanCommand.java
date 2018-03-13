@@ -104,10 +104,11 @@ public class CleanCommand extends GitCommand<Set<String>> {
 			FS fs = getRepository().getFS();
 			for (String p : status.getIgnoredNotInIndex()) {
 				File f = new File(repo.getWorkTree(), p);
-				if (fs.isFile(f) || fs.isSymLink(f))
+				if (fs.isFile(f) || fs.isSymLink(f)) {
 					untrackedAndIgnoredFiles.add(p);
-				else if (fs.isDirectory(f))
+				} else if (fs.isDirectory(f)) {
 					untrackedAndIgnoredDirs.add(p);
+				}
 			}
 
 			Set<String> filtered = filterFolders(untrackedAndIgnoredFiles,
@@ -175,7 +176,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 * If paths are set, only these paths are affected by the cleaning.
 	 *
 	 * @param paths
-	 *            the paths to set (with <code>/</code> as separator)
+	 *            the paths to set
 	 * @return {@code this}
 	 */
 	public CleanCommand setPaths(Set<String> paths) {

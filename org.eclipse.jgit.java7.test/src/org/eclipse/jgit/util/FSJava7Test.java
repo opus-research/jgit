@@ -58,13 +58,13 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class FSJava7Test {
-	private File trash;
+
+	private final File trash = new File(new File("target"), "trash");
 
 	@Before
 	public void setUp() throws Exception {
-		trash = File.createTempFile("tmp_", "");
-		trash.delete();
-		assertTrue("mkdir " + trash, trash.mkdir());
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		assertTrue(trash.mkdirs());
 	}
 
 	@After
