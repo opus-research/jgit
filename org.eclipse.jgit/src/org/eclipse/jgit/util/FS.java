@@ -44,14 +44,12 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.security.AccessController;
@@ -901,8 +899,7 @@ public abstract class FS {
 			throws IOException, InterruptedException {
 		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
 				stdinArgs.getBytes(Constants.CHARACTER_ENCODING));
-		return runProcess(processBuilder, outRedirect, errRedirect, in,
-				false);
+		return runProcess(processBuilder, outRedirect, errRedirect, in);
 	}
 
 	/**
@@ -927,12 +924,6 @@ public abstract class FS {
 	 *            any data over stdin. If binary is set to
 	 *            <code>false</code> then it is expected that the process
 	 *            expects text data which should be processed line by line.
-	 * @param binary
-	 *            Determines whether the process is expecting/emitting binary
-	 *            data over stdin/stdout. Non binary data will be copied
-	 *            line-by-line to and from the processes stdin/stdout. Binary
-	 *            data will be copied in chunks of 4K. Copying binary data with
-	 *            binary set to <code>false</code> can lead to data corruption.
 	 * @return the return code of this process.
 	 * @throws IOException
 	 *             if an I/O error occurs while executing this process.
@@ -943,7 +934,7 @@ public abstract class FS {
 	 */
 	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect,
-			InputStream inRedirect, boolean binary) throws IOException,
+			InputStream inRedirect) throws IOException,
 			InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
@@ -953,14 +944,14 @@ public abstract class FS {
 		try {
 			process = processBuilder.start();
 			final Callable<Void> errorGobbler = new StreamGobbler(
-					process.getErrorStream(), errRedirect, binary);
+					process.getErrorStream(), errRedirect);
 			final Callable<Void> outputGobbler = new StreamGobbler(
-					process.getInputStream(), outRedirect, binary);
+					process.getInputStream(), outRedirect);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
 			OutputStream outputStream = process.getOutputStream();
 			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream, binary)
+				new StreamGobbler(inRedirect, outputStream)
 						.call();
 			}
 			outputStream.close();
@@ -1241,64 +1232,33 @@ public abstract class FS {
 	 * </p>
 	 */
 	private static class StreamGobbler implements Callable<Void> {
-		private BufferedReader reader;
 		private InputStream in;
 
-		private BufferedWriter writer;
 		private OutputStream out;
 
-		private boolean binary = false;
-
-		public StreamGobbler(InputStream stream, OutputStream output, boolean binary) {
-			this.binary = binary;
-			if (!binary) {
-				this.reader = new BufferedReader(new InputStreamReader(stream));
-				if (output != null)
-					this.writer = new BufferedWriter(new OutputStreamWriter(
-							output));
-			} else {
-				this.in = stream;
-				this.out = output;
-			}
+		public StreamGobbler(InputStream stream, OutputStream output) {
+			this.in = stream;
+			this.out = output;
 		}
 
 		public Void call() throws IOException {
 			boolean writeFailure = false;
-			if (binary) {
-				byte buffer[] = new byte[4096];
-				int readBytes;
-				while ((readBytes = in.read(buffer)) != -1) {
-					// Do not try to write again after a failure, but keep
-					// reading as long as possible to prevent the input stream
-					// from choking.
-					if (!writeFailure && out != null) {
-						try {
-							out.write(buffer, 0, readBytes);
-							out.flush();
-						} catch (IOException e) {
-							writeFailure = true;
-						}
+			byte buffer[] = new byte[4096];
+			int readBytes;
+			while ((readBytes = in.read(buffer)) != -1) {
+				// Do not try to write again after a failure, but keep
+				// reading as long as possible to prevent the input stream
+				// from choking.
+				if (!writeFailure && out != null) {
+					try {
+						out.write(buffer, 0, readBytes);
+						out.flush();
+					} catch (IOException e) {
+						writeFailure = true;
 					}
 				}
-				return null;
-			} else {
-				String line = null;
-				while ((line = reader.readLine()) != null) {
-					// Do not try to write again after a failure, but keep
-					// reading as long as possible to prevent the input stream
-					// from choking.
-					if (!writeFailure && writer != null) {
-						try {
-							writer.write(line);
-							writer.newLine();
-							writer.flush();
-						} catch (IOException e) {
-							writeFailure = true;
-						}
-					}
-				}
-				return null;
 			}
+			return null;
 		}
 	}
 }
