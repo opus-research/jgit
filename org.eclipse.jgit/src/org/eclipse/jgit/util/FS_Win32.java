@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <me@lathund.dewire.com>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,50 +42,23 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.internal;
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import org.eclipse.jgit.util.FS;
 
 /**
- * FS implementation for POSIX systems using Java6
+ * FS implementation for Windows
  */
-public class FS_POSIX_Java6 extends FS_POSIX {
-	private static final Method canExecute;
-
-	private static final Method setExecute;
-
-	static {
-		canExecute = needMethod(File.class, "canExecute"); //$NON-NLS-1$
-		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE); //$NON-NLS-1$
-	}
-
-	/**
-	 * @return true if Java has the ability to set and get the executable flag
-	 *         on files
-	 */
-	public static boolean hasExecute() {
-		return canExecute != null && setExecute != null;
-	}
-
-	private static Method needMethod(final Class<?> on, final String name,
-			final Class<?>... args) {
-		try {
-			return on.getMethod(name, args);
-		} catch (SecurityException e) {
-			return null;
-		} catch (NoSuchMethodException e) {
-			return null;
-		}
-	}
-
+public class FS_Win32 extends FS {
 	/**
 	 * Constructor
 	 */
-	public FS_POSIX_Java6() {
+	public FS_Win32() {
 		super();
 	}
 
@@ -96,48 +68,85 @@ public class FS_POSIX_Java6 extends FS_POSIX {
 	 * @param src
 	 *            instance whose attributes to copy
 	 */
-	public FS_POSIX_Java6(FS src) {
+	protected FS_Win32(FS src) {
 		super(src);
 	}
 
-	@Override
 	public FS newInstance() {
-		return new FS_POSIX_Java6(this);
+		return new FS_Win32(this);
 	}
 
 	public boolean supportsExecute() {
-		return true;
+		return false;
 	}
 
 	public boolean canExecute(final File f) {
-		try {
-			final Object r = canExecute.invoke(f, (Object[]) null);
-			return ((Boolean) r).booleanValue();
-		} catch (IllegalArgumentException e) {
-			throw new Error(e);
-		} catch (IllegalAccessException e) {
-			throw new Error(e);
-		} catch (InvocationTargetException e) {
-			throw new Error(e);
-		}
+		return false;
 	}
 
 	public boolean setExecute(final File f, final boolean canExec) {
-		try {
-			final Object r;
-			r = setExecute.invoke(f, new Object[] { Boolean.valueOf(canExec) });
-			return ((Boolean) r).booleanValue();
-		} catch (IllegalArgumentException e) {
-			throw new Error(e);
-		} catch (IllegalAccessException e) {
-			throw new Error(e);
-		} catch (InvocationTargetException e) {
-			throw new Error(e);
-		}
+		return false;
+	}
+
+	@Override
+	public boolean isCaseSensitive() {
+		return false;
 	}
 
 	@Override
 	public boolean retryFailedLockFileCommit() {
-		return false;
+		return true;
+	}
+
+	@Override
+	protected File discoverGitPrefix() {
+		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
+		File gitExe = searchPath(path, "git.exe", "git.cmd"); //$NON-NLS-1$ //$NON-NLS-2$
+		if (gitExe != null)
+			return gitExe.getParentFile().getParentFile();
+
+		// This isn't likely to work, if bash is in $PATH, git should
+		// also be in $PATH. But its worth trying.
+		//
+		String w = readPipe(userHome(), //
+				new String[] { "bash", "--login", "-c", "which git" }, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+				Charset.defaultCharset().name());
+		if (w != null) {
+			// The path may be in cygwin/msys notation so resolve it right away
+			gitExe = resolve(null, w);
+			if (gitExe != null)
+				return gitExe.getParentFile().getParentFile();
+		}
+		return null;
+	}
+
+	@Override
+	protected File userHomeImpl() {
+		String home = SystemReader.getInstance().getenv("HOME"); //$NON-NLS-1$
+		if (home != null)
+			return resolve(null, home);
+		String homeDrive = SystemReader.getInstance().getenv("HOMEDRIVE"); //$NON-NLS-1$
+		if (homeDrive != null) {
+			String homePath = SystemReader.getInstance().getenv("HOMEPATH"); //$NON-NLS-1$
+			return new File(homeDrive, homePath);
+		}
+
+		String homeShare = SystemReader.getInstance().getenv("HOMESHARE"); //$NON-NLS-1$
+		if (homeShare != null)
+			return new File(homeShare);
+
+		return super.userHomeImpl();
+	}
+
+	@Override
+	public ProcessBuilder runInShell(String cmd, String[] args) {
+		List<String> argv = new ArrayList<String>(3 + args.length);
+		argv.add("cmd.exe"); //$NON-NLS-1$
+		argv.add("/c"); //$NON-NLS-1$
+		argv.add(cmd);
+		argv.addAll(Arrays.asList(args));
+		ProcessBuilder proc = new ProcessBuilder();
+		proc.command(argv);
+		return proc;
 	}
 }

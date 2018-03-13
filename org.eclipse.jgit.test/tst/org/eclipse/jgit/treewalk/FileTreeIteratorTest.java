@@ -63,7 +63,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -228,11 +227,9 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testIsModifiedSymlinkAsFile() throws Exception {
+	public void testIsModifiedSymlink() throws Exception {
 		File f = writeTrashFile("symlink", "content");
 		Git git = new Git(db);
-		db.getConfig().setString(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_SYMLINKS, "false");
 		git.add().addFilepattern("symlink").call();
 		git.commit().setMessage("commit").call();
 

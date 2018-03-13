@@ -41,50 +41,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.internal.FS_POSIX;
 
 /**
- * FS implementation for Java7 on unix like systems
+ * FS for Java7 on Windows
  */
-public class FS_POSIX_Java7 extends FS_POSIX {
+public class FS_Win32_Java7 extends FS_Win32 {
 
-	FS_POSIX_Java7(FS_POSIX_Java7 src) {
+	FS_Win32_Java7(FS src) {
 		super(src);
 	}
 
-	FS_POSIX_Java7() {
-		// empty
+	FS_Win32_Java7() {
 	}
 
 	@Override
 	public FS newInstance() {
-		return new FS_POSIX_Java7(this);
-	}
-
-	@Override
-	public boolean supportsExecute() {
-		return true;
-	}
-
-	@Override
-	public boolean canExecute(File f) {
-		return FileUtil.canExecute(f);
-	}
-
-	@Override
-	public boolean setExecute(File f, boolean canExecute) {
-		return FileUtil.setExecute(f, canExecute);
-	}
-
-	@Override
-	public boolean retryFailedLockFileCommit() {
-		return false;
+		return new FS_Win32_Java7(this);
 	}
 
 	@Override
@@ -122,9 +103,9 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 		return FileUtil.isDirectory(path);
 	}
 
-	@Override
 	public boolean isFile(File path) {
-		return FileUtil.isFile(path);
+		Path nioPath = path.toPath();
+		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
 	}
 
 	@Override
@@ -134,7 +115,7 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
-		// no action on POSIX
+		FileUtil.setHidden(path, hidden);
 	}
 
 	@Override

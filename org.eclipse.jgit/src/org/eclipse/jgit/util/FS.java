@@ -55,10 +55,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.util.internal.FS_POSIX_Java5;
-import org.eclipse.jgit.util.internal.FS_POSIX_Java6;
-import org.eclipse.jgit.util.internal.FS_Win32;
-import org.eclipse.jgit.util.internal.FS_Win32_Cygwin;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -147,7 +143,7 @@ public abstract class FS {
 		if (factory == null) {
 			try {
 				Class<?> activatorClass = Class
-						.forName("org.eclipse.jgit.java7.Java7FSFactory"); //$NON-NLS-1$
+						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
 				System.out.println("Found Java7");
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
