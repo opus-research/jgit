@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -74,7 +75,6 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
 public class RefUpdateTest extends SampleDataRepositoryTestCase {
@@ -455,6 +455,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 
 		// now update that ref
 		updateRef = db.updateRef(Constants.HEAD);
+		updateRef.setForceUpdate(true);
 		updateRef.setNewObjectId(oldValue);
 		update = updateRef.update();
 		assertEquals(Result.FAST_FORWARD, update);
