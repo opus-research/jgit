@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, 2017 Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,46 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.http.test;
 
-import javax.servlet.http.HttpServletRequest;
+package org.eclipse.jgit.events;
 
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-
-/** A simple repository resolver for tests. */
-public final class TestRepositoryResolver
-		implements RepositoryResolver<HttpServletRequest> {
-
-	private final TestRepository<Repository> repo;
-
-	private final String repoName;
+/**
+ * Receives {@link WorkingTreeModifiedEvent}s, which are fired whenever a
+ * {@link org.eclipse.jgit.dircache.DirCacheCheckout} modifies
+ * (adds/deletes/updates) files in the working tree.
+ *
+ * @since 4.9
+ */
+public interface WorkingTreeModifiedListener extends RepositoryListener {
 
 	/**
-	 * Creates a new {@link TestRepositoryResolver} that resolves the given name to
-	 * the given repository.
+	 * Respond to working tree modifications.
 	 *
-	 * @param repo
-	 *            to resolve to
-	 * @param repoName
-	 *            to match
+	 * @param event
 	 */
-	public TestRepositoryResolver(TestRepository<Repository> repo, String repoName) {
-		this.repo = repo;
-		this.repoName = repoName;
-	}
-
-	@Override
-	public Repository open(HttpServletRequest req, String name)
-			throws RepositoryNotFoundException, ServiceNotEnabledException {
-		if (!name.equals(repoName)) {
-			throw new RepositoryNotFoundException(name);
-		}
-		Repository db = repo.getRepository();
-		db.incrementOpen();
-		return db;
-	}
+	void onWorkingTreeModified(WorkingTreeModifiedEvent event);
 }
