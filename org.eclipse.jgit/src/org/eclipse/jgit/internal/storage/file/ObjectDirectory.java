@@ -114,8 +114,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
 	private static final int RESOLVE_ABBREV_LIMIT = 256;
 
-	private static final String STALE_FILE_HANDLE_MSG = "stale file handle"; //$NON-NLS-1$
-
 	private final Config config;
 
 	private final File objects;
@@ -565,14 +563,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 		} else if (e instanceof FileNotFoundException) {
 			warnTmpl = JGitText.get().packWasDeleted;
 			removePack(p);
-		} else if (e.getMessage() != null
-				&& e.getMessage().toLowerCase().contains(STALE_FILE_HANDLE_MSG)) {
-			warnTmpl = JGitText.get().packHandleIsStale;
-			removePack(p);
 		}
 		if (warnTmpl != null) {
 			if (LOG.isDebugEnabled()) {
-				LOG.warn(MessageFormat.format(warnTmpl,
+				LOG.debug(MessageFormat.format(warnTmpl,
 						p.getPackFile().getAbsolutePath()), e);
 			} else {
 				LOG.warn(MessageFormat.format(warnTmpl,
