@@ -42,6 +42,9 @@
  */
 package org.eclipse.jgit.gitrepo;
 
+import static org.eclipse.jgit.lib.Constants.DEFAULT_REMOTE_NAME;
+import static org.eclipse.jgit.lib.Constants.R_REMOTES;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -51,6 +54,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.SubmoduleAddCommand;
@@ -100,16 +104,17 @@ import org.eclipse.jgit.util.FileUtils;
  * @since 3.4
  */
 public class RepoCommand extends GitCommand<RevCommit> {
-
 	private String path;
 	private String uri;
 	private String groups;
 	private String branch;
 	private String targetBranch = Constants.HEAD;
+	private boolean recordRemoteBranch = false;
 	private PersonIdent author;
 	private RemoteReader callback;
 	private InputStream inputStream;
 	private IncludedFileReader includedReader;
+	private boolean ignoreRemoteFailures = false;
 
 	private List<RepoProject> bareProjects;
 	private Git git;
@@ -133,9 +138,11 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		 *            The URI of the remote repository
 		 * @param ref
 		 *            The ref (branch/tag/etc.) to read
-		 * @return the sha1 of the remote repository
+		 * @return the sha1 of the remote repository, or null if the ref does
+		 *         not exist.
 		 * @throws GitAPIException
 		 */
+		@Nullable
 		public ObjectId sha1(String uri, String ref) throws GitAPIException;
 
 		/**
@@ -314,6 +321,30 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
+	 * Set whether the branch name should be recorded in .gitmodules.
+	 * <p>
+	 * Submodule entries in .gitmodules can include a "branch" field
+	 * to indicate what remote branch each submodule tracks.
+	 * <p>
+	 * That field is used by "git submodule update --remote" to update
+	 * to the tip of the tracked branch when asked and by Gerrit to
+	 * update the superproject when a change on that branch is merged.
+	 * <p>
+	 * Subprojects that request a specific commit or tag will not have
+	 * a branch name recorded.
+	 * <p>
+	 * Not implemented for non-bare repositories.
+	 *
+	 * @param enable Whether to record the branch name
+	 * @return this command
+	 * @since 4.2
+	 */
+	public RepoCommand setRecordRemoteBranch(boolean enable) {
+		this.recordRemoteBranch = enable;
+		return this;
+	}
+
+	/**
 	 * The progress monitor associated with the clone operation. By default,
 	 * this is set to <code>NullProgressMonitor</code>
 	 *
@@ -323,6 +354,26 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 */
 	public RepoCommand setProgressMonitor(final ProgressMonitor monitor) {
 		this.monitor = monitor;
+		return this;
+	}
+
+	/**
+	 * Set whether to skip projects whose commits don't exist remotely.
+	 * <p>
+	 * When set to true, we'll just skip the manifest entry and continue
+	 * on to the next one.
+	 * <p>
+	 * When set to false (default), we'll throw an error when remote
+	 * failures occur.
+	 * <p>
+	 * Not implemented for non-bare repositories.
+	 *
+	 * @param ignore Whether to ignore the remote failures.
+	 * @return this command
+	 * @since 4.3
+	 */
+	public RepoCommand setIgnoreRemoteFailures(boolean ignore) {
+		this.ignoreRemoteFailures = ignore;
 		return this;
 	}
 
@@ -424,18 +475,29 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				for (RepoProject proj : bareProjects) {
 					String name = proj.getPath();
 					String nameUri = proj.getName();
+					ObjectId objectId;
+					if (ObjectId.isId(proj.getRevision())
+							&& !ignoreRemoteFailures) {
+						objectId = ObjectId.fromString(proj.getRevision());
+					} else {
+						objectId = callback.sha1(nameUri, proj.getRevision());
+						if (objectId == null) {
+							if (ignoreRemoteFailures) {
+								continue;
+							}
+							throw new RemoteUnavailableException(nameUri);
+						}
+						if (recordRemoteBranch) {
+							// can be branch or tag
+							cfg.setString("submodule", name, "branch", //$NON-NLS-1$ //$NON-NLS-2$
+									proj.getRevision());
+						}
+					}
 					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
 					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
+
 					// create gitlink
 					DirCacheEntry dcEntry = new DirCacheEntry(name);
-					ObjectId objectId;
-					if (ObjectId.isId(proj.getRevision()))
-						objectId = ObjectId.fromString(proj.getRevision());
-					else {
-						objectId = callback.sha1(nameUri, proj.getRevision());
-					}
-					if (objectId == null)
-						throw new RemoteUnavailableException(nameUri);
 					dcEntry.setObjectId(objectId);
 					dcEntry.setFileMode(FileMode.GITLINK);
 					builder.add(dcEntry);
@@ -545,7 +607,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private static String findRef(String ref, Repository repo)
 			throws IOException {
 		if (!ObjectId.isId(ref)) {
-			Ref r = repo.getRef(Constants.DEFAULT_REMOTE_NAME + "/" + ref); //$NON-NLS-1$
+			Ref r = repo.exactRef(R_REMOTES + DEFAULT_REMOTE_NAME + "/" + ref); //$NON-NLS-1$
 			if (r != null)
 				return r.getName();
 		}

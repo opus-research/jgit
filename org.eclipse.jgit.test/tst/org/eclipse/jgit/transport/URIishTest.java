@@ -51,7 +51,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,24 +63,16 @@ public class URIishTest {
 
 	private static final String GIT_SCHEME = "git://";
 
-	@Test
+	@SuppressWarnings("unused")
+	@Test(expected = URISyntaxException.class)
 	public void shouldRaiseErrorOnEmptyURI() throws Exception {
-		try {
-			new URIish("");
-			fail("expecting an exception");
-		} catch (URISyntaxException e) {
-			// expected
-		}
+		new URIish("");
 	}
 
-	@Test
+	@SuppressWarnings("unused")
+	@Test(expected = URISyntaxException.class)
 	public void shouldRaiseErrorOnNullURI() throws Exception {
-		try {
-			new URIish((String) null);
-			fail("expecting an exception");
-		} catch (URISyntaxException e) {
-			// expected
-		}
+		new URIish((String) null);
 	}
 
 	@Test
@@ -469,6 +460,48 @@ public class URIishTest {
 	}
 
 	@Test
+	public void testSshProtoWithEmailUserAndPort() throws Exception {
+		final String str = "ssh://user.name@email.com@example.com:33/some/p ath";
+		URIish u = new URIish(str);
+		assertEquals("ssh", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/p ath", u.getRawPath());
+		assertEquals("/some/p ath", u.getPath());
+		assertEquals("example.com", u.getHost());
+		assertEquals("user.name@email.com", u.getUser());
+		assertNull(u.getPass());
+		assertEquals(33, u.getPort());
+		assertEquals("ssh://user.name%40email.com@example.com:33/some/p ath",
+				u.toPrivateString());
+		assertEquals("ssh://user.name%40email.com@example.com:33/some/p%20ath",
+				u.toPrivateASCIIString());
+		assertEquals(u.setPass(null).toPrivateString(), u.toString());
+		assertEquals(u.setPass(null).toPrivateASCIIString(), u.toASCIIString());
+		assertEquals(u, new URIish(str));
+	}
+
+	@Test
+	public void testSshProtoWithEmailUserPassAndPort() throws Exception {
+		final String str = "ssh://user.name@email.com:pass@wor:d@example.com:33/some/p ath";
+		URIish u = new URIish(str);
+		assertEquals("ssh", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/p ath", u.getRawPath());
+		assertEquals("/some/p ath", u.getPath());
+		assertEquals("example.com", u.getHost());
+		assertEquals("user.name@email.com", u.getUser());
+		assertEquals("pass@wor:d", u.getPass());
+		assertEquals(33, u.getPort());
+		assertEquals("ssh://user.name%40email.com:pass%40wor%3ad@example.com:33/some/p ath",
+				u.toPrivateString());
+		assertEquals("ssh://user.name%40email.com:pass%40wor%3ad@example.com:33/some/p%20ath",
+				u.toPrivateASCIIString());
+		assertEquals(u.setPass(null).toPrivateString(), u.toString());
+		assertEquals(u.setPass(null).toPrivateASCIIString(), u.toASCIIString());
+		assertEquals(u, new URIish(str));
+	}
+
+	@Test
 	public void testSshProtoWithADUserPassAndPort() throws Exception {
 		final String str = "ssh://DOMAIN\\user:pass@example.com:33/some/p ath";
 		URIish u = new URIish(str);
@@ -592,34 +625,19 @@ public class URIishTest {
 		assertEquals(u, new URIish(str));
 	}
 
-	@Test
+	@Test(expected = IllegalArgumentException.class)
 	public void testGetNullHumanishName() {
-		try {
-			new URIish().getHumanishName();
-			fail("path must be not null");
-		} catch (IllegalArgumentException e) {
-			// expected
-		}
+		new URIish().getHumanishName();
 	}
 
-	@Test
+	@Test(expected = IllegalArgumentException.class)
 	public void testGetEmptyHumanishName() throws URISyntaxException {
-		try {
-			new URIish(GIT_SCHEME).getHumanishName();
-			fail("empty path is useless");
-		} catch (IllegalArgumentException e) {
-			// expected
-		}
+		new URIish(GIT_SCHEME).getHumanishName();
 	}
 
-	@Test
+	@Test(expected = IllegalArgumentException.class)
 	public void testGetAbsEmptyHumanishName() {
-		try {
-			new URIish().getHumanishName();
-			fail("empty path is useless");
-		} catch (IllegalArgumentException e) {
-			// expected
-		}
+		new URIish().getHumanishName();
 	}
 
 	@Test
@@ -927,5 +945,20 @@ public class URIishTest {
 				}
 			}
 		}
+	}
+
+	@Test
+	public void testStringConstructor() throws Exception {
+		String str = "http://example.com/";
+		URIish u = new URIish(str);
+		assertEquals("example.com", u.getHost());
+		assertEquals("/", u.getPath());
+		assertEquals(str, u.toString());
+
+		str = "http://example.com";
+		u = new URIish(str);
+		assertEquals("example.com", u.getHost());
+		assertEquals("", u.getPath());
+		assertEquals(str, u.toString());
 	}
 }

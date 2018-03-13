@@ -59,8 +59,9 @@ import org.eclipse.jgit.lib.IndexDiff.StageState;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
+import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-
+import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 import org.eclipse.jgit.pgm.opt.UntrackedFilesHandler;
 
 /**
@@ -83,17 +84,20 @@ class Status extends TextBuiltin {
 	@Option(name = "--untracked-files", aliases = { "-u", "-uno", "-uall" }, usage = "usage_untrackedFilesMode", handler = UntrackedFilesHandler.class)
 	protected String untrackedFilesMode = "all"; // default value //$NON-NLS-1$
 
-	@Option(name = "--", metaVar = "metaVar_path", multiValued = true)
+	@Argument(required = false, index = 0, metaVar = "metaVar_paths")
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = RestOfArgumentsHandler.class)
 	protected List<String> filterPaths;
 
 	@Override
 	protected void run() throws Exception {
-		StatusCommand statusCommand = new Git(db).status();
-		if (filterPaths != null && filterPaths.size() > 0)
-			for (String path : filterPaths)
-				statusCommand.addPath(path);
-		org.eclipse.jgit.api.Status status = statusCommand.call();
-		printStatus(status);
+		try (Git git = new Git(db)) {
+			StatusCommand statusCommand = git.status();
+			if (filterPaths != null && filterPaths.size() > 0)
+				for (String path : filterPaths)
+					statusCommand.addPath(path);
+			org.eclipse.jgit.api.Status status = statusCommand.call();
+			printStatus(status);
+		}
 	}
 
 	private void printStatus(org.eclipse.jgit.api.Status status)
