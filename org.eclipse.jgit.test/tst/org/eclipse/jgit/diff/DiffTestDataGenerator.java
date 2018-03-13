@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,54 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.transport.FetchResult;
+package org.eclipse.jgit.diff;
 
-/**
- * Encapsulates the result of a {@link PullCommand}
- */
-public class PullResult {
-	private final FetchResult fetchResult;
-
-	private final MergeResult mergeResult;
-
-	private final String fetchedFrom;
-
-	PullResult(FetchResult fetchResult, String fetchedFrom,
-			MergeResult mergeResult) {
-		this.fetchResult = fetchResult;
-		this.fetchedFrom = fetchedFrom;
-		this.mergeResult = mergeResult;
+public class DiffTestDataGenerator {
+	/**
+	 * Generate sequence of characters in ascending order. The first character
+	 * is a space. All subsequent characters have an ASCII code one greater then
+	 * the ASCII code of the preceding character. On exception: the character
+	 * following which follows '~' is again a ' '.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len) {
+		return generateSequence(len, 0, 0);
 	}
 
 	/**
-	 * @return the fetch result, or <code>null</code>
+	 * Generate sequence of characters similar to the one returned by
+	 * {@link #generateSequence(int)}. But this time in each chunk of
+	 * <skipPeriod> characters the last <skipLength> characters are left out. By
+	 * calling this method twice with two different prime skipPeriod values and
+	 * short skipLength values you create test data which is similar to what
+	 * programmers do to their source code - huge files with only few
+	 * insertions/deletions/changes.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @param skipPeriod
+	 * @param skipLength
+	 * @return the sequence of characters as String
 	 */
-	public FetchResult getFetchResult() {
-		return this.fetchResult;
-	}
-
-	/**
-	 * @return the merge result, or <code>null</code>
-	 */
-	public MergeResult getMergeResult() {
-		return this.mergeResult;
-	}
-
-	/**
-	 * @return the name of the remote configuration from which fetch was tried,
-	 *         or <code>null</code>
-	 */
-	public String getFetchedFrom() {
-		return this.fetchedFrom;
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		if (fetchResult != null)
-			sb.append(fetchResult.toString());
-		else
-			sb.append("No fetch result");
-		sb.append("\n");
-		if (mergeResult != null)
-			sb.append(mergeResult.toString());
-		else
-			sb.append("No merge result");
-		return sb.toString();
+	public static String generateSequence(int len, int skipPeriod,
+			int skipLength) {
+		StringBuilder text = new StringBuilder(len);
+		int skipStart = skipPeriod - skipLength;
+		int skippedChars = 0;
+		int block = 0;
+		for (int i = 0; i - skippedChars < len; ++i) {
+			if ((i % skipPeriod) == 1)
+				text.append((char) (256 + block++));
+			else if (skipPeriod == 0 || i % skipPeriod < skipStart) {
+				text.append((char) (32 + i % 95));
+			} else {
+				skippedChars++;
+			}
+		}
+		return text.toString();
 	}
 }

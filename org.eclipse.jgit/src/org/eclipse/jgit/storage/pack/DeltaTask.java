@@ -46,7 +46,7 @@ package org.eclipse.jgit.storage.pack;
 import java.util.concurrent.Callable;
 
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
 final class DeltaTask implements Callable<Object> {
 	private final PackConfig config;
@@ -55,7 +55,7 @@ final class DeltaTask implements Callable<Object> {
 
 	private final DeltaCache dc;
 
-	private final ThreadSafeProgressMonitor pm;
+	private final ProgressMonitor pm;
 
 	private final int batchSize;
 
@@ -64,8 +64,7 @@ final class DeltaTask implements Callable<Object> {
 	private final ObjectToPack[] list;
 
 	DeltaTask(PackConfig config, ObjectReader reader, DeltaCache dc,
-			ThreadSafeProgressMonitor pm, int batchSize, int start,
-			ObjectToPack[] list) {
+			ProgressMonitor pm, int batchSize, int start, ObjectToPack[] list) {
 		this.config = config;
 		this.templateReader = reader;
 		this.dc = dc;
@@ -83,7 +82,6 @@ final class DeltaTask implements Callable<Object> {
 			dw.search(pm, list, start, batchSize);
 		} finally {
 			or.release();
-			pm.endWorker();
 		}
 		return null;
 	}

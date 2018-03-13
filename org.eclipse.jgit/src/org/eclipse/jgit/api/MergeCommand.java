@@ -69,7 +69,6 @@ import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
@@ -83,6 +82,9 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  * supported options and arguments of this command and a {@link #call()} method
  * to finally execute the command. Each instance of this class should only be
  * used for one invocation of the command (means: one call to {@link #call()})
+ * <p>
+ * This is currently a very basic implementation which takes only one commits to
+ * merge with as option. Furthermore it does supports only fast forward.
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-merge.html"
  *      >Git documentation about Merge</a>
@@ -133,7 +135,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			revWalk = new RevWalk(repo);
 			RevCommit headCommit = revWalk.lookupCommit(head.getObjectId());
 
-			// we know for now there is only one commit
+			// we know for know there is only one commit
 			Ref ref = commits.get(0);
 
 			refLogMessage.append(ref.getName());
@@ -165,9 +167,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						headCommit, srcCommit }, MergeStatus.FAST_FORWARD,
 						mergeStrategy, null, null);
 			} else {
-
-				repo.writeMergeCommitMsg(new MergeMessageFormatter().format(
-						commits, head));
+				repo.writeMergeCommitMsg("merging " + ref.getName() + " into "
+						+ head.getName());
 				repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
 				ThreeWayMerger merger = (ThreeWayMerger) mergeStrategy
 						.newMerger(repo);
@@ -178,7 +179,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					ResolveMerger resolveMerger = (ResolveMerger) merger;
 					resolveMerger.setCommitNames(new String[] {
 							"BASE", "HEAD", ref.getName() });
-					resolveMerger.setWorkingTreeIterator(new FileTreeIterator(repo));
+					resolveMerger.setWorkingTreeIt(new FileTreeIterator(repo));
 					noProblems = merger.merge(headCommit, srcCommit);
 					lowLevelResults = resolveMerger
 							.getMergeResults();

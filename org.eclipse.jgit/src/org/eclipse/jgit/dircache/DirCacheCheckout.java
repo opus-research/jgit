@@ -273,25 +273,17 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) {
 		if (m != null) {
-			if (i == null || f == null || !m.idEqual(i)
-					|| f.isModified(i.getDirCacheEntry(), true,
-							config_filemode(), repo.getFS())) {
-				update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode());
-			} else
-				keep(i.getDirCacheEntry());
+			update(m.getEntryPathString(), m.getEntryObjectId(),
+					m.getEntryFileMode());
 		} else {
 			if (f != null) {
 				if (walk.isDirectoryFileConflict()) {
 					conflicts.add(walk.getPathString());
 				} else {
-					if (i != null) {
-						// ... and the working dir contained a file or folder ->
-						// add it to the removed set and remove it from
-						// conflicts set
-						remove(i.getEntryPathString());
-						conflicts.remove(i.getEntryPathString());
-					}
+					// ... and the working dir contained a file or folder ->
+					// add it to the removed set and remove it from conflicts set
+					remove(i.getEntryPathString());
+					conflicts.remove(i.getEntryPathString());
 				}
 			} else
 				keep(i.getDirCacheEntry());
@@ -406,7 +398,7 @@ public class DirCacheCheckout {
 			// File/Directory conflict case #20
 			if (walk.isDirectoryFileConflict())
 				// TODO: check whether it is always correct to report a conflict here
-				conflict(name, null, null, null);
+				conflict(name, null, h, m);
 
 			// file only exists in working tree -> ignore it
 			return;
@@ -517,6 +509,7 @@ public class DirCacheCheckout {
 				conflict(name, (i != null) ? i.getDirCacheEntry() : null, h, m);
 				break;
 			case 0xFDF: // 7 8 9
+				dce = i.getDirCacheEntry();
 				if (hId.equals(mId)) {
 					if (isModified(name))
 						conflict(name, i.getDirCacheEntry(), h, m); // 8
