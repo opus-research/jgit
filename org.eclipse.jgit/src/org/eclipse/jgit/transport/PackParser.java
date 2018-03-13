@@ -419,6 +419,20 @@ public abstract class PackParser {
 	}
 
 	/**
+	 * Get the size of the parsed pack.
+	 *
+	 * This will also include the pack index size if an index was created. This
+	 * method should only be called after pack parsing is finished.
+	 *
+	 * @return the pack size (including the index size) or -1 if the size cannot
+	 *         be determined
+	 * @since 3.3
+	 */
+	public long getPackSize() {
+		return -1;
+	}
+
+	/**
 	 * Parse the pack stream.
 	 *
 	 * @param progress
@@ -1000,9 +1014,11 @@ public abstract class PackParser {
 			try {
 				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().invalidObject, Constants
-								.typeString(type), id.name(), e.getMessage()));
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().invalidObject,
+						Constants.typeString(type),
+						readCurs.abbreviate(id, 10).name(),
+						e.getMessage()), e);
 			}
 		}
 
