@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -191,20 +190,6 @@ public class ReceiveCommand {
 		}
 	}
 
-	/**
-	 * Check whether a command failed due to transaction aborted.
-	 *
-	 * @param cmd
-	 *            command.
-	 * @return whether the command failed due to transaction aborted, as in {@link
-	 *         #abort(Iterable)}.
-	 * @since 4.9
-	 */
-	public static boolean isTransactionAborted(ReceiveCommand cmd) {
-		return cmd.getResult() == REJECTED_OTHER_REASON
-				&& cmd.getMessage().equals(JGitText.get().transactionAborted);
-	}
-
 	private final ObjectId oldId;
 
 	private final ObjectId newId;
@@ -218,12 +203,6 @@ public class ReceiveCommand {
 	private Result status = Result.NOT_ATTEMPTED;
 
 	private String message;
-
-	private boolean customRefLog;
-
-	private String refLogMessage;
-
-	private boolean refLogIncludeResult;
 
 	private boolean typeIsCorrect;
 
@@ -350,90 +329,6 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Set the message to include in the reflog.
-	 * <p>
-	 * Overrides the default set by {@code setRefLogMessage} on any containing
-	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
-	 *
-	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
-	 * @param appendStatus
-	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
-	 * @since 4.9
-	 */
-	public void setRefLogMessage(String msg, boolean appendStatus) {
-		customRefLog = true;
-		if (msg == null && !appendStatus) {
-			disableRefLog();
-		} else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
-			refLogIncludeResult = true;
-		} else {
-			refLogMessage = msg;
-			refLogIncludeResult = appendStatus;
-		}
-	}
-
-	/**
-	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
-	 *
-	 * @since 4.9
-	 */
-	public void disableRefLog() {
-		customRefLog = true;
-		refLogMessage = null;
-		refLogIncludeResult = false;
-	}
-
-	/**
-	 * Check whether this command has a custom reflog setting that should override
-	 * defaults in any containing {@link org.eclipse.jgit.lib.BatchRefUpdate}.
-	 *
-	 * @return whether a custom reflog is set.
-	 * @since 4.9
-	 */
-	public boolean hasCustomRefLog() {
-		return customRefLog;
-	}
-
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 * @since 4.9
-	 */
-	public boolean isRefLogDisabled() {
-		return refLogMessage == null;
-	}
-
-	/**
-	 * Get the message to include in the reflog.
-	 *
-	 * @return message the caller wants to include in the reflog; null if the
-	 *         update should not be logged.
-	 * @since 4.9
-	 */
-	@Nullable
-	public String getRefLogMessage() {
-		return refLogMessage;
-	}
-
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 *
-	 * @return true if the message should include the result.
-	 * @since 4.9
-	 */
-	public boolean isRefLogIncludingResult() {
-		return refLogIncludeResult;
-	}
-
-	/**
 	 * Set the status of this command.
 	 *
 	 * @param s
@@ -499,7 +394,6 @@ public class ReceiveCommand {
 		try {
 			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
 			ru.setRefLogIdent(rp.getRefLogIdent());
-			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
 			switch (getType()) {
 			case DELETE:
 				if (!ObjectId.zeroId().equals(getOldId())) {
@@ -571,14 +465,6 @@ public class ReceiveCommand {
 
 		case REJECTED_CURRENT_BRANCH:
 			setResult(Result.REJECTED_CURRENT_BRANCH);
-			break;
-
-		case REJECTED_MISSING_OBJECT:
-			setResult(Result.REJECTED_MISSING_OBJECT);
-			break;
-
-		case REJECTED_OTHER_REASON:
-			setResult(Result.REJECTED_OTHER_REASON);
 			break;
 
 		default:

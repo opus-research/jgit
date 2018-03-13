@@ -53,7 +53,7 @@ public class InMemoryRepository extends DfsRepository {
 
 	static final AtomicInteger packId = new AtomicInteger();
 
-	private final MemObjDatabase objdb;
+	private final DfsObjDatabase objdb;
 	private final RefDatabase refdb;
 	private String gitwebDescription;
 	private boolean performsAtomicTransactions = true;
@@ -75,7 +75,7 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	@Override
-	public MemObjDatabase getObjectDatabase() {
+	public DfsObjDatabase getObjectDatabase() {
 		return objdb;
 	}
 
@@ -106,21 +106,11 @@ public class InMemoryRepository extends DfsRepository {
 		gitwebDescription = d;
 	}
 
-	/** DfsObjDatabase used by InMemoryRepository. */
-	public class MemObjDatabase extends DfsObjDatabase {
+	private class MemObjDatabase extends DfsObjDatabase {
 		private List<DfsPackDescription> packs = new ArrayList<>();
-		private int blockSize;
 
 		MemObjDatabase(DfsRepository repo) {
 			super(repo, new DfsReaderOptions());
-		}
-
-		/**
-		 * @param blockSize
-		 *            force a different block size for testing.
-		 */
-		public void setReadableChannelBlockSizeForTest(int blockSize) {
-			this.blockSize = blockSize;
 		}
 
 		@Override
@@ -162,7 +152,7 @@ public class InMemoryRepository extends DfsRepository {
 			byte[] file = memPack.fileMap.get(ext);
 			if (file == null)
 				throw new FileNotFoundException(desc.getFileName(ext));
-			return new ByteArrayReadableChannel(file, blockSize);
+			return new ByteArrayReadableChannel(file);
 		}
 
 		@Override
@@ -226,13 +216,13 @@ public class InMemoryRepository extends DfsRepository {
 
 	private static class ByteArrayReadableChannel implements ReadableChannel {
 		private final byte[] data;
-		private final int blockSize;
+
 		private int position;
+
 		private boolean open = true;
 
-		ByteArrayReadableChannel(byte[] buf, int blockSize) {
+		ByteArrayReadableChannel(byte[] buf) {
 			data = buf;
-			this.blockSize = blockSize;
 		}
 
 		@Override
@@ -272,7 +262,7 @@ public class InMemoryRepository extends DfsRepository {
 
 		@Override
 		public int blockSize() {
-			return blockSize;
+			return 0;
 		}
 
 		@Override
