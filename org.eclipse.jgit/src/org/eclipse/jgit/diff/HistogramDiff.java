@@ -78,13 +78,6 @@ public class HistogramDiff extends DiffAlgorithm {
 		return s.edits;
 	}
 
-	<S extends Sequence> void diffNonCommon(EditList edits,
-			HashedSequenceComparator<S> cmp, HashedSequence<S> a,
-			HashedSequence<S> b, Edit region) {
-		State<S> s = new State<S>(edits, cmp, a, b);
-		s.diffReplace(region);
-	}
-
 	private class State<S extends Sequence> {
 		private final HashedSequenceComparator<S> cmp;
 
@@ -100,14 +93,6 @@ public class HistogramDiff extends DiffAlgorithm {
 			this.a = p.getA();
 			this.b = p.getB();
 			this.edits = new EditList();
-		}
-
-		State(EditList edits, HashedSequenceComparator<S> cmp,
-				HashedSequence<S> a, HashedSequence<S> b) {
-			this.cmp = cmp;
-			this.a = a;
-			this.b = b;
-			this.edits = edits;
 		}
 
 		void diffReplace(Edit r) {
