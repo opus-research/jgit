@@ -967,7 +967,7 @@ public class PackWriter {
 
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
-			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>((int) cnt);
+			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>();
 			tmp.addAll(objectsLists[Constants.OBJ_TAG]);
 			tmp.addAll(objectsLists[Constants.OBJ_COMMIT]);
 			tmp.addAll(objectsLists[Constants.OBJ_TREE]);
