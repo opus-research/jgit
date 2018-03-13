@@ -52,6 +52,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -253,10 +254,14 @@ public class ReftableTest {
 		head = t.resolve(head);
 		assertNotNull(head);
 		assertEquals(id(1), head.getObjectId());
+
+		Ref master = t.exactRef(MASTER);
+		assertNotNull(master);
+		assertSame(master, t.resolve(master));
 	}
 
 	@Test
-	public void failChainOfSymbolicRef() throws IOException {
+	public void failDeepChainOfSymbolicRef() throws IOException {
 		Reftable t = read(write(
 				sym(HEAD, "refs/heads/1"),
 				sym("refs/heads/1", "refs/heads/2"),

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,69 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.ignore.internal;
 
-package org.eclipse.jgit.internal.storage.dfs;
+import static org.junit.Assert.assertEquals;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import org.junit.Test;
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
+public class StringsTest {
 
-/** Tracks multiple open {@link Reftable} instances. */
-public class ReftableStack implements AutoCloseable {
-	/**
-	 * Opens a stack of tables for reading.
-	 *
-	 * @param ctx
-	 *            context to read the tables with. This {@code ctx} will be
-	 *            retained by the stack and each of the table readers.
-	 * @param tables
-	 *            the tables to open.
-	 * @return stack reference to close the tables.
-	 * @throws IOException
-	 *             a table could not be opened
-	 */
-	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
-			throws IOException {
-		ReftableStack stack = new ReftableStack(tables.size());
-		boolean close = true;
-		try {
-			for (DfsReftable t : tables) {
-				stack.tables.add(t.open(ctx));
-			}
-			close = false;
-			return stack;
-		} finally {
-			if (close) {
-				stack.close();
-			}
-		}
+	private void testString(String string, int n, int m) {
+		assertEquals(string, n, Strings.count(string, '/', false));
+		assertEquals(string, m, Strings.count(string, '/', true));
 	}
 
-	private final List<Reftable> tables;
-
-	private ReftableStack(int tableCnt) {
-		this.tables = new ArrayList<>(tableCnt);
-	}
-
-	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
-	 */
-	public List<Reftable> readers() {
-		return Collections.unmodifiableList(tables);
-	}
-
-	@Override
-	public void close() {
-		for (Reftable t : tables) {
-			try {
-				t.close();
-			} catch (IOException e) {
-				// Ignore close failures.
-			}
-		}
+	@Test
+	public void testCount() {
+		testString("", 0, 0);
+		testString("/", 1, 0);
+		testString("//", 2, 0);
+		testString("///", 3, 1);
+		testString("////", 4, 2);
+		testString("foo", 0, 0);
+		testString("/foo", 1, 0);
+		testString("foo/", 1, 0);
+		testString("/foo/", 2, 0);
+		testString("foo/bar", 1, 1);
+		testString("/foo/bar/", 3, 1);
+		testString("/foo/bar//", 4, 2);
+		testString("/foo//bar/", 4, 2);
+		testString(" /foo/ ", 2, 2);
 	}
 }

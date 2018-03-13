@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,68 +41,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.events;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
-/** Tracks multiple open {@link Reftable} instances. */
-public class ReftableStack implements AutoCloseable {
-	/**
-	 * Opens a stack of tables for reading.
-	 *
-	 * @param ctx
-	 *            context to read the tables with. This {@code ctx} will be
-	 *            retained by the stack and each of the table readers.
-	 * @param tables
-	 *            the tables to open.
-	 * @return stack reference to close the tables.
-	 * @throws IOException
-	 *             a table could not be opened
-	 */
-	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
-			throws IOException {
-		ReftableStack stack = new ReftableStack(tables.size());
-		boolean close = true;
-		try {
-			for (DfsReftable t : tables) {
-				stack.tables.add(t.open(ctx));
-			}
-			close = false;
-			return stack;
-		} finally {
-			if (close) {
-				stack.close();
-			}
-		}
-	}
+/**
+ * A {@link WorkingTreeModifiedListener} that can be used in tests to check
+ * expected events.
+ */
+public class ChangeRecorder implements WorkingTreeModifiedListener {
 
-	private final List<Reftable> tables;
+	public static final String[] EMPTY = new String[0];
 
-	private ReftableStack(int tableCnt) {
-		this.tables = new ArrayList<>(tableCnt);
-	}
+	private Set<String> modified = new HashSet<>();
 
-	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
-	 */
-	public List<Reftable> readers() {
-		return Collections.unmodifiableList(tables);
-	}
+	private Set<String> deleted = new HashSet<>();
+
+	private int eventCount;
 
 	@Override
-	public void close() {
-		for (Reftable t : tables) {
-			try {
-				t.close();
-			} catch (IOException e) {
-				// Ignore close failures.
-			}
-		}
+	public void onWorkingTreeModified(WorkingTreeModifiedEvent event) {
+		eventCount++;
+		modified.removeAll(event.getDeleted());
+		deleted.removeAll(event.getModified());
+		modified.addAll(event.getModified());
+		deleted.addAll(event.getDeleted());
+	}
+
+	private String[] getModified() {
+		return modified.toArray(new String[modified.size()]);
+	}
+
+	private String[] getDeleted() {
+		return deleted.toArray(new String[deleted.size()]);
+	}
+
+	private void reset() {
+		eventCount = 0;
+		modified.clear();
+		deleted.clear();
+	}
+
+	public void assertNoEvent() {
+		assertEquals("Unexpected WorkingTreeModifiedEvent ", 0, eventCount);
+	}
+
+	public void assertEvent(String[] expectedModified,
+			String[] expectedDeleted) {
+		String[] actuallyModified = getModified();
+		String[] actuallyDeleted = getDeleted();
+		Arrays.sort(actuallyModified);
+		Arrays.sort(expectedModified);
+		Arrays.sort(actuallyDeleted);
+		Arrays.sort(expectedDeleted);
+		assertArrayEquals("Unexpected modifications reported", expectedModified,
+				actuallyModified);
+		assertArrayEquals("Unexpected deletions reported", expectedDeleted,
+				actuallyDeleted);
+		reset();
 	}
 }

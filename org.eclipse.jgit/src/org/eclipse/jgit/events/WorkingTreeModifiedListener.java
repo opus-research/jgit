@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,68 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.events;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+/**
+ * Receives {@link WorkingTreeModifiedEvent}s, which are fired whenever a
+ * {@link org.eclipse.jgit.dircache.DirCacheCheckout} modifies
+ * (adds/deletes/updates) files in the working tree.
+ *
+ * @since 4.9
+ */
+public interface WorkingTreeModifiedListener extends RepositoryListener {
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
-
-/** Tracks multiple open {@link Reftable} instances. */
-public class ReftableStack implements AutoCloseable {
 	/**
-	 * Opens a stack of tables for reading.
+	 * Respond to working tree modifications.
 	 *
-	 * @param ctx
-	 *            context to read the tables with. This {@code ctx} will be
-	 *            retained by the stack and each of the table readers.
-	 * @param tables
-	 *            the tables to open.
-	 * @return stack reference to close the tables.
-	 * @throws IOException
-	 *             a table could not be opened
+	 * @param event
 	 */
-	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
-			throws IOException {
-		ReftableStack stack = new ReftableStack(tables.size());
-		boolean close = true;
-		try {
-			for (DfsReftable t : tables) {
-				stack.tables.add(t.open(ctx));
-			}
-			close = false;
-			return stack;
-		} finally {
-			if (close) {
-				stack.close();
-			}
-		}
-	}
-
-	private final List<Reftable> tables;
-
-	private ReftableStack(int tableCnt) {
-		this.tables = new ArrayList<>(tableCnt);
-	}
-
-	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
-	 */
-	public List<Reftable> readers() {
-		return Collections.unmodifiableList(tables);
-	}
-
-	@Override
-	public void close() {
-		for (Reftable t : tables) {
-			try {
-				t.close();
-			} catch (IOException e) {
-				// Ignore close failures.
-			}
-		}
-	}
+	void onWorkingTreeModified(WorkingTreeModifiedEvent event);
 }

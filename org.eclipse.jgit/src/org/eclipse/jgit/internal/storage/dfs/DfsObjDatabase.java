@@ -52,7 +52,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.internal.storage.pack.PackExt;
@@ -458,31 +457,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		} while (!packList.compareAndSet(o, n));
 	}
 
-	void addReftable(DfsPackDescription add, Set<DfsPackDescription> remove)
-			throws IOException {
-		PackList o, n;
-		do {
-			o = packList.get();
-			if (o == NO_PACKS) {
-				o = scanPacks(o);
-				for (DfsReftable t : o.reftables) {
-					if (t.getPackDescription().equals(add)) {
-						return;
-					}
-				}
-			}
-
-			List<DfsReftable> tables = new ArrayList<>(1 + o.reftables.length);
-			for (DfsReftable t : o.reftables) {
-				if (!remove.contains(t.getPackDescription())) {
-					tables.add(t);
-				}
-			}
-			tables.add(new DfsReftable(add));
-			n = new PackListImpl(o.packs, tables.toArray(new DfsReftable[0]));
-		} while (!packList.compareAndSet(o, n));
-	}
-
 	PackList scanPacks(final PackList original) throws IOException {
 		PackList o, n;
 		synchronized (packList) {
@@ -570,24 +544,26 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			DfsPackDescription a = fa.getPackDescription();
 			DfsPackDescription b = fb.getPackDescription();
 
-			// Prefer sorting by maxUpdateIndex, lower table first.
-			int c = Long.signum(a.getMaxUpdateIndex() - b.getMaxUpdateIndex());
+			// GC, COMPACT reftables first by higher category.
+			int c = category(b) - category(a);
 			if (c != 0) {
 				return c;
 			}
 
-			// GC reftable first.
-			if (a.getPackSource() == PackSource.GC
-					&& b.getPackSource() != PackSource.GC) {
-				return -1;
-			} else if (b.getPackSource() == PackSource.GC
-					&& a.getPackSource() != PackSource.GC) {
-				return 1;
+			// Lower maxUpdateIndex first.
+			c = Long.signum(a.getMaxUpdateIndex() - b.getMaxUpdateIndex());
+			if (c != 0) {
+				return c;
 			}
 
 			// Older reftable first.
 			return Long.signum(a.getLastModified() - b.getLastModified());
 		};
+	}
+
+	static int category(DfsPackDescription d) {
+		PackSource s = d.getPackSource();
+		return s != null ? s.category : 0;
 	}
 
 	/** Clears the cached list of packs, forcing them to be scanned again. */

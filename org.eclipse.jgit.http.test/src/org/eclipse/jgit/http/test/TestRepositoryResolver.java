@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2016, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,69 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.http.test;
 
-package org.eclipse.jgit.internal.storage.dfs;
+import javax.servlet.http.HttpServletRequest;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
+/** A simple repository resolver for tests. */
+public final class TestRepositoryResolver
+		implements RepositoryResolver<HttpServletRequest> {
 
-/** Tracks multiple open {@link Reftable} instances. */
-public class ReftableStack implements AutoCloseable {
+	private final TestRepository<Repository> repo;
+
+	private final String repoName;
+
 	/**
-	 * Opens a stack of tables for reading.
+	 * Creates a new {@link TestRepositoryResolver} that resolves the given name to
+	 * the given repository.
 	 *
-	 * @param ctx
-	 *            context to read the tables with. This {@code ctx} will be
-	 *            retained by the stack and each of the table readers.
-	 * @param tables
-	 *            the tables to open.
-	 * @return stack reference to close the tables.
-	 * @throws IOException
-	 *             a table could not be opened
+	 * @param repo
+	 *            to resolve to
+	 * @param repoName
+	 *            to match
 	 */
-	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
-			throws IOException {
-		ReftableStack stack = new ReftableStack(tables.size());
-		boolean close = true;
-		try {
-			for (DfsReftable t : tables) {
-				stack.tables.add(t.open(ctx));
-			}
-			close = false;
-			return stack;
-		} finally {
-			if (close) {
-				stack.close();
-			}
-		}
-	}
-
-	private final List<Reftable> tables;
-
-	private ReftableStack(int tableCnt) {
-		this.tables = new ArrayList<>(tableCnt);
-	}
-
-	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
-	 */
-	public List<Reftable> readers() {
-		return Collections.unmodifiableList(tables);
+	public TestRepositoryResolver(TestRepository<Repository> repo, String repoName) {
+		this.repo = repo;
+		this.repoName = repoName;
 	}
 
 	@Override
-	public void close() {
-		for (Reftable t : tables) {
-			try {
-				t.close();
-			} catch (IOException e) {
-				// Ignore close failures.
-			}
+	public Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotEnabledException {
+		if (!name.equals(repoName)) {
+			throw new RepositoryNotFoundException(name);
 		}
+		Repository db = repo.getRepository();
+		db.incrementOpen();
+		return db;
 	}
 }
