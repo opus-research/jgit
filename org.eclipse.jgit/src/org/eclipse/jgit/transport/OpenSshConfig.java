@@ -60,7 +60,6 @@ import java.util.Map;
 
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.fnmatch.FileNameMatcher;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.StringUtils;
 
@@ -93,7 +92,7 @@ public class OpenSshConfig {
 		if (home == null)
 			home = new File(".").getAbsoluteFile();
 
-		final File config = new File(new File(home, ".ssh"), Constants.CONFIG);
+		final File config = new File(new File(home, ".ssh"), "config");
 		final OpenSshConfig osc = new OpenSshConfig(home, config);
 		osc.refresh();
 		return osc;

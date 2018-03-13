@@ -54,13 +54,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
  * the connection information before invoking UploadPack.
  */
 public interface UploadPackLogger {
-	/** A simple no-op logger. */
-	public static final UploadPackLogger NULL = new UploadPackLogger() {
-		public void onPackStatistics(PackWriter.Statistics stats) {
-			// Do nothing.
-		}
-	};
-
 	/**
 	 * Notice to the logger after a pack has been sent.
 	 *
