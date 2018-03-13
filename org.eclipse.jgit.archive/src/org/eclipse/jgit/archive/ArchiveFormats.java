@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2013 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,44 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.archive;
 
-package org.eclipse.jgit.pgm;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.archive.ArchiveFormats;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	static {
-		ArchiveFormats.registerAll();
+/**
+ * Registers all format types from the org.eclipse.jgit.archive
+ * package for use via the ArchiveCommand API.
+ *
+ * See {@link FormatActivator} for an OSGi bundle activator
+ * that performs the same registration automatically.
+ */
+public class ArchiveFormats {
+	private static final List<String> myFormats = new ArrayList<String>();
+
+	private static final void register(String name, ArchiveCommand.Format<?> fmt) {
+		myFormats.add(name);
+		ArchiveCommand.registerFormat(name, fmt);
 	}
 
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private ObjectId tree;
+	/**
+	 * Register all included archive formats so they can be used
+	 * as arguments to the ArchiveCommand.setFormat() method.
+	 *
+	 * Should not be called twice without a call to stop() in between.
+	 * Not thread-safe.
+	 */
+	public static void registerAll() {
+		register("tar", new TarFormat());
+		register("tgz", new TgzFormat());
+		register("txz", new TxzFormat());
+		register("zip", new ZipFormat());
+	}
 
-	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private String format = "zip";
-
-	@Override
-	protected void run() throws Exception {
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
-
-		try {
-			new Git(db).archive()
-				.setTree(tree)
-				.setFormat(format)
-				.setOutputStream(outs)
-				.call();
-		} catch (GitAPIException e) {
-			throw die(e.getMessage());
+	/**
+	 * Clean up by deregistering all formats that were registered
+	 * by registerAll().
+	 *
+	 * Not thread-safe.
+	 */
+	public static void unregisterAll() {
+		for (String name : myFormats) {
+			ArchiveCommand.unregisterFormat(name);
 		}
+		myFormats.clear();
 	}
 }
