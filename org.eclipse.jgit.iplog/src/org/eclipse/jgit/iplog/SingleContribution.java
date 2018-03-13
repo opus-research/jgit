@@ -61,6 +61,8 @@ class SingleContribution {
 
 	private Date created;
 
+	private String bugId;
+
 	private String size;
 
 	/**
@@ -87,6 +89,17 @@ class SingleContribution {
 	/** @return summary of the contribution. */
 	String getSummary() {
 		return summary;
+	}
+
+	/** @return Bugzilla bug id */
+	String getBugID() {
+		return bugId;
+	}
+
+	void setBugID(String id) {
+		if (id.startsWith("https://bugs.eclipse.org/"))
+			id = id.substring("https://bugs.eclipse.org/".length());
+		bugId = id;
 	}
 
 	String getSize() {
