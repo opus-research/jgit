@@ -248,12 +248,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				newHead = continueRebase();
 
 				File amendFile = rebaseState.getFile(AMEND);
-				File doneFile = rebaseState.getFile(DONE);
 				boolean amendExists = amendFile.exists();
 				if (amendExists) {
 					FileUtils.delete(amendFile);
 				}
-				if (newHead == null && !amendExists && !doneFile.exists()) {
+				if (newHead == null && !amendExists) {
 					// continueRebase() returns null only if no commit was
 					// neccessary. This means that no changes where left over
 					// after resolving all conflicts. In this case, cgit stops
