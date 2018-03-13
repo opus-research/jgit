@@ -63,6 +63,26 @@ public class URIishTest {
 	private static final String GIT_SCHEME = "git://";
 
 	@Test
+	public void shouldRaiseErrorOnEmptyURI() throws Exception {
+		try {
+			new URIish("");
+			fail("expecting an exception");
+		} catch (URISyntaxException e) {
+			// expected
+		}
+	}
+
+	@Test
+	public void shouldRaiseErrorOnNullURI() throws Exception {
+		try {
+			new URIish((String) null);
+			fail("expecting an exception");
+		} catch (URISyntaxException e) {
+			// expected
+		}
+	}
+
+	@Test
 	public void testUnixFile() throws Exception {
 		final String str = "/home/m y";
 		URIish u = new URIish(str);
@@ -482,6 +502,17 @@ public class URIishTest {
 			throws IllegalArgumentException, URISyntaxException {
 		String humanishName = new URIish("/a/b/c.git/").getHumanishName();
 		assertEquals("c", humanishName);
+	}
+
+	@Test
+	public void testGetWindowsPathHumanishName()
+			throws IllegalArgumentException,
+			URISyntaxException {
+		if (File.separatorChar == '\\') {
+			String humanishName = new URIish("file:///C\\a\\b\\c.git/")
+					.getHumanishName();
+			assertEquals("c", humanishName);
+		}
 	}
 
 	@Test
