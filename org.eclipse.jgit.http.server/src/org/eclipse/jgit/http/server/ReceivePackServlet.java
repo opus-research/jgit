@@ -137,10 +137,11 @@ class ReceivePackServlet extends HttpServlet {
 			try {
 				rp = receivePackFactory.create(req, getRepository(req));
 			} catch (ServiceNotAuthorizedException e) {
-				rsp.sendError(SC_UNAUTHORIZED, e.getMessage());
+				rsp.sendError(SC_UNAUTHORIZED);
 				return;
+
 			} catch (ServiceNotEnabledException e) {
-				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
+				sendError(req, rsp, SC_FORBIDDEN);
 				return;
 			}
 
