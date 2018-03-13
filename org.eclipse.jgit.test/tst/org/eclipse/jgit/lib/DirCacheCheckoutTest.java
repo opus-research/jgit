@@ -3,7 +3,6 @@
  * Copyright (C) 2008-2011, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2008-2011, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2010-2011, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2016, Rüdiger Herrmann <ruediger.herrmann@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -1615,64 +1614,62 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertNotNull(git.checkout().setName(Constants.MASTER).call());
 	}
 
-	@Test
-	public void testSkipConflicts() throws Exception {
-		RevCommit headCommit = commitFile("a", "initial content", "master");
-		RevCommit checkoutCommit = commitFile("a", "side content", "side");
-		String workDirContent = "changed in work dir";
-		writeTrashFile("a", workDirContent);
-
-		dco = createDirCacheCheckout(headCommit, checkoutCommit);
-		dco.setFailOnConflict(false);
-		dco.setSkipConflicts(true);
-		boolean checkoutOk = dco.checkout();
-
-		assertTrue(checkoutOk);
-		assertEquals("a", dco.getConflicts().get(0));
-		assertEquals(workDirContent, read("a"));
+	@Test(expected = CheckoutConflictException.class)
+	public void testFolderFileConflict() throws Exception {
+		RevCommit headCommit = commitFile("f/a", "initial content", "master");
+		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
+		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
+		writeTrashFile("f", "file instead of folder");
+		new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
+				checkoutCommit.getTree()).checkout();
 	}
 
 	@Test
-	public void testSkipConflictsWithFileFolderConflict() throws Exception {
-		RevCommit headCommit = commitFile("a", "initial content", "master");
-		RevCommit checkoutCommit = commitFile("a", "side content", "side");
-		deleteTrashFile("a");
-		File folder = new File(trash, "a");
-		folder.mkdir();
-
-		dco = createDirCacheCheckout(headCommit, checkoutCommit);
-		dco.setFailOnConflict(false);
-		dco.setSkipConflicts(true);
-		boolean checkoutOk = dco.checkout();
-
-		assertTrue(checkoutOk);
-		assertEquals("a", dco.getConflicts().get(0));
-		assertTrue(folder.isDirectory());
-	}
-
-	@Test
-	public void testFailOnConflictOverridesSkipConflicts() throws Exception {
-		RevCommit headCommit = commitFile("a", "initial content", "master");
-		RevCommit checkoutCommit = commitFile("a", "side content", "side");
-		String workDirContent = "changed in work dir";
-		writeTrashFile("a", workDirContent);
-		dco = createDirCacheCheckout(headCommit, checkoutCommit);
-		dco.setFailOnConflict(true);
-		dco.setSkipConflicts(true);
+	public void testMultipleContentConflicts() throws Exception {
+		commitFile("a", "initial content", "master");
+		RevCommit headCommit = commitFile("b", "initial content", "master");
+		commitFile("a", "side content", "side");
+		RevCommit checkoutCommit = commitFile("b", "side content", "side");
+		writeTrashFile("a", "changed content");
+		writeTrashFile("b", "changed content");
 
 		try {
-			dco.checkout();
+			new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
+					checkoutCommit.getTree()).checkout();
 			fail();
 		} catch (CheckoutConflictException expected) {
-			assertArrayEquals(new String[] { "a" },
-					expected.getConflictingFiles());
+			assertEquals(2, expected.getConflictingFiles().length);
+			assertTrue(Arrays.asList(expected.getConflictingFiles())
+					.contains("a"));
+			assertTrue(Arrays.asList(expected.getConflictingFiles())
+					.contains("b"));
+			assertEquals("changed content", read("a"));
+			assertEquals("changed content", read("b"));
 		}
 	}
 
-	private DirCacheCheckout createDirCacheCheckout(RevCommit headCommit,
-			RevCommit checkoutCommit) throws IOException {
-		return new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-				checkoutCommit.getTree());
+	@Test
+	public void testFolderFileAndContentConflicts() throws Exception {
+		RevCommit headCommit = commitFile("f/a", "initial content", "master");
+		commitFile("b", "side content", "side");
+		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
+		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
+		writeTrashFile("f", "file instead of a folder");
+		writeTrashFile("b", "changed content");
+
+		try {
+			new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
+					checkoutCommit.getTree()).checkout();
+			fail();
+		} catch (CheckoutConflictException expected) {
+			assertEquals(2, expected.getConflictingFiles().length);
+			assertTrue(Arrays.asList(expected.getConflictingFiles())
+					.contains("b"));
+			assertTrue(Arrays.asList(expected.getConflictingFiles())
+					.contains("f"));
+			assertEquals("file instead of a folder", read("f"));
+			assertEquals("changed content", read("b"));
+		}
 	}
 
 	public void assertWorkDir(Map<String, String> i)
