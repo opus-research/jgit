@@ -63,6 +63,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
@@ -193,33 +194,6 @@ public class MergedReftableTest {
 			assertEquals(exp.getObjectId(), act.getObjectId());
 		}
 		assertFalse(mr.next());
-	}
-
-	@Test
-	public void compaction() throws IOException {
-		List<Ref> delta1 = Arrays.asList(
-				ref("refs/heads/next", 4),
-				ref("refs/heads/master", 1));
-		List<Ref> delta2 = Arrays.asList(delete("refs/heads/next"));
-		List<Ref> delta3 = Arrays.asList(ref("refs/heads/master", 8));
-
-		ReftableCompactor rc = new ReftableCompactor();
-		rc.addAll(Arrays.asList(
-				read(write(delta1)),
-				read(write(delta2)),
-				read(write(delta3))));
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		rc.compact(out);
-		byte[] table = out.toByteArray();
-
-		ReftableReader rr = read(table);
-		rr.seekToFirstRef();
-		assertTrue(rr.next());
-		Ref r = rr.getRef();
-		assertEquals("refs/heads/master", r.getName());
-		assertEquals(id(8), r.getObjectId());
-
-		assertFalse(rr.next());
 	}
 
 	private static MergedReftable merge(byte[]... table) {
