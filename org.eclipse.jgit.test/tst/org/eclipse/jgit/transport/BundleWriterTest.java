@@ -65,9 +65,9 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
 public class BundleWriterTest extends SampleDataRepositoryTestCase {
@@ -140,7 +140,7 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 		}
 	}
 
-	private static FetchResult fetchFromBundle(final Repository newRepo,
+	private FetchResult fetchFromBundle(final Repository newRepo,
 			final byte[] bundle) throws URISyntaxException,
 			NotSupportedException, TransportException {
 		final URIish uri = new URIish("in-memory://");

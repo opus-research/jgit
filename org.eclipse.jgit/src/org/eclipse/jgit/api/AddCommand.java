@@ -93,15 +93,11 @@ public class AddCommand extends GitCommand<DirCache> {
 	}
 
 	/**
-	 * Add a path to a file/directory whose content should be added.
-	 * <p>
-	 * A directory name (e.g. <code>dir</code> to add <code>dir/file1</code> and
-	 * <code>dir/file2</code>) can also be given to add all files in the
-	 * directory, recursively. Fileglobs (e.g. *.c) are not yet supported.
-	 *
 	 * @param filepattern
-	 *            repository-relative path of file/directory to add (with
-	 *            <code>/</code> as separator)
+	 *            File to add content from. Also a leading directory name (e.g.
+	 *            dir to add dir/file1 and dir/file2) can be given to add all
+	 *            files in the directory, recursively. Fileglobs (e.g. *.c) are
+	 *            not yet supported.
 	 * @return {@code this}
 	 */
 	public AddCommand addFilepattern(String filepattern) {
@@ -134,7 +130,7 @@ public class AddCommand extends GitCommand<DirCache> {
 		checkCallable();
 		DirCache dc = null;
 		boolean addAll = false;
-		if (filepatterns.contains(".")) //$NON-NLS-1$
+		if (filepatterns.contains("."))
 			addAll = true;
 
 		ObjectInserter inserter = repo.newObjectInserter();

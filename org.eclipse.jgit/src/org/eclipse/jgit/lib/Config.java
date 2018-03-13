@@ -134,24 +134,24 @@ public class Config {
 					r.append('"');
 					inquote = false;
 				}
-				r.append("\\n\\\n"); //$NON-NLS-1$
+				r.append("\\n\\\n");
 				lineStart = r.length();
 				break;
 
 			case '\t':
-				r.append("\\t"); //$NON-NLS-1$
+				r.append("\\t");
 				break;
 
 			case '\b':
-				r.append("\\b"); //$NON-NLS-1$
+				r.append("\\b");
 				break;
 
 			case '\\':
-				r.append("\\\\"); //$NON-NLS-1$
+				r.append("\\\\");
 				break;
 
 			case '"':
-				r.append("\\\""); //$NON-NLS-1$
+				r.append("\\\"");
 				break;
 
 			case ';':
@@ -354,7 +354,7 @@ public class Config {
 	@SuppressWarnings("unchecked")
 	private static <T> T[] allValuesOf(final T value) {
 		try {
-			return (T[]) value.getClass().getMethod("values").invoke(null); //$NON-NLS-1$
+			return (T[]) value.getClass().getMethod("values").invoke(null);
 		} catch (Exception err) {
 			String typeName = value.getClass().getName();
 			String msg = MessageFormat.format(
@@ -387,28 +387,15 @@ public class Config {
 		if (value == null)
 			return defaultValue;
 
-		if (all[0] instanceof ConfigEnum) {
-			for (T t : all) {
-				if (((ConfigEnum) t).matchConfigValue(value))
-					return t;
-			}
-		}
-
 		String n = value.replace(' ', '_');
-
-		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
-		// the real world before its breakage was fully understood, we must
-		// also accept '-' as though it were ' '.
-		n = n.replace('-', '_');
-
 		T trueState = null;
 		T falseState = null;
 		for (T e : all) {
 			if (StringUtils.equalsIgnoreCase(e.name(), n))
 				return e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE")) //$NON-NLS-1$
+			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE"))
 				trueState = e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE")) //$NON-NLS-1$
+			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE"))
 				falseState = e;
 		}
 
@@ -425,17 +412,15 @@ public class Config {
 		}
 
 		if (subsection != null)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().enumValueNotSupported3, section, subsection,
-					name, value));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().enumValueNotSupported3, section, name, value));
 		else
-			throw new IllegalArgumentException(
-					MessageFormat.format(JGitText.get().enumValueNotSupported2,
-							section, name, value));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().enumValueNotSupported2, section, name, value));
 	}
 
 	/**
-	 * Get string value or null if not found.
+	 * Get string value
 	 *
 	 * @param section
 	 *            the section
@@ -443,7 +428,7 @@ public class Config {
 	 *            the subsection for the value
 	 * @param name
 	 *            the key name
-	 * @return a String value from the config, <code>null</code> if not found
+	 * @return a String value from git config.
 	 */
 	public String getString(final String section, String subsection,
 			final String name) {
@@ -525,35 +510,6 @@ public class Config {
 	 */
 	public Set<String> getNames(String section, String subsection) {
 		return getState().getNames(section, subsection);
-	}
-
-	/**
-	 * @param section
-	 *            the section
-	 * @param recursive
-	 *            if {@code true} recursively adds the names defined in all base
-	 *            configurations
-	 * @return the list of names defined for this section
-	 * @since 3.2
-	 */
-	public Set<String> getNames(String section, boolean recursive) {
-		return getState().getNames(section, null, recursive);
-	}
-
-	/**
-	 * @param section
-	 *            the section
-	 * @param subsection
-	 *            the subsection
-	 * @param recursive
-	 *            if {@code true} recursively adds the names defined in all base
-	 *            configurations
-	 * @return the list of names defined for this subsection
-	 * @since 3.2
-	 */
-	public Set<String> getNames(String section, String subsection,
-			boolean recursive) {
-		return getState().getNames(section, subsection, recursive);
 	}
 
 	/**
@@ -708,11 +664,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
+			s = String.valueOf(value / GiB) + " g";
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
+			s = String.valueOf(value / MiB) + " m";
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
+			s = String.valueOf(value / KiB) + " k";
 		else
 			s = String.valueOf(value);
 
@@ -739,7 +695,7 @@ public class Config {
 	 */
 	public void setBoolean(final String section, final String subsection,
 			final String name, final boolean value) {
-		setString(section, subsection, name, value ? "true" : "false"); //$NON-NLS-1$ //$NON-NLS-2$
+		setString(section, subsection, name, value ? "true" : "false");
 	}
 
 	/**
@@ -764,11 +720,7 @@ public class Config {
 	 */
 	public <T extends Enum<?>> void setEnum(final String section,
 			final String subsection, final String name, final T value) {
-		String n;
-		if (value instanceof ConfigEnum)
-			n = ((ConfigEnum) value).toConfigValue();
-		else
-			n = value.name().toLowerCase().replace('_', ' ');
+		String n = value.name().toLowerCase().replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
@@ -985,8 +937,8 @@ public class Config {
 					out.append(' ');
 					String escaped = escapeValue(e.subsection);
 					// make sure to avoid double quotes here
-					boolean quoted = escaped.startsWith("\"") //$NON-NLS-1$
-							&& escaped.endsWith("\""); //$NON-NLS-1$
+					boolean quoted = escaped.startsWith("\"")
+							&& escaped.endsWith("\"");
 					if (!quoted)
 						out.append('"');
 					out.append(escaped);
@@ -995,11 +947,11 @@ public class Config {
 				}
 				out.append(']');
 			} else if (e.section != null && e.name != null) {
-				if (e.prefix == null || "".equals(e.prefix)) //$NON-NLS-1$
+				if (e.prefix == null || "".equals(e.prefix))
 					out.append('\t');
 				out.append(e.name);
 				if (MAGIC_EMPTY_VALUE != e.value) {
-					out.append(" ="); //$NON-NLS-1$
+					out.append(" =");
 					if (e.value != null) {
 						out.append(' ');
 						out.append(escapeValue(e.value));
@@ -1031,11 +983,8 @@ public class Config {
 		ConfigLine e = new ConfigLine();
 		for (;;) {
 			int input = in.read();
-			if (-1 == input) {
-				if (e.section != null)
-					newEntries.add(e);
+			if (-1 == input)
 				break;
-			}
 
 			final char c = (char) input;
 			if ('\n' == c) {
@@ -1056,7 +1005,7 @@ public class Config {
 			} else if (e.section == null && Character.isWhitespace(c)) {
 				// Save the leading whitespace (if any).
 				if (e.prefix == null)
-					e.prefix = ""; //$NON-NLS-1$
+					e.prefix = "";
 				e.prefix += c;
 
 			} else if ('[' == c) {
@@ -1069,7 +1018,7 @@ public class Config {
 				}
 				if (']' != input)
 					throw new ConfigInvalidException(JGitText.get().badGroupHeader);
-				e.suffix = ""; //$NON-NLS-1$
+				e.suffix = "";
 
 			} else if (last != null) {
 				// Read a value.
@@ -1077,7 +1026,7 @@ public class Config {
 				e.subsection = last.subsection;
 				in.reset();
 				e.name = readKeyName(in);
-				if (e.name.endsWith("\n")) { //$NON-NLS-1$
+				if (e.name.endsWith("\n")) {
 					e.name = e.name.substring(0, e.name.length() - 1);
 					e.value = MAGIC_EMPTY_VALUE;
 				} else
@@ -1317,28 +1266,5 @@ public class Config {
 		void reset() {
 			pos--;
 		}
-	}
-
-	/**
-	 * Converts enumeration values into configuration options and vice-versa,
-	 * allowing to match a config option with an enum value.
-	 *
-	 */
-	public static interface ConfigEnum {
-		/**
-		 * Converts enumeration value into a string to be save in config.
-		 *
-		 * @return the enum value as config string
-		 */
-		String toConfigValue();
-
-		/**
-		 * Checks if the given string matches with enum value.
-		 *
-		 * @param in
-		 *            the string to match
-		 * @return true if the given string matches enum value, false otherwise
-		 */
-		boolean matchConfigValue(String in);
 	}
 }

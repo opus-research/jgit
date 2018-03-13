@@ -68,12 +68,6 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.internal.storage.file.LockFile;
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
-import org.eclipse.jgit.internal.storage.file.PackFile;
-import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -94,6 +88,12 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.LockFile;
+import org.eclipse.jgit.storage.file.ObjectDirectory;
+import org.eclipse.jgit.storage.file.PackFile;
+import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
+import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FileUtils;
@@ -550,23 +550,6 @@ public class TestRepository<R extends Repository> {
 	}
 
 	/**
-	 * Tag an object using a lightweight tag.
-	 *
-	 * @param name
-	 *            the tag name. The /refs/tags/ prefix will be added if the name
-	 *            doesn't start with it
-	 * @param obj
-	 *            the object to tag
-	 * @return the tagged object
-	 * @throws Exception
-	 */
-	public ObjectId lightweightTag(String name, ObjectId obj) throws Exception {
-		if (!name.startsWith(Constants.R_TAGS))
-			name = Constants.R_TAGS + name;
-		return update(name, obj);
-	}
-
-	/**
 	 * Run consistency checks against the object database.
 	 * <p>
 	 * This method completes silently if the checks pass. A temporary revision
@@ -667,13 +650,13 @@ public class TestRepository<R extends Repository> {
 				pw.release();
 			}
 
-			odb.openPack(pack);
+			odb.openPack(pack, idx);
 			updateServerInfo();
 			prunePacked(odb);
 		}
 	}
 
-	private static void prunePacked(ObjectDirectory odb) throws IOException {
+	private void prunePacked(ObjectDirectory odb) throws IOException {
 		for (PackFile p : odb.getPacks()) {
 			for (MutableEntry e : p)
 				FileUtils.delete(odb.fileFor(e.toObjectId()));
@@ -750,8 +733,6 @@ public class TestRepository<R extends Repository> {
 
 		private final DirCache tree = DirCache.newInCore();
 
-		private ObjectId topLevelTree;
-
 		private final List<RevCommit> parents = new ArrayList<RevCommit>(2);
 
 		private int tick = 1;
@@ -803,11 +784,6 @@ public class TestRepository<R extends Repository> {
 
 		public CommitBuilder noFiles() {
 			tree.clear();
-			return this;
-		}
-
-		public CommitBuilder setTopLevelTree(ObjectId treeId) {
-			topLevelTree = treeId;
 			return this;
 		}
 
@@ -864,10 +840,7 @@ public class TestRepository<R extends Repository> {
 
 				ObjectId commitId;
 				try {
-					if (topLevelTree != null)
-						c.setTreeId(topLevelTree);
-					else
-						c.setTreeId(tree.writeTree(inserter));
+					c.setTreeId(tree.writeTree(inserter));
 					commitId = inserter.insert(c);
 					inserter.flush();
 				} finally {

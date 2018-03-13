@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011-2012, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -58,13 +58,11 @@ import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -257,36 +255,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testMixedResetWithUnmerged() throws Exception {
-		git = new Git(db);
-
-		String file = "a.txt";
-		writeTrashFile(file, "data");
-		String file2 = "b.txt";
-		writeTrashFile(file2, "data");
-
-		git.add().addFilepattern(file).addFilepattern(file2).call();
-		git.commit().setMessage("commit").call();
-
-		DirCache index = db.lockDirCache();
-		DirCacheBuilder builder = index.builder();
-		builder.add(createEntry(file, FileMode.REGULAR_FILE, 1, ""));
-		builder.add(createEntry(file, FileMode.REGULAR_FILE, 2, ""));
-		builder.add(createEntry(file, FileMode.REGULAR_FILE, 3, ""));
-		assertTrue(builder.commit());
-
-		assertEquals("[a.txt, mode:100644, stage:1]"
-				+ "[a.txt, mode:100644, stage:2]"
-				+ "[a.txt, mode:100644, stage:3]",
-				indexState(0));
-
-		git.reset().setMode(ResetType.MIXED).call();
-
-		assertEquals("[a.txt, mode:100644]" + "[b.txt, mode:100644]",
-				indexState(0));
-	}
-
-	@Test
 	public void testPathsReset() throws Exception {
 		setupRepository();
 
@@ -374,57 +342,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testPathsResetWithUnmerged() throws Exception {
-		setupRepository();
-
-		String file = "a.txt";
-		writeTrashFile(file, "data");
-
-		git.add().addFilepattern(file).call();
-		git.commit().setMessage("commit").call();
-
-		DirCache index = db.lockDirCache();
-		DirCacheBuilder builder = index.builder();
-		builder.add(createEntry(file, FileMode.REGULAR_FILE, 1, ""));
-		builder.add(createEntry(file, FileMode.REGULAR_FILE, 2, ""));
-		builder.add(createEntry(file, FileMode.REGULAR_FILE, 3, ""));
-		builder.add(createEntry("b.txt", FileMode.REGULAR_FILE));
-		assertTrue(builder.commit());
-
-		assertEquals("[a.txt, mode:100644, stage:1]"
-				+ "[a.txt, mode:100644, stage:2]"
-				+ "[a.txt, mode:100644, stage:3]"
-				+ "[b.txt, mode:100644]",
-				indexState(0));
-
-		git.reset().addPath(file).call();
-
-		assertEquals("[a.txt, mode:100644]" + "[b.txt, mode:100644]",
-				indexState(0));
-	}
-
-	@Test
-	public void testPathsResetOnUnbornBranch() throws Exception {
-		git = new Git(db);
-		writeTrashFile("a.txt", "content");
-		git.add().addFilepattern("a.txt").call();
-		// Should assume an empty tree, like in C Git 1.8.2
-		git.reset().addPath("a.txt").call();
-
-		DirCache cache = db.readDirCache();
-		DirCacheEntry aEntry = cache.getEntry("a.txt");
-		assertNull(aEntry);
-	}
-
-	@Test(expected = JGitInternalException.class)
-	public void testPathsResetToNonexistingRef() throws Exception {
-		git = new Git(db);
-		writeTrashFile("a.txt", "content");
-		git.add().addFilepattern("a.txt").call();
-		git.reset().setRef("doesnotexist").addPath("a.txt").call();
-	}
-
-	@Test
 	public void testHardResetOnTag() throws Exception {
 		setupRepository();
 		String tagName = "initialtag";
@@ -472,21 +389,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 		g.reset().setMode(ResetType.HARD).setRef(first.getName()).call();
 
 		assertNull(db.readSquashCommitMsg());
-	}
-
-	@Test
-	public void testHardResetOnUnbornBranch() throws Exception {
-		git = new Git(db);
-		File fileA = writeTrashFile("a.txt", "content");
-		git.add().addFilepattern("a.txt").call();
-		// Should assume an empty tree, like in C Git 1.8.2
-		git.reset().setMode(ResetType.HARD).call();
-
-		DirCache cache = db.readDirCache();
-		DirCacheEntry aEntry = cache.getEntry("a.txt");
-		assertNull(aEntry);
-		assertFalse(fileA.exists());
-		assertNull(db.resolve(Constants.HEAD));
 	}
 
 	private void assertReflog(ObjectId prevHead, ObjectId head)

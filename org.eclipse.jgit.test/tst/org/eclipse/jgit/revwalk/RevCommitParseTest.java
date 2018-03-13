@@ -52,12 +52,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Test;
 
 public class RevCommitParseTest extends RepositoryTestCase {
@@ -381,19 +381,6 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals(committer, p.getCommitterIdent());
 		assertEquals("Test commit", p.getShortMessage());
 		assertEquals(src.getMessage(), p.getFullMessage());
-	}
-
-	@Test
-	public void testParse_GitStyleMessageWithCRLF() throws Exception {
-		final String shortMsgIn = "This fixes a\r\nbug.\r\n\r\n";
-		final String shortMsg = "This fixes a bug.";
-		final String body = "We do it with magic and pixie dust\r\nand stuff.\r\n"
-				+ "\r\n\r\n"
-				+ "Signed-off-by: A U. Thor <author@example.com>\r\n";
-		final String fullMsg = shortMsgIn + "\r\n" + "\r\n" + body;
-		final RevCommit c = create(fullMsg);
-		assertEquals(fullMsg, c.getFullMessage());
-		assertEquals(shortMsg, c.getShortMessage());
 	}
 
 	private static ObjectId id(final String str) {

@@ -110,7 +110,6 @@ public class SubmoduleUpdateCommand extends
 	 * Add repository-relative submodule path to initialize
 	 *
 	 * @param path
-	 *            (with <code>/</code> as separator)
 	 * @return this command
 	 */
 	public SubmoduleUpdateCommand addPath(final String path) {

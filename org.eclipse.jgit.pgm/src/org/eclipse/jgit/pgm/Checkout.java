@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, 2012 Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,14 +47,12 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -86,34 +83,25 @@ class Checkout extends TextBuiltin {
 		try {
 			String oldBranch = db.getBranch();
 			Ref ref = command.call();
-			if (ref == null)
-				return;
 			if (Repository.shortenRefName(ref.getName()).equals(oldBranch)) {
-				outw.println(MessageFormat.format(
-						CLIText.get().alreadyOnBranch,
+				out.println(MessageFormat.format(CLIText.get().alreadyOnBranch,
 						name));
 				return;
 			}
 			if (createBranch)
-				outw.println(MessageFormat.format(
+				out.println(MessageFormat.format(
 						CLIText.get().switchedToNewBranch,
 						Repository.shortenRefName(ref.getName())));
 			else
-				outw.println(MessageFormat.format(
+				out.println(MessageFormat.format(
 						CLIText.get().switchedToBranch,
 						Repository.shortenRefName(ref.getName())));
 		} catch (RefNotFoundException e) {
-			outw.println(MessageFormat.format(
-					CLIText.get().pathspecDidNotMatch,
+			out.println(MessageFormat.format(CLIText.get().pathspecDidNotMatch,
 					name));
 		} catch (RefAlreadyExistsException e) {
 			throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
 					name));
-		} catch (CheckoutConflictException e) {
-			outw.println(CLIText.get().checkoutConflict);
-			for (String path : e.getConflictingPaths())
-				outw.println(MessageFormat.format(
-						CLIText.get().checkoutConflictPathLine, path));
 		}
 	}
 }

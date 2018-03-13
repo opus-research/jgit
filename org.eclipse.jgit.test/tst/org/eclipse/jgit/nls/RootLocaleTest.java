@@ -46,7 +46,8 @@ package org.eclipse.jgit.nls;
 import org.eclipse.jgit.awtui.UIText;
 import org.eclipse.jgit.console.ConsoleText;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.iplog.IpLogText;
+import org.eclipse.jgit.pgm.CLIText;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -74,5 +75,10 @@ public class RootLocaleTest {
 	@Test
 	public void testUIText() {
 		NLS.getBundleFor(UIText.class);
+	}
+
+	@Test
+	public void testIpLogText() {
+		NLS.getBundleFor(IpLogText.class);
 	}
 }

@@ -56,8 +56,8 @@ import org.kohsuke.args4j.spi.OptionHandler;
 import org.kohsuke.args4j.spi.Setter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -127,13 +127,13 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 		final ArrayList<String> tmp = new ArrayList<String>(args.length);
 		for (int argi = 0; argi < args.length; argi++) {
 			final String str = args[argi];
-			if (str.equals("--")) { //$NON-NLS-1$
+			if (str.equals("--")) {
 				while (argi < args.length)
 					tmp.add(args[argi++]);
 				break;
 			}
 
-			if (str.startsWith("--")) { //$NON-NLS-1$
+			if (str.startsWith("--")) {
 				final int eq = str.indexOf('=');
 				if (eq > 0) {
 					tmp.add(str.substring(0, eq));
@@ -191,7 +191,7 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 		@Override
 		public String toString() {
 			if (metaVar() == null)
-				return "ARG"; //$NON-NLS-1$
+				return "ARG";
 			try {
 				Field field = CLIText.class.getField(metaVar());
 				String ret = field.get(CLIText.get()).toString();

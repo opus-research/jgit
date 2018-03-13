@@ -68,12 +68,12 @@ import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileSnapshot;
-import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileSnapshot;
+import org.eclipse.jgit.storage.file.LockFile;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -555,7 +555,7 @@ public class DirCache {
 
 	private static String formatExtensionName(final byte[] hdr)
 			throws UnsupportedEncodingException {
-		return "'" + new String(hdr, 0, 4, "ISO-8859-1") + "'"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		return "'" + new String(hdr, 0, 4, "ISO-8859-1") + "'";
 	}
 
 	private static boolean is_DIRC(final byte[] hdr) {
@@ -731,7 +731,13 @@ public class DirCache {
 
 	/**
 	 * Locate the position a path's entry is at in the index.
-	 * For details refer to #findEntry(byte[], int).
+	 * <p>
+	 * If there is at least one entry in the index for this path the position of
+	 * the lowest stage is returned. Subsequent stages can be identified by
+	 * testing consecutive entries until the path differs.
+	 * <p>
+	 * If no path matches the entry -(position+1) is returned, where position is
+	 * the location it would have gone within the index.
 	 *
 	 * @param path
 	 *            the path to search for.
@@ -744,26 +750,7 @@ public class DirCache {
 		return findEntry(p, p.length);
 	}
 
-	/**
-	 * Locate the position a path's entry is at in the index.
-	 * <p>
-	 * If there is at least one entry in the index for this path the position of
-	 * the lowest stage is returned. Subsequent stages can be identified by
-	 * testing consecutive entries until the path differs.
-	 * <p>
-	 * If no path matches the entry -(position+1) is returned, where position is
-	 * the location it would have gone within the index.
-	 *
-	 * @param p
-	 *            the byte array starting with the path to search for.
-	 * @param pLen
-	 *            the length of the path in bytes
-	 * @return if >= 0 then the return value is the position of the entry in the
-	 *         index; pass to {@link #getEntry(int)} to obtain the entry
-	 *         information. If < 0 the entry does not exist in the index.
-	 * @since 3.4
-	 */
-	public int findEntry(final byte[] p, final int pLen) {
+	int findEntry(final byte[] p, final int pLen) {
 		int low = 0;
 		int high = entryCnt;
 		while (low < high) {
@@ -868,8 +855,8 @@ public class DirCache {
 			System.arraycopy(sortedEntries, 0, r, 0, sortedEntries.length);
 			return r;
 		}
-		if (!path.endsWith("/")) //$NON-NLS-1$
-			path += "/"; //$NON-NLS-1$
+		if (!path.endsWith("/"))
+			path += "/";
 		final byte[] p = Constants.encode(path);
 		final int pLen = p.length;
 

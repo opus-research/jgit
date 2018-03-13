@@ -49,7 +49,6 @@ import static org.junit.Assert.fail;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
@@ -153,7 +152,6 @@ public class ReflogResolveTest extends RepositoryTestCase {
 			db.resolve("@{-1}@{0}");
 			fail();
 		} catch (RevisionSyntaxException e) {
-			// good
 		}
 		assertEquals(c1.getName(), db.resolve("@{-2}@{0}").getName());
 

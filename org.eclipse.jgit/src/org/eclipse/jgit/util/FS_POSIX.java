@@ -43,23 +43,16 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-
-/**
- * Base FS for POSIX based systems
- *
- * @since 3.0
- */
-public abstract class FS_POSIX extends FS {
+abstract class FS_POSIX extends FS {
 	@Override
 	protected File discoverGitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
-		File gitExe = searchPath(path, "git"); //$NON-NLS-1$
+		String path = SystemReader.getInstance().getenv("PATH");
+		File gitExe = searchPath(path, "git");
 		if (gitExe != null)
 			return gitExe.getParentFile().getParentFile();
 
@@ -69,7 +62,7 @@ public abstract class FS_POSIX extends FS {
 			// login shell and search using that.
 			//
 			String w = readPipe(userHome(), //
-					new String[] { "bash", "--login", "-c", "which git" }, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+					new String[] { "bash", "--login", "-c", "which git" }, //
 					Charset.defaultCharset().name());
 			if (w == null || w.length() == 0)
 				return null;
@@ -82,20 +75,11 @@ public abstract class FS_POSIX extends FS {
 		return null;
 	}
 
-	/**
-	 * Default constructor
-	 */
-	protected FS_POSIX() {
+	FS_POSIX() {
 		super();
 	}
 
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            FS to copy some settings from
-	 */
-	protected FS_POSIX(FS src) {
+	FS_POSIX(FS src) {
 		super(src);
 	}
 
@@ -105,16 +89,11 @@ public abstract class FS_POSIX extends FS {
 	}
 
 	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		// Do nothing
-	}
-
-	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
 		List<String> argv = new ArrayList<String>(4 + args.length);
-		argv.add("sh"); //$NON-NLS-1$
-		argv.add("-c"); //$NON-NLS-1$
-		argv.add(cmd + " \"$@\""); //$NON-NLS-1$
+		argv.add("sh");
+		argv.add("-c");
+		argv.add(cmd + " \"$@\"");
 		argv.add(cmd);
 		argv.addAll(Arrays.asList(args));
 		ProcessBuilder proc = new ProcessBuilder();

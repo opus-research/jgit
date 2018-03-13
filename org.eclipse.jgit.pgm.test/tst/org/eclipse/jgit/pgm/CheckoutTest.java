@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,15 +42,8 @@
  */
 package org.eclipse.jgit.pgm;
 
-import java.io.File;
-
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.treewalk.FileTreeIterator.FileEntry;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -90,105 +83,19 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
 		new Git(db).commit().setMessage("initial commit").call();
 
-		assertEquals("fatal: A branch named 'master' already exists.",
+		assertEquals("A branch named 'master' already exists.",
 				execute("git checkout -b master"));
 	}
 
 	@Test
 	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
-		assertEquals("fatal: You are on a branch yet to be born",
+		assertEquals("You are on a branch yet to be born",
 				execute("git checkout -b side"));
 	}
 
-	@Test
-	public void testCheckoutUnresolvedHead() throws Exception {
-		assertEquals(
-				"error: pathspec 'HEAD' did not match any file(s) known to git.",
-				execute("git checkout HEAD"));
-	}
-
-	@Test
-	public void testCheckoutHead() throws Exception {
-		new Git(db).commit().setMessage("initial commit").call();
-
-		assertEquals("", execute("git checkout HEAD"));
-	}
-
-	@Test
-	public void testCheckoutExistingBranchWithConflict() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("a", "Hello world a");
-		git.add().addFilepattern(".").call();
-		git.commit().setMessage("commit file a").call();
-		git.branchCreate().setName("branch_1").call();
-		git.rm().addFilepattern("a").call();
-		FileUtils.mkdirs(new File(db.getWorkTree(), "a"));
-		writeTrashFile("a/b", "Hello world b");
-		git.add().addFilepattern("a/b").call();
-		git.commit().setMessage("commit folder a").call();
-		git.rm().addFilepattern("a").call();
-		writeTrashFile("a", "New Hello world a");
-		git.add().addFilepattern(".").call();
-
-		String[] execute = execute("git checkout branch_1");
-		Assert.assertEquals(
-				"error: Your local changes to the following files would be overwritten by checkout:",
-				execute[0]);
-		Assert.assertEquals("\ta", execute[1]);
-	}
-
-	/**
-	 * Steps:
-	 * <ol>
-	 * <li>Add file 'a' and 'b'
-	 * <li>Commit
-	 * <li>Create branch '1'
-	 * <li>modify file 'a'
-	 * <li>Commit
-	 * <li>Delete file 'a' in the working tree
-	 * <li>Checkout branch '1'
-	 * </ol>
-	 * The working tree should contain 'a' with FileMode.REGULAR_FILE after the
-	 * checkout.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testCheckoutWithMissingWorkingTreeFile() throws Exception {
-		Git git = new Git(db);
-		File fileA = writeTrashFile("a", "Hello world a");
-		writeTrashFile("b", "Hello world b");
-		git.add().addFilepattern(".").call();
-		git.commit().setMessage("add files a & b").call();
-		Ref branch_1 = git.branchCreate().setName("branch_1").call();
-		writeTrashFile("a", "b");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("modify file a").call();
-
-		FileEntry entry = new FileTreeIterator.FileEntry(new File(
-				db.getWorkTree(), "a"), db.getFS());
-		assertEquals(FileMode.REGULAR_FILE, entry.getMode());
-
-		FileUtils.delete(fileA);
-
-		git.checkout().setName(branch_1.getName()).call();
-
-		entry = new FileTreeIterator.FileEntry(new File(db.getWorkTree(), "a"),
-				db.getFS());
-		assertEquals(FileMode.REGULAR_FILE, entry.getMode());
-		assertEquals("Hello world a", read(fileA));
-	}
-
-	static private void assertEquals(Object expected, Object actual) {
-		Assert.assertEquals(expected, actual);
-	}
-
 	static private void assertEquals(String expected, String[] actual) {
-		// if there is more than one line, ignore last one if empty
-		Assert.assertEquals(
-				1,
-				actual.length > 1 && actual[actual.length - 1].equals("") ? actual.length - 1
-						: actual.length);
+		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
+				actual.length); // ignore last line if empty
 		Assert.assertEquals(expected, actual[0]);
 	}
 }

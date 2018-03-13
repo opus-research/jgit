@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 François Rey <eclipse.org_@_francois_._rey_._name>
+ * Copyright (C) 2012, François Rey <eclipse.org_@_francois_._rey_._name>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.pgm;
 
+import static org.junit.Assert.assertEquals;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
@@ -191,7 +192,7 @@ public class StatusTest extends CLIRepositoryTestCase {
 						"# On branch master", //
 						"# Unmerged paths:", //
 						"# ", //
-						"# \tboth modified:      unmerged", //
+						"# \tunmerged", //
 						"# ", //
 						"# Untracked files:", //
 						"# ", //
@@ -205,7 +206,7 @@ public class StatusTest extends CLIRepositoryTestCase {
 						"# Not currently on any branch.", //
 						"# Unmerged paths:", //
 						"# ", //
-						"# \tboth modified:      unmerged", //
+						"# \tunmerged", //
 						"# ", //
 						"# Untracked files:", //
 						"# ", //
@@ -214,121 +215,16 @@ public class StatusTest extends CLIRepositoryTestCase {
 				}, execute("git status")); //
 	}
 
-	@Test
-	public void testStatusPorcelain() throws Exception {
-		Git git = new Git(db);
-		// Write all files
-		writeTrashFile("tracked", "tracked");
-		writeTrashFile("stagedNew", "stagedNew");
-		writeTrashFile("stagedModified", "stagedModified");
-		writeTrashFile("stagedDeleted", "stagedDeleted");
-		writeTrashFile("trackedModified", "trackedModified");
-		writeTrashFile("trackedDeleted", "trackedDeleted");
-		writeTrashFile("untracked", "untracked");
-		// Test untracked
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"?? stagedDeleted", //
-						"?? stagedModified", //
-						"?? stagedNew", //
-						"?? tracked", //
-						"?? trackedDeleted", //
-						"?? trackedModified", //
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Add to index
-		git.add().addFilepattern("tracked").call();
-		git.add().addFilepattern("stagedModified").call();
-		git.add().addFilepattern("stagedDeleted").call();
-		git.add().addFilepattern("trackedModified").call();
-		git.add().addFilepattern("trackedDeleted").call();
-		// Test staged count
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"A  stagedDeleted", //
-						"A  stagedModified", //
-						"A  tracked", //
-						"A  trackedDeleted", //
-						"A  trackedModified", //
-						"?? stagedNew", //
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Commit
-		git.commit().setMessage("initial commit").call();
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"?? stagedNew", //
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Make some changes and stage them
-		writeTrashFile("stagedModified", "stagedModified modified");
-		deleteTrashFile("stagedDeleted");
-		writeTrashFile("trackedModified", "trackedModified modified");
-		deleteTrashFile("trackedDeleted");
-		git.add().addFilepattern("stagedModified").call();
-		git.rm().addFilepattern("stagedDeleted").call();
-		git.add().addFilepattern("stagedNew").call();
-		// Test staged/not-staged status
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"D  stagedDeleted", //
-						"M  stagedModified", //
-						"A  stagedNew", //
-						" D trackedDeleted", //
-						" M trackedModified", //
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Create unmerged file
-		writeTrashFile("unmerged", "unmerged");
-		git.add().addFilepattern("unmerged").call();
-		// Commit pending changes
-		git.add().addFilepattern("trackedModified").call();
-		git.rm().addFilepattern("trackedDeleted").call();
-		git.commit().setMessage("commit before branching").call();
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Checkout new branch
-		git.checkout().setCreateBranch(true).setName("test").call();
-		// Test branch status
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Commit change and checkout master again
-		writeTrashFile("unmerged", "changed in test branch");
-		git.add().addFilepattern("unmerged").call();
-		RevCommit testBranch = git.commit()
-				.setMessage("changed unmerged in test branch").call();
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		git.checkout().setName("master").call();
-		// Change the same file and commit
-		writeTrashFile("unmerged", "changed in master branch");
-		git.add().addFilepattern("unmerged").call();
-		git.commit().setMessage("changed unmerged in master branch").call();
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Merge test branch into master
-		git.merge().include(testBranch.getId()).call();
-		// Test unmerged status
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"UU unmerged", //
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
-		// Test detached head
-		String commitId = db.getRef(Constants.MASTER).getObjectId().name();
-		git.checkout().setName(commitId).call();
-		assertArrayOfLinesEquals(new String[] { // git status output
-						"UU unmerged", //
-						"?? untracked", //
-						"" //
-				}, execute("git status --porcelain")); //
+	private void assertArrayOfLinesEquals(String[] expected, String[] actual) {
+		assertEquals(toText(expected), toText(actual));
+	}
+
+	private String toText(String[] lines) {
+		StringBuilder b = new StringBuilder();
+		for (String s : lines) {
+			b.append(s);
+			b.append('\n');
+		}
+		return b.toString();
 	}
 }

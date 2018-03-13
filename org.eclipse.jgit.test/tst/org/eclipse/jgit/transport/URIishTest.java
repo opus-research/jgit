@@ -2,7 +2,6 @@
  * Copyright (C) 2009, Mykola Nikishov <mn@mn.com.ua>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -612,7 +611,7 @@ public class URIishTest {
 
 	@Test
 	public void testGetTwoSlashesDotGitHumanishName() throws URISyntaxException {
-		assertEquals("", new URIish("//.git").getHumanishName());
+		assertEquals("", new URIish("/.git").getHumanishName());
 	}
 
 	@Test
@@ -647,7 +646,7 @@ public class URIishTest {
 	@Test
 	public void testGetSlashSlashDotGitSlashHumanishName()
 			throws IllegalArgumentException, URISyntaxException {
-		final String humanishName = new URIish(GIT_SCHEME + "/.git")
+		final String humanishName = new URIish(GIT_SCHEME + "/abc//.git")
 				.getHumanishName();
 		assertEquals("may return an empty humanish name", "", humanishName);
 	}
@@ -700,21 +699,6 @@ public class URIishTest {
 	public void testGetValidWithSlashesDotGitSlashHumanishName()
 			throws IllegalArgumentException, URISyntaxException {
 		String humanishName = new URIish("/a/b/c.git/").getHumanishName();
-		assertEquals("c", humanishName);
-	}
-
-	@Test
-	public void testGetValidLocalWithTwoSlashesHumanishName()
-			throws IllegalArgumentException, URISyntaxException {
-		String humanishName = new URIish("/a/b/c//").getHumanishName();
-		assertEquals("c", humanishName);
-	}
-
-	@Test
-	public void testGetValidGitSchemeWithTwoSlashesHumanishName()
-			throws IllegalArgumentException, URISyntaxException {
-		String humanishName = new URIish(GIT_SCHEME + "/a/b/c//")
-				.getHumanishName();
 		assertEquals("c", humanishName);
 	}
 
@@ -838,7 +822,7 @@ public class URIishTest {
 		String[] users = new String[] { "me", "l usr\\example.com",
 				"lusr\\example" };
 		String[] passes = new String[] { "wtf", };
-		String[] hosts = new String[] { "example.com", "1.2.3.4", "[::1]" };
+		String[] hosts = new String[] { "example.com", "1.2.3.4" };
 		String[] ports = new String[] { "1234", "80" };
 		String[] paths = new String[] { "/", "/abc", "D:/x", "D:\\x" };
 		for (String[] test : tests) {

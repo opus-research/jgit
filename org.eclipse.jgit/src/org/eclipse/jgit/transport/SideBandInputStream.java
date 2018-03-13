@@ -48,7 +48,6 @@ import static org.eclipse.jgit.transport.SideBandOutputStream.HDR_SIZE;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.Writer;
 import java.text.MessageFormat;
 import java.util.regex.Matcher;
@@ -87,10 +86,10 @@ class SideBandInputStream extends InputStream {
 	static final int CH_ERROR = 3;
 
 	private static Pattern P_UNBOUNDED = Pattern
-			.compile("^([\\w ]+): +(\\d+)(?:, done\\.)? *[\r\n]$"); //$NON-NLS-1$
+			.compile("^([\\w ]+): +(\\d+)(?:, done\\.)? *[\r\n]$");
 
 	private static Pattern P_BOUNDED = Pattern
-			.compile("^([\\w ]+): +\\d+% +\\( *(\\d+)/ *(\\d+)\\)(?:, done\\.)? *[\r\n]$"); //$NON-NLS-1$
+			.compile("^([\\w ]+): +\\d+% +\\( *(\\d+)/ *(\\d+)\\)(?:, done\\.)? *[\r\n]$");
 
 	private final InputStream rawIn;
 
@@ -100,9 +99,7 @@ class SideBandInputStream extends InputStream {
 
 	private final Writer messages;
 
-	private final OutputStream out;
-
-	private String progressBuffer = ""; //$NON-NLS-1$
+	private String progressBuffer = "";
 
 	private String currentTask;
 
@@ -115,13 +112,12 @@ class SideBandInputStream extends InputStream {
 	private int available;
 
 	SideBandInputStream(final InputStream in, final ProgressMonitor progress,
-			final Writer messageStream, OutputStream outputStream) {
+			final Writer messageStream) {
 		rawIn = in;
 		pckIn = new PacketLineIn(rawIn);
 		monitor = progress;
 		messages = messageStream;
-		currentTask = ""; //$NON-NLS-1$
-		out = outputStream;
+		currentTask = "";
 	}
 
 	@Override
@@ -236,8 +232,6 @@ class SideBandInputStream extends InputStream {
 		}
 
 		messages.write(msg);
-		if (out != null)
-			out.write(msg.getBytes());
 	}
 
 	private void beginTask(final int totalWorkUnits) {

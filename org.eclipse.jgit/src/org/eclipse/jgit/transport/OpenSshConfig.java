@@ -91,9 +91,9 @@ public class OpenSshConfig {
 	public static OpenSshConfig get(FS fs) {
 		File home = fs.userHome();
 		if (home == null)
-			home = new File(".").getAbsoluteFile(); //$NON-NLS-1$
+			home = new File(".").getAbsoluteFile();
 
-		final File config = new File(new File(home, ".ssh"), Constants.CONFIG); //$NON-NLS-1$
+		final File config = new File(new File(home, ".ssh"), Constants.CONFIG);
 		final OpenSshConfig osc = new OpenSshConfig(home, config);
 		osc.refresh();
 		return osc;
@@ -180,16 +180,16 @@ public class OpenSshConfig {
 
 		while ((line = br.readLine()) != null) {
 			line = line.trim();
-			if (line.length() == 0 || line.startsWith("#")) //$NON-NLS-1$
+			if (line.length() == 0 || line.startsWith("#"))
 				continue;
 
-			final String[] parts = line.split("[ \t]*[= \t]", 2); //$NON-NLS-1$
+			final String[] parts = line.split("[ \t]*[= \t]", 2);
 			final String keyword = parts[0].trim();
 			final String argValue = parts[1].trim();
 
-			if (StringUtils.equalsIgnoreCase("Host", keyword)) { //$NON-NLS-1$
+			if (StringUtils.equalsIgnoreCase("Host", keyword)) {
 				current.clear();
-				for (final String pattern : argValue.split("[ \t]")) { //$NON-NLS-1$
+				for (final String pattern : argValue.split("[ \t]")) {
 					final String name = dequote(pattern);
 					Host c = m.get(name);
 					if (c == null) {
@@ -208,15 +208,15 @@ public class OpenSshConfig {
 				continue;
 			}
 
-			if (StringUtils.equalsIgnoreCase("HostName", keyword)) { //$NON-NLS-1$
+			if (StringUtils.equalsIgnoreCase("HostName", keyword)) {
 				for (final Host c : current)
 					if (c.hostName == null)
 						c.hostName = dequote(argValue);
-			} else if (StringUtils.equalsIgnoreCase("User", keyword)) { //$NON-NLS-1$
+			} else if (StringUtils.equalsIgnoreCase("User", keyword)) {
 				for (final Host c : current)
 					if (c.user == null)
 						c.user = dequote(argValue);
-			} else if (StringUtils.equalsIgnoreCase("Port", keyword)) { //$NON-NLS-1$
+			} else if (StringUtils.equalsIgnoreCase("Port", keyword)) {
 				try {
 					final int port = Integer.parseInt(dequote(argValue));
 					for (final Host c : current)
@@ -225,21 +225,19 @@ public class OpenSshConfig {
 				} catch (NumberFormatException nfe) {
 					// Bad port number. Don't set it.
 				}
-			} else if (StringUtils.equalsIgnoreCase("IdentityFile", keyword)) { //$NON-NLS-1$
+			} else if (StringUtils.equalsIgnoreCase("IdentityFile", keyword)) {
 				for (final Host c : current)
 					if (c.identityFile == null)
 						c.identityFile = toFile(dequote(argValue));
-			} else if (StringUtils.equalsIgnoreCase(
-					"PreferredAuthentications", keyword)) { //$NON-NLS-1$
+			} else if (StringUtils.equalsIgnoreCase("PreferredAuthentications", keyword)) {
 				for (final Host c : current)
 					if (c.preferredAuthentications == null)
 						c.preferredAuthentications = nows(dequote(argValue));
-			} else if (StringUtils.equalsIgnoreCase("BatchMode", keyword)) { //$NON-NLS-1$
+			} else if (StringUtils.equalsIgnoreCase("BatchMode", keyword)) {
 				for (final Host c : current)
 					if (c.batchMode == null)
 						c.batchMode = yesno(dequote(argValue));
-			} else if (StringUtils.equalsIgnoreCase(
-					"StrictHostKeyChecking", keyword)) { //$NON-NLS-1$
+			} else if (StringUtils.equalsIgnoreCase("StrictHostKeyChecking", keyword)) {
 				String value = dequote(argValue);
 				for (final Host c : current)
 					if (c.strictHostKeyChecking == null)
@@ -266,7 +264,7 @@ public class OpenSshConfig {
 	}
 
 	private static String dequote(final String value) {
-		if (value.startsWith("\"") && value.endsWith("\"")) //$NON-NLS-1$ //$NON-NLS-2$
+		if (value.startsWith("\"") && value.endsWith("\""))
 			return value.substring(1, value.length() - 1);
 		return value;
 	}
@@ -281,13 +279,13 @@ public class OpenSshConfig {
 	}
 
 	private static Boolean yesno(final String value) {
-		if (StringUtils.equalsIgnoreCase("yes", value)) //$NON-NLS-1$
+		if (StringUtils.equalsIgnoreCase("yes", value))
 			return Boolean.TRUE;
 		return Boolean.FALSE;
 	}
 
 	private File toFile(final String path) {
-		if (path.startsWith("~/")) //$NON-NLS-1$
+		if (path.startsWith("~/"))
 			return new File(home, path.substring(2));
 		File ret = new File(path);
 		if (ret.isAbsolute())
@@ -298,7 +296,7 @@ public class OpenSshConfig {
 	static String userName() {
 		return AccessController.doPrivileged(new PrivilegedAction<String>() {
 			public String run() {
-				return System.getProperty("user.name"); //$NON-NLS-1$
+				return System.getProperty("user.name");
 			}
 		});
 	}
