@@ -54,7 +54,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
@@ -113,7 +112,7 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	public ObjectInserter newInserter() {
+	public ObjectDirectoryInserter newInserter() {
 		return wrapped.newInserter();
 	}
 
@@ -188,15 +187,15 @@ class CachedObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	boolean hasObject2(String objectId) {
-		// This method should never be invoked.
-		throw new UnsupportedOperationException();
+		return unpackedObjects.contains(ObjectId.fromString(objectId));
 	}
 
 	@Override
 	ObjectLoader openObject2(WindowCursor curs, String objectName,
 			AnyObjectId objectId) throws IOException {
-		// This method should never be invoked.
-		throw new UnsupportedOperationException();
+		if (unpackedObjects.contains(objectId))
+			return wrapped.openObject2(curs, objectName, objectId);
+		return null;
 	}
 
 	@Override
@@ -209,8 +208,28 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	long getObjectSize2(WindowCursor curs, String objectName, AnyObjectId objectId)
 			throws IOException {
-		// This method should never be invoked.
-		throw new UnsupportedOperationException();
+		if (unpackedObjects.contains(objectId))
+			return wrapped.getObjectSize2(curs, objectName, objectId);
+		return -1;
+	}
+
+	@Override
+	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId objectId,
+			boolean createDuplicate) {
+		InsertLooseObjectResult result = wrapped.insertUnpackedObject(tmp,
+				objectId, createDuplicate);
+		switch (result) {
+		case INSERTED:
+		case EXISTS_LOOSE:
+			if (!unpackedObjects.contains(objectId))
+				unpackedObjects.add(objectId);
+			break;
+
+		case EXISTS_PACKED:
+		case FAILURE:
+			break;
+		}
+		return result;
 	}
 
 	@Override
