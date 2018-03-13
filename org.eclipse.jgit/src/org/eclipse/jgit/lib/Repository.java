@@ -46,11 +46,9 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -64,6 +62,7 @@ import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
@@ -194,7 +193,7 @@ public class Repository {
 			if (d != null)
 				gitDir = d;
 			else
-				throw new IllegalArgumentException("Either GIT_DIR or GIT_WORK_TREE must be passed to Repository constructor");
+				throw new IllegalArgumentException(JGitText.get().eitherGIT_DIRorGIT_WORK_TREEmustBePassed);
 		}
 
 		userConfig = SystemReader.getInstance().openUserConfig();
@@ -229,8 +228,8 @@ public class Repository {
 			final String repositoryFormatVersion = getConfig().getString(
 					"core", null, "repositoryFormatVersion");
 			if (!"0".equals(repositoryFormatVersion)) {
-				throw new IOException("Unknown repository format \""
-						+ repositoryFormatVersion + "\"; expected \"0\".");
+				throw new IOException(MessageFormat.format(
+						JGitText.get().unknownRepositoryFormat2, repositoryFormatVersion));
 			}
 		}
 	}
@@ -239,9 +238,8 @@ public class Repository {
 		try {
 			userConfig.load();
 		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("User config file "
-					+ userConfig.getFile().getAbsolutePath() + " invalid: "
-					+ e1);
+			IOException e2 = new IOException(MessageFormat.format(
+					JGitText.get().userConfigFileInvalid, userConfig.getFile().getAbsolutePath(), e1));
 			e2.initCause(e1);
 			throw e2;
 		}
@@ -251,7 +249,7 @@ public class Repository {
 		try {
 			config.load();
 		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("Unknown repository format");
+			IOException e2 = new IOException(JGitText.get().unknownRepositoryFormat);
 			e2.initCause(e1);
 			throw e2;
 		}
@@ -282,8 +280,7 @@ public class Repository {
 	public void create(boolean bare) throws IOException {
 		final RepositoryConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
-			throw new IllegalStateException("Repository already exists: "
-					+ gitDir);
+			throw new IllegalStateException(MessageFormat.format(JGitText.get().repositoryAlreadyExists, gitDir));
 		}
 		gitDir.mkdirs();
 		refs.create();
@@ -509,7 +506,7 @@ public class Repository {
 
 		default:
 			throw new IncorrectObjectTypeException(id,
-				"COMMIT nor TREE nor BLOB nor TAG");
+				JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
 		}
 	}
 
@@ -730,7 +727,7 @@ public class Repository {
 							pnum = Integer.parseInt(parentnum);
 						} catch (NumberFormatException e) {
 							throw new RevisionSyntaxException(
-									"Invalid commit parent number",
+									JGitText.get().invalidCommitParentNumber,
 									revstr);
 						}
 						if (pnum != 0) {
@@ -856,7 +853,7 @@ public class Repository {
 					dist = Integer.parseInt(distnum);
 				} catch (NumberFormatException e) {
 					throw new RevisionSyntaxException(
-							"Invalid ancestry length", revstr);
+							JGitText.get().invalidAncestryLength, revstr);
 				}
 				while (dist > 0) {
 					final ObjectId[] parents = ((Commit) ref).getParentIds();
@@ -880,7 +877,7 @@ public class Repository {
 					}
 				}
 				if (time != null)
-					throw new RevisionSyntaxException("reflogs not yet supported by revision parser", revstr);
+					throw new RevisionSyntaxException(JGitText.get().reflogsNotYetSupportedByRevisionParser, revstr);
 				i = m - 1;
 				break;
 			default:
@@ -1340,67 +1337,5 @@ public class Repository {
 		if (ref != null)
 			return new ReflogReader(this, ref.getName());
 		return null;
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/MERGE_MSG. In this
-	 * file operations triggering a merge will store a template for the commit
-	 * message of the merge commit.
-	 *
-	 * @return a String containing the content of the MERGE_MSG file or
-	 *         {@code null} if this file doesn't exist
-	 * @throws IOException
-	 */
-	public String readMergeCommitMsg() throws IOException {
-		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
-		if (mergeMsgFile.exists()) {
-			int length = (int) mergeMsgFile.length();
-			char[] messageBuffer = new char[length];
-			try {
-				FileReader r = new FileReader(mergeMsgFile);
-				r.read(messageBuffer, 0, length);
-				r.close();
-				return new String(messageBuffer);
-			} catch (FileNotFoundException e) {
-				// MERGE_MSG file has disappeared in the meantime
-				// ignore it
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/MERGE_HEAD. In this
-	 * file operations triggering a merge will store the IDs of all heads which
-	 * should be merged together with HEAD.
-	 *
-	 * @return a list of {@link Commit}s which IDs are listed in the MERGE_HEAD
-	 *         file or {@code null} if this file doesn't exist
-	 * @throws IOException
-	 */
-	public List<ObjectId> readMergeHeads() throws IOException {
-		List<ObjectId> heads = null;
-		File mergeHeadFile = new File(gitDir, Constants.MERGE_HEAD);
-		if (mergeHeadFile.exists()) {
-			try {
-				FileReader r = new FileReader(mergeHeadFile);
-				BufferedReader mh = new BufferedReader(r);
-				String headStr;
-				try {
-					heads = new LinkedList<ObjectId>();
-					while ((headStr = mh.readLine()) != null) {
-						heads.add(ObjectId.fromString(headStr));
-					}
-				} finally {
-					r.close();
-				}
-
-			} catch (FileNotFoundException e) {
-				// MERGE_HEAD file has disappeared in the meantime
-				// ignore it
-				heads = null;
-			}
-		}
-		return heads;
 	}
 }

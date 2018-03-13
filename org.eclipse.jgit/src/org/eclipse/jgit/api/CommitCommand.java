@@ -42,11 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
+import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Commit;
@@ -58,7 +57,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -77,10 +75,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	private PersonIdent committer;
 
 	private String message;
-
-	// parents this commit should have. The current HEAD will be in this list
-	// and also all commits mentioned in .git/MERGE_HEAD
-	private List<ObjectId> parents = new LinkedList<ObjectId>();
 
 	/**
 	 * @param repo
@@ -102,8 +96,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             when called without specifying a commit message
 	 * @throws UnmergedPathException
 	 *             when the current index contained unmerged pathes (conflicts)
-	 * @throws WrongRepositoryStateException
-	 *             when repository is not in the right state for committing
 	 * @throws JGitInternalException
 	 *             a low-level exception of JGit has occurred. The original
 	 *             exception can be retrieved by calling
@@ -114,25 +106,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	public RevCommit call() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException {
+			JGitInternalException {
 		checkCallable();
-
-		RepositoryState state = repo.getRepositoryState();
-		if (!state.canCommit())
-			throw new WrongRepositoryStateException(
-					"Cannot commit on a a repo with state: " + state.name());
-		processOptions(state);
+		processOptions();
 
 		try {
 			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
-						"Commit on repo without HEAD currently not supported");
+						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 
 			// determine the current HEAD and the commit it is referring to
-			ObjectId headId = head.getLeaf().getObjectId();
-			if (headId!=null)
-				parents.add(headId);
+			ObjectId parentID = repo.resolve(Constants.HEAD + "^{commit}");
 
 			// lock the index
 			DirCache index = DirCache.lock(repo);
@@ -149,24 +134,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				commit.setCommitter(committer);
 				commit.setAuthor(author);
 				commit.setMessage(message);
-
-				if (parents != null && parents.size() > 0)
-					commit.setParentIds(parents.toArray(new ObjectId[]{}));
+				if (parentID != null)
+					commit.setParentIds(new ObjectId[] { parentID });
 				commit.setTreeId(indexTreeId);
 				ObjectId commitId = repoWriter.writeCommit(commit);
-
-				if (state == RepositoryState.MERGING_RESOLVED) {
-					// Commit was succesfull. Now delete the files
-					// used for merge commits
-					File mergeHeadsFile = new File(repo.getDirectory(),
-							Constants.MERGE_HEAD);
-					if (mergeHeadsFile.exists())
-						mergeHeadsFile.delete();
-					File mergeMsgFile = new File(repo.getDirectory(),
-							Constants.MERGE_MSG);
-					if (mergeMsgFile.exists())
-						mergeMsgFile.delete();
-				}
 
 				RevCommit revCommit = new RevWalk(repo).parseCommit(commitId);
 				RefUpdate ru = repo.updateRef(Constants.HEAD);
@@ -174,7 +145,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				ru.setRefLogMessage("commit : " + revCommit.getShortMessage(),
 						false);
 
-				ru.setExpectedOldObjectId(headId);
+				ru.setExpectedOldObjectId(parentID);
 				Result rc = ru.update();
 				switch (rc) {
 				case NEW:
@@ -184,15 +155,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				case REJECTED:
 				case LOCK_FAILURE:
 					throw new ConcurrentRefUpdateException(
-							"Could lock HEAD during commit", ru.getRef(), rc);
+							JGitText.get().couldNotLockHEAD, ru.getRef(), rc);
 				default:
-					throw new JGitInternalException(
-							"Updating the ref "
-									+ Constants.HEAD
-									+ " to "
-									+ commitId.toString()
-									+ " failed. ReturnCode from RefUpdate.update() was "
-									+ rc);
+					throw new JGitInternalException(MessageFormat.format(
+							JGitText.get().updatingRefFailed
+							, Constants.HEAD, commitId.toString(), rc));
 				}
 			} finally {
 				index.unlock();
@@ -204,7 +171,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			throw e;
 		} catch (IOException e) {
 			throw new JGitInternalException(
-					"Exception caught during execution of commit command", e);
+					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
 		}
 	}
 
@@ -212,43 +179,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * Sets default values for not explicitly specified options. Then validates
 	 * that all required data has been provided.
 	 *
-	 * @param state
-	 *            the state of the repository we are working on
-	 *
 	 * @throws NoMessageException
 	 *             if the commit message has not been specified
 	 */
-	private void processOptions(RepositoryState state)
-			throws NoMessageException {
+	private void processOptions() throws NoMessageException {
+		if (message == null)
+			// as long as we don't suppport -C option we have to have
+			// an explicit message
+			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
 		if (committer == null)
 			committer = new PersonIdent(repo);
 		if (author == null)
 			author = committer;
-
-		// when doing a merge commit parse MERGE_HEAD and MERGE_MSG files
-		if (state == RepositoryState.MERGING_RESOLVED) {
-			try {
-				parents = repo.readMergeHeads();
-			} catch (IOException e) {
-				throw new JGitInternalException(
-						"Exceptions occured during reading of $GIT_DIR/"
-								+ Constants.MERGE_HEAD, e);
-			}
-			if (message == null) {
-				try {
-					message = repo.readMergeCommitMsg();
-				} catch (IOException e) {
-					throw new JGitInternalException(
-							"Exceptions occured during reading of $GIT_DIR/"
-									+ Constants.MERGE_MSG, e);
-				}
-			}
-		}
-		if (message == null) {
-			// as long as we don't suppport -C option we have to have
-			// an explicit message or one in MERGE_MSG
-			throw new NoMessageException("commit message not specified");
-		}
 	}
 
 	/**
