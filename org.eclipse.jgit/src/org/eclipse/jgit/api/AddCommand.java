@@ -43,6 +43,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
@@ -58,6 +59,7 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -183,10 +185,20 @@ public class AddCommand extends GitCommand<DirCache> {
 									} finally {
 										in.close();
 									}
-								} else
-									entry.setObjectId(f.getEntryObjectId());
-								builder.add(entry);
-								lastAddedFile = path;
+									builder.add(entry);
+									lastAddedFile = path;
+								} else {
+									Repository subRepo = Git.open(
+											new File(repo.getWorkTree(), path))
+											.getRepository();
+									ObjectId subRepoHead = subRepo
+											.resolve(Constants.HEAD);
+									if (subRepoHead != null) {
+										entry.setObjectId(subRepoHead);
+										builder.add(entry);
+										lastAddedFile = path;
+									}
+								}
 							} else {
 								builder.add(c.getDirCacheEntry());
 							}
