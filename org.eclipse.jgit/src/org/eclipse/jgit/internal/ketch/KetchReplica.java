@@ -348,12 +348,14 @@ public abstract class KetchReplica {
 		return new ReceiveCommand(c.getOldId(), c.getNewId(), c.getRefName());
 	}
 
-	void pushCommitAsync(ObjectId committed, boolean leaderIsIdle) {
-		if (leaderIsIdle || commitSpeed == FAST) {
-			List<ReceiveCommand> cmds = new ArrayList<>();
-			prepareTxnCommitted(cmds, committed);
-			pushAsync(new ReplicaPushRequest(this, cmds));
-		}
+	boolean shouldPushUnbatchedCommit(LogIndex committed, boolean leaderIdle) {
+		return (leaderIdle || commitSpeed == FAST) && hasAccepted(committed);
+	}
+
+	void pushCommitAsync(LogIndex committed) {
+		List<ReceiveCommand> cmds = new ArrayList<>();
+		prepareTxnCommitted(cmds, committed);
+		pushAsync(new ReplicaPushRequest(this, cmds));
 	}
 
 	private void prepareTxnCommitted(List<ReceiveCommand> cmds,
@@ -410,10 +412,10 @@ public abstract class KetchReplica {
 	 * Must be invoked with {@link KetchLeader#lock} held by caller.
 	 */
 	private void runNextPushRequest() {
-		LogIndex committedIndex = leader.getCommitted();
-		if (equals(txnAccepted, committedIndex)
-				&& !equals(txnCommitted, committedIndex)) {
-			pushCommitAsync(committedIndex, leader.isIdle());
+		LogIndex committed = leader.getCommitted();
+		if (!equals(txnCommitted, committed)
+				&& shouldPushUnbatchedCommit(committed, leader.isIdle())) {
+			pushCommitAsync(committed);
 		}
 
 		if (queued.isEmpty() || !running.isEmpty() || waitingForRetry()) {
@@ -547,6 +549,20 @@ public abstract class KetchReplica {
 	 */
 	protected abstract void startPush(ReplicaPushRequest req);
 
+	/**
+	 * Callback from {@link ReplicaPushRequest} upon success or failure.
+	 * <p>
+	 * Acquires the {@link KetchLeader#lock} and updates the leader's internal
+	 * knowledge about this replica to reflect what has been learned during a
+	 * push to the replica. In some cases of divergence this method may take
+	 * some time to determine how the replica has diverged; to reduce contention
+	 * this is evaluated before acquiring the leader lock.
+	 *
+	 * @param repo
+	 *            local repository instance used by the push thread.
+	 * @param req
+	 *            push request just attempted.
+	 */
 	void afterPush(@Nullable Repository repo, ReplicaPushRequest req) {
 		ReceiveCommand acceptCmd = null;
 		ReceiveCommand commitCmd = null;

@@ -84,7 +84,7 @@ public class StageBuilder {
 	 * proposal completes the temporary commit is discarded and can be garbage
 	 * collected by all replicas.
 	 */
-	private static final int TEMP_PARENTS = 128;
+	private static final int TEMP_PARENT_BATCH_SIZE = 128;
 
 	private static final byte[] PEEL = { ' ', '^' };
 
@@ -207,7 +207,7 @@ public class StageBuilder {
 		// TODO(sop) Cluster by restricted graphs to support filtering.
 		ObjectId tip = null;
 		for (int end = commits.size(); end > 0;) {
-			int start = Math.max(0, end - TEMP_PARENTS);
+			int start = Math.max(0, end - TEMP_PARENT_BATCH_SIZE);
 			List<RevCommit> batch = commits.subList(start, end);
 			List<ObjectId> parents = new ArrayList<>(1 + batch.size());
 			if (tip != null) {

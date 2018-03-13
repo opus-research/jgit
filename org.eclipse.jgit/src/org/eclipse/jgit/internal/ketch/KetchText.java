@@ -55,7 +55,7 @@ public class KetchText extends TranslationBundle {
 
 	// @formatter:off
 	/***/ public String cannotFetchFromLocalReplica;
-	/***/ public String leaderFailedStore;
+	/***/ public String leaderFailedToStore;
 	/***/ public String localReplicaRequired;
 	/***/ public String mismatchedTxnNamespace;
 	/***/ public String outsideTxnNamespace;
