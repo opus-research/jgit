@@ -56,12 +56,11 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
-import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
 /**
- * Support for the pack bitmpa index v1 format, which contains experimental
+ * Support for the pack bitmap index v1 format, which contains experimental
  * support for bitmaps.
  *
  * @see PackBitmapIndex

@@ -44,8 +44,8 @@
 package org.eclipse.jgit.storage.file;
 
 import static org.junit.Assert.*;
+
 import javaewah.EWAHCompressedBitmap;
-import javaewah.IntIterator;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;

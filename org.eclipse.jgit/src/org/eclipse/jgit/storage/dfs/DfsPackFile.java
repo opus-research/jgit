@@ -60,8 +60,6 @@ import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import javaewah.EWAHCompressedBitmap;
-
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -286,10 +284,6 @@ public final class DfsPackFile {
 				return idx;
 		}
 
-		PackIndex packIndex = idx(ctx);
-		if (packIndex.hasBitmapIndex())
-			return packIndex.getBitmapIndex(getReverseIdx(ctx));
-
 		if (!packDesc.hasFileExt(PackExt.BITMAP_INDEX))
 			return null;
 
@@ -315,7 +309,7 @@ public final class DfsPackFile {
 						bs = wantSize;
 					in = new BufferedInputStream(in, bs);
 					idx = PackBitmapIndex.read(
-							in, packIndex, getReverseIdx(ctx));
+							in, idx(ctx), getReverseIdx(ctx));
 				} finally {
 					size = rc.position();
 					rc.close();
