@@ -469,9 +469,8 @@ public class FileUtilTest {
 				actual = FileUtils.relativize(base, other);
 				assertEquals(expectedWindows, actual);
 			} finally {
-				if (oldOSName != null) {
+				if (oldOSName != null)
 					System.setProperty("os.name", oldOSName);
-				}
 			}
 		} else {
 			String actual = FileUtils.relativize(base, other);

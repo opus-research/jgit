@@ -139,12 +139,18 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		return proc;
 	}
 
+	/**
+	 * @since 3.7
+	 */
 	@Override
 	public String relativize(String base, String other) {
 		final String relativized = super.relativize(base, other);
 		return relativized.replace(File.separatorChar, '/');
 	}
 
+	/**
+	 * @since 3.7
+	 */
 	@Override
 	public ProcessResult runIfPresent(Repository repository, Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
