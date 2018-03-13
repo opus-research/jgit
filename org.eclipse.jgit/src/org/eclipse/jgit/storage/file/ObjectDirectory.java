@@ -346,13 +346,17 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// The pack and index are assumed to exist. The existence of other
 		// extensions needs to be explicitly checked.
 		//
-		int extensions = PACK.getBit() | INDEX.getBit();
+		final List<PackExt> extensions = new ArrayList<PackExt>(
+				PackExt.values().length);
+		extensions.add(PACK);
+		extensions.add(INDEX);
+
 		final String base = p.substring(0, p.length() - 4);
 		for (PackExt ext : PackExt.values()) {
-			if ((extensions & ext.getBit()) == 0) {
+			if (ext != PACK && ext != INDEX) {
 				final String name = base + ext.getExtension();
 				if (new File(pack.getParentFile(), name).exists())
-					extensions |= ext.getBit();
+					extensions.add(ext);
 			}
 		}
 
@@ -739,13 +743,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 				continue;
 
 			final String base = indexName.substring(0, indexName.length() - 3);
-			int extensions = 0;
+			final List<PackExt> extensions = new ArrayList<PackExt>(
+					PackExt.values().length);
 			for (PackExt ext : PackExt.values()) {
-				if (names.contains(base + ext.getExtension()))
-					extensions |= ext.getBit();
+				final String name = base + ext.getExtension();
+				if (names.contains(name))
+					extensions.add(ext);
 			}
 
-			if ((extensions & PACK.getBit()) == 0) {
+			if (!extensions.contains(PACK)) {
 				// Sometimes C Git's HTTP fetch transport leaves a
 				// .idx file behind and does not download the .pack.
 				// We have to skip over such useless indexes.

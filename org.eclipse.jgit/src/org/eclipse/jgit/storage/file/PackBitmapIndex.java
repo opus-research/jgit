@@ -69,8 +69,6 @@ import org.eclipse.jgit.lib.ObjectId;
  * compatible with the encoded bitmaps available from the index.
  */
 public abstract class PackBitmapIndex {
-	public static final int FLAG_REUSE = 1;
-
 	/**
 	 * Read an existing pack bitmap index file from a buffered stream.
 	 * <p>
@@ -140,7 +138,7 @@ public abstract class PackBitmapIndex {
 	}
 
 	/** Footer checksum applied on the bottom of the pack file. */
-	byte[] packChecksum;
+	protected byte[] packChecksum;
 
 	/**
 	 * Finds the position in the bitmap of the object.

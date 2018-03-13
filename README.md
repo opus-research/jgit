@@ -118,6 +118,8 @@ There are some missing features:
 
 - gitattributes support
 
+- Recursive merge strategy
+
 
 Support
 -------

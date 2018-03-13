@@ -44,6 +44,7 @@
 package org.eclipse.jgit.storage.dfs;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -79,7 +80,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private PackWriter.Statistics stats;
 
-	private int extensions;
+	private final Set<PackExt> extensions;
 
 	private int indexVersion;
 
@@ -103,6 +104,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
 		this.sizeMap = new HashMap<PackExt, Long>(PackExt.values().length * 2);
+		this.extensions = new HashSet<PackExt>(PackExt.values().length * 2);
 	}
 
 	/** @return description of the repository. */
@@ -117,7 +119,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *            the file extension
 	 */
 	public void addFileExt(PackExt ext) {
-		extensions |= ext.getBit();
+		extensions.add(ext);
 	}
 
 	/**
@@ -126,7 +128,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return whether the pack file extensions is known to exist.
 	 */
 	public boolean hasFileExt(PackExt ext) {
-		return (extensions & ext.getBit()) != 0;
+		return extensions.contains(ext);
 	}
 
 	/**
