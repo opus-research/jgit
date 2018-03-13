@@ -6,16 +6,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.GraftsDatabase;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.util.RefList;
@@ -36,16 +31,6 @@ public class InMemoryRepository extends DfsRepository {
 	private final DfsObjDatabase objdb;
 
 	private final DfsRefDatabase refdb;
-
-	private final GraftsDatabase graftsDatabase = new GraftsDatabase() {
-
-		Map<AnyObjectId, List<ObjectId>> grafts = new HashMap<AnyObjectId, List<ObjectId>>();
-
-		public Map<AnyObjectId, List<ObjectId>> getGrafts()
-				throws IOException {
-			return grafts;
-		}
-	};
 
 	/**
 	 * Initialize a new in-memory repository.
@@ -300,10 +285,5 @@ public class InMemoryRepository extends DfsRepository {
 				return a.getObjectId().equals(b.getObjectId());
 			return false;
 		}
-	}
-
-	@Override
-	public GraftsDatabase getGraftsDatabase() {
-		return graftsDatabase;
 	}
 }
