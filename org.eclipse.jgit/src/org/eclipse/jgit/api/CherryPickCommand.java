@@ -122,13 +122,10 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				RevCommit srcCommit = revWalk.parseCommit(srcObjectId);
 
 				// get the parent of the commit to cherry-pick
-				if (srcCommit.getParentCount() != 1)
+				if (srcCommit.getParentCount() != 1) {
 					throw new MultipleParentsNotAllowedException(
-							MessageFormat.format(
-									JGitText.get().canOnlyCherryPickCommitsWithOneParent,
-									srcCommit.name(),
-									Integer.valueOf(srcCommit.getParentCount())));
-
+							JGitText.get().canOnlyCherryPickCommitsWithOneParent);
+				}
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
 
@@ -136,6 +133,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
+
 				if (merger.merge(headCommit, srcCommit)) {
 					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
@@ -147,9 +145,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
-							.setReflogComment(
-									"cherry-pick: "
-											+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {

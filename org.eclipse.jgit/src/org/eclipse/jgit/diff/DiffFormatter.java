@@ -275,15 +275,6 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Get the prefix applied in front of old file paths.
-	 *
-	 * @return the prefix
-	 */
-	public String getOldPrefix() {
-		return this.oldPrefix;
-	}
-
-	/**
 	 * Set the prefix applied in front of new file paths.
 	 *
 	 * @param prefix
@@ -294,15 +285,6 @@ public class DiffFormatter {
 	 */
 	public void setNewPrefix(String prefix) {
 		newPrefix = prefix;
-	}
-
-	/**
-	 * Get the prefix applied in front of new file paths.
-	 *
-	 * @return the prefix
-	 */
-	public String getNewPrefix() {
-		return this.newPrefix;
 	}
 
 	/** @return true if rename detection is enabled. */
@@ -599,9 +581,7 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Format a patch script from a list of difference entries. Requires
-	 * {@link #scan(AbstractTreeIterator, AbstractTreeIterator)} to have been
-	 * called first.
+	 * Format a patch script from a list of difference entries.
 	 *
 	 * @param entries
 	 *            entries describing the affected files.
@@ -1108,9 +1088,6 @@ public class DiffFormatter {
 
 	private void formatOldNewPaths(ByteArrayOutputStream o, DiffEntry ent)
 			throws IOException {
-		if (ent.oldId.equals(ent.newId))
-			return;
-
 		final String oldp;
 		final String newp;
 

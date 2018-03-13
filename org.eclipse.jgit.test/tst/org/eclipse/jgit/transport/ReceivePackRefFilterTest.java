@@ -74,7 +74,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.ObjectDirectory;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.util.NB;
@@ -83,7 +82,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCase {
+public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 	private static final NullProgressMonitor PM = NullProgressMonitor.INSTANCE;
 
 	private static final String R_MASTER = Constants.R_HEADS + Constants.MASTER;
@@ -151,7 +150,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 				dst.incrementOpen();
 
 				final ReceivePack rp = super.createReceivePack(dst);
-				rp.setAdvertiseRefsHook(new HidePrivateHook());
+				rp.setRefFilter(new HidePrivateFilter());
 				return rp;
 			}
 		};
@@ -216,7 +215,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 				final ReceivePack rp = super.createReceivePack(dst);
 				rp.setCheckReceivedObjects(true);
 				rp.setCheckReferencedObjectsAreReachable(true);
-				rp.setAdvertiseRefsHook(new HidePrivateHook());
+				rp.setRefFilter(new HidePrivateFilter());
 				return rp;
 			}
 		};
@@ -260,7 +259,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		final ReceivePack rp = new ReceivePack(dst);
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
-		rp.setAdvertiseRefsHook(new HidePrivateHook());
+		rp.setRefFilter(new HidePrivateFilter());
 		try {
 			receive(rp, inBuf, outBuf);
 			fail("Expected UnpackException");
@@ -318,7 +317,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		final ReceivePack rp = new ReceivePack(dst);
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
-		rp.setAdvertiseRefsHook(new HidePrivateHook());
+		rp.setRefFilter(new HidePrivateFilter());
 		try {
 			receive(rp, inBuf, outBuf);
 			fail("Expected UnpackException");
@@ -368,7 +367,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		final ReceivePack rp = new ReceivePack(dst);
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
-		rp.setAdvertiseRefsHook(new HidePrivateHook());
+		rp.setRefFilter(new HidePrivateFilter());
 		try {
 			receive(rp, inBuf, outBuf);
 			fail("Expected UnpackException");
@@ -419,7 +418,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		final ReceivePack rp = new ReceivePack(dst);
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
-		rp.setAdvertiseRefsHook(new HidePrivateHook());
+		rp.setRefFilter(new HidePrivateFilter());
 		try {
 			receive(rp, inBuf, outBuf);
 			fail("Expected UnpackException");
@@ -467,7 +466,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		final ReceivePack rp = new ReceivePack(dst);
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
-		rp.setAdvertiseRefsHook(new HidePrivateHook());
+		rp.setRefFilter(new HidePrivateFilter());
 		try {
 			receive(rp, inBuf, outBuf);
 			fail("Expected UnpackException");
@@ -561,11 +560,11 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		return new PacketLineIn(new ByteArrayInputStream(buf.toByteArray()));
 	}
 
-	private static final class HidePrivateHook extends AbstractAdvertiseRefsHook {
-		public Map<String, Ref> getAdvertisedRefs(Repository r, RevWalk revWalk) {
-			Map<String, Ref> refs = new HashMap<String, Ref>(r.getAllRefs());
-			assertNotNull(refs.remove(R_PRIVATE));
-			return refs;
+	private static final class HidePrivateFilter implements RefFilter {
+		public Map<String, Ref> filter(Map<String, Ref> refs) {
+			Map<String, Ref> r = new HashMap<String, Ref>(refs);
+			assertNotNull(r.remove(R_PRIVATE));
+			return r;
 		}
 	}
 

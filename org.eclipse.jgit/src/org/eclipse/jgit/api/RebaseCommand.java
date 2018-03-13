@@ -62,7 +62,6 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseResult.Status;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -555,10 +554,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		for (RevCommit commit : commitsToUse) {
 			if (commit.getParentCount() != 1)
 				throw new JGitInternalException(
-						MessageFormat.format(
-								JGitText.get().canOnlyCherryPickCommitsWithOneParent,
-								commit.name(),
-								Integer.valueOf(commit.getParentCount())));
+						JGitText.get().canOnlyCherryPickCommitsWithOneParent);
 			cherryPickList.add(commit);
 		}
 
@@ -676,8 +672,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} catch (RefNotFoundException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		} catch (InvalidRefNameException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (CheckoutConflictException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 	}

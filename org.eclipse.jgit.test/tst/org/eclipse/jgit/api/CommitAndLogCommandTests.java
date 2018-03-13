@@ -67,7 +67,6 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.junit.Test;
@@ -109,8 +108,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		}
 		assertEquals(l, -1);
 		ReflogReader reader = db.getReflogReader(Constants.HEAD);
-		assertTrue(reader.getLastEntry().getComment().startsWith("commit:"));
-		reader = db.getReflogReader(db.getBranch());
 		assertTrue(reader.getLastEntry().getComment().startsWith("commit:"));
 	}
 
@@ -268,36 +265,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testModeChange() throws IOException, NoFilepatternException,
-			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException {
-		Git git = new Git(db);
-
-		// create file
-		File file = new File(db.getWorkTree(), "a.txt");
-		FileUtils.createNewFile(file);
-		PrintWriter writer = new PrintWriter(file);
-		writer.print("content1");
-		writer.close();
-
-		// First commit - a.txt file
-		git.add().addFilepattern("a.txt").call();
-		git.commit().setMessage("commit1").setCommitter(committer).call();
-
-		// pure mode change should be committable
-		FS fs = db.getFS();
-		fs.setExecute(file, true);
-		git.add().addFilepattern("a.txt").call();
-		git.commit().setMessage("mode change").setCommitter(committer).call();
-
-		// pure mode change should be committable with -o option
-		fs.setExecute(file, false);
-		git.add().addFilepattern("a.txt").call();
-		git.commit().setMessage("mode change").setCommitter(committer)
-				.setOnly("a.txt").call();
-	}
-
-	@Test
 	public void testCommitRange() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
@@ -349,9 +316,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		}
 		assertEquals(1, c);
 		ReflogReader reader = db.getReflogReader(Constants.HEAD);
-		assertTrue(reader.getLastEntry().getComment()
-				.startsWith("commit (amend):"));
-		reader = db.getReflogReader(db.getBranch());
 		assertTrue(reader.getLastEntry().getComment()
 				.startsWith("commit (amend):"));
 	}
