@@ -90,8 +90,8 @@ import org.eclipse.jgit.util.FileUtils;
  */
 public class ResolveMerger extends ThreeWayMerger {
 	/**
-	 * If the merge fails (means: not stopped because of unresolved conflicts)
-	 * this enum is used to explain why it failed
+	 * If the merge fails abnormally (means: not because of unresolved
+	 * conflicts) this enum is used to explain why it failed
 	 */
 	public enum MergeFailureReason {
 		/** the merge failed because of a dirty index */
@@ -393,10 +393,6 @@ public class ResolveMerger extends ThreeWayMerger {
 		if (modeB == modeO && tw.idEqual(T_BASE, T_OURS)) {
 			// OURS was not changed compared to BASE. All changes must be in
 			// THEIRS. THEIRS is chosen.
-
-			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty())
-				return false;
 			if (nonTree(modeT)) {
 				DirCacheEntry e = add(tw.getRawPath(), theirs,
 						DirCacheEntry.STAGE_0);
@@ -629,23 +625,12 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	/**
-	 * @return lists paths causing this merge to fail (not stopped because of a
-	 *         conflict). <code>null</code> is returned if this merge didn't
-	 *         fail.
+	 * @return lists paths causing this merge to fail abnormally (not because of
+	 *         a conflict). <code>null</code> is returned if this merge didn't
+	 *         fail abnormally.
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return (failingPaths.size() == 0) ? null : failingPaths;
-	}
-
-	/**
-	 * Returns whether this merge failed (i.e. not stopped because of a
-	 * conflict)
-	 *
-	 * @return <code>true</code> if a failure occurred, <code>false</code>
-	 *         otherwise
-	 */
-	public boolean failed() {
-		return failingPaths.size() > 0;
 	}
 
 	/**
