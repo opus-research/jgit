@@ -171,11 +171,6 @@ public final class DfsPackFile {
 		return packDesc;
 	}
 
-	/** @return bytes cached in memory for this pack, excluding the index. */
-	public long getCachedSize() {
-		return key.cachedSize.get();
-	}
-
 	private String getPackName() {
 		return packDesc.getPackName();
 	}
