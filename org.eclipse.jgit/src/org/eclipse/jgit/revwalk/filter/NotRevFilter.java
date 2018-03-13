@@ -82,11 +82,6 @@ public class NotRevFilter extends RevFilter {
 	}
 
 	@Override
-	public boolean requiresCommitBody() {
-		return a.requiresCommitBody();
-	}
-
-	@Override
 	public RevFilter clone() {
 		return new NotRevFilter(a.clone());
 	}

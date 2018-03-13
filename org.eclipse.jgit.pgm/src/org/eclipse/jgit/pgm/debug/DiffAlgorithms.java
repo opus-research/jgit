@@ -135,7 +135,7 @@ class DiffAlgorithms extends TextBuiltin {
 
 		if (gitDirs.isEmpty()) {
 			RepositoryBuilder rb = new RepositoryBuilder() //
-					.setGitDir(new File(gitdir)) //
+					.setGitDir(gitdir) //
 					.readEnvironment() //
 					.findGitDir();
 			if (rb.getGitDir() == null)

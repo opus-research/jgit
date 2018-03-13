@@ -53,7 +53,6 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -70,7 +69,7 @@ import org.eclipse.jgit.transport.URIish;
 
 /**
  * Clone a repository into a new working directory
- *
+ * 
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
  *      >Git documentation about Clone</a>
  */
@@ -137,12 +136,6 @@ public class CloneCommand implements Callable<Git> {
 
 		config.addFetchRefSpec(refSpec);
 		config.update(repo.getConfig());
-
-		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branch, ConfigConstants.CONFIG_REMOTE_SECTION, remote);
-		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branch, ConfigConstants.CONFIG_KEY_MERGE, branch); //$NON-NLS-1$ //$NON-NLS-2$
-
 		repo.getConfig().save();
 
 		// run the fetch command
