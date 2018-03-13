@@ -52,7 +52,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 
 /**
- * Create an empty git repository or reinitalize an existing one
+ * Create an empty git repository
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
  *      >Git documentation about init</a>
@@ -89,8 +89,7 @@ public class InitCommand implements Callable<Git> {
 				builder.setGitDir(d);
 			}
 			Repository repository = builder.build();
-			if (!repository.getObjectDatabase().exists())
-				repository.create(bare);
+			repository.create(bare);
 			return new Git(repository);
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
