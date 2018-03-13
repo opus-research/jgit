@@ -45,9 +45,12 @@
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
+import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
+import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
+import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 import static org.eclipse.jgit.util.HttpSupport.METHOD_POST;
 
 import java.io.BufferedReader;
@@ -112,11 +115,24 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack";
 
+	private static final String userAgent = computeUserAgent();
+
 	static boolean canHandle(final URIish uri) {
 		if (!uri.isRemote())
 			return false;
 		final String s = uri.getScheme();
 		return "http".equals(s) || "https".equals(s) || "ftp".equals(s);
+	}
+
+	private static String computeUserAgent() {
+		String version;
+		final Package pkg = TransportHttp.class.getPackage();
+		if (pkg != null && pkg.getImplementationVersion() != null) {
+			version = pkg.getImplementationVersion();
+		} else {
+			version = "unknown"; //$NON-NLS-1$
+		}
+		return "JGit/" + version; //$NON-NLS-1$
 	}
 
 	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
@@ -323,6 +339,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		try {
 			final HttpURLConnection conn = httpOpen(u);
+			if (useSmartHttp) {
+				String expType = "application/x-" + service + "-advertisement";
+				conn.setRequestProperty(HDR_ACCEPT, expType + ", */*");
+			} else {
+				conn.setRequestProperty(HDR_ACCEPT, "*/*");
+			}
 			final int status = HttpSupport.response(conn);
 			switch (status) {
 			case HttpURLConnection.HTTP_OK:
@@ -351,6 +373,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
+		conn.setRequestProperty(HDR_PRAGMA, "no-cache");//$NON-NLS-1$
+		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
 		return conn;
 	}
 
@@ -639,6 +663,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
 			conn.setRequestProperty(HDR_CONTENT_TYPE, requestType);
+			conn.setRequestProperty(HDR_ACCEPT, responseType);
 		}
 
 		void execute() throws IOException {
@@ -664,7 +689,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 						buf = out;
 				} catch (IOException err) {
 					// Most likely caused by overflowing the buffer, meaning
-					// its larger if it were compressed.  Don't compress.
+					// its larger if it were compressed. Don't compress.
 					buf = out;
 				}
 
