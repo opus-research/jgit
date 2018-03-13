@@ -76,6 +76,6 @@ class ReceivePack extends TextBuiltin {
 		}
 
 		rp = new org.eclipse.jgit.transport.ReceivePack(db);
-		rp.receive(ins, outs, err);
+		rp.receive(System.in, outs, System.err);
 	}
 }
