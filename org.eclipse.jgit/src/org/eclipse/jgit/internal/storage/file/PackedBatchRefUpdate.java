@@ -349,14 +349,10 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 	}
 
 	private void writeReflog(List<ReceiveCommand> commands) {
-		if (isRefLogDisabled()) {
+		if (getRefLogMessage() == null && !isRefLogIncludingResult()) {
 			return;
 		}
 
-		PersonIdent ident = getRefLogIdent();
-		if (ident == null) {
-			ident = new PersonIdent(refdb.getRepository());
-		}
 		ReflogWriter w = refdb.getLogWriter();
 		for (ReceiveCommand cmd : commands) {
 			// Assume any pending commands have already been executed atomically.
@@ -381,6 +377,10 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 					msg = msg.isEmpty()
 							? strResult : msg + ": " + strResult; //$NON-NLS-1$
 				}
+			}
+			PersonIdent ident = getRefLogIdent();
+			if (ident == null) {
+				ident = new PersonIdent(refdb.getRepository());
 			}
 			try {
 				w.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
@@ -407,13 +407,6 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		case CREATE:
 			return ReflogEntry.PREFIX_CREATED;
 		case UPDATE:
-			// Match the behavior of a single RefUpdate. In that case, setting the
-			// force bit completely bypasses the potentially expensive isMergedInto
-			// check, by design, so the reflog message may be inaccurate.
-			//
-			// Similarly, this class bypasses the isMergedInto checks when the force
-			// bit is set, meaning we can't actually distinguish between UPDATE and
-			// UPDATE_NONFASTFORWARD when isAllowNonFastForwards() returns true.
 			return isAllowNonFastForwards()
 					? ReflogEntry.PREFIX_FORCED_UPDATE : ReflogEntry.PREFIX_FAST_FORWARD;
 		case UPDATE_NONFASTFORWARD:
