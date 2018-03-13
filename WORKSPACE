@@ -34,6 +34,12 @@ maven_jar(
 )
 
 maven_jar(
+    name = "commons_codec",
+    artifact = "commons-codec:commons-codec:1.4",
+    sha1 = "4216af16d38465bbab0f3dff8efa14204f7a399a",
+)
+
+maven_jar(
     name = "commons_logging",
     artifact = "commons-logging:commons-logging:1.1.3",
     sha1 = "f6f66e966c70a83ffbdb6f17a0919eaf7c8aca7f",
@@ -97,4 +103,48 @@ maven_jar(
     name = "gson",
     artifact = "com.google.code.gson:gson:2.2.4",
     sha1 = "a60a5e993c98c864010053cb901b7eab25306568",
+)
+
+JETTY_VER = "9.3.17.v20170317"
+
+maven_jar(
+    name = "jetty_servlet",
+    artifact = "org.eclipse.jetty:jetty-servlet:" + JETTY_VER,
+    sha1 = "ed6986b0d0ca7b9b0f9015c9efb80442e3043a8e",
+    src_sha1 = "ee6b4784a00a92e5c1b6111033b7ae41ac6052a3",
+)
+
+maven_jar(
+    name = "jetty_security",
+    artifact = "org.eclipse.jetty:jetty-security:" + JETTY_VER,
+    sha1 = "ca52535569445682d42aaa97c7039442719a0507",
+    src_sha1 = "2ff9f4fb18b320fd5a0272a427bacc4d5fe7bc86",
+)
+
+maven_jar(
+    name = "jetty_server",
+    artifact = "org.eclipse.jetty:jetty-server:" + JETTY_VER,
+    sha1 = "194e9a02e6ba249ef4a3f4bd56b4993087992299",
+    src_sha1 = "0c9bd572f530c411592aefb71781ecca0b3719a9",
+)
+
+maven_jar(
+    name = "jetty_http",
+    artifact = "org.eclipse.jetty:jetty-http:" + JETTY_VER,
+    sha1 = "6c02d728e15d4868486254039c867a1ac3e4a52e",
+    src_sha1 = "3c0a2a82792f268631b4fefd77be9f126ec974b1",
+)
+
+maven_jar(
+    name = "jetty_io",
+    artifact = "org.eclipse.jetty:jetty-io:" + JETTY_VER,
+    sha1 = "756a8cd2a1cbfb84a94973b6332dd3eccd47c0cd",
+    src_sha1 = "a9afa99cccb19b441364fa805d027f457cbbb136",
+)
+
+maven_jar(
+    name = "jetty_util",
+    artifact = "org.eclipse.jetty:jetty-util:" + JETTY_VER,
+    sha1 = "b8512ab02819de01f0f5a5c6026163041f579beb",
+    src_sha1 = "96f8e3dcdc3660a5c91f19c46695daa70ac95625",
 )

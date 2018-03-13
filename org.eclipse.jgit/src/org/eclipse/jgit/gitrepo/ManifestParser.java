@@ -78,7 +78,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
  */
 public class ManifestParser extends DefaultHandler {
 	private final String filename;
-	private final String baseUrl;
+	private final URI baseUrl;
 	private final String defaultBranch;
 	private final Repository rootRepo;
 	private final Map<String, Remote> remotes;
@@ -125,12 +125,7 @@ public class ManifestParser extends DefaultHandler {
 		this.filename = filename;
 		this.defaultBranch = defaultBranch;
 		this.rootRepo = rootRepo;
-
-		// Strip trailing /s to match repo behavior.
-		int lastIndex = baseUrl.length() - 1;
-		while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-			lastIndex--;
-		this.baseUrl = baseUrl.substring(0, lastIndex + 1);
+		this.baseUrl = normalizeEmptyPath(URI.create(baseUrl));
 
 		plusGroups = new HashSet<>();
 		minusGroups = new HashSet<>();
@@ -258,13 +253,7 @@ public class ManifestParser extends DefaultHandler {
 			return;
 
 		// Only do the following after we finished reading everything.
-		Map<String, String> remoteUrls = new HashMap<>();
-		URI baseUri;
-		try {
-			baseUri = new URI(baseUrl);
-		} catch (URISyntaxException e) {
-			throw new SAXException(e);
-		}
+		Map<String, URI> remoteUrls = new HashMap<>();
 		if (defaultRevision == null && defaultRemote != null) {
 			Remote remote = remotes.get(defaultRemote);
 			if (remote != null) {
@@ -294,21 +283,40 @@ public class ManifestParser extends DefaultHandler {
 					revision = r.revision;
 				}
 			}
-			String remoteUrl = remoteUrls.get(remote);
+			URI remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				remoteUrl =
-						baseUri.resolve(remotes.get(remote).fetch).toString();
-				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
-					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
+				String fetch = remotes.get(remote).fetch;
+				if (fetch == null) {
+					throw new SAXException(MessageFormat
+							.format(RepoText.get().errorNoFetch, remote));
+				}
+				remoteUrl = normalizeEmptyPath(baseUrl.resolve(fetch));
 				remoteUrls.put(remote, remoteUrl);
 			}
-			proj.setUrl(remoteUrl + proj.getName())
-					.setDefaultRevision(revision);
+			proj.setUrl(remoteUrl.resolve(proj.getName()).toString())
+				.setDefaultRevision(revision);
 		}
 
 		filteredProjects.addAll(projects);
 		removeNotInGroup();
 		removeOverlaps();
+	}
+
+	static URI normalizeEmptyPath(URI u) {
+		// URI.create("scheme://host").resolve("a/b") => "scheme://hosta/b"
+		// That seems like bug https://bugs.openjdk.java.net/browse/JDK-4666701.
+		// We workaround this by special casing the empty path case.
+		if (u.getHost() != null && !u.getHost().isEmpty() &&
+			(u.getPath() == null || u.getPath().isEmpty())) {
+			try {
+				return new URI(u.getScheme(),
+					u.getUserInfo(), u.getHost(), u.getPort(),
+						"/", u.getQuery(), u.getFragment()); //$NON-NLS-1$
+			} catch (URISyntaxException x) {
+				throw new IllegalArgumentException(x.getMessage(), x);
+			}
+		}
+		return u;
 	}
 
 	/**
