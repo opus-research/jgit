@@ -45,6 +45,7 @@
 
 package org.eclipse.jgit.pgm;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.MessageFormat;
@@ -80,7 +81,8 @@ class Show extends TextBuiltin {
 
 	private final DateFormat fmt;
 
-	private final DiffFormatter diffFmt;
+	private final DiffFormatter diffFmt = new DiffFormatter( //
+			new BufferedOutputStream(System.out));
 
 	@Argument(index = 0, metaVar = "metaVar_object")
 	private String objectName;
@@ -161,7 +163,6 @@ class Show extends TextBuiltin {
 
 	Show() {
 		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US); //$NON-NLS-1$
-		diffFmt = new DiffFormatter(outs);
 	}
 
 	@SuppressWarnings("boxing")
