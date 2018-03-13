@@ -125,7 +125,7 @@ abstract class UrlPipeline {
 					return null;
 				}
 
-				public Enumeration<String> getInitParameterNames() {
+				public Enumeration getInitParameterNames() {
 					return new Enumeration<String>() {
 						public boolean hasMoreElements() {
 							return false;
