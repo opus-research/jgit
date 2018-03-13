@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,34 +40,33 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.ignore.internal;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.internal.storage.reftable;
 
-import org.junit.Test;
+import java.io.IOException;
 
-public class StringsTest {
+import org.eclipse.jgit.lib.Ref;
 
-	private void testString(String string, int n, int m) {
-		assertEquals(string, n, Strings.count(string, '/', false));
-		assertEquals(string, m, Strings.count(string, '/', true));
+/** Iterator over references inside a {@link Reftable}. */
+public abstract class RefCursor implements AutoCloseable {
+	/**
+	 * Check if another reference is available.
+	 *
+	 * @return {@code true} if there is another result.
+	 * @throws IOException
+	 *             references cannot be read.
+	 */
+	public abstract boolean next() throws IOException;
+
+	/** @return reference at the current position. */
+	public abstract Ref getRef();
+
+	/** @return {@code true} if the current reference was deleted. */
+	public boolean wasDeleted() {
+		Ref r = getRef();
+		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
 	}
 
-	@Test
-	public void testCount() {
-		testString("", 0, 0);
-		testString("/", 1, 0);
-		testString("//", 2, 0);
-		testString("///", 3, 1);
-		testString("////", 4, 2);
-		testString("foo", 0, 0);
-		testString("/foo", 1, 0);
-		testString("foo/", 1, 0);
-		testString("/foo/", 2, 0);
-		testString("foo/bar", 1, 1);
-		testString("/foo/bar/", 3, 1);
-		testString("/foo/bar//", 4, 2);
-		testString("/foo//bar/", 4, 2);
-		testString(" /foo/ ", 2, 2);
-	}
+	@Override
+	public abstract void close();
 }

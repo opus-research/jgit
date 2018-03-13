@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,68 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.events;
+package org.eclipse.jgit.internal.storage.reftable;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+class ReftableConstants {
+	static final byte[] FILE_HEADER_MAGIC = { '\1', 'R', 'E', 'F' };
+	static final byte VERSION_1 = (byte) 1;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+	static final int FILE_HEADER_LEN = 8;
+	static final int FILE_FOOTER_LEN = 52;
 
-/**
- * A {@link WorkingTreeModifiedListener} that can be used in tests to check
- * expected events.
- */
-public class ChangeRecorder implements WorkingTreeModifiedListener {
+	static final byte FILE_BLOCK_TYPE = '\1';
+	static final byte REF_BLOCK_TYPE = 'r';
+	static final byte OBJ_BLOCK_TYPE = 'o';
+	static final byte LOG_BLOCK_TYPE = 'g';
+	static final byte INDEX_BLOCK_TYPE = (byte) 0x80;
 
-	public static final String[] EMPTY = new String[0];
+	static final int VALUE_NONE = 0x0;
+	static final int VALUE_1ID = 0x1;
+	static final int VALUE_2ID = 0x2;
+	static final int VALUE_SYMREF = 0x3;
+	static final int VALUE_LEN_SPECIFIED = 0x4;
+	static final int VALUE_TYPE_MASK = 0x7;
 
-	private Set<String> modified = new HashSet<>();
+	static final int MAX_RESTARTS = 65536;
 
-	private Set<String> deleted = new HashSet<>();
-
-	private int eventCount;
-
-	@Override
-	public void onWorkingTreeModified(WorkingTreeModifiedEvent event) {
-		eventCount++;
-		modified.removeAll(event.getDeleted());
-		deleted.removeAll(event.getModified());
-		modified.addAll(event.getModified());
-		deleted.addAll(event.getDeleted());
+	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
+		return (n - o) >= FILE_HEADER_MAGIC.length
+				&& buf[o + 0] == FILE_HEADER_MAGIC[0]
+				&& buf[o + 1] == FILE_HEADER_MAGIC[1]
+				&& buf[o + 2] == FILE_HEADER_MAGIC[2]
+				&& buf[o + 3] == FILE_HEADER_MAGIC[3];
 	}
 
-	private String[] getModified() {
-		return modified.toArray(new String[modified.size()]);
+	static long reverseTime(long time) {
+		return 0xffffffffffffffffL - time;
 	}
 
-	private String[] getDeleted() {
-		return deleted.toArray(new String[deleted.size()]);
-	}
-
-	private void reset() {
-		eventCount = 0;
-		modified.clear();
-		deleted.clear();
-	}
-
-	public void assertNoEvent() {
-		assertEquals("Unexpected WorkingTreeModifiedEvent ", 0, eventCount);
-	}
-
-	public void assertEvent(String[] expectedModified,
-			String[] expectedDeleted) {
-		String[] actuallyModified = getModified();
-		String[] actuallyDeleted = getDeleted();
-		Arrays.sort(actuallyModified);
-		Arrays.sort(expectedModified);
-		Arrays.sort(actuallyDeleted);
-		Arrays.sort(expectedDeleted);
-		assertArrayEquals("Unexpected modifications reported", expectedModified,
-				actuallyModified);
-		assertArrayEquals("Unexpected deletions reported", expectedDeleted,
-				actuallyDeleted);
-		reset();
+	private ReftableConstants() {
 	}
 }

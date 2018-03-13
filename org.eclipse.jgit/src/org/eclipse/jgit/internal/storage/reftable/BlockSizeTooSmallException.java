@@ -41,54 +41,22 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.internal.storage.reftable;
 
-import org.eclipse.jgit.annotations.Nullable;
+import java.io.IOException;
 
-/**
- * Exception thrown when encounters a corrupt pack index file.
- *
- * @since 4.9
- */
-public class CorruptPackIndexException extends Exception {
+/** Thrown if {@link ReftableWriter} cannot fit a reference. */
+public class BlockSizeTooSmallException extends IOException {
 	private static final long serialVersionUID = 1L;
 
-	/** The error type of a corrupt index file. */
-	public enum ErrorType {
-		/** Offset does not match index in pack file. */
-		MISMATCH_OFFSET,
-		/** CRC does not match CRC of the object data in pack file. */
-		MISMATCH_CRC,
-		/** CRC is not present in index file. */
-		MISSING_CRC,
-		/** Object in pack is not present in index file. */
-		MISSING_OBJ,
-		/** Object in index file is not present in pack file. */
-		UNKNOWN_OBJ,
+	private final int minBlockSize;
+
+	BlockSizeTooSmallException(int b) {
+		minBlockSize = b;
 	}
 
-	private ErrorType errorType;
-
-	/**
-	 * Report a specific error condition discovered in an index file.
-	 *
-	 * @param message
-	 *            the error message.
-	 * @param errorType
-	 *            the error type of corruption.
-	 */
-	public CorruptPackIndexException(String message, ErrorType errorType) {
-		super(message);
-		this.errorType = errorType;
-	}
-
-	/**
-	 * Specific the reason of the corrupt index file.
-	 *
-	 * @return error condition or null.
-	 */
-	@Nullable
-	public ErrorType getErrorType() {
-		return errorType;
+	/** @return minimum block size in bytes reftable requires to write a ref. */
+	public int getMinimumBlockSize() {
+		return minBlockSize;
 	}
 }
