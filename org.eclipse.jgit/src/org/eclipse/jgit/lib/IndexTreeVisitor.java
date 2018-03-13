@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,55 +45,63 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.File;
 import java.io.IOException;
 
+import org.eclipse.jgit.lib.GitIndex.Entry;
+
 /**
- * A tree entry representing a gitlink entry used for submodules.
+ * Visitor interface for traversing the index and two trees in parallel.
  *
- * Note. Java cannot really handle these as file system objects.
+ * When merging we deal with up to two tree nodes and a base node. Then
+ * we figure out what to do.
  *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
+ * A File argument is supplied to allow us to check for modifications in
+ * a work tree or update the file.
+ *
+ * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with
+ * a {@link org.eclipse.jgit.dircache.DirCacheIterator} as a member.
  */
 @Deprecated
-public class GitlinkTreeEntry extends TreeEntry {
-	private static final long serialVersionUID = 1L;
+public interface IndexTreeVisitor {
+	/**
+	 * Visit a blob, and corresponding tree and index entries.
+	 *
+	 * @param treeEntry
+	 * @param indexEntry
+	 * @param file
+	 * @throws IOException
+	 */
+	public void visitEntry(TreeEntry treeEntry, Entry indexEntry, File file) throws IOException;
 
 	/**
-	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
+	 * Visit a blob, and corresponding tree nodes and associated index entry.
 	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
+	 * @param treeEntry
+	 * @param auxEntry
+	 * @param indexEntry
+	 * @param file
+	 * @throws IOException
 	 */
-	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
-	}
+	public void visitEntry(TreeEntry treeEntry, TreeEntry auxEntry, Entry indexEntry, File file) throws IOException;
 
-	public FileMode getMode() {
-		return FileMode.GITLINK;
-	}
+	/**
+	 * Invoked after handling all child nodes of a tree, during a three way merge
+	 *
+	 * @param tree
+	 * @param auxTree
+	 * @param curDir
+	 * @throws IOException
+	 */
+	public void finishVisitTree(Tree tree, Tree auxTree, String curDir) throws IOException;
 
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitGitlink(this);
-	}
-
-	@Override
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(" G ");
-		r.append(getFullName());
-		return r.toString();
-	}
+	/**
+	 * Invoked after handling all child nodes of a tree, during two way merge.
+	 *
+	 * @param tree
+	 * @param i
+	 * @param curDir
+	 * @throws IOException
+	 */
+	public void finishVisitTree(Tree tree, int i, String curDir) throws IOException;
 }

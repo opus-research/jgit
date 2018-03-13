@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
+ * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,55 +45,38 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.File;
 import java.io.IOException;
 
+import org.eclipse.jgit.lib.GitIndex.Entry;
+
 /**
- * A tree entry representing a gitlink entry used for submodules.
+ * Implementation of IndexTreeVisitor that can be subclassed if you don't
+ * case about certain events
+ * @author dwatson
  *
- * Note. Java cannot really handle these as file system objects.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
+ * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with a
+ * {@link org.eclipse.jgit.dircache.DirCacheIterator} as one of the members.
  */
 @Deprecated
-public class GitlinkTreeEntry extends TreeEntry {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
-	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
-	 */
-	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
-	}
-
-	public FileMode getMode() {
-		return FileMode.GITLINK;
-	}
-
-	public void accept(final TreeVisitor tv, final int flags)
+public class AbstractIndexTreeVisitor implements IndexTreeVisitor {
+	public void finishVisitTree(Tree tree, Tree auxTree, String curDir)
 			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitGitlink(this);
+		// Empty
 	}
 
-	@Override
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(" G ");
-		r.append(getFullName());
-		return r.toString();
+	public void finishVisitTree(Tree tree, int i, String curDir)
+			throws IOException {
+		// Empty
+	}
+
+	public void visitEntry(TreeEntry treeEntry, Entry indexEntry, File file)
+			throws IOException {
+		// Empty
+	}
+
+	public void visitEntry(TreeEntry treeEntry, TreeEntry auxEntry,
+			Entry indexEntry, File file) throws IOException {
+		// Empty
 	}
 }

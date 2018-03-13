@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -47,78 +48,28 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 
 /**
- * A representation of a file (blob) object in a {@link Tree}.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
+ *	Visitor for marking all nodes of a tree as modified.
  */
-@Deprecated
-public class FileTreeEntry extends TreeEntry {
-	private FileMode mode;
-
-	/**
-	 * Constructor for a File (blob) object.
-	 *
-	 * @param parent
-	 *            The {@link Tree} holding this object (or null)
-	 * @param id
-	 *            the SHA-1 of the blob (or null for a yet unhashed file)
-	 * @param nameUTF8
-	 *            raw object name in the parent tree
-	 * @param execute
-	 *            true if the executable flag is set
-	 */
-	public FileTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8, final boolean execute) {
-		super(parent, id, nameUTF8);
-		setExecutable(execute);
+public class ForceModified implements TreeVisitor {
+	public void startVisitTree(final Tree t) throws IOException {
+		t.setModified();
 	}
 
-	public FileMode getMode() {
-		return mode;
+	public void endVisitTree(final Tree t) throws IOException {
+		// Nothing to do.
 	}
 
-	/**
-	 * @return true if this file is executable
-	 */
-	public boolean isExecutable() {
-		return getMode().equals(FileMode.EXECUTABLE_FILE);
+	public void visitFile(final FileTreeEntry f) throws IOException {
+		f.setModified();
 	}
 
-	/**
-	 * @param execute set/reset the executable flag
-	 */
-	public void setExecutable(final boolean execute) {
-		mode = execute ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+	public void visitSymlink(final SymlinkTreeEntry s) throws IOException {
+		// TODO: handle symlinks. Only problem is that JGit is independent of
+		// Eclipse
+		// and Pure Java does not know what to do about symbolic links.
 	}
 
-	/**
-	 * @return an {@link ObjectLoader} that will return the data
-	 * @throws IOException
-	 */
-	public ObjectLoader openReader() throws IOException {
-		return getRepository().open(getId(), Constants.OBJ_BLOB);
-	}
-
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitFile(this);
-	}
-
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(' ');
-		r.append(isExecutable() ? 'X' : 'F');
-		r.append(' ');
-		r.append(getFullName());
-		return r.toString();
+	public void visitGitlink(GitlinkTreeEntry s) throws IOException {
+		// TODO: handle gitlinks.
 	}
 }
