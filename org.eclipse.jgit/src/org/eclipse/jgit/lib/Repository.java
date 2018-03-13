@@ -429,7 +429,12 @@ public abstract class Repository {
 			case '^':
 				if (rev == null) {
 					if (name == null)
-						name = new String(revChars, done, i);
+						if (done == 0)
+							name = new String(revChars, done, i);
+						else {
+							done = i + 1;
+							break;
+						}
 					rev = parseSimple(rw, name);
 					name = null;
 					if (rev == null)
@@ -471,7 +476,7 @@ public abstract class Repository {
 								rev = commit.getParent(pnum - 1);
 						}
 						i = j - 1;
-						done = i;
+						done = j;
 						break;
 					case '{':
 						int k;
@@ -512,7 +517,6 @@ public abstract class Repository {
 						} else
 							throw new IncorrectObjectTypeException(rev,
 									Constants.TYPE_COMMIT);
-
 					}
 				} else {
 					rev = rw.peel(rev);
@@ -526,12 +530,19 @@ public abstract class Repository {
 						throw new IncorrectObjectTypeException(rev,
 								Constants.TYPE_COMMIT);
 				}
+				done = i + 1;
 				break;
 			case '~':
 				if (rev == null) {
 					if (name == null)
-						name = new String(revChars, done, i);
+						if (done == 0)
+							name = new String(revChars, done, i);
+						else {
+							done = i + 1;
+							break;
+						}
 					rev = parseSimple(rw, name);
+					name = null;
 					if (rev == null)
 						return null;
 				}
@@ -567,10 +578,13 @@ public abstract class Repository {
 					--dist;
 				}
 				i = l - 1;
+				done = l;
 				break;
 			case '@':
 				if (rev != null)
 					throw new RevisionSyntaxException(revstr);
+				if (i + 1 < revChars.length && revChars[i + 1] != '{')
+					continue;
 				int m;
 				String time = null;
 				for (m = i + 2; m < revChars.length; ++m) {
@@ -587,7 +601,10 @@ public abstract class Repository {
 							// Currently checked out branch, HEAD if
 							// detached
 							name = Constants.HEAD;
+						if (!Repository.isValidRefName("x/" + name))
+							throw new RevisionSyntaxException(revstr);
 						Ref ref = getRef(name);
+						name = null;
 						if (ref == null)
 							return null;
 						if (ref.isSymbolic())
@@ -634,7 +651,10 @@ public abstract class Repository {
 							name = new String(revChars, done, i);
 						if (name.equals(""))
 							name = Constants.HEAD;
+						if (!Repository.isValidRefName("x/" + name))
+							throw new RevisionSyntaxException(revstr);
 						Ref ref = getRef(name);
+						name = null;
 						if (ref == null)
 							return null;
 						// @{n} means current branch, not HEAD@{1} unless
@@ -642,7 +662,6 @@ public abstract class Repository {
 						if (ref.isSymbolic())
 							ref = ref.getLeaf();
 						rev = resolveReflog(rw, ref, time);
-						name = null;
 					}
 					i = m;
 				} else
@@ -656,6 +675,7 @@ public abstract class Repository {
 					if (name.equals(""))
 						name = Constants.HEAD;
 					rev = parseSimple(rw, name);
+					name = null;
 				}
 				if (rev == null)
 					return null;
@@ -677,7 +697,11 @@ public abstract class Repository {
 			return rev.copy();
 		if (name != null)
 			return name;
+		if (done == revstr.length())
+			return null;
 		name = revstr.substring(done);
+		if (!Repository.isValidRefName("x/" + name))
+			throw new RevisionSyntaxException(revstr);
 		if (getRef(name) != null)
 			return name;
 		return resolveSimple(name);
@@ -706,9 +730,11 @@ public abstract class Repository {
 		if (ObjectId.isId(revstr))
 			return ObjectId.fromString(revstr);
 
-		Ref r = getRefDatabase().getRef(revstr);
-		if (r != null)
-			return r.getObjectId();
+		if (Repository.isValidRefName("x/" + revstr)) {
+			Ref r = getRefDatabase().getRef(revstr);
+			if (r != null)
+				return r.getObjectId();
+		}
 
 		if (AbbreviatedObjectId.isId(revstr))
 			return resolveAbbreviation(revstr);
@@ -1129,6 +1155,8 @@ public abstract class Repository {
 			case '/':
 				if (i == 0 || i == len - 1)
 					return false;
+				if (p == '/')
+					return false;
 				components++;
 				break;
 			case '{':
@@ -1138,6 +1166,7 @@ public abstract class Repository {
 			case '~': case '^': case ':':
 			case '?': case '[': case '*':
 			case '\\':
+			case '\u007F':
 				return false;
 			}
 			p = c;
