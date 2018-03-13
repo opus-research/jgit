@@ -590,6 +590,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
+	/***/ public String serviceNotPermittedNoName;
 	/***/ public String shallowCommitsAlreadyInitialized;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
@@ -660,7 +661,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unableToCreateNewObject;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
-	/***/ public String unauthorized;
 	/***/ public String unencodeableFile;
 	/***/ public String unexpectedCompareResult;
 	/***/ public String unexpectedEndOfConfigFile;
