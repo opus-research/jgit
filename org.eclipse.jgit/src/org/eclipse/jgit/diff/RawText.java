@@ -95,7 +95,7 @@ public class RawText implements Sequence {
 	protected final IntList lines;
 
 	/** Hash code for each line, for fast equality elimination. */
-	protected final int[] hashes;
+	protected final IntList hashes;
 
 	/**
 	 * Create a new sequence from an existing content byte array.
@@ -140,7 +140,7 @@ public class RawText implements Sequence {
 
 	private static boolean equals(final RawText a, final int ai,
 			final RawText b, final int bi) {
-		if (a.hashes[ai] != b.hashes[bi])
+		if (a.hashes.get(ai) != b.hashes.get(bi))
 			return false;
 
 		int as = a.lines.get(ai);
@@ -197,13 +197,15 @@ public class RawText implements Sequence {
 		return content[end - 1] != '\n';
 	}
 
-	private int[] computeHashes() {
-		final int[] r = new int[lines.size()];
+	private IntList computeHashes() {
+		final IntList r = new IntList(lines.size());
+		r.add(0);
 		for (int lno = 1; lno < lines.size() - 1; lno++) {
 			final int ptr = lines.get(lno);
 			final int end = lines.get(lno + 1);
-			r[lno] = hashLine(content, ptr, end);
+			r.add(hashLine(content, ptr, end));
 		}
+		r.add(0);
 		return r;
 	}
 
