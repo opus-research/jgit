@@ -99,7 +99,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		}
 
 		@Override
-		public SubscribeConnection openSubscribe()
+		public SubscribeConnection openSubscribe(Subscriber sub)
 				throws NotSupportedException, TransportException {
 			BasePackSubscribeConnection c = new BasePackSubscribeConnection(
 					this) {
@@ -108,14 +108,12 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 						Subscriber s) throws IOException {
 					// Nothing
 				}
-				
+
 				@Override
-				public void doSubscribe(Subscriber s, Map<
-						String,
-						List<SubscribeCommand>> subscribeCommands,
-						ProgressMonitor monitor)
-						throws InterruptedException, TransportException,
-						IOException {
+				public void doSubscribe(Subscriber s,
+						Map<String, List<SubscribeCommand>> subscribeCommands,
+						ProgressMonitor monitor) throws InterruptedException,
+						TransportException, IOException {
 					init(new ByteArrayInputStream(publisherOut.toByteArray()),
 							testOut);
 					super.doSubscribe(s, subscribeCommands, monitor);
@@ -234,6 +232,21 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
+	public void testError() throws Exception {
+		// Setup client
+		subscriber.setRestartToken("server-token");
+		subscriber.setLastPackNumber("0");
+		// Setup server response
+		publisherLineOut.writeString("error: no access to chromium");
+		try {
+			executeSubscribe();
+			fail("Should have failed");
+		} catch (TransportException e) {
+			assertEquals("no access to chromium", e.getMessage());
+		}
+	}
+
+	@Test
 	public void testBadRestart() throws Exception {
 		// Setup client
 		subscriber.setRestartToken("badtoken");
@@ -243,7 +256,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		try {
 			executeSubscribe();
 		} catch (TransportException e) {
-			assertEquals("Invalid restart token", e.getMessage());
+			throw e;
+		} catch (IOException e) {
+			// Stream timeout
 		}
 
 		// Check subscribe output
