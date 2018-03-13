@@ -1660,8 +1660,7 @@ public class PackWriter {
 
 				for (int i = 0; i < cmit.getParentCount(); i++) {
 					RevCommit p = cmit.getParent(i);
-					if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)
-							&& !exclude(p)) {
+					if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)) {
 						p.add(added);
 						addObject(p, 0);
 						commitCnt++;
@@ -1870,7 +1869,6 @@ public class PackWriter {
 			otp.clearReuseAsIs();
 		}
 
-		otp.setDeltaAttempted(next.wasDeltaAttempted());
 		otp.select(next);
 	}
 

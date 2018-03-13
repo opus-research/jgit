@@ -72,9 +72,8 @@ public class StoredObjectRepresentation {
 	}
 
 	/**
-	 * @return the storage format type, which must be one of
-	 *         {@link #PACK_DELTA}, {@link #PACK_WHOLE}, or
-	 *         {@link #FORMAT_OTHER}.
+	 * @return true if this is a delta against another object and this is stored
+	 *         in pack delta format.
 	 */
 	public int getFormat() {
 		return FORMAT_OTHER;
@@ -87,14 +86,5 @@ public class StoredObjectRepresentation {
 	 */
 	public ObjectId getDeltaBase() {
 		return null;
-	}
-
-	/**
-	 * @return whether the current representation of the object has had delta
-	 *         compression attempted on it.
-	 */
-	public boolean wasDeltaAttempted() {
-		int fmt = getFormat();
-		return fmt == PACK_DELTA || fmt == PACK_WHOLE;
 	}
 }

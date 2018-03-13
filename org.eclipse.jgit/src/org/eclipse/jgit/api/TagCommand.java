@@ -46,11 +46,9 @@ import java.io.IOException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -102,10 +100,15 @@ public class TagCommand extends GitCommand<Ref> {
 	 * @return a {@link Ref} a ref pointing to a tag
 	 * @throws NoHeadException
 	 *             when called on a git repo without a HEAD reference
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped.
 	 * @since 2.0
 	 */
-	public Ref call() throws GitAPIException, ConcurrentRefUpdateException,
-			InvalidTagNameException, NoHeadException {
+	public Ref call() throws JGitInternalException,
+			ConcurrentRefUpdateException, InvalidTagNameException, NoHeadException {
 		checkCallable();
 
 		RepositoryState state = repo.getRepositoryState();
@@ -152,11 +155,6 @@ public class TagCommand extends GitCommand<Ref> {
 						throw new ConcurrentRefUpdateException(
 								JGitText.get().couldNotLockHEAD,
 								tagRef.getRef(), updateResult);
-					case REJECTED:
-						throw new RefAlreadyExistsException(
-								MessageFormat.format(
-										JGitText.get().tagAlreadyExists,
-										newTag.toString()));
 					default:
 						throw new JGitInternalException(MessageFormat.format(
 								JGitText.get().updatingRefFailed, refName,

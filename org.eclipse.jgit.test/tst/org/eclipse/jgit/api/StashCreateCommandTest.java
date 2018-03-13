@@ -52,7 +52,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -292,7 +291,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals("content", read(committedFile));
 		validateStashedCommit(stashed);
 
-		assertEquals(stashed.getParent(1).getTree(), stashed.getTree());
+		assertTrue(stashed.getTree().equals(stashed.getParent(1).getTree()));
 
 		List<DiffEntry> workingDiffs = diffWorkingAgainstHead(stashed);
 		assertEquals(1, workingDiffs.size());
@@ -327,7 +326,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 
 		validateStashedCommit(stashed);
 
-		assertEquals(stashed.getParent(1).getTree(), stashed.getTree());
+		assertTrue(stashed.getTree().equals(stashed.getParent(1).getTree()));
 
 		List<DiffEntry> workingDiffs = diffWorkingAgainstHead(stashed);
 		assertEquals(1, workingDiffs.size());
@@ -417,15 +416,5 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals(stashed, entry.getNewId());
 		assertEquals(who, entry.getWho());
 		assertEquals(stashed.getFullMessage(), entry.getComment());
-	}
-
-	@Test(expected = UnmergedPathsException.class)
-	public void unmergedPathsShouldCauseException() throws Exception {
-		commitFile("file.txt", "master", "base");
-		RevCommit side = commitFile("file.txt", "side", "side");
-		commitFile("file.txt", "master", "master");
-		git.merge().include(side).call();
-
-		git.stashCreate().call();
 	}
 }

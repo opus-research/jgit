@@ -137,8 +137,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private static final String ONTO = "onto";
 
-	private static final String ONTO_NAME = "onto-name";
-
 	private static final String PATCH = "patch";
 
 	private static final String REBASE_HEAD = "head";
@@ -169,8 +167,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private RevCommit upstreamCommit;
 
-	private String upstreamCommitName;
-
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private final RevWalk walk;
@@ -193,13 +189,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 * this method twice on an instance.
 	 *
 	 * @return an object describing the result of this command
-	 * @throws GitAPIException
-	 * @throws WrongRepositoryStateException
-	 * @throws NoHeadException
-	 * @throws RefNotFoundException
 	 */
-	public RebaseResult call() throws GitAPIException, NoHeadException,
-			RefNotFoundException, WrongRepositoryStateException {
+	public RebaseResult call() throws NoHeadException, RefNotFoundException,
+			JGitInternalException, GitAPIException {
 		RevCommit newHead = null;
 		boolean lastStepWasForward = false;
 		checkCallable();
@@ -215,16 +207,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case SKIP:
 				// fall through
 			case CONTINUE:
-				String upstreamCommitId = readFile(rebaseDir, ONTO);
-				try {
-					upstreamCommitName = readFile(rebaseDir, ONTO_NAME);
-				} catch (FileNotFoundException e) {
-					// Fall back to commit ID if file doesn't exist (e.g. rebase
-					// was started by C Git)
-					upstreamCommitName = upstreamCommitId;
-				}
+				String upstreamCommitName = readFile(rebaseDir, ONTO);
 				this.upstreamCommit = walk.parseCommit(repo
-						.resolve(upstreamCommitId));
+						.resolve(upstreamCommitName));
 				break;
 			case BEGIN:
 				RebaseResult res = initFilesAndRewind();
@@ -278,10 +263,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						// TODO if the content of this commit is already merged
 						// here we should skip this step in order to avoid
 						// confusing pseudo-changed
-						String ourCommitName = getOurCommitName();
 						CherryPickResult cherryPickResult = new Git(repo)
-								.cherryPick().include(commitToPick)
-								.setOurCommitName(ourCommitName).call();
+								.cherryPick().include(commitToPick).call();
 						switch (cherryPickResult.getStatus()) {
 						case FAILED:
 							if (operation == Operation.BEGIN)
@@ -313,14 +296,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private String getOurCommitName() {
-		// If onto is different from upstream, this should say "onto", but
-		// RebaseCommand doesn't support a different "onto" at the moment.
-		String ourCommitName = "Upstream, based on "
-				+ Repository.shortenRefName(upstreamCommitName);
-		return ourCommitName;
-	}
-
 	private void updateHead(String headName, RevCommit newHead)
 			throws IOException {
 		// point the previous head (if any) to the new commit
@@ -350,7 +325,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RevCommit checkoutCurrentHead() throws IOException, NoHeadException {
+	private RevCommit checkoutCurrentHead() throws IOException,
+			NoHeadException, JGitInternalException {
 		ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 		if (headTree == null)
 			throw new NoHeadException(
@@ -460,7 +436,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// representation for date and timezone
 		sb.append(GIT_AUTHOR_DATE);
 		sb.append("='");
-		sb.append("@"); // @ for time in seconds since 1970
 		String externalString = author.toExternalString();
 		sb
 				.append(externalString.substring(externalString
@@ -542,8 +517,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RebaseResult initFilesAndRewind() throws IOException,
-			GitAPIException {
+	private RebaseResult initFilesAndRewind() throws RefNotFoundException,
+			IOException, NoHeadException, JGitInternalException {
 		// we need to store everything into files so that we can implement
 		// --skip, --continue, and --abort
 
@@ -601,11 +576,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// create the folder for the meta information
 		FileUtils.mkdir(rebaseDir);
 
-		repo.writeOrigHead(headId);
+		createFile(repo.getDirectory(), Constants.ORIG_HEAD, headId.name());
 		createFile(rebaseDir, REBASE_HEAD, headId.name());
 		createFile(rebaseDir, HEAD_NAME, headName);
 		createFile(rebaseDir, ONTO, upstreamCommit.name());
-		createFile(rebaseDir, ONTO_NAME, upstreamCommitName);
 		createFile(rebaseDir, INTERACTIVE, "");
 		BufferedWriter fw = new BufferedWriter(new OutputStreamWriter(
 				new FileOutputStream(new File(rebaseDir, GIT_REBASE_TODO)),
@@ -652,11 +626,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 *
 	 * @param newCommit
 	 * @return the new head, or null
+	 * @throws RefNotFoundException
 	 * @throws IOException
-	 * @throws GitAPIException
 	 */
-	public RevCommit tryFastForward(RevCommit newCommit) throws IOException,
-			GitAPIException {
+	public RevCommit tryFastForward(RevCommit newCommit)
+			throws RefNotFoundException, IOException {
 		Ref head = repo.getRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
@@ -679,7 +653,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private RevCommit tryFastForward(String headName, RevCommit oldCommit,
-			RevCommit newCommit) throws IOException, GitAPIException {
+			RevCommit newCommit) throws IOException, JGitInternalException {
 		boolean tryRebase = false;
 		for (RevCommit parentCommit : newCommit.getParents())
 			if (parentCommit.equals(oldCommit))
@@ -723,9 +697,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			// these operations are only possible while in a rebasing state
 			switch (repo.getRepositoryState()) {
 			case REBASING_INTERACTIVE:
-			case REBASING:
-			case REBASING_REBASING:
-			case REBASING_MERGE:
 				break;
 			default:
 				throw new WrongRepositoryStateException(MessageFormat.format(
@@ -762,8 +733,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private RebaseResult abort(RebaseResult result) throws IOException {
 		try {
-			ObjectId origHead = repo.readOrigHead();
-			String commitId = origHead != null ? origHead.name() : null;
+			String commitId = readFile(repo.getDirectory(), Constants.ORIG_HEAD);
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().abortingRebase, commitId),
 					ProgressMonitor.UNKNOWN);
@@ -850,7 +820,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return true;
 	}
 
-	List<Step> loadSteps() throws IOException {
+	private List<Step> loadSteps() throws IOException {
 		byte[] buf = IO.readFully(new File(rebaseDir, GIT_REBASE_TODO));
 		int ptr = 0;
 		int tokenBegin = 0;
@@ -858,12 +828,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		while (ptr < buf.length) {
 			tokenBegin = ptr;
 			ptr = RawParseUtils.nextLF(buf, ptr);
-			int nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
+			int nextSpace = 0;
 			int tokenCount = 0;
 			Step current = null;
 			while (tokenCount < 3 && nextSpace < ptr) {
 				switch (tokenCount) {
 				case 0:
+					nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
 					String actionToken = new String(buf, tokenBegin, nextSpace
 							- tokenBegin - 1);
 					tokenBegin = nextSpace;
@@ -909,7 +880,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 */
 	public RebaseCommand setUpstream(RevCommit upstream) {
 		this.upstreamCommit = upstream;
-		this.upstreamCommitName = upstream.name();
 		return this;
 	}
 
@@ -921,7 +891,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	public RebaseCommand setUpstream(AnyObjectId upstream) {
 		try {
 			this.upstreamCommit = walk.parseCommit(upstream);
-			this.upstreamCommitName = upstream.name();
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().couldNotReadObjectWhileParsingCommit,
@@ -944,28 +913,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				throw new RefNotFoundException(MessageFormat.format(JGitText
 						.get().refNotResolved, upstream));
 			upstreamCommit = walk.parseCommit(repo.resolve(upstream));
-			upstreamCommitName = upstream;
 			return this;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
-	}
-
-	/**
-	 * Optionally override the name of the upstream. If this is used, it has to
-	 * come after any {@link #setUpstream} call.
-	 *
-	 * @param upstreamName
-	 *            the name which will be used to refer to upstream in conflicts
-	 * @return {@code this}
-	 */
-	public RebaseCommand setUpstreamName(String upstreamName) {
-		if (upstreamCommit == null) {
-			throw new IllegalStateException(
-					"setUpstreamName must be called after setUpstream.");
-		}
-		this.upstreamCommitName = upstreamName;
-		return this;
 	}
 
 	/**
@@ -1001,11 +952,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			return this.token;
 		}
 
-		@Override
-		public String toString() {
-			return "Action[" + token + "]";
-		}
-
 		static Action parse(String token) {
 			if (token.equals("pick") || token.equals("p"))
 				return PICK;
@@ -1024,15 +970,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		Step(Action action) {
 			this.action = action;
-		}
-
-		@Override
-		public String toString() {
-			return "Step[" + action + ", "
-					+ ((commit == null) ? "null" : commit)
-					+ ", "
-					+ ((shortMessage == null) ? "null" : new String(
-							shortMessage)) + "]";
 		}
 	}
 
@@ -1059,13 +996,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		String time = keyValueMap.get(GIT_AUTHOR_DATE);
 
 		// the time is saved as <seconds since 1970> <timezone offset>
-		int timeStart = 0;
-		if (time.startsWith("@"))
-			timeStart = 1;
-		else
-			timeStart = 0;
-		long when = Long
-				.parseLong(time.substring(timeStart, time.indexOf(' '))) * 1000;
+		long when = Long.parseLong(time.substring(0, time.indexOf(' '))) * 1000;
 		String tzOffsetString = time.substring(time.indexOf(' ') + 1);
 		int multiplier = -1;
 		if (tzOffsetString.charAt(0) == '+')
