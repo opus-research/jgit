@@ -69,6 +69,8 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.ProcessResult.Status;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -106,6 +108,8 @@ public abstract class FS {
 				return new FS_POSIX_Java5();
 		}
 	}
+
+	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -418,12 +422,12 @@ public abstract class FS {
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
-		final boolean debug = Boolean.parseBoolean(SystemReader.getInstance()
-				.getProperty("jgit.fs.debug")); //$NON-NLS-1$
+		final boolean debug = LOG.isDebugEnabled();
 		try {
-			if (debug)
-				System.err.println("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
+			if (debug) {
+				LOG.debug("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
+			}
 			final Process p = Runtime.getRuntime().exec(command, null, dir);
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
@@ -451,8 +455,9 @@ public abstract class FS {
 						is.close();
 					} catch (IOException e) {
 						// Just print on stderr for debugging
-						if (debug)
-							e.printStackTrace(System.err);
+						if (debug) {
+							LOG.debug("Caught exception in gobbler thread", e); //$NON-NLS-1$
+						}
 						gooblerFail.set(true);
 					}
 				}
@@ -462,13 +467,14 @@ public abstract class FS {
 			try {
 				r = lineRead.readLine();
 				if (debug) {
-					System.err.println("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-					System.err.println("(ignoring remaing output:"); //$NON-NLS-1$
+					LOG.debug("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+					LOG.debug("(ignoring remaing output:"); //$NON-NLS-1$
 				}
 				String l;
 				while ((l = lineRead.readLine()) != null) {
-					if (debug)
-						System.err.println(l);
+					if (debug) {
+						LOG.debug(l);
+					}
 				}
 			} finally {
 				p.getErrorStream().close();
@@ -482,20 +488,20 @@ public abstract class FS {
 					if (rc == 0 && r != null && r.length() > 0
 							&& !gooblerFail.get())
 						return r;
-					if (debug)
-						System.err.println("readpipe rc=" + rc); //$NON-NLS-1$
+					if (debug) {
+						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
+					}
 					break;
 				} catch (InterruptedException ie) {
 					// Stop bothering me, I have a zombie to reap.
 				}
 			}
 		} catch (IOException e) {
-			if (debug)
-				System.err.println(e);
-			// Ignore error (but report)
+			LOG.error("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
 		}
-		if (debug)
-			System.err.println("readpipe returns null"); //$NON-NLS-1$
+		if (debug) {
+			LOG.debug("readpipe returns null"); //$NON-NLS-1$
+		}
 		return null;
 	}
 
@@ -654,8 +660,8 @@ public abstract class FS {
 	 *
 	 * @param repository
 	 *            The repository for which a hook should be run.
-	 * @param hookName
-	 *            The name of the hook to be executed.
+	 * @param hook
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -663,12 +669,11 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	public ProcessResult runIfPresent(Repository repository,
-			final String hookName,
+	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args) throws JGitInternalException {
-		return runIfPresent(repository, hookName, args, System.out, System.err,
+		return runIfPresent(repository, hook, args, System.out, System.err,
 				null);
 	}
 
@@ -678,8 +683,8 @@ public abstract class FS {
 	 *
 	 * @param repository
 	 *            The repository for which a hook should be run.
-	 * @param hookName
-	 *            The name of the hook to be executed.
+	 * @param hook
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -698,10 +703,9 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	public ProcessResult runIfPresent(Repository repository,
-			final String hookName,
+	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
 			String stdinArgs) throws JGitInternalException {
 		return new ProcessResult(Status.NOT_SUPPORTED);
@@ -709,13 +713,13 @@ public abstract class FS {
 
 	/**
 	 * See
-	 * {@link #runIfPresent(Repository, String, String[], PrintStream, PrintStream, String)}
+	 * {@link #runIfPresent(Repository, Hook, String[], PrintStream, PrintStream, String)}
 	 * . Should only be called by FS supporting shell scripts execution.
 	 *
 	 * @param repository
 	 *            The repository for which a hook should be run.
-	 * @param hookName
-	 *            The name of the hook to be executed.
+	 * @param hook
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -734,13 +738,13 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 4.0
+	 * @since 3.7
 	 */
 	protected ProcessResult internalRunIfPresent(Repository repository,
-			final String hookName, String[] args, PrintStream outRedirect,
+			final Hook hook, String[] args, PrintStream outRedirect,
 			PrintStream errRedirect, String stdinArgs)
 			throws JGitInternalException {
-		final File hookFile = findHook(repository, hookName);
+		final File hookFile = findHook(repository, hook);
 		if (hookFile == null)
 			return new ProcessResult(Status.NOT_PRESENT);
 
@@ -760,11 +764,11 @@ public abstract class FS {
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().exceptionCaughtDuringExecutionOfHook,
-					hookName), e);
+					hook.getName()), e);
 		} catch (InterruptedException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().exceptionHookExecutionInterrupted,
-							hookName), e);
+					hook.getName()), e);
 		}
 	}
 
@@ -774,15 +778,15 @@ public abstract class FS {
 	 *
 	 * @param repository
 	 *            The repository within which to find a hook.
-	 * @param hookName
-	 *            The name of the hook we're trying to find.
+	 * @param hook
+	 *            The hook we're trying to find.
 	 * @return The {@link File} containing this particular hook if it exists in
 	 *         the given repository, <code>null</code> otherwise.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	public File findHook(Repository repository, final String hookName) {
+	public File findHook(Repository repository, final Hook hook) {
 		final File hookFile = new File(new File(repository.getDirectory(),
-				Constants.HOOKS), hookName);
+				Constants.HOOKS), hook.getName());
 		return hookFile.isFile() ? hookFile : null;
 	}
 

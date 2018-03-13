@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,67 +40,98 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
+package org.eclipse.jgit.transport;
 
 /**
- * Exception thrown when a hook returns a process result with a value different
- * from 0. It is up to the caller to decide whether this should block execution
- * or not.
+ * The required information to verify the push.
  *
  * @since 4.0
  */
-public class AbortedByHookException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
+public class PushCertificate {
+
+	/** The tuple "name <email>" as presented in the push certificate */
+	String pusher;
+
+	/** The remote URL the signed push goes to */
+	String pushee;
+
+	/** What we think about the returned signed nonce */
+	NonceStatus nonceStatus;
 
 	/**
-	 * The hook that caused this exception.
-	 */
-	private final String hookName;
-
-	/**
-	 * The process result.
-	 */
-	private final int returnCode;
-
-	/**
-	 * Constructor.
 	 *
-	 * @param message
-	 *            The error details.
-	 * @param hookName
-	 *            The name of the hook that interrupted the command, must not be
-	 *            null.
-	 * @param returnCode
-	 *            The return code of the hook process that has been run.
+	 *
 	 */
-	public AbortedByHookException(String message, String hookName,
-			int returnCode) {
-		super(message);
-		this.hookName = hookName;
-		this.returnCode = returnCode;
+	public enum NonceStatus {
+		/**
+		 *
+		 */
+		UNSOLICITED,
+		/**
+		 *
+		 */
+		BAD,
+		/**
+		 *
+		 */
+		MISSING,
+		/**
+		 *
+		 */
+		OK,
+		/**
+		 *
+		 */
+		SLOP
 	}
 
 	/**
-	 * @return the type of the hook that interrupted the git command.
+	 *
 	 */
-	public String getHookName() {
-		return hookName;
+	String commandList;
+
+	/**
+	 *
+	 */
+	String signature;
+
+	/**
+	 *
+	 * @return the signature, consisting of the lines received between the lines
+	 *         '----BEGIN GPG SIGNATURE-----\n' and the '----END GPG
+	 *         SIGNATURE-----\n'
+	 */
+	public String getSignature() {
+		return signature;
 	}
 
 	/**
-	 * @return the hook process result.
+	 * @return the list of commands as one string to be feed into the signature
+	 *         verifier.
 	 */
-	public int getReturnCode() {
-		return returnCode;
+	public String getCommandList() {
+		return commandList;
 	}
 
-	@Override
-	public String getMessage() {
-		return MessageFormat.format(JGitText.get().commandRejectedByHook,
-				hookName, super.getMessage());
+	/**
+	 * @return the pushedCertPusher
+	 */
+	public String getPusher() {
+		return pusher;
+	}
+
+	/**
+	 * @return the pushedCertPushee
+	 */
+	public String getPushee() {
+		return pushee;
+	}
+
+	/**
+	 * @return the pushCertNonceStatus
+	 */
+	public NonceStatus getNonceStatus() {
+		return nonceStatus;
 	}
 }
