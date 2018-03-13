@@ -178,9 +178,6 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 	}
 
 	private DirCacheEntry toEntry(final int stage, final TreeWalk tw) {
-		if (!tw.isValidPath())
-			throw new InvalidPathException(tw.getPathString());
-
 		final DirCacheEntry e = new DirCacheEntry(tw.getRawPath(), stage);
 		final AbstractTreeIterator i;
 
