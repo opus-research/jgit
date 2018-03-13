@@ -195,7 +195,6 @@ public class SideBandOutputStreamTest {
 		assertEquals(1, flushCnt[0]);
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void testConstructor_RejectsBadChannel() {
 		try {
@@ -221,7 +220,6 @@ public class SideBandOutputStreamTest {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void testConstructor_RejectsBadBufferSize() {
 		try {

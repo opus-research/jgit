@@ -362,7 +362,6 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 		assertNotSame(db.getConfig(), db2.getConfig());
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void test008_FailOnWrongVersion() throws IOException {
 		final File cfg = new File(db.getDirectory(), Constants.CONFIG);
