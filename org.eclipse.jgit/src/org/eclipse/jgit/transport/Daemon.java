@@ -53,8 +53,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackConfig;
@@ -336,12 +336,15 @@ public class Daemon {
 			public void run() {
 				try {
 					dc.execute(s);
+				} catch (RepositoryNotFoundException e) {
+					// Ignored. Client cannot use this repository.
 				} catch (ServiceNotEnabledException e) {
 					// Ignored. Client cannot use this repository.
 				} catch (ServiceNotAuthorizedException e) {
 					// Ignored. Client cannot use this repository.
 				} catch (IOException e) {
 					// Ignore unexpected IO exceptions from clients
+					e.printStackTrace();
 				} finally {
 					try {
 						s.getInputStream().close();
@@ -366,8 +369,7 @@ public class Daemon {
 		return null;
 	}
 
-	Repository openRepository(DaemonClient client, String name)
-			throws ServiceMayNotContinueException {
+	Repository openRepository(DaemonClient client, String name) {
 		// Assume any attempt to use \ was by a Windows client
 		// and correct to the more typical / used in Git URIs.
 		//

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
- * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,7 +47,7 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.merge.MergeChunk;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
@@ -70,119 +70,37 @@ public class MergeResult {
 			public String toString() {
 				return "Fast-forward";
 			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
-		/**
-		 * @since 2.0
-		 */
-		FAST_FORWARD_SQUASHED {
-			@Override
-			public String toString() {
-				return "Fast-forward-squashed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
 		},
 		/** */
 		ALREADY_UP_TO_DATE {
-			@Override
 			public String toString() {
 				return "Already-up-to-date";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
 			}
 		},
 		/** */
 		FAILED {
-			@Override
 			public String toString() {
 				return "Failed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
 			}
 		},
 		/** */
 		MERGED {
-			@Override
 			public String toString() {
 				return "Merged";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
-		/**
-		 * @since 2.0
-		 */
-		MERGED_SQUASHED {
-			@Override
-			public String toString() {
-				return "Merged-squashed";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return true;
 			}
 		},
 		/** */
 		CONFLICTING {
-			@Override
 			public String toString() {
 				return "Conflicting";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * @since 2.2
-		 */
-		ABORTED {
-			@Override
-			public String toString() {
-				return "Aborted";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
 			}
 		},
 		/** */
 		NOT_SUPPORTED {
-			@Override
 			public String toString() {
 				return "Not-yet-supported";
 			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		};
-
-		/**
-		 * @return whether the status indicates a successful result
-		 */
-		public abstract boolean isSuccessful();
+		}
 	}
 
 	private ObjectId[] mergedCommits;
@@ -212,19 +130,17 @@ public class MergeResult {
 	 *            all the commits which have been merged together
 	 * @param mergeStatus
 	 *            the status the merge resulted in
-	 * @param mergeStrategy
-	 *            the used {@link MergeStrategy}
 	 * @param lowLevelResults
 	 *            merge results as returned by
 	 *            {@link ResolveMerger#getMergeResults()}
-	 * @since 2.0
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
 	 */
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			MergeStrategy mergeStrategy,
-			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults) {
-		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null);
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
+			MergeStrategy mergeStrategy) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, lowLevelResults, null);
 	}
 
 	/**
@@ -251,7 +167,7 @@ public class MergeResult {
 			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
 			String description) {
 		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null, description);
+				lowLevelResults, null, null);
 	}
 
 	/**

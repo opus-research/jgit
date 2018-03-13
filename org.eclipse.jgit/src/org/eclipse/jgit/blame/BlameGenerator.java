@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.blame.Candidate.BlobCandidate;
 import org.eclipse.jgit.blame.Candidate.ReverseCandidate;
 import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
@@ -60,7 +61,6 @@ import org.eclipse.jgit.diff.HistogramDiff;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.RenameDetector;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -76,7 +76,7 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
- * Generate author information for lines based on a provided file.
+ * Generate author information for lines based on introduction to the file.
  * <p>
  * Applications that want a simple one-shot computation of blame for a file
  * should use {@link #computeBlameResult()} to prepare the entire result in one
@@ -144,14 +144,12 @@ public class BlameGenerator {
 	private Candidate currentSource;
 
 	/**
-	 * Create a blame generator for the repository and path (relative to
-	 * repository)
-	 * 
+	 * Create a blame generator for the repository and path
+	 *
 	 * @param repository
 	 *            repository to access revision data from.
 	 * @param path
-	 *            initial path of the file to start scanning (relative to the
-	 *            repository).
+	 *            initial path of the file to start scanning.
 	 */
 	public BlameGenerator(Repository repository, String path) {
 		this.repository = repository;
@@ -180,7 +178,6 @@ public class BlameGenerator {
 		SEEN = revPool.newFlag("SEEN");
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
-		treeWalk.setRecursive(true);
 	}
 
 	/** @return repository being scanned for revision history. */
@@ -948,7 +945,6 @@ public class BlameGenerator {
 
 		treeWalk.setFilter(TreeFilter.ANY_DIFF);
 		treeWalk.reset(parent.getTree(), commit.getTree());
-		renameDetector.reset();
 		renameDetector.addAll(DiffEntry.scan(treeWalk));
 		for (DiffEntry ent : renameDetector.compute()) {
 			if (isRename(ent) && ent.getNewPath().equals(path.getPath()))

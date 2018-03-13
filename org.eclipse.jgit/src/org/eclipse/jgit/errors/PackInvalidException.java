@@ -47,7 +47,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /** Thrown when a PackFile previously failed and is known to be unusable */
 public class PackInvalidException extends IOException {
@@ -60,16 +60,6 @@ public class PackInvalidException extends IOException {
 	 *            path of the invalid pack file.
 	 */
 	public PackInvalidException(final File path) {
-		this(path.getAbsolutePath());
-	}
-
-	/**
-	 * Construct a pack invalid error.
-	 *
-	 * @param path
-	 *            path of the invalid pack file.
-	 */
-	public PackInvalidException(final String path) {
-		super(MessageFormat.format(JGitText.get().packFileInvalid, path));
+		super(MessageFormat.format(JGitText.get().packFileInvalid, path.getAbsolutePath()));
 	}
 }

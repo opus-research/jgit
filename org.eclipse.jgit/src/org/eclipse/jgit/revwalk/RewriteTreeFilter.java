@@ -252,12 +252,6 @@ class RewriteTreeFilter extends RevFilter {
 		for (DiffEntry ent : files) {
 			if (isRename(ent) && ent.getNewPath().equals(oldFilter.getPath())) {
 				newFilter = FollowFilter.create(ent.getOldPath());
-				RenameCallback callback = oldFilter.getRenameCallback();
-				if (callback != null) {
-					callback.renamed(ent);
-					// forward the callback to the new follow filter
-					((FollowFilter) newFilter).setRenameCallback(callback);
-				}
 				break;
 			}
 		}

@@ -59,74 +59,27 @@ public class RebaseResult {
 		/**
 		 * Rebase was successful, HEAD points to the new commit
 		 */
-		OK {
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
+		OK,
 		/**
 		 * Aborted; the original HEAD was restored
 		 */
-		ABORTED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
+		ABORTED,
 		/**
 		 * Stopped due to a conflict; must either abort or resolve or skip
 		 */
-		STOPPED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
+		STOPPED,
 		/**
 		 * Failed; the original HEAD was restored
 		 */
-		FAILED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
+		FAILED,
 		/**
 		 * Already up-to-date
 		 */
-		UP_TO_DATE {
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
+		UP_TO_DATE,
 		/**
 		 * Fast-forward, HEAD points to the new commit
 		 */
-		FAST_FORWARD {
-			@Override
-			public boolean isSuccessful() {
-				return true;
-			}
-		},
-
-		/**
-		 * Continue with nothing left to commit (possibly want skip).
-		 *
-		 * @since 2.0
-		 */
-		NOTHING_TO_COMMIT {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		};
-
-		/**
-		 * @return whether the status indicates a successful result
-		 */
-		public abstract boolean isSuccessful();
+		FAST_FORWARD;
 	}
 
 	static final RebaseResult OK_RESULT = new RebaseResult(Status.OK);
@@ -139,17 +92,14 @@ public class RebaseResult {
 	static final RebaseResult FAST_FORWARD_RESULT = new RebaseResult(
 			Status.FAST_FORWARD);
 
-	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
-			Status.NOTHING_TO_COMMIT);
-
-	private final Status status;
+	private final Status mySatus;
 
 	private final RevCommit currentCommit;
 
 	private Map<String, MergeFailureReason> failingPaths;
 
 	private RebaseResult(Status status) {
-		this.status = status;
+		this.mySatus = status;
 		currentCommit = null;
 	}
 
@@ -160,7 +110,7 @@ public class RebaseResult {
 	 *            current commit
 	 */
 	RebaseResult(RevCommit commit) {
-		status = Status.STOPPED;
+		mySatus = Status.STOPPED;
 		currentCommit = commit;
 	}
 
@@ -171,7 +121,7 @@ public class RebaseResult {
 	 *            list of paths causing this rebase to fail
 	 */
 	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
-		status = Status.FAILED;
+		mySatus = Status.FAILED;
 		currentCommit = null;
 		this.failingPaths = failingPaths;
 	}
@@ -180,7 +130,7 @@ public class RebaseResult {
 	 * @return the overall status
 	 */
 	public Status getStatus() {
-		return status;
+		return mySatus;
 	}
 
 	/**
