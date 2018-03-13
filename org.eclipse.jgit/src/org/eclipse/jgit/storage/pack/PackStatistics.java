@@ -101,6 +101,12 @@ public class PackStatistics {
 		 *            the accumulator of the statistics
 		 */
 		public ObjectType(ObjectType.Accumulator accumulator) {
+			/*
+			 * For efficiency this wraps and serves up the Accumulator object
+			 * rather than making a deep clone. Normal usage of PackWriter is to
+			 * create a single pack/index/bitmap and only call getStatistics()
+			 * after all work is complete.
+			 */
 			objectType = accumulator;
 		}
 
@@ -165,6 +171,9 @@ public class PackStatistics {
 
 		/** The set of objects to be excluded from the pack. */
 		public Set<ObjectId> uninterestingObjects;
+
+		/** The set of shallow commits on the client. */
+		public Set<ObjectId> clientShallowCommits;
 
 		/** The collection of reused packs in the upload. */
 		public List<CachedPack> reusedPacks;
@@ -248,8 +257,12 @@ public class PackStatistics {
 	 *            the accumulator of the statistics
 	 */
 	public PackStatistics(Accumulator accumulator) {
-		// Note: PackStatistics directly serves up the collections in the
-		// accumulator.
+		/*
+		 * For efficiency this wraps and serves up the Accumulator object rather
+		 * than making a deep clone. Normal usage of PackWriter is to create a
+		 * single pack/index/bitmap and only call getStatistics() after all work
+		 * is complete.
+		 */
 		statistics = accumulator;
 	}
 
@@ -268,6 +281,14 @@ public class PackStatistics {
 	 */
 	public Set<ObjectId> getUninterestingObjects() {
 		return statistics.uninterestingObjects;
+	}
+
+	/**
+	 * @return unmodifiable collection of objects that were shallow commits on
+	 *         the client.
+	 */
+	public Set<ObjectId> getClientShallowCommits() {
+		return statistics.clientShallowCommits;
 	}
 
 	/**

@@ -110,8 +110,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 
 	private boolean includeUntracked;
 
-	private boolean keepIndex;
-
 	/**
 	 * Create a command to stash changes in the working directory and index
 	 *
@@ -187,18 +185,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 		return this;
 	}
 
-	/**
-	 * Whether to keep changes that are staged for commit.
-	 *
-	 * @param keepIndex
-	 * @return {@code this}
-	 * @since 4.0
-	 */
-	public StashCreateCommand setKeepIndex(boolean keepIndex) {
-		this.keepIndex = keepIndex;
-		return this;
-	}
-
 	private RevCommit parseCommit(final ObjectReader reader,
 			final ObjectId headId) throws IOException {
 		try (final RevWalk walk = new RevWalk(reader)) {
@@ -254,15 +240,8 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 		checkCallable();
 
 		Ref head = getHead();
-
-		RevCommit keepIndexCommit = null;
-		if (keepIndex)
-			new CommitCommand(repo).setMessage(indexMessage).call();
-
 		try (ObjectReader reader = repo.newObjectReader()) {
 			RevCommit headCommit = parseCommit(reader, head.getObjectId());
-			if (keepIndex)
-				keepIndexCommit = headCommit;
 			DirCache cache = repo.lockDirCache();
 			ObjectId commitId;
 			try (ObjectInserter inserter = repo.newObjectInserter();
@@ -334,14 +313,8 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 						wtDeletes.add(treeWalk.getPathString());
 				} while (treeWalk.next());
 
-				if (!hasChanges) {
-					if (keepIndexCommit != null) {
-						new ResetCommand(repo)
-								.setRef(keepIndexCommit.getName())
-								.setMode(ResetType.SOFT).call();
-					}
+				if (!hasChanges)
 					return null;
-				}
 
 				String branch = Repository.shortenRefName(head.getTarget()
 						.getName());
@@ -412,11 +385,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 
 			// Hard reset to HEAD
 			new ResetCommand(repo).setMode(ResetType.HARD).call();
-
-			if (keepIndexCommit != null) {
-				new ResetCommand(repo).setRef(keepIndexCommit.getName())
-						.setMode(ResetType.SOFT).call();
-			}
 
 			// Return stashed commit
 			return parseCommit(reader, commitId);

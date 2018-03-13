@@ -381,6 +381,18 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	/**
+	 * Records the set of shallow commits in the client.
+	 *
+	 * @param clientShallowCommits
+	 *            the shallow commits in the client
+	 * @since 4.1
+	 */
+	public void setClientShallowCommits(Set<ObjectId> clientShallowCommits) {
+		stats.clientShallowCommits = Collections
+				.unmodifiableSet(new HashSet<ObjectId>(clientShallowCommits));
+	}
+
+	/**
 	 * Check whether writer can store delta base as an offset (new style
 	 * reducing pack size) or should store it as an object id (legacy style,
 	 * compatible with old readers).
@@ -1020,8 +1032,8 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * @return description of what this PackWriter did in order to create the
-	 *         final pack stream. The object is only available to callers after
-	 *         {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
+	 *         final pack stream. This should only be invoked after the calls to
+	 *         create the pack/index/bitmap have completed.
 	 */
 	public PackStatistics getStatistics() {
 		return new PackStatistics(stats);
