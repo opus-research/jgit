@@ -69,15 +69,6 @@ public class GcCommitSelectionTest extends GcTestCase {
 
 	@Test
 	public void testBitmapSpansNoMerges() throws Exception {
-		testBitmapSpansNoMerges(false);
-	}
-
-	@Test
-	public void testBitmapSpansNoMergesWithTags() throws Exception {
-		testBitmapSpansNoMerges(true);
-	}
-
-	private void testBitmapSpansNoMerges(boolean withTags) throws Exception {
 		/*
 		 * Commit counts -> expected bitmap counts for history without merges.
 		 * The top 100 contiguous commits should always have bitmaps, and the
@@ -98,10 +89,7 @@ public class GcCommitSelectionTest extends GcTestCase {
 			assertTrue(nextCommitCount > currentCommits); // programming error
 			for (int i = currentCommits; i < nextCommitCount; i++) {
 				String str = "A" + i;
-				RevCommit rc = bb.commit().message(str).add(str, str).create();
-				if (withTags) {
-					tr.lightweightTag(str, rc);
-				}
+				bb.commit().message(str).add(str, str).create();
 			}
 			currentCommits = nextCommitCount;
 
@@ -245,7 +233,7 @@ public class GcCommitSelectionTest extends GcTestCase {
 				m8, m9);
 		PackWriterBitmapPreparer preparer = newPeparer(m9, commits);
 		List<BitmapCommit> selection = new ArrayList<>(
-				preparer.selectCommits(commits.size(), PackWriter.NONE));
+				preparer.selectCommits(commits.size()));
 
 		// Verify that the output is ordered by the separate "chains"
 		String[] expected = { m0.name(), m1.name(), m2.name(), m4.name(),
