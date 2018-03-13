@@ -226,20 +226,6 @@ public class ConfigConstants {
 	/** The "pruneexpire" key */
 	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
 
-	/**
-	 * The "aggressiveDepth" key
-	 *
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_AGGRESSIVE_DEPTH = "aggressiveDepth";
-
-	/**
-	 * The "aggressiveWindow" key
-	 *
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_AGGRESSIVE_WINDOW = "aggressiveWindow";
-
 	/** The "mergeoptions" key */
 	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
 
