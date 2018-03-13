@@ -273,13 +273,8 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) {
 		if (m != null) {
-			if (i == null || f == null || !m.idEqual(i)
-					|| f.isModified(i.getDirCacheEntry(), true,
-							config_filemode(), repo.getFS())) {
-				update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode());
-			} else
-				keep(i.getDirCacheEntry());
+			update(m.getEntryPathString(), m.getEntryObjectId(),
+					m.getEntryFileMode());
 		} else {
 			if (f != null) {
 				if (walk.isDirectoryFileConflict()) {
