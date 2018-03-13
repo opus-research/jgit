@@ -43,6 +43,8 @@
 package org.eclipse.jgit.junit;
 
 import java.text.MessageFormat;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -71,6 +73,9 @@ import org.junit.runners.model.Statement;
  */
 public class RepeatRule implements TestRule {
 
+	private static Logger LOG = Logger
+			.getLogger(RepeatRule.class.getName());
+
 	public static class RepeatedTestException extends RuntimeException {
 		private static final long serialVersionUID = 1L;
 
@@ -96,10 +101,13 @@ public class RepeatRule implements TestRule {
 				try {
 				statement.evaluate();
 				} catch (Throwable e) {
-					throw new RepeatedTestException(MessageFormat.format(
+					RepeatedTestException ex = new RepeatedTestException(
+							MessageFormat.format(
 							"Repeated test failed when run for the {0}. time",
 							Integer.valueOf(i + 1)),
 							e);
+					LOG.log(Level.SEVERE, e.getMessage(), e);
+					throw ex;
 				}
 			}
 		}
