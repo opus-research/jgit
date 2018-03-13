@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,54 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.storage.dht.spi.memory;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Assert;
+import org.junit.Test;
 
-import java.text.MessageFormat;
-import java.util.concurrent.TimeoutException;
+public class CheckoutTest extends CLIRepositoryTestCase {
 
-import org.eclipse.jgit.storage.dht.DhtException;
-import org.eclipse.jgit.storage.dht.DhtText;
-import org.eclipse.jgit.storage.dht.RepositoryKey;
-import org.eclipse.jgit.storage.dht.RepositoryName;
-import org.eclipse.jgit.storage.dht.spi.RepositoryIndexTable;
-import org.eclipse.jgit.storage.dht.spi.memory.MemTable.Cell;
-import org.eclipse.jgit.storage.dht.spi.util.ColumnMatcher;
+	@Test
+	public void testCheckoutSelf() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
 
-final class MemRepositoryIndexTable implements RepositoryIndexTable {
-	private final MemTable table = new MemTable();
-
-	private final ColumnMatcher colId = new ColumnMatcher("id");
-
-	public RepositoryKey get(RepositoryName name) throws DhtException,
-			TimeoutException {
-		Cell cell = table.get(name.asBytes(), colId.name());
-		if (cell == null)
-			return null;
-		return RepositoryKey.fromBytes(cell.getValue());
+		assertEquals("Already on 'master'", execute("git checkout master"));
 	}
 
-	public void putUnique(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet( //
-				name.asBytes(), //
-				colId.name(), //
-				null, //
-				key.asBytes());
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
+	@Test
+	public void testCheckoutBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+
+		assertEquals("Switched to branch 'side'", execute("git checkout side"));
 	}
 
-	public void remove(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet(
-				name.asBytes(),
-				colId.name(),
-				key.asBytes(),
-				null);
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
+	@Test
+	public void testCheckoutNewBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Switched to a new branch 'side'",
+				execute("git checkout -b side"));
+	}
+
+	@Test
+	public void testCheckoutNonExistingBranch() throws Exception {
+		assertEquals(
+				"error: pathspec 'side' did not match any file(s) known to git.",
+				execute("git checkout side"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("A branch named 'master' already exists.",
+				execute("git checkout -b master"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
+		assertEquals("You are on a branch yet to be born",
+				execute("git checkout -b side"));
+	}
+
+	static private void assertEquals(String expected, String[] actual) {
+		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
+				actual.length); // ignore last line if empty
+		Assert.assertEquals(expected, actual[0]);
 	}
 }
