@@ -240,7 +240,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				if (RefSpec.isWildcard(spec) && !refName.startsWith(
 						spec.substring(0, spec.length() - 1)))
 					continue;
-				else if (!refName.equals(spec))
+				else if (!RefSpec.isWildcard(spec) && !refName.equals(spec))
 					continue;
 				String objId = ref.getValue().getLeaf().getObjectId().getName();
 				write("have " + objId + " " + refName);
