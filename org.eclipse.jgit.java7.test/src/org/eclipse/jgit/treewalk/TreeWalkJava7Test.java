@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,69 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.treewalk;
 
-package org.eclipse.jgit.internal.storage.file;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ObjectDatabase;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.util.FS;
+import org.junit.Test;
 
-abstract class FileObjectDatabase extends ObjectDatabase {
-	static enum InsertLooseObjectResult {
-		INSERTED, EXISTS_PACKED, EXISTS_LOOSE, FAILURE;
+public class TreeWalkJava7Test extends RepositoryTestCase {
+	@Test
+	public void testSymlinkToDirNotRecursingViaSymlink() throws Exception {
+		FS fs = db.getFS();
+		assertTrue(fs.supportsSymlinks());
+		writeTrashFile("target/data", "targetdata");
+		fs.createSymLink(new File(trash, "link"), "target");
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new FileTreeIterator(db));
+		assertTrue(tw.next());
+		assertEquals("link", tw.getPathString());
+		assertTrue(tw.next());
+		assertEquals("target/data", tw.getPathString());
+		assertFalse(tw.next());
 	}
-
-	@Override
-	public ObjectReader newReader() {
-		return new WindowCursor(this);
-	}
-
-	@Override
-	public ObjectDirectoryInserter newInserter() {
-		return new ObjectDirectoryInserter(this, getConfig());
-	}
-
-	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
-			throws IOException;
-
-	abstract Config getConfig();
-
-	abstract FS getFS();
-
-	abstract Set<ObjectId> getShallowCommits() throws IOException;
-
-	abstract void selectObjectRepresentation(PackWriter packer,
-			ObjectToPack otp, WindowCursor curs) throws IOException;
-
-	abstract File getDirectory();
-
-	abstract File fileFor(AnyObjectId id);
-
-	abstract ObjectLoader openObject(WindowCursor curs, AnyObjectId objectId)
-			throws IOException;
-
-	abstract long getObjectSize(WindowCursor curs, AnyObjectId objectId)
-			throws IOException;
-
-	abstract ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
-			throws IOException;
-
-	abstract InsertLooseObjectResult insertUnpackedObject(File tmp,
-			ObjectId id, boolean createDuplicate) throws IOException;
-
-	abstract PackFile openPack(File pack) throws IOException;
-
-	abstract Collection<PackFile> getPacks();
 }

@@ -1278,8 +1278,10 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 	private static ReceiveCommand newCommand(RevCommit a, RevCommit b,
 			String string, Type update) {
-		return new ReceiveCommand(a != null ? a.getId() : null,
+		ReceiveCommand ret = new ReceiveCommand(a != null ? a.getId() : null,
 				b != null ? b.getId() : null, string, update);
+		ret.setResult(ReceiveCommand.Result.NOT_ATTEMPTED);
+		return ret;
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
