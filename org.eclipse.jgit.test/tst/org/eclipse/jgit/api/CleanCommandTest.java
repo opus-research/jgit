@@ -90,7 +90,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 		status = git.status().call();
 		files = status.getUntracked();
 
-		assertEquals(0, files.size() );
+		assertEquals(0, files.size());
 		assertTrue(cleanedFiles.contains("File2.txt"));
 		assertTrue(cleanedFiles.contains("File3.txt"));
 	}
@@ -111,7 +111,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 
 		status = git.status().call();
 		files = status.getUntracked();
-		assertEquals(1, files.size() );
+		assertEquals(1, files.size());
 		assertTrue(cleanedFiles.contains("File3.txt"));
 		assertFalse(cleanedFiles.contains("File2.txt"));
 	}
@@ -131,7 +131,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 		status = git.status().call();
 		files = status.getUntracked();
 
-		assertEquals(2, files.size() );
+		assertEquals(2, files.size());
 		assertTrue(cleanedFiles.contains("File2.txt"));
 		assertTrue(cleanedFiles.contains("File3.txt"));
 	}

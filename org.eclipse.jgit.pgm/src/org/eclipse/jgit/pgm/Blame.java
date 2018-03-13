@@ -131,7 +131,6 @@ class Blame extends TextBuiltin {
 
 	private BlameResult blame;
 
-	@SuppressWarnings("boxing")
 	@Override
 	protected void run() throws Exception {
 		if (file == null) {
@@ -303,7 +302,6 @@ class Blame extends TextBuiltin {
 		return name != null ? name : "";
 	}
 
-	@SuppressWarnings("boxing")
 	private String date(int line) {
 		if (blame.getSourceCommit(line) == null)
 			return "";

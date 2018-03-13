@@ -62,7 +62,6 @@ public class ObjectCheckerTest {
 		checker = new ObjectChecker();
 	}
 
-	@SuppressWarnings("boxing")
 	@Test
 	public void testInvalidType() {
 		try {

@@ -55,7 +55,6 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.pgm.TextBuiltin;
 
 class ShowDirCache extends TextBuiltin {
-	@SuppressWarnings("boxing")
 	@Override
 	protected void run() throws Exception {
 		final SimpleDateFormat fmt;

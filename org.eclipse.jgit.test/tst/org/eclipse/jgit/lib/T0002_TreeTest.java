@@ -123,7 +123,7 @@ public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 		assertTrue("no name", t.getName() == null);
 		assertTrue("no nameUTF8", t.getNameUTF8() == null);
 		assertTrue("has entries array", t.members() != null);
-		assertEquals("entries is empty", 0, t.members().length );
+		assertEquals("entries is empty", 0, t.members().length);
 		assertEquals("full name is empty", "", t.getFullName());
 		assertTrue("no id", t.getId() == null);
 		assertTrue("database is r", t.getRepository() == db);
@@ -184,7 +184,7 @@ public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 		final TreeEntry[] i = t.members();
 		assertTrue("iterator is not empty", i.length > 0);
 		assertTrue("iterator returns file", i[0] == f);
-		assertEquals("iterator is empty", 1, i.length );
+		assertEquals("iterator is empty", 1, i.length);
 	}
 
 	@Test
