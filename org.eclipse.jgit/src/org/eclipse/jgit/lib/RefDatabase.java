@@ -217,6 +217,7 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @deprecated Use {@link #findRef(String)} instead.
 	 */
+	@Deprecated
 	public Ref getRef(String name) throws IOException {
 		return findRef(name);
 	}
