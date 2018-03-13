@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Set;
@@ -112,7 +111,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 		files = status.getUntracked();
 		assertTrue(files.size() == 1);
 		assertTrue(cleanedFiles.contains("File3.txt"));
-		assertFalse(cleanedFiles.contains("File2.txt"));
+		assertTrue(!cleanedFiles.contains("File2.txt"));
 	}
 
 	@Test
