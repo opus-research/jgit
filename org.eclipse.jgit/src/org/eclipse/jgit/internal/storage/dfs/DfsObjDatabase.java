@@ -465,7 +465,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			if (oldPack != null) {
 				list.add(oldPack);
 			} else {
-				list.add(new DfsPackFile(cache, dsc));
+				list.add(cache.getOrCreate(dsc, null));
 				foundNew = true;
 			}
 		}
