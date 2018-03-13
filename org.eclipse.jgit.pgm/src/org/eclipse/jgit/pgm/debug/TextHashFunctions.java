@@ -266,7 +266,7 @@ class TextHashFunctions extends TextBuiltin {
 	protected void run() throws Exception {
 		if (gitDirs.isEmpty()) {
 			RepositoryBuilder rb = new RepositoryBuilder() //
-					.setGitDir(new File(gitdir)) //
+					.setGitDir(gitdir) //
 					.readEnvironment() //
 					.findGitDir();
 			if (rb.getGitDir() == null)
