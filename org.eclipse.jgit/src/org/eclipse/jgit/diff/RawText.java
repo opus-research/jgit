@@ -336,13 +336,15 @@ public class RawText extends Sequence {
 				if (n < 0) {
 					throw new EOFException();
 				}
-
 				left -= n;
-				off += n;
-			}
 
-			if (isBinary(head)) {
-				throw new BinaryBlobException();
+				while (n > 0) {
+					if (head[off] == '\0') {
+						throw new BinaryBlobException();
+					}
+					off++;
+					n--;
+				}
 			}
 
 			byte data[];
