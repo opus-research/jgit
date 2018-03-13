@@ -86,7 +86,6 @@ public class ConfigTest {
 		final Config c = parse("[foo]\nbar\n");
 		assertTrue(c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
-		assertEquals("", c.get("foo", null, "bar"));
 	}
 
 	@Test
@@ -696,7 +695,6 @@ public class ConfigTest {
 		}
 
 		assertNull(c.getString("a", null, "z"));
-		assertNull(c.get("a", null, "z"));
 		assertArrayEquals(new String[]{}, c.getStringList("a", null, "z"));
 	}
 
@@ -709,9 +707,8 @@ public class ConfigTest {
 		assertEquals("0", c.getString("a", null, "x"));
 		assertEquals(0, c.getInt("a", null, "x", 1));
 
-		assertNull(c.getString("a", null, "y"));
-		assertArrayEquals(new String[]{null}, c.getStringList("a", null, "y"));
-		assertEquals("", c.get("a", null, "y"));
+		assertEquals("", c.getString("a", null, "y"));
+		assertArrayEquals(new String[]{""}, c.getStringList("a", null, "y"));
 		try {
 			c.getInt("a", null, "y", 1);
 		} catch (IllegalArgumentException e) {
@@ -719,7 +716,6 @@ public class ConfigTest {
 		}
 
 		assertNull(c.getString("a", null, "z"));
-		assertNull(c.get("a", null, "z"));
 		assertArrayEquals(new String[]{}, c.getStringList("a", null, "z"));
 	}
 
@@ -734,15 +730,9 @@ public class ConfigTest {
 	public void testEmptyValueAtEof() throws Exception {
 		String text = "[a]\nx =";
 		Config c = parse(text);
-		assertNull(c.getString("a", null, "x"));
-		assertArrayEquals(new String[]{null},
-				c.getStringList("a", null, "x"));
-		assertEquals("", c.get("a", null, "x"));
+		assertEquals("", c.getString("a", null, "x"));
 		c = parse(text + "\n");
-		assertNull(c.getString("a", null, "x"));
-		assertArrayEquals(new String[]{null},
-				c.getStringList("a", null, "x"));
-		assertEquals("", c.get("a", null, "x"));
+		assertEquals("", c.getString("a", null, "x"));
 	}
 
 	private static void assertReadLong(long exp) throws ConfigInvalidException {
