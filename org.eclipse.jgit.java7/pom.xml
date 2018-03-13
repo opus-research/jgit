@@ -106,12 +106,12 @@
             <id>translate-source-qualifier</id>
             <phase>generate-resources</phase>
             <configuration>
-              <target>
+              <tasks>
                 <copy file="META-INF/SOURCE-MANIFEST.MF" tofile="${source-bundle-manifest}" overwrite="true"/>
                 <replace file="${source-bundle-manifest}">
                   <replacefilter token=".qualifier" value=".${maven.build.timestamp}"/>
                 </replace>
-              </target>
+              </tasks>
             </configuration>
             <goals>
               <goal>run</goal>
