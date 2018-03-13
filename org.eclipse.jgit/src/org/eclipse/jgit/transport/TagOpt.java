@@ -47,10 +47,9 @@ package org.eclipse.jgit.transport;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Config.ConfigEnum;
 
 /** Specification of annotated tag behavior during fetch. */
-public enum TagOpt implements ConfigEnum {
+public enum TagOpt {
 	/**
 	 * Automatically follow tags if we fetch the thing they point at.
 	 * <p>
@@ -102,9 +101,6 @@ public enum TagOpt implements ConfigEnum {
 	 * @param o
 	 *            the configuration file text value.
 	 * @return the option that matches the passed parameter.
-	 * @throws IllegalArgumentException
-	 *             if the given string {@code o} cannot be parsed as a
-	 *             {@link TagOpt} value.
 	 */
 	public static TagOpt fromOption(final String o) {
 		if (o == null || o.length() == 0)
@@ -114,21 +110,5 @@ public enum TagOpt implements ConfigEnum {
 				return tagopt;
 		}
 		throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidTagOption, o));
-	}
-
-	/**
-	 * @since 4.9
-	 */
-	@Override
-	public String toConfigValue() {
-		return option;
-	}
-
-	/**
-	 * @since 4.9
-	 */
-	@Override
-	public boolean matchConfigValue(String in) {
-		return option.equals(in) || in == null && option.isEmpty();
 	}
 }
