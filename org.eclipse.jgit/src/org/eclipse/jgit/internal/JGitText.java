@@ -300,6 +300,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
@@ -383,10 +384,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidGitdirRef;
 	/***/ public String invalidGitType;
 	/***/ public String invalidId;
-	/***/ public String invalidId0;
 	/***/ public String invalidIdLength;
 	/***/ public String invalidIgnoreParamSubmodule;
-	/***/ public String invalidIgnoreRule;
 	/***/ public String invalidIntegerValue;
 	/***/ public String invalidKey;
 	/***/ public String invalidLineInConfigFile;
@@ -623,9 +622,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
-	/***/ public String storePushCertMultipleRefs;
-	/***/ public String storePushCertOneRef;
-	/***/ public String storePushCertReflog;
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
