@@ -89,6 +89,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FileUtils;
+
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -280,19 +281,13 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		final String name;
 		final String path;
 		final String revision;
-		final String remote;
 		final Set<String> groups;
 		final List<CopyFile> copyfiles;
 
-		Project(String name, String path, String revision,
-				String remote, String groups) {
+		Project(String name, String path, String revision, String groups) {
 			this.name = name;
-			if (path != null)
-				this.path = path;
-			else
-				this.path = name;
+			this.path = path;
 			this.revision = revision;
-			this.remote = remote;
 			this.groups = new HashSet<String>();
 			if (groups != null && groups.length() > 0)
 				this.groups.addAll(Arrays.asList(groups.split(","))); //$NON-NLS-1$
@@ -406,14 +401,10 @@ public class RepoCommand extends GitCommand<RevCommit> {
 						attributes.getValue("name"), //$NON-NLS-1$
 						attributes.getValue("path"), //$NON-NLS-1$
 						attributes.getValue("revision"), //$NON-NLS-1$
-						attributes.getValue("remote"), //$NON-NLS-1$
 						attributes.getValue("groups")); //$NON-NLS-1$
 			} else if ("remote".equals(qName)) { //$NON-NLS-1$
-				String alias = attributes.getValue("alias"); //$NON-NLS-1$
-				String fetch = attributes.getValue("fetch"); //$NON-NLS-1$
-				remotes.put(attributes.getValue("name"), fetch); //$NON-NLS-1$
-				if (alias != null)
-					remotes.put(alias, fetch);
+				remotes.put(attributes.getValue("name"), //$NON-NLS-1$
+						attributes.getValue("fetch")); //$NON-NLS-1$
 			} else if ("default".equals(qName)) { //$NON-NLS-1$
 				defaultRemote = attributes.getValue("remote"); //$NON-NLS-1$
 				defaultRevision = attributes.getValue("revision"); //$NON-NLS-1$
@@ -475,40 +466,26 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			xmlInRead--;
 			if (xmlInRead != 0)
 				return;
-
 			// Only do the following after we finished reading everything.
-			removeNotInGroup();
-			removeOverlaps();
-
-			Map<String, String> remoteUrls = new HashMap<String, String>();
-			URI baseUri;
+			if (defaultRemote == null) {
+				if (filename != null)
+					throw new SAXException(MessageFormat.format(
+							RepoText.get().errorNoDefaultFilename, filename));
+				else
+					throw new SAXException(RepoText.get().errorNoDefault);
+			}
+			String remoteUrl;
 			try {
-				baseUri = new URI(baseUrl);
+				URI uri = new URI(baseUrl);
+				remoteUrl = uri.resolve(remotes.get(defaultRemote)).toString();
+				if (!remoteUrl.endsWith("/"))
+					remoteUrl = remoteUrl + "/";
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
 			}
+			removeNotInGroup();
+			removeOverlaps();
 			for (Project proj : projects) {
-				String remote = proj.remote;
-				if (remote == null) {
-					if (defaultRemote == null) {
-						if (filename != null)
-							throw new SAXException(MessageFormat.format(
-									RepoText.get().errorNoDefaultFilename,
-									filename));
-						else
-							throw new SAXException(
-									RepoText.get().errorNoDefault);
-					}
-					remote = defaultRemote;
-				}
-				String remoteUrl = remoteUrls.get(remote);
-				if (remoteUrl == null) {
-					remoteUrl = baseUri.resolve(remotes.get(remote)).toString();
-					if (!remoteUrl.endsWith("/"))
-						remoteUrl = remoteUrl + "/";
-					remoteUrls.put(remote, remoteUrl);
-				}
-
 				command.addSubmodule(remoteUrl + proj.name,
 						proj.path,
 						proj.revision == null
@@ -560,14 +537,12 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 	}
 
-	@SuppressWarnings("serial")
 	private static class ManifestErrorException extends GitAPIException {
 		ManifestErrorException(Throwable cause) {
 			super(RepoText.get().invalidManifest, cause);
 		}
 	}
 
-	@SuppressWarnings("serial")
 	private static class RemoteUnavailableException extends GitAPIException {
 		RemoteUnavailableException(String uri) {
 			super(MessageFormat.format(RepoText.get().errorRemoteUnavailable, uri));
@@ -752,26 +727,26 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				Config cfg = new Config();
 				for (Project proj : bareProjects) {
 					String name = proj.path;
-					String nameUri = proj.name;
+					String uri = proj.name;
 					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
-					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
+					cfg.setString("submodule", name, "url", uri); //$NON-NLS-1$ //$NON-NLS-2$
 					// create gitlink
 					DirCacheEntry dcEntry = new DirCacheEntry(name);
 					ObjectId objectId;
 					if (ObjectId.isId(proj.revision))
 						objectId = ObjectId.fromString(proj.revision);
 					else {
-						objectId = callback.sha1(nameUri, proj.revision);
+						objectId = callback.sha1(uri, proj.revision);
 					}
 					if (objectId == null)
-						throw new RemoteUnavailableException(nameUri);
+						throw new RemoteUnavailableException(uri);
 					dcEntry.setObjectId(objectId);
 					dcEntry.setFileMode(FileMode.GITLINK);
 					builder.add(dcEntry);
 
 					for (CopyFile copyfile : proj.copyfiles) {
 						byte[] src = callback.readFile(
-								nameUri, proj.revision, copyfile.src);
+								uri, proj.revision, copyfile.src);
 						objectId = inserter.insert(Constants.OBJ_BLOB, src);
 						dcEntry = new DirCacheEntry(copyfile.dest);
 						dcEntry.setObjectId(objectId);
@@ -844,7 +819,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private void addSubmodule(String url, String name, String revision,
 			List<CopyFile> copyfiles) throws SAXException {
 		if (repo.isBare()) {
-			Project proj = new Project(url, name, revision, null, null);
+			Project proj = new Project(url, name, revision, null);
 			proj.copyfiles.addAll(copyfiles);
 			bareProjects.add(proj);
 		} else {
@@ -877,7 +852,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private static String findRef(String ref, Repository repo)
 			throws IOException {
 		if (!ObjectId.isId(ref)) {
-			Ref r = repo.getRef(Constants.DEFAULT_REMOTE_NAME + "/" + ref); //$NON-NLS-1$
+			Ref r = repo.getRef(
+					Constants.DEFAULT_REMOTE_NAME + "/" + ref);
 			if (r != null)
 				return r.getName();
 		}

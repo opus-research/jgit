@@ -91,7 +91,6 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 	 * @param h
 	 *            total height (in pixels) of this cell.
 	 */
-	@SuppressWarnings("unchecked")
 	protected void paintCommit(final PlotCommit<TLane> commit, final int h) {
 		final int dotSize = computeDotSize(h);
 		final TLane myLane = commit.getLane();
@@ -115,6 +114,7 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 					LINE_WIDTH);
 
 			for (int i = 0; i < commit.mergingLanes.length; i++) {
+				@SuppressWarnings("unchecked")
 				final TLane pLane = (TLane) commit.mergingLanes[i];
 				final TColor pColor = laneColor(pLane);
 				final int cx = laneC(pLane);
@@ -138,6 +138,7 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 
 		if (commit.getChildCount() > 0) {
 			for (int i = 0; i < commit.forkingOffLanes.length; i++) {
+				@SuppressWarnings("unchecked")
 				final TLane childLane = (TLane) commit.forkingOffLanes[i];
 				final TColor cColor = laneColor(childLane);
 				final int cx = laneC(childLane);

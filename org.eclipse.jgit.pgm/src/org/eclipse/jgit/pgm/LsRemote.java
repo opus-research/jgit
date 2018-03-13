@@ -80,11 +80,6 @@ class LsRemote extends TextBuiltin {
 		}
 	}
 
-	@Override
-	protected boolean requiresRepository() {
-		return false;
-	}
-
 	private void show(final AnyObjectId id, final String name)
 			throws IOException {
 		outw.print(id.name());
