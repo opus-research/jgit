@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.pgm;
 
+import static org.junit.Assert.assertEquals;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
@@ -212,5 +213,18 @@ public class StatusTest extends CLIRepositoryTestCase {
 						"# \tuntracked", //
 						"" //
 				}, execute("git status")); //
+	}
+
+	private void assertArrayOfLinesEquals(String[] expected, String[] actual) {
+		assertEquals(toText(expected), toText(actual));
+	}
+
+	private String toText(String[] lines) {
+		StringBuilder b = new StringBuilder();
+		for (String s : lines) {
+			b.append(s);
+			b.append('\n');
+		}
+		return b.toString();
 	}
 }
