@@ -143,8 +143,6 @@ public abstract class PackParser {
 
 	private boolean expectDataAfterPackFooter;
 
-	private boolean deferCheckObject;
-
 	private long objectCount;
 
 	private PackedObjectInfo[] entries;
@@ -176,7 +174,7 @@ public abstract class PackParser {
 	private LongMap<UnresolvedDelta> baseByPos;
 
 	/** Blobs whose contents need to be double-checked after indexing. */
-	private BlockList<PackedObjectInfo> deferredCheckObjs;
+	private BlockList<PackedObjectInfo> deferredCheckBlobs;
 
 	private MessageDigest packDigest;
 
@@ -262,21 +260,6 @@ public abstract class PackParser {
 	 */
 	protected void setCheckObjectCollisions(boolean check) {
 		checkObjectCollisions = check;
-	}
-
-	/**
-	 * Configure integrity check for receiving objects.
-	 * <p>
-	 * By default PackParser verifies every object while processing it. This
-	 * phase sometime can be slow and hanging the network stream. This flag
-	 * allow defer the check until the pack stream is closed.
-	 *
-	 * @param defer
-	 *            true to defer object checking until end of the pack stream.
-	 * @since 4.8
-	 */
-	public void setDeferCheckObject(boolean defer) {
-		deferCheckObject = defer;
 	}
 
 	/**
@@ -545,7 +528,7 @@ public abstract class PackParser {
 			entries = new PackedObjectInfo[(int) objectCount];
 			baseById = new ObjectIdOwnerMap<>();
 			baseByPos = new LongMap<>();
-			deferredCheckObjs = new BlockList<>();
+			deferredCheckBlobs = new BlockList<>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
@@ -562,8 +545,8 @@ public abstract class PackParser {
 				receiving.endTask();
 			}
 
-			if (!deferredCheckObjs.isEmpty())
-				doDeferredCheckObjs();
+			if (!deferredCheckBlobs.isEmpty())
+				doDeferredCheckBlobs();
 			if (deltaCount > 0) {
 				if (resolving instanceof BatchingProgressMonitor) {
 					((BatchingProgressMonitor) resolving).setDelayStart(
@@ -909,13 +892,11 @@ public abstract class PackParser {
 			if (buf[p + k] != Constants.PACK_SIGNATURE[k])
 				throw new IOException(JGitText.get().notAPACKFile);
 
-		final long vers = NB
-				.decodeUInt32(buf, p + Constants.PACK_SIGNATURE.length);
+		final long vers = NB.decodeUInt32(buf, p + 4);
 		if (vers != 2 && vers != 3)
 			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
-		objectCount = NB
-				.decodeUInt32(buf, p + Constants.PACK_SIGNATURE.length + 4);
+		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
 
 		onPackHeader(objectCount);
@@ -1067,15 +1048,12 @@ public abstract class PackParser {
 			checkContentLater = isCheckObjectCollisions()
 					&& readCurs.has(tempObjectId);
 			data = null;
+
 		} else {
 			data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
 			objectDigest.digest(tempObjectId);
-			if (!deferCheckObject) {
-				verifySafeObject(tempObjectId, type, data);
-			} else {
-				checkContentLater = true;
-			}
+			verifySafeObject(tempObjectId, type, data);
 		}
 
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
@@ -1085,7 +1063,7 @@ public abstract class PackParser {
 			onInflatedObjectData(obj, type, data);
 		addObjectAndTrack(obj);
 		if (checkContentLater)
-			deferredCheckObjs.add(obj);
+			deferredCheckBlobs.add(obj);
 	}
 
 	private void verifySafeObject(final AnyObjectId id, final int type,
@@ -1105,70 +1083,56 @@ public abstract class PackParser {
 			}
 		}
 
-		if (isCheckObjectCollisions() && readCurs.has(id)) {
-			checkObjectCollision(id, type, data);
-		}
-	}
-
-	private void checkObjectCollision(AnyObjectId id, int type, byte[] data)
-			throws IOException {
-		try {
-			final ObjectLoader ldr = readCurs.open(id, type);
-			final byte[] existingData = ldr.getCachedBytes(data.length);
-			if (!Arrays.equals(data, existingData)) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, id.name()));
+		if (isCheckObjectCollisions()) {
+			try {
+				final ObjectLoader ldr = readCurs.open(id, type);
+				final byte[] existingData = ldr.getCachedBytes(data.length);
+				if (!Arrays.equals(data, existingData)) {
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, id.name()));
+				}
+			} catch (MissingObjectException notLocal) {
+				// This is OK, we don't have a copy of the object locally
+				// but the API throws when we try to read it as usually its
+				// an error to read something that doesn't exist.
 			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
 		}
 	}
 
-	private void checkObjectCollision(AnyObjectId id, int type)
-			throws IOException {
+	private void doDeferredCheckBlobs() throws IOException {
 		final byte[] readBuffer = buffer();
 		final byte[] curBuffer = new byte[readBuffer.length];
 		ObjectTypeAndSize info = new ObjectTypeAndSize();
-		long sz = info.size;
-		ObjectStream cur = readCurs.open(id, type).openStream();
-		InputStream pck = inflate(Source.DATABASE, sz);
-		try {
-			if (cur.getSize() != sz) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, id.name()));
-			}
-			while (0 < sz) {
-				int n = (int) Math.min(readBuffer.length, sz);
-				IO.readFully(cur, curBuffer, 0, n);
-				IO.readFully(pck, readBuffer, 0, n);
-				for (int i = 0; i < n; i++) {
-					if (curBuffer[i] != readBuffer[i]) {
-						throw new IOException(MessageFormat.format(JGitText
-								.get().collisionOn, id.name()));
-					}
-				}
-				sz -= n;
-			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
-		} finally {
-			pck.close();
-			cur.close();
-		}
-	}
 
-	private void doDeferredCheckObjs() throws IOException {
-		for (PackedObjectInfo obj : deferredCheckObjs) {
-			ObjectTypeAndSize info = openDatabase(obj, new ObjectTypeAndSize());
-			if (info.type != Constants.OBJ_BLOB) {
-				byte[] data = inflateAndReturn(Source.DATABASE, info.size);
-				verifySafeObject(obj, info.type, data);
-			} else {
-				checkObjectCollision(obj, info.type);
+		for (PackedObjectInfo obj : deferredCheckBlobs) {
+			info = openDatabase(obj, info);
+
+			if (info.type != Constants.OBJ_BLOB)
+				throw new IOException(MessageFormat.format(
+						JGitText.get().unknownObjectType,
+						Integer.valueOf(info.type)));
+
+			ObjectStream cur = readCurs.open(obj, info.type).openStream();
+			try {
+				long sz = info.size;
+				if (cur.getSize() != sz)
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, obj.name()));
+				InputStream pck = inflate(Source.DATABASE, sz);
+				while (0 < sz) {
+					int n = (int) Math.min(readBuffer.length, sz);
+					IO.readFully(cur, curBuffer, 0, n);
+					IO.readFully(pck, readBuffer, 0, n);
+					for (int i = 0; i < n; i++) {
+						if (curBuffer[i] != readBuffer[i])
+							throw new IOException(MessageFormat.format(JGitText
+									.get().collisionOn, obj.name()));
+					}
+					sz -= n;
+				}
+				pck.close();
+			} finally {
+				cur.close();
 			}
 		}
 	}

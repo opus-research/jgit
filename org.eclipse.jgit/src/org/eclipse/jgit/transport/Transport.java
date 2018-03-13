@@ -814,8 +814,6 @@ public abstract class Transport implements AutoCloseable {
 	private PrintStream hookOutRedirect;
 
 	private PrePushHook prePush;
-
-	private boolean deferCheckObject;
 	/**
 	 * Create a new transport instance.
 	 *
@@ -962,26 +960,6 @@ public abstract class Transport implements AutoCloseable {
 	 */
 	public void setObjectChecker(ObjectChecker impl) {
 		objectChecker = impl;
-	}
-
-	/**
-	 * @param defer
-	 *            If True, defer object checking until network is done.
-	 *            False by default.
-	 * @see {@link PackParser#setDeferCheckObject(boolean)}
-	 * @since 4.8
-	 */
-	public void setDeferCheckObject(boolean defer) {
-		deferCheckObject = defer;
-	}
-
-	/**
-	 * @return true if checking object should be done until the end of pack
-	 *         stream.
-	 * @since 4.8
-	 */
-	public boolean isDeferCheckObject() {
-		return deferCheckObject;
 	}
 
 	/**
