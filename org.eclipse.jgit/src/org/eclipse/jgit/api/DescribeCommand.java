@@ -48,7 +48,6 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -136,16 +135,14 @@ public class DescribeCommand extends GitCommand<String> {
 	}
 
 	/**
-	 * Describes the specified commit. Target defaults to HEAD if no commit was
-	 * set explicitly.
+	 * Describes the specified commit.
 	 *
-	 * @return if there's a tag that points to the commit being described, this
-	 *         tag name is returned. Otherwise additional suffix is added to the
-	 *         nearest tag, just like git-describe(1).
+	 * @return if there's a tag that points to the commit being described, this tag name
+	 *         is returned. Otherwise additional suffix is added to the nearest tag, just
+	 *         like git-describe(1).
 	 *         <p/>
-	 *         If none of the ancestors of the commit being described has any
-	 *         tags at all, then this method returns null, indicating that
-	 *         there's no way to describe this tag.
+	 *         If none of the ancestors of the commit being described has any tags at all,
+	 *         then this method returns null, indicating that there's no way to describe this tag.
 	 */
 	@Override
 	public String call() throws GitAPIException {
@@ -153,7 +150,7 @@ public class DescribeCommand extends GitCommand<String> {
 			checkCallable();
 
 			if (target == null)
-				setTarget(Constants.HEAD);
+				throw new IllegalArgumentException(JGitText.get().targetIsNotSet);
 
 			Map<ObjectId, Ref> tags = new HashMap<ObjectId, Ref>();
 
