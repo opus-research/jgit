@@ -183,9 +183,10 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	}
 
 	private Gson createGson() {
-		return new GsonBuilder()
-				.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.disableHtmlEscaping()
-				.create();
+		GsonBuilder gb = new GsonBuilder()
+				.setFieldNamingPolicy(
+						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+				.setPrettyPrinting().disableHtmlEscaping();
+		return gb.create();
 	}
 }
