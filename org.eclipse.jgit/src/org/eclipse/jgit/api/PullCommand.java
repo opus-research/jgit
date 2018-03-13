@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.merge.ContentMerger;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 
@@ -88,8 +87,6 @@ public class PullCommand extends GitCommand<PullResult> {
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private CredentialsProvider credentialsProvider;
-
-	private ContentMerger contentMerger;
 
 	/**
 	 * @param repo
@@ -127,19 +124,6 @@ public class PullCommand extends GitCommand<PullResult> {
 			CredentialsProvider credentialsProvider) {
 		checkCallable();
 		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
-
-	/**
-	 * Defines which {@link ContentMerger} is used for merging file contents
-	 * during pull.
-	 *
-	 * @param newMerger
-	 * @return {@code this}
-	 */
-	public PullCommand mergeWith(ContentMerger newMerger) {
-		checkCallable();
-		this.contentMerger = newMerger;
 		return this;
 	}
 
@@ -210,7 +194,8 @@ public class PullCommand extends GitCommand<PullResult> {
 		String remoteUri;
 		FetchResult fetchRes;
 		if (isRemote) {
-			remoteUri = repoConfig.getString("remote", remote,
+			remoteUri = repoConfig.getString(
+					ConfigConstants.CONFIG_REMOTE_SECTION, remote,
 					ConfigConstants.CONFIG_KEY_URL);
 			if (remoteUri == null) {
 				String missingKey = ConfigConstants.CONFIG_REMOTE_SECTION + DOT
@@ -297,7 +282,6 @@ public class PullCommand extends GitCommand<PullResult> {
 					+ Repository.shortenRefName(remoteBranchName) + "\' of "
 					+ remoteUri;
 			merge.include(name, commitToMerge);
-			merge.mergeWith(contentMerger);
 			MergeResult mergeRes;
 			try {
 				mergeRes = merge.call();

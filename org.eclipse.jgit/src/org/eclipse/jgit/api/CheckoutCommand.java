@@ -65,7 +65,9 @@ import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
@@ -142,8 +144,8 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			}
 
 			Ref headRef = repo.getRef(Constants.HEAD);
-			String refLogMessage = "checkout: moving from "
-					+ headRef.getTarget().getName();
+			String shortHeadRef = getShortBranchName(headRef);
+			String refLogMessage = "checkout: moving from " + shortHeadRef;
 			ObjectId branch = repo.resolve(name);
 			if (branch == null)
 				throw new RefNotFoundException(MessageFormat.format(JGitText
@@ -168,10 +170,10 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
 				ref = null;
+			String toName = Repository.shortenRefName(name);
 			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, ref == null);
 			refUpdate.setForceUpdate(force);
-			refUpdate.setRefLogMessage(refLogMessage + " to "
-					+ newCommit.getName(), false);
+			refUpdate.setRefLogMessage(refLogMessage + " to " + toName, false);
 			Result updateResult;
 			if (ref != null)
 				updateResult = refUpdate.link(ref.getName());
@@ -215,6 +217,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		}
 	}
 
+	private String getShortBranchName(Ref headRef) {
+		if (headRef.getTarget().getName().equals(headRef.getName()))
+			return headRef.getTarget().getObjectId().getName();
+		return Repository.shortenRefName(headRef.getTarget().getName());
+	}
+
 	/**
 	 * @param path
 	 *            Path to update in the working tree and index.
@@ -238,37 +246,44 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		RevWalk revWalk = new RevWalk(repo);
 		DirCache dc = repo.lockDirCache();
 		try {
-			TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader());
-			treeWalk.setRecursive(true);
-			treeWalk.addTree(new DirCacheIterator(dc));
-			treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
-			List<String> files = new LinkedList<String>();
-			while (treeWalk.next())
-				files.add(treeWalk.getPathString());
-
-			if (startCommit != null || startPoint != null) {
-				DirCacheEditor editor = dc.editor();
-				TreeWalk startWalk = new TreeWalk(revWalk.getObjectReader());
-				startWalk.setRecursive(true);
-				startWalk.setFilter(treeWalk.getFilter());
+			DirCacheEditor editor = dc.editor();
+			TreeWalk startWalk = new TreeWalk(revWalk.getObjectReader());
+			startWalk.setRecursive(true);
+			startWalk.setFilter(PathFilterGroup.createFromStrings(paths));
+			boolean checkoutIndex = startCommit == null && startPoint == null;
+			if (!checkoutIndex)
 				startWalk.addTree(revWalk.parseCommit(getStartPoint())
 						.getTree());
+			else
+				startWalk.addTree(new DirCacheIterator(dc));
+
+			final File workTree = repo.getWorkTree();
+			final ObjectReader r = repo.getObjectDatabase().newReader();
+			try {
 				while (startWalk.next()) {
 					final ObjectId blobId = startWalk.getObjectId(0);
+					final FileMode mode = startWalk.getFileMode(0);
 					editor.add(new PathEdit(startWalk.getPathString()) {
-
 						public void apply(DirCacheEntry ent) {
 							ent.setObjectId(blobId);
+							ent.setFileMode(mode);
+							try {
+								DirCacheCheckout.checkoutEntry(repo, new File(
+										workTree, ent.getPathString()), ent, r);
+							} catch (IOException e) {
+								throw new JGitInternalException(
+										MessageFormat.format(
+												JGitText.get().checkoutConflictWithFile,
+												ent.getPathString()), e);
+							}
 						}
 					});
 				}
 				editor.commit();
+			} finally {
+				startWalk.release();
+				r.release();
 			}
-
-			File workTree = repo.getWorkTree();
-			for (String file : files)
-				DirCacheCheckout.checkoutEntry(repo, new File(workTree, file),
-						dc.getEntry(file));
 		} finally {
 			dc.unlock();
 			revWalk.release();

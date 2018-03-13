@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Benjamin Muskalla <benjamin.muskalla@tasktop.com>
+ * Copyright (C) 2011, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,46 +40,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.junit;
 
-import java.io.IOException;
-import java.util.Collections;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.ContentMerger;
-import org.eclipse.jgit.merge.MergeChunk.ConflictState;
-import org.eclipse.jgit.merge.MergeResult;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+/**
+ * Parsed information about a checkout.
+ */
+public class CheckoutEntry {
+	static final String CHECKOUT_MOVING_FROM = "checkout: moving from ";
 
-public final class MockContentMerger extends ContentMerger {
+	private String from;
 
-	public MockContentMerger(Repository db) {
-		super(db);
+	private String to;
+
+	CheckoutEntry(ReflogEntry reflogEntry) {
+		String comment = reflogEntry.getComment();
+		int p1 = CHECKOUT_MOVING_FROM.length();
+		int p2 = comment.indexOf(" to ", p1);
+		int p3 = comment.length();
+		from = comment.substring(p1,p2);
+		to = comment.substring(p2 + " to ".length(), p3);
 	}
 
-	@Override
-	public MergeResult<RawText> merge(RawTextComparator cmp,
-			CanonicalTreeParser base, CanonicalTreeParser ours,
-			CanonicalTreeParser theirs) throws IOException {
-		String mergedContent = "custom merge - ";
-		mergedContent += getRawText(base);
-		mergedContent += ":";
-		mergedContent += getRawText(ours);
-		mergedContent += ":";
-		mergedContent += getRawText(theirs);
-
-		RawText rawMerge = new RawText(mergedContent.getBytes());
-		MergeResult<RawText> mergeResult = new MergeResult<RawText>(
-				Collections.singletonList(rawMerge));
-		mergeResult.add(0, 0, 1, ConflictState.NO_CONFLICT);
-		return mergeResult;
+	/**
+	 * @return the name of the branch before checkout
+	 */
+	public String getFromBranch() {
+		return from;
 	}
 
-	private String getRawText(CanonicalTreeParser tree) throws IOException {
-		return new RawText(db.open(tree.getEntryObjectId(), Constants.OBJ_BLOB)
-				.getCachedBytes()).getString(0);
+	/**
+	 * @return the name of the branch after checkout
+	 */
+	public String getToBranch() {
+		return to;
 	}
 }

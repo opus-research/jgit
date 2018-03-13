@@ -69,12 +69,11 @@ import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.ContentMerger;
 import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
+import org.eclipse.jgit.merge.Merger;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
-import org.eclipse.jgit.merge.ThreeWayMerger;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -93,8 +92,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
 
 	private List<Ref> commits = new LinkedList<Ref>();
-
-	private ContentMerger contentMerger;
 
 	/**
 	 * @param repo
@@ -196,8 +193,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						commits, head);
 				repo.writeMergeCommitMsg(mergeMessage);
 				repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
-				ThreeWayMerger merger = (ThreeWayMerger) mergeStrategy
-						.newMerger(repo);
+				Merger merger = mergeStrategy.newMerger(repo);
 				boolean noProblems;
 				Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults = null;
 				Map<String, MergeFailureReason> failingPaths = null;
@@ -207,7 +203,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					resolveMerger.setCommitNames(new String[] {
 							"BASE", "HEAD", ref.getName() });
 					resolveMerger.setWorkingTreeIterator(new FileTreeIterator(repo));
-					resolveMerger.setContentMerger(contentMerger);
 					noProblems = merger.merge(headCommit, srcCommit);
 					lowLevelResults = resolveMerger
 							.getMergeResults();
@@ -215,14 +210,18 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
-
+				refLogMessage.append(": Merge made by ");
+				refLogMessage.append(mergeStrategy.getName());
+				refLogMessage.append('.');
 				if (noProblems) {
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
 							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					RevCommit newHead = new Git(getRepository()).commit().call();
+
+					RevCommit newHead = new Git(getRepository()).commit()
+							.setReflogComment(refLogMessage.toString()).call();
 					return new MergeResult(newHead.getId(),
 							null, new ObjectId[] {
 									headCommit.getId(), srcCommit.getId() },
@@ -327,18 +326,5 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	public MergeCommand include(String name, AnyObjectId commit) {
 		return include(new ObjectIdRef.Unpeeled(Storage.LOOSE, name,
 				commit.copy()));
-	}
-
-	/**
-	 * Defines which {@link ContentMerger} is used for merging file contents
-	 * during the merge.
-	 * 
-	 * @param newMerger
-	 * @return {@code this}
-	 */
-	public MergeCommand mergeWith(ContentMerger newMerger) {
-		checkCallable();
-		this.contentMerger = newMerger;
-		return this;
 	}
 }
