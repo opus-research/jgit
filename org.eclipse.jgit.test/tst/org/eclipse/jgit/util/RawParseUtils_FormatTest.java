@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Benjamin Muskalla <bmuskalla@eclipsesource.com>
- * Copyright (C) 2008, Manuel Woelker <manuel.woelker@gmail.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,67 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.blame;
 
-/**
- *  A range of lines in a file
- */
-public class Range {
-	int start;
-	int length;
+package org.eclipse.jgit.util;
 
-	/**
-	 * @return start of range (0-based)
-	 */
-	public int getStart() {
-		return start;
-	}
+import java.io.UnsupportedEncodingException;
 
-	/**
-	 * @return length of range, 0 if range is empty
-	 */
-	public int getLength() {
-		return length;
-	}
+import junit.framework.TestCase;
 
+public class RawParseUtils_FormatTest extends TestCase {
+	public void testFormatBase10() throws UnsupportedEncodingException {
+		byte[] b = new byte[64];
+		int p;
 
-	/**
-	 * @param start
-	 * @param length
-	 */
-	public Range(int start, int length) {
-		this.start = start;
-		this.length = length;
-	}
+		p = RawParseUtils.formatBase10(b, b.length, 0);
+		assertEquals("0", new String(b, p, b.length - p, "UTF-8"));
 
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + length;
-		result = prime * result + start;
-		return result;
-	}
+		p = RawParseUtils.formatBase10(b, b.length, 42);
+		assertEquals("42", new String(b, p, b.length - p, "UTF-8"));
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Range other = (Range) obj;
-		if (length != other.length)
-			return false;
-		if (start != other.start)
-			return false;
-		return true;
-	}
+		p = RawParseUtils.formatBase10(b, b.length, 1234);
+		assertEquals("1234", new String(b, p, b.length - p, "UTF-8"));
 
-	@Override
-	public String toString() {
-		return String.format("(%d:+%d)", Integer.valueOf(start), Integer
-				.valueOf(length));
+		p = RawParseUtils.formatBase10(b, b.length, -9876);
+		assertEquals("-9876", new String(b, p, b.length - p, "UTF-8"));
+
+		p = RawParseUtils.formatBase10(b, b.length, 123456789);
+		assertEquals("123456789", new String(b, p, b.length - p, "UTF-8"));
 	}
 }
