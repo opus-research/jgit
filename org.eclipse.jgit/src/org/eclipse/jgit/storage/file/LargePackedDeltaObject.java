@@ -58,8 +58,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.storage.pack.DeltaStream;
-import org.eclipse.jgit.util.TemporaryBuffer;
-import org.eclipse.jgit.util.io.TeeInputStream;
 
 class LargePackedDeltaObject extends ObjectLoader {
 	private static final long SIZE_UNKNOWN = -1;
@@ -157,9 +155,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 		try {
 			throw new LargeObjectException(getObjectId());
 		} catch (IOException cannotObtainId) {
-			LargeObjectException err = new LargeObjectException();
-			err.initCause(cannotObtainId);
-			throw err;
+			throw new LargeObjectException();
 		}
 	}
 
@@ -195,13 +191,9 @@ class LargePackedDeltaObject extends ObjectLoader {
 		final ObjectLoader base = pack.load(wc, baseOffset);
 		DeltaStream ds = new DeltaStream(delta) {
 			private long baseSize = SIZE_UNKNOWN;
-			private TemporaryBuffer.LocalFile buffer;
 
 			@Override
 			protected InputStream openBase() throws IOException {
-				if (buffer != null)
-					return buffer.openInputStream();
-
 				InputStream in;
 				if (base instanceof LargePackedDeltaObject)
 					in = ((LargePackedDeltaObject) base).open(wc);
@@ -213,9 +205,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 					else if (in instanceof ObjectStream)
 						baseSize = ((ObjectStream) in).getSize();
 				}
-
-				buffer = new TemporaryBuffer.LocalFile(db.getDirectory());
-				return new TeeInputStream(in, buffer);
+				return in;
 			}
 
 			@Override
@@ -227,13 +217,6 @@ class LargePackedDeltaObject extends ObjectLoader {
 					baseSize = base.getSize();
 				}
 				return baseSize;
-			}
-
-			@Override
-			public void close() throws IOException {
-				super.close();
-				if (buffer != null)
-					buffer.destroy();
 			}
 		};
 		if (size == SIZE_UNKNOWN)

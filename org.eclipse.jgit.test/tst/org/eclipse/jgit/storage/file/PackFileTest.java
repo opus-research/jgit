@@ -47,11 +47,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
@@ -135,9 +133,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id.name()), tooBig
-					.getMessage());
+			assertEquals(id.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
@@ -261,9 +257,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id3.name()), tooBig
-					.getMessage());
+			assertEquals(id3.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
@@ -319,9 +313,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id3.name()), tooBig
-					.getMessage());
+			assertEquals(id3.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
