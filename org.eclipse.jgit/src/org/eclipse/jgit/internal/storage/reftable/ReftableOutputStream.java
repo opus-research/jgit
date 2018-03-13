@@ -50,13 +50,11 @@ import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.security.DigestOutputStream;
 import java.util.Arrays;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.io.CountingOutputStream;
@@ -69,7 +67,6 @@ import org.eclipse.jgit.util.io.CountingOutputStream;
  */
 class ReftableOutputStream extends OutputStream {
 	private final byte[] tmp = new byte[10];
-	private final DigestOutputStream hashOut;
 	private final CountingOutputStream out;
 	private final Deflater deflater;
 	private final DeflaterOutputStream compressor;
@@ -87,8 +84,7 @@ class ReftableOutputStream extends OutputStream {
 		blockSize = bs;
 		blockBuf = new byte[bs];
 
-		hashOut = new DigestOutputStream(os, Constants.newMessageDigest());
-		out = new CountingOutputStream(hashOut);
+		out = new CountingOutputStream(os);
 		deflater = new Deflater(Deflater.BEST_COMPRESSION);
 		compressor = new DeflaterOutputStream(out, deflater);
 	}
@@ -226,12 +222,11 @@ class ReftableOutputStream extends OutputStream {
 		return (blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE;
 	}
 
-	ObjectId finishFile() throws IOException {
+	void finishFile() throws IOException {
 		// File footer doesn't need patching for the block start.
 		// Just flush what has been buffered.
 		out.write(blockBuf, 0, cur);
 		cur = 0;
 		deflater.end();
-		return ObjectId.fromRaw(hashOut.getMessageDigest().digest());
 	}
 }
