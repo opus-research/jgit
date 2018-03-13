@@ -45,6 +45,7 @@ package org.eclipse.jgit.storage.file;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
+import java.util.Collection;
 import java.util.Collections;
 
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
@@ -59,8 +60,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class GCTest extends LocalDiskRepositoryTestCase {
-	private static long TWO_WEEKS_MILLIS = 14L * 24L * 60L * 60L * 1000L;
-
 	private TestRepository<FileRepository> tr;
 
 	private FileRepository repo;
@@ -74,7 +73,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		super.setUp();
 		repo = createWorkRepository();
 		tr = new TestRepository<FileRepository>((repo));
-		gc = new GC(repo, null, TWO_WEEKS_MILLIS);
+		gc = new GC(repo);
 	}
 
 	@After
@@ -87,26 +86,26 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		tr.branch("refs/heads/master").commit().add("A", "A").add("B", "B")
 				.create();
 		stats = gc.getStatistics();
-		assertEquals(4, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(4, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(0, stats.nrOfLooseObjects);
-		assertEquals(4, stats.nrOfPackedObjects);
-		assertEquals(1, stats.nrOfPackFiles);
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(4, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 	}
 
 	@Test
 	public void testPackRepoWithNoRefs() throws Exception {
 		tr.commit().add("A", "A").add("B", "B").create();
 		stats = gc.getStatistics();
-		assertEquals(4, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(4, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(4, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
-		assertEquals(0, stats.nrOfPackFiles);
+		assertEquals(4, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
+		assertEquals(0, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -116,13 +115,13 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		bb.commit().add("A", "A2").add("B", "B2").create();
 
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(0, stats.nrOfLooseObjects);
-		assertEquals(8, stats.nrOfPackedObjects);
-		assertEquals(1, stats.nrOfPackFiles);
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(8, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -133,13 +132,37 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		tr.update("refs/heads/master", first);
 
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(0, stats.nrOfLooseObjects);
-		assertEquals(8, stats.nrOfPackedObjects);
-		assertEquals(2, stats.nrOfPackFiles);
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(8, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
+	}
+
+	@Test
+	public void testNotPackTwice() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		RevCommit second = tr.commit().parent(first).add("A", "Aside")
+				.add("B", "B").create();
+		tr.update("refs/tags/v2.0", tr.tag("v2.0", second));
+
+		Collection<PackFile> oldPacks = tr.getRepository().getObjectDatabase()
+				.getPacks();
+		assertEquals(0, oldPacks.size());
+		stats = gc.getStatistics();
+		assertEquals(12, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
+
+		gc.setExpireAgeMillis(0);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(12, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -150,8 +173,8 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		tr.update("refs/heads/master", first);
 
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 
 		FileUtils.delete(new File(repo.getDirectory(), "logs/HEAD"),
 				FileUtils.RETRY | FileUtils.SKIP_MISSING);
@@ -161,9 +184,9 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		gc.gc();
 
 		stats = gc.getStatistics();
-		assertEquals(4, stats.nrOfLooseObjects);
-		assertEquals(4, stats.nrOfPackedObjects);
-		assertEquals(1, stats.nrOfPackFiles);
+		assertEquals(4, stats.numberOfLooseObjects);
+		assertEquals(4, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -174,14 +197,14 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		tr.update("refs/heads/master", first);
 
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.setExpireAgeMillis(0);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(0, stats.nrOfLooseObjects);
-		assertEquals(8, stats.nrOfPackedObjects);
-		assertEquals(2, stats.nrOfPackFiles);
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(8, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -193,8 +216,8 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		tr.update("refs/heads/master", first);
 
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 
 		FileUtils.delete(new File(repo.getDirectory(), "logs/HEAD"),
 				FileUtils.RETRY | FileUtils.SKIP_MISSING);
@@ -205,9 +228,9 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		gc.gc();
 
 		stats = gc.getStatistics();
-		assertEquals(0, stats.nrOfLooseObjects);
-		assertEquals(4, stats.nrOfPackedObjects);
-		assertEquals(1, stats.nrOfPackFiles);
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(4, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -217,13 +240,13 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		bb.commit().add("A", "A2").add("B", "B2").create();
 		bb.commit().add("A", "A3"); // this new content in index should survive
 		stats = gc.getStatistics();
-		assertEquals(9, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(9, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(1, stats.nrOfLooseObjects);
-		assertEquals(8, stats.nrOfPackedObjects);
-		assertEquals(1, stats.nrOfPackFiles);
+		assertEquals(1, stats.numberOfLooseObjects);
+		assertEquals(8, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -233,14 +256,14 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		bb.commit().add("A", "A2").add("B", "B2").create();
 		bb.commit().add("A", "A3"); // this new content in index should survive
 		stats = gc.getStatistics();
-		assertEquals(9, stats.nrOfLooseObjects);
-		assertEquals(0, stats.nrOfPackedObjects);
+		assertEquals(9, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
 		gc.setExpireAgeMillis(0);
 		gc.gc();
 		stats = gc.getStatistics();
-		assertEquals(0, stats.nrOfLooseObjects);
-		assertEquals(8, stats.nrOfPackedObjects);
-		assertEquals(1, stats.nrOfPackFiles);
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(8, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 	}
 
 	@Test
@@ -249,16 +272,16 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		bb.commit().add("A", "A").add("B", "B").create();
 		bb.commit().add("A", "A2").add("B", "B2").create();
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
 		gc.setExpireAgeMillis(0);
 		gc.prune(Collections.<ObjectId> emptySet());
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
 		tr.blob("x");
 		stats = gc.getStatistics();
-		assertEquals(9, stats.nrOfLooseObjects);
+		assertEquals(9, stats.numberOfLooseObjects);
 		gc.prune(Collections.<ObjectId> emptySet());
 		stats = gc.getStatistics();
-		assertEquals(8, stats.nrOfLooseObjects);
+		assertEquals(8, stats.numberOfLooseObjects);
 	}
 }

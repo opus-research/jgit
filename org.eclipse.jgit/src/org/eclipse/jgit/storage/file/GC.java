@@ -52,14 +52,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -84,32 +81,11 @@ import org.eclipse.jgit.util.FileUtils;
  * Additionally the index is taken into account and reflogs are handled.
  */
 public class GC {
-	private FileRepository repo;
+	private final FileRepository repo;
 
 	private ProgressMonitor pm;
 
 	private long expireAgeMillis;
-
-	/**
-	 * Creates a new garbage collector
-	 *
-	 * @param pm
-	 *            a progress monitor
-	 * @param repo
-	 *            the repo to work on
-	 * @param expireAgeMillis
-	 *            During gc() or prune() each unreferenced, loose object which
-	 *            has been created or modified in the last <expireAgeMillis>
-	 *            milliseconds will not be pruned. Only older objects may be
-	 *            pruned. If set to 0 then every object is a candidate for
-	 *            pruning.
-	 */
-
-	public GC(FileRepository repo, ProgressMonitor pm, long expireAgeMillis) {
-		this.repo = repo;
-		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
-		this.expireAgeMillis = expireAgeMillis;
-	}
 
 	/**
 	 * Creates a new garbage collector with default values. An expirationTime of
@@ -119,7 +95,10 @@ public class GC {
 	 *            the repo to work on
 	 */
 	public GC(FileRepository repo) {
-		this(repo, NullProgressMonitor.INSTANCE, 14 * 24 * 60 * 60 * 1000l);
+		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
+		this.repo = repo;
+		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
+		this.expireAgeMillis = 14 * 24 * 60 * 60 * 1000l;
 	}
 
 	/**
@@ -135,7 +114,7 @@ public class GC {
 	 *
 	 */
 	public Collection<PackFile> gc() throws IOException {
-		packRefs();
+		// TODO: implement packRefs(pm, repo);
 		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack();
 		prune(Collections.<ObjectId> emptySet());
@@ -172,6 +151,7 @@ public class GC {
 			for (PackFile newPack : newPacks)
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
+			oldPack.close();
 			FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions);
 			FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions);
 		}
@@ -315,45 +295,11 @@ public class GC {
 	}
 
 	/**
-<<<<<<< HEAD
 	 * Packs all objects which are reachable from any of the heads into one pack
 	 * file. Additionally all objects which are not reachable from any head but
 	 * which are reachable from any of the other refs (e.g. tags), special refs
 	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. All old
 	 * pack files which existed before are deleted.
-=======
-	 * packs all non-symbolic, loose refs into the packed-refs.
-	 *
-	 * @throws IOException
-	 */
-	public void packRefs() throws IOException {
-		Set<Entry<String, Ref>> refEntries = repo.getAllRefs().entrySet();
-		if (pm == null)
-			pm = NullProgressMonitor.INSTANCE;
-		pm.beginTask("pack refs", refEntries.size());
-		try {
-			Collection<RefDirectoryUpdate> updates = new LinkedList<RefDirectoryUpdate>();
-			for (Map.Entry<String, Ref> entry : refEntries) {
-				Ref ref = entry.getValue();
-				if (!ref.isSymbolic() && ref.getStorage().isLoose()) {
-					updates.add(new RefDirectoryUpdate((RefDirectory) repo
-							.getRefDatabase(), ref));
-				}
-				pm.update(1);
-			}
-			((RefDirectory) repo.getRefDatabase()).pack(updates);
-		} finally {
-			pm.endTask();
-		}
-	}
-
-	/**
-	 * Packs all objects which reachable from any of the heads into one
-	 * packfile. Additionally all objects which are not reachable from any head
-	 * but which are reachable from any of the other refs (e.g. tags), special
-	 * refs (e.g. FETCH_HEAD) or index are packed into a separate packfile. All
-	 * old packfiles which existed before are deleted.
->>>>>>> Allow to pack a set of loose and packed refs into a new packed-ref file
 	 *
 	 * @return a collection of the newly created pack files
 	 * @throws IOException
@@ -385,16 +331,21 @@ public class GC {
 			List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
 					.getReverseEntries();
 			if (rlEntries != null)
-				for (ReflogEntry e : rlEntries)
+				for (ReflogEntry e : rlEntries) {
 					nonHeads.add(e.getNewId());
+					ObjectId oldId = e.getOldId();
+					if (oldId != null && !ObjectId.zeroId().equals(oldId))
+						nonHeads.add(oldId);
+				}
 		}
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
 		List<PackFile> ret = new ArrayList<PackFile>(2);
+		PackFile heads = null;
 		if (!allHeads.isEmpty()) {
-			PackFile heads = writePack(allHeads,
-					Collections.<ObjectId> emptySet(), tagTargets);
+			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
+					tagTargets, null);
 			if (heads != null)
 				ret.add(heads);
 		}
@@ -406,7 +357,9 @@ public class GC {
 			// stop traversing when he finds a head?
 			// My problem: I don't have the PackIndex anymore and PackFile
 			// doesn't expose it.
-			PackFile rest = writePack(nonHeads, allHeads, tagTargets);
+			PackFile rest = writePack(nonHeads, allHeads, tagTargets,
+					(heads == null) ? null : Collections.singleton(heads
+							.getIndex()));
 			if (rest != null)
 				ret.add(rest);
 		}
@@ -427,7 +380,6 @@ public class GC {
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
 		RevWalk revWalk = null;
-		DirCache dc = null;
 		try {
 			// Even bare repos may have an index check for the existence of an
 			// index file. Only checking for isBare() is wrong.
@@ -438,8 +390,7 @@ public class GC {
 		}
 		TreeWalk treeWalk = new TreeWalk(repo);
 		try {
-			dc = repo.readDirCache();
-			treeWalk.addTree(new DirCacheIterator(dc));
+			treeWalk.addTree(new DirCacheIterator(repo.readDirCache()));
 			ObjectId headID = repo.resolve(Constants.HEAD);
 			if (headID != null) {
 				revWalk = new RevWalk(repo);
@@ -464,53 +415,60 @@ public class GC {
 	}
 
 	private PackFile writePack(Set<? extends ObjectId> want,
-			Set<? extends ObjectId> have, Set<ObjectId> tagTargets)
-			throws IOException {
-
+			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
+			Set<PackIndex> excludeObjects) throws IOException {
 		PackWriter pw = new PackWriter(repo);
 		pw.setDeltaBaseAsOffset(true);
 		pw.setReuseDeltaCommits(false);
 		if (tagTargets != null)
 			pw.setTagTargets(tagTargets);
 		try {
+			if (excludeObjects != null)
+				for (PackIndex idx : excludeObjects)
+					pw.excludeObjects(idx);
 			pw.preparePack(pm, want, have);
-			if (0 < pw.getObjectCount()) {
-				String id = pw.computeName().getName();
-				File pack = nameFor(id, ".pack");
-				File idx = nameFor(id, ".idx");
-				if (!pack.createNewFile()) {
-					for (PackFile f : repo.getObjectDatabase().getPacks())
-						if (f.getPackName().equals(id))
-							return f;
-					throw new IOException(
-							MessageFormat.format(
-									JGitText.get().cannotCreatePackfile,
-									pack.getPath()));
-				}
-				if (!idx.createNewFile())
-					throw new IOException(
-							MessageFormat.format(
-									JGitText.get().cannotCreateIndexfile,
-									idx.getPath()));
-				BufferedOutputStream out = new BufferedOutputStream(
-						new FileOutputStream(pack));
-				try {
-					pw.writePack(pm, pm, out);
-				} finally {
-					out.close();
-				}
-				pack.setReadOnly();
-
-				out = new BufferedOutputStream(new FileOutputStream(idx));
-				try {
-					pw.writeIndex(out);
-				} finally {
-					out.close();
-				}
-				idx.setReadOnly();
-				return repo.getObjectDatabase().openPack(pack, idx);
-			} else
+			if (pw.getObjectCount() == 0)
 				return null;
+			String id = pw.computeName().getName();
+			File pack = nameFor(id, ".pack");
+			File idx = nameFor(id, ".idx");
+
+			// TODO: write new pack files into temp files
+			if (!pack.createNewFile()) {
+				for (PackFile f : repo.getObjectDatabase().getPacks())
+					if (f.getPackName().equals(id))
+						return f;
+				throw new IOException(MessageFormat.format(
+						JGitText.get().cannotCreatePackfile, pack.getPath()));
+			}
+			if (!idx.createNewFile())
+				throw new IOException(MessageFormat.format(
+						JGitText.get().cannotCreateIndexfile, idx.getPath()));
+			BufferedOutputStream out = new BufferedOutputStream(
+					new FileOutputStream(pack));
+
+			// TODO: Shawn: We should not only mark the pack setReadOnly() but
+			// we should use the FileChannel to ensure the data was synced to
+			// disk before we return and claim the file is created. We already
+			// have this as an optional feature when creating loose objects.
+			// git-core *always* does an fsync when it is done creating the pack
+			// and the index during repacking. The extra time the fsync takes is
+			// minimal compared to the time it takes to make the pack.
+			try {
+				pw.writePack(pm, pm, out);
+			} finally {
+				out.close();
+			}
+			pack.setReadOnly();
+
+			out = new BufferedOutputStream(new FileOutputStream(idx));
+			try {
+				pw.writeIndex(out);
+			} finally {
+				out.close();
+			}
+			idx.setReadOnly();
+			return repo.getObjectDatabase().openPack(pack, idx);
 		} finally {
 			pw.release();
 		}
@@ -531,17 +489,17 @@ public class GC {
 		 * stored in multiple pack files then it is counted as often as it
 		 * occurs in pack files.
 		 */
-		public long nrOfPackedObjects;
+		public long numberOfPackedObjects;
 
 		/**
 		 * The number of pack files
 		 */
-		public long nrOfPackFiles;
+		public long numberOfPackFiles;
 
 		/**
 		 * The number of objects stored as loose objects.
 		 */
-		public long nrOfLooseObjects;
+		public long numberOfLooseObjects;
 	}
 
 	/**
@@ -553,11 +511,11 @@ public class GC {
 	 */
 	public RepoStatistics getStatistics() throws IOException {
 		RepoStatistics ret = new RepoStatistics();
-		ret.nrOfPackedObjects = 0;
+		ret.numberOfPackedObjects = 0;
 		for (PackFile f : repo.getObjectDatabase().getPacks())
-			ret.nrOfPackedObjects += f.getObjectCount();
-		ret.nrOfPackFiles = repo.getObjectDatabase().getPacks().size();
-		ret.nrOfLooseObjects = 0;
+			ret.numberOfPackedObjects += f.getObjectCount();
+		ret.numberOfPackFiles = repo.getObjectDatabase().getPacks().size();
+		ret.numberOfLooseObjects = 0;
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
 		if (fanout != null && fanout.length > 0) {
@@ -570,7 +528,7 @@ public class GC {
 				for (String e : entries) {
 					if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
-					ret.nrOfLooseObjects++;
+					ret.numberOfLooseObjects++;
 				}
 			}
 		}
@@ -578,8 +536,8 @@ public class GC {
 	}
 
 	/**
-	 * Set's the progress monitor used for garbage collection methods.
-	 *
+	 * Set the progress monitor used for garbage collection methods.
+	 * 
 	 * @param pm
 	 */
 	public void setProgressMonitor(ProgressMonitor pm) {
