@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,19 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.hooks;
-
-import java.io.PrintStream;
-
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.errors;
 
 /**
- * Factory class for instantiating supported hooks.
+ * BinaryBlobException is used to signal that binary data was found
+ * in a context that requires text (eg. for generating textual diffs).
  *
- * @since 4.0
+ * @since 4.10
  */
-public class Hooks {
+public class BinaryBlobException extends Exception {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The pre-commit hook for the given repository.
+	 * Construct a BinaryBlobException.
 	 */
-	public static PreCommitHook preCommit(Repository repo,
-			PrintStream outputStream) {
-		return new PreCommitHook(repo, outputStream);
-	}
-
-	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The post-commit hook for the given repository.
-	 * @since 4.5
-	 */
-	public static PostCommitHook postCommit(Repository repo,
-			PrintStream outputStream) {
-		return new PostCommitHook(repo, outputStream);
-	}
-
-	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The commit-msg hook for the given repository.
-	 */
-	public static CommitMsgHook commitMsg(Repository repo,
-			PrintStream outputStream) {
-		return new CommitMsgHook(repo, outputStream);
-	}
-
-	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The pre-push hook for the given repository.
-	 * @since 4.2
-	 */
-	public static PrePushHook prePush(Repository repo, PrintStream outputStream) {
-		return new PrePushHook(repo, outputStream);
-	}
+	public BinaryBlobException() {}
 }
