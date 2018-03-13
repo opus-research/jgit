@@ -120,6 +120,7 @@ public class UnpackedObjectLoader extends ObjectLoader {
 						final CorruptObjectException coe;
 						coe = new CorruptObjectException(id, "bad stream");
 						coe.initCause(dfe);
+						inflater.end();
 						throw coe;
 					}
 				if (avail < 5)
