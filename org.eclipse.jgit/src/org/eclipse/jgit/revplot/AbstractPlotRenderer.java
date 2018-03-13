@@ -97,7 +97,7 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 		final int myLaneX = laneC(myLane);
 		final TColor myColor = laneColor(myLane);
 
-		int maxCenter = myLaneX;
+		int maxCenter = 0;
 		for (final TLane passingLane : (TLane[]) commit.passingLanes) {
 			final int cx = laneC(passingLane);
 			final TColor c = laneColor(passingLane);
@@ -154,7 +154,7 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 		}
 
 		final String msg = commit.getShortMessage();
-		drawText(msg, textx + dotSize, h / 2);
+		drawText(msg, textx + dotSize + n*2, h / 2);
 	}
 
 	/**
@@ -170,7 +170,7 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 	 */
 	protected abstract int drawLabel(int x, int y, Ref ref);
 
-	private static int computeDotSize(final int h) {
+	private int computeDotSize(final int h) {
 		int d = (int) (Math.min(h, LANE_WIDTH) * 0.50f);
 		d += (d & 1);
 		return d;
@@ -262,12 +262,12 @@ public abstract class AbstractPlotRenderer<TLane extends PlotLane, TColor> {
 	 */
 	protected abstract void drawText(String msg, int x, int y);
 
-	private static int laneX(final PlotLane myLane) {
+	private int laneX(final PlotLane myLane) {
 		final int p = myLane != null ? myLane.getPosition() : 0;
 		return LEFT_PAD + LANE_WIDTH * p;
 	}
 
-	private static int laneC(final PlotLane myLane) {
+	private int laneC(final PlotLane myLane) {
 		return laneX(myLane) + LANE_WIDTH / 2;
 	}
 }
