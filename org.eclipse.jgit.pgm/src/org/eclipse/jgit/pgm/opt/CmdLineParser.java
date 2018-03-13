@@ -45,10 +45,15 @@ package org.eclipse.jgit.pgm.opt;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
 
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.IllegalAnnotationError;
+import org.kohsuke.args4j.NamedOptionDef;
+import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.OptionDef;
+import org.kohsuke.args4j.spi.OptionHandler;
+import org.kohsuke.args4j.spi.Setter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.TextBuiltin;
@@ -58,14 +63,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.IllegalAnnotationError;
-import org.kohsuke.args4j.NamedOptionDef;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.OptionDef;
-import org.kohsuke.args4j.spi.OptionHandler;
-import org.kohsuke.args4j.spi.Setter;
 
 /**
  * Extended command line parser which handles --foo=value arguments.
@@ -156,40 +153,13 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 				break;
 			}
 		}
-		List<OptionHandler> backup = null;
-		if (seenHelp) {
-			backup = unsetRequiredOptions();
-		}
 
 		try {
 			super.parseArgument(tmp.toArray(new String[tmp.size()]));
 		} finally {
 			// reset "required" options to defaults for correct command printout
-			if (backup != null && !backup.isEmpty()) {
-				restoreRequiredOptions(backup);
-			}
 			seenHelp = false;
 		}
-	}
-
-	private List<OptionHandler> unsetRequiredOptions() {
-		List<OptionHandler> options = getOptions();
-		List<OptionHandler> backup = new ArrayList<>(options);
-		for (Iterator<OptionHandler> iterator = options.iterator(); iterator
-				.hasNext();) {
-			OptionHandler handler = iterator.next();
-			if (handler.option instanceof NamedOptionDef
-					&& handler.option.required()) {
-				iterator.remove();
-			}
-		}
-		return backup;
-	}
-
-	private void restoreRequiredOptions(List<OptionHandler> backup) {
-		List<OptionHandler> options = getOptions();
-		options.clear();
-		options.addAll(backup);
 	}
 
 	/**
@@ -269,23 +239,5 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 		else
 			return super.createOptionHandler(new MyOptionDef(o), setter);
 
-	}
-
-	@SuppressWarnings("unchecked")
-	private List<OptionHandler> getOptions() {
-		List<OptionHandler> options = null;
-		try {
-			Field field = org.kohsuke.args4j.CmdLineParser.class
-					.getDeclaredField("options"); //$NON-NLS-1$
-			field.setAccessible(true);
-			options = (List<OptionHandler>) field.get(this);
-		} catch (NoSuchFieldException | SecurityException
-				| IllegalArgumentException | IllegalAccessException e) {
-			// ignore
-		}
-		if (options == null) {
-			return Collections.emptyList();
-		}
-		return options;
 	}
 }
