@@ -447,16 +447,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Returns whether this entry is in the fully-merged stage (0).
-	 *
-	 * @return true if this entry is merged
-	 * @since 2.2
-	 */
-	public boolean isMerged() {
-		return getStage() == STAGE_0;
-	}
-
-	/**
 	 * Obtain the raw {@link FileMode} bits for this entry.
 	 *
 	 * @return mode bits for the entry.
@@ -637,7 +627,6 @@ public class DirCacheEntry {
 	/**
 	 * Use for debugging only !
 	 */
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return getFileMode() + " " + getLength() + " " + getLastModified()

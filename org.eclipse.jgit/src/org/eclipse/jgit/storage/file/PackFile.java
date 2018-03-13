@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -76,7 +74,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackOutputStream;
 import org.eclipse.jgit.util.LongList;
 import org.eclipse.jgit.util.NB;
@@ -94,6 +91,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			return b.packLastModified - a.packLastModified;
 		}
 	};
+
+	private final File idxFile;
 
 	private final File packFile;
 
@@ -136,12 +135,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Construct a reader for an existing, pre-indexed packfile.
 	 *
+	 * @param idxFile
+	 *            path of the <code>.idx</code> file listing the contents.
 	 * @param packFile
 	 *            path of the <code>.pack</code> file holding the data.
-	 * @param extensions
-	 *            additional pack file extensions with the same base as the pack
 	 */
-	public PackFile(final File packFile, int extensions) {
+	public PackFile(final File idxFile, final File packFile) {
+		this.idxFile = idxFile;
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
 
@@ -158,7 +158,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				throw new PackInvalidException(packFile);
 
 			try {
-				final PackIndex idx = PackIndex.open(extFile(INDEX));
+				final PackIndex idx = PackIndex.open(idxFile);
 
 				if (packChecksum == null)
 					packChecksum = idx.packChecksum;
@@ -192,10 +192,10 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		String name = packName;
 		if (name == null) {
 			name = getPackFile().getName();
-			if (name.startsWith("pack-")) //$NON-NLS-1$
-				name = name.substring("pack-".length()); //$NON-NLS-1$
-			if (name.endsWith(".pack")) //$NON-NLS-1$
-				name = name.substring(0, name.length() - ".pack".length()); //$NON-NLS-1$
+			if (name.startsWith("pack-"))
+				name = name.substring("pack-".length());
+			if (name.endsWith(".pack"))
+				name = name.substring(0, name.length() - ".pack".length());
 			packName = name;
 		}
 		return name;
@@ -226,7 +226,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 */
 	public boolean shouldBeKept() {
 		if (keepFile == null)
-			keepFile = new File(packFile.getPath() + ".keep"); //$NON-NLS-1$
+			keepFile = new File(packFile.getPath() + ".keep");
 		return keepFile.exists();
 	}
 
@@ -589,7 +589,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			if (invalid)
 				throw new PackInvalidException(packFile);
 			synchronized (readLock) {
-				fd = new RandomAccessFile(packFile, "r"); //$NON-NLS-1$
+				fd = new RandomAccessFile(packFile, "r");
 				length = fd.length();
 				onOpenPack();
 			}
@@ -1079,12 +1079,5 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		synchronized (list) {
 			list.add(offset);
 		}
-	}
-
-	private File extFile(PackExt ext) {
-		String p = packFile.getName();
-		int dot = p.lastIndexOf('.');
-		String b = (dot < 0) ? p : p.substring(0, dot);
-		return new File(packFile.getParentFile(), b + '.' + ext.getExtension());
 	}
 }

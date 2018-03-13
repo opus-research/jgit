@@ -97,6 +97,7 @@ public class GitCheckoutTask extends Task {
 	 *            already exists, the start-point of an existing branch will be
 	 *            set to a new start-point; if false, the existing branch will
 	 *            not be changed
+	 * @return this instance
 	 */
 	public void setForce(boolean force) {
 		this.force = force;

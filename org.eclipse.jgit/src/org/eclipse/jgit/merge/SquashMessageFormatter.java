@@ -80,11 +80,11 @@ public class SquashMessageFormatter {
 		for (RevCommit c : squashedCommits) {
 			sb.append("\ncommit ");
 			sb.append(c.getName());
-			sb.append("\n"); //$NON-NLS-1$
+			sb.append("\n");
 			sb.append(toString(c.getAuthorIdent()));
-			sb.append("\n\t"); //$NON-NLS-1$
+			sb.append("\n\t");
 			sb.append(c.getShortMessage());
-			sb.append("\n"); //$NON-NLS-1$
+			sb.append("\n");
 		}
 		return sb.toString();
 	}
@@ -94,12 +94,12 @@ public class SquashMessageFormatter {
 
 		a.append("Author: ");
 		a.append(author.getName());
-		a.append(" <"); //$NON-NLS-1$
+		a.append(" <");
 		a.append(author.getEmailAddress());
-		a.append(">\n"); //$NON-NLS-1$
+		a.append(">\n");
 		a.append("Date:   ");
 		a.append(dateFormatter.formatDate(author));
-		a.append("\n"); //$NON-NLS-1$
+		a.append("\n");
 
 		return a.toString();
 	}

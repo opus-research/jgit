@@ -127,7 +127,7 @@ public abstract class Transport {
 
 	private static Enumeration<URL> catalogs(ClassLoader ldr) {
 		try {
-			String prefix = "META-INF/services/"; //$NON-NLS-1$
+			String prefix = "META-INF/services/";
 			String name = prefix + Transport.class.getName();
 			return ldr.getResources(name);
 		} catch (IOException err) {
@@ -139,7 +139,7 @@ public abstract class Transport {
 		BufferedReader br;
 		try {
 			InputStream urlIn = url.openStream();
-			br = new BufferedReader(new InputStreamReader(urlIn, "UTF-8")); //$NON-NLS-1$
+			br = new BufferedReader(new InputStreamReader(urlIn, "UTF-8"));
 		} catch (IOException err) {
 			// If we cannot read from the service list, go to the next.
 			//
@@ -687,14 +687,14 @@ public abstract class Transport {
 	 * Acts as --tags.
 	 */
 	public static final RefSpec REFSPEC_TAGS = new RefSpec(
-			"refs/tags/*:refs/tags/*"); //$NON-NLS-1$
+			"refs/tags/*:refs/tags/*");
 
 	/**
 	 * Specification for push operation, to push all refs under refs/heads. Acts
 	 * as --all.
 	 */
 	public static final RefSpec REFSPEC_PUSH_ALL = new RefSpec(
-			"refs/heads/*:refs/heads/*"); //$NON-NLS-1$
+			"refs/heads/*:refs/heads/*");
 
 	/** The repository this transport fetches into, or pushes out of. */
 	protected final Repository local;
