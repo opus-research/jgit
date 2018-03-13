@@ -53,7 +53,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -192,10 +191,9 @@ public class RepositoryCache {
 
 	private void evict(Repository repo) {
 		LOG.debug("Called evict() for {}, ttl: {}", repo.getDirectory(),
-				expireAfter
-						- (System.currentTimeMillis() - repo.closedAt.get()));
-		if (repo.useCnt.get() == 0 && (System.currentTimeMillis()
-				- repo.closedAt.get() > expireAfter)) {
+				20000 - (System.currentTimeMillis() - repo.closedAt.get()));
+		if (repo.useCnt.get() == 0
+				&& (System.currentTimeMillis() - repo.closedAt.get() > 20000)) {
 			LOG.debug("evict()!");
 			repo.doClose();
 			unregister(repo);
@@ -215,10 +213,6 @@ public class RepositoryCache {
 		cache.clearAll();
 	}
 
-	static void reconfigure(RepositoryCacheConfig repositoryCacheConfig) {
-		cache.configureEviction(repositoryCacheConfig);
-	}
-
 	private final ConcurrentHashMap<Key, Reference<Repository>> cacheMap;
 
 	private final Lock[] openLocks;
@@ -227,15 +221,27 @@ public class RepositoryCache {
 
 	private final ScheduledThreadPoolExecutor scheduler;
 
-	private ScheduledFuture<?> cleanupTask;
-
-	private volatile long expireAfter;
-
 	private RepositoryCache() {
 		cacheMap = new ConcurrentHashMap<Key, Reference<Repository>>();
 		openLocks = new Lock[4];
 		for (int i = 0; i < openLocks.length; i++)
 			openLocks[i] = new Lock();
+
+		Runnable terminator = new Runnable() {
+			@Override
+			public void run() {
+				try {
+					for (Reference<Repository> ref : cache.cacheMap.values()) {
+						Repository repository = ref.get();
+						if (repository != null) {
+							cache.evict(repository);
+						}
+					}
+				} catch (Throwable e) {
+					LOG.error(e.getMessage(), e);
+				}
+			}
+		};
 		scheduler = new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
 			private final ThreadFactory baseFactory = Executors
 					.defaultThreadFactory();
@@ -254,7 +260,7 @@ public class RepositoryCache {
 			}
 		};
 
-		scheduler.setRemoveOnCancelPolicy(true);
+		scheduler.scheduleWithFixedDelay(terminator, 10, 10, TimeUnit.SECONDS);
 		scheduler.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
 		scheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 		scheduler.prestartAllCoreThreads();
@@ -264,34 +270,6 @@ public class RepositoryCache {
 		// This allows the class to GC.
 		//
 		scheduler.setThreadFactory(Executors.defaultThreadFactory());
-		configureEviction(new RepositoryCacheConfig());
-	}
-
-	private void configureEviction(
-			RepositoryCacheConfig repositoryCacheConfig) {
-		expireAfter = repositoryCacheConfig.getExpireAfter();
-		synchronized (scheduler) {
-			if (cleanupTask != null) {
-				cleanupTask.cancel(false);
-			}
-			long newDelay = repositoryCacheConfig.getCleanupDelay();
-			cleanupTask = scheduler.scheduleWithFixedDelay(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						for (Reference<Repository> ref : cache.cacheMap
-								.values()) {
-							Repository repository = ref.get();
-							if (repository != null) {
-								cache.evict(repository);
-							}
-						}
-					} catch (Throwable e) {
-						LOG.error(e.getMessage(), e);
-					}
-				}
-			}, newDelay, newDelay, TimeUnit.MILLISECONDS);
-		}
 	}
 
 	@SuppressWarnings("resource")
