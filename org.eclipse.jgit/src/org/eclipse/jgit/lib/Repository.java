@@ -120,9 +120,6 @@ public abstract class Repository implements AutoCloseable {
 	/** If not bare, the top level directory of the working files. */
 	private final File workTree;
 
-	// TODO: docs
-	private final DirectoryFlags directoryFlags;
-
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
@@ -137,7 +134,6 @@ public abstract class Repository implements AutoCloseable {
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
-		directoryFlags = options.getDirectoryFlags();
 	}
 
 	/** @return listeners observing only events on this repository. */
@@ -1247,11 +1243,6 @@ public abstract class Repository implements AutoCloseable {
 		if (isBare())
 			throw new NoWorkTreeException();
 		return workTree;
-	}
-
-	// TODO: docs
-	public DirectoryFlags getDirectoryFlags() {
-		return directoryFlags;
 	}
 
 	/**
