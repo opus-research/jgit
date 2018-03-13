@@ -147,10 +147,7 @@ public class FileLfsRepository implements LargeFileRepository {
 	AtomicObjectOutputStream getOutputStream(AnyLongObjectId id)
 			throws IOException {
 		Path path = getPath(id);
-		Path parent = path.getParent();
-		if (parent != null) {
-			Files.createDirectories(parent);
-		}
+		Files.createDirectories(path.getParent());
 		return new AtomicObjectOutputStream(path, id);
 	}
 
