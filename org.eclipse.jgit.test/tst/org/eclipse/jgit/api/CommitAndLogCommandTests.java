@@ -50,10 +50,12 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
@@ -74,8 +76,9 @@ import org.junit.Test;
  */
 public class CommitAndLogCommandTests extends RepositoryTestCase {
 	@Test
-	public void testSomeCommits() throws JGitInternalException, IOException,
-			GitAPIException {
+	public void testSomeCommits() throws NoHeadException, NoMessageException,
+			ConcurrentRefUpdateException, JGitInternalException,
+			WrongRepositoryStateException, IOException {
 
 		// do 4 commits
 		Git git = new Git(db);
@@ -111,8 +114,9 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testLogWithFilter() throws IOException, JGitInternalException,
-			GitAPIException {
+	public void testLogWithFilter() throws IOException, NoFilepatternException,
+			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 
 		Git git = new Git(db);
 
@@ -166,7 +170,8 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	// try to do a commit without specifying a message. Should fail!
 	@Test
 	public void testWrongParams() throws UnmergedPathException,
-			JGitInternalException, GitAPIException {
+			NoHeadException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 		Git git = new Git(db);
 		try {
 			git.commit().setAuthor(author).call();
@@ -179,8 +184,10 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	// try to work with Commands after command has been invoked. Should throw
 	// exceptions
 	@Test
-	public void testMultipleInvocations() throws UnmergedPathException,
-			JGitInternalException, GitAPIException {
+	public void testMultipleInvocations() throws NoHeadException,
+			ConcurrentRefUpdateException, NoMessageException,
+			UnmergedPathException, JGitInternalException,
+			WrongRepositoryStateException {
 		Git git = new Git(db);
 		CommitCommand commitCmd = git.commit();
 		commitCmd.setMessage("initial commit").call();
@@ -203,8 +210,9 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testMergeEmptyBranches() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testMergeEmptyBranches() throws IOException, NoHeadException,
+			NoMessageException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		RefUpdate r = db.updateRef("refs/heads/side");
@@ -226,8 +234,10 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddUnstagedChanges() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testAddUnstagedChanges() throws IOException, NoHeadException,
+			NoMessageException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException,
+			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -257,9 +267,10 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCommitRange() throws UnmergedPathException,
-			JGitInternalException, IncorrectObjectTypeException,
-			MissingObjectException, GitAPIException {
+	public void testCommitRange() throws NoHeadException, NoMessageException,
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException,
+			IncorrectObjectTypeException, MissingObjectException {
 		// do 4 commits and set the range to the second and fourth one
 		Git git = new Git(db);
 		git.commit().setMessage("first commit").call();
@@ -292,8 +303,9 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCommitAmend() throws JGitInternalException, IOException,
-			GitAPIException {
+	public void testCommitAmend() throws NoHeadException, NoMessageException,
+			ConcurrentRefUpdateException, JGitInternalException,
+			WrongRepositoryStateException, IOException {
 		Git git = new Git(db);
 		git.commit().setMessage("first comit").call(); // typo
 		git.commit().setAmend(true).setMessage("first commit").call();
@@ -314,8 +326,10 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testInsertChangeId() throws UnmergedPathException,
-			JGitInternalException, GitAPIException {
+	public void testInsertChangeId() throws NoHeadException,
+			NoMessageException,
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 		Git git = new Git(db);
 		String messageHeader = "Some header line\n\nSome detail explanation\n";
 		String changeIdTemplate = "\nChange-Id: I"
