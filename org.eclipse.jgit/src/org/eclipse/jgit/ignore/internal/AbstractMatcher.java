@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,49 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.ignore.internal;
 
-package org.eclipse.jgit.internal.storage.file;
+/**
+ * Base class for default methods as {@link #toString()} and such.
+ * <p>
+ * This class is immutable and thread safe.
+ *
+ * @since 3.6
+ */
+public abstract class AbstractMatcher implements IMatcher {
 
-import static org.junit.Assert.assertEquals;
+	final boolean dirOnly;
 
-import org.eclipse.jgit.internal.storage.file.BasePackBitmapIndex.StoredBitmap;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+	final String pattern;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
-public class StoredBitmapTest {
-
-	@Test
-	public void testGetBitmapWithoutXor() {
-		EWAHCompressedBitmap b = bitmapOf(100);
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
-		assertEquals(b, sb.getBitmap());
+	/**
+	 * @param pattern
+	 *            string to parse
+	 * @param dirOnly
+	 *            true if this matcher should match only directories
+	 */
+	AbstractMatcher(String pattern, boolean dirOnly) {
+		this.pattern = pattern;
+		this.dirOnly = dirOnly;
 	}
 
-	@Test
-	public void testGetBitmapWithOneXor() {
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
-		assertEquals(bitmapOf(101), sb.getBitmap());
+	@Override
+	public String toString() {
+		return pattern;
 	}
 
-	@Test
-	public void testGetBitmapWithThreeXor() {
-		StoredBitmap sb = newStoredBitmap(
-				bitmapOf(100),
-				bitmapOf(90, 101),
-				bitmapOf(100, 101),
-				bitmapOf(50));
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
+	@Override
+	public int hashCode() {
+		return pattern.hashCode();
 	}
 
-	private static final StoredBitmap newStoredBitmap(
-			EWAHCompressedBitmap... bitmaps) {
-		StoredBitmap sb = null;
-		for (EWAHCompressedBitmap bitmap : bitmaps)
-			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb, 0);
-		return sb;
-	}
-
-	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
-		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
-		for (int bit : bits)
-			b.set(bit);
-		return b;
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!(obj instanceof AbstractMatcher))
+			return false;
+		AbstractMatcher other = (AbstractMatcher) obj;
+		return dirOnly == other.dirOnly && pattern.equals(other.pattern);
 	}
 }
