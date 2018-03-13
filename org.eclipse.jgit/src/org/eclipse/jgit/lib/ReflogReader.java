@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Google Inc.
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.lib;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
- * Translation bundle for JGit archive support
+ * Utility for reading reflog entries
  */
-public class ArchiveText extends TranslationBundle {
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static ArchiveText get() {
-		return NLS.getBundleFor(ArchiveText.class);
-	}
+public interface ReflogReader {
 
-	// @formatter:off
-	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
+	/**
+	 * Get the last entry in the reflog
+	 *
+	 * @return the latest reflog entry, or null if no log
+	 * @throws IOException
+	 */
+	public abstract ReflogEntry getLastEntry() throws IOException;
+
+	/**
+	 * @return all reflog entries in reverse order
+	 * @throws IOException
+	 */
+	public abstract List<ReflogEntry> getReverseEntries() throws IOException;
+
+	/**
+	 * Get specific entry in the reflog relative to the last entry which is
+	 * considered entry zero.
+	 *
+	 * @param number
+	 * @return reflog entry or null if not found
+	 * @throws IOException
+	 */
+	public abstract ReflogEntry getReverseEntry(int number) throws IOException;
+
+	/**
+	 * @param max
+	 *            max number of entries to read
+	 * @return all reflog entries in reverse order
+	 * @throws IOException
+	 */
+	public abstract List<ReflogEntry> getReverseEntries(int max)
+			throws IOException;
+
 }

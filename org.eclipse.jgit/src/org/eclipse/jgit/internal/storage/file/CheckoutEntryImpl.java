@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2011-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +41,35 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.internal.storage.file;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.lib.CheckoutEntry;
+import org.eclipse.jgit.lib.ReflogEntry;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+/**
+ * Parsed information about a checkout.
+ */
+public class CheckoutEntryImpl implements CheckoutEntry {
+	static final String CHECKOUT_MOVING_FROM = "checkout: moving from "; //$NON-NLS-1$
+
+	private String from;
+
+	private String to;
+
+	CheckoutEntryImpl(ReflogEntry reflogEntry) {
+		String comment = reflogEntry.getComment();
+		int p1 = CHECKOUT_MOVING_FROM.length();
+		int p2 = comment.indexOf(" to ", p1); //$NON-NLS-1$
+		int p3 = comment.length();
+		from = comment.substring(p1,p2);
+		to = comment.substring(p2 + " to ".length(), p3); //$NON-NLS-1$
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
+	public String getFromBranch() {
+		return from;
 	}
 
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
-
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
-
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
+	public String getToBranch() {
+		return to;
 	}
 }

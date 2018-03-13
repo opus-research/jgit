@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2011-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,40 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.internal.storage.file;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
 
 /**
- * Parsed information about a checkout.
+ * Parsed reflog entry
  */
-public class CheckoutEntry {
-	static final String CHECKOUT_MOVING_FROM = "checkout: moving from "; //$NON-NLS-1$
-
-	private String from;
-
-	private String to;
-
-	CheckoutEntry(ReflogEntry reflogEntry) {
-		String comment = reflogEntry.getComment();
-		int p1 = CHECKOUT_MOVING_FROM.length();
-		int p2 = comment.indexOf(" to ", p1); //$NON-NLS-1$
-		int p3 = comment.length();
-		from = comment.substring(p1,p2);
-		to = comment.substring(p2 + " to ".length(), p3); //$NON-NLS-1$
-	}
+public interface ReflogEntry {
 
 	/**
-	 * @return the name of the branch before checkout
+	 * @return the commit id before the change
 	 */
-	public String getFromBranch() {
-		return from;
-	}
+	public abstract ObjectId getOldId();
 
 	/**
-	 * @return the name of the branch after checkout
+	 * @return the commit id after the change
 	 */
-	public String getToBranch() {
-		return to;
-	}
+	public abstract ObjectId getNewId();
+
+	/**
+	 * @return user performing the change
+	 */
+	public abstract PersonIdent getWho();
+
+	/**
+	 * @return textual description of the change
+	 */
+	public abstract String getComment();
+
+	/**
+	 * @return a {@link CheckoutEntry} with parsed information about a branch
+	 *         switch, or null if the entry is not a checkout
+	 */
+	public abstract CheckoutEntry parseCheckout();
+
 }
