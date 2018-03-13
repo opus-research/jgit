@@ -405,12 +405,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						.call();
 			} catch (StashApplyFailureException e) {
 				conflicts = true;
-				try (RevWalk rw = new RevWalk(repo)) {
-					ObjectId stashId = repo.resolve(stash);
-					RevCommit commit = rw.parseCommit(stashId);
-					updateStashRef(commit, commit.getAuthorIdent(),
-							commit.getShortMessage());
-				}
+				RevWalk rw = new RevWalk(repo);
+				ObjectId stashId = repo.resolve(stash);
+				RevCommit commit = rw.parseCommit(stashId);
+				updateStashRef(commit, commit.getAuthorIdent(),
+						commit.getShortMessage());
 			}
 		}
 		return conflicts;
@@ -445,7 +444,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		Collection<ObjectId> ids = or.resolve(step.getCommit());
 		if (ids.size() != 1)
 			throw new JGitInternalException(
-					JGitText.get().cannotResolveUniquelyAbbrevObjectId);
+					"Could not resolve uniquely the abbreviated object ID");
 		RevCommit commitToPick = walk.parseCommit(ids.iterator().next());
 		if (shouldPick) {
 			if (monitor.isCancelled())
@@ -879,8 +878,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case NO_CHANGE:
 				break;
 			default:
-				throw new JGitInternalException(
-						JGitText.get().updatingHeadFailed);
+				throw new JGitInternalException("Updating HEAD failed");
 			}
 			rup = repo.updateRef(Constants.HEAD);
 			rup.setRefLogMessage("rebase finished: returning to " + headName, //$NON-NLS-1$
@@ -892,8 +890,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case NO_CHANGE:
 				break;
 			default:
-				throw new JGitInternalException(
-						JGitText.get().updatingHeadFailed);
+				throw new JGitInternalException("Updating HEAD failed");
 			}
 		}
 	}
@@ -920,10 +917,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} finally {
 			dc.unlock();
 		}
-		try (RevWalk rw = new RevWalk(repo)) {
-			RevCommit commit = rw.parseCommit(repo.resolve(Constants.HEAD));
-			return commit;
-		}
+		RevWalk rw = new RevWalk(repo);
+		RevCommit commit = rw.parseCommit(repo.resolve(Constants.HEAD));
+		rw.release();
+		return commit;
 	}
 
 	/**
@@ -939,22 +936,22 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			throw new UnmergedPathsException();
 
 		// determine whether we need to commit
-		boolean needsCommit;
-		try (TreeWalk treeWalk = new TreeWalk(repo)) {
-			treeWalk.reset();
-			treeWalk.setRecursive(true);
-			treeWalk.addTree(new DirCacheIterator(dc));
-			ObjectId id = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
-			if (id == null)
-				throw new NoHeadException(
-						JGitText.get().cannotRebaseWithoutCurrentHead);
+		TreeWalk treeWalk = new TreeWalk(repo);
+		treeWalk.reset();
+		treeWalk.setRecursive(true);
+		treeWalk.addTree(new DirCacheIterator(dc));
+		ObjectId id = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
+		if (id == null)
+			throw new NoHeadException(
+					JGitText.get().cannotRebaseWithoutCurrentHead);
 
-			treeWalk.addTree(id);
+		treeWalk.addTree(id);
 
-			treeWalk.setFilter(TreeFilter.ANY_DIFF);
+		treeWalk.setFilter(TreeFilter.ANY_DIFF);
 
-			needsCommit = treeWalk.next();
-		}
+		boolean needsCommit = treeWalk.next();
+		treeWalk.release();
+
 		if (needsCommit) {
 			CommitCommand commit = new Git(repo).commit();
 			commit.setMessage(rebaseState.readFile(MESSAGE));
@@ -982,10 +979,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		rebaseState.createFile(AUTHOR_SCRIPT, authorScript);
 		rebaseState.createFile(MESSAGE, commitToPick.getFullMessage());
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		try (DiffFormatter df = new DiffFormatter(bos)) {
-			df.setRepository(repo);
-			df.format(commitToPick.getParent(0), commitToPick);
-		}
+		DiffFormatter df = new DiffFormatter(bos);
+		df.setRepository(repo);
+		df.format(commitToPick.getParent(0), commitToPick);
 		rebaseState.createFile(PATCH, new String(bos.toByteArray(),
 				Constants.CHARACTER_ENCODING));
 		rebaseState.createFile(STOPPED_SHA,
@@ -1279,7 +1275,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				if (this.upstreamCommit == null)
 					throw new JGitInternalException(MessageFormat
 							.format(JGitText.get().missingRequiredParameter,
-									"upstream")); //$NON-NLS-1$
+									"upstream"));
 				return;
 			default:
 				throw new WrongRepositoryStateException(MessageFormat.format(
@@ -1314,7 +1310,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			dco.setFailOnConflict(false);
 			dco.checkout();
-			walk.close();
+			walk.release();
 		} finally {
 			monitor.endTask();
 		}
@@ -1386,11 +1382,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case FORCED:
 				break;
 			default:
-				throw new IOException(
-						JGitText.get().couldNotRewindToUpstreamCommit);
+				throw new IOException("Could not rewind to upstream commit");
 			}
 		} finally {
-			walk.close();
+			walk.release();
 			monitor.endTask();
 		}
 		return true;
@@ -1457,7 +1452,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	public RebaseCommand setUpstreamName(String upstreamName) {
 		if (upstreamCommit == null) {
 			throw new IllegalStateException(
-					"setUpstreamName must be called after setUpstream."); //$NON-NLS-1$
+					"setUpstreamName must be called after setUpstream.");
 		}
 		this.upstreamCommitName = upstreamName;
 		return this;
