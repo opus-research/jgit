@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.ignore;
 
-import java.io.IOException;
+import static org.junit.Assert.*;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.ignore.FastIgnoreRule;
+import org.junit.Test;
 
-/**
- * An internal interface use to retrieve {@link AttributesNode}s.
- * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
- *
- */
-interface AttributeNodeProvider {
+public class BasicRuleTest {
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
+	@Test
+	public void test() {
+		FastIgnoreRule rule1 = new FastIgnoreRule("/hello/[a]/");
+		FastIgnoreRule rule2 = new FastIgnoreRule("/hello/[a]/");
+		FastIgnoreRule rule3 = new FastIgnoreRule("!/hello/[a]/");
+		FastIgnoreRule rule4 = new FastIgnoreRule("/hello/[a]");
+		assertTrue(rule1.dirOnly());
+		assertTrue(rule3.dirOnly());
+		assertFalse(rule4.dirOnly());
+		assertFalse(rule1.getNegation());
+		assertTrue(rule3.getNegation());
+		assertNotEquals(rule1, null);
+		assertEquals(rule1, rule1);
+		assertEquals(rule1, rule2);
+		assertNotEquals(rule1, rule3);
+		assertNotEquals(rule1, rule4);
+		assertEquals(rule1.hashCode(), rule2.hashCode());
+		assertNotEquals(rule1.hashCode(), rule3.hashCode());
+		assertEquals(rule1.toString(), rule2.toString());
+		assertNotEquals(rule1.toString(), rule3.toString());
+	}
 
 }

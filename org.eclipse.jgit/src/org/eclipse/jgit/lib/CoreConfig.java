@@ -127,7 +127,7 @@ public class CoreConfig {
 		/** Hide only .git */
 		DOTGITONLY
 	}
-	
+
 	private final String attributesfile;
 
 	private CoreConfig(final Config rc) {

@@ -72,8 +72,8 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
-import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
@@ -101,8 +101,7 @@ import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
  *
  * @see FileTreeIterator
  */
-public abstract class WorkingTreeIterator extends AbstractTreeIterator
-		implements AttributeNodeProvider {
+public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** An empty entry array, suitable for {@link #init(Entry[])}. */
 	protected static final Entry[] EOF = {};
 
@@ -633,6 +632,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator
 	 * @return {@link AttributesNode} for the current entry.
 	 * @throws IOException
 	 *             if an error is raised while parsing the .gitattributes file
+	 * @since 3.6
 	 */
 	public AttributesNode getEntryAttributesNode() throws IOException {
 		if (attributesNode instanceof PerDirectoryAttributesNode)
@@ -649,6 +649,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator
 	 *         $GIT_DIR/info/attributes file.
 	 * @throws IOException
 	 *             if an error is raised while parsing the attributes file
+	 * @since 3.6
 	 */
 	public AttributesNode getInfoAttributesNode() throws IOException {
 		if (infoAttributeNode instanceof InfoAttributesNode)
@@ -666,6 +667,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator
 	 *             IOException if an error is raised while parsing the
 	 *             attributes file
 	 * @see CoreConfig#getAttributesFile()
+	 * @since 3.6
 	 */
 	public AttributesNode getGlobalAttributesNode() throws IOException {
 		if (globalAttributeNode instanceof GlobalAttributesNode)
@@ -741,6 +743,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator
 		ptr = 0;
 		if (!eof())
 			parseEntry();
+		else if (pathLen == 0) // see bug 445363
+			pathLen = pathOffset;
 	}
 
 	/**
@@ -1204,7 +1208,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator
 		final Entry entry;
 
 		PerDirectoryIgnoreNode(Entry entry) {
-			super(Collections.<IgnoreRule> emptyList());
+			super(Collections.<FastIgnoreRule> emptyList());
 			this.entry = entry;
 		}
 

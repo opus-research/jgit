@@ -91,8 +91,19 @@ public class AttributesNode {
 		String txt;
 		while ((txt = br.readLine()) != null) {
 			txt = txt.trim();
-			if (txt.length() > 0 && !txt.startsWith("#")) { //$NON-NLS-1$
-				int patternEnd = txt.indexOf(' '); // TODO: clarify handling to tabs and escaping
+			if (txt.length() > 0 && !txt.startsWith("#") /* Comments *///$NON-NLS-1$
+					&& !txt.startsWith("!") /* Negative pattern forbidden for attributes */) { //$NON-NLS-1$
+				int patternEndSpace = txt.indexOf(' ');
+				int patternEndTab = txt.indexOf('\t');
+
+				final int patternEnd;
+				if (patternEndSpace == -1)
+					patternEnd = patternEndTab;
+				else if (patternEndTab == -1)
+					patternEnd = patternEndSpace;
+				else
+					patternEnd = Math.min(patternEndSpace, patternEndTab);
+
 				if (patternEnd > -1)
 					rules.add(new AttributesRule(txt.substring(0, patternEnd),
 							txt.substring(patternEnd + 1).trim()));
@@ -125,20 +136,11 @@ public class AttributesNode {
 	 */
 	public void getAttributes(String entryPath, boolean isDirectory,
 			Map<String, Attribute> attributes) {
-		// Parse rules in the reverse order that they were read since the last
-		// entry should be used
-		for (int i = rules.size() - 1; i >= 0; i--) {
-			AttributesRule rule = rules.get(i);
+		for (AttributesRule rule : rules) {
 			if (rule.isMatch(entryPath, isDirectory)) {
 				List<Attribute> attrs = rule.getAttributes();
-				// Parses the attributes in the reverse order that they were
-				// read since the last entry should be used
-				for (int attrIndex = attrs.size() - 1; attrIndex >= 0; attrIndex--) {
-					Attribute attr = attrs.get(attrIndex);
-					if (!attributes.containsKey(attr.getKey())) {
-						attributes.put(attr.getKey(), attr);
-					}
-				}
+				for (Attribute attr : attrs)
+					attributes.put(attr.getKey(), attr);
 			}
 		}
 	}
