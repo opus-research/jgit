@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010-2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -78,7 +78,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
@@ -127,11 +126,11 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private Map<String, DirCacheEntry> toBeCheckedOut = new HashMap<String, DirCacheEntry>();
 
+	private List<String> toBeDeleted = new ArrayList<String>();
+
 	private Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<String, MergeResult<? extends Sequence>>();
 
 	private Map<String, MergeFailureReason> failingPaths = new HashMap<String, MergeFailureReason>();
-
-	private ObjectInserter oi;
 
 	private boolean enterSubtree;
 
@@ -155,7 +154,6 @@ public class ResolveMerger extends ThreeWayMerger {
 				SupportedAlgorithm.HISTOGRAM);
 		mergeAlgorithm = new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
 		commitNames = new String[] { "BASE", "OURS", "THEIRS" };
-		oi = getObjectInserter();
 		this.inCore = inCore;
 
 		if (inCore) {
@@ -225,8 +223,8 @@ public class ResolveMerger extends ThreeWayMerger {
 				builder = null;
 			}
 
-			if (getUnmergedPaths().isEmpty()) {
-				resultTree = dircache.writeTree(oi);
+			if (getUnmergedPaths().isEmpty() && !failed()) {
+				resultTree = dircache.writeTree(getObjectInserter());
 				return true;
 			} else {
 				resultTree = null;
@@ -244,15 +242,20 @@ public class ResolveMerger extends ThreeWayMerger {
 			for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
 					.entrySet()) {
 				File f = new File(db.getWorkTree(), entry.getKey());
-				if (entry.getValue() != null) {
-					createDir(f.getParentFile());
-					DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), r);
-				} else {
-					if (!f.delete())
-						failingPaths.put(entry.getKey(),
-								MergeFailureReason.COULD_NOT_DELETE);
-				}
+				createDir(f.getParentFile());
+				DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), r);
 				modifiedFiles.add(entry.getKey());
+			}
+			// Iterate in reverse so that "folder/file" is deleted before
+			// "folder". Otherwise this could result in a failing path because
+			// of a non-empty directory, for which delete() would fail.
+			for (int i = toBeDeleted.size() - 1; i >= 0; i--) {
+				String fileName = toBeDeleted.get(i);
+				File f = new File(db.getWorkTree(), fileName);
+				if (!f.delete())
+					failingPaths.put(fileName,
+							MergeFailureReason.COULD_NOT_DELETE);
+				modifiedFiles.add(fileName);
 			}
 		} finally {
 			r.release();
@@ -445,7 +448,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			} else if (modeT == 0 && modeB != 0) {
 				// we want THEIRS ... but THEIRS contains the deletion of the
 				// file
-				toBeCheckedOut.put(tw.getPathString(), null);
+				toBeDeleted.add(tw.getPathString());
 				return true;
 			}
 		}
@@ -624,7 +627,8 @@ public class ResolveMerger extends ThreeWayMerger {
 			dce.setLength((int) of.length());
 			InputStream is = new FileInputStream(of);
 			try {
-				dce.setObjectId(oi.insert(Constants.OBJ_BLOB, of.length(), is));
+				dce.setObjectId(getObjectInserter().insert(
+				    Constants.OBJ_BLOB, of.length(), is));
 			} finally {
 				is.close();
 				if (inCore)

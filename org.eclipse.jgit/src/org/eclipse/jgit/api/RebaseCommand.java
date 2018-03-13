@@ -295,8 +295,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				return RebaseResult.OK_RESULT;
 			}
 			return RebaseResult.FAST_FORWARD_RESULT;
-		} catch (CheckoutConflictException cce) {
-			return new RebaseResult(cce.getConflictingPaths());
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
@@ -799,18 +797,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return RawParseUtils.decode(content, 0, end);
 	}
 
-	private boolean checkoutCommit(RevCommit commit) throws IOException,
-			CheckoutConflictException {
+	private boolean checkoutCommit(RevCommit commit) throws IOException {
 		try {
 			RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
 			DirCacheCheckout dco = new DirCacheCheckout(repo, head.getTree(),
 					repo.lockDirCache(), commit.getTree());
 			dco.setFailOnConflict(true);
-			try {
-				dco.checkout();
-			} catch (org.eclipse.jgit.errors.CheckoutConflictException cce) {
-				throw new CheckoutConflictException(dco.getConflicts(), cce);
-			}
+			dco.checkout();
 			// update the HEAD
 			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, true);
 			refUpdate.setExpectedOldObjectId(head);
@@ -831,7 +824,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return true;
 	}
 
-	private List<Step> loadSteps() throws IOException {
+	List<Step> loadSteps() throws IOException {
 		byte[] buf = IO.readFully(new File(rebaseDir, GIT_REBASE_TODO));
 		int ptr = 0;
 		int tokenBegin = 0;
@@ -839,13 +832,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		while (ptr < buf.length) {
 			tokenBegin = ptr;
 			ptr = RawParseUtils.nextLF(buf, ptr);
-			int nextSpace = 0;
+			int nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
 			int tokenCount = 0;
 			Step current = null;
 			while (tokenCount < 3 && nextSpace < ptr) {
 				switch (tokenCount) {
 				case 0:
-					nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
 					String actionToken = new String(buf, tokenBegin, nextSpace
 							- tokenBegin - 1);
 					tokenBegin = nextSpace;
@@ -963,6 +955,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			return this.token;
 		}
 
+		@Override
+		public String toString() {
+			return "Action[" + token + "]";
+		}
+
 		static Action parse(String token) {
 			if (token.equals("pick") || token.equals("p"))
 				return PICK;
@@ -981,6 +978,15 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		Step(Action action) {
 			this.action = action;
+		}
+
+		@Override
+		public String toString() {
+			return "Step[" + action + ", "
+					+ ((commit == null) ? "null" : commit)
+					+ ", "
+					+ ((shortMessage == null) ? "null" : new String(
+							shortMessage)) + "]";
 		}
 	}
 
