@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015, 2017, Dariusz Luksza <dariusz@luksza.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +41,63 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lfs.lib;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.kohsuke.args4j.Option;
+import java.io.IOException;
 
-@Command(common = true, usage = "usage_Gc")
-class Gc extends TextBuiltin {
-	@Option(name = "--aggressive", usage = "usage_Aggressive")
-	private boolean aggressive;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lfs.LfsPointer;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectStream;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.TreeFilter;
+
+/**
+ * Detects Large File pointers, as described in [1] in Git repository.
+ *
+ * [1] https://github.com/github/git-lfs/blob/master/docs/spec.md
+ *
+ * @since 4.7
+ */
+public class LfsPointerFilter extends TreeFilter {
+
+	private LfsPointer pointer;
+
+	/**
+	 * @return {@link LfsPointer} or {@code null}
+	 */
+	public LfsPointer getPointer() {
+		return pointer;
+	}
 
 	@Override
-	protected void run() throws Exception {
-		Git git = Git.wrap(db);
-		git.gc().setAggressive(aggressive)
-				.setProgressMonitor(new TextProgressMonitor(errw)).call();
+	public boolean include(TreeWalk walk) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		pointer = null;
+		if (walk.isSubtree()) {
+			return walk.isRecursive();
+		}
+		ObjectId objectId = walk.getObjectId(0);
+		ObjectLoader object = walk.getObjectReader().open(objectId);
+		if (object.getSize() > 1024) {
+			return false;
+		}
+
+		try (ObjectStream stream = object.openStream()) {
+			pointer = LfsPointer.parseLfsPointer(stream);
+			return pointer != null;
+		}
+	}
+
+	@Override
+	public boolean shouldBeRecursive() {
+		return false;
+	}
+
+	@Override
+	public TreeFilter clone() {
+		return new LfsPointerFilter();
 	}
 }
