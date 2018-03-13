@@ -51,7 +51,7 @@ import org.eclipse.jgit.api.InitCommand;
 
 /**
  * Create an empty git repository.
- *
+ * 
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
  *      >git-init(1)</a>
  */
