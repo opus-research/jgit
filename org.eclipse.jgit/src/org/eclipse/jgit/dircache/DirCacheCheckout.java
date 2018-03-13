@@ -1391,8 +1391,7 @@ public class DirCacheCheckout {
 				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
 			if (checkoutMetadata.smudgeFilterCommand != null) {
 				if (FilterCommandRegistry
-						.isRegistered(
-								checkoutMetadata.smudgeFilterCommand)) {
+						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
 					runBuiltinFilterCommand(repo, checkoutMetadata, ol,
 							channel);
 				} else {
@@ -1483,8 +1482,7 @@ public class DirCacheCheckout {
 		FilterCommand command = null;
 		try {
 			command = FilterCommandRegistry.createFilterCommand(
-					checkoutMetadata.smudgeFilterCommand, repo,
-					ol.openStream(),
+					checkoutMetadata.smudgeFilterCommand, repo, ol.openStream(),
 					channel);
 		} catch (IOException e) {
 			LOG.error(JGitText.get().failedToDetermineFilterDefinition, e);

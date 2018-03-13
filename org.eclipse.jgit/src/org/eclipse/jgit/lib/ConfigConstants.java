@@ -347,6 +347,13 @@ public class ConfigConstants {
 	public static final String CONFIG_KEY_TRUSTFOLDERSTAT = "trustfolderstat";
 
 	/**
+	 * The "supportsAtomicFileCreation" key in the "core section"
+	 *
+	 * @since 4.5
+	 */
+	public static final String CONFIG_KEY_SUPPORTSATOMICFILECREATION = "supportsatomicfilecreation";
+
+	/**
 	 * The "noprefix" key in the "diff section"
 	 * @since 3.0
 	 */
@@ -413,10 +420,4 @@ public class ConfigConstants {
 	 * @since 4.7
 	 */
 	public static final String CONFIG_KEY_RECURSE_SUBMODULES = "recurseSubmodules";
-
-	/**
-	 * The "required" key
-	 * @since 4.10
-	 */
-	public static final String CONFIG_KEY_REQUIRED = "required";
 }
