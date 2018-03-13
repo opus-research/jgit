@@ -59,8 +59,6 @@ import org.eclipse.jgit.ignore.internal.Strings.PatternState;
  * Matcher built by patterns consists of multiple path segments.
  * <p>
  * This class is immutable and thread safe.
- *
- * @since 3.6
  */
 public class PathMatcher extends AbstractMatcher {
 
@@ -92,7 +90,7 @@ public class PathMatcher extends AbstractMatcher {
 	static private List<IMatcher> createMatchers(List<String> segments,
 			Character pathSeparator, boolean dirOnly)
 			throws InvalidPatternException {
-		List<IMatcher> matchers = new ArrayList<IMatcher>(segments.size());
+		List<IMatcher> matchers = new ArrayList<>(segments.size());
 		for (int i = 0; i < segments.size(); i++) {
 			String segment = segments.get(i);
 			IMatcher matcher = createNameMatcher0(segment, pathSeparator,
@@ -172,6 +170,7 @@ public class PathMatcher extends AbstractMatcher {
 		}
 	}
 
+	@Override
 	public boolean matches(String path, boolean assumeDirectory) {
 		if (matchers == null)
 			return simpleMatch(path, assumeDirectory);
@@ -211,6 +210,7 @@ public class PathMatcher extends AbstractMatcher {
 		return false;
 	}
 
+	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		throw new UnsupportedOperationException(
@@ -227,29 +227,30 @@ public class PathMatcher extends AbstractMatcher {
 			int left = right;
 			right = path.indexOf(slash, right);
 			if (right == -1) {
-				if (left < endExcl)
+				if (left < endExcl) {
 					match = matches(matcher, path, left, endExcl,
 							assumeDirectory);
+				} else {
+					// a/** should not match a/ or a
+					match = match && matchers.get(matcher) != WILD;
+				}
 				if (match) {
-					if (matcher == matchers.size() - 2
-							&& matchers.get(matcher + 1) == WILD)
-						// ** can match *nothing*: a/b/** match also a/b
-						return true;
 					if (matcher < matchers.size() - 1
 							&& matchers.get(matcher) == WILD) {
 						// ** can match *nothing*: a/**/b match also a/b
 						matcher++;
 						match = matches(matcher, path, left, endExcl,
 								assumeDirectory);
-					} else if (dirOnly && !assumeDirectory)
+					} else if (dirOnly && !assumeDirectory) {
 						// Directory expectations not met
 						return false;
+					}
 				}
 				return match && matcher + 1 == matchers.size();
 			}
-			if (right - left > 0)
+			if (right - left > 0) {
 				match = matches(matcher, path, left, right, assumeDirectory);
-			else {
+			} else {
 				// path starts with slash???
 				right++;
 				continue;
@@ -261,12 +262,14 @@ public class PathMatcher extends AbstractMatcher {
 					right = left - 1;
 				}
 				matcher++;
-				if (matcher == matchers.size())
+				if (matcher == matchers.size()) {
 					return true;
-			} else if (lastWildmatch != -1)
+				}
+			} else if (lastWildmatch != -1) {
 				matcher = lastWildmatch + 1;
-			else
+			} else {
 				return false;
+			}
 			right++;
 		}
 	}

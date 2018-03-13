@@ -183,6 +183,7 @@ public abstract class PackIndex
 	 *
 	 * @return iterator over pack index entries
 	 */
+	@Override
 	public abstract Iterator<MutableEntry> iterator();
 
 	/**
@@ -365,6 +366,7 @@ public abstract class PackIndex
 
 		protected abstract MutableEntry initEntry();
 
+		@Override
 		public boolean hasNext() {
 			return returnedNumber < getObjectCount();
 		}
@@ -373,8 +375,10 @@ public abstract class PackIndex
 		 * Implementation must update {@link #returnedNumber} before returning
 		 * element.
 		 */
+		@Override
 		public abstract MutableEntry next();
 
+		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
