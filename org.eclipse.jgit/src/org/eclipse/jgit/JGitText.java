@@ -380,7 +380,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryState_rebaseWithMerge;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
-	/***/ public String searchForReuse;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
@@ -412,7 +411,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String truncatedHunkNewLinesMissing;
 	/***/ public String truncatedHunkOldLinesMissing;
 	/***/ public String unableToCheckConnectivity;
-	/***/ public String unableToLockTag;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;
