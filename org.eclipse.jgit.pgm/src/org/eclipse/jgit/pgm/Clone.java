@@ -50,6 +50,7 @@ import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.URIish;
 import org.kohsuke.args4j.Argument;
@@ -65,9 +66,6 @@ class Clone extends AbstractFetchCommand {
 
 	@Option(name = "--no-checkout", aliases = { "-n" }, usage = "usage_noCheckoutAfterClone")
 	private boolean noCheckout;
-
-	@Option(name = "--bare", usage = "usage_bareClone")
-	private boolean isBare;
 
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
@@ -98,15 +96,21 @@ class Clone extends AbstractFetchCommand {
 			branch = Constants.HEAD;
 
 		CloneCommand command = Git.cloneRepository();
-		command.setURI(sourceUri).setRemote(remoteName).setBare(isBare)
+		command.setURI(sourceUri).setRemote(remoteName)
 				.setNoCheckout(noCheckout).setBranch(branch);
-		if (localName != null && localName.length() > 0)
-			command.setDirectory(new File(localName));
-		if (gitdir != null && gitdir.length() > 0)
-			command.setDirectory(new File(gitdir));
 
+		String dirPath = ""; //$NON-NLS-1$
+		if (localName != null && localName.length() > 0)
+			dirPath = localName;
+		if (gitdir != null && gitdir.length() > 0)
+			dirPath = gitdir;
+		command.setDirectory(new File(dirPath));
 		try {
-			command.call();
+			outw.println(MessageFormat.format(CLIText.get().cloningInto,
+					dirPath));
+			Repository db = command.call().getRepository();
+			if (db.resolve(Constants.HEAD) == null)
+				outw.println(CLIText.get().clonedEmptyRepository);
 		} catch (InvalidRemoteException e) {
 			throw die(MessageFormat.format(CLIText.get().doesNotExist,
 					sourceUri));

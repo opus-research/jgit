@@ -42,8 +42,8 @@
  */
 package org.eclipse.jgit.pgm;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.util.List;
@@ -57,19 +57,19 @@ import org.junit.Test;
 
 public class CloneTest extends CLIRepositoryTestCase {
 
+	private Git git;
+
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-
-		Git git = new Git(db);
-		JGitTestUtil.writeTrashFile(db, "hello.txt", "world");
-		git.add().addFilepattern("hello.txt").call();
-		git.commit().setMessage("Initial commit").call();
+		git = new Git(db);
 	}
 
 	@Test
 	public void testClone() throws Exception {
+		createInitialCommit();
+
 		File gitDir = db.getDirectory();
 		String sourcePath = gitDir.getAbsolutePath();
 		String targetPath = (new File(sourcePath)).getParentFile()
@@ -77,25 +77,38 @@ public class CloneTest extends CLIRepositoryTestCase {
 				+ "/target";
 		StringBuilder cmd = new StringBuilder("git clone ").append(sourcePath
 				+ " " + targetPath);
-		execute(cmd.toString());
-		Git git = Git.open(new File(targetPath));
-		List<Ref> branches = git.branchList().call();
+		String[] result = execute(cmd.toString());
+		assertArrayEquals(new String[] {
+				"Cloning into '" + targetPath + "'...", "", "" }, result);
+
+		Git git2 = Git.open(new File(targetPath));
+		List<Ref> branches = git2.branchList().call();
 		assertEquals("expected 1 branch", 1, branches.size());
 	}
 
+	private void createInitialCommit() throws Exception {
+		JGitTestUtil.writeTrashFile(db, "hello.txt", "world");
+		git.add().addFilepattern("hello.txt").call();
+		git.commit().setMessage("Initial commit").call();
+	}
+
 	@Test
-	public void testCloneBare() throws Exception {
+	public void testCloneEmpty() throws Exception {
 		File gitDir = db.getDirectory();
 		String sourcePath = gitDir.getAbsolutePath();
 		String targetPath = (new File(sourcePath)).getParentFile()
 				.getParentFile().getAbsolutePath()
-				+ "/target.git";
-		StringBuilder cmd = new StringBuilder("git clone --bare ")
-				.append(sourcePath + " " + targetPath);
-		execute(cmd.toString());
-		Git git = Git.open(new File(targetPath));
-		List<Ref> branches = git.branchList().call();
-		assertEquals("expected 1 branch", 1, branches.size());
-		assertTrue("expected bare repository", git.getRepository().isBare());
+				+ "/target";
+		StringBuilder cmd = new StringBuilder("git clone ").append(sourcePath
+				+ " " + targetPath);
+		String[] result = execute(cmd.toString());
+		assertArrayEquals(new String[] {
+				"Cloning into '" + targetPath + "'...",
+				"warning: You appear to have cloned an empty repository.", "",
+				"" }, result);
+
+		Git git2 = Git.open(new File(targetPath));
+		List<Ref> branches = git2.branchList().call();
+		assertEquals("expected 0 branch", 0, branches.size());
 	}
 }
