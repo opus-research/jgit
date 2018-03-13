@@ -53,7 +53,10 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 
 /**
@@ -75,8 +78,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 */
 	protected final FS fs;
 
-	protected final DirectoryFlags directoryFlags;
-
 	/**
 	 * Create a new iterator to traverse the work tree and its children.
 	 *
@@ -85,8 +86,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 */
 	public FileTreeIterator(Repository repo) {
 		this(repo.getWorkTree(), repo.getFS(),
-				repo.getConfig().get(WorkingTreeOptions.KEY),
-				repo.getDirectoryFlags());
+				repo.getConfig().get(WorkingTreeOptions.KEY));
 		initRootIterator(repo);
 	}
 
@@ -103,15 +103,9 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            working tree options to be used
 	 */
 	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options) {
-		this(root, fs, options, DirectoryFlags.DEFAULTS);
-	}
-
-	// TODO: docs
-	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options, DirectoryFlags directoryFlags) {
 		super(options);
 		directory = root;
 		this.fs = fs;
-		this.directoryFlags = directoryFlags;
 		init(entries());
 	}
 
@@ -129,22 +123,16 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 */
 	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
 			FS fs) {
-		this(p, root, fs, DirectoryFlags.DEFAULTS);
-	}
-
-	// TODO: docs
-	protected FileTreeIterator(final WorkingTreeIterator p, final File root, FS fs, DirectoryFlags directoryFlags) {
 		super(p);
 		directory = root;
 		this.fs = fs;
-		this.directoryFlags = directoryFlags;
 		init(entries());
 	}
 
 	@Override
 	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
-		return new FileTreeIterator(this, ((FileEntry) current()).getFile(), fs, directoryFlags);
+		return new FileTreeIterator(this, ((FileEntry) current()).getFile(), fs);
 	}
 
 	private Entry[] entries() {
@@ -153,7 +141,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			return EOF;
 		final Entry[] r = new Entry[all.length];
 		for (int i = 0; i < r.length; i++)
-			r[i] = new FileEntry(all[i], fs, directoryFlags);
+			r[i] = new FileEntry(all[i], fs);
 		return r;
 	}
 
@@ -176,22 +164,16 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 *            file system
 		 */
 		public FileEntry(File f, FS fs) {
-			this(f, fs, DirectoryFlags.DEFAULTS);
-		}
-
-		// TODO: docs
-		public FileEntry(File f, FS fs, DirectoryFlags directoryFlags) {
 			this.fs = fs;
 			f = fs.normalize(f);
 			attributes = fs.getAttributes(f);
 			if (attributes.isSymbolicLink())
 				mode = FileMode.SYMLINK;
 			else if (attributes.isDirectory()) {
-				if ((new File(f, Constants.DOT_GIT).exists()) && gitLinksEnabled(directoryFlags)) {
+				if (new File(f, Constants.DOT_GIT).exists())
 					mode = FileMode.GITLINK;
-				} else {
+				else
 					mode = FileMode.TREE;
-				}
 			} else if (attributes.isExecutable())
 				mode = FileMode.EXECUTABLE_FILE;
 			else
@@ -235,11 +217,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 */
 		public File getFile() {
 			return attributes.getFile();
-		}
-
-		// TODO: docs
-		private boolean gitLinksEnabled(DirectoryFlags directoryFlags) {
-			return directoryFlags == null || !directoryFlags.isNoGitLinks();
 		}
 	}
 
