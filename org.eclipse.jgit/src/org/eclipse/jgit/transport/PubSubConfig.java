@@ -90,7 +90,7 @@ public class PubSubConfig {
 
 		private final URIish uriRoot;
 
-		private Map<String, Subscriber> subscribers;
+		private final Map<String, Subscriber> subscribers;
 
 		Publisher(Config c, String k) throws URISyntaxException, IOException,
 				ConfigInvalidException {
@@ -100,8 +100,10 @@ public class PubSubConfig {
 					KEY_SUBSCRIBER);
 
 			subscribers = new HashMap<String, Subscriber>();
-			for (String subscriber : sList)
-				addSubscriber(new Subscriber(this, subscriber));
+			for (String subscriber : sList) {
+				String[] parts = subscriber.split(" ", 2);
+				addSubscriber(new Subscriber(this, parts[0], parts[1]));
+			}
 		}
 
 		/**
@@ -118,7 +120,7 @@ public class PubSubConfig {
 		}
 
 		/** @return publisher section key */
-		public String getKey() {
+		String getKey() {
 			return key;
 		}
 
@@ -140,7 +142,7 @@ public class PubSubConfig {
 		 * @return subscriber with k == name, else null
 		 */
 		public Subscriber getSubscriber(String remote, String directory) {
-			return subscribers.get(remote + " " + directory);
+			return subscribers.get(Subscriber.getKey(remote, directory));
 		}
 
 		/**
@@ -168,7 +170,8 @@ public class PubSubConfig {
 		 * @return true if the subscriber was found and removed
 		 */
 		public boolean removeSubscriber(String remote, String directory) {
-			return subscribers.remove(remote + " " + directory) != null;
+			return subscribers.remove(Subscriber.getKey(remote, directory))
+					!= null;
 		}
 
 		/**
@@ -193,15 +196,19 @@ public class PubSubConfig {
 	 * configuration using the "fetch" key.
 	 */
 	public static class Subscriber {
-		private Publisher publisher;
+		private final Publisher publisher;
 
-		private String directory;
+		private final String directory;
 
-		private String remote;
+		private final String remote;
 
-		private String name;
+		private final String name;
 
-		private List<RefSpec> subscribeSpecs;
+		private final List<RefSpec> subscribeSpecs;
+
+		private static String getKey(String remote, String directory) {
+			return remote + " " + directory;
+		}
 
 		/**
 		 * @param pub
@@ -221,28 +228,7 @@ public class PubSubConfig {
 			publisher = pub;
 			directory = dir;
 			this.remote = remote;
-			load();
-		}
-
-		Subscriber(Publisher pub, String configLine)
-				throws IOException, ConfigInvalidException, URISyntaxException {
-			String[] parts = configLine.split(" ", 2);
-			remote = parts[0];
-			directory = parts[1];
-			publisher = pub;
-			load();
-		}
-
-		private void load()
-				throws IOException, ConfigInvalidException, URISyntaxException {
-			FS fs = FS.detect();
-			File git = RepositoryCache.FileKey.resolve(new File(directory), fs);
-			if (git == null)
-				throw new FileNotFoundException(directory);
-			FileBasedConfig fc = new FileBasedConfig(new File(git, "config"),
-					fs);
-			fc.load();
-			RemoteConfig rc = new RemoteConfig(fc, remote);
+			RemoteConfig rc = load();
 			subscribeSpecs = rc.getFetchRefSpecs();
 			// Remove the leading slash
 			if (rc.getURIs().size() == 0)
@@ -251,9 +237,21 @@ public class PubSubConfig {
 			name = rc.getURIs().get(0).getPath().substring(1);
 		}
 
+		private RemoteConfig load()
+				throws IOException, ConfigInvalidException, URISyntaxException {
+			FS fs = FS.detect();
+			File git = RepositoryCache.FileKey.resolve(new File(directory), fs);
+			if (git == null)
+				throw new FileNotFoundException(directory);
+			FileBasedConfig fc = new FileBasedConfig(new File(git, "config"),
+					fs);
+			fc.load();
+			return new RemoteConfig(fc, remote);
+		}
+
 		/** @return the key that identifies this subscriber */
-		public String getKey() {
-			return remote + " " + directory;
+		private String getKey() {
+			return Subscriber.getKey(remote, directory);
 		}
 
 		/** @return the remote section name that is subscribed to */

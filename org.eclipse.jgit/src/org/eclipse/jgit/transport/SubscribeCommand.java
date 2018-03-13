@@ -53,9 +53,9 @@ public class SubscribeCommand {
 		UNSUBSCRIBE
 	}
 
-	private Command command;
+	private final Command command;
 
-	private String spec;
+	private final String spec;
 
 	/**
 	 * @param c
@@ -82,6 +82,14 @@ public class SubscribeCommand {
 			return false;
 		SubscribeCommand o = (SubscribeCommand) other;
 		return o.command == command && o.spec.equals(spec);
+	}
+
+	@Override
+	public int hashCode() {
+		int hash = 1;
+		hash = hash * 31 + command.hashCode();
+		hash = hash * 31 + spec.hashCode();
+		return hash;
 	}
 
 	@Override
