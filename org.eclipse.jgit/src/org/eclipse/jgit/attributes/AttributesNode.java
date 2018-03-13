@@ -49,6 +49,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 
 import org.eclipse.jgit.lib.Constants;
@@ -136,11 +137,23 @@ public class AttributesNode {
 	 */
 	public void getAttributes(String entryPath, boolean isDirectory,
 			Map<String, Attribute> attributes) {
-		for (AttributesRule rule : rules) {
+		// Parse rules in the reverse order that they were read since the last
+		// entry should be used
+		ListIterator<AttributesRule> ruleIterator = rules.listIterator(rules
+				.size());
+		while (ruleIterator.hasPrevious()) {
+			AttributesRule rule = ruleIterator.previous();
 			if (rule.isMatch(entryPath, isDirectory)) {
-				List<Attribute> attrs = rule.getAttributes();
-				for (Attribute attr : attrs)
-					attributes.put(attr.getKey(), attr);
+				ListIterator<Attribute> attributeIte = rule.getAttributes()
+						.listIterator(rule.getAttributes().size());
+				// Parses the attributes in the reverse order that they were
+				// read since the last entry should be used
+				while (attributeIte.hasPrevious()) {
+					Attribute attr = attributeIte.previous();
+					if (!attributes.containsKey(attr.getKey())) {
+						attributes.put(attr.getKey(), attr);
+					}
+				}
 			}
 		}
 	}
