@@ -684,7 +684,7 @@ public class PackWriter {
 
 			stats.reusedObjects += typeStat.reusedObjects;
 			stats.reusedDeltas += typeStat.reusedDeltas;
-			stats.totalDeltas += typeStat.cntDeltas;
+			stats.totalDeltas += typeStat.bytes;
 		}
 
 		reader.release();
