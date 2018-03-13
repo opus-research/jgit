@@ -44,16 +44,15 @@
 package org.eclipse.jgit.pgm.debug;
 
 import java.io.IOException;
-import java.io.PrintStream;
 import java.net.URL;
 
-import org.eclipse.jgit.util.io.ThrowingPrintWriter;
-import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.CommandCatalog;
 import org.eclipse.jgit.pgm.CommandRef;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.util.io.ThrowingPrintWriter;
+import org.kohsuke.args4j.Option;
 
 @Command(usage = "usage_displayAListOfAllRegisteredJgitCommands")
 class ShowCommands extends TextBuiltin {

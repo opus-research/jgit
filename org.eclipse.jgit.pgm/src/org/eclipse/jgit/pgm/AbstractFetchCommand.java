@@ -50,9 +50,6 @@ package org.eclipse.jgit.pgm;
 import static java.lang.Character.valueOf;
 
 import java.io.IOException;
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.Writer;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.lib.Constants;

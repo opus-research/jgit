@@ -56,7 +56,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
@@ -219,6 +218,7 @@ public abstract class TextBuiltin {
 	 *
 	 * @param args
 	 *            the arguments supplied on the command line, if any.
+	 * @throws IOException
 	 */
 	protected void parseArguments(final String[] args) throws IOException {
 		final CmdLineParser clp = new CmdLineParser(this);
@@ -227,7 +227,7 @@ public abstract class TextBuiltin {
 		} catch (CmdLineException err) {
 			if (!help) {
 				this.errw.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
-				throw die(true);
+				System.exit(1);
 			}
 		}
 
@@ -242,6 +242,7 @@ public abstract class TextBuiltin {
 	 * Print the usage line
 	 *
 	 * @param clp
+	 * @throws IOException
 	 */
 	public void printUsageAndExit(final CmdLineParser clp) throws IOException {
 		printUsageAndExit("", clp); //$NON-NLS-1$
@@ -252,6 +253,7 @@ public abstract class TextBuiltin {
 	 *
 	 * @param message
 	 * @param clp
+	 * @throws IOException
 	 */
 	public void printUsageAndExit(final String message, final CmdLineParser clp) throws IOException {
 		errw.println(message);
@@ -265,7 +267,7 @@ public abstract class TextBuiltin {
 		errw.println();
 
 		errw.flush();
-		throw die(true);
+		System.exit(1);
 	}
 
 	/**
@@ -320,16 +322,6 @@ public abstract class TextBuiltin {
 	 */
 	protected static Die die(final String why, final Throwable cause) {
 		return new Die(why, cause);
-	}
-
-	/**
-	 * @param aborted
-	 *            boolean indicating that the exception should be aborted
-	 * @return a runtime exception the caller is expected to throw
-	 * @since 3.4
-	 */
-	protected static Die die(boolean aborted) {
-		return new Die(aborted);
 	}
 
 	String abbreviateRef(String dst, boolean abbreviateRemote) {
