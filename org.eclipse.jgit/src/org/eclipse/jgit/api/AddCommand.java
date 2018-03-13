@@ -43,7 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
@@ -58,8 +57,6 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -171,34 +168,20 @@ public class AddCommand extends GitCommand<DirCache> {
 							DirCacheEntry entry = new DirCacheEntry(path);
 							if (c == null || c.getDirCacheEntry() == null
 									|| !c.getDirCacheEntry().isAssumeValid()) {
-								FileMode mode = f.getIndexFileMode(c);
-								entry.setFileMode(mode);
+								entry.setLength(sz);
+								entry.setLastModified(f.getEntryLastModified());
+								entry.setFileMode(f.getEntryFileMode());
 
-								if (FileMode.GITLINK != mode) {
-									entry.setLength(sz);
-									entry.setLastModified(f
-											.getEntryLastModified());
-									InputStream in = f.openEntryStream();
-									try {
-										entry.setObjectId(inserter.insert(
-												Constants.OBJ_BLOB, sz, in));
-									} finally {
-										in.close();
-									}
-									builder.add(entry);
-									lastAddedFile = path;
-								} else {
-									Repository subRepo = Git.open(
-											new File(repo.getWorkTree(), path))
-											.getRepository();
-									ObjectId subRepoHead = subRepo
-											.resolve(Constants.HEAD);
-									if (subRepoHead != null) {
-										entry.setObjectId(subRepoHead);
-										builder.add(entry);
-										lastAddedFile = path;
-									}
+								InputStream in = f.openEntryStream();
+								try {
+									entry.setObjectId(inserter.insert(
+											Constants.OBJ_BLOB, sz, in));
+								} finally {
+									in.close();
 								}
+
+								builder.add(entry);
+								lastAddedFile = path;
 							} else {
 								builder.add(c.getDirCacheEntry());
 							}

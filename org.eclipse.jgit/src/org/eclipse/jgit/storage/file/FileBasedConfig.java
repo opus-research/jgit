@@ -55,7 +55,6 @@ import java.io.IOException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
@@ -173,7 +172,7 @@ public class FileBasedConfig extends StoredConfig {
 		final byte[] out = Constants.encode(toText());
 		final LockFile lf = new LockFile(getFile(), fs);
 		if (!lf.lock())
-			throw new LockFailedException(getFile());
+			throw new IOException(MessageFormat.format(JGitText.get().cannotLockFile, getFile()));
 		try {
 			lf.setNeedSnapshot(true);
 			lf.write(out);
