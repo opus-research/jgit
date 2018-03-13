@@ -56,7 +56,6 @@ import org.eclipse.jgit.lib.GitIndex.Entry;
  *
  * A visitor is invoked for executing actions, like figuring out how to merge.
  */
-@Deprecated
 public class IndexTreeWalker {
 	private final Tree mainTree;
 	private final Tree newTree;
