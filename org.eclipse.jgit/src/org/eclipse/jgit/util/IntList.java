@@ -76,6 +76,7 @@ public class IntList {
 	 * @param value
 	 *            the value to search for.
 	 * @return true of {@code value} appears in this list.
+	 * @since 4.9
 	 */
 	public boolean contains(int value) {
 		for (int i = 0; i < count; i++)
