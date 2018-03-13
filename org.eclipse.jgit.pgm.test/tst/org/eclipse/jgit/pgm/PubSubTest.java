@@ -46,6 +46,7 @@ package org.eclipse.jgit.pgm;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.text.MessageFormat;
 
@@ -74,12 +75,7 @@ public class PubSubTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testSubscribeOutput() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.addURI(
-				new URIish("http://android.googlesource.com/android"));
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupURIOnlyConfig();
 
 		String[] output = execute("git subscribe origin");
 		assertArrayEquals("expected successful subscribe", //
@@ -91,29 +87,23 @@ public class PubSubTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testNoUriSubscribeOutput() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.setTimeout(0); // Just to populate the config section
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupEmptyConfig();
 
-		String[] output = execute("git subscribe origin");
-		assertArrayEquals("expected failed subscribe", //
-				new String[] { MessageFormat.format(
-						CLIText.get().noRemoteUriSubscribe, "origin"), //
-						"" /* ends with LF (last line empty) */}, output);
+		try {
+			execute("git subscribe origin");
+		} catch (Exception e) {
+			assertEquals(MessageFormat.format(
+					CLIText.get().noRemoteUriSubscribe, "origin"),
+					e.getMessage());
+			return;
+		}
+		fail("Should have died");
 	}
 
+	@SuppressWarnings("null")
 	@Test
 	public void testConfigWrite() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.addURI(
-				new URIish("http://android.googlesource.com/android"));
-		remoteConfig.addFetchRefSpec(
-				new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupURIFetchConfig();
 
 		String[] output = execute("git subscribe origin");
 		assertArrayEquals("expected successful subscribe", //
@@ -138,12 +128,7 @@ public class PubSubTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testUnsubscribeOutput() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.addURI(
-				new URIish("http://android.googlesource.com/android"));
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupURIOnlyConfig();
 
 		String[] output = execute("git subscribe origin");
 		output = execute("git unsubscribe origin");
@@ -156,45 +141,37 @@ public class PubSubTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testNoUriUnsubscribeOutput() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.setTimeout(0); // Just to populate the config section
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupEmptyConfig();
 
-		String[] output = execute("git unsubscribe origin");
-		assertArrayEquals("expected unsuccessful unsubscribe", //
-				new String[] { MessageFormat.format(
-						CLIText.get().noRemoteUriUnsubscribe, "origin"), //
-						"" /* ends with LF (last line empty) */}, output);
+		try {
+			execute("git unsubscribe origin");
+		} catch (Exception e) {
+			assertEquals(MessageFormat.format(
+					CLIText.get().noRemoteUriUnsubscribe, "origin"),
+					e.getMessage());
+			return;
+		}
+		fail("Should have died");
 	}
 
 	@Test
 	public void testNotFoundUnsubscribeOutput() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.addURI(
-				new URIish("http://android.googlesource.com/android"));
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupURIOnlyConfig();
 
-		String[] output = execute("git unsubscribe origin");
-		assertArrayEquals("expected unsuccessful unsubscribe", //
-				new String[] { MessageFormat.format(
-						CLIText.get().subscriptionDoesNotExist, "origin"), //
-						"" /* ends with LF (last line empty) */}, output);
+		try {
+			execute("git unsubscribe origin");
+		} catch (Exception e) {
+			assertEquals(MessageFormat.format(
+					CLIText.get().subscriptionDoesNotExist, "origin"),
+					e.getMessage());
+			return;
+		}
+		fail("Should have died");
 	}
 
 	@Test
 	public void testUnsubscribeConfig() throws Exception {
-		StoredConfig dbconfig = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
-		remoteConfig.addURI(
-				new URIish("http://android.googlesource.com/android"));
-		remoteConfig.addFetchRefSpec(
-				new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
-		remoteConfig.update(dbconfig);
-		dbconfig.save();
+		setupURIFetchConfig();
 
 		String[] output = execute("git subscribe origin");
 		output = execute("git unsubscribe origin");
@@ -205,6 +182,46 @@ public class PubSubTest extends CLIRepositoryTestCase {
 						"" /* ends with LF (last line empty) */}, output);
 		PubSubConfig config = SubscribeDaemon.getConfig();
 		assertEquals(0, config.getPublishers().size());
+	}
+
+	private void setupEmptyConfig() throws Exception {
+		changeConfig(new ConfigEdit() {
+			public void doEdit(RemoteConfig remoteConfig) throws Exception {
+				remoteConfig.setTimeout(0); // Just to populate the section
+			}
+		});
+	}
+
+	private void setupURIOnlyConfig() throws Exception {
+		changeConfig(new ConfigEdit() {
+			public void doEdit(RemoteConfig remoteConfig) throws Exception {
+				remoteConfig.addURI(
+						new URIish("http://android.googlesource.com/android"));
+			}
+		});
+	}
+
+	private void setupURIFetchConfig() throws Exception {
+		changeConfig(new ConfigEdit() {
+			public void doEdit(RemoteConfig remoteConfig) throws Exception {
+				remoteConfig.addURI(
+						new URIish("http://android.googlesource.com/android"));
+				remoteConfig.addFetchRefSpec(
+						new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+			}
+		});
+	}
+
+	private interface ConfigEdit {
+		void doEdit(RemoteConfig remoteConfig) throws Exception;
+	}
+
+	private void changeConfig(ConfigEdit ce) throws Exception {
+		StoredConfig dbconfig = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, "origin");
+		ce.doEdit(remoteConfig);
+		remoteConfig.update(dbconfig);
+		dbconfig.save();
 	}
 
 	@After

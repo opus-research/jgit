@@ -55,7 +55,7 @@ import org.eclipse.jgit.util.FS;
 @Command(common = false, usage = "usage_RunSubscribeDaemon")
 class SubscribeDaemon extends TextBuiltin {
 	/** Name of the pubsub config file */
-	public static String GLOBAL_PUBSUB_FILE = ".gitpubsub";
+	protected static String GLOBAL_PUBSUB_FILE = ".gitpubsub";
 
 	/** @return the pubsub config file */
 	public static File getConfigFile() {

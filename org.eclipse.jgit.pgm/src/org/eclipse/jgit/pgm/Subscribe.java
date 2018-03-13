@@ -70,11 +70,9 @@ class Subscribe extends TextBuiltin {
 		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, remote);
 		PubSubConfig pubsubConfig = SubscribeDaemon.getConfig();
 		List<URIish> uris = remoteConfig.getURIs();
-		if (uris.isEmpty()) {
-			out.println(MessageFormat.format(
+		if (uris.isEmpty())
+			throw die(MessageFormat.format(
 					CLIText.get().noRemoteUriSubscribe, remote));
-			return;
-		}
 		String uriRoot = PubSubConfig.getUriRoot(uris.get(0));
 		String dir = db.getDirectory().getAbsolutePath();
 
@@ -93,9 +91,8 @@ class Subscribe extends TextBuiltin {
 		try {
 			SubscribeDaemon.updateConfig(pubsubConfig);
 		} catch (IOException e) {
-			out.println(MessageFormat.format(CLIText.get().cannotWrite,
+			throw die(MessageFormat.format(CLIText.get().cannotWrite,
 					SubscribeDaemon.getConfigFile()));
-			return;
 		}
 
 		out.println(MessageFormat.format(

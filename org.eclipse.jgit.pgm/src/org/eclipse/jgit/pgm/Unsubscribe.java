@@ -67,20 +67,17 @@ class Unsubscribe extends TextBuiltin {
 		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, remote);
 		PubSubConfig pubsubConfig = SubscribeDaemon.getConfig();
 		List<URIish> uris = remoteConfig.getURIs();
-		if (uris.isEmpty()) {
-			out.println(MessageFormat.format(
+		if (uris.isEmpty())
+			throw die(MessageFormat.format(
 					CLIText.get().noRemoteUriUnsubscribe, remote));
-			return;
-		}
+
 		String uriRoot = PubSubConfig.getUriRoot(uris.get(0));
 		String dir = db.getDirectory().getAbsolutePath();
 
 		Publisher p = pubsubConfig.getPublisher(uriRoot);
-		if (p == null || !p.removeSubscriber(remote, dir)) {
-			out.println(MessageFormat.format(
+		if (p == null || !p.removeSubscriber(remote, dir))
+			throw die(MessageFormat.format(
 					CLIText.get().subscriptionDoesNotExist, remote));
-			return;
-		}
 
 		// See if this publisher is now empty
 		if (p.getSubscribers().size() == 0)
@@ -89,9 +86,8 @@ class Unsubscribe extends TextBuiltin {
 		try {
 			SubscribeDaemon.updateConfig(pubsubConfig);
 		} catch (IOException e) {
-			out.println(MessageFormat.format(CLIText.get().cannotWrite,
+			throw die(MessageFormat.format(CLIText.get().cannotWrite,
 					SubscribeDaemon.getConfigFile()));
-			return;
 		}
 
 		out.println(MessageFormat.format(
