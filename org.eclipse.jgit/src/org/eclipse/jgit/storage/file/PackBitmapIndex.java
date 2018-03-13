@@ -45,7 +45,6 @@ package org.eclipse.jgit.storage.file;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
@@ -69,6 +68,7 @@ import org.eclipse.jgit.lib.ObjectId;
  * compatible with the encoded bitmaps available from the index.
  */
 public abstract class PackBitmapIndex {
+	/** Flag bit denoting the bitmap should be reused during index creation. */
 	public static final int FLAG_REUSE = 1;
 
 	/**

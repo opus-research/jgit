@@ -49,15 +49,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.security.DigestOutputStream;
 import java.text.MessageFormat;
-import java.util.List;
 
 import javaewah.EWAHCompressedBitmap;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.storage.file.PackBitmapIndexBuilder.StoredEntry;
-import org.eclipse.jgit.transport.PackedObjectInfo;
-import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
@@ -69,6 +66,12 @@ public class PackBitmapIndexWriterV1 {
 	private final DigestOutputStream out;
 	private final DataOutput dataOutput;
 
+	/**
+	 * Creates the version 1 pack bitmap index files.
+	 *
+	 * @param dst
+	 *            the output stream to which the index will be written.
+	 */
 	public PackBitmapIndexWriterV1(final OutputStream dst) {
 		out = new DigestOutputStream(dst instanceof BufferedOutputStream ? dst
 				: new SafeBufferedOutputStream(dst),
@@ -143,7 +146,7 @@ public class PackBitmapIndexWriterV1 {
 	}
 
 	private void writeBitmapEntry(StoredEntry entry) throws IOException {
-		// Write object, xor offset, and bitmap
+		// Write object, XOR offset, and bitmap
 		dataOutput.writeInt((int) entry.getObjectId());
 		out.write(entry.getXorOffset());
 		out.write(entry.getFlags());
