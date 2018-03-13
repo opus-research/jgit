@@ -43,6 +43,12 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -52,14 +58,23 @@ import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FileUtils;
+import org.junit.Test;
 
 public class AddCommandTest extends RepositoryTestCase {
 
+	@Test
 	public void testAddNothing() {
 		Git git = new Git(db);
 
@@ -72,6 +87,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	}
 
+	@Test
 	public void testAddNonExistingSingleFile() throws NoFilepatternException {
 		Git git = new Git(db);
 
@@ -80,9 +96,10 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	}
 
+	@Test
 	public void testAddExistingSingleFile() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -96,10 +113,59 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
+	public void testAddExistingSingleFileWithNewLine() throws IOException,
+			NoFilepatternException {
+		File file = new File(db.getWorkTree(), "a.txt");
+		FileUtils.createNewFile(file);
+		PrintWriter writer = new PrintWriter(file);
+		writer.print("row1\r\nrow2");
+		writer.close();
+
+		Git git = new Git(db);
+		db.getConfig().setString("core", null, "autocrlf", "false");
+		git.add().addFilepattern("a.txt").call();
+		assertEquals("[a.txt, mode:100644, content:row1\r\nrow2]",
+				indexState(CONTENT));
+		db.getConfig().setString("core", null, "autocrlf", "true");
+		git.add().addFilepattern("a.txt").call();
+		assertEquals("[a.txt, mode:100644, content:row1\nrow2]",
+				indexState(CONTENT));
+		db.getConfig().setString("core", null, "autocrlf", "input");
+		git.add().addFilepattern("a.txt").call();
+		assertEquals("[a.txt, mode:100644, content:row1\nrow2]",
+				indexState(CONTENT));
+	}
+
+	@Test
+	public void testAddExistingSingleBinaryFile() throws IOException,
+			NoFilepatternException {
+		File file = new File(db.getWorkTree(), "a.txt");
+		FileUtils.createNewFile(file);
+		PrintWriter writer = new PrintWriter(file);
+		writer.print("row1\r\nrow2\u0000");
+		writer.close();
+
+		Git git = new Git(db);
+		db.getConfig().setString("core", null, "autocrlf", "false");
+		git.add().addFilepattern("a.txt").call();
+		assertEquals("[a.txt, mode:100644, content:row1\r\nrow2\u0000]",
+				indexState(CONTENT));
+		db.getConfig().setString("core", null, "autocrlf", "true");
+		git.add().addFilepattern("a.txt").call();
+		assertEquals("[a.txt, mode:100644, content:row1\r\nrow2\u0000]",
+				indexState(CONTENT));
+		db.getConfig().setString("core", null, "autocrlf", "input");
+		git.add().addFilepattern("a.txt").call();
+		assertEquals("[a.txt, mode:100644, content:row1\r\nrow2\u0000]",
+				indexState(CONTENT));
+	}
+
+	@Test
 	public void testAddExistingSingleFileInSubDir() throws IOException, NoFilepatternException {
-		new File(db.getWorkTree(), "sub").mkdir();
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -113,9 +179,10 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddExistingSingleFileTwice() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -136,9 +203,10 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddExistingSingleFileTwiceWithCommit() throws Exception {
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -161,9 +229,10 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddRemovedFile() throws Exception {
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -172,7 +241,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		DirCache dc = git.add().addFilepattern("a.txt").call();
 
 		dc.getEntry(0).getObjectId();
-		file.delete();
+		FileUtils.delete(file);
 
 		// is supposed to do nothing
 		dc = git.add().addFilepattern("a.txt").call();
@@ -182,9 +251,10 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddRemovedCommittedFile() throws Exception {
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -195,7 +265,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		git.commit().setMessage("commit a.txt").call();
 
 		dc.getEntry(0).getObjectId();
-		file.delete();
+		FileUtils.delete(file);
 
 		// is supposed to do nothing
 		dc = git.add().addFilepattern("a.txt").call();
@@ -205,17 +275,18 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddWithConflicts() throws Exception {
 		// prepare conflict
 
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -258,15 +329,16 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddTwoFiles() throws Exception  {
 		File file = new File(db.getWorkTree(), "a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -279,16 +351,17 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddFolder() throws Exception  {
-		new File(db.getWorkTree(), "sub").mkdir();
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -301,22 +374,23 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddIgnoredFile() throws Exception  {
-		new File(db.getWorkTree(), "sub").mkdir();
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File ignoreFile = new File(db.getWorkTree(), ".gitignore");
-		ignoreFile.createNewFile();
+		FileUtils.createNewFile(ignoreFile);
 		writer = new PrintWriter(ignoreFile);
 		writer.print("sub/b.txt");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -329,16 +403,17 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
+	@Test
 	public void testAddWholeRepo() throws Exception  {
-		new File(db.getWorkTree(), "sub").mkdir();
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -355,16 +430,17 @@ public class AddCommandTest extends RepositoryTestCase {
 	// file a exists in workdir and in index -> added
 	// file b exists not in workdir but in index -> unchanged
 	// file c exists in workdir but not in index -> added
+	@Test
 	public void testAddWithoutParameterUpdate() throws Exception {
-		new File(db.getWorkTree(), "sub").mkdir();
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -381,7 +457,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		// new unstaged file sub/c.txt
 		File file3 = new File(db.getWorkTree(), "sub/c.txt");
-		file3.createNewFile();
+		FileUtils.createNewFile(file3);
 		writer = new PrintWriter(file3);
 		writer.print("content c");
 		writer.close();
@@ -392,7 +468,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		writer.close();
 
 		// file sub/b.txt is deleted
-		file2.delete();
+		FileUtils.delete(file2);
 
 		git.add().addFilepattern("sub").call();
 		// change in sub/a.txt is staged
@@ -408,16 +484,17 @@ public class AddCommandTest extends RepositoryTestCase {
 	// file a exists in workdir and in index -> added
 	// file b exists not in workdir but in index -> deleted
 	// file c exists in workdir but not in index -> unchanged
+	@Test
 	public void testAddWithParameterUpdate() throws Exception {
-		new File(db.getWorkTree(), "sub").mkdir();
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		FileUtils.createNewFile(file2);
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -434,7 +511,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		// new unstaged file sub/c.txt
 		File file3 = new File(db.getWorkTree(), "sub/c.txt");
-		file3.createNewFile();
+		FileUtils.createNewFile(file3);
 		writer = new PrintWriter(file3);
 		writer.print("content c");
 		writer.close();
@@ -444,7 +521,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		writer.print("modified content");
 		writer.close();
 
-		file2.delete();
+		FileUtils.delete(file2);
 
 		// change in sub/a.txt is staged
 		// deletion of sub/b.txt is staged
@@ -454,6 +531,165 @@ public class AddCommandTest extends RepositoryTestCase {
 		assertEquals(
 				"[sub/a.txt, mode:100644, content:modified content]",
 				indexState(CONTENT));
+	}
+
+	@Test
+	public void testAssumeUnchanged() throws Exception {
+		Git git = new Git(db);
+		String path = "a.txt";
+		writeTrashFile(path, "content");
+		git.add().addFilepattern(path).call();
+		String path2 = "b.txt";
+		writeTrashFile(path2, "content");
+		git.add().addFilepattern(path2).call();
+		git.commit().setMessage("commit").call();
+		assertEquals("[a.txt, mode:100644, content:"
+				+ "content, assume-unchanged:false]"
+				+ "[b.txt, mode:100644, content:content, "
+				+ "assume-unchanged:false]", indexState(CONTENT
+				| ASSUME_UNCHANGED));
+		assumeUnchanged(path2);
+		assertEquals("[a.txt, mode:100644, content:content, "
+				+ "assume-unchanged:false][b.txt, mode:100644, "
+				+ "content:content, assume-unchanged:true]", indexState(CONTENT
+				| ASSUME_UNCHANGED));
+		writeTrashFile(path, "more content");
+		writeTrashFile(path2, "more content");
+
+		git.add().addFilepattern(".").call();
+
+		assertEquals("[a.txt, mode:100644, content:more content,"
+				+ " assume-unchanged:false][b.txt, mode:100644,"
+ + "" + ""
+				+ " content:content, assume-unchanged:true]",
+				indexState(CONTENT
+				| ASSUME_UNCHANGED));
+	}
+
+	@Test
+	public void testExecutableRetention() throws Exception {
+		StoredConfig config = db.getConfig();
+		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_FILEMODE, true);
+		config.save();
+
+		FS executableFs = new FS() {
+
+			public boolean supportsExecute() {
+				return true;
+			}
+
+			public boolean setExecute(File f, boolean canExec) {
+				return true;
+			}
+
+			public ProcessBuilder runInShell(String cmd, String[] args) {
+				return null;
+			}
+
+			public boolean retryFailedLockFileCommit() {
+				return false;
+			}
+
+			public FS newInstance() {
+				return this;
+			}
+
+			protected File discoverGitPrefix() {
+				return null;
+			}
+
+			public boolean canExecute(File f) {
+				return true;
+			}
+		};
+
+		Git git = Git.open(db.getDirectory(), executableFs);
+		String path = "a.txt";
+		writeTrashFile(path, "content");
+		git.add().addFilepattern(path).call();
+		RevCommit commit1 = git.commit().setMessage("commit").call();
+		TreeWalk walk = TreeWalk.forPath(db, path, commit1.getTree());
+		assertNotNull(walk);
+		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+
+		FS nonExecutableFs = new FS() {
+
+			public boolean supportsExecute() {
+				return false;
+			}
+
+			public boolean setExecute(File f, boolean canExec) {
+				return false;
+			}
+
+			public ProcessBuilder runInShell(String cmd, String[] args) {
+				return null;
+			}
+
+			public boolean retryFailedLockFileCommit() {
+				return false;
+			}
+
+			public FS newInstance() {
+				return this;
+			}
+
+			protected File discoverGitPrefix() {
+				return null;
+			}
+
+			public boolean canExecute(File f) {
+				return false;
+			}
+		};
+
+		config = db.getConfig();
+		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_FILEMODE, false);
+		config.save();
+
+		Git git2 = Git.open(db.getDirectory(), nonExecutableFs);
+		writeTrashFile(path, "content2");
+		git2.add().addFilepattern(path).call();
+		RevCommit commit2 = git2.commit().setMessage("commit2").call();
+		walk = TreeWalk.forPath(db, path, commit2.getTree());
+		assertNotNull(walk);
+		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+	}
+
+	@Test
+	public void testSubmoduleDeleteNotStagedWithUpdate() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		assertNotNull(git.commit().setMessage("create file").call());
+
+		SubmoduleAddCommand command = new SubmoduleAddCommand(db);
+		String path = "sub";
+		command.setPath(path);
+		String uri = db.getDirectory().toURI().toString();
+		command.setURI(uri);
+		Repository repo = command.call();
+		assertNotNull(repo);
+		assertNotNull(git.commit().setMessage("add submodule").call());
+
+		assertTrue(git.status().call().isClean());
+
+		FileUtils.delete(repo.getWorkTree(), FileUtils.RECURSIVE);
+		FileUtils.mkdir(new File(db.getWorkTree(), path), false);
+
+		assertNotNull(git.add().addFilepattern(".").setUpdate(true).call());
+
+		Status status = git.status().call();
+		assertFalse(status.isClean());
+		assertTrue(status.getAdded().isEmpty());
+		assertTrue(status.getChanged().isEmpty());
+		assertTrue(status.getRemoved().isEmpty());
+		assertTrue(status.getUntracked().isEmpty());
+		assertTrue(status.getModified().isEmpty());
+		assertEquals(1, status.getMissing().size());
+		assertEquals(path, status.getMissing().iterator().next());
 	}
 
 	private DirCacheEntry addEntryToBuilder(String path, File file,
@@ -471,6 +707,16 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		builder.add(entry);
 		return entry;
+	}
+
+	private void assumeUnchanged(String path) throws IOException {
+		final DirCache dirc = db.lockDirCache();
+		final DirCacheEntry ent = dirc.getEntry(path);
+		if (ent != null)
+			ent.setAssumeValid(true);
+		dirc.write();
+		if (!dirc.commit())
+			throw new IOException("could not commit");
 	}
 
 }

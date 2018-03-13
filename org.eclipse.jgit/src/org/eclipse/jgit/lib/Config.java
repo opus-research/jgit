@@ -52,21 +52,24 @@
 package org.eclipse.jgit.lib;
 
 import java.text.MessageFormat;
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.events.ListenerList;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.StringUtils;
 
 
@@ -331,6 +334,95 @@ public class Config {
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidBooleanValue
 					, section, name, n));
 		}
+	}
+
+	/**
+	 * Parse an enumeration from the configuration.
+	 *
+	 * @param <T>
+	 *            type of the enumeration object.
+	 * @param section
+	 *            section the key is grouped within.
+	 * @param subsection
+	 *            subsection name, such a remote or branch name.
+	 * @param name
+	 *            name of the key to get.
+	 * @param defaultValue
+	 *            default value to return if no value was present.
+	 * @return the selected enumeration value, or {@code defaultValue}.
+	 */
+	public <T extends Enum<?>> T getEnum(final String section,
+			final String subsection, final String name, final T defaultValue) {
+		final T[] all = allValuesOf(defaultValue);
+		return getEnum(all, section, subsection, name, defaultValue);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <T> T[] allValuesOf(final T value) {
+		try {
+			return (T[]) value.getClass().getMethod("values").invoke(null);
+		} catch (Exception err) {
+			String typeName = value.getClass().getName();
+			String msg = MessageFormat.format(
+					JGitText.get().enumValuesNotAvailable, typeName);
+			throw new IllegalArgumentException(msg, err);
+		}
+	}
+
+	/**
+	 * Parse an enumeration from the configuration.
+	 *
+	 * @param <T>
+	 *            type of the enumeration object.
+	 * @param all
+	 *            all possible values in the enumeration which should be
+	 *            recognized. Typically {@code EnumType.values()}.
+	 * @param section
+	 *            section the key is grouped within.
+	 * @param subsection
+	 *            subsection name, such a remote or branch name.
+	 * @param name
+	 *            name of the key to get.
+	 * @param defaultValue
+	 *            default value to return if no value was present.
+	 * @return the selected enumeration value, or {@code defaultValue}.
+	 */
+	public <T extends Enum<?>> T getEnum(final T[] all, final String section,
+			final String subsection, final String name, final T defaultValue) {
+		String value = getString(section, subsection, name);
+		if (value == null)
+			return defaultValue;
+
+		String n = value.replace(' ', '_');
+		T trueState = null;
+		T falseState = null;
+		for (T e : all) {
+			if (StringUtils.equalsIgnoreCase(e.name(), n))
+				return e;
+			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE"))
+				trueState = e;
+			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE"))
+				falseState = e;
+		}
+
+		// This is an odd little fallback. C Git sometimes allows boolean
+		// values in a tri-state with other things. If we have both a true
+		// and a false value in our enumeration, assume its one of those.
+		//
+		if (trueState != null && falseState != null) {
+			try {
+				return StringUtils.toBoolean(n) ? trueState : falseState;
+			} catch (IllegalArgumentException err) {
+				// Fall through and use our custom error below.
+			}
+		}
+
+		if (subsection != null)
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().enumValueNotSupported3, section, name, value));
+		else
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().enumValueNotSupported2, section, name, value));
 	}
 
 	/**
@@ -623,6 +715,32 @@ public class Config {
 	public void setBoolean(final String section, final String subsection,
 			final String name, final boolean value) {
 		setString(section, subsection, name, value ? "true" : "false");
+	}
+
+	/**
+	 * Add or modify a configuration value. The parameters will result in a
+	 * configuration entry like this.
+	 *
+	 * <pre>
+	 * [section &quot;subsection&quot;]
+	 *         name = value
+	 * </pre>
+	 *
+	 * @param <T>
+	 *            type of the enumeration object.
+	 * @param section
+	 *            section name, e.g "branch"
+	 * @param subsection
+	 *            optional subsection value, e.g. a branch name
+	 * @param name
+	 *            parameter name, e.g. "filemode"
+	 * @param value
+	 *            parameter value
+	 */
+	public <T extends Enum<?>> void setEnum(final String section,
+			final String subsection, final String name, final T value) {
+		String n = value.name().toLowerCase().replace('_', ' ');
+		setString(section, subsection, name, n);
 	}
 
 	/**
@@ -1159,7 +1277,7 @@ public class Config {
 		}
 
 		public Set<String> parse(Config cfg) {
-			final Set<String> result = new HashSet<String>();
+			final Set<String> result = new LinkedHashSet<String>();
 			while (cfg != null) {
 				for (final Entry e : cfg.state.get().entryList) {
 					if (e.subsection != null && e.name == null
@@ -1212,39 +1330,71 @@ public class Config {
 		}
 
 		public Set<String> parse(Config cfg) {
-			final Set<String> result = new HashSet<String>();
+			final Map<String, String> m = new LinkedHashMap<String, String>();
 			while (cfg != null) {
 				for (final Entry e : cfg.state.get().entryList) {
-					if (e.name != null
-							&& StringUtils.equalsIgnoreCase(e.section, section)) {
-						if (subsection == null && e.subsection == null)
-							result.add(StringUtils.toLowerCase(e.name));
-						else if (e.subsection != null
-								&& e.subsection.equals(subsection))
-							result.add(StringUtils.toLowerCase(e.name));
-
+					if (e.name == null)
+						continue;
+					if (!StringUtils.equalsIgnoreCase(section, e.section))
+						continue;
+					if ((subsection == null && e.subsection == null)
+							|| (subsection != null && subsection
+									.equals(e.subsection))) {
+						String lc = StringUtils.toLowerCase(e.name);
+						if (!m.containsKey(lc))
+							m.put(lc, e.name);
 					}
 				}
 				cfg = cfg.baseConfig;
 			}
-			return Collections.unmodifiableSet(result);
+			return new CaseFoldingSet(m);
 		}
 	}
 
 	private static class SectionNames implements SectionParser<Set<String>> {
 		public Set<String> parse(Config cfg) {
-			final Set<String> result = new HashSet<String>();
+			final Map<String, String> m = new LinkedHashMap<String, String>();
 			while (cfg != null) {
 				for (final Entry e : cfg.state.get().entryList) {
-					if (e.section != null)
-						result.add(StringUtils.toLowerCase(e.section));
+					if (e.section != null) {
+						String lc = StringUtils.toLowerCase(e.section);
+						if (!m.containsKey(lc))
+							m.put(lc, e.section);
+					}
 				}
 				cfg = cfg.baseConfig;
 			}
-			return Collections.unmodifiableSet(result);
+			return new CaseFoldingSet(m);
 		}
 	}
 
+	private static class CaseFoldingSet extends AbstractSet<String> {
+		private final Map<String, String> names;
+
+		CaseFoldingSet(Map<String, String> names) {
+			this.names = Collections.unmodifiableMap(names);
+		}
+
+		@Override
+		public boolean contains(Object needle) {
+			if (!(needle instanceof String))
+				return false;
+
+			String n = (String) needle;
+			return names.containsKey(n)
+					|| names.containsKey(StringUtils.toLowerCase(n));
+		}
+
+		@Override
+		public Iterator<String> iterator() {
+			return names.values().iterator();
+		}
+
+		@Override
+		public int size() {
+			return names.size();
+		}
+	}
 
 	private static class State {
 		final List<Entry> entryList;
@@ -1264,6 +1414,7 @@ public class Config {
 	 * The configuration file entry
 	 */
 	private static class Entry {
+
 		/**
 		 * The text content before entry
 		 */
@@ -1331,6 +1482,20 @@ public class Config {
 			if (a == null || b == null)
 				return false;
 			return a.equals(b);
+		}
+
+		@Override
+		public String toString() {
+			if (section == null)
+				return "<empty>";
+			StringBuilder b = new StringBuilder(section);
+			if (subsection != null)
+				b.append(".").append(subsection);
+			if (name != null)
+				b.append(".").append(name);
+			if (value != null)
+				b.append("=").append(value);
+			return b.toString();
 		}
 	}
 

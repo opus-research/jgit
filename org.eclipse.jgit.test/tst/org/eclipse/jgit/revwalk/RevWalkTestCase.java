@@ -43,10 +43,13 @@
 
 package org.eclipse.jgit.revwalk;
 
+import static org.junit.Assert.assertSame;
+
 import java.util.Date;
 
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.junit.TestRepository.CommitBuilder;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 
@@ -115,6 +118,11 @@ public abstract class RevWalkTestCase extends RepositoryTestCase {
 	protected RevTag tag(final String name, final RevObject dst)
 			throws Exception {
 		return util.tag(name, dst);
+	}
+
+	protected CommitBuilder commitBuilder()
+			throws Exception {
+		return util.commit();
 	}
 
 	protected <T extends RevObject> T parseBody(final T t) throws Exception {

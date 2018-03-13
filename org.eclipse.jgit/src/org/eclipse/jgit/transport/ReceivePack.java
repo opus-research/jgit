@@ -55,8 +55,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,19 +62,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.UnpackException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.revwalk.ObjectWalk;
@@ -98,6 +98,40 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a push connection, receiving objects.
  */
 public class ReceivePack {
+	/** Data in the first line of a request, the line itself plus capabilities. */
+	public static class FirstLine {
+		private final String line;
+		private final Set<String> capabilities;
+
+		/**
+		 * Parse the first line of a receive-pack request.
+		 *
+		 * @param line
+		 *            line from the client.
+		 */
+		public FirstLine(String line) {
+			final HashSet<String> caps = new HashSet<String>();
+			final int nul = line.indexOf('\0');
+			if (nul >= 0) {
+				for (String c : line.substring(nul + 1).split(" "))
+					caps.add(c);
+				this.line = line.substring(0, nul);
+			} else
+				this.line = line;
+			this.capabilities = Collections.unmodifiableSet(caps);
+		}
+
+		/** @return non-capabilities part of the line. */
+		public String getLine() {
+			return line;
+		}
+
+		/** @return capabilities parsed from the line. */
+		public Set<String> getCapabilities() {
+			return capabilities;
+		}
+	}
+
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -134,6 +168,9 @@ public class ReceivePack {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
+	/** Hook used while advertising the refs to the client. */
+	private AdvertiseRefsHook advertiseRefsHook;
+
 	/** Filter used while advertising the refs to the client. */
 	private RefFilter refFilter;
 
@@ -155,19 +192,24 @@ public class ReceivePack {
 
 	private OutputStream rawOut;
 
+	private OutputStream msgOut;
+
+	private final MessageOutputWrapper msgOutWrapper = new MessageOutputWrapper();
+
 	private PacketLineIn pckIn;
 
 	private PacketLineOut pckOut;
 
-	private Writer msgs;
-
-	private IndexPack ip;
+	private PackParser parser;
 
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
+	/** All SHA-1s shown to the client, which can be possible edges. */
+	private Set<ObjectId> advertisedHaves;
+
 	/** Capabilities requested by the client. */
-	private Set<String> enabledCapablities;
+	private Set<String> enabledCapabilities;
 
 	/** Commands to execute, as received by the client. */
 	private List<ReceiveCommand> commands;
@@ -189,6 +231,9 @@ public class ReceivePack {
 
 	private boolean checkReferencedIsReachable;
 
+	/** Git object size limit */
+	private long maxObjectSizeLimit;
+
 	/**
 	 * Create a new pack receive for an open repository.
 	 *
@@ -205,9 +250,11 @@ public class ReceivePack {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
+		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
+		advertisedHaves = new HashSet<ObjectId>();
 	}
 
 	private static class ReceiveConfig {
@@ -239,6 +286,52 @@ public class ReceivePack {
 		}
 	}
 
+	/**
+	 * Output stream that wraps the current {@link #msgOut}.
+	 * <p>
+	 * We don't want to expose {@link #msgOut} directly because it can change
+	 * several times over the course of a session.
+	 */
+	private class MessageOutputWrapper extends OutputStream {
+		@Override
+		public void write(int ch) {
+			if (msgOut != null) {
+				try {
+					msgOut.write(ch);
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+
+		@Override
+		public void write(byte[] b, int off, int len) {
+			if (msgOut != null) {
+				try {
+					msgOut.write(b, off, len);
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+
+		@Override
+		public void write(byte[] b) {
+			write(b, 0, b.length);
+		}
+
+		@Override
+		public void flush() {
+			if (msgOut != null) {
+				try {
+					msgOut.flush();
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+	}
+
 	/** @return the repository this receive completes into. */
 	public final Repository getRepository() {
 		return db;
@@ -249,9 +342,60 @@ public class ReceivePack {
 		return walk;
 	}
 
-	/** @return all refs which were advertised to the client. */
+	/**
+	 * Get refs which were advertised to the client.
+	 *
+	 * @return all refs which were advertised to the client, or null if
+	 *         {@link #setAdvertisedRefs(Map, Set)} has not been called yet.
+	 */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		return refs;
+	}
+
+	/**
+	 * Set the refs advertised by this ReceivePack.
+	 * <p>
+	 * Intended to be called from a {@link PreReceiveHook}.
+	 *
+	 * @param allRefs
+	 *            explicit set of references to claim as advertised by this
+	 *            ReceivePack instance. This overrides any references that
+	 *            may exist in the source repository. The map is passed
+	 *            to the configured {@link #getRefFilter()}. If null, assumes
+	 *            all refs were advertised.
+	 * @param additionalHaves
+	 *            explicit set of additional haves to claim as advertised. If
+	 *            null, assumes the default set of additional haves from the
+	 *            repository.
+	 */
+	public void setAdvertisedRefs(Map<String, Ref> allRefs,
+			Set<ObjectId> additionalHaves) {
+		refs = allRefs != null ? allRefs : db.getAllRefs();
+		refs = refFilter.filter(refs);
+
+		Ref head = refs.get(Constants.HEAD);
+		if (head != null && head.isSymbolic())
+			refs.remove(Constants.HEAD);
+
+		for (Ref ref : refs.values()) {
+			if (ref.getObjectId() != null)
+				advertisedHaves.add(ref.getObjectId());
+		}
+		if (additionalHaves != null)
+			advertisedHaves.addAll(additionalHaves);
+		else
+			advertisedHaves.addAll(db.getAdditionalHaves());
+	}
+
+	/**
+	 * Get objects advertised to the client.
+	 *
+	 * @return the set of objects advertised to the as present in this repository,
+	 *         or null if {@link #setAdvertisedRefs(Map, Set)} has not been called
+	 *         yet.
+	 */
+	public final Set<ObjectId> getAdvertisedObjects() {
+		return advertisedHaves;
 	}
 
 	/**
@@ -268,13 +412,13 @@ public class ReceivePack {
 	 * <p>
 	 * If enabled, this instance will verify that references to objects not
 	 * contained within the received pack are already reachable through at least
-	 * one other reference selected by the {@link #getRefFilter()} and displayed
-	 * as part of {@link #getAdvertisedRefs()}.
+	 * one other reference displayed as part of {@link #getAdvertisedRefs()}.
 	 * <p>
 	 * This feature is useful when the application doesn't trust the client to
 	 * not provide a forged SHA-1 reference to an object, in an attempt to
 	 * access parts of the DAG that they aren't allowed to see and which have
-	 * been hidden from them via the configured {@link RefFilter}.
+	 * been hidden from them via the configured {@link AdvertiseRefsHook} or
+	 * {@link RefFilter}.
 	 * <p>
 	 * Enabling this feature may imply at least some, if not all, of the same
 	 * functionality performed by {@link #setCheckReceivedObjects(boolean)}.
@@ -390,18 +534,42 @@ public class ReceivePack {
 		refLogIdent = pi;
 	}
 
+	/** @return the hook used while advertising the refs to the client */
+	public AdvertiseRefsHook getAdvertiseRefsHook() {
+		return advertiseRefsHook;
+	}
+
 	/** @return the filter used while advertising the refs to the client */
 	public RefFilter getRefFilter() {
 		return refFilter;
 	}
 
 	/**
+	 * Set the hook used while advertising the refs to the client.
+	 * <p>
+	 * If the {@link AdvertiseRefsHook} chooses to call
+	 * {@link #setAdvertisedRefs(Map,Set)}, only refs set by this hook
+	 * <em>and</em> selected by the {@link RefFilter} will be shown to the client.
+	 * Clients may still attempt to create or update a reference not advertised by
+	 * the configured {@link AdvertiseRefsHook}. These attempts should be rejected
+	 * by a matching {@link PreReceiveHook}.
+	 *
+	 * @param advertiseRefsHook
+	 *            the hook; may be null to show all refs.
+	 */
+	public void setAdvertiseRefsHook(final AdvertiseRefsHook advertiseRefsHook) {
+		if (advertiseRefsHook != null)
+			this.advertiseRefsHook = advertiseRefsHook;
+		else
+			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+	}
+
+	/**
 	 * Set the filter used while advertising the refs to the client.
 	 * <p>
 	 * Only refs allowed by this filter will be shown to the client.
-	 * Clients may still attempt to create or update a reference hidden
-	 * by the configured {@link RefFilter}. These attempts should be
-	 * rejected by a matching {@link PreReceiveHook}.
+	 * The filter is run against the refs specified by the
+	 * {@link AdvertiseRefsHook} (if applicable).
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -410,7 +578,7 @@ public class ReceivePack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return get the hook invoked before updates occur. */
+	/** @return the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -433,7 +601,7 @@ public class ReceivePack {
 		preReceive = h != null ? h : PreReceiveHook.NULL;
 	}
 
-	/** @return get the hook invoked after updates occur. */
+	/** @return the hook invoked after updates occur. */
 	public PostReceiveHook getPostReceiveHook() {
 		return postReceive;
 	}
@@ -467,6 +635,36 @@ public class ReceivePack {
 	 */
 	public void setTimeout(final int seconds) {
 		timeout = seconds;
+	}
+
+	/**
+	 * Set the maximum allowed Git object size.
+	 * <p>
+	 * If an object is larger than the given size the pack-parsing will throw an
+	 * exception aborting the receive-pack operation.
+	 *
+	 * @param limit
+	 *            the Git object size limit. If zero then there is not limit.
+	 */
+	public void setMaxObjectSizeLimit(final long limit) {
+		maxObjectSizeLimit = limit;
+	}
+
+	/**
+	 * Check whether the client expects a side-band stream.
+	 *
+	 * @return true if the client has advertised a side-band capability, false
+	 *     otherwise.
+	 * @throws RequestNotYetReadException
+	 *             if the client's request has not yet been read from the wire, so
+	 *             we do not know if they expect side-band. Note that the client
+	 *             may have already written the request, it just has not been
+	 *             read.
+	 */
+	public boolean isSideBand() throws RequestNotYetReadException {
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
+		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
 	/** @return all of the command received by the current request. */
@@ -503,12 +701,7 @@ public class ReceivePack {
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			try {
-				if (msgs != null)
-					msgs.write("error: " + what + "\n");
-			} catch (IOException e) {
-				// Ignore write failures.
-			}
+			msgOutWrapper.write(Constants.encode("error: " + what + "\n"));
 		}
 	}
 
@@ -523,12 +716,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		try {
-			if (msgs != null)
-				msgs.write(what + "\n");
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+		msgOutWrapper.write(Constants.encode(what + "\n"));
+	}
+
+	/** @return an underlying stream for sending messages to the client. */
+	public OutputStream getMessageOutputStream() {
+		return msgOutWrapper;
 	}
 
 	/**
@@ -554,6 +747,7 @@ public class ReceivePack {
 		try {
 			rawIn = input;
 			rawOut = output;
+			msgOut = messages;
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
@@ -568,21 +762,14 @@ public class ReceivePack {
 
 			pckIn = new PacketLineIn(rawIn);
 			pckOut = new PacketLineOut(rawOut);
-			if (messages != null)
-				msgs = new OutputStreamWriter(messages, Constants.CHARSET);
+			pckOut.setFlushOnEnd(false);
 
-			enabledCapablities = new HashSet<String>();
 			commands = new ArrayList<ReceiveCommand>();
 
 			service();
 		} finally {
 			walk.release();
 			try {
-				if (pckOut != null)
-					pckOut.flush();
-				if (msgs != null)
-					msgs.flush();
-
 				if (sideBand) {
 					// If we are using side band, we need to send a final
 					// flush-pkt to tell the remote peer the side band is
@@ -590,18 +777,33 @@ public class ReceivePack {
 					// use the original output stream as rawOut is now the
 					// side band data channel.
 					//
-					new PacketLineOut(output).end();
+					((SideBandOutputStream) msgOut).flushBuffer();
+					((SideBandOutputStream) rawOut).flushBuffer();
+
+					PacketLineOut plo = new PacketLineOut(output);
+					plo.setFlushOnEnd(false);
+					plo.end();
+				}
+
+				if (biDirectionalPipe) {
+					// If this was a native git connection, flush the pipe for
+					// the caller. For smart HTTP we don't do this flush and
+					// instead let the higher level HTTP servlet code do it.
+					//
+					if (!sideBand && msgOut != null)
+						msgOut.flush();
+					rawOut.flush();
 				}
 			} finally {
 				unlockPack();
 				timeoutIn = null;
 				rawIn = null;
 				rawOut = null;
+				msgOut = null;
 				pckIn = null;
 				pckOut = null;
-				msgs = null;
 				refs = null;
-				enabledCapablities = null;
+				enabledCapabilities = null;
 				commands = null;
 				if (timer != null) {
 					try {
@@ -614,11 +816,18 @@ public class ReceivePack {
 		}
 	}
 
+	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
+		if (refs == null)
+			setAdvertisedRefs(null, null);
+		return refs;
+	}
+
 	private void service() throws IOException {
-		if (biDirectionalPipe)
+		if (biDirectionalPipe) {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
-		else
-			refs = refFilter.filter(db.getAllRefs());
+			pckOut.flush();
+		} else
+			getAdvertisedOrDefaultRefs();
 		if (advertiseError != null)
 			return;
 		recvCommands();
@@ -630,7 +839,7 @@ public class ReceivePack {
 					receivePack();
 					if (needCheckConnectivity())
 						checkConnectivity();
-					ip = null;
+					parser = null;
 					unpackError = null;
 				} catch (IOException err) {
 					unpackError = err;
@@ -654,22 +863,23 @@ public class ReceivePack {
 					}
 				});
 				pckOut.end();
-			} else if (msgs != null) {
+			} else if (msgOut != null) {
 				sendStatusReport(false, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgs.write(s + "\n");
+						msgOut.write(Constants.encode(s + "\n"));
 					}
 				});
 			}
 
-			postReceive.onPostReceive(this, filterCommands(Result.OK));
+			postReceive.onPostReceive(this,
+					ReceiveCommand.filter(commands, Result.OK));
 
 			if (unpackError != null)
 				throw new UnpackException(unpackError);
 		}
 	}
 
-	private void unlockPack() {
+	private void unlockPack() throws IOException {
 		if (packLock != null) {
 			packLock.unlock();
 			packLock = null;
@@ -683,26 +893,35 @@ public class ReceivePack {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
+	 * @throws ServiceMayNotContinueException
+	 *             the hook denied advertisement.
 	 */
-	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
+			 ServiceMayNotContinueException {
 		if (advertiseError != null) {
 			adv.writeOne("ERR " + advertiseError);
 			return;
 		}
 
-		final RevFlag advertised = walk.newFlag("ADVERTISED");
-		adv.init(walk, advertised);
+		try {
+			advertiseRefsHook.advertiseRefs(this);
+		} catch (ServiceMayNotContinueException fail) {
+			if (fail.getMessage() != null) {
+				adv.writeOne("ERR " + fail.getMessage());
+				fail.setOutput();
+			}
+			throw fail;
+		}
+
+		adv.init(db);
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = refFilter.filter(db.getAllRefs());
-		final Ref head = refs.remove(Constants.HEAD);
-		adv.send(refs);
-		if (head != null && !head.isSymbolic())
-			adv.advertiseHave(head.getObjectId());
-		adv.includeAdditionalHaves(db);
+		adv.send(getAdvertisedOrDefaultRefs());
+		for (ObjectId obj : advertisedHaves)
+			adv.advertiseHave(obj);
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}");
 		adv.end();
@@ -722,12 +941,9 @@ public class ReceivePack {
 				break;
 
 			if (commands.isEmpty()) {
-				final int nul = line.indexOf('\0');
-				if (nul >= 0) {
-					for (String c : line.substring(nul + 1).split(" "))
-						enabledCapablities.add(c);
-					line = line.substring(0, nul);
-				}
+				final FirstLine firstLine = new FirstLine(line);
+				enabledCapabilities = firstLine.getCapabilities();
+				line = firstLine.getLine();
 			}
 
 			if (line.length() < 83) {
@@ -750,16 +966,17 @@ public class ReceivePack {
 	}
 
 	private void enableCapabilities() {
-		reportStatus = enabledCapablities.contains(CAPABILITY_REPORT_STATUS);
+		reportStatus = enabledCapabilities.contains(CAPABILITY_REPORT_STATUS);
 
-		sideBand = enabledCapablities.contains(CAPABILITY_SIDE_BAND_64K);
+		sideBand = enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
+			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
+
 			pckOut = new PacketLineOut(rawOut);
-			msgs = new OutputStreamWriter(new SideBandOutputStream(CH_PROGRESS,
-					MAX_BUF, out), Constants.CHARSET);
+			pckOut.setFlushOnEnd(false);
 		}
 	}
 
@@ -779,17 +996,30 @@ public class ReceivePack {
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(10 * timeout * 1000);
 
-		ip = IndexPack.create(db, rawIn);
-		ip.setFixThin(true);
-		ip.setNeedNewObjectIds(checkReferencedIsReachable);
-		ip.setNeedBaseObjectIds(checkReferencedIsReachable);
-		ip.setObjectChecking(isCheckReceivedObjects());
-		ip.index(NullProgressMonitor.INSTANCE);
+		ProgressMonitor receiving = NullProgressMonitor.INSTANCE;
+		ProgressMonitor resolving = NullProgressMonitor.INSTANCE;
+		if (sideBand)
+			resolving = new SideBandProgressMonitor(msgOut);
 
-		String lockMsg = "jgit receive-pack";
-		if (getRefLogIdent() != null)
-			lockMsg += " from " + getRefLogIdent().toExternalString();
-		packLock = ip.renameAndOpenPack(lockMsg);
+		ObjectInserter ins = db.newObjectInserter();
+		try {
+			String lockMsg = "jgit receive-pack";
+			if (getRefLogIdent() != null)
+				lockMsg += " from " + getRefLogIdent().toExternalString();
+
+			parser = ins.newPackParser(rawIn);
+			parser.setAllowThin(true);
+			parser.setNeedNewObjectIds(checkReferencedIsReachable);
+			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
+			parser.setCheckEofAfterPackFooter(!biDirectionalPipe);
+			parser.setObjectChecking(isCheckReceivedObjects());
+			parser.setLockMessage(lockMsg);
+			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
+			packLock = parser.parse(receiving, resolving);
+			ins.flush();
+		} finally {
+			ins.release();
+		}
 
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(timeout * 1000);
@@ -805,10 +1035,10 @@ public class ReceivePack {
 		ObjectIdSubclassMap<ObjectId> providedObjects = null;
 
 		if (checkReferencedIsReachable) {
-			baseObjects = ip.getBaseObjectIds();
-			providedObjects = ip.getNewObjectIds();
+			baseObjects = parser.getBaseObjectIds();
+			providedObjects = parser.getNewObjectIds();
 		}
-		ip = null;
+		parser = null;
 
 		final ObjectWalk ow = new ObjectWalk(db);
 		ow.setRetainBody(false);
@@ -825,8 +1055,8 @@ public class ReceivePack {
 				continue;
 			ow.markStart(ow.parseAny(cmd.getNewId()));
 		}
-		for (final Ref ref : refs.values()) {
-			RevObject o = ow.parseAny(ref.getObjectId());
+		for (final ObjectId have : advertisedHaves) {
+			RevObject o = ow.parseAny(have);
 			ow.markUninteresting(o);
 
 			if (checkReferencedIsReachable && !baseObjects.isEmpty()) {
@@ -903,7 +1133,8 @@ public class ReceivePack {
 					// A well behaved client shouldn't have sent us a
 					// create command for a ref we advertised to it.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, "ref exists");
+					cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat
+							.format(JGitText.get().refAlreadyExists, ref));
 					continue;
 				}
 			}
@@ -982,84 +1213,23 @@ public class ReceivePack {
 	}
 
 	private void executeCommands() {
-		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
-		for (final ReceiveCommand cmd : filterCommands(Result.NOT_ATTEMPTED))
-			execute(cmd);
-	}
+		preReceive.onPreReceive(this,
+				ReceiveCommand.filter(commands, Result.NOT_ATTEMPTED));
 
-	private void execute(final ReceiveCommand cmd) {
-		try {
-			final RefUpdate ru = db.updateRef(cmd.getRefName());
-			ru.setRefLogIdent(getRefLogIdent());
-			switch (cmd.getType()) {
-			case DELETE:
-				if (!ObjectId.zeroId().equals(cmd.getOldId())) {
-					// We can only do a CAS style delete if the client
-					// didn't bork its delete request by sending the
-					// wrong zero id rather than the advertised one.
-					//
-					ru.setExpectedOldObjectId(cmd.getOldId());
-				}
-				ru.setForceUpdate(true);
-				status(cmd, ru.delete(walk));
-				break;
-
-			case CREATE:
-			case UPDATE:
-			case UPDATE_NONFASTFORWARD:
-				ru.setForceUpdate(isAllowNonFastForwards());
-				ru.setExpectedOldObjectId(cmd.getOldId());
-				ru.setNewObjectId(cmd.getNewId());
-				ru.setRefLogMessage("push", true);
-				status(cmd, ru.update(walk));
-				break;
-			}
-		} catch (IOException err) {
-			cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
-					JGitText.get().lockError, err.getMessage()));
+		List<ReceiveCommand> toApply = ReceiveCommand.filter(commands,
+				Result.NOT_ATTEMPTED);
+		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
+		if (sideBand) {
+			SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
+			pm.setDelayStart(250, TimeUnit.MILLISECONDS);
+			updating = pm;
 		}
-	}
-
-	private void status(final ReceiveCommand cmd, final RefUpdate.Result result) {
-		switch (result) {
-		case NOT_ATTEMPTED:
-			cmd.setResult(Result.NOT_ATTEMPTED);
-			break;
-
-		case LOCK_FAILURE:
-		case IO_FAILURE:
-			cmd.setResult(Result.LOCK_FAILURE);
-			break;
-
-		case NO_CHANGE:
-		case NEW:
-		case FORCED:
-		case FAST_FORWARD:
-			cmd.setResult(Result.OK);
-			break;
-
-		case REJECTED:
-			cmd.setResult(Result.REJECTED_NONFASTFORWARD);
-			break;
-
-		case REJECTED_CURRENT_BRANCH:
-			cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
-			break;
-
-		default:
-			cmd.setResult(Result.REJECTED_OTHER_REASON, result.name());
-			break;
+		updating.beginTask(JGitText.get().updatingReferences, toApply.size());
+		for (ReceiveCommand cmd : toApply) {
+			updating.update(1);
+			cmd.execute(this);
 		}
-	}
-
-	private List<ReceiveCommand> filterCommands(final Result want) {
-		final List<ReceiveCommand> r = new ArrayList<ReceiveCommand>(commands
-				.size());
-		for (final ReceiveCommand cmd : commands) {
-			if (cmd.getResult() == want)
-				r.add(cmd);
-		}
-		return r;
+		updating.endTask();
 	}
 
 	private void sendStatusReport(final boolean forClient, final Reporter out)

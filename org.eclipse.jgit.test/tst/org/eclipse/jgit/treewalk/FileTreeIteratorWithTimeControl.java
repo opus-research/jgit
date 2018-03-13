@@ -46,6 +46,7 @@ import java.io.File;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
@@ -87,7 +88,7 @@ public class FileTreeIteratorWithTimeControl extends FileTreeIterator {
 
 	public FileTreeIteratorWithTimeControl(File f, FS fs,
 			TreeSet<Long> modTimes) {
-		super(f, fs, new WorkingTreeOptions(false));
+		super(f, fs, new Config().get(WorkingTreeOptions.KEY));
 		this.modTimes = modTimes;
 	}
 

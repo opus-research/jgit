@@ -47,6 +47,7 @@ import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
+import static org.eclipse.jgit.http.server.GitSmartHttpTools.sendError;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_REPOSITORY;
 
 import java.io.IOException;
@@ -63,10 +64,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /**
  * Opens a repository named by the path info through {@link RepositoryResolver}.
@@ -82,7 +83,7 @@ import org.eclipse.jgit.lib.Repository;
  * attribute when the request is complete.
  */
 public class RepositoryFilter implements Filter {
-	private final RepositoryResolver resolver;
+	private final RepositoryResolver<HttpServletRequest> resolver;
 
 	private ServletContext context;
 
@@ -94,7 +95,7 @@ public class RepositoryFilter implements Filter {
 	 *            component to the actual {@link Repository} instance for the
 	 *            current web request.
 	 */
-	public RepositoryFilter(final RepositoryResolver resolver) {
+	public RepositoryFilter(final RepositoryResolver<HttpServletRequest> resolver) {
 		this.resolver = resolver;
 	}
 
@@ -107,42 +108,43 @@ public class RepositoryFilter implements Filter {
 	}
 
 	public void doFilter(final ServletRequest request,
-			final ServletResponse rsp, final FilterChain chain)
+			final ServletResponse response, final FilterChain chain)
 			throws IOException, ServletException {
+		HttpServletRequest req = (HttpServletRequest) request;
+		HttpServletResponse res = (HttpServletResponse) response;
+
 		if (request.getAttribute(ATTRIBUTE_REPOSITORY) != null) {
 			context.log(MessageFormat.format(HttpServerText.get().internalServerErrorRequestAttributeWasAlreadySet
 					, ATTRIBUTE_REPOSITORY
 					, getClass().getName()));
-			((HttpServletResponse) rsp).sendError(SC_INTERNAL_SERVER_ERROR);
+			sendError(req, res, SC_INTERNAL_SERVER_ERROR);
 			return;
 		}
-
-		final HttpServletRequest req = (HttpServletRequest) request;
 
 		String name = req.getPathInfo();
+		while (name != null && 0 < name.length() && name.charAt(0) == '/')
+			name = name.substring(1);
 		if (name == null || name.length() == 0) {
-			((HttpServletResponse) rsp).sendError(SC_NOT_FOUND);
+			sendError(req, res, SC_NOT_FOUND);
 			return;
 		}
-		if (name.startsWith("/"))
-			name = name.substring(1);
 
 		final Repository db;
 		try {
 			db = resolver.open(req, name);
 		} catch (RepositoryNotFoundException e) {
-			((HttpServletResponse) rsp).sendError(SC_NOT_FOUND);
-			return;
-		} catch (ServiceNotAuthorizedException e) {
-			((HttpServletResponse) rsp).sendError(SC_UNAUTHORIZED);
+			sendError(req, res, SC_NOT_FOUND);
 			return;
 		} catch (ServiceNotEnabledException e) {
-			((HttpServletResponse) rsp).sendError(SC_FORBIDDEN);
+			sendError(req, res, SC_FORBIDDEN);
+			return;
+		} catch (ServiceNotAuthorizedException e) {
+			res.sendError(SC_UNAUTHORIZED);
 			return;
 		}
 		try {
 			request.setAttribute(ATTRIBUTE_REPOSITORY, db);
-			chain.doFilter(request, rsp);
+			chain.doFilter(request, response);
 		} finally {
 			request.removeAttribute(ATTRIBUTE_REPOSITORY);
 			db.close();

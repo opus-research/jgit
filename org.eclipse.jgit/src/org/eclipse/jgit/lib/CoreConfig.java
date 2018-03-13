@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
@@ -61,19 +62,35 @@ public class CoreConfig {
 		}
 	};
 
+	/** Permissible values for {@code core.autocrlf}. */
+	public static enum AutoCRLF {
+		/** Automatic CRLF->LF conversion is disabled. */
+		FALSE,
+
+		/** Automatic CRLF->LF conversion is enabled. */
+		TRUE,
+
+		/** CRLF->LF performed, but no LF->CRLF. */
+		INPUT;
+	}
+
 	private final int compression;
 
 	private final int packIndexVersion;
 
 	private final boolean logAllRefUpdates;
 
-	private final boolean autoCRLF;
+	private final String excludesfile;
 
 	private CoreConfig(final Config rc) {
-		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt("pack", "indexversion", 2);
-		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		autoCRLF = rc.getBoolean("core", "autocrlf", false);
+		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_COMPRESSION, DEFAULT_COMPRESSION);
+		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
+				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
+		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
+		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
 	}
 
 	/**
@@ -85,7 +102,6 @@ public class CoreConfig {
 
 	/**
 	 * @return the preferred pack index file format; 0 for oldest possible.
-	 * @see org.eclipse.jgit.transport.IndexPack
 	 */
 	public int getPackIndexVersion() {
 		return packIndexVersion;
@@ -99,9 +115,9 @@ public class CoreConfig {
 	}
 
 	/**
-	 * @return whether automatic CRLF conversion has been configured
+	 * @return path of excludesfile
 	 */
-	public boolean isAutoCRLF() {
-		return autoCRLF;
+	public String getExcludesFile() {
+		return excludesfile;
 	}
 }

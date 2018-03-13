@@ -53,14 +53,15 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Config.SectionParser;
@@ -119,23 +120,35 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	protected static final int MIN_CLIENT_BUFFER = 2 * 32 * 46 + 8;
 
-	static final String OPTION_INCLUDE_TAG = "include-tag";
+	/** Include tags if we are also including the referenced objects. */
+	public static final String OPTION_INCLUDE_TAG = "include-tag";
 
-	static final String OPTION_MULTI_ACK = "multi_ack";
+	/** Mutli-ACK support for improved negotiation. */
+	public static final String OPTION_MULTI_ACK = "multi_ack";
 
-	static final String OPTION_MULTI_ACK_DETAILED = "multi_ack_detailed";
+	/** Mutli-ACK detailed support for improved negotiation. */
+	public static final String OPTION_MULTI_ACK_DETAILED = "multi_ack_detailed";
 
-	static final String OPTION_THIN_PACK = "thin-pack";
+	/** The client supports packs with deltas but not their bases. */
+	public static final String OPTION_THIN_PACK = "thin-pack";
 
-	static final String OPTION_SIDE_BAND = "side-band";
+	/** The client supports using the side-band for progress messages. */
+	public static final String OPTION_SIDE_BAND = "side-band";
 
-	static final String OPTION_SIDE_BAND_64K = "side-band-64k";
+	/** The client supports using the 64K side-band for progress messages. */
+	public static final String OPTION_SIDE_BAND_64K = "side-band-64k";
 
-	static final String OPTION_OFS_DELTA = "ofs-delta";
+	/** The client supports packs with OFS deltas. */
+	public static final String OPTION_OFS_DELTA = "ofs-delta";
 
-	static final String OPTION_SHALLOW = "shallow";
+	/** The client supports shallow fetches. */
+	public static final String OPTION_SHALLOW = "shallow";
 
-	static final String OPTION_NO_PROGRESS = "no-progress";
+	/** The client does not want progress messages and will ignore them. */
+	public static final String OPTION_NO_PROGRESS = "no-progress";
+
+	/** The client supports receiving a pack before it has sent "done". */
+	public static final String OPTION_NO_DONE = "no-done";
 
 	static enum MultiAck {
 		OFF, CONTINUE, DETAILED;
@@ -167,6 +180,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	private boolean includeTags;
 
 	private boolean allowOfsDelta;
+
+	private boolean noDone;
 
 	private String lockMessage;
 
@@ -316,24 +331,19 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	private void markReachable(final Set<ObjectId> have, final int maxTime)
 			throws IOException {
 		for (final Ref r : local.getAllRefs().values()) {
-			try {
-				final RevCommit o = walk.parseCommit(r.getObjectId());
-				o.add(REACHABLE);
-				reachableCommits.add(o);
-			} catch (IOException readError) {
-				// If we cannot read the value of the ref skip it.
-			}
+			ObjectId id = r.getPeeledObjectId();
+			if (id == null)
+				id = r.getObjectId();
+			if (id == null)
+				continue;
+			parseReachable(id);
 		}
 
-		for (final ObjectId id : have) {
-			try {
-				final RevCommit o = walk.parseCommit(id);
-				o.add(REACHABLE);
-				reachableCommits.add(o);
-			} catch (IOException readError) {
-				// If we cannot read the value of the ref skip it.
-			}
-		}
+		for (ObjectId id : local.getAdditionalHaves())
+			parseReachable(id);
+
+		for (ObjectId id : have)
+			parseReachable(id);
 
 		if (maxTime > 0) {
 			// Mark reachable commits until we reach maxTime. These may
@@ -357,6 +367,18 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					reachableCommits.add(c);
 				}
 			}
+		}
+	}
+
+	private void parseReachable(ObjectId id) {
+		try {
+			RevCommit o = walk.parseCommit(id);
+			if (!o.has(REACHABLE)) {
+				o.add(REACHABLE);
+				reachableCommits.add(o);
+			}
+		} catch (IOException readError) {
+			// If we cannot read the value of the ref skip it.
 		}
 	}
 
@@ -400,9 +422,11 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		if (allowOfsDelta)
 			wantCapability(line, OPTION_OFS_DELTA);
 
-		if (wantCapability(line, OPTION_MULTI_ACK_DETAILED))
+		if (wantCapability(line, OPTION_MULTI_ACK_DETAILED)) {
 			multiAck = MultiAck.DETAILED;
-		else if (wantCapability(line, OPTION_MULTI_ACK))
+			if (statelessRPC)
+				noDone = wantCapability(line, OPTION_NO_DONE);
+		} else if (wantCapability(line, OPTION_MULTI_ACK))
 			multiAck = MultiAck.CONTINUE;
 		else
 			multiAck = MultiAck.OFF;
@@ -419,7 +443,9 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			// ACK status to tell us common objects for reuse in future
 			// requests.  If its not enabled, we can't talk to the peer.
 			//
-			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().statelessRPCRequiresOptionToBeEnabled, OPTION_MULTI_ACK_DETAILED));
+			throw new PackProtocolException(uri, MessageFormat.format(
+					JGitText.get().statelessRPCRequiresOptionToBeEnabled,
+					OPTION_MULTI_ACK_DETAILED));
 		}
 
 		return line.toString();
@@ -433,6 +459,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		int havesSinceLastContinue = 0;
 		boolean receivedContinue = false;
 		boolean receivedAck = false;
+		boolean receivedReady = false;
 
 		if (statelessRPC)
 			state.writeTo(out, null);
@@ -504,6 +531,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					receivedAck = true;
 					receivedContinue = true;
 					havesSinceLastContinue = 0;
+					if (anr == AckNackResult.ACK_READY)
+						receivedReady = true;
 					break;
 				}
 
@@ -511,6 +540,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					throw new CancelledException();
 			}
 
+			if (noDone & receivedReady)
+				break SEND_HAVES;
 			if (statelessRPC)
 				state.writeTo(out, null);
 
@@ -529,12 +560,14 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		if (monitor.isCancelled())
 			throw new CancelledException();
 
-		// When statelessRPC is true we should always leave SEND_HAVES
-		// loop above while in the middle of a request. This allows us
-		// to just write done immediately.
-		//
-		pckOut.writeString("done\n");
-		pckOut.flush();
+		if (!receivedReady || !noDone) {
+			// When statelessRPC is true we should always leave SEND_HAVES
+			// loop above while in the middle of a request. This allows us
+			// to just write done immediately.
+			//
+			pckOut.writeString("done\n");
+			pckOut.flush();
+		}
 
 		if (!receivedAck) {
 			// Apparently if we have never received an ACK earlier
@@ -598,6 +631,11 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 				}
 				return !remoteKnowsIsCommon;
 			}
+
+			@Override
+			public boolean requiresCommitBody() {
+				return false;
+			}
 		});
 	}
 
@@ -635,17 +673,31 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	}
 
 	private void receivePack(final ProgressMonitor monitor) throws IOException {
-		final IndexPack ip;
-
+		onReceivePack();
 		InputStream input = in;
 		if (sideband)
 			input = new SideBandInputStream(input, monitor, getMessageWriter());
 
-		ip = IndexPack.create(local, input);
-		ip.setFixThin(thinPack);
-		ip.setObjectChecking(transport.isCheckFetchedObjects());
-		ip.index(monitor);
-		packLock = ip.renameAndOpenPack(lockMessage);
+		ObjectInserter ins = local.newObjectInserter();
+		try {
+			PackParser parser = ins.newPackParser(input);
+			parser.setAllowThin(thinPack);
+			parser.setObjectChecking(transport.isCheckFetchedObjects());
+			parser.setLockMessage(lockMessage);
+			packLock = parser.parse(monitor);
+			ins.flush();
+		} finally {
+			ins.release();
+		}
+	}
+
+	/**
+	 * Notification event delivered just before the pack is received from the
+	 * network. This event can be used by RPC such as {@link TransportHttp} to
+	 * disable its request magic and ensure the pack stream is read correctly.
+	 */
+	protected void onReceivePack() {
+		// By default do nothing for TCP based protocols.
 	}
 
 	private static class CancelledException extends Exception {

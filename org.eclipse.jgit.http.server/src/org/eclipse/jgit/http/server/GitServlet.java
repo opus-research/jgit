@@ -43,28 +43,22 @@
 
 package org.eclipse.jgit.http.server;
 
-import java.io.File;
-import java.text.MessageFormat;
+import java.util.Enumeration;
 
+import javax.servlet.Filter;
+import javax.servlet.FilterConfig;
 import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletRequest;
 
-import org.eclipse.jgit.http.server.glue.ErrorServlet;
 import org.eclipse.jgit.http.server.glue.MetaServlet;
-import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
-import org.eclipse.jgit.http.server.glue.ServletBinder;
-import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
-import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.AsIsFileService;
-import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.util.StringUtils;
+import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 
 /**
  * Handles Git repository access over HTTP.
@@ -103,15 +97,7 @@ import org.eclipse.jgit.util.StringUtils;
 public class GitServlet extends MetaServlet {
 	private static final long serialVersionUID = 1L;
 
-	private volatile boolean initialized;
-
-	private RepositoryResolver resolver;
-
-	private AsIsFileService asIs = new AsIsFileService();
-
-	private UploadPackFactory uploadPackFactory = new DefaultUploadPackFactory();
-
-	private ReceivePackFactory receivePackFactory = new DefaultReceivePackFactory();
+	private final GitFilter gitFilter;
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -120,7 +106,8 @@ public class GitServlet extends MetaServlet {
 	 * the local filesystem directory where all served Git repositories reside.
 	 */
 	public GitServlet() {
-		// Initialized above by field declarations.
+		super(new GitFilter());
+		gitFilter = (GitFilter) getDelegateFilter();
 	}
 
 	/**
@@ -132,9 +119,8 @@ public class GitServlet extends MetaServlet {
 	 *            parameter table during init, which usually comes from the
 	 *            {@code web.xml} file of the web application.
 	 */
-	public void setRepositoryResolver(RepositoryResolver resolver) {
-		assertNotInitialized();
-		this.resolver = resolver;
+	public void setRepositoryResolver(RepositoryResolver<HttpServletRequest> resolver) {
+		gitFilter.setRepositoryResolver(resolver);
 	}
 
 	/**
@@ -144,8 +130,7 @@ public class GitServlet extends MetaServlet {
 	 *            support is completely disabled.
 	 */
 	public void setAsIsFileService(AsIsFileService f) {
-		assertNotInitialized();
-		this.asIs = f != null ? f : AsIsFileService.DISABLED;
+		gitFilter.setAsIsFileService(f);
 	}
 
 	/**
@@ -153,9 +138,18 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure an {@link UploadPack}
 	 *            session when a fetch or clone is requested by a client.
 	 */
-	public void setUploadPackFactory(UploadPackFactory f) {
-		assertNotInitialized();
-		this.uploadPackFactory = f != null ? f : UploadPackFactory.DISABLED;
+	public void setUploadPackFactory(UploadPackFactory<HttpServletRequest> f) {
+		gitFilter.setUploadPackFactory(f);
+	}
+
+	/**
+	 * @param filter
+	 *            filter to apply before any of the UploadPack operations. The
+	 *            UploadPack instance is available in the request attribute
+	 *            {@link ServletUtils#ATTRIBUTE_HANDLER}.
+	 */
+	public void addUploadPackFilter(Filter filter) {
+		gitFilter.addUploadPackFilter(filter);
 	}
 
 	/**
@@ -163,128 +157,38 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure a {@link ReceivePack}
 	 *            session when a push is requested by a client.
 	 */
-	public void setReceivePackFactory(ReceivePackFactory f) {
-		assertNotInitialized();
-		this.receivePackFactory = f != null ? f : ReceivePackFactory.DISABLED;
+	public void setReceivePackFactory(ReceivePackFactory<HttpServletRequest> f) {
+		gitFilter.setReceivePackFactory(f);
 	}
 
-	private void assertNotInitialized() {
-		if (initialized)
-			throw new IllegalStateException(HttpServerText.get().alreadyInitializedByContainer);
+	/**
+	 * @param filter
+	 *            filter to apply before any of the ReceivePack operations. The
+	 *            ReceivePack instance is available in the request attribute
+	 *            {@link ServletUtils#ATTRIBUTE_HANDLER}.
+	 */
+	public void addReceivePackFilter(Filter filter) {
+		gitFilter.addReceivePackFilter(filter);
 	}
 
 	@Override
 	public void init(final ServletConfig config) throws ServletException {
-		super.init(config);
+		gitFilter.init(new FilterConfig() {
+			public String getFilterName() {
+				return gitFilter.getClass().getName();
+			}
 
-		if (resolver == null) {
-			final File root = getFile("base-path");
-			final boolean exportAll = getBoolean("export-all");
-			setRepositoryResolver(new FileResolver(root, exportAll));
-		}
+			public String getInitParameter(String name) {
+				return config.getInitParameter(name);
+			}
 
-		initialized = true;
+			public Enumeration getInitParameterNames() {
+				return config.getInitParameterNames();
+			}
 
-		if (uploadPackFactory != UploadPackFactory.DISABLED) {
-			serve("*/git-upload-pack")//
-					.with(new UploadPackServlet(uploadPackFactory));
-		}
-
-		if (receivePackFactory != ReceivePackFactory.DISABLED) {
-			serve("*/git-receive-pack")//
-					.with(new ReceivePackServlet(receivePackFactory));
-		}
-
-		ServletBinder refs = serve("*/" + Constants.INFO_REFS);
-		if (uploadPackFactory != UploadPackFactory.DISABLED) {
-			refs = refs.through(//
-					new UploadPackServlet.InfoRefs(uploadPackFactory));
-		}
-		if (receivePackFactory != ReceivePackFactory.DISABLED) {
-			refs = refs.through(//
-					new ReceivePackServlet.InfoRefs(receivePackFactory));
-		}
-		if (asIs != AsIsFileService.DISABLED) {
-			refs = refs.through(new IsLocalFilter());
-			refs = refs.through(new AsIsFileFilter(asIs));
-			refs.with(new InfoRefsServlet());
-		} else
-			refs.with(new ErrorServlet(HttpServletResponse.SC_FORBIDDEN));
-
-		if (asIs != AsIsFileService.DISABLED) {
-			final IsLocalFilter mustBeLocal = new IsLocalFilter();
-			final AsIsFileFilter enabled = new AsIsFileFilter(asIs);
-
-			serve("*/" + Constants.HEAD)//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.with(new TextFileServlet(Constants.HEAD));
-
-			final String info_alternates = "objects/info/alternates";
-			serve("*/" + info_alternates)//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.with(new TextFileServlet(info_alternates));
-
-			final String http_alternates = "objects/info/http-alternates";
-			serve("*/" + http_alternates)//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.with(new TextFileServlet(http_alternates));
-
-			serve("*/objects/info/packs")//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.with(new InfoPacksServlet());
-
-			serveRegex("^/(.*)/objects/([0-9a-f]{2}/[0-9a-f]{38})$")//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.through(new RegexGroupFilter(2))//
-					.with(new ObjectFileServlet.Loose());
-
-			serveRegex("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.pack)$")//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.through(new RegexGroupFilter(2))//
-					.with(new ObjectFileServlet.Pack());
-
-			serveRegex("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.idx)$")//
-					.through(mustBeLocal)//
-					.through(enabled)//
-					.through(new RegexGroupFilter(2))//
-					.with(new ObjectFileServlet.PackIdx());
-		}
-	}
-
-	private File getFile(final String param) throws ServletException {
-		String n = getInitParameter(param);
-		if (n == null || "".equals(n))
-			throw new ServletException(MessageFormat.format(HttpServerText.get().parameterNotSet, param));
-
-		File path = new File(n);
-		if (!path.exists())
-			throw new ServletException(MessageFormat.format(HttpServerText.get().pathForParamNotFound, path, param));
-		return path;
-	}
-
-	private boolean getBoolean(String param) throws ServletException {
-		String n = getInitParameter(param);
-		if (n == null)
-			return false;
-		try {
-			return StringUtils.toBoolean(n);
-		} catch (IllegalArgumentException err) {
-			throw new ServletException(MessageFormat.format(HttpServerText.get().invalidBoolean, param, n));
-		}
-	}
-
-	@Override
-	protected ServletBinder register(ServletBinder binder) {
-		if (resolver == null)
-			throw new IllegalStateException(HttpServerText.get().noResolverAvailable);
-		binder = binder.through(new NoCacheFilter());
-		binder = binder.through(new RepositoryFilter(resolver));
-		return binder;
+			public ServletContext getServletContext() {
+				return config.getServletContext();
+			}
+		});
 	}
 }

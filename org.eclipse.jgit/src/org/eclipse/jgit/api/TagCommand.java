@@ -45,11 +45,11 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -140,11 +140,12 @@ public class TagCommand extends GitCommand<RevTag> {
 
 				RevWalk revWalk = new RevWalk(repo);
 				try {
-					RevTag revTag = revWalk.parseTag(newTag.getTagId());
+					RevTag revTag = revWalk.parseTag(tagId);
 					String refName = Constants.R_TAGS + newTag.getTag();
 					RefUpdate tagRef = repo.updateRef(refName);
 					tagRef.setNewObjectId(tagId);
 					tagRef.setForceUpdate(forceUpdate);
+					tagRef.setRefLogMessage("tagged " + name, false);
 					Result updateResult = tagRef.update(revWalk);
 					switch (updateResult) {
 					case NEW:

@@ -43,10 +43,11 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.Serializable;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -61,7 +62,9 @@ import org.eclipse.jgit.util.RawParseUtils;
  * This class converts the hex string into a binary form, to make it more
  * efficient for matching against an object.
  */
-public final class AbbreviatedObjectId {
+public final class AbbreviatedObjectId implements Serializable {
+	private static final long serialVersionUID = 1L;
+
 	/**
 	 * Test a string of characters to verify it is a hex format.
 	 * <p>

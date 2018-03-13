@@ -52,7 +52,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>0.9.0-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.test</artifactId>
@@ -124,14 +124,8 @@
     <plugins>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.4.2</version>
         <configuration>
           <argLine>-Xmx256m -Dfile.encoding=UTF-8</argLine>
-          <includes>
-            <include>**/*Test.java</include>
-            <include>**/*TestCase.java</include>
-            <include>**/T000*.java</include>
-          </includes>
         </configuration>
       </plugin>
     </plugins>
