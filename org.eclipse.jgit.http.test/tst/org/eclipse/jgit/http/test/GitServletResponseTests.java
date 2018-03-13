@@ -222,14 +222,9 @@ public class GitServletResponseTests extends HttpTestCase {
 		preHook = null;
 		oc = new ObjectChecker() {
 			@Override
-			public void checkCommit(byte[] raw) throws CorruptObjectException {
-				throw new IllegalStateException();
-			}
-
-			@Override
 			public void checkCommit(AnyObjectId id, byte[] raw)
 					throws CorruptObjectException {
-				throw new IllegalStateException();
+				throw new CorruptObjectException("refusing all commits");
 			}
 		};
 
