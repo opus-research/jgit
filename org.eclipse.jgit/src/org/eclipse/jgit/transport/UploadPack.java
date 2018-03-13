@@ -141,12 +141,8 @@ public class UploadPack {
 		ANY;
 	}
 
-	/**
-	 * Validator for client requests.
-	 *
-	 * @since 3.1
-	 */
-	public interface RequestValidator {
+	/** Validator for client requests. */
+	private interface RequestValidator {
 		/**
 		 * Check a list of client wants against the request policy.
 		 *
@@ -159,7 +155,6 @@ public class UploadPack {
 		 *            if one or more wants is not valid.
 		 * @throws IOException
 		 *            if a low-level exception occurred.
-		 * @since 3.1
 		 */
 		void checkWants(UploadPack up, List<RevObject> wants)
 				throws PackProtocolException, IOException;
@@ -302,7 +297,7 @@ public class UploadPack {
 
 	private final RevFlagSet SAVE;
 
-	private RequestValidator requestValidator = new AdvertisedRequestValidator();
+	private RequestPolicy requestPolicy;
 
 	private MultiAck multiAck = MultiAck.OFF;
 
@@ -335,7 +330,7 @@ public class UploadPack {
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
 
-		transferConfig = new TransferConfig(db);
+		setTransferConfig(null);
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -419,22 +414,9 @@ public class UploadPack {
 		biDirectionalPipe = twoWay;
 	}
 
-	/**
-	 * @return policy used by the service to validate client requests, or null for
-	 *         a custom request validator.
-	 */
+	/** @return policy used by the service to validate client requests. */
 	public RequestPolicy getRequestPolicy() {
-		if (requestValidator instanceof AdvertisedRequestValidator)
-			return RequestPolicy.ADVERTISED;
-		if (requestValidator instanceof ReachableCommitRequestValidator)
-			return RequestPolicy.REACHABLE_COMMIT;
-		if (requestValidator instanceof TipRequestValidator)
-			return RequestPolicy.TIP;
-		if (requestValidator instanceof ReachableCommitTipRequestValidator)
-			return RequestPolicy.REACHABLE_COMMIT_TIP;
-		if (requestValidator instanceof AnyRequestValidator)
-			return RequestPolicy.ANY;
-		return null;
+		return requestPolicy;
 	}
 
 	/**
@@ -449,34 +431,7 @@ public class UploadPack {
 	 *            Overrides any policy specified in a {@link TransferConfig}.
 	 */
 	public void setRequestPolicy(RequestPolicy policy) {
-		switch (policy) {
-			case ADVERTISED:
-			default:
-				requestValidator = new AdvertisedRequestValidator();
-				break;
-			case REACHABLE_COMMIT:
-				requestValidator = new ReachableCommitRequestValidator();
-				break;
-			case TIP:
-				requestValidator = new TipRequestValidator();
-				break;
-			case REACHABLE_COMMIT_TIP:
-				requestValidator = new ReachableCommitTipRequestValidator();
-				break;
-			case ANY:
-				requestValidator = new AnyRequestValidator();
-				break;
-		}
-	}
-
-	/**
-	 * @param validator
-	 *            custom validator for client want list.
-	 * @since 3.1
-	 */
-	public void setRequestValidator(RequestValidator validator) {
-		requestValidator = validator != null ? validator
-				: new AdvertisedRequestValidator();
+		requestPolicy = policy;
 	}
 
 	/** @return the hook used while advertising the refs to the client */
@@ -554,6 +509,8 @@ public class UploadPack {
 	 */
 	public void setTransferConfig(TransferConfig tc) {
 		this.transferConfig = tc != null ? tc : new TransferConfig(db);
+		this.requestPolicy = transferConfig.isAllowTipSha1InWant()
+				? RequestPolicy.TIP : RequestPolicy.ADVERTISED;
 	}
 
 	/** @return the configured logger. */
@@ -662,7 +619,7 @@ public class UploadPack {
 	private void service() throws IOException {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
-		else if (requestValidator instanceof AnyRequestValidator)
+		else if (requestPolicy == RequestPolicy.ANY)
 			advertised = Collections.emptySet();
 		else
 			advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
@@ -801,10 +758,8 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_SHALLOW);
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
-		RequestPolicy policy = getRequestPolicy();
-		if (policy == RequestPolicy.TIP
-				|| policy == RequestPolicy.REACHABLE_COMMIT_TIP
-				|| policy == null)
+		if (requestPolicy == RequestPolicy.TIP
+				|| requestPolicy == RequestPolicy.REACHABLE_COMMIT_TIP)
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
 		advertised = adv.send(getAdvertisedOrDefaultRefs());
@@ -1053,7 +1008,7 @@ public class UploadPack {
 				}
 			}
 			if (notAdvertisedWants != null)
-				requestValidator.checkWants(this, notAdvertisedWants);
+				getRequestValidator().checkWants(this, notAdvertisedWants);
 			wantIds.clear();
 		} catch (MissingObjectException notFound) {
 			ObjectId id = notFound.getObjectId();
@@ -1071,13 +1026,23 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * Validator corresponding to {@link RequestPolicy#ADVERTISED}.
-	 *
-	 * @since 3.1
-	 */
-	public static final class AdvertisedRequestValidator
-			implements RequestValidator {
+	private RequestValidator getRequestValidator() {
+		switch (requestPolicy) {
+			case ADVERTISED:
+			default:
+				return new AdvertisedRequestValidator();
+			case REACHABLE_COMMIT:
+				return new ReachableCommitRequestValidator();
+			case TIP:
+				return new TipRequestValidator();
+			case REACHABLE_COMMIT_TIP:
+				return new ReachableCommitTipRequestValidator();
+			case ANY:
+				return new AnyRequestValidator();
+		}
+	}
+
+	private static class AdvertisedRequestValidator implements RequestValidator {
 		public void checkWants(UploadPack up, List<RevObject> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1088,12 +1053,7 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * Validator corresponding to {@link RequestPolicy#REACHABLE_COMMIT}.
-	 *
-	 * @since 3.1
-	 */
-	public static final class ReachableCommitRequestValidator
+	private static class ReachableCommitRequestValidator
 			implements RequestValidator {
 		public void checkWants(UploadPack up, List<RevObject> wants)
 				throws PackProtocolException, IOException {
@@ -1102,12 +1062,7 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * Validator corresponding to {@link RequestPolicy#TIP}.
-	 *
-	 * @since 3.1
-	 */
-	public static final class TipRequestValidator implements RequestValidator {
+	private static class TipRequestValidator implements RequestValidator {
 		public void checkWants(UploadPack up, List<RevObject> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1124,12 +1079,7 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * Validator corresponding to {@link RequestPolicy#REACHABLE_COMMIT_TIP}.
-	 *
-	 * @since 3.1
-	 */
-	public static final class ReachableCommitTipRequestValidator
+	private static class ReachableCommitTipRequestValidator
 			implements RequestValidator {
 		public void checkWants(UploadPack up, List<RevObject> wants)
 				throws PackProtocolException, IOException {
@@ -1138,12 +1088,7 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * Validator corresponding to {@link RequestPolicy#ANY}.
-	 *
-	 * @since 3.1
-	 */
-	public static final class AnyRequestValidator implements RequestValidator {
+	private static class AnyRequestValidator implements RequestValidator {
 		public void checkWants(UploadPack up, List<RevObject> wants)
 				throws PackProtocolException, IOException {
 			// All requests are valid.
