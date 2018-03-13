@@ -233,9 +233,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 								// used for merge commits
 								repo.writeMergeCommitMsg(null);
 								repo.writeMergeHeads(null);
-							} else if (state == RepositoryState.CHERRY_PICKING_RESOLVED) {
-								repo.writeMergeCommitMsg(null);
-								repo.writeCherryPickHead(null);
 							}
 							return revCommit;
 						}
