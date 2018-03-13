@@ -161,7 +161,7 @@ class Push extends TextBuiltin {
 				printRefUpdateResult(reader, uri, result, rru);
 		}
 
-		AbstractFetchCommand.showRemoteMessages(errw, result.getMessages());
+		AbstractFetchCommand.showRemoteMessages(result.getMessages());
 		if (everythingUpToDate)
 			outw.println(CLIText.get().everythingUpToDate);
 	}
