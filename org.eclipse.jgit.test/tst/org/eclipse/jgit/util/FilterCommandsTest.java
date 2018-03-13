@@ -77,6 +77,7 @@ public class FilterCommandsTest extends RepositoryTestCase {
 		public FilterCommand create(Repository db, InputStream in,
 				final OutputStream out) {
 			FilterCommand cmd = new FilterCommand(in, out) {
+
 				@Override
 				public int run() throws IOException {
 					int b = in.read();
@@ -117,7 +118,7 @@ public class FilterCommandsTest extends RepositoryTestCase {
 	public void testBuiltinCleanFilter()
 			throws IOException, GitAPIException {
 		String builtinCommandName = "jgit://builtin/test/clean";
-		Repository.registerCommand(builtinCommandName,
+		Repository.registerFilterCommand(builtinCommandName,
 				new TestCommandFactory('c'));
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "test", "clean", builtinCommandName);
@@ -154,7 +155,7 @@ public class FilterCommandsTest extends RepositoryTestCase {
 	@Test
 	public void testBuiltinSmudgeFilter() throws IOException, GitAPIException {
 		String builtinCommandName = "jgit://builtin/test/smudge";
-		Repository.registerCommand(builtinCommandName,
+		Repository.registerFilterCommand(builtinCommandName,
 				new TestCommandFactory('s'));
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "test", "smudge", builtinCommandName);
@@ -198,9 +199,9 @@ public class FilterCommandsTest extends RepositoryTestCase {
 	@Test
 	public void testBuiltinCleanAndSmudgeFilter() throws IOException, GitAPIException {
 		String builtinCommandPrefix = "jgit://builtin/test/";
-		Repository.registerCommand(builtinCommandPrefix + "smudge",
+		Repository.registerFilterCommand(builtinCommandPrefix + "smudge",
 				new TestCommandFactory('s'));
-		Repository.registerCommand(builtinCommandPrefix + "clean",
+		Repository.registerFilterCommand(builtinCommandPrefix + "clean",
 				new TestCommandFactory('c'));
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "test", "smudge", builtinCommandPrefix+"smudge");

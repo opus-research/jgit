@@ -56,7 +56,7 @@ import org.eclipse.jgit.lfs.internal.LfsText;
 @SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git LFS extension for large objects. */
-	public static final String LONG_HASH_FUNCTION = "SHA-256";
+	private static final String LONG_HASH_FUNCTION = "SHA-256";
 
 	/**
 	 * A Git LFS large object hash is 256 bits, i.e. 32 bytes.
