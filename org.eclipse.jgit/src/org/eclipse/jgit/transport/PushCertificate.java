@@ -228,8 +228,24 @@ public class PushCertificate {
 				&& pusher.equals(p.pusher)
 				&& Objects.equals(pushee, p.pushee)
 				&& nonceStatus == p.nonceStatus
-				&& rawCommands.equals(p.rawCommands)
-				&& signature.equals(p.signature);
+				&& signature.equals(p.signature)
+				&& commandsEqual(this, p);
+	}
+
+	private static boolean commandsEqual(PushCertificate c1, PushCertificate c2) {
+		if (c1.commands.size() != c2.commands.size()) {
+			return false;
+		}
+		for (int i = 0; i < c1.commands.size(); i++) {
+			ReceiveCommand cmd1 = c1.commands.get(i);
+			ReceiveCommand cmd2 = c2.commands.get(i);
+			if (!cmd1.getOldId().equals(cmd2.getOldId())
+					|| !cmd1.getNewId().equals(cmd2.getNewId())
+					|| !cmd1.getRefName().equals(cmd2.getRefName())) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	@Override
