@@ -55,7 +55,7 @@ public class DfsText extends TranslationBundle {
 
 	// @formatter:off
 	/***/ public String cannotReadIndex;
-	/***/ public String readBackDelta;
+	/***/ public String cannotReadBackDelta;
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfIndex;
 	/***/ public String unexpectedEofInPack;
