@@ -92,7 +92,7 @@ public abstract class ObjectDatabase {
 	}
 
 	/**
-	 * Create a new {@code DatabaseInserter} to insert new objects.
+	 * Create a new {@code ObjectInserter} to insert new objects.
 	 * <p>
 	 * The returned inserter is not itself thread-safe, but multiple concurrent
 	 * inserter instances created from the same {@code ObjectDatabase} must be
