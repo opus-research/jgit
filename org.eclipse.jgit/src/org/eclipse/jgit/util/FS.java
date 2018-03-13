@@ -89,7 +89,7 @@ public abstract class FS {
 	 * @return detected file system abstraction
 	 */
 	public static FS detect(Boolean cygwinUsed) {
-		if (FS_Win32.isWin32()) {
+		if (SystemReader.getInstance().isWindows()) {
 			if (cygwinUsed == null)
 				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
 			if (cygwinUsed.booleanValue())
@@ -134,6 +134,13 @@ public abstract class FS {
 	 *         executable bit information; false otherwise.
 	 */
 	public abstract boolean supportsExecute();
+
+	/**
+	 * Is this file system case sensitive
+	 *
+	 * @return true if this implementation is case sensitive
+	 */
+	public abstract boolean isCaseSensitive();
 
 	/**
 	 * Determine if the file is executable (or not).
@@ -244,7 +251,20 @@ public abstract class FS {
 		return new File(home).getAbsoluteFile();
 	}
 
+	/**
+	 * Searches the given path to see if it contains one of the given files.
+	 * Returns the first it finds. Returns null if not found or if path is null.
+	 *
+	 * @param path
+	 *            List of paths to search separated by File.pathSeparator
+	 * @param lookFor
+	 *            Files to search for in the given path
+	 * @return the first match found, or null
+	 **/
 	static File searchPath(final String path, final String... lookFor) {
+		if (path == null)
+			return null;
+
 		for (final String p : path.split(File.pathSeparator)) {
 			for (String command : lookFor) {
 				final File e = new File(p, command);
@@ -291,14 +311,16 @@ public abstract class FS {
 							}
 					} catch (IOException e) {
 						// Just print on stderr for debugging
-						e.printStackTrace(System.err);
+						if (debug)
+							e.printStackTrace(System.err);
 						gooblerFail.set(true);
 					}
 					try {
 						is.close();
 					} catch (IOException e) {
 						// Just print on stderr for debugging
-						e.printStackTrace(System.err);
+						if (debug)
+							e.printStackTrace(System.err);
 						gooblerFail.set(true);
 					}
 				}

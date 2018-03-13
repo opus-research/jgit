@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2011, Google Inc.
  * Copyright (C) 2010, Garmin International
  * Copyright (C) 2010, Matt Fischer <matt.fischer@garmin.com>
  * and other copyright owners as documented in the project's IP log.
@@ -50,61 +49,61 @@ import java.io.IOException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 
-import static org.eclipse.jgit.revwalk.RevWalk.UNINTERESTING;
-
 /**
- * Only produce commits which are below a specified depth. Also find boundary
- * points where ancestry becomes uninteresting.
+ * Only produce commits which are below a specified depth.
+ *
+ * @see DepthWalk
  */
 class DepthGenerator extends Generator {
 	private final FIFORevQueue pending;
+
 	private final int depth;
-	// Should be a DepthRevWalk or a DepthObjectWalk
+
 	private final RevWalk walk;
 
-	/** A flag for commits whose parents are too deep to include */
-	final RevFlag SHALLOW;
+	/**
+	 * Commits which used to be shallow in the client, but which are
+	 * being extended as part of this fetch.  These commits should be
+	 * returned to the caller as UNINTERESTING so that their blobs/trees
+	 * can be marked appropriately in the pack writer.
+	 */
+	private final RevFlag UNSHALLOW;
 
 	/**
-	 * A flag for uninteresting commits that are direct parents of
-	 * interesting commits
+	 * Commits which the normal framework has marked as UNINTERESTING,
+	 * but which we now care about again.  This happens if a client is
+	 * extending a shallow checkout to become deeper--the new commits at
+	 * the bottom of the graph need to be sent, even though they are
+	 * below other commits which the client already has.
 	 */
-	final RevFlag BOUNDARY;
+	private final RevFlag REINTERESTING;
 
 	/**
 	 * @param w
-	 *                The walk that's using this generator
-	 * @param d
-	 *                The maximum commit depth to generate
-	 * @param shallow
-	 *                The flag that denotes maximum depth
-	 * @param boundary
-	 *                The flag that denotes the edge of an uninteresting area
-	 * @param s
-	 *                A queue of commits to begin with whose depth will be 0
+	 * @param s Parent generator
 	 * @throws MissingObjectException
 	 * @throws IncorrectObjectTypeException
 	 * @throws IOException
 	 */
-	DepthGenerator(RevWalk w, int d, final RevFlag shallow,
-			final RevFlag boundary, final DateRevQueue s)
-			throws MissingObjectException,
+	DepthGenerator(DepthWalk w, Generator s) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		pending = new FIFORevQueue();
-		walk = w;
-		depth = d;
-		SHALLOW = shallow;
-		BOUNDARY = boundary;
+		walk = (RevWalk)w;
+
+		this.depth = w.getDepth();
+		this.UNSHALLOW = w.getUnshallowFlag();
+		this.REINTERESTING = w.getReinterestingFlag();
 
 		s.shareFreeList(pending);
 
-		// Grab all source's commits and make them the 0th layer
+		// Begin by sucking out all of the source's commits, and
+		// adding them to the pending queue
 		for (;;) {
-			final DepthCommit c = (DepthCommit)s.next();
+			RevCommit c = s.next();
 			if (c == null)
 				break;
-			c.depth = 0;
-			pending.add(c);
+			if (((DepthWalk.Commit) c).getDepth() == 0)
+				pending.add(c);
 		}
 	}
 
@@ -126,54 +125,52 @@ class DepthGenerator extends Generator {
 		// reachable by more than one route, we are guaranteed to
 		// arrive by the shortest route first.
 		for (;;) {
-			final DepthCommit c = (DepthCommit)pending.next();
+			final DepthWalk.Commit c = (DepthWalk.Commit) pending.next();
 			if (c == null)
 				return null;
 
 			if ((c.flags & RevWalk.PARSED) == 0)
 				c.parseHeaders(walk);
 
-			// These need to be marked so PackWriter doesn't
-			// think they're useful parents
-			if (c.depth > depth) {
-				c.flags |= UNINTERESTING;
-				continue;
-			}
-			if (c.depth == depth)
-				c.add(SHALLOW);
-
 			int newDepth = c.depth + 1;
 
 			for (final RevCommit p : c.parents) {
-				DepthCommit dp = (DepthCommit)p;
-				boolean add = false;
+				DepthWalk.Commit dp = (DepthWalk.Commit) p;
 
-				// If no depth has been assigned to this
-				// commit, assign it now.  Since we arrive
-				// by the shortest route first, this depth
-				// is guaranteed to be the smallest value
-				// that any path could produce.
+				// If no depth has been assigned to this commit, assign
+				// it now.  Since we arrive by the shortest route first,
+				// this depth is guaranteed to be the smallest value that
+				// any path could produce.
 				if (dp.depth == -1) {
 					dp.depth = newDepth;
-					add = true;
+
+					// If the parent is not too deep, add it to the queue
+					// so that we can produce it later
+					if (newDepth <= depth)
+						pending.add(p);
 				}
 
-				// Detect boundaries and flag appropriately. Queue
-				// them for output, in case a shorter path where
-				// they aren't boundaries reached them already.
-				if ((c.flags & UNINTERESTING) == 0
-						&& ((p.flags & UNINTERESTING) != 0)
-						&& (BOUNDARY != null)
-						&& !p.has(BOUNDARY)) {
-					p.add(BOUNDARY);
-					add = true;
+				// If the current commit has become unshallowed, everything
+				// below us is new to the client.  Mark its parent as
+				// re-interesting, and carry that flag downward to all
+				// of its ancestors.
+				if(c.has(UNSHALLOW) || c.has(REINTERESTING)) {
+					p.add(REINTERESTING);
+					p.flags &= ~RevWalk.UNINTERESTING;
 				}
-
-				if (add)
-					pending.add(p);
 			}
 
-			return c;
+			// Produce all commits less than the depth cutoff
+			boolean produce = c.depth <= depth;
+
+			// Unshallow commits are uninteresting, but still need to be sent
+			// up to the PackWriter so that it will exclude objects correctly.
+			// All other uninteresting commits should be omitted.
+			if ((c.flags & RevWalk.UNINTERESTING) != 0 && !c.has(UNSHALLOW))
+				produce = false;
+
+			if (produce)
+				return c;
 		}
 	}
 }
