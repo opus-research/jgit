@@ -169,7 +169,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
 		PackList packList = db.getPackList();
 		resolveImpl(packList, id, noGarbage, matches);
-		if (matches.size() <= MAX_RESOLVE_MATCHES && packList.dirty()) {
+		if (matches.size() < MAX_RESOLVE_MATCHES && packList.dirty()) {
 			resolveImpl(db.scanPacks(packList), id, noGarbage, matches);
 		}
 		return matches;
@@ -182,7 +182,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				continue;
 			}
 			pack.resolve(this, matches, id, MAX_RESOLVE_MATCHES);
-			if (MAX_RESOLVE_MATCHES <= matches.size()) {
+			if (matches.size() >= MAX_RESOLVE_MATCHES) {
 				break;
 			}
 		}
@@ -305,7 +305,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		PackList packList = db.getPackList();
 		List<FoundObject<T>> r = new ArrayList<>();
 		findAllImpl(packList, pending, r);
-		if (packList.dirty()) {
+		if (!pending.isEmpty() && packList.dirty()) {
 			findAllImpl(db.scanPacks(packList), pending, r);
 		}
 		for (T t : pending) {
@@ -318,6 +318,9 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	private <T extends ObjectId> void findAllImpl(PackList packList,
 			Collection<T> pending, List<FoundObject<T>> r) {
 		DfsPackFile[] packs = packList.packs;
+		if (packs.length == 0) {
+			return;
+		}
 		int lastIdx = 0;
 		DfsPackFile lastPack = packs[lastIdx];
 		boolean noGarbage = avoidUnreachable;
