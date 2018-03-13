@@ -137,12 +137,13 @@ public class AddCommand extends GitCommand<DirCache> {
 		if (filepatterns.contains(".")) //$NON-NLS-1$
 			addAll = true;
 
-		try (ObjectInserter inserter = repo.newObjectInserter();
-				final TreeWalk tw = new TreeWalk(repo)) {
+		ObjectInserter inserter = repo.newObjectInserter();
+		try {
 			dc = repo.lockDirCache();
 			DirCacheIterator c;
 
 			DirCacheBuilder builder = dc.builder();
+			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (workingTreeIterator == null)
 				workingTreeIterator = new FileTreeIterator(repo);
@@ -211,6 +212,7 @@ public class AddCommand extends GitCommand<DirCache> {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfAddCommand, e);
 		} finally {
+			inserter.release();
 			if (dc != null)
 				dc.unlock();
 		}
