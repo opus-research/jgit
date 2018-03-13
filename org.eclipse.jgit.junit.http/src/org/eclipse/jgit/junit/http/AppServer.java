@@ -269,7 +269,7 @@ public class AppServer {
 
 	/** @return all requests since the server was started. */
 	public List<AccessEvent> getRequests() {
-		return new ArrayList<>(log.getEvents());
+		return new ArrayList<AccessEvent>(log.getEvents());
 	}
 
 	/**
@@ -289,7 +289,7 @@ public class AppServer {
 	 * @return all requests which match the given path.
 	 */
 	public List<AccessEvent> getRequests(String path) {
-		ArrayList<AccessEvent> r = new ArrayList<>();
+		ArrayList<AccessEvent> r = new ArrayList<AccessEvent>();
 		for (AccessEvent event : log.getEvents()) {
 			if (event.getPath().equals(path)) {
 				r.add(event);

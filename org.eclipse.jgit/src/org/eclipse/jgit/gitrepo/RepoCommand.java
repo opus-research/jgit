@@ -96,8 +96,8 @@ import org.eclipse.jgit.util.FileUtils;
  * If called against a bare repository, it will replace all the existing content
  * of the repository with the contents populated from the manifest.
  *
- * repo manifest allows projects overlapping, e.g. one project's manifestPath is
- * &quot;foo&quot; and another project's manifestPath is &quot;foo/bar&quot;. This won't
+ * repo manifest allows projects overlapping, e.g. one project's path is
+ * &quot;foo&quot; and another project's path is &quot;foo/bar&quot;. This won't
  * work in git submodule, so we'll skip all the sub projects
  * (&quot;foo/bar&quot; in the example) while converting.
  *
@@ -105,7 +105,7 @@ import org.eclipse.jgit.util.FileUtils;
  * @since 3.4
  */
 public class RepoCommand extends GitCommand<RevCommit> {
-	private String manifestPath;
+	private String path;
 	private String uri;
 	private String groupsParam;
 	private String branch;
@@ -168,7 +168,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	/** A default implementation of {@link RemoteReader} callback. */
 	public static class DefaultRemoteReader implements RemoteReader {
-		@Override
 		public ObjectId sha1(String uri, String ref) throws GitAPIException {
 			Map<String, Ref> map = Git
 					.lsRemoteRepository()
@@ -178,13 +177,13 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			return r != null ? r.getObjectId() : null;
 		}
 
-		@Override
 		public byte[] readFile(String uri, String ref, String path)
 				throws GitAPIException, IOException {
 			File dir = FileUtils.createTempDir("jgit_", ".git", null); //$NON-NLS-1$ //$NON-NLS-2$
 			try (Git git = Git.cloneRepository().setBare(true).setDirectory(dir)
-					.setURI(uri).call()) {
-				return readFileFromRepo(git.getRepository(), ref, path);
+					.setURI(uri).call();
+					Repository repo = git.getRepository()) {
+				return readFileFromRepo(repo, ref, path);
 			} finally {
 				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
@@ -244,7 +243,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @return this command
 	 */
 	public RepoCommand setPath(String path) {
-		this.manifestPath = path;
+		this.path = path;
 		return this;
 	}
 
@@ -264,11 +263,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set base URI of the paths inside the XML. This is typically the name of
-	 * the directory holding the manifest repository, eg. for
-	 * https://android.googlesource.com/platform/manifest, this should be
-	 * /platform (if you would run this on android.googlesource.com)
-	 * or https://android.googlesource.com/platform elsewhere.
+	 * Set base URI of the pathes inside the XML
 	 *
 	 * @param uri
 	 * @return this command
@@ -452,16 +447,15 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	public RevCommit call() throws GitAPIException {
 		try {
 			checkCallable();
-			if (uri == null || uri.length() == 0) {
+			if (uri == null || uri.length() == 0)
 				throw new IllegalArgumentException(
-					JGitText.get().uriNotConfigured);
-			}
+						JGitText.get().uriNotConfigured);
 			if (inputStream == null) {
-				if (manifestPath == null || manifestPath.length() == 0)
+				if (path == null || path.length() == 0)
 					throw new IllegalArgumentException(
 							JGitText.get().pathNotConfigured);
 				try {
-					inputStream = new FileInputStream(manifestPath);
+					inputStream = new FileInputStream(path);
 				} catch (IOException e) {
 					throw new IllegalArgumentException(
 							JGitText.get().pathNotConfigured);
@@ -469,7 +463,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			}
 
 			if (repo.isBare()) {
-				bareProjects = new ArrayList<>();
+				bareProjects = new ArrayList<RepoProject>();
 				if (author == null)
 					author = new PersonIdent(repo);
 				if (callback == null)
@@ -478,7 +472,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				git = new Git(repo);
 
 			ManifestParser parser = new ManifestParser(
-					includedReader, manifestPath, branch, uri, groupsParam, repo);
+					includedReader, path, branch, uri, groupsParam, repo);
 			try {
 				parser.read(inputStream);
 				for (RepoProject proj : parser.getFilteredProjects()) {
@@ -509,7 +503,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				Config cfg = new Config();
 				StringBuilder attributes = new StringBuilder();
 				for (RepoProject proj : bareProjects) {
-					String path = proj.getPath();
+					String name = proj.getPath();
 					String nameUri = proj.getName();
 					ObjectId objectId;
 					if (ObjectId.isId(proj.getRevision())
@@ -525,7 +519,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 						}
 						if (recordRemoteBranch) {
 							// can be branch or tag
-							cfg.setString("submodule", path, "branch", //$NON-NLS-1$ //$NON-NLS-2$
+							cfg.setString("submodule", name, "branch", //$NON-NLS-1$ //$NON-NLS-2$
 									proj.getRevision());
 						}
 
@@ -535,14 +529,14 @@ public class RepoCommand extends GitCommand<RevCommit> {
 							// depth in the 'clone-depth' field, while
 							// git core only uses a binary 'shallow = true/false'
 							// hint, we'll map any depth to 'shallow = true'
-							cfg.setBoolean("submodule", path, "shallow", //$NON-NLS-1$ //$NON-NLS-2$
+							cfg.setBoolean("submodule", name, "shallow", //$NON-NLS-1$ //$NON-NLS-2$
 									true);
 						}
 					}
 					if (recordSubmoduleLabels) {
 						StringBuilder rec = new StringBuilder();
 						rec.append("/"); //$NON-NLS-1$
-						rec.append(path);
+						rec.append(name);
 						for (String group : proj.getGroups()) {
 							rec.append(" "); //$NON-NLS-1$
 							rec.append(group);
@@ -550,11 +544,11 @@ public class RepoCommand extends GitCommand<RevCommit> {
 						rec.append("\n"); //$NON-NLS-1$
 						attributes.append(rec.toString());
 					}
-					cfg.setString("submodule", path, "path", path); //$NON-NLS-1$ //$NON-NLS-2$
-					cfg.setString("submodule", path, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
+					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
+					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
 
 					// create gitlink
-					DirCacheEntry dcEntry = new DirCacheEntry(path);
+					DirCacheEntry dcEntry = new DirCacheEntry(name);
 					dcEntry.setObjectId(objectId);
 					dcEntry.setFileMode(FileMode.GITLINK);
 					builder.add(dcEntry);
@@ -641,17 +635,17 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 	}
 
-	private void addSubmodule(String url, String path, String revision,
+	private void addSubmodule(String url, String name, String revision,
 			List<CopyFile> copyfiles, Set<String> groups, String recommendShallow)
 			throws GitAPIException, IOException {
 		if (repo.isBare()) {
-			RepoProject proj = new RepoProject(url, path, revision, null, groups, recommendShallow);
+			RepoProject proj = new RepoProject(url, name, revision, null, groups, recommendShallow);
 			proj.addCopyFiles(copyfiles);
 			bareProjects.add(proj);
 		} else {
 			SubmoduleAddCommand add = git
 				.submoduleAdd()
-				.setPath(path)
+				.setPath(name)
 				.setURI(url);
 			if (monitor != null)
 				add.setProgressMonitor(monitor);
@@ -663,7 +657,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 							.call();
 				}
 				subRepo.close();
-				git.add().addFilepattern(path).call();
+				git.add().addFilepattern(name).call();
 			}
 			for (CopyFile copyfile : copyfiles) {
 				copyfile.copy();

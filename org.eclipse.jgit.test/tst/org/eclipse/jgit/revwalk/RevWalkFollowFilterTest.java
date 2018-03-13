@@ -58,7 +58,7 @@ import org.junit.Test;
 public class RevWalkFollowFilterTest extends RevWalkTestCase {
 
 	private static class DiffCollector extends RenameCallback {
-		List<DiffEntry> diffs = new ArrayList<>();
+		List<DiffEntry> diffs = new ArrayList<DiffEntry>();
 
 		@Override
 		public void renamed(DiffEntry diff) {
