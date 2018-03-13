@@ -83,7 +83,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Parses a pack stream and imports it for an {@link ObjectInserter}.
@@ -117,7 +116,8 @@ public abstract class PackParser {
 
 	private byte[] hdrBuf;
 
-	private final SHA1 objectHasher = SHA1.newInstance();
+	private final MessageDigest objectDigest;
+
 	private final MutableObjectId tempObjectId;
 
 	private InputStream in;
@@ -206,6 +206,7 @@ public abstract class PackParser {
 		buf = new byte[BUFFER_SIZE];
 		tempBuffer = new byte[BUFFER_SIZE];
 		hdrBuf = new byte[64];
+		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
 		checkObjectCollisions = true;
@@ -274,7 +275,7 @@ public abstract class PackParser {
 	 */
 	public void setNeedNewObjectIds(boolean b) {
 		if (b)
-			newObjectIds = new ObjectIdSubclassMap<>();
+			newObjectIds = new ObjectIdSubclassMap<ObjectId>();
 		else
 			newObjectIds = null;
 	}
@@ -332,14 +333,14 @@ public abstract class PackParser {
 	public ObjectIdSubclassMap<ObjectId> getNewObjectIds() {
 		if (newObjectIds != null)
 			return newObjectIds;
-		return new ObjectIdSubclassMap<>();
+		return new ObjectIdSubclassMap<ObjectId>();
 	}
 
 	/** @return set of objects the incoming pack assumed for delta purposes */
 	public ObjectIdSubclassMap<ObjectId> getBaseObjectIds() {
 		if (baseObjectIds != null)
 			return baseObjectIds;
-		return new ObjectIdSubclassMap<>();
+		return new ObjectIdSubclassMap<ObjectId>();
 	}
 
 	/**
@@ -526,9 +527,9 @@ public abstract class PackParser {
 			readPackHeader();
 
 			entries = new PackedObjectInfo[(int) objectCount];
-			baseById = new ObjectIdOwnerMap<>();
-			baseByPos = new LongMap<>();
-			deferredCheckBlobs = new BlockList<>();
+			baseById = new ObjectIdOwnerMap<DeltaChain>();
+			baseByPos = new LongMap<UnresolvedDelta>();
+			deferredCheckBlobs = new BlockList<PackedObjectInfo>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
@@ -666,13 +667,12 @@ public abstract class PackParser {
 						JGitText.get().corruptionDetectedReReadingAt,
 						Long.valueOf(visit.delta.position)));
 
-			SHA1 objectDigest = objectHasher.reset();
 			objectDigest.update(Constants.encodedTypeString(type));
 			objectDigest.update((byte) ' ');
 			objectDigest.update(Constants.encodeASCII(visit.data.length));
 			objectDigest.update((byte) 0);
 			objectDigest.update(visit.data);
-			objectDigest.digest(tempObjectId);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
 
 			verifySafeObject(tempObjectId, type, visit.data);
 
@@ -826,9 +826,9 @@ public abstract class PackParser {
 		growEntries(baseById.size());
 
 		if (needBaseObjectIds)
-			baseObjectIds = new ObjectIdSubclassMap<>();
+			baseObjectIds = new ObjectIdSubclassMap<ObjectId>();
 
-		final List<DeltaChain> missing = new ArrayList<>(64);
+		final List<DeltaChain> missing = new ArrayList<DeltaChain>(64);
 		for (final DeltaChain baseId : baseById) {
 			if (baseId.head == null)
 				continue;
@@ -1024,7 +1024,6 @@ public abstract class PackParser {
 
 	private void whole(final long pos, final int type, final long sz)
 			throws IOException {
-		SHA1 objectDigest = objectHasher.reset();
 		objectDigest.update(Constants.encodedTypeString(type));
 		objectDigest.update((byte) ' ');
 		objectDigest.update(Constants.encodeASCII(sz));
@@ -1044,7 +1043,7 @@ public abstract class PackParser {
 				cnt += r;
 			}
 			inf.close();
-			objectDigest.digest(tempObjectId);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			checkContentLater = isCheckObjectCollisions()
 					&& readCurs.has(tempObjectId);
 			data = null;
@@ -1052,7 +1051,7 @@ public abstract class PackParser {
 		} else {
 			data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
-			objectDigest.digest(tempObjectId);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			verifySafeObject(tempObjectId, type, data);
 		}
 

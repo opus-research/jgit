@@ -93,14 +93,12 @@ public class RegexPipelineTest extends HttpTestCase {
 		}
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		server = new AppServer();
 		ctx = server.addContext("/");
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		server.tearDown();
