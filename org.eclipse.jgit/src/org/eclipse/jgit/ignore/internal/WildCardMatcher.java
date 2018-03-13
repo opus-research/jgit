@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.ignore.internal;
 
-package org.eclipse.jgit.internal.storage.file;
+import static org.eclipse.jgit.ignore.internal.Strings.convertGlob;
 
-import static org.junit.Assert.assertEquals;
+import java.util.regex.Pattern;
 
-import org.eclipse.jgit.internal.storage.file.BasePackBitmapIndex.StoredBitmap;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import org.eclipse.jgit.errors.InvalidPatternException;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
+/**
+ * Matcher built from path segments containing wildcards. This matcher converts
+ * glob wildcards to Java {@link Pattern}'s.
+ * <p>
+ * This class is immutable and thread safe.
+ *
+ * @since 3.6
+ */
+public class WildCardMatcher extends NameMatcher {
 
-public class StoredBitmapTest {
+	final Pattern p;
 
-	@Test
-	public void testGetBitmapWithoutXor() {
-		EWAHCompressedBitmap b = bitmapOf(100);
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
-		assertEquals(b, sb.getBitmap());
+	WildCardMatcher(String pattern, Character pathSeparator, boolean dirOnly)
+			throws InvalidPatternException {
+		super(pattern, pathSeparator, dirOnly);
+		p = convertGlob(subPattern);
 	}
 
-	@Test
-	public void testGetBitmapWithOneXor() {
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
-		assertEquals(bitmapOf(101), sb.getBitmap());
-	}
-
-	@Test
-	public void testGetBitmapWithThreeXor() {
-		StoredBitmap sb = newStoredBitmap(
-				bitmapOf(100),
-				bitmapOf(90, 101),
-				bitmapOf(100, 101),
-				bitmapOf(50));
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-	}
-
-	private static final StoredBitmap newStoredBitmap(
-			EWAHCompressedBitmap... bitmaps) {
-		StoredBitmap sb = null;
-		for (EWAHCompressedBitmap bitmap : bitmaps)
-			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb, 0);
-		return sb;
-	}
-
-	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
-		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
-		for (int bit : bits)
-			b.set(bit);
-		return b;
+	@Override
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		return p.matcher(segment.substring(startIncl, endExcl)).matches();
 	}
 }

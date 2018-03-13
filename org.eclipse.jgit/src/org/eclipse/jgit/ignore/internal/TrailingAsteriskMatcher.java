@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.ignore.internal;
 
-package org.eclipse.jgit.internal.storage.file;
+/**
+ * Matcher for simple patterns ending with an asterisk, e.g. "Makefile.*"
+ *
+ * @since 3.6
+ */
+public class TrailingAsteriskMatcher extends NameMatcher {
 
-import static org.junit.Assert.assertEquals;
+	TrailingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
+		super(pattern, pathSeparator, dirOnly);
 
-import org.eclipse.jgit.internal.storage.file.BasePackBitmapIndex.StoredBitmap;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
-
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
-public class StoredBitmapTest {
-
-	@Test
-	public void testGetBitmapWithoutXor() {
-		EWAHCompressedBitmap b = bitmapOf(100);
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
-		assertEquals(b, sb.getBitmap());
+		if (subPattern.charAt(subPattern.length() - 1) != '*')
+			throw new IllegalArgumentException(
+					"Pattern must have trailing asterisk: " + pattern); //$NON-NLS-1$
 	}
 
-	@Test
-	public void testGetBitmapWithOneXor() {
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
-		assertEquals(bitmapOf(101), sb.getBitmap());
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		// faster local access, same as in string.indexOf()
+		String s = subPattern;
+		// we don't need to count '*' character itself
+		int subLenth = s.length() - 1;
+		// simple /*/ pattern
+		if (subLenth == 0)
+			return true;
+
+		if (subLenth > (endExcl - startIncl))
+			return false;
+
+		for (int i = 0; i < subLenth; i++) {
+			char c1 = s.charAt(i);
+			char c2 = segment.charAt(i + startIncl);
+			if (c1 != c2)
+				return false;
+		}
+		return true;
 	}
 
-	@Test
-	public void testGetBitmapWithThreeXor() {
-		StoredBitmap sb = newStoredBitmap(
-				bitmapOf(100),
-				bitmapOf(90, 101),
-				bitmapOf(100, 101),
-				bitmapOf(50));
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-	}
-
-	private static final StoredBitmap newStoredBitmap(
-			EWAHCompressedBitmap... bitmaps) {
-		StoredBitmap sb = null;
-		for (EWAHCompressedBitmap bitmap : bitmaps)
-			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb, 0);
-		return sb;
-	}
-
-	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
-		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
-		for (int bit : bits)
-			b.set(bit);
-		return b;
-	}
 }

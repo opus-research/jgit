@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,37 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.internal.storage.file;
+package org.eclipse.jgit.ignore;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.internal.storage.file.BasePackBitmapIndex.StoredBitmap;
-import org.eclipse.jgit.lib.ObjectId;
 import org.junit.Test;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
-public class StoredBitmapTest {
+public class BasicRuleTest {
 
 	@Test
-	public void testGetBitmapWithoutXor() {
-		EWAHCompressedBitmap b = bitmapOf(100);
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
-		assertEquals(b, sb.getBitmap());
+	public void test() {
+		FastIgnoreRule rule1 = new FastIgnoreRule("/hello/[a]/");
+		FastIgnoreRule rule2 = new FastIgnoreRule("/hello/[a]/");
+		FastIgnoreRule rule3 = new FastIgnoreRule("!/hello/[a]/");
+		FastIgnoreRule rule4 = new FastIgnoreRule("/hello/[a]");
+		assertTrue(rule1.dirOnly());
+		assertTrue(rule3.dirOnly());
+		assertFalse(rule4.dirOnly());
+		assertFalse(rule1.getNegation());
+		assertTrue(rule3.getNegation());
+		assertNotEquals(rule1, null);
+		assertEquals(rule1, rule1);
+		assertEquals(rule1, rule2);
+		assertNotEquals(rule1, rule3);
+		assertNotEquals(rule1, rule4);
+		assertEquals(rule1.hashCode(), rule2.hashCode());
+		assertNotEquals(rule1.hashCode(), rule3.hashCode());
+		assertEquals(rule1.toString(), rule2.toString());
+		assertNotEquals(rule1.toString(), rule3.toString());
 	}
 
-	@Test
-	public void testGetBitmapWithOneXor() {
-		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
-		assertEquals(bitmapOf(101), sb.getBitmap());
-	}
-
-	@Test
-	public void testGetBitmapWithThreeXor() {
-		StoredBitmap sb = newStoredBitmap(
-				bitmapOf(100),
-				bitmapOf(90, 101),
-				bitmapOf(100, 101),
-				bitmapOf(50));
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-		assertEquals(bitmapOf(50, 90), sb.getBitmap());
-	}
-
-	private static final StoredBitmap newStoredBitmap(
-			EWAHCompressedBitmap... bitmaps) {
-		StoredBitmap sb = null;
-		for (EWAHCompressedBitmap bitmap : bitmaps)
-			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb, 0);
-		return sb;
-	}
-
-	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
-		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
-		for (int bit : bits)
-			b.set(bit);
-		return b;
-	}
 }
