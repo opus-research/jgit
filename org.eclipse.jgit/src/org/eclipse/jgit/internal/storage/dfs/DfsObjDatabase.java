@@ -91,13 +91,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		GC(1),
 
 		/**
-		 * RefTreeGraph pack was created by Git garbage collection.
-		 *
-		 * @see DfsGarbageCollector
-		 */
-		GC_TXN(1),
-
-		/**
 		 * The pack was created by compacting multiple packs together.
 		 * <p>
 		 * Packs created by compacting multiple packs together aren't nearly as

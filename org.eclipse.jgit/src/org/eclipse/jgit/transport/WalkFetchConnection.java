@@ -267,10 +267,6 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final HashSet<ObjectId> inWorkQueue = new HashSet<ObjectId>();
 		for (final Ref r : want) {
 			final ObjectId id = r.getObjectId();
-			if (id == null) {
-				throw new NullPointerException(MessageFormat.format(
-						JGitText.get().transportProvidedRefWithNoObjectId, r.getName()));
-			}
 			try {
 				final RevObject obj = revWalk.parseAny(id);
 				if (obj.has(COMPLETE))
@@ -637,11 +633,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final byte[] raw = uol.getCachedBytes();
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, raw);
+				objCheck.check(type, raw);
 			} catch (CorruptObjectException e) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().transportExceptionInvalid,
-						Constants.typeString(type), id.name(), e.getMessage()));
+				throw new TransportException(MessageFormat.format(JGitText.get().transportExceptionInvalid
+						, Constants.typeString(type), id.name(), e.getMessage()));
 			}
 		}
 
