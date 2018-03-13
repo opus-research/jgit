@@ -52,11 +52,7 @@ public class PackExt {
 	/** A pack index file extension. */
 	public static final PackExt INDEX = new PackExt("idx"); //$NON-NLS-1$
 
-	/** A pack bitmap index file extension. */
-	public static final PackExt BITMAP_INDEX = new PackExt("bitmap"); //$NON-NLS-1$
-
-	private static final PackExt[] VALUES = new PackExt[] {
-			PACK, INDEX, BITMAP_INDEX };
+	private static final PackExt[] VALUES = new PackExt[] { PACK, INDEX };
 
 	private final String ext;
 
