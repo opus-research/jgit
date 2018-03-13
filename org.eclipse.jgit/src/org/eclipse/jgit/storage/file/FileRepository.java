@@ -136,9 +136,7 @@ public class FileRepository extends Repository {
 		super(options);
 
 		userConfig = SystemReader.getInstance().openUserConfig(getFS());
-		repoConfig = new FileBasedConfig(userConfig, //
-				getFS().resolve(getDirectory(), "config"), //
-				getFS());
+		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(getDirectory(), "config"));
 
 		loadUserConfig();
 		loadRepoConfig();
