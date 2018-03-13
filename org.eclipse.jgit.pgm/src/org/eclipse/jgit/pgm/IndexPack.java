@@ -71,7 +71,7 @@ class IndexPack extends TextBuiltin {
 				ObjectDirectoryPackParser imp = (ObjectDirectoryPackParser) p;
 				imp.setIndexVersion(indexVersion);
 			}
-			p.parse(new TextProgressMonitor(errw));
+			p.parse(new TextProgressMonitor());
 			inserter.flush();
 		} finally {
 			inserter.release();
