@@ -1075,8 +1075,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 
 			File exclude = fs
-.resolve(repository.getDirectory(),
-					Constants.INFO_EXCLUDE);
+					.resolve(repository.getDirectory(), "info/exclude"); //$NON-NLS-1$
 			loadRulesFromFile(r, exclude);
 
 			return r.getRules().isEmpty() ? null : r;
