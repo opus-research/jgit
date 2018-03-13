@@ -88,8 +88,6 @@ public class PullCommand extends GitCommand<PullResult> {
 
 	private CredentialsProvider credentialsProvider;
 
-	private String remoteName;
-
 	/**
 	 * @param repo
 	 */
@@ -126,17 +124,6 @@ public class PullCommand extends GitCommand<PullResult> {
 			CredentialsProvider credentialsProvider) {
 		checkCallable();
 		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
-
-	/**
-	 * @param remote
-	 *            the name of the remote to use
-	 * @return this instance
-	 */
-	public PullCommand setRemote(String remote) {
-		checkCallable();
-		remoteName = remote;
 		return this;
 	}
 
@@ -179,15 +166,12 @@ public class PullCommand extends GitCommand<PullResult> {
 		// get the configured remote for the currently checked out branch
 		// stored in configuration key branch.<branch name>.remote
 		Config repoConfig = repo.getConfig();
-		String remote = this.remoteName;
-		if (remote == null) {
-			remote = repoConfig.getString(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REMOTE);
-			if (remote == null)
-				// fall back to default remote
-				remote = Constants.DEFAULT_REMOTE_NAME;
-		}
+		String remote = repoConfig.getString(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_REMOTE);
+		if (remote == null)
+			// fall back to default remote
+			remote = Constants.DEFAULT_REMOTE_NAME;
 
 		// get the name of the branch in the remote repository
 		// stored in configuration key branch.<branch name>.merge
