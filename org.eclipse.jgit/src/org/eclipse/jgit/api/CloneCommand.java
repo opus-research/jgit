@@ -151,7 +151,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 	}
 
-	private static boolean isDirExistsNotEmpty(File dir) {
+	private static boolean isNonEmptyDirectory(File dir) {
 		if (dir != null && dir.exists()) {
 			File[] files = dir.listFiles();
 			return files != null && files.length != 0;
@@ -166,11 +166,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
 		}
 		validateDirs(directory, gitDir, bare);
-		if (isDirExistsNotEmpty(directory)) {
+		if (isNonEmptyDirectory(directory)) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cloneNonEmptyDirectory, directory.getName()));
 		}
-		if (isDirExistsNotEmpty(gitDir)) {
+		if (isNonEmptyDirectory(gitDir)) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cloneNonEmptyDirectory, gitDir.getName()));
 		}
