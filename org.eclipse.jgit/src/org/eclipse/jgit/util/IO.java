@@ -137,33 +137,12 @@ public class IO {
 			throws FileNotFoundException, IOException {
 		final FileInputStream in = new FileInputStream(path);
 		try {
-			long sz = path.length();
+			final long sz = in.getChannel().size();
 			if (sz > max)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
-			byte[] buf = new byte[(int) Math.min(sz, max)];
-			int valid = 0;
-			for (;;) {
-				if (buf.length == valid) {
-					int nsz = Math.max(max, buf.length * 2);
-					if (nsz == max)
-						throw new IOException(MessageFormat.format(
-								JGitText.get().fileIsTooLarge, path));
-
-					byte[] nb = new byte[nsz];
-					System.arraycopy(buf, 0, nb, 0, valid);
-					buf = nb;
-				}
-				int n = in.read(buf, valid, buf.length - valid);
-				if (n < 0)
-					break;
-				valid += n;
-			}
-			if (valid < buf.length) {
-				byte[] nb = new byte[valid];
-				System.arraycopy(buf, 0, nb, 0, valid);
-				buf = nb;
-			}
+			final byte[] buf = new byte[(int) sz];
+			IO.readFully(in, buf, 0);
 			return buf;
 		} finally {
 			try {
