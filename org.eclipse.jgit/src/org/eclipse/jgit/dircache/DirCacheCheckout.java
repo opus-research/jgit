@@ -396,9 +396,10 @@ public class DirCacheCheckout {
 				prescanOneTree();
 
 			if (!conflicts.isEmpty()) {
-				if (failOnConflict)
+				if (failOnConflict) {
+					dc.unlock();
 					throw new CheckoutConflictException(conflicts.toArray(new String[conflicts.size()]));
-				else
+				} else
 					cleanUpConflicts();
 			}
 
@@ -447,8 +448,10 @@ public class DirCacheCheckout {
 			}
 
 			// commit the index builder - a new index is persisted
-			if (!builder.commit())
+			if (!builder.commit()) {
+				dc.unlock();
 				throw new IndexWriteException();
+			}
 		} finally {
 			objectReader.release();
 		}
