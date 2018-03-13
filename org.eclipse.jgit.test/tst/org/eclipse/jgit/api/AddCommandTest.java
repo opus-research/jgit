@@ -136,6 +136,27 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testCleanFilterEnvironment()
+			throws IOException, GitAPIException {
+		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
+		writeTrashFile("src/a.txt", "foo");
+		File script = writeTempFile("echo $PWD $GIT_DIR");
+
+		Git git = new Git(db);
+		StoredConfig config = git.getRepository().getConfig();
+		config.setString("filter", "tstFilter", "clean",
+				"sh " + script.getPath());
+		config.save();
+
+		git.add().addFilepattern("src/a.txt").call();
+
+		String path = db.getWorkTree().getAbsolutePath();
+		String gitDir = db.getDirectory().getAbsolutePath();
+		assertEquals("[src/a.txt, mode:100644, content:" + path + " " + gitDir
+				+ "\n]", indexState(CONTENT));
+	}
+
+	@Test
 	public void testMultipleCleanFilter() throws IOException, GitAPIException {
 		writeTrashFile(".gitattributes",
 				"*.txt filter=tstFilter\n*.tmp filter=tstFilter2");
