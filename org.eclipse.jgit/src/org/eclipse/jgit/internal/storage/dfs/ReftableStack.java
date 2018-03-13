@@ -48,9 +48,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
+import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
 
-/** Tracks multiple open {@link Reftable} instances. */
+/** Tracks multiple open {@link ReftableReader} instances. */
 public class ReftableStack implements AutoCloseable {
 	/**
 	 * Opens a stack of tables for reading.
@@ -81,23 +81,23 @@ public class ReftableStack implements AutoCloseable {
 		}
 	}
 
-	private final List<Reftable> tables;
+	private final List<ReftableReader> tables;
 
 	private ReftableStack(int tableCnt) {
 		this.tables = new ArrayList<>(tableCnt);
 	}
 
 	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
+	 * @return unmodifiable list of table readers, in the same order the files
+	 *         were passed to {@link #open(DfsReader, List)}.
 	 */
-	public List<Reftable> readers() {
+	public List<ReftableReader> readers() {
 		return Collections.unmodifiableList(tables);
 	}
 
 	@Override
 	public void close() {
-		for (Reftable t : tables) {
+		for (ReftableReader t : tables) {
 			try {
 				t.close();
 			} catch (IOException e) {

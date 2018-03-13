@@ -99,10 +99,10 @@ public class MergedReftable extends Reftable {
 	}
 
 	@Override
-	public RefCursor seekRef(String name) throws IOException {
+	public RefCursor seek(String name) throws IOException {
 		MergedRefCursor m = new MergedRefCursor();
 		for (int i = 0; i < tables.length; i++) {
-			m.add(new RefQueueEntry(tables[i].seekRef(name), i));
+			m.add(new RefQueueEntry(tables[i].seek(name), i));
 		}
 		return m;
 	}
@@ -142,53 +142,31 @@ public class MergedReftable extends Reftable {
 		}
 	}
 
-	int queueSize() {
-		return Math.max(1, tables.length);
-	}
-
 	private class MergedRefCursor extends RefCursor {
 		private final PriorityQueue<RefQueueEntry> queue;
-		private RefQueueEntry head;
 		private Ref ref;
-		private long updateIndex;
 
 		MergedRefCursor() {
-			queue = new PriorityQueue<>(queueSize(), RefQueueEntry::compare);
+			queue = new PriorityQueue<>(tables.length, RefQueueEntry::compare);
 		}
 
 		void add(RefQueueEntry t) throws IOException {
-			// Common case is many iterations over the same RefQueueEntry
-			// for the bottom of the stack (scanning all refs). Its almost
-			// always less than the top of the queue. Avoid the queue's
-			// O(log N) insertion and removal costs for this common case.
-			if (!t.rc.next()) {
-				t.rc.close();
-			} else if (head == null) {
-				RefQueueEntry p = queue.peek();
-				if (p == null || RefQueueEntry.compare(t, p) < 0) {
-					head = t;
-				} else {
-					head = queue.poll();
-					queue.add(t);
-				}
-			} else if (RefQueueEntry.compare(t, head) > 0) {
+			if (t.rc.next()) {
 				queue.add(t);
 			} else {
-				queue.add(head);
-				head = t;
+				t.rc.close();
 			}
 		}
 
 		@Override
 		public boolean next() throws IOException {
 			for (;;) {
-				RefQueueEntry t = poll();
+				RefQueueEntry t = queue.poll();
 				if (t == null) {
 					return false;
 				}
 
 				ref = t.rc.getRef();
-				updateIndex = t.rc.getUpdateIndex();
 				boolean include = includeDeletes || !t.rc.wasDeleted();
 				skipShadowedRefs(ref.getName());
 				add(t);
@@ -198,20 +176,11 @@ public class MergedReftable extends Reftable {
 			}
 		}
 
-		private RefQueueEntry poll() {
-			RefQueueEntry e = head;
-			if (e != null) {
-				head = null;
-				return e;
-			}
-			return queue.poll();
-		}
-
 		private void skipShadowedRefs(String name) throws IOException {
 			for (;;) {
-				RefQueueEntry t = head != null ? head : queue.peek();
+				RefQueueEntry t = queue.peek();
 				if (t != null && name.equals(t.name())) {
-					add(poll());
+					add(queue.remove());
 				} else {
 					break;
 				}
@@ -224,16 +193,7 @@ public class MergedReftable extends Reftable {
 		}
 
 		@Override
-		public long getUpdateIndex() {
-			return updateIndex;
-		}
-
-		@Override
 		public void close() {
-			if (head != null) {
-				head.rc.close();
-				head = null;
-			}
 			while (!queue.isEmpty()) {
 				queue.remove().rc.close();
 			}
@@ -243,10 +203,6 @@ public class MergedReftable extends Reftable {
 	private static class RefQueueEntry {
 		static int compare(RefQueueEntry a, RefQueueEntry b) {
 			int cmp = a.name().compareTo(b.name());
-			if (cmp == 0) {
-				// higher updateIndex shadows lower updateIndex.
-				cmp = Long.signum(b.updateIndex() - a.updateIndex());
-			}
 			if (cmp == 0) {
 				// higher index shadows lower index, so higher index first.
 				cmp = b.stackIdx - a.stackIdx;
@@ -265,10 +221,6 @@ public class MergedReftable extends Reftable {
 		String name() {
 			return rc.getRef().getName();
 		}
-
-		long updateIndex() {
-			return rc.getUpdateIndex();
-		}
 	}
 
 	private class MergedLogCursor extends LogCursor {
@@ -278,7 +230,7 @@ public class MergedReftable extends Reftable {
 		private ReflogEntry entry;
 
 		MergedLogCursor() {
-			queue = new PriorityQueue<>(queueSize(), LogQueueEntry::compare);
+			queue = new PriorityQueue<>(tables.length, LogQueueEntry::compare);
 		}
 
 		void add(LogQueueEntry t) throws IOException {
@@ -306,6 +258,7 @@ public class MergedReftable extends Reftable {
 				if (include) {
 					return true;
 				}
+				return true;
 			}
 		}
 

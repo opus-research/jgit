@@ -72,29 +72,15 @@ import org.junit.Test;
 
 public class MergedReftableTest {
 	@Test
-	public void noTables() throws IOException {
-		MergedReftable mr = merge(new byte[0][]);
-		try (RefCursor rc = mr.allRefs()) {
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = mr.seekRef(HEAD)) {
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = mr.seekRef(R_HEADS)) {
-			assertFalse(rc.next());
-		}
-	}
-
-	@Test
 	public void oneEmptyTable() throws IOException {
 		MergedReftable mr = merge(write());
 		try (RefCursor rc = mr.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = mr.seekRef(HEAD)) {
+		try (RefCursor rc = mr.seek(HEAD)) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = mr.seekRef(R_HEADS)) {
+		try (RefCursor rc = mr.seek(R_HEADS)) {
 			assertFalse(rc.next());
 		}
 	}
@@ -105,10 +91,10 @@ public class MergedReftableTest {
 		try (RefCursor rc = mr.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = mr.seekRef(HEAD)) {
+		try (RefCursor rc = mr.seek(HEAD)) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = mr.seekRef(R_HEADS)) {
+		try (RefCursor rc = mr.seek(R_HEADS)) {
 			assertFalse(rc.next());
 		}
 	}
@@ -157,7 +143,7 @@ public class MergedReftableTest {
 		List<Ref> delta2 = Arrays.asList(ref("refs/heads/banana", 3));
 
 		MergedReftable mr = merge(write(delta1), write(delta2));
-		try (RefCursor rc = mr.seekRef("refs/heads/master")) {
+		try (RefCursor rc = mr.seek("refs/heads/master")) {
 			assertTrue(rc.next());
 			assertEquals("refs/heads/master", rc.getRef().getName());
 			assertEquals(id(2), rc.getRef().getObjectId());
@@ -251,48 +237,13 @@ public class MergedReftableTest {
 
 		MergedReftable mr = merge(write(refs));
 		for (Ref exp : refs) {
-			try (RefCursor rc = mr.seekRef(exp.getName())) {
+			try (RefCursor rc = mr.seek(exp.getName())) {
 				assertTrue("has " + exp.getName(), rc.next());
 				Ref act = rc.getRef();
 				assertEquals(exp.getName(), act.getName());
 				assertEquals(exp.getObjectId(), act.getObjectId());
 				assertFalse(rc.next());
 			}
-		}
-	}
-
-	@Test
-	public void missedUpdate() throws IOException {
-		ByteArrayOutputStream buf = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter()
-				.setMinUpdateIndex(1)
-				.setMaxUpdateIndex(3)
-				.begin(buf);
-		writer.writeRef(ref("refs/heads/a", 1), 1);
-		writer.writeRef(ref("refs/heads/c", 3), 3);
-		writer.finish();
-		byte[] base = buf.toByteArray();
-
-		byte[] delta = write(Arrays.asList(
-				ref("refs/heads/b", 2),
-				ref("refs/heads/c", 4)),
-				2);
-		MergedReftable mr = merge(base, delta);
-		try (RefCursor rc = mr.allRefs()) {
-			assertTrue(rc.next());
-			assertEquals("refs/heads/a", rc.getRef().getName());
-			assertEquals(id(1), rc.getRef().getObjectId());
-			assertEquals(1, rc.getUpdateIndex());
-
-			assertTrue(rc.next());
-			assertEquals("refs/heads/b", rc.getRef().getName());
-			assertEquals(id(2), rc.getRef().getObjectId());
-			assertEquals(2, rc.getUpdateIndex());
-
-			assertTrue(rc.next());
-			assertEquals("refs/heads/c", rc.getRef().getName());
-			assertEquals(id(3), rc.getRef().getObjectId());
-			assertEquals(3, rc.getUpdateIndex());
 		}
 	}
 
@@ -357,18 +308,12 @@ public class MergedReftableTest {
 	}
 
 	private byte[] write(Collection<Ref> refs) throws IOException {
-		return write(refs, 1);
-	}
-
-	private byte[] write(Collection<Ref> refs, long updateIndex)
-			throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		new ReftableWriter()
-				.setMinUpdateIndex(updateIndex)
-				.setMaxUpdateIndex(updateIndex)
-				.begin(buffer)
-				.sortAndWriteRefs(refs)
-				.finish();
+		ReftableWriter writer = new ReftableWriter().begin(buffer);
+		for (Ref r : RefComparator.sort(refs)) {
+			writer.writeRef(r);
+		}
+		writer.finish();
 		return buffer.toByteArray();
 	}
 

@@ -69,27 +69,32 @@ import org.eclipse.jgit.util.io.CountingOutputStream;
 class ReftableOutputStream extends OutputStream {
 	private final byte[] tmp = new byte[10];
 	private final CountingOutputStream out;
-	private final boolean alignBlocks;
-
-	private Deflater deflater;
-	private DeflaterOutputStream compressor;
+	private final Deflater deflater;
+	private final DeflaterOutputStream compressor;
 
 	private int blockType;
 	private int blockSize;
 	private int blockStart;
 	private byte[] blockBuf;
 	private int cur;
+
+	private int blockCount;
 	private long paddingUsed;
 
-	ReftableOutputStream(OutputStream os, int bs, boolean align) {
+	ReftableOutputStream(OutputStream os, int bs) {
 		blockSize = bs;
 		blockBuf = new byte[bs];
-		alignBlocks = align;
+
 		out = new CountingOutputStream(os);
+		deflater = new Deflater(Deflater.BEST_COMPRESSION);
+		compressor = new DeflaterOutputStream(out, deflater);
 	}
 
 	void setBlockSize(int bs) {
 		blockSize = bs;
+		if (blockSize > blockBuf.length) {
+			blockBuf = Arrays.copyOf(blockBuf, blockSize);
+		}
 	}
 
 	@Override
@@ -115,6 +120,10 @@ class ReftableOutputStream extends OutputStream {
 
 	long paddingUsed() {
 		return paddingUsed;
+	}
+
+	int blockCount() {
+		return blockCount;
 	}
 
 	/** @return bytes flushed; excludes {@link #bytesWrittenInBlock()}. */
@@ -145,10 +154,13 @@ class ReftableOutputStream extends OutputStream {
 		cur += 2;
 	}
 
-	void writeInt24(int val) {
-		ensureBytesAvailableInBlockBuf(3);
-		NB.encodeInt24(blockBuf, cur, val);
-		cur += 3;
+	void reserve(int cnt) {
+		ensureBytesAvailableInBlockBuf(cnt);
+		cur += cnt;
+	}
+
+	void patchInt24(int ptr, int val) {
+		NB.encodeInt24(blockBuf, ptr, val);
 	}
 
 	void writeId(ObjectId id) {
@@ -175,32 +187,28 @@ class ReftableOutputStream extends OutputStream {
 
 	void flushFileHeader() throws IOException {
 		if (cur == FILE_HEADER_LEN && out.getCount() == 0) {
+			// If the file will be a log only file, flush the file header.
 			out.write(blockBuf, 0, cur);
 			cur = 0;
 		}
 	}
 
-	void beginBlock(byte type) {
-		blockType = type;
+	void beginBlock(byte id) {
+		blockType = id;
 		blockStart = cur;
 		cur += 4; // reserve space for 4-byte block header.
 	}
 
 	void flushBlock() throws IOException {
-		if (cur > blockSize && blockType != INDEX_BLOCK_TYPE) {
+		if (cur > blockSize && !isIndexBlock()) {
 			throw new IOException(JGitText.get().overflowedReftableBlock);
 		}
 		NB.encodeInt32(blockBuf, blockStart, (blockType << 24) | cur);
 
 		if (blockType == LOG_BLOCK_TYPE) {
 			// Log blocks are deflated after the block header.
+			deflater.reset();
 			out.write(blockBuf, 0, 4);
-			if (deflater != null) {
-				deflater.reset();
-			} else {
-				deflater = new Deflater(Deflater.BEST_COMPRESSION);
-				compressor = new DeflaterOutputStream(out, deflater);
-			}
 			compressor.write(blockBuf, 4, cur - 4);
 			compressor.finish();
 		} else {
@@ -211,27 +219,27 @@ class ReftableOutputStream extends OutputStream {
 		cur = 0;
 		blockType = 0;
 		blockStart = 0;
+		blockCount++;
 	}
 
 	void padBetweenBlocksToNextBlock() throws IOException {
-		if (alignBlocks) {
-			long m = size() % blockSize;
-			if (m > 0) {
-				int pad = blockSize - (int) m;
-				ensureBytesAvailableInBlockBuf(pad);
-				Arrays.fill(blockBuf, 0, pad, (byte) 0);
-				out.write(blockBuf, 0, pad);
-				paddingUsed += pad;
-			}
+		long m = size() % blockSize;
+		if (m > 0) {
+			int pad = blockSize - (int) m;
+			ensureBytesAvailableInBlockBuf(pad);
+			Arrays.fill(blockBuf, 0, pad, (byte) 0);
+			out.write(blockBuf, 0, pad);
+			paddingUsed += pad;
 		}
 	}
 
 	int estimatePadBetweenBlocks(int currentBlockSize) {
-		if (alignBlocks) {
-			long m = (size() + currentBlockSize) % blockSize;
-			return m > 0 ? blockSize - (int) m : 0;
-		}
-		return 0;
+		long m = (size() + currentBlockSize) % blockSize;
+		return m > 0 ? blockSize - (int) m : 0;
+	}
+
+	private boolean isIndexBlock() {
+		return (blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE;
 	}
 
 	void finishFile() throws IOException {
@@ -239,9 +247,6 @@ class ReftableOutputStream extends OutputStream {
 		// Just flush what has been buffered.
 		out.write(blockBuf, 0, cur);
 		cur = 0;
-
-		if (deflater != null) {
-			deflater.end();
-		}
+		deflater.end();
 	}
 }

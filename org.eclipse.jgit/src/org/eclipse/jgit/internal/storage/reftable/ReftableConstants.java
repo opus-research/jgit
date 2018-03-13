@@ -54,18 +54,32 @@ class ReftableConstants {
 	static final byte REF_BLOCK_TYPE = 'r';
 	static final byte OBJ_BLOCK_TYPE = 'o';
 	static final byte LOG_BLOCK_TYPE = 'g';
-	static final byte INDEX_BLOCK_TYPE = 'i';
+	static final byte INDEX_BLOCK_TYPE = (byte) 0x80;
 
 	static final int VALUE_NONE = 0x0;
 	static final int VALUE_1ID = 0x1;
 	static final int VALUE_2ID = 0x2;
-	static final int VALUE_SYMREF = 0x3;
+	static final int VALUE_TEXT = 0x3;
 	static final int VALUE_TYPE_MASK = 0x7;
 
 	static final int LOG_NONE = 0x0;
 	static final int LOG_DATA = 0x1;
 
+	/**
+	 * Chained log records, reusing data from more recent record.
+	 *
+	 * <pre>
+	 * 100b -> chained ids, moreRecent old is this new (0x4)
+	 * 101b -> same committer (| 0x1)
+	 * 110b -> same message (| 0x2)
+	 * </pre>
+	 */
+	static final int LOG_CHAINED = 0x4;
+	static final int LOG_SAME_COMMITTER = 0x1;
+	static final int LOG_SAME_MESSAGE = 0x2;
+
 	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
+	static final int MAX_INDEX_SIZE = 0x7fffffff;
 	static final int MAX_RESTARTS = 65535;
 
 	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
