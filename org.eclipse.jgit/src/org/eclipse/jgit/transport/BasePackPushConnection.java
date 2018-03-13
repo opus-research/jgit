@@ -83,17 +83,13 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
  */
 public abstract class BasePackPushConnection extends BasePackConnection implements
 		PushConnection {
-	/** The client expects a status report after the server processes the pack. */
-	public static final String CAPABILITY_REPORT_STATUS = "report-status";
+	static final String CAPABILITY_REPORT_STATUS = "report-status";
 
-	/** The server supports deleting refs. */
-	public static final String CAPABILITY_DELETE_REFS = "delete-refs";
+	static final String CAPABILITY_DELETE_REFS = "delete-refs";
 
-	/** The server supports packs with OFS deltas. */
-	public static final String CAPABILITY_OFS_DELTA = "ofs-delta";
+	static final String CAPABILITY_OFS_DELTA = "ofs-delta";
 
-	/** The client supports using the 64K side-band for progress messages. */
-	public static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
+	static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
 
 	private final boolean thinPack;
 

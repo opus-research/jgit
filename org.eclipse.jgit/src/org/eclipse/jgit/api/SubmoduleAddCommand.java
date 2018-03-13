@@ -49,7 +49,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -149,18 +148,12 @@ public class SubmoduleAddCommand extends
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
-		final String resolvedUri;
-		try {
-			resolvedUri = SubmoduleWalk.getSubmoduleRemoteUrl(repo, uri);
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
 		// Clone submodule repository
 		File moduleDirectory = SubmoduleWalk.getSubmoduleDirectory(repo, path);
 		CloneCommand clone = Git.cloneRepository();
 		configure(clone);
 		clone.setDirectory(moduleDirectory);
-		clone.setURI(resolvedUri);
+		clone.setURI(uri);
 		if (monitor != null)
 			clone.setProgressMonitor(monitor);
 		Repository subRepo = clone.call().getRepository();
@@ -168,7 +161,7 @@ public class SubmoduleAddCommand extends
 		// Save submodule URL to parent repository's config
 		StoredConfig config = repo.getConfig();
 		config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, resolvedUri);
+				ConfigConstants.CONFIG_KEY_URL, uri);
 		try {
 			config.save();
 		} catch (IOException e) {
@@ -178,16 +171,13 @@ public class SubmoduleAddCommand extends
 		// Save path and URL to parent repository's .gitmodules file
 		FileBasedConfig modulesConfig = new FileBasedConfig(new File(
 				repo.getWorkTree(), Constants.DOT_GIT_MODULES), repo.getFS());
+		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_PATH, path);
+		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_URL, uri);
 		try {
-			modulesConfig.load();
-			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-					path, ConfigConstants.CONFIG_KEY_PATH, path);
-			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-					path, ConfigConstants.CONFIG_KEY_URL, uri);
 			modulesConfig.save();
 		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (ConfigInvalidException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
