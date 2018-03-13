@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,14 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.junit;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+package org.eclipse.jgit.lfs.errors;
 
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ java.lang.annotation.ElementType.METHOD })
-public @interface Repeat {
-	public abstract int n();
+/**
+ * Thrown when there is insufficient storage on the server.
+ *
+ * @since 4.5
+ *
+ */
+public class LfsInsufficientStorage extends LfsException {
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * @param message
+	 */
+	public LfsInsufficientStorage(String message) {
+		super(message);
+	}
 }
