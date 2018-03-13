@@ -70,11 +70,5 @@ abstract class NoteBucket {
 	abstract InMemoryNoteBucket set(AnyObjectId noteOn, AnyObjectId noteData,
 			ObjectReader reader) throws IOException;
 
-	// TODO: the computation of the tree SHA1 has to be refactored from the
-	// writeTree method so that we can use it for in-memory buckets
-	// to compute their SHA1 and compare with the SHA1 of the other version
-	// of the same tree
 	abstract ObjectId writeTree(ObjectInserter inserter) throws IOException;
-
-	abstract ObjectId getTreeId();
 }
