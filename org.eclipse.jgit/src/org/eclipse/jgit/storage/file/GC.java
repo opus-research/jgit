@@ -253,7 +253,8 @@ public class GC {
 	 */
 	public void prune(Set<ObjectId> objectsToKeep)
 			throws IOException {
-		long expireDate = System.currentTimeMillis() - expireAgeMillis;
+		long expireDate = (expireAgeMillis == 0) ? Long.MAX_VALUE : System
+				.currentTimeMillis() - expireAgeMillis;
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -362,6 +363,8 @@ public class GC {
 		// loose objects
 		for (File f : deletionCandidates.values())
 			f.delete();
+
+		repo.getObjectDatabase().close();
 	}
 
 	/**
