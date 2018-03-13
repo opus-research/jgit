@@ -44,10 +44,11 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.lib;
 
 import java.io.File;
 
+import org.eclipse.jgit.junit.JGitTestUtil;
 
 /** Test case which includes C Git generated pack files for testing. */
 public abstract class SampleDataRepositoryTestCase extends RepositoryTestCase {
