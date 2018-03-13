@@ -481,10 +481,6 @@ public class GC {
 			}
 		}
 
-		FileUtils.delete(objects,
-				FileUtils.RECURSIVE | FileUtils.EMPTY_DIRECTORIES_ONLY
-						| FileUtils.IGNORE_ERRORS);
-
 		repo.getObjectDatabase().close();
 	}
 
