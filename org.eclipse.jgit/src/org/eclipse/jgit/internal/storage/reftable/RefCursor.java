@@ -45,72 +45,12 @@ package org.eclipse.jgit.internal.storage.reftable;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.ReflogEntry;
 
-/** Iterator over references. */
+/** Iterator over references inside a {@link Reftable}. */
 public abstract class RefCursor implements AutoCloseable {
-	/** {@code true} if deletions should be included in results. */
-	protected boolean includeDeletes;
-
 	/**
-	 * @param deletes
-	 *            if {@code true} deleted references will be returned. If
-	 *            {@code false} (default behavior), deleted references will be
-	 *            skipped, and not returned.
-	 */
-	public void setIncludeDeletes(boolean deletes) {
-		includeDeletes = deletes;
-	}
-
-	/**
-	 * Seek to the first reference, to iterate in order.
-	 *
-	 * @throws IOException
-	 *             references cannot be read.
-	 */
-	public abstract void seekToFirstRef() throws IOException;
-
-	/**
-	 * Seek either to a reference, or a reference subtree.
-	 * <p>
-	 * If {@code refName} ends with {@code "/"} the method will seek to the
-	 * subtree of all references starting with {@code refName} as a prefix.
-	 * <p>
-	 * Otherwise, only {@code refName} will be found, if present.
-	 *
-	 * @param refName
-	 *            reference name or subtree to find.
-	 * @throws IOException
-	 *             references cannot be read.
-	 */
-	public abstract void seek(String refName) throws IOException;
-
-	/**
-	 * Seek reader to read log records.
-	 *
-	 * @throws IOException
-	 *             logs cannot be read.
-	 */
-	public abstract void seekToFirstLog() throws IOException;
-
-	/**
-	 * Seek to a timestamp in a reference's log.
-	 *
-	 * @param refName
-	 *            exact name of the reference whose log to read.
-	 * @param timeUsec
-	 *            time in microseconds since the epoch to scan backwards from.
-	 *            Records at this time and older will be returned.
-	 * @throws IOException
-	 *             logs cannot be read.
-	 */
-	public abstract void seekLog(String refName, long timeUsec)
-			throws IOException;
-
-	/**
-	 * Check if another reference or log record is available.
+	 * Check if another reference is available.
 	 *
 	 * @return {@code true} if there is another result.
 	 * @throws IOException
@@ -118,10 +58,7 @@ public abstract class RefCursor implements AutoCloseable {
 	 */
 	public abstract boolean next() throws IOException;
 
-	/** @return name of the current reference. */
-	public abstract String getRefName();
-
-	/** @return reference at the current position,s if scanning references. */
+	/** @return reference at the current position. */
 	public abstract Ref getRef();
 
 	/** @return {@code true} if the current reference was deleted. */
@@ -130,47 +67,6 @@ public abstract class RefCursor implements AutoCloseable {
 		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
 	}
 
-	/** @return time of reflog entry, microseconds since the epoch. */
-	public abstract long getReflogTimeUsec();
-
-	/** @return current log entry, if scanning the log. */
-	public abstract ReflogEntry getReflogEntry();
-
-	/**
-	 * Lookup a reference, or null if not found.
-	 *
-	 * @param refName
-	 *            reference name to find.
-	 * @return the reference, or {@code null} if not found.
-	 * @throws IOException
-	 *             references cannot be read.
-	 */
-	@Nullable
-	public Ref exactRef(String refName) throws IOException {
-		seek(refName);
-		return next() ? getRef() : null;
-	}
-
-	/**
-	 * Test if a reference or reference subtree exists.
-	 * <p>
-	 * If {@code refName} ends with {@code "/"}, the method tests if any
-	 * reference starts with {@code refName} as a prefix.
-	 * <p>
-	 * Otherwise, the method checks if {@code refName} exists.
-	 *
-	 * @param refName
-	 *            reference name or subtree to find.
-	 * @return {@code true} if the reference exists, or at least one reference
-	 *         exists in the subtree.
-	 * @throws IOException
-	 *             references cannot be read.
-	 */
-	public boolean hasRef(String refName) throws IOException {
-		seek(refName);
-		return next();
-	}
-
 	@Override
-	public abstract void close() throws IOException;
+	public abstract void close();
 }

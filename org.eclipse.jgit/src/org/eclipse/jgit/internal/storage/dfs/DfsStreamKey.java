@@ -50,22 +50,14 @@ import java.util.Arrays;
 /** Key used by {@link DfsBlockCache} to disambiguate streams. */
 public abstract class DfsStreamKey {
 	/**
+	 * @param repo
+	 *            description of the containing repository.
 	 * @param name
 	 *            compute the key from a string name.
 	 * @return key for {@code name}
 	 */
-	public static DfsStreamKey of(String name) {
-		return of(name.getBytes(UTF_8));
-	}
-
-	/**
-	 * @param name
-	 *            compute the key from a byte array. The key takes ownership of
-	 *            the passed {@code byte[] name}.
-	 * @return key for {@code name}
-	 */
-	public static DfsStreamKey of(byte[] name) {
-		return new ByteArrayDfsStreamKey(name);
+	public static DfsStreamKey of(DfsRepositoryDescription repo, String name) {
+		return new ByteArrayDfsStreamKey(repo, name.getBytes(UTF_8));
 	}
 
 	final int hash;
@@ -79,15 +71,6 @@ public abstract class DfsStreamKey {
 		// value without doing the multiply there.
 		this.hash = hash * 31;
 	}
-
-	/**
-	 * Derive a new StreamKey based on this existing key.
-	 *
-	 * @param suffix
-	 *            a derivation suffix.
-	 * @return derived stream key.
-	 */
-	public abstract DfsStreamKey derive(String suffix);
 
 	@Override
 	public int hashCode() {
@@ -104,28 +87,39 @@ public abstract class DfsStreamKey {
 	}
 
 	private static final class ByteArrayDfsStreamKey extends DfsStreamKey {
+		private final DfsRepositoryDescription repo;
 		private final byte[] name;
 
-		ByteArrayDfsStreamKey(byte[] name) {
-			super(Arrays.hashCode(name));
+		ByteArrayDfsStreamKey(DfsRepositoryDescription repo, byte[] name) {
+			super(repo.hashCode() * 31 + Arrays.hashCode(name));
+			this.repo = repo;
 			this.name = name;
-		}
-
-		@Override
-		public DfsStreamKey derive(String suffix) {
-			byte[] s = suffix.getBytes(UTF_8);
-			byte[] n = Arrays.copyOf(name, name.length + s.length);
-			System.arraycopy(s, 0, n, name.length, s.length);
-			return new ByteArrayDfsStreamKey(n);
 		}
 
 		@Override
 		public boolean equals(Object o) {
 			if (o instanceof ByteArrayDfsStreamKey) {
 				ByteArrayDfsStreamKey k = (ByteArrayDfsStreamKey) o;
-				return hash == k.hash && Arrays.equals(name, k.name);
+				return hash == k.hash
+						&& repo.equals(k.repo)
+						&& Arrays.equals(name, k.name);
 			}
 			return false;
+		}
+	}
+
+	static final class ForReverseIndex extends DfsStreamKey {
+		private final DfsStreamKey idxKey;
+
+		ForReverseIndex(DfsStreamKey idxKey) {
+			super(idxKey.hash + 1);
+			this.idxKey = idxKey;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			return o instanceof ForReverseIndex
+					&& idxKey.equals(((ForReverseIndex) o).idxKey);
 		}
 	}
 }

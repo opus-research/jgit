@@ -178,7 +178,10 @@ public final class DfsBlockCache {
 		blockSizeShift = Integer.numberOfTrailingZeros(blockSize);
 
 		clockLock = new ReentrantLock(true /* fair */);
-		clockHand = new Ref<>(DfsStreamKey.of(""), -1, 0, null); //$NON-NLS-1$
+		String none = ""; //$NON-NLS-1$
+		clockHand = new Ref<>(
+				DfsStreamKey.of(new DfsRepositoryDescription(none), none),
+				-1, 0, null);
 		clockHand.next = clockHand;
 
 		statHit = new AtomicLong();
@@ -271,7 +274,7 @@ public final class DfsBlockCache {
 		int slot = slot(key, position);
 		HashEntry e1 = table.get(slot);
 		DfsBlock v = scan(e1, key, position);
-		if (v != null) {
+		if (v != null && v.contains(key, requestedPosition)) {
 			ctx.stats.blockCacheHit++;
 			statHit.incrementAndGet();
 			return v;
@@ -295,7 +298,7 @@ public final class DfsBlockCache {
 			statMiss.incrementAndGet();
 			boolean credit = true;
 			try {
-				v = file.readOneBlock(position, ctx, fileChannel);
+				v = file.readOneBlock(requestedPosition, ctx, fileChannel);
 				credit = false;
 			} finally {
 				if (credit)
@@ -390,6 +393,10 @@ public final class DfsBlockCache {
 		put(v.stream, v.start, v.size(), v);
 	}
 
+	<T> Ref<T> putRef(DfsStreamKey key, long size, T v) {
+		return put(key, 0, (int) Math.min(size, Integer.MAX_VALUE), v);
+	}
+
 	<T> Ref<T> put(DfsStreamKey key, long pos, int size, T v) {
 		int slot = slot(key, pos);
 		HashEntry e1 = table.get(slot);
@@ -442,6 +449,15 @@ public final class DfsBlockCache {
 	private <T> T scan(HashEntry n, DfsStreamKey key, long position) {
 		Ref<T> r = scanRef(n, key, position);
 		return r != null ? r.get() : null;
+	}
+
+	<T> Ref<T> getRef(DfsStreamKey key) {
+		Ref<T> r = scanRef(table.get(slot(key, 0)), key, 0);
+		if (r != null)
+			statHit.incrementAndGet();
+		else
+			statMiss.incrementAndGet();
+		return r;
 	}
 
 	@SuppressWarnings("unchecked")

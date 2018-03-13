@@ -28,8 +28,9 @@ and read the `$GIT_DIR/refs` directory.
 
 - Near constant time lookup for any single reference, even when the
   repository is cold and not in process or kernel cache.
+- Near constant time verification a SHA-1 is referred to by at least
+  one reference (for allow-tip-sha1-in-want).
 - Efficient lookup of an entire namespace, such as `refs/tags/`.
-- Occupy less disk space for large repositories.
 - Support atomic push `O(size_of_update)` operations.
 - Combine reflog storage with ref storage.
 
@@ -47,21 +48,24 @@ tunable by the writer.
 
 Space used, packed-refs vs. reftable:
 
-repository | packed-refs | reftable | % original | avg ref
------------|------------:|---------:|-----------:|---------:
-android    |      62.2 M |   27.7 M |     44.4%  | 33 bytes
-rails      |       1.8 M |  896.2 K |     47.6%  | 29 bytes
-git        |      78.7 K |   27.9 K |     40.0%  | 43 bytes
-git (heads)|       332 b |    222 b |     66.9%  | 37 bytes
+repository | packed-refs | reftable | % original | avg ref  | avg obj
+-----------|------------:|---------:|-----------:|---------:|--------:
+android    |      62.2 M |   34.4 M |     55.2%  | 33 bytes | 8 bytes
+rails      |       1.8 M |    1.1 M |     57.7%  | 29 bytes | 6 bytes
+git        |      78.7 K |   44.0 K |     60.0%  | 50 bytes | 6 bytes
+git (heads)|       332 b |    239 b |     72.0%  | 31 bytes | 0 bytes
 
-Scan (read 866k refs) and lookup (single ref from 866k refs):
+Scan (read 866k refs), by reference name lookup (single ref from 866k
+refs), and by SHA-1 lookup (refs with that SHA-1, from 866k refs):
 
-format      | scan    | lookup
-------------|--------:|---------------:
-packed-refs |  380 ms | 375420.0 usec
-reftable    |  125 ms |     42.3 usec
+format      | cache | scan    | by name        | by SHA-1
+------------|------:|--------:|---------------:|---------------:
+packed-refs | cold  |  402 ms | 409,660.1 usec | 412,535.8 usec
+packed-refs | hot   |         |   6,844.6 usec |  20,110.1 usec
+reftable    | cold  |  112 ms |      33.9 usec |     323.2 usec
+reftable    | hot   |         |      20.2 usec |     320.8 usec
 
-Space used for 149,932 log entries on 43,061 refs,
+Space used for 149,932 log entries for 43,061 refs,
 reflog vs. reftable:
 
 format        | size  | avg log
@@ -78,6 +82,10 @@ References in a reftable are always peeled.
 ### Reference name encoding
 
 Reference names should be encoded with UTF-8.
+
+### Network byte order
+
+All multi-byte, fixed width fields are in network byte order.
 
 ### Ordering
 
@@ -98,7 +106,7 @@ peers.
 
 ### Structure
 
-A reftable file has the following basic structure:
+A reftable file has the following high-level structure:
 
     first_block {
       header
@@ -106,6 +114,8 @@ A reftable file has the following basic structure:
     }
     ref_blocks*
     ref_index?
+    obj_blocks*
+    obj_index?
     log_blocks*
     log_index?
     footer
@@ -114,12 +124,13 @@ A reftable file has the following basic structure:
 
 The `block_size` is arbitrarily determined by the writer, and does not
 have to be a power of 2.  The block size must be larger than the
-longest reference name or log entry used in the repository, as
-references cannot span blocks.
+longest reference name or deflated log entry used in the repository,
+as references cannot span blocks.
 
 Powers of two that are friendly to the virtual memory system or
-filesystem (such as 4k or 8k) are recommended.  Larger sizes
-(64k) can yield better compression.
+filesystem (such as 4k or 8k) are recommended.  Larger sizes (64k) can
+yield better compression, with a possible increased cost incurred by
+readers during access.
 
 The largest block size is `16777215` bytes (15.99 MiB).
 
@@ -130,8 +141,6 @@ An 8-byte header appears at the beginning of the file:
     '\1REF'
     uint8( version_number = 1 )
     uint24( block_size )
-
-The `block_size` and all other uint fields are in network byte order.
 
 ### First ref block
 
@@ -192,9 +201,8 @@ A `ref_record` describes a single reference, storing both the name and
 its value(s). Records are formatted as:
 
     varint( prefix_length )
-    varint( suffix_length )
+    varint( (suffix_length << 3) | value_type )
     suffix
-    varint( value_type )
     value?
 
 The `prefix_length` field specifies how many leading bytes of the
@@ -210,17 +218,24 @@ Recovering a reference name from any `ref_record` is a simple concat:
 The `suffix_length` value provides the number of bytes to copy from
 `suffix` to complete the reference name.
 
-The `value_type` and `value` follows.  Its format is determined by
-`value_type`, one of the following:
+The `value` follows.  Its format is determined by `value_type`, one of
+the following:
 
 - `0x0`: deletion; no value data (see transactions, below)
 - `0x1`: one 20-byte object id; value of the ref
 - `0x2`: two 20-byte object ids; value of the ref, peeled target
 - `0x3`: symbolic reference: `varint( target_len ) target`
+- `0x4`: length delimited extension: `varint( data_len ) data`
 
 Symbolic references use a varint length followed by a variable number
 of bytes to encode the complete reference target.  No compression is
 applied to the target name.
+
+Type `0x4` is available for use by systems that need to store
+additional data under a reference name like `FETCH_HEAD` or
+`MERGE_HEAD`.
+
+Types `0x5..0x7` are reserved.
 
 ### Ref index
 
@@ -244,11 +259,12 @@ Index block format:
     index_record+
     uint32( restart_offset )+
     uint16( restart_count_m1 )
+    padding?
 
 The index block header starts with the high bit set.  This identifies
 the block as an index block, and not as a ref block, log block or file
 footer.  The `block_len` field in an index block is 30-bits network
-byte order, and allowed to occupy the space normally used by the block
+byte order, and allowed to occupy space normally used by the block
 type in other blocks.  This supports indexes significantly larger than
 the file's `block_size`.
 
@@ -261,7 +277,9 @@ readers must hold the entire index in memory to benefit from this, so
 it's a time-space tradeoff in both file size, and reader memory.
 Increasing the block size in the writer decreases the index size.
 
-Unlike ref blocks, the index block is not padded.
+When object blocks are present the ref index block is padded with
+`padding` to maintain alignment for the next block. No padding is
+necessary if log blocks or the file trailer follows the ref index.
 
 #### index record
 
@@ -269,7 +287,7 @@ An index record describes the last entry in another block.
 Index records are written as:
 
     varint( prefix_length )
-    varint( suffix_length )
+    varint( (suffix_length << 3) | 0 )
     suffix
     varint( block_offset )
 
@@ -284,11 +302,109 @@ with this reference.
 Readers loading the ref index must first read the footer (below) to
 obtain `ref_index_offset`. If not present, the offset will be 0.
 
+### Obj block format
+
+Object blocks use unique, abbreviated 2-20 byte SHA-1s keys, mapping
+to ref blocks containing references pointing to that object directly,
+or as the peeled value of an annotated tag.  Like ref blocks, object
+blocks use the file's standard `block_size`.
+
+To save space in small files, object blocks may be omitted if the ref
+index is not present.  When missing readers should brute force a
+linear search of all references to lookup by SHA-1.
+
+An object block is written as:
+
+    'o'
+    uint24 ( block_len )
+    obj_record+
+    uint32( restart_offset )+
+    uint16( restart_count_m1 )
+    padding?
+
+Fields are identical to ref block.  Binary search using the restart
+table works the same as in reference blocks.
+
+Because object identifiers are abbreviated by writers to the shortest
+unique abbreviation within the reftable, obj key lengths are variable
+between 2 and 20 bytes.  Readers must compare only for common prefix
+match within an obj block or obj index.
+
+Object blocks should be block aligned, according to `block_size` from
+the file header.  The `padding` field is filled with NULs to maintain
+alignment for the next block.
+
+#### obj record
+
+An `obj_record` describes a single object abbreviation, and the blocks
+containing references using that unique abbreviation:
+
+    varint( prefix_length )
+    varint( (suffix_length << 3) | cnt_3 )
+    suffix
+    varint( cnt_rest )?
+    varint( block_delta )+
+
+Like in reference blocks, abbreviations are prefix compressed within
+an obj block.  On large reftable files with many unique objects,
+higher block sizes (64k), and higher restart interval (128), a
+`prefix_length` of 2 or 3 and `suffix_length` of 3 may be common in
+obj records (unique abbreviation of 5-6 raw bytes, 10-12 hex digits).
+
+Each record contains `block_count` number of block identifiers for ref
+blocks.  The `block_count` is determined by:
+
+    block_count = cnt_3
+    if (cnt_3 == 0x7) {
+      block_count += cnt_rest
+    }
+
+The `cnt_rest` field is only present when `block_count >= 0x7` and
+could overflow the `cnt_3` field available in the record start.  This
+encoding scheme is used as the vast majority of abbreviations are
+only one reference (or at most a few), and unlikely to exceed 6 blocks.
+
+The first `block_delta` is the absolute block identifier counting from
+the start of the file. The offset of that block can be obtained by
+`block_delta[0] * block_size`.  Additional `block_delta` entries are
+relative to the prior entry, e.g. a reader would perform:
+
+    block_id = block_delta[0]
+    prior = block_id
+    for (j = 1; j < block_count; j++) {
+      block_id = prior + block_delta[j]
+      prior = block_id
+    }
+
+With a `block_id` in hand, a reader must linearly scan the ref block
+at `block_id * block_size` offset in the file, starting from the first
+`ref_record`, testing each reference's SHA-1s (for `value_type = 0x1`
+or `0x2`) for full equality.  Faster searching by SHA-1 within a
+single ref block is not supported by the reftable format.  Smaller
+block sizes reduces the number of candidates this step must consider.
+
+### Obj index
+
+The obj index stores the abbreviation from the last entry for every
+obj block in the file, enabling constant O(1) disk seeks for all
+lookups.  It is formatted exactly the same as the ref index, but
+refers to obj blocks.
+
+The obj index should be present if obj blocks are present, as
+obj blocks should only be written in larger files.
+
+The obj index should be block aligned, according to `block_size` from
+the file header.  This requires padding the last obj block to maintain
+alignment.
+
+Readers loading the obj index must first read the footer (below) to
+obtain `obj_index_offset`.  If not present, the offset will be 0.
+
 ### Log block format
 
-Unlike ref blocks, log block sizes are variable in size, and do not
-match the `block_size` specified in the file header or footer.
-Writers should choose an appropiate buffer size to prepare a log block
+Unlike ref and obj blocks, log block sizes are variable in size, and
+do not match the `block_size` specified in the file header or footer.
+Writers should choose an appropriate buffer size to prepare a log block
 for deflation, such as `2 * block_size`.
 
 A log block is written as:
@@ -310,15 +426,15 @@ preallocate the inflation output buffer.  Offsets within the block
 (e.g. `restart_offset`) still include the 4-byte header.  Readers may
 prefer prefixing the inflation output buffer with the 4-byte header.
 
-Within the deflate container, a variable number of `log_record`,
+Within the deflate container, a variable number of `log_record`
 describe reference changes.  The log record format is described
 below.  See ref block format (above) for a description of
 `restart_offset` and `restart_count_m1`.
 
 Unlike ref blocks, log blocks are written at any alignment, without
-padding.  The first log block immediately follows the end of the last
-ref block, or the ref index.  In very small files the log block may
-appear in the first block.
+padding.  The first log block immediately follows the end of the prior
+block, which omits its trailing padding.  In very small files the log
+block may appear in the first block.
 
 Because log blocks have no alignment or padding between blocks,
 readers must keep track of the bytes consumed by the inflater to
@@ -342,7 +458,7 @@ The `time_usec` field must be unique within the scope of a `ref_name`.
 Writers working from seconds precision source are recomended to add
 `999999` microseconds to the timestamp, and decrement microseconds
 from older entries within the same second to prevent duplicates.
-Rounding down to seconds on read will restore the original values.
+Truncating to seconds on read will restore the original values.
 
 Log records have a similar starting structure to ref and index
 records, utilizing the same prefix compression scheme applied to the
@@ -350,7 +466,7 @@ key described above.
 
 ```
     varint( prefix_length )
-    varint( suffix_length )
+    varint( (suffix_length << 3) | 0 )
     suffix
 
     old_id
@@ -380,9 +496,8 @@ supplied for the update.
 
 Readers accessing the log must first read the footer (below) to
 determine the `log_offset`.  The first block of the log begins at
-`log_offset` bytes since the start of the file.
-
-In very small reftable files `log_offset`, may not be block aligned.
+`log_offset` bytes since the start of the file.  The `log_offset` is
+not block aligned.
 
 ### Log index
 
@@ -409,31 +524,41 @@ obtain `log_index_offset`. If not present, the offset will be 0.
 After the last block of the file, a file footer is written.  It begins
 like the file header, but is extended with additional data.
 
-A 36-byte footer appears at the end:
+A 52-byte footer appears at the end:
 
 ```
     '\1REF'
     uint8( version_number = 1 )
     uint24( block_size )
-
     uint64( ref_index_offset )
+
+    uint64( obj_offset )
+    uint64( obj_index_offset )
+
     uint64( log_offset )
     uint64( log_index_offset )
+
     uint32( CRC-32 of prior )
 ```
 
 If a section is missing (e.g. ref index) the corresponding offset
 field (e.g. `ref_index_offset`) will be 0.
 
+- `obj_offset`: byte offset for the first obj block.
+- `log_offset`: byte offset for the first log block.
+- `ref_index_offset`: byte offset for the start of the ref index.
+- `obj_index_offset`: byte offset for the start of the obj index.
+- `log_index_offset`: byte offset for the start of the log index.
+
 #### Reading the footer
 
-Readers must seek to `file_length - 36` to access the footer.  A
+Readers must seek to `file_length - 64` to access the footer.  A
 trusted external source (such as `stat(2)`) is necessary to obtain
 `file_length`.  When reading the footer, readers must verify:
 
 - 4-byte magic is correct
 - 1-byte version number is recognized
-- 4-byte CRC-32 matches the other 32 bytes (including magic, and version)
+- 4-byte CRC-32 matches the other 48 bytes (including magic, and version)
 
 Once verified, the other fields of the footer can be accessed.
 
@@ -482,8 +607,8 @@ Less frequent restart points makes prefix compression more effective,
 decreasing overall file size, with increased penalities for readers
 walking through more records after the binary search step.
 
-A maxium of `65536` restart points is supported in any type of block.
-The `restart_count` field stores restart points `-1`, with a maxium
+A maximum of `65536` restart points per block is supported.  The
+`restart_count` field stores restart points `-1`, with a maximum
 value of `65535`.
 
 ## Considerations
@@ -500,17 +625,16 @@ bytes per reference.
 
 ### Low overhead
 
-A reftable with very few references (e.g.  git.git with 5 heads) uses
-only 222 bytes for reftable vs. 332 bytes for packed-refs.  This
-supports reftable scaling down, to be used for transaction logs
-(below).
+A reftable with very few references (e.g. git.git with 5 heads)
+is 251 bytes for reftable, vs. 332 bytes for packed-refs.  This
+supports reftable scaling down for transaction logs (below).
 
 ### Block size
 
 For a Gerrit Code Review type repository with many change refs, larger
 block sizes (64 KiB) and less frequent restart points (every 64) yield
-better compression due to more references within the block able to
-compress against the prior reference.
+better compression due to more references within the block compressing
+against the prior reference.
 
 Larger block sizes reduces the index size, as the reftable will
 require fewer blocks to store the same number of references.
@@ -520,6 +644,13 @@ require fewer blocks to store the same number of references.
 Assuming the index block has been loaded into memory, binary searching
 for any single reference requires exactly 1 disk seek to load the
 containing block.
+
+### Scans and lookups dominate
+
+Scanning all references and lookup by name (or namespace such as
+`refs/heads/`) is the most common activity performed by repositories.
+SHA-1s are stored twice when obj blocks are present, avoiding disk
+seeks for the common cases of scan and lookup by name.
 
 ### Logs are infrequently read
 
@@ -653,9 +784,8 @@ would reduce the amount of data a reader must inflate, but still
 leaves the problem of indexing chunks to support readers efficiently
 locating the correct chunk.
 
-Given the compression ratios achieved by reftable's simple encoding
-(e.g.  44%), without using a standard compression algorithm, it does
-not seem necessary to add the complexity of bzip/gzip/zlib.
+Given the compression achieved by reftable's encoding, it does not
+seem necessary to add the complexity of bzip/gzip/zlib.
 
 ### JGit Ketch RefTree
 
