@@ -141,6 +141,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
+	/** If there is a .gitattributes file present, the parsed rules from it. */
+	private AttributesNode attributesNode;
+
 	private String cleanFilterCommand;
 
 	/** Repository that is the root level being iterated over */
@@ -421,16 +424,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private boolean mightNeedCleaning() {
+	private boolean mightNeedCleaning() throws IOException {
 		switch (getOptions().getAutoCRLF()) {
 		case FALSE:
 		default:
-			try {
-				if (getCleanFilterCommand() != null)
-					return true;
-			} catch (IOException e) {
-				// TODO
-			}
+			if (getCleanFilterCommand() != null)
+				return true;
 			return false;
 
 		case TRUE:
