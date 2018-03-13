@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008-2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,48 +41,65 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.test.resources;
+package org.eclipse.jgit.internal.revwalk;
 
-import java.io.File;
-import java.io.IOException;
+import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevFlag;
 
-import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-
-
-/** Test case which includes C Git generated pack files for testing. */
-public abstract class SampleDataRepositoryTestCase extends RepositoryTestCase {
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
-		copyCGitTestPacks(db);
-	}
+/**
+ * A RevFilter that adds the visited commits to {@code bitmap} as a side
+ * effect.
+ * <p>
+ * When the walk hits a commit that is part of {@code bitmap}'s
+ * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
+ * commit and its parents are marked as SEEN so that the walk does not
+ * have to visit its ancestors.  This ensures the walk is very short if
+ * there is good bitmap coverage.
+ */
+public class AddToBitmapFilter extends RevFilter {
+	private final BitmapBuilder bitmap;
 
 	/**
-	 * Copy C Git generated pack files into given repository for testing
+	 * Create a filter that adds visited commits to the given bitmap.
 	 *
-	 * @param repo
-	 *            test repository to receive packfile copies
-	 * @throws IOException
+	 * @param bitmap bitmap to write visited commits to
 	 */
-	public static void copyCGitTestPacks(FileRepository repo) throws IOException {
-		final String[] packs = {
-				"pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f",
-				"pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371",
-				"pack-9fb5b411fe6dfa89cc2e6b89d2bd8e5de02b5745",
-				"pack-546ff360fe3488adb20860ce3436a2d6373d2796",
-				"pack-cbdeda40019ae0e6e789088ea0f51f164f489d14",
-				"pack-e6d07037cbcf13376308a0a995d1fa48f8f76aaa",
-				"pack-3280af9c07ee18a87705ef50b0cc4cd20266cf12"
-		};
-		final File packDir = repo.getObjectDatabase().getPackDirectory();
-		for (String n : packs) {
-			JGitTestUtil.copyTestResource(n + ".pack", new File(packDir, n + ".pack"));
-			JGitTestUtil.copyTestResource(n + ".idx", new File(packDir, n + ".idx"));
+	public AddToBitmapFilter(BitmapBuilder bitmap) {
+		this.bitmap = bitmap;
+	}
+
+	@Override
+	public final boolean include(RevWalk walker, RevCommit cmit) {
+		Bitmap visitedBitmap;
+
+		if (bitmap.contains(cmit)) {
+			// already included
+		} else if ((visitedBitmap = bitmap.getBitmapIndex()
+				.getBitmap(cmit)) != null) {
+			bitmap.or(visitedBitmap);
+		} else {
+			bitmap.addObject(cmit, Constants.OBJ_COMMIT);
+			return true;
 		}
 
-		JGitTestUtil.copyTestResource("packed-refs",
-				new File(repo.getDirectory(), "packed-refs"));
+		for (RevCommit p : cmit.getParents()) {
+			p.add(RevFlag.SEEN);
+		}
+		return false;
+	}
+
+	@Override
+	public final RevFilter clone() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public final boolean requiresCommitBody() {
+		return false;
 	}
 }
