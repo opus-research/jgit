@@ -63,7 +63,6 @@ import java.util.zip.Inflater;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ChunkMeta;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -252,6 +251,8 @@ public final class PackChunk {
 
 	private volatile Boolean valid;
 
+	private volatile ChunkKey nextFragment;
+
 	PackChunk(ChunkKey key, byte[] dataBuf, int dataPtr, int dataLen,
 			ChunkIndex index, ChunkMeta meta) {
 		this.key = key;
@@ -399,12 +400,9 @@ public final class PackChunk {
 						base = base - pos;
 
 						ChunkMeta.BaseChunk baseChunk;
-						baseChunk = ChunkMetaUtil.getBaseChunk(
-								pc.key,
-								pc.meta,
-								base);
-						baseChunkKey = ChunkKey.fromString(baseChunk.getChunkKey());
-						basePosInChunk = (int) (baseChunk.getRelativeStart() - base);
+						baseChunk = pc.meta.getBaseChunk(base);
+						baseChunkKey = baseChunk.getChunkKey();
+						basePosInChunk = (int) (baseChunk.relativeStart - base);
 					}
 
 					delta = new Delta(delta, //
@@ -561,8 +559,7 @@ public final class PackChunk {
 				if (inf.needsInput()) {
 					if (meta.getFragmentCount() <= nextChunk)
 						break;
-					pc = reader.getChunk(ChunkKey.fromString(
-							meta.getFragment(nextChunk++)));
+					pc = reader.getChunk(meta.getFragmentKey(nextChunk++));
 					if (meta.getFragmentCount() == nextChunk)
 						bs = pc.dataLen; // Include trailer on last chunk.
 					else
@@ -578,7 +575,7 @@ public final class PackChunk {
 		if (dstoff != sz) {
 			throw new DataFormatException(MessageFormat.format(
 					DhtText.get().shortCompressedObject,
-					ChunkKey.fromString(meta.getFragment(0)),
+					meta.getChunkKey(),
 					Integer.valueOf(pos)));
 		}
 		return dstbuf;
@@ -686,8 +683,7 @@ public final class PackChunk {
 		if (isFragment()) {
 			int cnt = meta.getFragmentCount();
 			for (int fragId = 1; fragId < cnt; fragId++) {
-				PackChunk pc = ctx.getChunk(ChunkKey.fromString(
-						meta.getFragment(fragId)));
+				PackChunk pc = ctx.getChunk(meta.getFragmentKey(fragId));
 				pc.copyEntireChunkAsIs(out, obj, validate);
 			}
 		}
@@ -730,6 +726,18 @@ public final class PackChunk {
 		if (index != null)
 			sz += index.getIndexSize();
 		return sz;
+	}
+
+	ChunkKey getNextFragment() {
+		if (meta == null)
+			return null;
+
+		ChunkKey next = nextFragment;
+		if (next == null) {
+			next = meta.getNextFragment(getChunkKey());
+			nextFragment = next;
+		}
+		return next;
 	}
 
 	private static class Delta {

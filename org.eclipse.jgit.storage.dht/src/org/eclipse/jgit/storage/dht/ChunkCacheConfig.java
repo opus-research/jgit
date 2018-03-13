@@ -41,21 +41,57 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.storage.dht;
 
-import java.io.IOException;
+import org.eclipse.jgit.lib.Config;
 
-/** UploadPack has already reported an error to the client. */
-public class UploadPackInternalServerErrorException extends IOException {
-	private static final long serialVersionUID = 1L;
+/** Configuration parameters for {@link ChunkCache}. */
+public class ChunkCacheConfig {
+	/** 1024 (number of bytes in one kibibyte/kilobyte) */
+	public static final int KiB = 1024;
+
+	/** 1024 {@link #KiB} (number of bytes in one mebibyte/megabyte) */
+	public static final int MiB = 1024 * KiB;
+
+	private long chunkCacheLimit;
+
+	/** Create a default configuration. */
+	public ChunkCacheConfig() {
+		setChunkCacheLimit(10 * MiB);
+	}
 
 	/**
-	 * Initialize a new exception.
-	 *
-	 * @param why
-	 *            root cause.
+	 * @return maximum number bytes of heap memory to dedicate to caching pack
+	 *         file data. If the limit is configured to 0, the chunk cache is
+	 *         disabled. <b>Default is 10 MB.</b>
 	 */
-	public UploadPackInternalServerErrorException(Throwable why) {
-		super(why);
+	public long getChunkCacheLimit() {
+		return chunkCacheLimit;
+	}
+
+	/**
+	 * @param newLimit
+	 *            maximum number bytes of heap memory to dedicate to caching
+	 *            pack file data.
+	 * @return {@code this}
+	 */
+	public ChunkCacheConfig setChunkCacheLimit(final long newLimit) {
+		chunkCacheLimit = Math.max(0, newLimit);
+		return this;
+	}
+
+	/**
+	 * Update properties by setting fields from the configuration.
+	 * <p>
+	 * If a property is not defined in the configuration, then it is left
+	 * unmodified.
+	 *
+	 * @param rc
+	 *            configuration to read properties from.
+	 * @return {@code this}
+	 */
+	public ChunkCacheConfig fromConfig(final Config rc) {
+		setChunkCacheLimit(rc.getLong("core", "dht", "chunkCacheLimit", getChunkCacheLimit()));
+		return this;
 	}
 }
