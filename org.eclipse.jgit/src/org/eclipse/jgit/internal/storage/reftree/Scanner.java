@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,133 +43,77 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.lib.RefDatabase.MAX_SYMBOLIC_REF_DEPTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
+import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
 import static org.eclipse.jgit.lib.Constants.R_REFS;
 import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_TREE;
-import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.MAX_SYMREF_DEPTH;
 
 import java.io.IOException;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.Paths;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
 
-/** A tree parser that extracts references from a {@link RefTree}. */
+/** Scans a {@link RefTree} to build a {@link RefList}. */
 class Scanner {
 	private static final int MAX_SYMLINK_BYTES = 10 << 10;
-	private static final byte[] BINARY_R_REFS = encode(R_REFS);
 	private static final byte[] REFS_DOT_DOT = encode("refs/.."); //$NON-NLS-1$
 
 	static class Result {
-		final ObjectId refTreeId;
-		final RefList<Ref> all;
-		final RefList<Ref> sym;
-
-		Result(ObjectId id, RefList<Ref> all, RefList<Ref> sym) {
-			this.refTreeId = id;
-			this.all = all;
-			this.sym = sym;
-		}
+		RefList<Ref> all;
+		RefList<Ref> sym;
 	}
 
-	/**
-	 * Scan a {@link RefTree} and parse entries into {@link Ref} instances.
-	 *
-	 * @param repo
-	 *            source repository containing the commit and tree objects that
-	 *            make up the RefTree.
-	 * @param src
-	 *            bootstrap reference such as {@code refs/txn/committed} to read
-	 *            the reference tree tip from. The current ObjectId will be
-	 *            included in {@link Result#refTreeId}.
-	 * @param prefix
-	 *            if non-empty a reference prefix to scan only a subdirectory.
-	 *            For example {@code prefix = "refs/heads/"} will limit the scan
-	 *            to only the {@code "heads"} directory of the RefTree, avoiding
-	 *            other directories like {@code "tags"}. Empty string reads all
-	 *            entries in the RefTree.
-	 * @param recursive
-	 *            if true recurse into subdirectories of the reference tree;
-	 *            false to read only one level. Callers may use false during an
-	 *            implementation of {@code exactRef(String)} where only one
-	 *            reference is needed out of a specific subtree.
-	 * @return sorted list of references after parsing.
-	 * @throws IOException
-	 *             tree cannot be accessed from the repository.
-	 */
-	static Result scanRefTree(Repository repo, @Nullable Ref src, String prefix,
-			boolean recursive) throws IOException {
+	static Result scanRefTree(Repository repo, @Nullable Ref src)
+			throws IOException, IncorrectObjectTypeException {
 		RefList.Builder<Ref> all = new RefList.Builder<>();
 		RefList.Builder<Ref> sym = new RefList.Builder<>();
 
-		ObjectId srcId;
 		if (src != null && src.getObjectId() != null) {
 			try (ObjectReader reader = repo.newObjectReader()) {
-				srcId = src.getObjectId();
-				scan(reader, srcId, prefix, recursive, all, sym);
+				scan(reader, src, all, sym);
 			}
-		} else {
-			srcId = ObjectId.zeroId();
 		}
 
-		RefList<Ref> aList = all.toRefList();
-		for (int idx = 0; idx < sym.size();) {
-			Ref s = sym.get(idx);
-			Ref r = resolve(s, 0, aList);
-			if (r != null) {
-				sym.set(idx++, r);
-			} else {
-				// Remove broken symbolic reference, they don't exist.
-				sym.remove(idx);
-				int rm = aList.find(s.getName());
-				if (0 <= rm) {
-					aList = aList.remove(rm);
-				}
-			}
+		Result refs = new Result();
+		refs.all = all.toRefList();
+		for (int i = 0; i < sym.size(); i++) {
+			sym.set(i, resolve(sym.get(i), 0, refs.all));
 		}
-		return new Result(srcId, aList, sym.toRefList());
+		refs.sym = sym.toRefList();
+		return refs;
 	}
 
-	private static void scan(ObjectReader reader, AnyObjectId srcId,
-			String prefix, boolean recursive,
+	private static void scan(ObjectReader reader, Ref src,
 			RefList.Builder<Ref> all, RefList.Builder<Ref> sym)
 					throws IncorrectObjectTypeException, IOException {
-		CanonicalTreeParser p = createParserAtPath(reader, srcId, prefix);
-		if (p == null) {
-			return;
-		}
-
+		CanonicalTreeParser p = new CanonicalTreeParser(
+				encode(R_REFS),
+				reader,
+				commitToTree(reader, src.getObjectId()));
 		while (!p.eof()) {
 			int mode = p.getEntryRawMode();
 			if (mode == TYPE_TREE) {
-				if (recursive) {
-					p = p.createSubtreeIterator(reader);
-				} else {
-					p = p.next();
-				}
+				p = p.createSubtreeIterator(reader);
 				continue;
 			}
 
-			if (!curElementHasPeelSuffix(p)) {
+			if (!isPeelSuffix(p)) {
 				Ref r = toRef(reader, mode, p);
 				if (r != null) {
 					all.add(r);
@@ -184,52 +128,29 @@ class Scanner {
 		}
 	}
 
-	private static CanonicalTreeParser createParserAtPath(ObjectReader reader,
-			AnyObjectId srcId, String prefix) throws IOException {
-		ObjectId root = toTree(reader, srcId);
-		if (prefix.isEmpty()) {
-			return new CanonicalTreeParser(BINARY_R_REFS, reader, root);
-		}
-
-		String dir = RefTree.refPath(Paths.stripTrailingSeparator(prefix));
-		TreeWalk tw = TreeWalk.forPath(reader, dir, root);
-		if (tw == null || !tw.isSubtree()) {
-			return null;
-		}
-
-		ObjectId id = tw.getObjectId(0);
-		return new CanonicalTreeParser(encode(prefix), reader, id);
-	}
-
 	private static Ref resolve(Ref ref, int depth, RefList<Ref> refs)
 			throws IOException {
-		if (!ref.isSymbolic()) {
-			return ref;
-		} else if (MAX_SYMBOLIC_REF_DEPTH <= depth) {
-			return null;
+		if (ref != null && ref.isSymbolic() && depth < MAX_SYMREF_DEPTH) {
+			Ref r = refs.get(ref.getTarget().getName());
+			Ref dst = resolve(r, depth + 1, refs);
+			if (dst != null) {
+				return new SymbolicRef(ref.getName(), dst);
+			}
 		}
-
-		Ref r = refs.get(ref.getTarget().getName());
-		if (r == null) {
-			return ref;
-		}
-
-		Ref dst = resolve(r, depth + 1, refs);
-		if (dst == null) {
-			return null;
-		}
-		return new SymbolicRef(ref.getName(), dst);
+		return ref;
 	}
 
-	@SuppressWarnings("resource")
-	private static RevTree toTree(ObjectReader reader, AnyObjectId id)
+	static AnyObjectId commitToTree(ObjectReader reader, ObjectId id)
 			throws IOException {
-		return new RevWalk(reader).parseTree(id);
+		byte[] raw = reader.open(id, OBJ_COMMIT).getCachedBytes();
+		MutableObjectId idBuf = new MutableObjectId();
+		idBuf.fromString(raw, 5);
+		return idBuf;
 	}
 
-	private static boolean curElementHasPeelSuffix(AbstractTreeIterator itr) {
-		int n = itr.getEntryPathLength();
-		byte[] c = itr.getEntryPathBuffer();
+	private static boolean isPeelSuffix(CanonicalTreeParser t) {
+		int n = t.getEntryPathLength();
+		byte[] c = t.getEntryPathBuffer();
 		return n > 3 && c[n - 3] == '^' && c[n - 2] == '{' && c[n - 1] == '}';
 	}
 
@@ -261,7 +182,7 @@ class Scanner {
 			byte[] bin = reader.open(id, OBJ_BLOB)
 					.getCachedBytes(MAX_SYMLINK_BYTES);
 			String dst = RawParseUtils.decode(bin);
-			Ref trg = new ObjectIdRef.Unpeeled(NEW, dst, null);
+			Ref trg = new ObjectIdRef.Unpeeled(PACKED, dst, null);
 			String name = refName(p, false);
 			return new SymbolicRef(name, trg);
 		}

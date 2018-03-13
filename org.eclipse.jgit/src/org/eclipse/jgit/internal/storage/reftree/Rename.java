@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,56 +43,79 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import java.io.IOException;
+import static org.eclipse.jgit.lib.Constants.HEAD;
+import static org.eclipse.jgit.lib.RefUpdate.Result.REJECTED;
+import static org.eclipse.jgit.lib.RefUpdate.Result.RENAMED;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
+import org.eclipse.jgit.lib.RefRename;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RefUpdate.Result;
+import org.eclipse.jgit.lib.SymbolicRef;
+import org.eclipse.jgit.revwalk.RevWalk;
 
-/** Update that always rejects with {@code LOCK_FAILURE}. */
-class AlwaysFailUpdate extends RefUpdate {
-	private final RefTreeDatabase refdb;
+/** Single reference rename to {@link RefTreeDb}. */
+class Rename extends RefRename {
+	private final RefTreeDb refdb;
 
-	AlwaysFailUpdate(RefTreeDatabase refdb, String name) {
-		super(new ObjectIdRef.Unpeeled(Ref.Storage.NEW, name, null));
+	Rename(RefTreeDb refdb, RefUpdate o, RefUpdate n) {
+		super(o, n);
 		this.refdb = refdb;
-		setCheckConflicting(false);
 	}
 
 	@Override
-	protected RefDatabase getRefDatabase() {
-		return refdb;
+	protected Result doRename() throws IOException {
+		try (RevWalk rw = new RevWalk(refdb.getRepository())) {
+			Batch batch = new Batch(refdb);
+			batch.setRefLogIdent(getRefLogIdent());
+			batch.setRefLogMessage(getRefLogMessage(), false);
+			batch.init(rw);
+
+			Ref head = batch.getRef(HEAD);
+			Ref oldRef = batch.getRef(source.getName());
+			if (oldRef == null) {
+				return REJECTED;
+			}
+
+			Ref newRef = asNew(oldRef);
+			List<Command> mv = new ArrayList<>(3);
+			mv.add(new Command(oldRef, null));
+			mv.add(new Command(null, newRef));
+			if (head != null && head.isSymbolic()
+					&& head.getTarget().getName().equals(oldRef.getName())) {
+				mv.add(new Command(
+					head,
+					new SymbolicRef(head.getName(), newRef)));
+			}
+			batch.execute(rw, mv);
+			return Update.translate(mv.get(1).getResult(), RENAMED);
+		}
 	}
 
-	@Override
-	protected Repository getRepository() {
-		return refdb.getRepository();
-	}
+	private Ref asNew(Ref o) {
+		String name = destination.getName();
+		if (o.isSymbolic()) {
+			return new SymbolicRef(name, o.getTarget());
+		}
 
-	@Override
-	protected boolean tryLock(boolean deref) throws IOException {
-		return false;
-	}
+		ObjectId peeled = o.getPeeledObjectId();
+		if (peeled != null) {
+			return new ObjectIdRef.PeeledTag(
+					o.getStorage(),
+					name,
+					o.getObjectId(),
+					peeled);
+		}
 
-	@Override
-	protected void unlock() {
-		// No locks are held here.
-	}
-
-	@Override
-	protected Result doUpdate(Result desiredResult) {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doDelete(Result desiredResult) {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doLink(String target) {
-		return Result.LOCK_FAILURE;
+		return new ObjectIdRef.PeeledNonTag(
+				o.getStorage(),
+				name,
+				o.getObjectId());
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,7 +48,6 @@ import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
 import static org.eclipse.jgit.lib.Ref.Storage.NETWORK;
-import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 
 import java.io.IOException;
 
@@ -66,22 +65,14 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 
 /**
- * Command to create, update or delete an entry inside a {@link RefTree}.
+ * Command with peeled reference information and symref support.
  * <p>
- * Unlike {@link ReceiveCommand} (which can only update a reference to an
- * {@link ObjectId}), a RefTree Command can also create, modify or delete
- * symbolic references to a target reference.
- * <p>
- * RefTree Commands may wrap a {@code ReceiveCommand} to allow callers to
- * process an existing ReceiveCommand against a RefTree.
- * <p>
- * Commands should be passed into {@link RefTree#apply(java.util.Collection)}
- * for processing.
+ * Command instances should be supplied to {@code RefTree} to make updates.
  */
 public class Command {
 	private final Ref oldRef;
 	private final Ref newRef;
-	private final ReceiveCommand cmd;
+	private ReceiveCommand cmd;
 	private Result result;
 
 	/**
@@ -98,8 +89,7 @@ public class Command {
 	public Command(@Nullable Ref oldRef, @Nullable Ref newRef) {
 		this.oldRef = oldRef;
 		this.newRef = newRef;
-		this.cmd = null;
-		this.result = NOT_ATTEMPTED;
+		this.result = Result.NOT_ATTEMPTED;
 
 		if (oldRef == null && newRef == null) {
 			throw new IllegalArgumentException();
@@ -119,7 +109,9 @@ public class Command {
 	 * @param rw
 	 *            walk instance to peel the {@code newId}.
 	 * @param cmd
-	 *            command received from a push client.
+	 *            command received from the push client. The result of this
+	 *            command will be pushed into {@code cmd}, making it available
+	 *            to clients.
 	 * @throws MissingObjectException
 	 *             {@code oldId} or {@code newId} is missing.
 	 * @throws IOException
@@ -127,30 +119,23 @@ public class Command {
 	 */
 	public Command(RevWalk rw, ReceiveCommand cmd)
 			throws MissingObjectException, IOException {
-		this.oldRef = toRef(rw, cmd.getOldId(), cmd.getRefName(), false);
-		this.newRef = toRef(rw, cmd.getNewId(), cmd.getRefName(), true);
 		this.cmd = cmd;
+		this.oldRef = toRef(rw, cmd.getOldId(), cmd.getRefName());
+		this.newRef = toRef(rw, cmd.getNewId(), cmd.getRefName());
 	}
 
-	static Ref toRef(RevWalk rw, ObjectId id, String name,
-			boolean mustExist) throws MissingObjectException, IOException {
+	private static Ref toRef(RevWalk rw, ObjectId id, String name)
+			throws MissingObjectException, IOException {
 		if (ObjectId.zeroId().equals(id)) {
 			return null;
 		}
 
-		try {
-			RevObject o = rw.parseAny(id);
-			if (o instanceof RevTag) {
-				RevObject p = rw.peel(o);
-				return new ObjectIdRef.PeeledTag(NETWORK, name, id, p.copy());
-			}
-			return new ObjectIdRef.PeeledNonTag(NETWORK, name, id);
-		} catch (MissingObjectException e) {
-			if (mustExist) {
-				throw e;
-			}
-			return new ObjectIdRef.Unpeeled(NETWORK, name, id);
+		RevObject o = rw.parseAny(id);
+		if (o instanceof RevTag) {
+			RevObject p = rw.peel(o);
+			return new ObjectIdRef.PeeledTag(NETWORK, name, id, p.copy());
 		}
+		return new ObjectIdRef.PeeledNonTag(NETWORK, name, id);
 	}
 
 	/** @return name of the reference affected by this command. */
@@ -163,25 +148,11 @@ public class Command {
 		return oldRef.getName();
 	}
 
-	/**
-	 * Set the result of this command.
-	 *
-	 * @param result
-	 *            the command result.
-	 */
-	public void setResult(Result result) {
+	void setResult(Result result) {
 		setResult(result, null);
 	}
 
-	/**
-	 * Set the result of this command.
-	 *
-	 * @param result
-	 *            the command result.
-	 * @param why
-	 *            optional message explaining the result status.
-	 */
-	public void setResult(Result result, @Nullable String why) {
+	void setResult(Result result, String why) {
 		if (cmd != null) {
 			cmd.setResult(result, why);
 		} else {
@@ -247,39 +218,27 @@ public class Command {
 		}
 	}
 
-	/**
-	 * Check the entry is consistent with either the old or the new ref.
-	 *
-	 * @param entry
-	 *            current entry; null if the entry does not exist.
-	 * @return true if entry matches {@link #getOldRef()} or
-	 *         {@link #getNewRef()}; otherwise false.
-	 */
-	boolean checkRef(@Nullable DirCacheEntry entry) {
-		if (entry != null && entry.getRawMode() == 0) {
-			entry = null;
+	boolean checkRef(@Nullable DirCacheEntry cur) {
+		if (cur != null && cur.getRawMode() == 0) {
+			cur = null;
 		}
-		return check(entry, oldRef) || check(entry, newRef);
-	}
 
-	private static boolean check(@Nullable DirCacheEntry cur,
-			@Nullable Ref exp) {
 		if (cur == null) {
 			// Does not exist, ok if oldRef does not exist.
-			return exp == null;
-		} else if (exp == null) {
+			return oldRef == null;
+		} else if (oldRef == null) {
 			// Expected to not exist, but currently exists, fail.
 			return false;
 		}
 
-		if (exp.isSymbolic()) {
-			String dst = exp.getTarget().getName();
+		if (oldRef.isSymbolic()) {
+			String dst = oldRef.getTarget().getName();
 			return cur.getRawMode() == TYPE_SYMLINK
 					&& cur.getObjectId().equals(symref(dst));
 		}
 
 		return cur.getRawMode() == TYPE_GITLINK
-				&& cur.getObjectId().equals(exp.getObjectId());
+				&& cur.getObjectId().equals(oldRef.getObjectId());
 	}
 
 	static ObjectId symref(String s) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,7 +44,6 @@
 package org.eclipse.jgit.internal.storage.reftree;
 
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
-import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -54,6 +53,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
@@ -63,17 +63,16 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/** Single reference update to {@link RefTreeDatabase}. */
-class RefTreeUpdate extends RefUpdate {
-	private final RefTreeDatabase refdb;
-	private RevWalk rw;
-	private RefTreeBatch batch;
-	private Ref oldRef;
+/** Single reference update to {@link RefTreeDb}. */
+class Update extends RefUpdate {
+	private final RefTreeDb refdb;
 
-	RefTreeUpdate(RefTreeDatabase refdb, Ref ref) {
+	private Ref oldRef;
+	private Batch batch;
+
+	Update(RefTreeDb refdb, Ref ref) {
 		super(ref);
 		this.refdb = refdb;
-		setCheckConflicting(false); // Done automatically by doUpdate.
 	}
 
 	@Override
@@ -88,13 +87,15 @@ class RefTreeUpdate extends RefUpdate {
 
 	@Override
 	protected boolean tryLock(boolean deref) throws IOException {
-		rw = new RevWalk(getRepository());
-		batch = new RefTreeBatch(refdb);
-		batch.init(rw);
-		oldRef = batch.exactRef(rw.getObjectReader(), getName());
+		batch = new Batch(refdb);
+		try (RevWalk rw = new RevWalk(getRepository())) {
+			batch.init(rw);
+		}
+
+		oldRef = batch.getRef(getName());
 		if (oldRef != null && oldRef.getObjectId() != null) {
 			setOldObjectId(oldRef.getObjectId());
-		} else if (oldRef == null && getExpectedOldObjectId() != null) {
+		} else {
 			setOldObjectId(ObjectId.zeroId());
 		}
 		return true;
@@ -102,11 +103,7 @@ class RefTreeUpdate extends RefUpdate {
 
 	@Override
 	protected void unlock() {
-		batch = null;
-		if (rw != null) {
-			rw.close();
-			rw = null;
-		}
+		// No locks are held here.
 	}
 
 	@Override
@@ -116,12 +113,15 @@ class RefTreeUpdate extends RefUpdate {
 
 	private Ref newRef(String name, ObjectId id)
 			throws MissingObjectException, IOException {
-		RevObject o = rw.parseAny(id);
-		if (o instanceof RevTag) {
-			RevObject p = rw.peel(o);
-			return new ObjectIdRef.PeeledTag(LOOSE, name, id, p.copy());
+		try (RevWalk rw = new RevWalk(getRepository())) {
+			RevObject o = rw.parseAny(id);
+			if (o instanceof RevTag) {
+				RevObject p = rw.peel(o);
+				return new ObjectIdRef.PeeledTag(LOOSE, name, id, p.copy());
+			} else {
+				return new ObjectIdRef.PeeledNonTag(LOOSE, name, id);
+			}
 		}
-		return new ObjectIdRef.PeeledNonTag(LOOSE, name, id);
 	}
 
 	@Override
@@ -131,20 +131,24 @@ class RefTreeUpdate extends RefUpdate {
 
 	@Override
 	protected Result doLink(String target) throws IOException {
-		Ref dst = new ObjectIdRef.Unpeeled(NEW, target, null);
+		Ref dst = new ObjectIdRef.Unpeeled(LOOSE, target, null);
 		SymbolicRef n = new SymbolicRef(getName(), dst);
-		Result desiredResult = getRef().getStorage() == NEW
+		Result result = getRef().getStorage() == Storage.NEW
 			? Result.NEW
 			: Result.FORCED;
-		return run(n, desiredResult);
+		return run(n, result);
 	}
 
 	private Result run(@Nullable Ref newRef, Result desiredResult)
 			throws IOException {
 		Command c = new Command(oldRef, newRef);
-		batch.setRefLogIdent(getRefLogIdent());
-		batch.setRefLogMessage(getRefLogMessage(), isRefLogIncludingResult());
-		batch.execute(rw, Collections.singletonList(c));
+		try (RevWalk rw = new RevWalk(getRepository())) {
+			batch.setRefLogIdent(getRefLogIdent());
+			batch.setRefLogMessage(
+					getRefLogMessage(),
+					isRefLogIncludingResult());
+			batch.execute(rw, Collections.singletonList(c));
+		}
 		return translate(c.getResult(), desiredResult);
 	}
 

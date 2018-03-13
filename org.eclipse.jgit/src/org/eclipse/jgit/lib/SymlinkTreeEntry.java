@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,66 +42,44 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.file;
+package org.eclipse.jgit.lib;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
-import org.eclipse.jgit.lib.ObjectIdSet;
-
-/** Lazily loads a set of ObjectIds, one per line. */
-public class LazyObjectIdSetFile implements ObjectIdSet {
-	private final File src;
-	private ObjectIdOwnerMap<Entry> set;
+/**
+ * A tree entry representing a symbolic link.
+ *
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class SymlinkTreeEntry extends TreeEntry {
 
 	/**
-	 * Create a new lazy set from a file.
+	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
 	 *
-	 * @param src
-	 *            the source file.
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
 	 */
-	public LazyObjectIdSetFile(File src) {
-		this.src = src;
+	public SymlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
 	}
 
-	@Override
-	public boolean contains(AnyObjectId objectId) {
-		if (set == null) {
-			set = load();
-		}
-		return set.contains(objectId);
+	public FileMode getMode() {
+		return FileMode.SYMLINK;
 	}
 
-	private ObjectIdOwnerMap<Entry> load() {
-		ObjectIdOwnerMap<Entry> r = new ObjectIdOwnerMap<>();
-		try (FileInputStream fin = new FileInputStream(src);
-				Reader rin = new InputStreamReader(fin, UTF_8);
-				BufferedReader br = new BufferedReader(rin)) {
-			MutableObjectId id = new MutableObjectId();
-			for (String line; (line = br.readLine()) != null;) {
-				id.fromString(line);
-				if (!r.contains(id)) {
-					r.add(new Entry(id));
-				}
-			}
-		} catch (IOException e) {
-			// Ignore IO errors accessing the lazy set.
-		}
-		return r;
-	}
-
-	static class Entry extends ObjectIdOwnerMap.Entry {
-		Entry(AnyObjectId id) {
-			super(id);
-		}
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" S "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
 	}
 }

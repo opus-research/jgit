@@ -90,23 +90,14 @@ public class Main {
 	@Argument(index = 1, metaVar = "metaVar_arg")
 	private List<String> arguments = new ArrayList<String>();
 
-	PrintWriter writer;
-
-	/**
-	 *
-	 */
-	public Main() {
-		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
-	}
-
 	/**
 	 * Execute the command line.
 	 *
 	 * @param argv
 	 *            arguments.
-	 * @throws Exception
 	 */
-	public static void main(final String[] argv) throws Exception {
+	public static void main(final String[] argv) {
+		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
 		new Main().run(argv);
 	}
 
@@ -125,10 +116,8 @@ public class Main {
 	 *
 	 * @param argv
 	 *            arguments.
-	 * @throws Exception
 	 */
-	protected void run(final String[] argv) throws Exception {
-		writer = createErrorWriter();
+	protected void run(final String[] argv) {
 		try {
 			if (!installConsole()) {
 				AwtAuthenticator.install();
@@ -137,14 +126,12 @@ public class Main {
 			configureHttpProxy();
 			execute(argv);
 		} catch (Die err) {
-			if (err.isAborted()) {
-				exit(1, err);
-			}
-			writer.println(CLIText.fatalError(err.getMessage()));
-			if (showStackTrace) {
-				err.printStackTrace(writer);
-			}
-			exit(128, err);
+			if (err.isAborted())
+				System.exit(1);
+			System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
+			if (showStackTrace)
+				err.printStackTrace();
+			System.exit(128);
 		} catch (Exception err) {
 			// Try to detect errno == EPIPE and exit normally if that happens
 			// There may be issues with operating system versions and locale,
@@ -152,54 +139,46 @@ public class Main {
 			// under other circumstances.
 			if (err.getClass() == IOException.class) {
 				// Linux, OS X
-				if (err.getMessage().equals("Broken pipe")) { //$NON-NLS-1$
-					exit(0, err);
-				}
+				if (err.getMessage().equals("Broken pipe")) //$NON-NLS-1$
+					System.exit(0);
 				// Windows
-				if (err.getMessage().equals("The pipe is being closed")) { //$NON-NLS-1$
-					exit(0, err);
-				}
+				if (err.getMessage().equals("The pipe is being closed")) //$NON-NLS-1$
+					System.exit(0);
 			}
 			if (!showStackTrace && err.getCause() != null
-					&& err instanceof TransportException) {
-				writer.println(CLIText.fatalError(err.getCause().getMessage()));
-			}
+					&& err instanceof TransportException)
+				System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getCause().getMessage()));
 
 			if (err.getClass().getName().startsWith("org.eclipse.jgit.errors.")) { //$NON-NLS-1$
-				writer.println(CLIText.fatalError(err.getMessage()));
-				if (showStackTrace) {
+				System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
+				if (showStackTrace)
 					err.printStackTrace();
-				}
-				exit(128, err);
+				System.exit(128);
 			}
 			err.printStackTrace();
-			exit(1, err);
+			System.exit(1);
 		}
 		if (System.out.checkError()) {
-			writer.println(CLIText.get().unknownIoErrorStdout);
-			exit(1, null);
+			System.err.println(CLIText.get().unknownIoErrorStdout);
+			System.exit(1);
 		}
-		if (writer.checkError()) {
+		if (System.err.checkError()) {
 			// No idea how to present an error here, most likely disk full or
 			// broken pipe
-			exit(1, null);
+			System.exit(1);
 		}
-	}
-
-	PrintWriter createErrorWriter() {
-		return new PrintWriter(System.err);
 	}
 
 	private void execute(final String[] argv) throws Exception {
-		final CmdLineParser clp = new SubcommandLineParser(this);
-
+		final CmdLineParser clp = new CmdLineParser(this);
+		PrintWriter writer = new PrintWriter(System.err);
 		try {
 			clp.parseArgument(argv);
 		} catch (CmdLineException err) {
 			if (argv.length > 0 && !help && !version) {
-				writer.println(CLIText.fatalError(err.getMessage()));
+				writer.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 				writer.flush();
-				exit(1, err);
+				System.exit(1);
 			}
 		}
 
@@ -215,24 +194,22 @@ public class Main {
 				writer.println(CLIText.get().mostCommonlyUsedCommandsAre);
 				final CommandRef[] common = CommandCatalog.common();
 				int width = 0;
-				for (final CommandRef c : common) {
+				for (final CommandRef c : common)
 					width = Math.max(width, c.getName().length());
-				}
 				width += 2;
 
 				for (final CommandRef c : common) {
 					writer.print(' ');
 					writer.print(c.getName());
-					for (int i = c.getName().length(); i < width; i++) {
+					for (int i = c.getName().length(); i < width; i++)
 						writer.print(' ');
-					}
 					writer.print(CLIText.get().resourceBundle().getString(c.getUsage()));
 					writer.println();
 				}
 				writer.println();
 			}
 			writer.flush();
-			exit(1, null);
+			System.exit(1);
 		}
 
 		if (version) {
@@ -241,36 +218,18 @@ public class Main {
 		}
 
 		final TextBuiltin cmd = subcommand;
-		init(cmd);
+		if (cmd.requiresRepository())
+			cmd.init(openGitDir(gitdir), null);
+		else
+			cmd.init(null, gitdir);
 		try {
 			cmd.execute(arguments.toArray(new String[arguments.size()]));
 		} finally {
-			if (cmd.outw != null) {
+			if (cmd.outw != null)
 				cmd.outw.flush();
-			}
-			if (cmd.errw != null) {
+			if (cmd.errw != null)
 				cmd.errw.flush();
-			}
 		}
-	}
-
-	void init(final TextBuiltin cmd) throws IOException {
-		if (cmd.requiresRepository()) {
-			cmd.init(openGitDir(gitdir), null);
-		} else {
-			cmd.init(null, gitdir);
-		}
-	}
-
-	/**
-	 * @param status
-	 * @param t
-	 *            can be {@code null}
-	 * @throws Exception
-	 */
-	void exit(int status, Exception t) throws Exception {
-		writer.flush();
-		System.exit(status);
 	}
 
 	/**
@@ -322,7 +281,7 @@ public class Main {
 			throws IllegalAccessException, InvocationTargetException,
 			NoSuchMethodException, ClassNotFoundException {
 		try {
-			Class.forName(name).getMethod("install").invoke(null); //$NON-NLS-1$
+		Class.forName(name).getMethod("install").invoke(null); //$NON-NLS-1$
 		} catch (InvocationTargetException e) {
 			if (e.getCause() instanceof RuntimeException)
 				throw (RuntimeException) e.getCause();
@@ -374,21 +333,6 @@ public class Main {
 						new CachedAuthenticator.CachedAuthentication(proxyHost,
 								proxyPort, user, pass));
 			}
-		}
-	}
-
-	/**
-	 * Parser for subcommands which doesn't stop parsing on help options and so
-	 * proceeds all specified options
-	 */
-	static class SubcommandLineParser extends CmdLineParser {
-		public SubcommandLineParser(Object bean) {
-			super(bean);
-		}
-
-		@Override
-		protected boolean containsHelp(String... args) {
-			return false;
 		}
 	}
 }
