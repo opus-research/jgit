@@ -117,7 +117,7 @@ public class DownloadTest extends LfsServerTest {
 	@Test
 	public void testLargeFileDownload() throws Exception {
 		Path f = Paths.get(getTempDirectory().toString(), "largeRandomFile");
-		long expectedLen = createPseudoRandomContentFile(f, 10 * MiB);
+		long expectedLen = createPseudoRandomContentFile(f, 5 * MiB);
 		AnyLongObjectId id = putContent(f);
 		Path f2 = Paths.get(getTempDirectory().toString(), "download");
 		long start = System.nanoTime();

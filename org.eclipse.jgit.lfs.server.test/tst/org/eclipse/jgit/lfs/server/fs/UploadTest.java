@@ -87,7 +87,7 @@ public class UploadTest extends LfsServerTest {
 	@Test
 	public void testLargeFileUpload() throws Exception {
 		Path f = Paths.get(getTempDirectory().toString(), "largeRandomFile");
-		createPseudoRandomContentFile(f, 10 * MiB);
+		createPseudoRandomContentFile(f, 5 * MiB);
 		long start = System.nanoTime();
 		LongObjectId id = putContent(f);
 		System.out.println(
