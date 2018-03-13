@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, David Ostrovsky <david@ostrovsky.org>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,41 +41,27 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.console;
 
-import java.beans.Statement;
-import java.io.IOException;
-import java.util.Map;
-
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.eclipse.jgit.util.StringUtils;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * Base format class
+ * Translation bundle for JGit console
  */
-public class BaseFormat {
+public class ConsoleText extends TranslationBundle {
 
 	/**
-	 * Apply options to archive output stream
-	 *
-	 * @param s
-	 *            stream to apply options to
-	 * @param o
-	 *            options map
-	 * @return stream with option applied
-	 * @throws IOException
+	 * @return an instance of this translation bundle
 	 */
-	protected ArchiveOutputStream applyFormatOptions(ArchiveOutputStream s,
-			Map<String, Object> o) throws IOException {
-		for (Map.Entry<String, Object> p : o.entrySet()) {
-			try {
-				new Statement(s,
-						"set" + StringUtils.capitalize(p.getKey()),
-						new Object[]{p.getValue()}).execute();
-			} catch (Exception e) {
-				throw new IOException("cannot set option: " + p.getKey(), e);
-			}
-		}
-		return s;
+	public static ConsoleText get() {
+		return NLS.getBundleFor(ConsoleText.class);
 	}
+
+	// @formatter:off
+	/***/ public String answerNo;
+	/***/ public String answerYes;
+	/***/ public String noSystemConsoleAvailable;
+	/***/ public String password;
+	/***/ public String usernameFor;
 }
