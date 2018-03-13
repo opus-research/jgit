@@ -54,7 +54,7 @@ repository | packed-refs | reftable | % original | avg ref  | avg obj
 android    |      62.2 M |   34.4 M |     55.2%  | 33 bytes | 8 bytes
 rails      |       1.8 M |    1.1 M |     57.7%  | 29 bytes | 6 bytes
 git        |      78.7 K |   44.0 K |     60.0%  | 50 bytes | 6 bytes
-git (heads)|       332 b |    276 b |     83.1%  | 34 bytes | 0 bytes
+git (heads)|       332 b |    274 b |     83.1%  | 34 bytes | 0 bytes
 
 Scan (read 866k refs), by reference name lookup (single ref from 866k
 refs), and by SHA-1 lookup (refs with that SHA-1, from 866k refs):
@@ -78,11 +78,16 @@ reftable      |   5 M |   37 bytes
 
 ### Peeling
 
-References in a reftable are always peeled.
+References stored in a reftable are peeled, a record for an annotated
+(or signed) tag records both the tag object, and the object it refers
+to.
 
 ### Reference name encoding
 
-Reference names should be encoded with UTF-8.
+Reference names are an uninterpreted sequence of bytes that must pass
+[git-check-ref-format][ref-fmt] as a valid reference name.
+
+[ref-fmt]: https://git-scm.com/docs/git-check-ref-format
 
 ### Network byte order
 
@@ -170,7 +175,7 @@ The first ref block shares the same block as the file header, and is
 24 bytes smaller than all other blocks in the file.  The first block
 immediately begins after the file header, at offset 24.
 
-If the first block is a log block (a log only table), its block header
+If the first block is a log block (a log-only file), its block header
 begins immediately at offset 24.
 
 ### Ref block format
@@ -180,7 +185,7 @@ A ref block is written as:
     'r'
     uint24( block_len )
     ref_record+
-    uint32( restart_offset )+
+    uint24( restart_offset )+
     uint16( restart_count )
     padding?
 
@@ -194,7 +199,7 @@ The 4-byte block header is followed by a variable number of
 `ref_record`, describing reference names and values.  The format
 is described below.
 
-A variable number of 4-byte `restart_offset` values follow the
+A variable number of 3-byte `restart_offset` values follow the
 records.  Offsets are relative to the start of the block and refer to
 the first byte of any `ref_record` whose name has not been prefix
 compressed.  Entries in the `restart_offset` list must be sorted,
@@ -274,16 +279,17 @@ If present the ref index block appears after the last ref block.  The
 prior ref block should be padded to ensure the ref index starts on a
 block alignment.
 
-An index block should only be written if there are at least 4 blocks
-in the file, as cold reads using the index requires 2 disk reads (read
-index, read block), and binary searching <= 4 blocks also requires <=
-2 reads.  Omitting the index block from smaller files saves space.
+If there are at least 4 ref blocks, a ref index block should be
+written to improve lookup times.  Cold reads using the index requires
+2 disk reads (read index, read block), and binary searching < 4 blocks
+also requires <= 2 reads.  Omitting the index block from smaller files
+saves space.
 
 Index block format:
 
     uint32( (0x80 << 24) | block_len )
     index_record+
-    uint32( restart_offset )+
+    uint24( restart_offset )+
     uint16( restart_count )
     padding?
 
@@ -337,15 +343,16 @@ or as the peeled value of an annotated tag.  Like ref blocks, object
 blocks use the file's standard `block_size`.
 
 To save space in small files, object blocks may be omitted if the ref
-index is not present.  When missing readers should brute force a
-linear search of all references to lookup by SHA-1.
+index is not present, as brute force search will only need to read a
+few ref blocks.  When missing, readers should brute force a linear
+search of all references to lookup by SHA-1.
 
 An object block is written as:
 
     'o'
     uint24( block_len )
     obj_record+
-    uint32( restart_offset )+
+    uint24( restart_offset )+
     uint16( restart_count )
     padding?
 
@@ -382,10 +389,15 @@ Each record contains `block_count` number of block identifiers for ref
 blocks.  For 1-7 blocks the block count is stored in `cnt_3`.  When
 `cnt_3 = 0` the actual block count follows in a varint, `cnt_large`.
 
+The use of `cnt_3` bets most objects are pointed to by only a single
+reference, some may be pointed to be a couple of references, and very
+few (if any) are pointed to by more than 7 references.
+
 The first `block_delta` is the absolute block identifier counting from
-the start of the file. The offset of that block can be obtained by
+the start of the file.  The offset of that block can be obtained by
 `block_delta[0] * block_size`.  Additional `block_delta` entries are
-relative to the prior entry, e.g. a reader would perform:
+sorted ascending and relative to the prior entry, e.g.  a reader would
+perform:
 
     block_id = block_delta[0]
     prior = block_id
@@ -431,8 +443,8 @@ A log block is written as:
     uint24( block_len )
     zlib_deflate {
       log_record+
-      int32( restart_offset )+
-      int16( restart_count )
+      uint24( restart_offset )+
+      uint16( restart_count )
     }
 
 Log blocks look similar to ref blocks, except `block_type = 'g'`.
@@ -440,9 +452,12 @@ Log blocks look similar to ref blocks, except `block_type = 'g'`.
 The 4-byte block header is followed by the deflated block contents
 using zlib deflate.  The `block_len` in the header is the inflated
 size (including 4-byte block header), and should be used by readers to
-preallocate the inflation output buffer.  Offsets within the block
-(e.g.  `restart_offset`) still include the 4-byte header.  Readers may
-prefer prefixing the inflation output buffer with the 4-byte header.
+preallocate the inflation output buffer.  A log block's `block_len`
+may exceed the file's `block_size`.
+
+Offsets within the log block (e.g.  `restart_offset`) still include
+the 4-byte header.  Readers may prefer prefixing the inflation output
+buffer with the 4-byte header.
 
 Within the deflate container, a variable number of `log_record`
 describe reference changes.  The log record format is described
@@ -498,7 +513,7 @@ The value data following the key suffix is complex:
 
 - two 20-byte SHA-1s (old id, new id)
 - varint time in seconds since epoch (Jan 1, 1970)
-- 2-byte timezone offset (signed)
+- 2-byte timezone offset in minutes (signed)
 - varint string of committer's name
 - varint string of committer's email
 - varint string of message
@@ -506,6 +521,9 @@ The value data following the key suffix is complex:
 `tz_offset` is the absolute number of minutes from GMT the committer
 was at the time of the update.  For example `GMT-0800` is encoded in
 reftable as `sint16(-480)` and `GMT+0230` is `sint16(150)`.
+
+The committer email does not contain `<` or `>`, its the value
+normally found between the `<>` in a git commit object header.
 
 The `message_length` may be 0, in which case there was no message
 supplied for the update.
@@ -649,7 +667,7 @@ bytes per reference.
 ### Low overhead
 
 A reftable with very few references (e.g. git.git with 5 heads)
-is 276 bytes for reftable, vs. 332 bytes for packed-refs.  This
+is 274 bytes for reftable, vs. 332 bytes for packed-refs.  This
 supports reftable scaling down for transaction logs (below).
 
 ### Block size
@@ -682,7 +700,7 @@ blocks saves disk space, with some increased penalty at read time.
 
 Logs are stored in an isolated section from refs, reducing the burden
 on reference readers that want to ignore logs.  Further, historical
-logs can be isolated into log-only reftables.
+logs can be isolated into log-only files.
 
 ### Logs are read backwards
 
@@ -699,7 +717,7 @@ A repository must set its `$GIT_DIR/config` to configure reftable:
     [core]
         repositoryformatversion = 1
     [extensions]
-        reftable = 1
+        reftable = true
 
 ### Layout
 
