@@ -53,7 +53,6 @@ import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
 import org.eclipse.jgit.awtui.AwtCredentialsProvider;
@@ -91,7 +90,7 @@ public class Main {
 	private TextBuiltin subcommand;
 
 	@Argument(index = 1, metaVar = "metaVar_arg")
-	private List<String> arguments = new ArrayList<>();
+	private List<String> arguments = new ArrayList<String>();
 
 	PrintWriter writer;
 
@@ -241,8 +240,7 @@ public class Main {
 		}
 
 		if (version) {
-			String cmdId = Version.class.getSimpleName()
-					.toLowerCase(Locale.ROOT);
+			String cmdId = Version.class.getSimpleName().toLowerCase();
 			subcommand = CommandCatalog.get(cmdId).create();
 		}
 
