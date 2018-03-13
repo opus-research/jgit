@@ -109,16 +109,8 @@ public class Repository {
 	private final List<RepositoryListener> listeners = new Vector<RepositoryListener>(); // thread safe
 	static private final List<RepositoryListener> allListeners = new Vector<RepositoryListener>(); // thread safe
 
-	private File workDir;
-
-	private File indexFile;
-
 	/**
 	 * Construct a representation of a Git repository.
-	 *
-	 * The work tree, object directory, alternate object directories and index
-	 * file locations are deduced from the given git directory and the default
-	 * rules.
 	 *
 	 * @param d
 	 *            GIT_DIR (the location of the repository metadata).
@@ -127,71 +119,9 @@ public class Repository {
 	 *             accessed.
 	 */
 	public Repository(final File d) throws IOException {
-		this(d, null, null, null, null); // go figure it out
-	}
-
-	/**
-	 * Construct a representation of a Git repository.
-	 *
-	 * The work tree, object directory, alternate object directories and index
-	 * file locations are deduced from the given git directory and the default
-	 * rules.
-	 *
-	 * @param d
-	 *            GIT_DIR (the location of the repository metadata). May be
-	 *            null work workTree is set
-	 * @param workTree
-	 *            GIT_WORK_TREE (the root of the checkout). May be null for
-	 *            default value.
-	 * @throws IOException
-	 *             the repository appears to already exist but cannot be
-	 *             accessed.
-	 */
-	public Repository(final File d, final File workTree) throws IOException {
-		this(d, workTree, null, null, null); // go figure it out
-	}
-
-	/**
-	 * Construct a representation of a Git repository using the given parameters
-	 * possibly overriding default conventions.
-	 *
-	 * @param d
-	 *            GIT_DIR (the location of the repository metadata). May be null
-	 *            for default value in which case it depends on GIT_WORK_TREE.
-	 * @param workTree
-	 *            GIT_WORK_TREE (the root of the checkout). May be null for
-	 *            default value if GIT_DIR is
-	 * @param objectDir
-	 *            GIT_OBJECT_DIRECTORY (where objects and are stored). May be
-	 *            null for default value. Relative names ares resolved against
-	 *            GIT_WORK_TREE
-	 * @param alternateObjectDir
-	 *            GIT_ALTERNATE_OBJECT_DIRECTORIES (where more objects are read
-	 *            from). May be null for default value. Relative names ares
-	 *            resolved against GIT_WORK_TREE
-	 * @param indexFile
-	 *            GIT_INDEX_FILE (the location of the index file). May be null
-	 *            for default value. Relative names ares resolved against
-	 *            GIT_WORK_TREE.
-	 * @throws IOException
-	 *             the repository appears to already exist but cannot be
-	 *             accessed.
-	 */
-	public Repository(final File d, final File workTree, final File objectDir,
-			final File[] alternateObjectDir, final File indexFile) throws IOException {
-
-		if (workTree != null) {
-			workDir = workTree;
-			if (d == null)
-				gitDir = new File(workTree, ".git");
-			else
-				gitDir = d;
-		} else {
-			if (d != null)
-				gitDir = d;
-			else
-				throw new IllegalArgumentException("Either GIT_DIR or GIT_WORK_TREE must be passed to Repository constructor");
-		}
+		gitDir = d.getAbsoluteFile();
+		refs = new RefDatabase(this);
+		objectDatabase = new ObjectDirectory(FS.resolve(gitDir, "objects"));
 
 		final FileBasedConfig userConfig;
 		userConfig = SystemReader.getInstance().openUserConfig();
@@ -206,37 +136,14 @@ public class Repository {
 		}
 		config = new RepositoryConfig(userConfig, FS.resolve(gitDir, "config"));
 
-		try {
-			getConfig().load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("Unknown repository format");
-			e2.initCause(e1);
-			throw e2;
-		}
-
-		if (workDir == null) {
-			String workTreeConfig = getConfig().getString("core", null, "worktree");
-			if (workTreeConfig != null) {
-				workDir = FS.resolve(d, workTreeConfig);
-			} else {
-				workDir = gitDir.getParentFile();
-			}
-		}
-
-		refs = new RefDatabase(this);
-		if (objectDir != null)
-			objectDatabase = new ObjectDirectory(FS.resolve(objectDir, ""),
-					alternateObjectDir);
-		else
-			objectDatabase = new ObjectDirectory(FS.resolve(gitDir, "objects"),
-					alternateObjectDir);
-
-		if (indexFile != null)
-			this.indexFile = indexFile;
-		else
-			this.indexFile = new File(gitDir, "index");
-
 		if (objectDatabase.exists()) {
+			try {
+				getConfig().load();
+			} catch (ConfigInvalidException e1) {
+				IOException e2 = new IOException("Unknown repository format");
+				e2.initCause(e1);
+				throw e2;
+			}
 			final String repositoryFormatVersion = getConfig().getString(
 					"core", null, "repositoryFormatVersion");
 			if (!"0".equals(repositoryFormatVersion)) {
@@ -592,24 +499,6 @@ public class Repository {
 	 */
 	public RefUpdate updateRef(final String ref) throws IOException {
 		return refs.newUpdate(ref);
-	}
-
-	/**
-	 * Create a command to update, create or delete a ref in this repository.
-	 *
-	 * @param ref
-	 *            name of the ref the caller wants to modify.
-	 * @param detach
-	 *            true to create a detached head
-	 * @return an update command. The caller must finish populating this command
-	 *         and then invoke one of the update methods to actually make a
-	 *         change.
-	 * @throws IOException
-	 *             a symbolic ref was passed in and could not be resolved back
-	 *             to the base ref, as the symbolic ref could not be read.
-	 */
-	public RefUpdate updateRef(final String ref, final boolean detach) throws IOException {
-		return refs.newUpdate(ref, detach);
 	}
 
 	/**
@@ -1052,13 +941,6 @@ public class Repository {
 		return index;
 	}
 
-	/**
-	 * @return the index file location
-	 */
-	public File getIndexFile() {
-		return indexFile;
-	}
-
 	static byte[] gitInternalSlash(byte[] bytes) {
 		if (File.separatorChar == '/')
 			return bytes;
@@ -1184,17 +1066,7 @@ public class Repository {
 	 * @return the workdir file, i.e. where the files are checked out
 	 */
 	public File getWorkDir() {
-		return workDir;
-	}
-
-	/**
-	 * Override default workdir
-	 *
-	 * @param workTree
-	 *            the work tree directory
-	 */
-	public void setWorkDir(File workTree) {
-		this.workDir = workTree;
+		return getDirectory().getParentFile();
 	}
 
 	/**
