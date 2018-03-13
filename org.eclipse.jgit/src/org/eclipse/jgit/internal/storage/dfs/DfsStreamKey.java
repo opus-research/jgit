@@ -43,18 +43,83 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import java.util.concurrent.atomic.AtomicLong;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
-final class DfsPackKey {
+import java.util.Arrays;
+
+/** Key used by {@link DfsBlockCache} to disambiguate streams. */
+public abstract class DfsStreamKey {
+	/**
+	 * @param repo
+	 *            description of the containing repository.
+	 * @param name
+	 *            compute the key from a string name.
+	 * @return key for {@code name}
+	 */
+	public static DfsStreamKey of(DfsRepositoryDescription repo, String name) {
+		return new ByteArrayDfsStreamKey(repo, name.getBytes(UTF_8));
+	}
+
 	final int hash;
 
-	final AtomicLong cachedSize;
-
-	DfsPackKey() {
+	/**
+	 * @param hash
+	 *            hash of the other identifying components of the key.
+	 */
+	protected DfsStreamKey(int hash) {
 		// Multiply by 31 here so we can more directly combine with another
 		// value without doing the multiply there.
-		//
-		hash = System.identityHashCode(this) * 31;
-		cachedSize = new AtomicLong();
+		this.hash = hash * 31;
+	}
+
+	@Override
+	public int hashCode() {
+		return hash;
+	}
+
+	@Override
+	public abstract boolean equals(Object o);
+
+	@SuppressWarnings("boxing")
+	@Override
+	public String toString() {
+		return String.format("DfsStreamKey[hash=%08x]", hash); //$NON-NLS-1$
+	}
+
+	private static final class ByteArrayDfsStreamKey extends DfsStreamKey {
+		private final DfsRepositoryDescription repo;
+		private final byte[] name;
+
+		ByteArrayDfsStreamKey(DfsRepositoryDescription repo, byte[] name) {
+			super(repo.hashCode() * 31 + Arrays.hashCode(name));
+			this.repo = repo;
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (o instanceof ByteArrayDfsStreamKey) {
+				ByteArrayDfsStreamKey k = (ByteArrayDfsStreamKey) o;
+				return hash == k.hash
+						&& repo.equals(k.repo)
+						&& Arrays.equals(name, k.name);
+			}
+			return false;
+		}
+	}
+
+	static final class ForReverseIndex extends DfsStreamKey {
+		private final DfsStreamKey idxKey;
+
+		ForReverseIndex(DfsStreamKey idxKey) {
+			super(idxKey.hash + 1);
+			this.idxKey = idxKey;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			return o instanceof ForReverseIndex
+					&& idxKey.equals(((ForReverseIndex) o).idxKey);
+		}
 	}
 }
