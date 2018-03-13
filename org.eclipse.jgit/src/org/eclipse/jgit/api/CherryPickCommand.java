@@ -93,8 +93,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 
 	private Integer mainlineParentNumber;
 
-	private boolean noCommit = false;
-
 	/**
 	 * @param repo
 	 */
@@ -164,12 +162,11 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					if (!noCommit)
-						newHead = new Git(getRepository()).commit()
-								.setMessage(srcCommit.getFullMessage())
-								.setReflogComment(reflogPrefix + " " //$NON-NLS-1$
-										+ srcCommit.getShortMessage())
-								.setAuthor(srcCommit.getAuthorIdent()).call();
+					newHead = new Git(getRepository()).commit()
+							.setMessage(srcCommit.getFullMessage())
+							.setReflogComment(reflogPrefix + " " //$NON-NLS-1$
+									+ srcCommit.getShortMessage())
+							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
 					if (merger.failed())
@@ -181,8 +178,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 							.formatWithConflicts(srcCommit.getFullMessage(),
 									merger.getUnmergedPaths());
 
-					if (!noCommit)
-						repo.writeCherryPickHead(srcCommit.getId());
+					repo.writeCherryPickHead(srcCommit.getId());
 					repo.writeMergeCommitMsg(message);
 
 					return CherryPickResult.CONFLICT;
@@ -304,23 +300,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 */
 	public CherryPickCommand setMainlineParentNumber(int mainlineParentNumber) {
 		this.mainlineParentNumber = Integer.valueOf(mainlineParentNumber);
-		return this;
-	}
-
-	/**
-	 * Allows cherry-picking changes without committing them.
-	 * <p>
-	 * NOTE: The behavior of cherry-pick is undefined, if you pick multiple
-	 * commits or if HEAD does not match the index state before cherry-picking..
-	 *
-	 * @param noCommit
-	 *            true to cherry pick to the index and working copy without
-	 *            committing, false to commit after each pick (default)
-	 * @return {@code this}
-	 * @since 3.5
-	 */
-	public CherryPickCommand setNoCommit(boolean noCommit) {
-		this.noCommit = noCommit;
 		return this;
 	}
 
