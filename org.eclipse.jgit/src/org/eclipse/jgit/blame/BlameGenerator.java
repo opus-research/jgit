@@ -172,14 +172,13 @@ public class BlameGenerator implements AutoCloseable {
 			throw new IllegalStateException();
 
 		if (revPool != null)
-			revPool.close();
+			revPool.release();
 
 		if (reverse)
 			revPool = new ReverseWalk(getRepository());
 		else
 			revPool = new RevWalk(getRepository());
 
-		revPool.setRetainBody(true);
 		SEEN = revPool.newFlag("SEEN"); //$NON-NLS-1$
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
@@ -451,7 +450,7 @@ public class BlameGenerator implements AutoCloseable {
 				r.computeAll();
 			return r;
 		} finally {
-			close();
+			release();
 		}
 	}
 
@@ -514,7 +513,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	private boolean done() {
-		close();
+		release();
 		return false;
 	}
 

@@ -104,7 +104,7 @@ class PushProcess {
 
 	/**
 	 * Create process for specified transport and refs updates specification.
-	 *
+	 * 
 	 * @param transport
 	 *            transport between remote and local repository, used to create
 	 *            connection.
@@ -155,6 +155,7 @@ class PushProcess {
 			try {
 				res.setAdvertisedRefs(transport.getURI(), connection
 						.getRefsMap());
+				res.peerUserAgent = connection.getPeerUserAgent();
 				res.setRemoteUpdates(toPush);
 				monitor.endTask();
 
@@ -176,7 +177,7 @@ class PushProcess {
 			}
 			return res;
 		} finally {
-			walker.close();
+			walker.release();
 		}
 	}
 
