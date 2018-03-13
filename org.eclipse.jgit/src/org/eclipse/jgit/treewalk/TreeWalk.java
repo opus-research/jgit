@@ -157,8 +157,11 @@ public class TreeWalk implements AutoCloseable {
 	public static TreeWalk forPath(final Repository db, final String path,
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		try (ObjectReader reader = db.newObjectReader()) {
+		ObjectReader reader = db.newObjectReader();
+		try {
 			return forPath(reader, path, trees);
+		} finally {
+			reader.close();
 		}
 	}
 
