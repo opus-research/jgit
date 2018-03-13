@@ -256,10 +256,13 @@ public class UploadPack {
 		return walk;
 	}
 
-	/** @return all refs which were advertised to the client. */
+	/**
+	 * Get refs which were advertised to the client.
+	 *
+	 * @return all refs which were advertised to the client, or null if
+	 *         {@link #setAdvertisedRefs(Map)} has not been called yet.
+	 */
 	public final Map<String, Ref> getAdvertisedRefs() {
-		if (refs == null)
-			setAdvertisedRefs(db.getAllRefs());
 		return refs;
 	}
 
@@ -483,6 +486,12 @@ public class UploadPack {
 		return statistics;
 	}
 
+	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
+		if (refs == null)
+			setAdvertisedRefs(null);
+		return refs;
+	}
+
 	private void service() throws IOException {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
@@ -490,7 +499,7 @@ public class UploadPack {
 			advertised = Collections.emptySet();
 		else {
 			advertised = new HashSet<ObjectId>();
-			for (Ref ref : getAdvertisedRefs().values()) {
+			for (Ref ref : getAdvertisedOrDefaultRefs().values()) {
 				if (ref.getObjectId() != null)
 					advertised.add(ref.getObjectId());
 			}
@@ -600,7 +609,6 @@ public class UploadPack {
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
 			ServiceMayNotContinueException {
 		try {
-			preUploadHook.onPreAdvertiseRefs(this);
 			advertiseRefsHook.advertiseRefs(this);
 		} catch (ServiceMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
@@ -623,7 +631,7 @@ public class UploadPack {
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
 		adv.setDerefTags(true);
-		advertised = adv.send(getAdvertisedRefs());
+		advertised = adv.send(getAdvertisedOrDefaultRefs());
 		adv.end();
 	}
 

@@ -160,6 +160,8 @@ public class ReceivePack {
 
 	private OutputStream msgOut;
 
+	private final MessageOutputWrapper msgOutWrapper = new MessageOutputWrapper();
+
 	private PacketLineIn pckIn;
 
 	private PacketLineOut pckOut;
@@ -250,6 +252,52 @@ public class ReceivePack {
 		}
 	}
 
+	/**
+	 * Output stream that wraps the current {@link #msgOut}.
+	 * <p>
+	 * We don't want to expose {@link #msgOut} directly because it can change
+	 * several times over the course of a session.
+	 */
+	private class MessageOutputWrapper extends OutputStream {
+		@Override
+		public void write(int ch) {
+			if (msgOut != null) {
+				try {
+					msgOut.write(ch);
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+
+		@Override
+		public void write(byte[] b, int off, int len) {
+			if (msgOut != null) {
+				try {
+					msgOut.write(b, off, len);
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+
+		@Override
+		public void write(byte[] b) {
+			write(b, 0, b.length);
+		}
+
+		@Override
+		public void flush() {
+			if (msgOut != null) {
+				try {
+					msgOut.flush();
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+	}
+
 	/** @return the repository this receive completes into. */
 	public final Repository getRepository() {
 		return db;
@@ -260,11 +308,13 @@ public class ReceivePack {
 		return walk;
 	}
 
-	/** @return all refs which were advertised to the client. */
+	/**
+	 * Get refs which were advertised to the client.
+	 *
+	 * @return all refs which were advertised to the client, or null if
+	 *         {@link #setAdvertisedRefs(Map, Set)} has not been called yet.
+	 */
 	public final Map<String, Ref> getAdvertisedRefs() {
-		if (refs == null) {
-			setAdvertisedRefs(null, null);
-		}
 		return refs;
 	}
 
@@ -303,9 +353,14 @@ public class ReceivePack {
 			advertisedHaves.addAll(db.getAdditionalHaves());
 	}
 
-	/** @return the set of objects advertised as present in this repository. */
+	/**
+	 * Get objects advertised to the client.
+	 *
+	 * @return the set of objects advertised to the as present in this repository,
+	 *         or null if {@link #setAdvertisedRefs(Map, Set)} has not been called
+	 *         yet.
+	 */
 	public final Set<ObjectId> getAdvertisedObjects() {
-		getAdvertisedRefs();
 		return advertisedHaves;
 	}
 
@@ -595,7 +650,7 @@ public class ReceivePack {
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			sendBytes(Constants.encode("error: " + what + "\n"));
+			msgOutWrapper.write(Constants.encode("error: " + what + "\n"));
 		}
 	}
 
@@ -610,43 +665,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		sendBytes(Constants.encode(what + "\n"));
+		msgOutWrapper.write(Constants.encode(what + "\n"));
 	}
 
-	/**
-	 * @see #sendBytes(byte[], int, int)
-	 *
-	 * @param what
-	 *            bytes to send.
-	 */
-	public void sendBytes(final byte[] what) {
-		sendBytes(what, 0, what.length);
-	}
-
-	/**
-	 * Send raw bytes to the the client over the sideband, if supported.
-	 * <p>
-	 * If the client doesn't support receiving messages, the message will be
-	 * discarded, with no other indication to the caller or to the client.
-	 * <p>
-	 * When possible, prefer {@link #sendMessage(String)} or
-	 * {@link #sendError(String)}; this method is intended only for callers who
-	 * need to do their own encoding.
-	 *
-	 * @param what
-	 *            bytes to send.
-	 * @param off
-	 *            array offset.
-	 * @param len
-	 *            number of bytes.
-	 */
-	public void sendBytes(final byte[] what, final int off, final int len) {
-		try {
-			if (msgOut != null)
-				msgOut.write(what, off, len);
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+	/** @return an underlying stream for sending messages to the client. */
+	public OutputStream getMessageOutputStream() {
+		return msgOutWrapper;
 	}
 
 	/**
@@ -742,12 +766,18 @@ public class ReceivePack {
 		}
 	}
 
+	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
+		if (refs == null)
+			setAdvertisedRefs(null, null);
+		return refs;
+	}
+
 	private void service() throws IOException {
 		if (biDirectionalPipe) {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 			pckOut.flush();
 		} else
-			getAdvertisedRefs();
+			getAdvertisedOrDefaultRefs();
 		if (advertiseError != null)
 			return;
 		recvCommands();
@@ -838,7 +868,7 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		adv.send(getAdvertisedRefs());
+		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
 			adv.advertiseHave(obj);
 		if (adv.isEmpty())
@@ -1153,7 +1183,13 @@ public class ReceivePack {
 	}
 
 	private List<ReceiveCommand> filterCommands(final Result want) {
-		return ReceiveCommand.filter(commands, want);
+		final List<ReceiveCommand> r = new ArrayList<ReceiveCommand>(commands
+				.size());
+		for (final ReceiveCommand cmd : commands) {
+			if (cmd.getResult() == want)
+				r.add(cmd);
+		}
+		return r;
 	}
 
 	private void sendStatusReport(final boolean forClient, final Reporter out)
