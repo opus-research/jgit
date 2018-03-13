@@ -86,7 +86,7 @@ final class DeltaWindow {
 	/** If we have a delta for {@link #res}, this is the shortest found yet. */
 	private TemporaryBuffer.Heap bestDelta;
 
-	/** If we have {@link #bestDelta}, the window entry it was created from. */
+	/** If we have {@link #bestDelta}, the window position it was created by. */
 	private DeltaWindowEntry bestBase;
 
 	/** Used to compress cached deltas. */
@@ -108,37 +108,26 @@ final class DeltaWindow {
 		res = DeltaWindowEntry.createWindow(config.getDeltaSearchWindowSize());
 	}
 
-	synchronized DeltaTask.Slice remaining() {
-		int e = end;
-		int halfRemaining = (e - cur) >>> 1;
-		if (0 == halfRemaining)
-			return null;
-
-		int split = e - halfRemaining;
-		int h = toSearch[split].getPathHash();
-
-		// Attempt to split on the next path after the 50% split point.
-		for (int n = split + 1; n < e; n++) {
-			if (h != toSearch[n].getPathHash())
-				return new DeltaTask.Slice(n, e);
-		}
-
-		if (h != toSearch[cur].getPathHash()) {
-			// Try to split on the path before the 50% split point.
-			// Do not split the path currently being processed.
-			for (int p = split - 1; cur < p; p--) {
-				if (h != toSearch[p].getPathHash())
-					return new DeltaTask.Slice(p + 1, e);
-			}
-		}
-		return null;
+	synchronized int remaining() {
+		return end - cur;
 	}
 
-	synchronized boolean tryStealWork(DeltaTask.Slice s) {
-		if (s.beginIndex <= cur)
-			return false;
-		end = s.beginIndex;
-		return true;
+	synchronized DeltaTask.Slice stealWork() {
+		int e = end;
+		int n = (e - cur) >>> 1;
+		if (0 == n)
+			return null;
+
+		int t = e - n;
+		int h = toSearch[t].getPathHash();
+		while (cur < t) {
+			if (h == toSearch[t - 1].getPathHash())
+				t--;
+			else
+				break;
+		}
+		end = t;
+		return new DeltaTask.Slice(t, e);
 	}
 
 	void search() throws IOException {
@@ -260,8 +249,8 @@ final class DeltaWindow {
 			return NEXT_RES;
 		}
 
-		// If the sizes are radically different, this is a bad pairing.
-		if (res.size() < src.size() >>> 4)
+		// Do not use a base that is 32x larger than desired result.
+		if (res.size() < src.size() >>> 5)
 			return NEXT_SRC;
 
 		int msz = deltaSizeLimit(src);
@@ -313,7 +302,7 @@ final class DeltaWindow {
 			// Evenly distribute delta size limits over allowed depth.
 			// If src is non-delta (depth = 0), delta <= 50% of original.
 			// If src is almost at limit (9/10), delta <= 10% of original.
-			return n * (maxDepth - src.depth()) / maxDepth;
+			return n - (n * src.depth() / maxDepth);
 		}
 
 		// With a delta base chosen any new delta must be "better".
@@ -402,11 +391,12 @@ final class DeltaWindow {
 			return;
 
 		DeltaWindowEntry n = res.next;
-		for (; maxMemory < loaded + need; n = n.next) {
+		while (maxMemory < loaded + need) {
 			clear(n);
 			if (n == ent)
 				throw new LargeObjectException.ExceedsLimit(
 						maxMemory, loaded + need);
+			n = n.next;
 		}
 	}
 
