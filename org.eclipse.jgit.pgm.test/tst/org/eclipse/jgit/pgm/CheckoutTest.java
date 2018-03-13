@@ -109,13 +109,13 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 
 		assertStringArrayEquals(
 				"fatal: A branch named 'master' already exists.",
-				executeUnchecked("git checkout -b master"));
+				execute("git checkout -b master"));
 	}
 
 	@Test
 	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
 		assertStringArrayEquals("fatal: You are on a branch yet to be born",
-				executeUnchecked("git checkout -b side"));
+				execute("git checkout -b side"));
 	}
 
 	@Test

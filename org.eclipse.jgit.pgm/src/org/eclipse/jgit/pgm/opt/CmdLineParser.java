@@ -43,13 +43,11 @@
 
 package org.eclipse.jgit.pgm.opt;
 
-import java.io.Writer;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ResourceBundle;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -67,7 +65,6 @@ import org.kohsuke.args4j.NamedOptionDef;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.OptionDef;
 import org.kohsuke.args4j.spi.OptionHandler;
-import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 import org.kohsuke.args4j.spi.Setter;
 
 /**
@@ -86,7 +83,6 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 		registerHandler(RefSpec.class, RefSpecHandler.class);
 		registerHandler(RevCommit.class, RevCommitHandler.class);
 		registerHandler(RevTree.class, RevTreeHandler.class);
-		registerHandler(List.class, OptionWithValuesListHandler.class);
 	}
 
 	private final Repository db;
@@ -291,38 +287,5 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 			return Collections.emptyList();
 		}
 		return options;
-	}
-
-	@Override
-	public void printSingleLineUsage(Writer w, ResourceBundle rb) {
-		List<OptionHandler> options = getOptions();
-		if (options.isEmpty()) {
-			super.printSingleLineUsage(w, rb);
-			return;
-		}
-		List<OptionHandler> backup = new ArrayList<>(options);
-		boolean changed = sortRestOfArgumentsHandlerToTheEnd(options);
-		try {
-			super.printSingleLineUsage(w, rb);
-		} finally {
-			if (changed) {
-				options.clear();
-				options.addAll(backup);
-			}
-		}
-	}
-
-	private boolean sortRestOfArgumentsHandlerToTheEnd(
-			List<OptionHandler> options) {
-		for (int i = 0; i < options.size(); i++) {
-			OptionHandler handler = options.get(i);
-			if (handler instanceof RestOfArgumentsHandler
-					|| handler instanceof PathTreeFilterHandler) {
-				options.remove(i);
-				options.add(handler);
-				return true;
-			}
-		}
-		return false;
 	}
 }
