@@ -46,7 +46,6 @@ package org.eclipse.jgit.lib;
 import java.util.Iterator;
 
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
-import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
  * A compressed bitmap representation of the entire object graph.
@@ -191,16 +190,5 @@ public interface BitmapIndex {
 
 		/** @return the number of elements in the bitmap. */
 		int cardinality();
-
-		/** @return the tip commit for this bitmap. */
-		RevCommit getTipCommit();
-
-		/**
-		 * Sets the tip commit for this bitmap.
-		 *
-		 * @param commit
-		 *            the tip commit
-		 */
-		void setTipCommit(RevCommit commit);
 	}
 }
