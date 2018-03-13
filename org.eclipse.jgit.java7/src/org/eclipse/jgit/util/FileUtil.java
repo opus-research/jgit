@@ -71,6 +71,8 @@ class FileUtil {
 	public static void createSymLink(File path, String target)
 			throws IOException {
 		Path nioPath = path.toPath();
+		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS))
+			Files.delete(nioPath);
 		if (SystemReader.getInstance().isWindows())
 			target = target.replace('/', '\\');
 		Path nioTarget = new File(target).toPath();
@@ -136,11 +138,6 @@ class FileUtil {
 		if (!isFile(path))
 			return false;
 		return path.setExecutable(executable);
-	}
-
-	public static void delete(File path) throws IOException {
-		Path nioPath = path.toPath();
-		Files.delete(nioPath);
 	}
 
 }
