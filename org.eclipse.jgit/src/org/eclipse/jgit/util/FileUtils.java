@@ -391,25 +391,20 @@ public class FileUtils {
 	 *
 	 * @param path
 	 * @param target
-	 * @return path to the created link
 	 * @throws IOException
-	 * @since 4.1
+	 * @since 3.0
 	 */
-	public static Path createSymLink(File path, String target)
+	public static void createSymLink(File path, String target)
 			throws IOException {
 		Path nioPath = path.toPath();
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
-			if (Files.isRegularFile(nioPath)) {
-				delete(path);
-			} else {
-				delete(path, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
-			}
+			Files.delete(nioPath);
 		}
 		if (SystemReader.getInstance().isWindows()) {
 			target = target.replace('/', '\\');
 		}
 		Path nioTarget = new File(target).toPath();
-		return Files.createSymbolicLink(nioPath, nioTarget);
+		Files.createSymbolicLink(nioPath, nioTarget);
 	}
 
 	/**
@@ -518,5 +513,16 @@ public class FileUtils {
 				builder.append(File.separator);
 		}
 		return builder.toString();
+	}
+
+	/**
+	 * Determine if an IOException is a Stale NFS File Handle
+	 *
+	 * @param ioe
+	 * @return a boolean true if the IOException is a Stale NFS FIle Handle
+	 */
+	public static boolean isStaleFileHandle(IOException ioe) {
+		String msg = ioe.getMessage();
+		return msg != null && msg.toLowerCase().matches("stale .*file .*handle");
 	}
 }
