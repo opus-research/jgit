@@ -223,7 +223,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				}
 			}
 
-			Ref headRef = repo.exactRef(Constants.HEAD);
+			Ref headRef = repo.getRef(Constants.HEAD);
 			if (headRef == null) {
 				// TODO Git CLI supports checkout from unborn branch, we should
 				// also allow this
@@ -242,7 +242,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 								JGitText.get().checkoutUnexpectedResult,
 								r.name()));
 					this.status = CheckoutResult.NOT_TRIED_RESULT;
-					return repo.exactRef(Constants.HEAD);
+					return repo.getRef(Constants.HEAD);
 				}
 				branch = getStartPointObjectId();
 			} else {
@@ -277,7 +277,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			} finally {
 				dc.unlock();
 			}
-			Ref ref = repo.findRef(name);
+			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
 				ref = null;
 			String toName = Repository.shortenRefName(name);
@@ -289,7 +289,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				updateResult = refUpdate.link(ref.getName());
 			else if (orphan) {
 				updateResult = refUpdate.link(getBranchName());
-				ref = repo.exactRef(Constants.HEAD);
+				ref = repo.getRef(Constants.HEAD);
 			} else {
 				refUpdate.setNewObjectId(newCommit);
 				updateResult = refUpdate.forceUpdate();
@@ -430,8 +430,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				continue;
 
 			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
-			final String filterCommand = treeWalk
-					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(path) {
 				public void apply(DirCacheEntry ent) {
 					int stage = ent.getStage();
@@ -439,15 +437,15 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						if (checkoutStage != null) {
 							if (stage == checkoutStage.number)
 								checkoutPath(ent, r, new CheckoutMetadata(
-										eolStreamType, filterCommand));
+										eolStreamType, null));
 						} else {
 							UnmergedPathException e = new UnmergedPathException(
 									ent);
 							throw new JGitInternalException(e.getMessage(), e);
 						}
 					} else {
-						checkoutPath(ent, r, new CheckoutMetadata(eolStreamType,
-								filterCommand));
+						checkoutPath(ent, r,
+								new CheckoutMetadata(eolStreamType, null));
 					}
 				}
 			});
@@ -466,14 +464,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			final ObjectId blobId = treeWalk.getObjectId(0);
 			final FileMode mode = treeWalk.getFileMode(0);
 			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
-			final String filterCommand = treeWalk
-					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(treeWalk.getPathString()) {
 				public void apply(DirCacheEntry ent) {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);
 					checkoutPath(ent, r,
-							new CheckoutMetadata(eolStreamType, filterCommand));
+							new CheckoutMetadata(eolStreamType, null));
 				}
 			});
 		}
@@ -519,7 +515,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					.get().branchNameInvalid, name == null ? "<null>" : name)); //$NON-NLS-1$
 
 		if (orphan) {
-			Ref refToCheck = repo.exactRef(getBranchName());
+			Ref refToCheck = repo.getRef(getBranchName());
 			if (refToCheck != null)
 				throw new RefAlreadyExistsException(MessageFormat.format(
 						JGitText.get().refAlreadyExists, name));
