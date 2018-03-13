@@ -73,10 +73,10 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.FileRepository;
 import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
+import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -99,13 +99,8 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
-/**
- * Wrapper to make creating test data easier.
- *
- * @param <R>
- *            type of Repository the test data is stored on.
- */
-public class TestRepository<R extends Repository> {
+/** Wrapper to make creating test data easier. */
+public class TestRepository {
 	private static final PersonIdent author;
 
 	private static final PersonIdent committer;
@@ -124,7 +119,7 @@ public class TestRepository<R extends Repository> {
 		committer = new PersonIdent(cn, ce, now, tz);
 	}
 
-	private final R db;
+	private final Repository db;
 
 	private final RevWalk pool;
 
@@ -137,9 +132,9 @@ public class TestRepository<R extends Repository> {
 	 *
 	 * @param db
 	 *            the test repository to write into.
-	 * @throws IOException
+	 * @throws Exception
 	 */
-	public TestRepository(R db) throws IOException {
+	public TestRepository(Repository db) throws Exception {
 		this(db, new RevWalk(db));
 	}
 
@@ -150,9 +145,9 @@ public class TestRepository<R extends Repository> {
 	 *            the test repository to write into.
 	 * @param rw
 	 *            the RevObject pool to use for object lookup.
-	 * @throws IOException
+	 * @throws Exception
 	 */
-	public TestRepository(R db, RevWalk rw) throws IOException {
+	public TestRepository(Repository db, RevWalk rw) throws Exception {
 		this.db = db;
 		this.pool = rw;
 		this.inserter = db.newObjectInserter();
@@ -160,7 +155,7 @@ public class TestRepository<R extends Repository> {
 	}
 
 	/** @return the repository this helper class operates against. */
-	public R getRepository() {
+	public Repository getRepository() {
 		return db;
 	}
 
@@ -476,27 +471,25 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public void updateServerInfo() throws Exception {
-		if (db instanceof FileRepository) {
-			final FileRepository fr = (FileRepository) db;
-			RefWriter rw = new RefWriter(fr.getAllRefs().values()) {
+		final ObjectDatabase odb = db.getObjectDatabase();
+		if (odb instanceof ObjectDirectory) {
+			RefWriter rw = new RefWriter(db.getAllRefs().values()) {
 				@Override
 				protected void writeFile(final String name, final byte[] bin)
 						throws IOException {
-					File path = new File(fr.getDirectory(), name);
-					TestRepository.this.writeFile(path, bin);
+					TestRepository.this.writeFile(name, bin);
 				}
 			};
 			rw.writePackedRefs();
 			rw.writeInfoRefs();
 
 			final StringBuilder w = new StringBuilder();
-			for (PackFile p : fr.getObjectDatabase().getPacks()) {
+			for (PackFile p : ((ObjectDirectory) odb).getPacks()) {
 				w.append("P ");
 				w.append(p.getPackFile().getName());
 				w.append('\n');
 			}
-			writeFile(new File(new File(fr.getObjectDatabase().getDirectory(),
-					"info"), "packs"), Constants.encodeASCII(w.toString()));
+			writeFile("objects/info/packs", Constants.encodeASCII(w.toString()));
 		}
 	}
 
@@ -598,40 +591,38 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public void packAndPrune() throws Exception {
-		if (db.getObjectDatabase() instanceof ObjectDirectory) {
-			ObjectDirectory odb = (ObjectDirectory) db.getObjectDatabase();
-			PackWriter pw = new PackWriter(db, NullProgressMonitor.INSTANCE);
+		final ObjectDirectory odb = (ObjectDirectory) db.getObjectDatabase();
+		final PackWriter pw = new PackWriter(db, NullProgressMonitor.INSTANCE);
 
-			Set<ObjectId> all = new HashSet<ObjectId>();
-			for (Ref r : db.getAllRefs().values())
-				all.add(r.getObjectId());
-			pw.preparePack(all, Collections.<ObjectId> emptySet());
+		Set<ObjectId> all = new HashSet<ObjectId>();
+		for (Ref r : db.getAllRefs().values())
+			all.add(r.getObjectId());
+		pw.preparePack(all, Collections.<ObjectId> emptySet());
 
-			final ObjectId name = pw.computeName();
-			OutputStream out;
+		final ObjectId name = pw.computeName();
+		OutputStream out;
 
-			final File pack = nameFor(odb, name, ".pack");
-			out = new BufferedOutputStream(new FileOutputStream(pack));
-			try {
-				pw.writePack(out);
-			} finally {
-				out.close();
-			}
-			pack.setReadOnly();
-
-			final File idx = nameFor(odb, name, ".idx");
-			out = new BufferedOutputStream(new FileOutputStream(idx));
-			try {
-				pw.writeIndex(out);
-			} finally {
-				out.close();
-			}
-			idx.setReadOnly();
-
-			odb.openPack(pack, idx);
-			updateServerInfo();
-			prunePacked(odb);
+		final File pack = nameFor(odb, name, ".pack");
+		out = new BufferedOutputStream(new FileOutputStream(pack));
+		try {
+			pw.writePack(out);
+		} finally {
+			out.close();
 		}
+		pack.setReadOnly();
+
+		final File idx = nameFor(odb, name, ".idx");
+		out = new BufferedOutputStream(new FileOutputStream(idx));
+		try {
+			pw.writeIndex(out);
+		} finally {
+			out.close();
+		}
+		idx.setReadOnly();
+
+		odb.openPack(pack, idx);
+		updateServerInfo();
+		prunePacked(odb);
 	}
 
 	private void prunePacked(ObjectDirectory odb) {
@@ -646,8 +637,9 @@ public class TestRepository<R extends Repository> {
 		return new File(packdir, "pack-" + name.name() + t);
 	}
 
-	private void writeFile(final File p, final byte[] bin) throws IOException,
-			ObjectWritingException {
+	private void writeFile(final String name, final byte[] bin)
+			throws IOException, ObjectWritingException {
+		final File p = new File(db.getDirectory(), name);
 		final LockFile lck = new LockFile(p);
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);

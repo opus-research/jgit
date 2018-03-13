@@ -47,9 +47,8 @@ package org.eclipse.jgit.pgm;
 import java.io.File;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.lib.RepositoryCache.FileKey;
-import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileRepository;
 import org.kohsuke.args4j.Argument;
 
 @Command(common = false, usage = "usage_ServerSideBackendForJgitPush")
@@ -66,14 +65,11 @@ class ReceivePack extends TextBuiltin {
 	protected void run() throws Exception {
 		final org.eclipse.jgit.transport.ReceivePack rp;
 
-		try {
-			FileKey key = FileKey.lenient(dstGitdir, FS.DETECTED);
-			db = key.open(true /* must exist */);
-		} catch (RepositoryNotFoundException notFound) {
-			throw die(MessageFormat.format(CLIText.get().notAGitRepository,
-					dstGitdir.getPath()));
-		}
-
+		if (new File(dstGitdir, Constants.DOT_GIT).isDirectory())
+			dstGitdir = new File(dstGitdir, Constants.DOT_GIT);
+		db = new FileRepository(dstGitdir);
+		if (!db.getObjectsDirectory().isDirectory())
+			throw die(MessageFormat.format(CLIText.get().notAGitRepository, dstGitdir.getPath()));
 		rp = new org.eclipse.jgit.transport.ReceivePack(db);
 		rp.receive(System.in, System.out, System.err);
 	}

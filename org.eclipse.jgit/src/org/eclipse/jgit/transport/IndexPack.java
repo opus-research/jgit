@@ -67,7 +67,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BinaryDelta;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -128,8 +127,7 @@ public class IndexPack {
 
 		base = new File(objdir, n.substring(0, n.length() - suffix.length()));
 		final IndexPack ip = new IndexPack(db, is, base);
-		ip.setIndexVersion(db.getConfig().get(CoreConfig.KEY)
-				.getPackIndexVersion());
+		ip.setIndexVersion(db.getConfig().getCore().getPackIndexVersion());
 		return ip;
 	}
 

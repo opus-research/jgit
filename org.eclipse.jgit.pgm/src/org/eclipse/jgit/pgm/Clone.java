@@ -51,8 +51,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Commit;
@@ -70,6 +68,8 @@ import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_cloneRepositoryIntoNewDir")
 class Clone extends AbstractFetchCommand {
@@ -81,8 +81,6 @@ class Clone extends AbstractFetchCommand {
 
 	@Argument(index = 1, metaVar = "metaVar_directory")
 	private String localName;
-
-	private FileRepository dst;
 
 	@Override
 	protected final boolean requiresRepository() {
@@ -105,11 +103,10 @@ class Clone extends AbstractFetchCommand {
 		if (gitdir == null)
 			gitdir = new File(localName, Constants.DOT_GIT);
 
-		dst = new FileRepository(gitdir);
-		dst.create();
-		dst.getConfig().setBoolean("core", null, "bare", false);
-		dst.getConfig().save();
-		db = dst;
+		db = new FileRepository(gitdir);
+		db.create();
+		db.getConfig().setBoolean("core", null, "bare", false);
+		db.getConfig().save();
 
 		out.format(CLIText.get().initializedEmptyGitRepositoryIn, gitdir.getAbsolutePath());
 		out.println();
@@ -123,13 +120,13 @@ class Clone extends AbstractFetchCommand {
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,
 			IOException {
-		final RemoteConfig rc = new RemoteConfig(dst.getConfig(), remoteName);
+		final RemoteConfig rc = new RemoteConfig(db.getConfig(), remoteName);
 		rc.addURI(uri);
 		rc.addFetchRefSpec(new RefSpec().setForceUpdate(true)
 				.setSourceDestination(Constants.R_HEADS + "*",
 						Constants.R_REMOTES + remoteName + "/*"));
-		rc.update(dst.getConfig());
-		dst.getConfig().save();
+		rc.update(db.getConfig());
+		db.getConfig().save();
 	}
 
 	private FetchResult runFetch() throws NotSupportedException,
