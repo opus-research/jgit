@@ -395,7 +395,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
-	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String theFactoryMustNotBeNull;
@@ -412,6 +411,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String truncatedHunkNewLinesMissing;
 	/***/ public String truncatedHunkOldLinesMissing;
 	/***/ public String unableToCheckConnectivity;
+	/***/ public String unableToLockTag;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;
