@@ -130,7 +130,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotStoreObjects;
 	/***/ public String cannotUnloadAModifiedTree;
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
-	/***/ public String canOnlyCherryPickCommitsWithOneParent;
 	/***/ public String cantFindObjectInReversePackIndexForTheSpecifiedOffset;
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
@@ -217,7 +216,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfCherryPickCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfFetchCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
