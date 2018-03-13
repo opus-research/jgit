@@ -46,7 +46,6 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -132,7 +131,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		try {
 			if (checkoutAllPaths || !paths.isEmpty()) {
 				checkoutPaths();
-				status = new CheckoutResult(Status.OK, paths);
+				status = CheckoutResult.OK_RESULT;
 				setCallable(false);
 				return null;
 			}
@@ -160,28 +159,22 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			RevCommit headCommit = headId == null ? null : revWalk
 					.parseCommit(headId);
 			RevCommit newCommit = revWalk.parseCommit(branch);
-			boolean isSameRev = (headCommit != null && headCommit
-					.equals(newCommit));
-
 			RevTree headTree = headCommit == null ? null : headCommit.getTree();
-			DirCacheCheckout dco = null;
-			if (!isSameRev) {
-				DirCache dc = repo.lockDirCache();
+			DirCacheCheckout dco;
+			DirCache dc = repo.lockDirCache();
+			try {
+				dco = new DirCacheCheckout(repo, headTree, dc,
+						newCommit.getTree());
+				dco.setFailOnConflict(true);
 				try {
-					dco = new DirCacheCheckout(repo, headTree, dc,
-							newCommit.getTree());
-					dco.setFailOnConflict(true);
-					try {
-						dco.checkout();
-					} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
-						status = new CheckoutResult(Status.CONFLICTS,
-								dco.getConflicts());
-						throw new CheckoutConflictException(dco.getConflicts(),
-								e);
-					}
-				} finally {
-					dc.unlock();
+					dco.checkout();
+				} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
+					status = new CheckoutResult(Status.CONFLICTS,
+							dco.getConflicts());
+					throw new CheckoutConflictException(dco.getConflicts(), e);
 				}
+			} finally {
+				dc.unlock();
 			}
 			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
@@ -218,15 +211,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
-			if (dco != null) {
-				if (!dco.getToBeDeleted().isEmpty()) {
-					status = new CheckoutResult(Status.NONDELETED,
-							dco.getToBeDeleted());
-				} else
-					status = new CheckoutResult(new ArrayList<String>(dco
-							.getUpdated().keySet()), dco.getRemoved());
-			} else
-				status = new CheckoutResult(Status.OK, new ArrayList<String>(0));
+			if (!dco.getToBeDeleted().isEmpty()) {
+				status = new CheckoutResult(Status.NONDELETED, dco
+						.getToBeDeleted());
+			}
+			else
+				status = CheckoutResult.OK_RESULT;
 			return ref;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
