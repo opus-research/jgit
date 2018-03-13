@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 
 /**
@@ -79,16 +78,11 @@ import org.eclipse.jgit.transport.FetchResult;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-pull.html"
  *      >Git documentation about Pull</a>
  */
-public class PullCommand extends GitCommand<PullResult> {
-	private int timeout = 0;
+public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 
 	private final static String DOT = ".";
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
-
-	private CredentialsProvider credentialsProvider;
-
-	private String remoteName;
 
 	/**
 	 * @param repo
@@ -98,45 +92,12 @@ public class PullCommand extends GitCommand<PullResult> {
 	}
 
 	/**
-	 * @param timeout
-	 *            in seconds
-	 * @return this instance
-	 */
-	public PullCommand setTimeout(int timeout) {
-		this.timeout = timeout;
-		return this;
-	}
-
-	/**
 	 * @param monitor
 	 *            a progress monitor
 	 * @return this instance
 	 */
 	public PullCommand setProgressMonitor(ProgressMonitor monitor) {
 		this.monitor = monitor;
-		return this;
-	}
-
-	/**
-	 * @param credentialsProvider
-	 *            the {@link CredentialsProvider} to use
-	 * @return this instance
-	 */
-	public PullCommand setCredentialsProvider(
-			CredentialsProvider credentialsProvider) {
-		checkCallable();
-		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
-
-	/**
-	 * @param remote
-	 *            the name of the remote to use
-	 * @return this instance
-	 */
-	public PullCommand setRemote(String remote) {
-		checkCallable();
-		remoteName = remote;
 		return this;
 	}
 
@@ -179,15 +140,12 @@ public class PullCommand extends GitCommand<PullResult> {
 		// get the configured remote for the currently checked out branch
 		// stored in configuration key branch.<branch name>.remote
 		Config repoConfig = repo.getConfig();
-		String remote = remoteName;
-		if (remote == null) {
-			remote = repoConfig.getString(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REMOTE);
-			if (remote == null)
-				// fall back to default remote
-				remote = Constants.DEFAULT_REMOTE_NAME;
-		}
+		String remote = repoConfig.getString(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_REMOTE);
+		if (remote == null)
+			// fall back to default remote
+			remote = Constants.DEFAULT_REMOTE_NAME;
 
 		// get the name of the branch in the remote repository
 		// stored in configuration key branch.<branch name>.merge
@@ -210,7 +168,8 @@ public class PullCommand extends GitCommand<PullResult> {
 		String remoteUri;
 		FetchResult fetchRes;
 		if (isRemote) {
-			remoteUri = repoConfig.getString("remote", remote,
+			remoteUri = repoConfig.getString(
+					ConfigConstants.CONFIG_REMOTE_SECTION, remote,
 					ConfigConstants.CONFIG_KEY_URL);
 			if (remoteUri == null) {
 				String missingKey = ConfigConstants.CONFIG_REMOTE_SECTION + DOT
@@ -227,8 +186,7 @@ public class PullCommand extends GitCommand<PullResult> {
 			FetchCommand fetch = new FetchCommand(repo);
 			fetch.setRemote(remote);
 			fetch.setProgressMonitor(monitor);
-			fetch.setTimeout(this.timeout);
-			fetch.setCredentialsProvider(credentialsProvider);
+			configure(fetch);
 
 			fetchRes = fetch.call();
 		} else {

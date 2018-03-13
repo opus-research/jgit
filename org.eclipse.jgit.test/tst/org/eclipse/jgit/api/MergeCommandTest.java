@@ -60,9 +60,19 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
+@RunWith(Theories.class)
 public class MergeCommandTest extends RepositoryTestCase {
+
+	public static @DataPoints
+	MergeStrategy[] mergeStrategies = MergeStrategy.get();
+
 	@Test
 	public void testMergeInItself() throws Exception {
 		Git git = new Git(db);
@@ -70,6 +80,13 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		MergeResult result = git.merge().include(db.getRef(Constants.HEAD)).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
+		// no reflog entry written by merge
+		assertEquals("commit: initial commit",
+				db
+				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("commit: initial commit",
+				db
+				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -82,7 +99,11 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(db.getRef("refs/heads/branch1")).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
-
+		// no reflog entry written by merge
+		assertEquals("commit: second commit", db
+				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("commit: second commit", db
+				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -99,6 +120,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -126,6 +151,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertTrue(new File(db.getWorkTree(), "file2").exists());
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -158,6 +187,36 @@ public class MergeCommandTest extends RepositoryTestCase {
 		} catch (InvalidMergeHeadsException e) {
 			// expected this exception
 		}
+	}
+
+	@Theory
+	public void testMergeSuccessAllStrategies(MergeStrategy mergeStrategy)
+			throws Exception {
+		Git git = new Git(db);
+
+		RevCommit first = git.commit().setMessage("first").call();
+		createBranch(first, "refs/heads/side");
+
+		writeTrashFile("a", "a");
+		git.add().addFilepattern("a").call();
+		git.commit().setMessage("second").call();
+
+		checkoutBranch("refs/heads/side");
+		writeTrashFile("b", "b");
+		git.add().addFilepattern("b").call();
+		git.commit().setMessage("third").call();
+
+		MergeResult result = git.merge().setStrategy(mergeStrategy)
+				.include(db.getRef(Constants.MASTER)).call();
+		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
+		assertEquals(
+				"merge refs/heads/master: Merge made by "
+						+ mergeStrategy.getName() + ".",
+				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals(
+				"merge refs/heads/master: Merge made by "
+						+ mergeStrategy.getName() + ".",
+				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -338,6 +397,14 @@ public class MergeCommandTest extends RepositoryTestCase {
 				.setStrategy(MergeStrategy.RESOLVE).call();
 		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 		assertEquals("1\nb(1)\n3\n", read(new File(db.getWorkTree(), "b")));
+		assertEquals("merge " + secondCommit.getId().getName()
+				+ ": Merge made by resolve.", db
+				.getReflogReader(Constants.HEAD)
+				.getLastEntry().getComment());
+		assertEquals("merge " + secondCommit.getId().getName()
+				+ ": Merge made by resolve.", db
+				.getReflogReader(db.getBranch())
+				.getLastEntry().getComment());
 	}
 
 	@Test
@@ -914,6 +981,46 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		checkMergeFailedResult(result, MergeFailureReason.DIRTY_WORKTREE,
 				indexState, fileA);
+	}
+
+	@Test
+	public void testMergeRemovingFolders() throws Exception {
+		File folder1 = new File(db.getWorkTree(), "folder1");
+		File folder2 = new File(db.getWorkTree(), "folder2");
+		FileUtils.mkdir(folder1);
+		FileUtils.mkdir(folder2);
+		File file = new File(folder1, "file1.txt");
+		write(file, "folder1--file1.txt");
+		file = new File(folder1, "file2.txt");
+		write(file, "folder1--file2.txt");
+		file = new File(folder2, "file1.txt");
+		write(file, "folder--file1.txt");
+		file = new File(folder2, "file2.txt");
+		write(file, "folder2--file2.txt");
+
+		Git git = new Git(db);
+		git.add().addFilepattern(folder1.getName())
+				.addFilepattern(folder2.getName()).call();
+		RevCommit commit1 = git.commit().setMessage("adding folders").call();
+
+		recursiveDelete(folder1);
+		recursiveDelete(folder2);
+		git.rm().addFilepattern("folder1/file1.txt")
+				.addFilepattern("folder1/file2.txt")
+				.addFilepattern("folder2/file1.txt")
+				.addFilepattern("folder2/file2.txt").call();
+		RevCommit commit2 = git.commit()
+				.setMessage("removing folders on 'branch'").call();
+
+		git.checkout().setName(commit1.name()).call();
+
+		MergeResult result = git.merge().include(commit2.getId())
+				.setStrategy(MergeStrategy.RESOLVE).call();
+		assertEquals(MergeResult.MergeStatus.FAST_FORWARD,
+				result.getMergeStatus());
+		assertEquals(commit2, result.getNewHead());
+		assertFalse(folder1.exists());
+		assertFalse(folder2.exists());
 	}
 
 	private RevCommit addAllAndCommit(final Git git) throws Exception {

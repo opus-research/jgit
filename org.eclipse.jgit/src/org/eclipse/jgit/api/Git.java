@@ -242,6 +242,16 @@ public class Git {
 	}
 
 	/**
+	 *
+	 * Returns a command object used to list tags
+	 *
+	 * @return a {@link ListTagCommand}
+	 */
+	public ListTagCommand tagList() {
+		return new ListTagCommand(repo);
+	}
+
+	/**
 	 * Returns a command object used to rename branches
 	 *
 	 * @return a {@link RenameBranchCommand}
@@ -453,6 +463,54 @@ public class Git {
 	 */
 	public CleanCommand clean() {
 		return new CleanCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code blame} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-blame.html"
+	 *      >Git documentation about Blame</a>
+	 * @return a {@link BlameCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code blame} command
+	 */
+	public BlameCommand blame() {
+		return new BlameCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code reflog} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reflog.html"
+	 *      >Git documentation about reflog</a>
+	 * @return a {@link ReflogCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code reflog} command
+	 */
+	public ReflogCommand reflog() {
+		return new ReflogCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code diff} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-diff.html"
+	 *      >Git documentation about diff</a>
+	 * @return a {@link DiffCommand} used to collect all optional parameters and
+	 *         to finally execute the {@code diff} command
+	 */
+	public DiffCommand diff() {
+		return new DiffCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to delete tags
+	 * 
+	 * @return a {@link DeleteTagCommand}
+	 */
+	public DeleteTagCommand tagDelete() {
+		return new DeleteTagCommand(repo);
 	}
 
 	/**

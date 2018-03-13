@@ -170,7 +170,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	final MutableObjectId idBuffer;
 
-	private ObjectIdOwnerMap<RevObject> objects;
+	ObjectIdOwnerMap<RevObject> objects;
 
 	private int freeFlags = APP_FLAGS;
 
@@ -965,7 +965,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	/**
-	 * Ensure the object's fully body content is available.
+	 * Ensure the object's full body content is available.
 	 * <p>
 	 * This method only returns successfully if the object exists and was parsed
 	 * without error.
