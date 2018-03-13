@@ -48,6 +48,7 @@ package org.eclipse.jgit.util;
  *
  * @param <V>
  *            type of the value instance.
+ * @since 4.9
  */
 public class LongMap<V> {
 	private static final float LOAD_FACTOR = 0.75f;
