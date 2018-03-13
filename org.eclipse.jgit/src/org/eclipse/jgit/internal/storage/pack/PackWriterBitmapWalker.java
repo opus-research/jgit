@@ -148,19 +148,19 @@ final class PackWriterBitmapWalker {
 		return new AddToBitmapFilter(bitmapResult);
 	}
 
-	/**
-	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
-	 * effect.
-	 * <p>
-	 * When the walk hits a commit that is part of {@code bitmap}'s
-	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
-	 * commit and its parents are marked as SEEN so that the walk does not
-	 * have to visit its ancestors.  This ensures the walk is very short if
-	 * there is good bitmap coverage.
-	 */
-	private static class AddToBitmapFilter extends RevFilter {
+	private static class AddToBitmapFilter extends NoCommitBodyRevFilter {
 		private final BitmapBuilder bitmap;
 
+		/**
+		 * A RevFilter that adds the visited commits to {@code bitmap} as a
+		 * side effect.
+		 * <p>
+		 * When the walk hits a commit that is part of {@code bitmap}'s
+		 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and
+		 * the commit and its parents are marked as SEEN so that the walk
+		 * does not have to visit its ancestors.  This ensures the walk
+		 * is very short if there is good bitmap coverage.
+		 */
 		AddToBitmapFilter(BitmapBuilder bitmap) {
 			this.bitmap = bitmap;
 		}
@@ -175,36 +175,26 @@ final class PackWriterBitmapWalker {
 			}
 			return false;
 		}
-
-		@Override
-		public final RevFilter clone() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public final boolean requiresCommitBody() {
-			return false;
-		}
 	}
 
-	/**
-	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
-	 * effect.
-	 * <p>
-	 * When the walk hits a commit that is part of {@code bitmap}'s
-	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
-	 * commit and its parents are marked as SEEN so that the walk does not
-	 * have to visit its ancestors.  This ensures the walk is very short if
-	 * there is good bitmap coverage.
-	 * <p>
-	 * Commits named in {@code seen} are considered already seen.  If one is
-	 * encountered, that commit and its parents will be marked with the SEEN
-	 * flag to prevent the walk from visiting its ancestors.
-	 */
-	private static class AddUnseenToBitmapFilter extends RevFilter {
+	private static class AddUnseenToBitmapFilter extends NoCommitBodyRevFilter {
 		private final BitmapBuilder seen;
 		private final BitmapBuilder bitmap;
 
+		/**
+		 * A RevFilter that adds the visited commits to {@code bitmap} as a
+		 * side effect.
+		 * <p>
+		 * When the walk hits a commit that is part of {@code bitmap}'s
+		 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and
+		 * the commit and its parents are marked as SEEN so that the walk
+		 * does not have to visit its ancestors.  This ensures the walk
+		 * is very short if there is good bitmap coverage.
+		 * <p>
+		 * Commits named in {@code seen} are considered already seen.
+		 * If one is encountered, that commit and its parents will be marked
+		 * with the SEEN flag to prevent the walk from visiting its ancestors.
+		 */
 		AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
 			this.seen = seen;
 			this.bitmap = bitmapResult;
@@ -220,10 +210,12 @@ final class PackWriterBitmapWalker {
 			}
 			return false;
 		}
+	}
 
+	private static abstract class NoCommitBodyRevFilter extends RevFilter {
 		@Override
 		public final RevFilter clone() {
-			throw new UnsupportedOperationException();
+			return this;
 		}
 
 		@Override
