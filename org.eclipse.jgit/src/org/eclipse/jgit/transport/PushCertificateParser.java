@@ -47,7 +47,6 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_CE
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.Reader;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,7 +57,6 @@ import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
-import org.eclipse.jgit.util.IO;
 
 /**
  * Parser for signed push certificates.
@@ -67,9 +65,9 @@ import org.eclipse.jgit.util.IO;
  */
 public class PushCertificateParser {
 	static final String BEGIN_SIGNATURE =
-			"-----BEGIN PGP SIGNATURE-----\n"; //$NON-NLS-1$
+			"-----BEGIN PGP SIGNATURE-----"; //$NON-NLS-1$
 	static final String END_SIGNATURE =
-			"-----END PGP SIGNATURE-----\n"; //$NON-NLS-1$
+			"-----END PGP SIGNATURE-----"; //$NON-NLS-1$
 
 	static final String VERSION = "certificate version"; //$NON-NLS-1$
 
@@ -79,77 +77,9 @@ public class PushCertificateParser {
 
 	static final String NONCE = "nonce"; //$NON-NLS-1$
 
-	static final String END_CERT = "push-cert-end\n"; //$NON-NLS-1$
-
 	private static final String VERSION_0_1 = "0.1"; //$NON-NLS-1$
 
-	private static interface StringReader {
-		String read() throws IOException;
-	}
-
-	private static class PacketLineReader implements StringReader {
-		private final PacketLineIn pckIn;
-
-		private PacketLineReader(PacketLineIn pckIn) {
-			this.pckIn = pckIn;
-		}
-
-		@Override
-		public String read() throws IOException {
-			return pckIn.readStringRaw();
-		}
-	}
-
-	private static class StreamReader implements StringReader {
-		private final Reader reader;
-
-		private StreamReader(Reader reader) {
-			this.reader = reader;
-		}
-
-		@Override
-		public String read() throws IOException {
-			// Presize for a command containing 2 SHA-1s and some refname.
-			return IO.readLine(reader, 41 * 2 + 64);
-		}
-	}
-
-	/**
-	 * Parse a push certificate from a reader.
-	 * <p>
-	 * Differences from the {@link PacketLineIn} receiver methods:
-	 * <ul>
-	 * <li>Does not use pkt-line framing.</li>
-	 * <li>Reads an entire cert in one call rather than depending on a loop in
-	 *   the caller.</li>
-	 * <li>Does not assume a {@code "push-cert-end"} line.</li>
-	 * </ul>
-	 *
-	 * @param r
-	 *            input reader; consumed only up until the end of the next
-	 *            signature in the input.
-	 * @return the parsed certificate, or null if the reader was at EOF.
-	 * @throws PackProtocolException
-	 *             if the certificate is malformed.
-	 * @throws IOException
-	 *             if there was an error reading from the input.
-	 * @since 4.1
-	 */
-	public static PushCertificate fromReader(Reader r)
-			throws PackProtocolException, IOException {
-		PushCertificateParser parser = new PushCertificateParser();
-		StreamReader reader = new StreamReader(r);
-		parser.receiveHeader(reader);
-		String line;
-		while (!(line = reader.read()).isEmpty()) {
-			if (line.equals(BEGIN_SIGNATURE)) {
-				parser.receiveSignature(reader);
-				break;
-			}
-			parser.addCommand(line);
-		}
-		return parser.build();
-	}
+	private static final String END_CERT = "push-cert-end"; //$NON-NLS-1$
 
 	private boolean received;
 	private String version;
@@ -179,10 +109,8 @@ public class PushCertificateParser {
 	 */
 	private final int nonceSlopLimit;
 
-	private final boolean enabled;
 	private final NonceGenerator nonceGenerator;
-	private final List<ReceiveCommand> commands = new ArrayList<>();
-	private final StringBuilder rawCommands = new StringBuilder();
+	private final List<ReceiveCommand> commands;
 
 	PushCertificateParser(Repository into, SignedPushConfig cfg) {
 		if (cfg != null) {
@@ -193,14 +121,7 @@ public class PushCertificateParser {
 			nonceGenerator = null;
 		}
 		db = into;
-		enabled = nonceGenerator != null;
-	}
-
-	private PushCertificateParser() {
-		db = null;
-		nonceSlopLimit = 0;
-		nonceGenerator = null;
-		enabled = true;
+		commands = new ArrayList<>();
 	}
 
 	/**
@@ -210,25 +131,23 @@ public class PushCertificateParser {
 	 * @since 4.1
 	 */
 	public PushCertificate build() throws IOException {
-		if (!received || !enabled) {
+		if (!received || nonceGenerator == null) {
 			return null;
 		}
 		try {
 			return new PushCertificate(version, pusher, pushee, receivedNonce,
-					nonceStatus, Collections.unmodifiableList(commands),
-					rawCommands.toString(), signature);
+					nonceStatus, Collections.unmodifiableList(commands), signature);
 		} catch (IllegalArgumentException e) {
 			throw new IOException(e.getMessage(), e);
 		}
 	}
 
 	/**
-	 * @return if the repository is configured to use signed pushes in this
-	 *         context.
+	 * @return if the server is configured to use signed pushes.
 	 * @since 4.0
 	 */
 	public boolean enabled() {
-		return enabled;
+		return nonceGenerator != null;
 	}
 
 	/**
@@ -252,20 +171,16 @@ public class PushCertificateParser {
 		return sentNonce;
 	}
 
-	private static String parseHeader(StringReader reader, String header)
+	private static String parseHeader(PacketLineIn pckIn, String header)
 			throws IOException {
-		String s = reader.read();
-		if (s.isEmpty()) {
-			throw new EOFException();
-		}
+		String s = pckIn.readString();
 		if (s.length() <= header.length()
 				|| !s.startsWith(header)
-				|| s.charAt(header.length()) != ' '
-				|| s.charAt(s.length() - 1) != '\n') {
+				|| s.charAt(header.length()) != ' ') {
 			throw new PackProtocolException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidHeader, header));
 		}
-		return s.substring(header.length() + 1, s.length() - 1);
+		return s.substring(header.length() + 1);
 	}
 
 	/**
@@ -290,36 +205,24 @@ public class PushCertificateParser {
 	 */
 	public void receiveHeader(PacketLineIn pckIn, boolean stateless)
 			throws IOException {
-		receiveHeader(new PacketLineReader(pckIn));
-		nonceStatus = nonceGenerator != null
-				? nonceGenerator.verify(
-					receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
-				: NonceStatus.UNSOLICITED;
-	}
-
-	private void receiveHeader(StringReader reader) throws IOException {
+		received = true;
 		try {
-			try {
-				version = parseHeader(reader, VERSION);
-			} catch (EOFException e) {
-				return;
-			}
-			received = true;
+			version = parseHeader(pckIn, VERSION);
 			if (!version.equals(VERSION_0_1)) {
 				throw new PackProtocolException(MessageFormat.format(
 						JGitText.get().pushCertificateInvalidFieldValue, VERSION, version));
 			}
-			String rawPusher = parseHeader(reader, PUSHER);
+			String rawPusher = parseHeader(pckIn, PUSHER);
 			pusher = PushCertificateIdent.parse(rawPusher);
 			if (pusher == null) {
 				throw new PackProtocolException(MessageFormat.format(
 						JGitText.get().pushCertificateInvalidFieldValue,
 						PUSHER, rawPusher));
 			}
-			pushee = parseHeader(reader, PUSHEE);
-			receivedNonce = parseHeader(reader, NONCE);
+			pushee = parseHeader(pckIn, PUSHEE);
+			receivedNonce = parseHeader(pckIn, NONCE);
 			// An empty line.
-			if (!"\n".equals(reader.read())) { //$NON-NLS-1$
+			if (!pckIn.readString().isEmpty()) {
 				throw new PackProtocolException(
 						JGitText.get().pushCertificateInvalidHeader);
 			}
@@ -327,15 +230,19 @@ public class PushCertificateParser {
 			throw new PackProtocolException(
 					JGitText.get().pushCertificateInvalidHeader, eof);
 		}
+		nonceStatus = nonceGenerator != null
+				? nonceGenerator.verify(
+					receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
+				: NonceStatus.UNSOLICITED;
 	}
 
 	/**
 	 * Read the PGP signature.
 	 * <p>
 	 * This method assumes the line
-	 * {@code "-----BEGIN PGP SIGNATURE-----\n"} has already been parsed,
-	 * and continues parsing until an {@code "-----END PGP SIGNATURE-----\n"} is
-	 * found, followed by {@code "push-cert-end\n"}.
+	 * {@code "-----BEGIN PGP SIGNATURE-----"} has already been parsed,
+	 * and continues parsing until an {@code "-----END PGP SIGNATURE-----"} is
+	 * found, followed by {@code "push-cert-end"}.
 	 *
 	 * @param pckIn
 	 *            where we read the signature from.
@@ -344,23 +251,18 @@ public class PushCertificateParser {
 	 * @since 4.0
 	 */
 	public void receiveSignature(PacketLineIn pckIn) throws IOException {
-		StringReader reader = new PacketLineReader(pckIn);
-		receiveSignature(reader);
-		if (!reader.read().equals(END_CERT)) {
-			throw new PackProtocolException(
-					JGitText.get().pushCertificateInvalidSignature);
-		}
-	}
-
-	private void receiveSignature(StringReader reader) throws IOException {
 		received = true;
 		try {
-			StringBuilder sig = new StringBuilder(BEGIN_SIGNATURE);
+			StringBuilder sig = new StringBuilder(BEGIN_SIGNATURE).append('\n');
 			String line;
-			while (!(line = reader.read()).equals(END_SIGNATURE)) {
-				sig.append(line);
+			while (!(line = pckIn.readString()).equals(END_SIGNATURE)) {
+				sig.append(line).append('\n');
 			}
-			signature = sig.append(END_SIGNATURE).toString();
+			signature = sig.append(END_SIGNATURE).append('\n').toString();
+			if (!pckIn.readString().equals(END_CERT)) {
+				throw new PackProtocolException(
+						JGitText.get().pushCertificateInvalidSignature);
+			}
 		} catch (EOFException eof) {
 			throw new PackProtocolException(
 					JGitText.get().pushCertificateInvalidSignature, eof);
@@ -372,46 +274,21 @@ public class PushCertificateParser {
 	 *
 	 * @param cmd
 	 *            the command.
-	 * @param rawLine
-	 *            the exact line read from the wire that produced this
-	 *            command, including trailing newline.
-	 * @throws PackProtocolException
-	 *             if the raw line does not end in a newline.
 	 * @since 4.1
 	 */
-	public void addCommand(ReceiveCommand cmd, String rawLine)
-			throws PackProtocolException {
-		checkCommandLine(rawLine);
+	public void addCommand(ReceiveCommand cmd) {
 		commands.add(cmd);
-		rawCommands.append(rawLine);
 	}
 
 	/**
 	 * Add a command to the signature.
 	 *
-	 * @param rawLine
-	 *            the exact line read from the wire that produced this
-	 *            command, including trailing newline.
-	 * @throws PackProtocolException
-	 *             if the raw line cannot be parsed to a command, or does not end
-	 *             in a newline.
+	 * @param line
+	 *            the line read from the wire that produced this
+	 *            command, with optional trailing newline already trimmed.
 	 * @since 4.0
 	 */
-	public void addCommand(String rawLine) throws PackProtocolException {
-		checkCommandLine(rawLine);
-		String line = rawLine.substring(0, rawLine.length() - 1);
+	public void addCommand(String line) {
 		commands.add(parseCommand(line));
-		rawCommands.append(rawLine);
-	}
-
-	private static void checkCommandLine(String rawLine)
-			throws PackProtocolException {
-		if (rawLine == null
-				|| rawLine.isEmpty()
-				|| rawLine.charAt(rawLine.length() - 1) != '\n') {
-			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidFieldValue,
-					"command", rawLine)); //$NON-NLS-1$
-		}
 	}
 }
