@@ -43,18 +43,14 @@
 package org.eclipse.jgit.lfs.server;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.http.HttpStatus.SC_FORBIDDEN;
-import static org.apache.http.HttpStatus.SC_NOT_FOUND;
-import static org.apache.http.HttpStatus.SC_OK;
-import static org.apache.http.HttpStatus.SC_SERVICE_UNAVAILABLE;
-import static org.apache.http.HttpStatus.SC_UNPROCESSABLE_ENTITY;
+import static javax.servlet.http.HttpServletResponse.SC_OK;
+import static javax.servlet.http.HttpServletResponse.SC_SERVICE_UNAVAILABLE;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.List;
@@ -63,11 +59,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jgit.lfs.errors.LfsException;
-import org.eclipse.jgit.lfs.errors.LfsRepositoryNotFound;
-import org.eclipse.jgit.lfs.errors.LfsRepositoryReadOnly;
-import org.eclipse.jgit.lfs.errors.LfsValidationError;
 
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
@@ -89,7 +80,7 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	private Gson gson = createGson();
 
 	/**
-	 * Get the large file repository for the given request and path.
+	 * Get the large file repository
 	 *
 	 * @param request
 	 *            the request
@@ -98,17 +89,11 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	 *
 	 * @return the large file repository storing large files or null if the
 	 *         request is not supported.
-	 * @throws LfsException
-	 * @since 4.5
 	 */
 	protected abstract LargeFileRepository getLargeFileRepository(
-			LfsRequest request, String path) throws LfsException;
+			LfsRequest request, String path);
 
-	/**
-	 * LFS request.
-	 *
-	 * @since 4.5
-	 */
+	/** LFS request. */
 	protected static class LfsRequest {
 		private String operation;
 
@@ -122,15 +107,6 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		public String getOperation() {
 			return operation;
 		}
-
-		/**
-		 * Get the LFS objects.
-		 *
-		 * @return the objects
-		 */
-		public List<LfsObject> getObjects() {
-			return objects;
-		}
 	}
 
 	@Override
@@ -143,22 +119,7 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
 		String path = req.getPathInfo();
 
-		LargeFileRepository repo = null;
-		try {
-			repo = getLargeFileRepository(request, path);
-		} catch (LfsValidationError e) {
-			sendError(res, SC_UNPROCESSABLE_ENTITY, e.getMessage());
-			return;
-		} catch (LfsRepositoryNotFound e) {
-			sendError(res, SC_NOT_FOUND, e.getMessage());
-			return;
-		} catch (LfsRepositoryReadOnly e) {
-			sendError(res, SC_FORBIDDEN, e.getMessage());
-			return;
-		} catch (LfsException e) {
-			sendError(res, SC_SERVICE_UNAVAILABLE, e.getMessage());
-			return;
-		}
+		LargeFileRepository repo = getLargeFileRepository(request, path);
 		if (repo == null) {
 			res.setStatus(SC_SERVICE_UNAVAILABLE);
 			return;
@@ -172,25 +133,7 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		w.flush();
 	}
 
-	static class Error {
-		String message;
-
-		Error(String m) {
-			this.message = m;
-		}
-	}
-
-	private void sendError(HttpServletResponse rsp, int status, String message)
-			throws IOException {
-		rsp.setStatus(status);
-		PrintWriter writer = rsp.getWriter();
-		gson.toJson(new Error(message), writer);
-		writer.flush();
-		writer.close();
-		rsp.flushBuffer();
-	}
-
-	private Gson createGson() {
+	private static Gson createGson() {
 		GsonBuilder gb = new GsonBuilder()
 				.setFieldNamingPolicy(
 						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
