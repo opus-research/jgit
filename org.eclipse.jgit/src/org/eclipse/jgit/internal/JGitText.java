@@ -373,6 +373,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexSignatureIsInvalid;
 	/***/ public String indexWriteException;
 	/***/ public String initFailedBareRepoDifferentDirs;
+	/***/ public String initFailedDirIsNoDirectory;
+	/***/ public String initFailedGitDirIsNoDirectory;
 	/***/ public String initFailedNonBareRepoSameDirs;
 	/***/ public String inMemoryBufferLimitExceeded;
 	/***/ public String inputDidntMatchLength;
@@ -553,7 +555,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pushCertificateInvalidSignature;
 	/***/ public String pushIsNotSupportedForBundleTransport;
 	/***/ public String pushNotPermitted;
-	/***/ public String pushOptionsNotSupported;
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String readTimedOut;
