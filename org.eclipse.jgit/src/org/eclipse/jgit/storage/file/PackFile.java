@@ -56,19 +56,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -87,7 +84,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/** Sorts PackFiles to be most recently created to least recently created. */
-	public static final Comparator<PackFile> SORT = new Comparator<PackFile>() {
+	public static Comparator<PackFile> SORT = new Comparator<PackFile>() {
 		public int compare(final PackFile a, final PackFile b) {
 			return b.packLastModified - a.packLastModified;
 		}
@@ -212,16 +209,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return 0 < offset && !isCorrupt(offset) ? load(curs, offset) : null;
 	}
 
-	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id, int matchLimit)
-			throws IOException {
-		idx().resolve(matches, id, matchLimit);
-	}
-
 	/**
 	 * Close the resources utilized by this repository
 	 */
 	public void close() {
-		DeltaBaseCache.purge(this);
+		UnpackedObjectCache.purge(this);
 		WindowCache.purge(this);
 		synchronized (this) {
 			loadedIdx = null;
@@ -275,11 +267,20 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return getReverseIdx().findObject(offset);
 	}
 
-	private final void decompress(final long position, final WindowCursor curs,
-			final byte[] dstbuf, final int dstoff, final int dstsz)
-			throws IOException, DataFormatException {
-		if (curs.inflate(this, position, dstbuf, dstoff) != dstsz)
+	private final UnpackedObjectCache.Entry readCache(final long position) {
+		return UnpackedObjectCache.get(this, position);
+	}
+
+	private final void saveCache(final long position, final byte[] data, final int type) {
+		UnpackedObjectCache.store(this, position, data, type);
+	}
+
+	private final byte[] decompress(final long position, final long totalSize,
+			final WindowCursor curs) throws IOException, DataFormatException {
+		final byte[] dstbuf = new byte[(int) totalSize];
+		if (curs.inflate(this, position, dstbuf, 0) != totalSize)
 			throw new EOFException(MessageFormat.format(JGitText.get().shortCompressedStreamAt, position));
+		return dstbuf;
 	}
 
 	final void copyAsIs(PackOutputStream out, LocalObjectToPack src,
@@ -326,7 +327,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 			readFully(src.offset + headerCnt, buf, 0, 20, curs);
 			crc1.update(buf, 0, 20);
-			crc2.update(buf, 0, 20);
+			crc2.update(buf, 0, headerCnt);
 			headerCnt += 20;
 		} else {
 			crc1.update(buf, 0, headerCnt);
@@ -599,7 +600,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					JGitText.get().packObjectCountMismatch, packCnt, idx.getObjectCount(), getPackFile()));
 
 		fd.seek(length - 20);
-		fd.readFully(buf, 0, 20);
+		fd.read(buf, 0, 20);
 		if (!Arrays.equals(buf, packChecksum))
 			throw new PackMismatchException(MessageFormat.format(
 					JGitText.get().packObjectCountMismatch
@@ -630,16 +631,10 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			case Constants.OBJ_BLOB:
 			case Constants.OBJ_TAG: {
 				if (sz < curs.getStreamFileThreshold()) {
-					byte[] data;
-					try {
-						data = new byte[(int) sz];
-					} catch (OutOfMemoryError tooBig) {
-						return largeWhole(curs, pos, type, sz, p);
-					}
-					decompress(pos + p, curs, data, 0, data.length);
+					byte[] data = decompress(pos + p, sz, curs);
 					return new ObjectLoader.SmallObject(type, data);
 				}
-				return largeWhole(curs, pos, type, sz, p);
+				return new LargePackedWholeObject(type, sz, pos, p, this, curs.db);
 			}
 
 			case Constants.OBJ_OFS_DELTA: {
@@ -686,58 +681,44 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	private ObjectLoader loadDelta(long posSelf, int hdrLen, long sz,
 			long posBase, WindowCursor curs) throws IOException,
 			DataFormatException {
-		if (Integer.MAX_VALUE <= sz)
-			return largeDelta(posSelf, hdrLen, posBase, curs);
+		if (curs.getStreamFileThreshold() <= sz) {
+			// The delta instruction stream itself is pretty big, and
+			// that implies the resulting object is going to be massive.
+			// Use only the large delta format here.
+			//
+			return new LargePackedDeltaObject(posSelf, posBase, hdrLen, //
+					this, curs.db);
+		}
 
-		byte[] base;
+		byte[] data;
 		int type;
 
-		DeltaBaseCache.Entry e = DeltaBaseCache.get(this, posBase);
+		UnpackedObjectCache.Entry e = readCache(posBase);
 		if (e != null) {
-			base = e.data;
+			data = e.data;
 			type = e.type;
 		} else {
 			ObjectLoader p = load(curs, posBase);
-			try {
-				base = p.getCachedBytes(curs.getStreamFileThreshold());
-			} catch (LargeObjectException tooBig) {
-				return largeDelta(posSelf, hdrLen, posBase, curs);
+			if (p.isLarge()) {
+				// The base itself is large. We have to produce a large
+				// delta stream as we don't want to build the whole base.
+				//
+				return new LargePackedDeltaObject(posSelf, posBase, hdrLen,
+						this, curs.db);
 			}
+			data = p.getCachedBytes();
 			type = p.getType();
-			DeltaBaseCache.store(this, posBase, base, type);
+			saveCache(posBase, data, type);
 		}
 
-		final byte[] delta;
-		try {
-			delta = new byte[(int) sz];
-		} catch (OutOfMemoryError tooBig) {
-			return largeDelta(posSelf, hdrLen, posBase, curs);
-		}
-
-		decompress(posSelf + hdrLen, curs, delta, 0, delta.length);
-		sz = BinaryDelta.getResultSize(delta);
-		if (Integer.MAX_VALUE <= sz)
-			return largeDelta(posSelf, hdrLen, posBase, curs);
-
-		final byte[] result;
-		try {
-			result = new byte[(int) sz];
-		} catch (OutOfMemoryError tooBig) {
-			return largeDelta(posSelf, hdrLen, posBase, curs);
-		}
-
-		BinaryDelta.apply(base, delta, result);
-		return new ObjectLoader.SmallObject(type, result);
-	}
-
-	private LargePackedWholeObject largeWhole(final WindowCursor curs,
-			final long pos, final int type, long sz, int p) {
-		return new LargePackedWholeObject(type, sz, pos, p, this, curs.db);
-	}
-
-	private LargePackedDeltaObject largeDelta(long posObj, int hdrLen,
-			long posBase, WindowCursor wc) {
-		return new LargePackedDeltaObject(posObj, posBase, hdrLen, this, wc.db);
+		// At this point we have the base, and its small, and the delta
+		// stream also is small, so the result object cannot be more than
+		// 2x our small size. This occurs if the delta instructions were
+		// "copy entire base, literal insert entire delta". Go with the
+		// faster small object style at this point.
+		//
+		data = BinaryDelta.apply(data, decompress(posSelf + hdrLen, sz, curs));
+		return new ObjectLoader.SmallObject(type, data);
 	}
 
 	byte[] getDeltaHeader(WindowCursor wc, long pos)
@@ -758,6 +739,12 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			readFully(pos, ib, 0, 20, curs);
 			int c = ib[0] & 0xff;
 			final int type = (c >> 4) & 7;
+			int shift = 4;
+			int p = 1;
+			while ((c & 0x80) != 0) {
+				c = ib[p++] & 0xff;
+				shift += 7;
+			}
 
 			switch (type) {
 			case Constants.OBJ_COMMIT:
@@ -767,9 +754,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				return type;
 
 			case Constants.OBJ_OFS_DELTA: {
-				int p = 1;
-				while ((c & 0x80) != 0)
-					c = ib[p++] & 0xff;
 				c = ib[p++] & 0xff;
 				long ofs = c & 127;
 				while ((c & 128) != 0) {
@@ -783,9 +767,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			}
 
 			case Constants.OBJ_REF_DELTA: {
-				int p = 1;
-				while ((c & 0x80) != 0)
-					c = ib[p++] & 0xff;
 				readFully(pos + p, ib, 0, 20, curs);
 				pos = findDeltaBase(ObjectId.fromRaw(ib));
 				continue;

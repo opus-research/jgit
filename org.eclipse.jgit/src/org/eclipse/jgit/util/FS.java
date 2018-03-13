@@ -43,10 +43,7 @@
 
 package org.eclipse.jgit.util;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 
@@ -55,44 +52,16 @@ public abstract class FS {
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED;
 
-	/**
-	 * Auto-detect the appropriate file system abstraction, taking into account
-	 * the presence of a Cygwin installation on the system. Using jgit in
-	 * combination with Cygwin requires a more elaborate (and possibly slower)
-	 * resolution of file system paths.
-	 *
-	 * @param cygwinUsed
-	 *            <ul>
-	 *            <li><code>Boolean.TRUE</code> to assume that Cygwin is used in
-	 *            combination with jgit</li>
-	 *            <li><code>Boolean.FALSE</code> to assume that Cygwin is
-	 *            <b>not</b> used with jgit</li>
-	 *            <li><code>null</code> to auto-detect whether a Cygwin
-	 *            installation is present on the system and in this case assume
-	 *            that Cygwin is used</li>
-	 *            </ul>
-	 *
-	 *            Note: this parameter is only relevant on Windows.
-	 *
-	 * @return detected file system abstraction
-	 */
-	public static FS detect(Boolean cygwinUsed) {
-		if (FS_Win32.detect()) {
-			boolean useCygwin = (cygwinUsed == null && FS_Win32_Cygwin.detect())
-					|| Boolean.TRUE.equals(cygwinUsed);
-
-			if (useCygwin)
-				return new FS_Win32_Cygwin();
-			else
-				return new FS_Win32();
-		} else if (FS_POSIX_Java6.detect())
-			return new FS_POSIX_Java6();
-		else
-			return new FS_POSIX_Java5();
-	}
-
 	static {
-		DETECTED = detect(null);
+		if (FS_Win32.detect()) {
+			if (FS_Win32_Cygwin.detect())
+				DETECTED = new FS_Win32_Cygwin();
+			else
+				DETECTED = new FS_Win32();
+		} else if (FS_POSIX_Java6.detect())
+			DETECTED = new FS_POSIX_Java6();
+		else
+			DETECTED = new FS_POSIX_Java5();
 	}
 
 	private final File userHome;
@@ -202,57 +171,4 @@ public abstract class FS {
 			return null;
 		return new File(home).getAbsoluteFile();
 	}
-
-	static File searchPath(final String path, final String... lookFor) {
-		for (final String p : path.split(File.pathSeparator)) {
-			for (String command : lookFor) {
-				final File e = new File(p, command);
-				if (e.isFile())
-					return e.getAbsoluteFile();
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Execute a command and return a single line of output as a String
-	 *
-	 * @param dir
-	 *            Working directory for the command
-	 * @param command
-	 *            as component array
-	 * @param encoding
-	 * @return the one-line output of the command
-	 */
-	protected static String readPipe(File dir, String[] command, String encoding) {
-		try {
-			final Process p = Runtime.getRuntime().exec(command, null, dir);
-			final BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), encoding));
-			String r = null;
-			try {
-				r = lineRead.readLine();
-			} finally {
-				p.getOutputStream().close();
-				p.getErrorStream().close();
-				lineRead.close();
-			}
-
-			for (;;) {
-				try {
-					if (p.waitFor() == 0 && r != null && r.length() > 0)
-						return r;
-					break;
-				} catch (InterruptedException ie) {
-					// Stop bothering me, I have a zombie to reap.
-				}
-			}
-		} catch (IOException e) {
-			// ignore
-		}
-		return null;
-	}
-
-	/** @return the $prefix directory C Git would use. */
-	public abstract File gitPrefix();
 }

@@ -48,24 +48,18 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.lib.CommitBuilder;
+import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -106,7 +100,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * class should only be used for one invocation of the command (means: one
 	 * call to {@link #call()})
 	 *
-	 * @return a {@link RevCommit} object representing the successful commit.
+	 * @return a {@link Commit} object representing the successful commit
 	 * @throws NoHeadException
 	 *             when called on a git repo without a HEAD reference
 	 * @throws NoMessageException
@@ -168,14 +162,15 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					ObjectId indexTreeId = index.writeTree(odi);
 
 					// Create a Commit object, populate it and write it
-					CommitBuilder commit = new CommitBuilder();
+					Commit commit = new Commit(repo);
 					commit.setCommitter(committer);
 					commit.setAuthor(author);
 					commit.setMessage(message);
 
-					commit.setParentIds(parents);
+					commit.setParentIds(parents.toArray(new ObjectId[] {}));
 					commit.setTreeId(indexTreeId);
-					ObjectId commitId = odi.insert(commit);
+					ObjectId commitId = odi.insert(Constants.OBJ_COMMIT, odi
+							.format(commit));
 					odi.flush();
 
 					RevWalk revWalk = new RevWalk(repo);
@@ -253,7 +248,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			} catch (IOException e) {
 				throw new JGitInternalException(MessageFormat.format(
 						JGitText.get().exceptionOccuredDuringReadingOfGIT_DIR,
-						Constants.MERGE_HEAD, e), e);
+						Constants.MERGE_HEAD, e));
 			}
 			if (message == null) {
 				try {
@@ -261,7 +256,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				} catch (IOException e) {
 					throw new JGitInternalException(MessageFormat.format(
 							JGitText.get().exceptionOccuredDuringReadingOfGIT_DIR,
-							Constants.MERGE_MSG, e), e);
+							Constants.MERGE_MSG, e));
 				}
 			}
 		}

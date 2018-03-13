@@ -42,22 +42,11 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -110,7 +99,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			git.commit().setAuthor(author).call();
 			fail("Didn't get the expected exception");
 		} catch (NoMessageException e) {
-			// expected
 		}
 	}
 
@@ -128,7 +116,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			commitCmd.setAuthor(author);
 			fail("didn't catch the expected exception");
 		} catch (IllegalStateException e) {
-			// expected
 		}
 		LogCommand logCmd = git.log();
 		logCmd.call();
@@ -137,7 +124,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			logCmd.call();
 			fail("didn't catch the expected exception");
 		} catch (IllegalStateException e) {
-			// expected
 		}
 	}
 
@@ -153,9 +139,13 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		db.updateRef(Constants.HEAD).link("refs/heads/side");
 		RevCommit firstSide = git.commit().setMessage("first side commit").setAuthor(author).call();
 
-		write(new File(db.getDirectory(), Constants.MERGE_HEAD), ObjectId
-				.toString(db.resolve("refs/heads/master")));
-		write(new File(db.getDirectory(), Constants.MERGE_MSG), "merging");
+		FileWriter wr = new FileWriter(new File(db.getDirectory(),
+				Constants.MERGE_HEAD));
+		wr.write(ObjectId.toString(db.resolve("refs/heads/master")));
+		wr.close();
+		wr = new FileWriter(new File(db.getDirectory(), Constants.MERGE_MSG));
+		wr.write("merging");
+		wr.close();
 
 		RevCommit commit = git.commit().call();
 		RevCommit[] parents = commit.getParents();
@@ -194,40 +184,5 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		tw = TreeWalk.forPath(db, "a.txt", commit.getTree());
 		assertEquals("db00fd65b218578127ea51f3dffac701f12f486a",
 				tw.getObjectId(0).getName());
-	}
-
-	public void testCommitRange() throws NoHeadException, NoMessageException,
-			UnmergedPathException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException,
-			IncorrectObjectTypeException, MissingObjectException {
-		// do 4 commits and set the range to the second and fourth one
-		Git git = new Git(db);
-		git.commit().setMessage("first commit").call();
-		RevCommit second = git.commit().setMessage("second commit")
-				.setCommitter(committer).call();
-		git.commit().setMessage("third commit").setAuthor(author).call();
-		RevCommit last = git.commit().setMessage("fourth commit").setAuthor(
-				author)
-				.setCommitter(committer).call();
-		Iterable<RevCommit> commits = git.log().addRange(second.getId(),
-				last.getId()).call();
-
-		// check that we have the third and fourth commit
-		PersonIdent defaultCommitter = new PersonIdent(db);
-		PersonIdent expectedAuthors[] = new PersonIdent[] { author, author };
-		PersonIdent expectedCommitters[] = new PersonIdent[] {
-				defaultCommitter, committer };
-		String expectedMessages[] = new String[] { "third commit",
-				"fourth commit" };
-		int l = expectedAuthors.length - 1;
-		for (RevCommit c : commits) {
-			assertEquals(expectedAuthors[l].getName(), c.getAuthorIdent()
-					.getName());
-			assertEquals(expectedCommitters[l].getName(), c.getCommitterIdent()
-					.getName());
-			assertEquals(c.getFullMessage(), expectedMessages[l]);
-			l--;
-		}
-		assertEquals(l, -1);
 	}
 }

@@ -67,12 +67,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -126,10 +122,6 @@ public class RefDirectory extends RefDatabase {
 
 	/** If in the header, denotes the file has peeled data. */
 	public static final String PACKED_REFS_PEELED = " peeled"; //$NON-NLS-1$
-
-	/** The names of the additional refs supported by this class */
-	private static final String[] additionalRefsNames = new String[] {
-			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD };
 
 	private final FileRepository parent;
 
@@ -303,17 +295,6 @@ public class RefDirectory extends RefDatabase {
 		}
 
 		return new RefMap(prefix, packed, upcast(loose), symbolic.toRefList());
-	}
-
-	@Override
-	public List<Ref> getAdditionalRefs() throws IOException {
-		List<Ref> ret = new LinkedList<Ref>();
-		for (String name : additionalRefsNames) {
-			Ref r = getRef(name);
-			if (r != null)
-				ret.add(r);
-		}
-		return ret;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -608,7 +589,6 @@ public class RefDirectory extends RefDatabase {
 			write = false;
 
 		if (write) {
-			WriteConfig wc = getRepository().getConfig().get(WriteConfig.KEY);
 			FileOutputStream out;
 			try {
 				out = new FileOutputStream(log, true);
@@ -621,15 +601,7 @@ public class RefDirectory extends RefDatabase {
 				out = new FileOutputStream(log, true);
 			}
 			try {
-				if (wc.getFSyncRefFiles()) {
-					FileChannel fc = out.getChannel();
-					ByteBuffer buf = ByteBuffer.wrap(rec);
-					while (0 < buf.remaining())
-						fc.write(buf);
-					fc.force(true);
-				} else {
-					out.write(rec);
-				}
+				out.write(rec);
 			} finally {
 				out.close();
 			}
@@ -768,7 +740,6 @@ public class RefDirectory extends RefDatabase {
 			@Override
 			protected void writeFile(String name, byte[] content)
 					throws IOException {
-				lck.setFSync(true);
 				lck.setNeedStatInformation(true);
 				try {
 					lck.write(content);
@@ -812,13 +783,6 @@ public class RefDirectory extends RefDatabase {
 		final LooseRef n = scanRef(null, name);
 		if (n == null)
 			return packed.get(name);
-
-		// check whether the found new ref is the an additional ref. These refs
-		// should not go into looseRefs
-		for (int i = 0; i < additionalRefsNames.length; i++)
-			if (name.equals(additionalRefsNames[i]))
-				return n;
-
 		if (looseRefs.compareAndSet(curList, curList.add(idx, n)))
 			modCnt.incrementAndGet();
 		return n;
@@ -887,7 +851,7 @@ public class RefDirectory extends RefDatabase {
 	private void fireRefsChanged() {
 		final int last = lastNotifiedModCnt.get();
 		final int curr = modCnt.get();
-		if (last != curr && lastNotifiedModCnt.compareAndSet(last, curr) && last != 0)
+		if (last != curr && lastNotifiedModCnt.compareAndSet(last, curr))
 			parent.fireEvent(new RefsChangedEvent());
 	}
 

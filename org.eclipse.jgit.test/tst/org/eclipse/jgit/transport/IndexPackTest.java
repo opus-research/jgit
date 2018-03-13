@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertTrue;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -56,19 +54,17 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.storage.file.PackFile;
+import org.eclipse.jgit.util.JGitTestUtil;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
-import org.junit.Test;
 
 /**
  * Test indexing of git packs. A pack is read from a stream, copied
@@ -83,7 +79,6 @@ public class IndexPackTest extends RepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void test1() throws  IOException {
 		File packFile = JGitTestUtil.getTestResourceFile("pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f.pack");
 		final InputStream is = new FileInputStream(packFile);
@@ -110,7 +105,6 @@ public class IndexPackTest extends RepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void test2() throws  IOException {
 		File packFile = JGitTestUtil.getTestResourceFile("pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371.pack");
 		final InputStream is = new FileInputStream(packFile);
@@ -136,7 +130,6 @@ public class IndexPackTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testTinyThinPack() throws Exception {
 		TestRepository d = new TestRepository(db);
 		RevBlob a = d.blob("a");
@@ -154,25 +147,6 @@ public class IndexPackTest extends RepositoryTestCase {
 		final byte[] raw = pack.toByteArray();
 		IndexPack ip = IndexPack.create(db, new ByteArrayInputStream(raw));
 		ip.setFixThin(true);
-		ip.index(NullProgressMonitor.INSTANCE);
-		ip.renameAndOpenPack();
-	}
-
-	@Test
-	public void testPackWithDuplicateBlob() throws Exception {
-		final byte[] data = Constants.encode("0123456789abcdefg");
-		TestRepository<Repository> d = new TestRepository<Repository>(db);
-		assertTrue(db.hasObject(d.blob(data)));
-
-		TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(1024);
-		packHeader(pack, 1);
-		pack.write((Constants.OBJ_BLOB) << 4 | 0x80 | 1);
-		pack.write(1);
-		deflate(pack, data);
-		digest(pack);
-
-		final byte[] raw = pack.toByteArray();
-		IndexPack ip = IndexPack.create(db, new ByteArrayInputStream(raw));
 		ip.index(NullProgressMonitor.INSTANCE);
 		ip.renameAndOpenPack();
 	}

@@ -43,22 +43,16 @@
 
 package org.eclipse.jgit.util;
 
-import static org.eclipse.jgit.junit.JGitTestUtil.getName;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
 import org.eclipse.jgit.junit.TestRng;
-import org.junit.Test;
 
-public class TemporaryBufferTest {
-	@Test
+import junit.framework.TestCase;
+
+public class TemporaryBufferTest extends TestCase {
 	public void testEmpty() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		try {
@@ -72,7 +66,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneByte() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte test = (byte) new TestRng(getName()).nextInt();
@@ -99,7 +92,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneBlock_BulkWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -130,7 +122,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneBlockAndHalf_BulkWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -161,7 +152,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneBlockAndHalf_SingleWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -190,7 +180,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneBlockAndHalf_Copy() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -220,7 +209,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testLarge_SingleWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -248,7 +236,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testInCoreLimit_SwitchOnAppendByte() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -277,7 +264,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testInCoreLimit_SwitchBeforeAppendByte() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -306,7 +292,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testInCoreLimit_SwitchOnCopy() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -338,7 +323,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testDestroyWhileOpen() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		try {
@@ -349,7 +333,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testRandomWrites() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final TestRng rng = new TestRng(getName());
@@ -396,7 +379,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testHeap() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.Heap(2 * 8 * 1024);
 		final byte[] r = new byte[8 * 1024];

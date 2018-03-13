@@ -43,20 +43,14 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class GetTextTest {
-	@Test
+public class GetTextTest extends TestCase {
 	public void testGetText_BothISO88591() throws IOException {
 		final Charset cs = Charset.forName("ISO-8859-1");
 		final Patch p = parseTestPatchFile();
@@ -67,7 +61,6 @@ public class GetTextTest {
 		assertEquals(readTestPatchFile(cs), fh.getScriptText(cs, cs));
 	}
 
-	@Test
 	public void testGetText_NoBinary() throws IOException {
 		final Charset cs = Charset.forName("ISO-8859-1");
 		final Patch p = parseTestPatchFile();
@@ -78,7 +71,6 @@ public class GetTextTest {
 		assertEquals(readTestPatchFile(cs), fh.getScriptText(cs, cs));
 	}
 
-	@Test
 	public void testGetText_Convert() throws IOException {
 		final Charset csOld = Charset.forName("ISO-8859-1");
 		final Charset csNew = Charset.forName("UTF-8");
@@ -98,7 +90,6 @@ public class GetTextTest {
 		assertEquals(exp, fh.getScriptText(csOld, csNew));
 	}
 
-	@Test
 	public void testGetText_DiffCc() throws IOException {
 		final Charset csOld = Charset.forName("ISO-8859-1");
 		final Charset csNew = Charset.forName("UTF-8");
@@ -120,7 +111,7 @@ public class GetTextTest {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = JGitTestUtil.getName() + ".patch";
+		final String patchFile = getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");
@@ -136,7 +127,7 @@ public class GetTextTest {
 	}
 
 	private String readTestPatchFile(final Charset cs) throws IOException {
-		final String patchFile = JGitTestUtil.getName() + ".patch";
+		final String patchFile = getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

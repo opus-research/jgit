@@ -52,7 +52,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.EntryExistsException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -603,26 +602,6 @@ public class Tree extends TreeEntry implements Treeish {
 		}
 
 		contents = temp;
-	}
-
-	/**
-	 * Format this Tree in canonical format.
-	 *
-	 * @return canonical encoding of the tree object.
-	 * @throws IOException
-	 *             the tree cannot be loaded, or its not in a writable state.
-	 */
-	public byte[] format() throws IOException {
-		TreeFormatter fmt = new TreeFormatter();
-		for (TreeEntry e : members()) {
-			ObjectId id = e.getId();
-			if (id == null)
-				throw new ObjectWritingException(MessageFormat.format(JGitText
-						.get().objectAtPathDoesNotHaveId, e.getFullName()));
-
-			fmt.append(e.getNameUTF8(), e.getMode(), id);
-		}
-		return fmt.toByteArray();
 	}
 
 	public String toString() {

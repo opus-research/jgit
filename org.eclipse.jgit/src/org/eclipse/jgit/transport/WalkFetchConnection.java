@@ -87,7 +87,6 @@ import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.file.UnpackedObject;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Generic fetch support for dumb transport protocols.
@@ -318,7 +317,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		// If we had any prior errors fetching this object they are
 		// now resolved, as the object was parsed successfully.
 		//
-		fetchErrors.remove(id);
+		fetchErrors.remove(id.copy());
 	}
 
 	private void processBlob(final RevObject obj) throws TransportException {
@@ -462,7 +461,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 			// We could not obtain the object. There may be reasons why.
 			//
-			List<Throwable> failures = fetchErrors.get(id);
+			List<Throwable> failures = fetchErrors.get(id.copy());
 			final TransportException te;
 
 			te = new TransportException(MessageFormat.format(JGitText.get().cannotGet, id.name()));
@@ -541,12 +540,8 @@ class WalkFetchConnection extends BaseFetchConnection {
 				// it failed the index and pack are unusable and we
 				// shouldn't consult them again.
 				//
-				try {
-					if (pack.tmpIdx != null)
-						FileUtils.delete(pack.tmpIdx);
-				} catch (IOException e) {
-					throw new TransportException(e.getMessage(), e);
-				}
+				if (pack.tmpIdx != null)
+					pack.tmpIdx.delete();
 				packItr.remove();
 			}
 
@@ -835,7 +830,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					fos.close();
 				}
 			} catch (IOException err) {
-				FileUtils.delete(tmpIdx);
+				tmpIdx.delete();
 				throw err;
 			} finally {
 				s.in.close();
@@ -843,14 +838,14 @@ class WalkFetchConnection extends BaseFetchConnection {
 			pm.endTask();
 
 			if (pm.isCancelled()) {
-				FileUtils.delete(tmpIdx);
+				tmpIdx.delete();
 				return;
 			}
 
 			try {
 				index = PackIndex.open(tmpIdx);
 			} catch (IOException e) {
-				FileUtils.delete(tmpIdx);
+				tmpIdx.delete();
 				throw e;
 			}
 		}

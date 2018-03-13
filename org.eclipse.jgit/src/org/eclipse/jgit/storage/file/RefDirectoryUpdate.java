@@ -99,10 +99,6 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected Result doUpdate(final Result status) throws IOException {
-		WriteConfig wc = database.getRepository().getConfig()
-				.get(WriteConfig.KEY);
-
-		lock.setFSync(wc.getFSyncRefFiles());
 		lock.setNeedStatInformation(true);
 		lock.write(getNewObjectId());
 
@@ -147,10 +143,6 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected Result doLink(final String target) throws IOException {
-		WriteConfig wc = database.getRepository().getConfig()
-				.get(WriteConfig.KEY);
-
-		lock.setFSync(wc.getFSyncRefFiles());
 		lock.setNeedStatInformation(true);
 		lock.write(encode(RefDirectory.SYMREF + target + '\n'));
 
