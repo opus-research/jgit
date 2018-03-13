@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,18 +54,19 @@ public class CheckoutResult {
 	/**
 	 * The {@link Status#OK} result;
 	 */
-	public static CheckoutResult OK_RESULT = new CheckoutResult(Status.OK, null);
+	public static final CheckoutResult OK_RESULT = new CheckoutResult(
+			Status.OK, null);
 
 	/**
 	 * The {@link Status#ERROR} result;
 	 */
-	public static CheckoutResult ERROR_RESULT = new CheckoutResult(
+	public static final CheckoutResult ERROR_RESULT = new CheckoutResult(
 			Status.ERROR, null);
 
 	/**
 	 * The {@link Status#NOT_TRIED} result;
 	 */
-	public static CheckoutResult NOT_TRIED_RESULT = new CheckoutResult(
+	public static final CheckoutResult NOT_TRIED_RESULT = new CheckoutResult(
 			Status.NOT_TRIED, null);
 
 	/**
@@ -97,20 +97,20 @@ public class CheckoutResult {
 
 	private final Status myStatus;
 
-	private final List<File> conflictList;
+	private final List<String> conflictList;
 
-	private final List<File> undeletedList;
+	private final List<String> undeletedList;
 
-	CheckoutResult(Status status, List<File> fileList) {
+	CheckoutResult(Status status, List<String> fileList) {
 		myStatus = status;
 		if (status == Status.CONFLICTS)
 			this.conflictList = fileList;
 		else
-			this.conflictList = new ArrayList<File>(0);
+			this.conflictList = new ArrayList<String>(0);
 		if (status == Status.NONDELETED)
 			this.undeletedList = fileList;
 		else
-			this.undeletedList = new ArrayList<File>(0);
+			this.undeletedList = new ArrayList<String>(0);
 
 	}
 
@@ -125,7 +125,7 @@ public class CheckoutResult {
 	 * @return the list of files that created a checkout conflict, or an empty
 	 *         list if {@link #getStatus()} is not {@link Status#CONFLICTS};
 	 */
-	public List<File> getConflictList() {
+	public List<String> getConflictList() {
 		return conflictList;
 	}
 
@@ -134,7 +134,7 @@ public class CheckoutResult {
 	 *         an empty list if {@link #getStatus()} is not
 	 *         {@link Status#NONDELETED};
 	 */
-	public List<File> getUndeletedList() {
+	public List<String> getUndeletedList() {
 		return undeletedList;
 	}
 

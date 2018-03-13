@@ -60,6 +60,9 @@ public class ConfigConstants {
 	/** The "diff" section */
 	public static final String CONFIG_DIFF_SECTION = "diff";
 
+	/** The "user" section */
+	public static final String CONFIG_USER_SECTION = "user";
+
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
@@ -68,6 +71,9 @@ public class ConfigConstants {
 
 	/** The "bare" key */
 	public static final String CONFIG_KEY_BARE = "bare";
+
+	/** The "excludesfile" key */
+	public static final String CONFIG_KEY_EXCLUDESFILE = "excludesfile";
 
 	/** The "filemode" key */
 	public static final String CONFIG_KEY_FILEMODE = "filemode";
@@ -95,4 +101,30 @@ public class ConfigConstants {
 
 	/** The "autosetupmerge" key */
 	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
+
+	/** The "autosetuprebase" key */
+	public static final String CONFIG_KEY_AUTOSETUPREBASE = "autosetuprebase";
+	/** The "name" key */
+	public static final String CONFIG_KEY_NAME = "name";
+
+	/** The "email" key */
+	public static final String CONFIG_KEY_EMAIL = "email";
+
+	/** The "false" key (used to configure {@link #CONFIG_KEY_AUTOSETUPMERGE} */
+	public static final String CONFIG_KEY_FALSE = "false";
+
+	/** The "true" key (used to configure {@link #CONFIG_KEY_AUTOSETUPMERGE} */
+	public static final String CONFIG_KEY_TRUE = "true";
+
+	/**
+	 * The "always" key (used to configure {@link #CONFIG_KEY_AUTOSETUPREBASE}
+	 * and {@link #CONFIG_KEY_AUTOSETUPMERGE}
+	 */
+	public static final String CONFIG_KEY_ALWAYS = "always";
+
+	/** The "never" key (used to configure {@link #CONFIG_KEY_AUTOSETUPREBASE} */
+	public static final String CONFIG_KEY_NEVER = "never";
+
+	/** The "local" key (used to configure {@link #CONFIG_KEY_AUTOSETUPREBASE} */
+	public static final String CONFIG_KEY_LOCAL = "local";
 }

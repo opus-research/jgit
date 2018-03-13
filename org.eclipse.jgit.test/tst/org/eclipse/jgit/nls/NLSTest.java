@@ -43,15 +43,23 @@
 
 package org.eclipse.jgit.nls;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+
 import java.util.Locale;
-import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
+public class NLSTest {
 
-public class TestNLS extends TestCase {
-
+	@Test
 	public void testNLSLocale() {
 		NLS.setLocale(NLS.ROOT_LOCALE);
 		GermanTranslatedBundle bundle = GermanTranslatedBundle.get();
@@ -62,6 +70,7 @@ public class TestNLS extends TestCase {
 		assertEquals(Locale.GERMAN, bundle.effectiveLocale());
 	}
 
+	@Test
 	public void testJVMDefaultLocale() {
 		Locale.setDefault(NLS.ROOT_LOCALE);
 		NLS.useJVMDefaultLocale();
@@ -74,6 +83,7 @@ public class TestNLS extends TestCase {
 		assertEquals(Locale.GERMAN, bundle.effectiveLocale());
 	}
 
+	@Test
 	public void testThreadTranslationBundleInheritance() throws InterruptedException {
 
 		class T extends Thread {
@@ -99,43 +109,38 @@ public class TestNLS extends TestCase {
 		assertSame(mainThreadsBundle, t.bundle);
 	}
 
-	public void testParallelThreadsWithDifferentLocales() throws InterruptedException {
+	@Test
+	public void testParallelThreadsWithDifferentLocales()
+			throws InterruptedException, ExecutionException {
 
 		final CyclicBarrier barrier = new CyclicBarrier(2);
 
-		class T extends Thread {
-			Locale locale;
-			GermanTranslatedBundle bundle;
-			Exception e;
+		class GetBundle implements Callable<TranslationBundle> {
 
-			T(Locale locale) {
+			private Locale locale;
+
+			GetBundle(Locale locale) {
 				this.locale = locale;
 			}
 
-			@Override
-			public void run() {
-				try {
-					NLS.setLocale(locale);
-					barrier.await(); // wait for the other thread to set its locale
-					bundle = GermanTranslatedBundle.get();
-				} catch (InterruptedException e) {
-					this.e = e;
-				} catch (BrokenBarrierException e) {
-					this.e = e;
-				}
+			public TranslationBundle call() throws Exception {
+				NLS.setLocale(locale);
+				barrier.await(); // wait for the other thread to set its locale
+				return GermanTranslatedBundle.get();
 			}
 		}
 
-		T t1 = new T(NLS.ROOT_LOCALE);
-		T t2 = new T(Locale.GERMAN);
-		t1.start();
-		t2.start();
-		t1.join();
-		t2.join();
-
-		assertNull("t1 was interrupted or barrier was broken", t1.e);
-		assertNull("t2 was interrupted or barrier was broken", t2.e);
-		assertEquals(NLS.ROOT_LOCALE, t1.bundle.effectiveLocale());
-		assertEquals(Locale.GERMAN, t2.bundle.effectiveLocale());
+		ExecutorService pool = Executors.newFixedThreadPool(2);
+		try {
+			Future<TranslationBundle> root = pool.submit(new GetBundle(
+					NLS.ROOT_LOCALE));
+			Future<TranslationBundle> german = pool.submit(new GetBundle(
+					Locale.GERMAN));
+			assertEquals(NLS.ROOT_LOCALE, root.get().effectiveLocale());
+			assertEquals(Locale.GERMAN, german.get().effectiveLocale());
+		} finally {
+			pool.shutdown();
+			pool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+		}
 	}
 }

@@ -80,8 +80,21 @@ public class Git {
 	private final Repository repo;
 
 	/**
+	 * Returns a command object to execute a {@code clone} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
+	 *      >Git documentation about clone</a>
+	 * @return a {@link CloneCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code clone} command
+	 */
+	static public CloneCommand cloneRepository() {
+		return new CloneCommand();
+	}
+
+	/**
 	 * Returns a command object to execute a {@code init} command
-	 * 
+	 *
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
 	 *      >Git documentation about init</a>
@@ -257,6 +270,19 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command object to execute a {@code revert} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-revert.html"
+	 *      >Git documentation about reverting changes</a>
+	 * @return a {@link RevertCommand} used to collect all optional
+	 *         parameters and to finally execute the {@code cherry-pick} command
+	 */
+	public RevertCommand revert() {
+		return new RevertCommand(repo);
+	}
+
+	/**
 	 * Returns a command object to execute a {@code Rebase} command
 	 *
 	 * @see <a
@@ -293,6 +319,19 @@ public class Git {
 	 */
 	public CheckoutCommand checkout() {
 		return new CheckoutCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code reset} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reset.html"
+	 *      >Git documentation about reset</a>
+	 * @return a {@link ResetCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code reset} command
+	 */
+	public ResetCommand reset() {
+		return new ResetCommand(repo);
 	}
 
 	/**

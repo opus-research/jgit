@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,16 +41,70 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.notes;
 
-import org.eclipse.jgit.http.server.HttpServerText;
+import java.io.IOException;
+import java.text.MessageFormat;
 
-/** Indicates the request service is not enabled on a repository. */
-public class ServiceNotEnabledException extends Exception {
+import org.eclipse.jgit.JGitText;
+
+/**
+ * This exception will be thrown from the {@link NoteMerger} when a conflict on
+ * Notes content is found during merge.
+ */
+public class NotesMergeConflictException extends IOException {
 	private static final long serialVersionUID = 1L;
 
-	/** Indicates the request service is not available. */
-	public ServiceNotEnabledException() {
-		super(HttpServerText.get().serviceNotEnabled);
+	/**
+	 * Construct a NotesMergeConflictException for the specified base, ours and
+	 * theirs note versions.
+	 *
+	 * @param base
+	 *            note version
+	 * @param ours
+	 *            note version
+	 * @param theirs
+	 *            note version
+	 */
+	public NotesMergeConflictException(Note base, Note ours, Note theirs) {
+		super(MessageFormat.format(JGitText.get().mergeConflictOnNotes,
+				noteOn(base, ours, theirs), noteData(base), noteData(ours),
+				noteData(theirs)));
+	}
+
+	/**
+	 * Constructs a NotesMergeConflictException for the specified base, ours and
+	 * theirs versions of the root note tree.
+	 *
+	 * @param base
+	 *            version of the root note tree
+	 * @param ours
+	 *            version of the root note tree
+	 * @param theirs
+	 *            version of the root note tree
+	 */
+	public NotesMergeConflictException(NonNoteEntry base, NonNoteEntry ours,
+			NonNoteEntry theirs) {
+		super(MessageFormat.format(
+				JGitText.get().mergeConflictOnNonNoteEntries, name(base),
+				name(ours), name(theirs)));
+	}
+
+	private static String noteOn(Note base, Note ours, Note theirs) {
+		if (base != null)
+			return base.name();
+		if (ours != null)
+			return ours.name();
+		return theirs.name();
+	}
+
+	private static String noteData(Note n) {
+		if (n != null)
+			return n.getData().name();
+		return "";
+	}
+
+	private static String name(NonNoteEntry e) {
+		return e != null ? e.name() : "";
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,39 +41,24 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.http.server;
 
-import javax.servlet.http.HttpServletRequest;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.ReceivePack;
+import org.junit.Test;
 
-/** Create and configure {@link ReceivePack} service instance. */
-public interface ReceivePackFactory {
-	/** A factory disabling the ReceivePack service for all repositories. */
-	public static final ReceivePackFactory DISABLED = new ReceivePackFactory() {
-		public ReceivePack create(HttpServletRequest req, Repository db)
-				throws ServiceNotEnabledException {
-			throw new ServiceNotEnabledException();
-		}
-	};
+public class ServletUtilsTest {
+	@Test
+	public void testAcceptGzip() {
+		assertFalse(ServletUtils.acceptsGzipEncoding((String) null));
+		assertFalse(ServletUtils.acceptsGzipEncoding(""));
 
-	/**
-	 * Create and configure a new ReceivePack instance for a repository.
-	 *
-	 * @param req
-	 *            current HTTP request, in case information from the request may
-	 *            help configure the ReceivePack instance.
-	 * @param db
-	 *            the repository the receive would write into.
-	 * @return the newly configured ReceivePack instance, must not be null.
-	 * @throws ServiceNotEnabledException
-	 *             this factory refuses to create the instance because it is not
-	 *             allowed on the target repository, by any user.
-	 * @throws ServiceNotAuthorizedException
-	 *             this factory refuses to create the instance for this HTTP
-	 *             request and repository, such as due to a permission error.
-	 */
-	ReceivePack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
+		assertTrue(ServletUtils.acceptsGzipEncoding("gzip"));
+		assertTrue(ServletUtils.acceptsGzipEncoding("deflate,gzip"));
+		assertTrue(ServletUtils.acceptsGzipEncoding("gzip,deflate"));
+
+		assertFalse(ServletUtils.acceptsGzipEncoding("gzip(proxy)"));
+		assertFalse(ServletUtils.acceptsGzipEncoding("proxy-gzip"));
+	}
 }

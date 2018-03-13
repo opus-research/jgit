@@ -46,6 +46,8 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -54,18 +56,21 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.zip.Deflater;
 
+import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevBlob;
+import org.eclipse.jgit.storage.file.ObjectDirectoryPackParser;
 import org.eclipse.jgit.storage.file.PackFile;
-import org.eclipse.jgit.util.JGitTestUtil;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
+import org.junit.After;
+import org.junit.Test;
 
 /**
  * Test indexing of git packs. A pack is read from a stream, copied
@@ -73,20 +78,21 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * to make sure they contain the expected objects (well we don't test
  * for all of them unless the packs are very small).
  */
-public class IndexPackTest extends RepositoryTestCase {
-
+public class PackParserTest extends RepositoryTestCase {
 	/**
 	 * Test indexing one of the test packs in the egit repo. It has deltas.
 	 *
 	 * @throws IOException
 	 */
+	@Test
 	public void test1() throws  IOException {
 		File packFile = JGitTestUtil.getTestResourceFile("pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f.pack");
 		final InputStream is = new FileInputStream(packFile);
 		try {
-			IndexPack pack = new IndexPack(db, is, new File(trash, "tmp_pack1"));
-			pack.index(new TextProgressMonitor());
-			PackFile file = new PackFile(new File(trash, "tmp_pack1.idx"), new File(trash, "tmp_pack1.pack"));
+			ObjectDirectoryPackParser p = (ObjectDirectoryPackParser) index(is);
+			p.parse(NullProgressMonitor.INSTANCE);
+			PackFile file = p.getPackFile();
+
 			assertTrue(file.hasObject(ObjectId.fromString("4b825dc642cb6eb9a060e54bf8d69288fbee4904")));
 			assertTrue(file.hasObject(ObjectId.fromString("540a36d136cf413e4b064c2b0e0a4db60f77feab")));
 			assertTrue(file.hasObject(ObjectId.fromString("5b6e7c66c276e7610d4a73c70ec1a1f7c1003259")));
@@ -106,13 +112,15 @@ public class IndexPackTest extends RepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
+	@Test
 	public void test2() throws  IOException {
 		File packFile = JGitTestUtil.getTestResourceFile("pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371.pack");
 		final InputStream is = new FileInputStream(packFile);
 		try {
-			IndexPack pack = new IndexPack(db, is, new File(trash, "tmp_pack2"));
-			pack.index(new TextProgressMonitor());
-			PackFile file = new PackFile(new File(trash, "tmp_pack2.idx"), new File(trash, "tmp_pack2.pack"));
+			ObjectDirectoryPackParser p = (ObjectDirectoryPackParser) index(is);
+			p.parse(NullProgressMonitor.INSTANCE);
+			PackFile file = p.getPackFile();
+
 			assertTrue(file.hasObject(ObjectId.fromString("02ba32d3649e510002c21651936b7077aa75ffa9")));
 			assertTrue(file.hasObject(ObjectId.fromString("0966a434eb1a025db6b71485ab63a3bfbea520b6")));
 			assertTrue(file.hasObject(ObjectId.fromString("09efc7e59a839528ac7bda9fa020dc9101278680")));
@@ -131,6 +139,7 @@ public class IndexPackTest extends RepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testTinyThinPack() throws Exception {
 		TestRepository d = new TestRepository(db);
 		RevBlob a = d.blob("a");
@@ -145,13 +154,12 @@ public class IndexPackTest extends RepositoryTestCase {
 
 		digest(pack);
 
-		final byte[] raw = pack.toByteArray();
-		IndexPack ip = IndexPack.create(db, new ByteArrayInputStream(raw));
-		ip.setFixThin(true);
-		ip.index(NullProgressMonitor.INSTANCE);
-		ip.renameAndOpenPack();
+		PackParser p = index(new ByteArrayInputStream(pack.toByteArray()));
+		p.setAllowThin(true);
+		p.parse(NullProgressMonitor.INSTANCE);
 	}
 
+	@Test
 	public void testPackWithDuplicateBlob() throws Exception {
 		final byte[] data = Constants.encode("0123456789abcdefg");
 		TestRepository<Repository> d = new TestRepository<Repository>(db);
@@ -164,10 +172,9 @@ public class IndexPackTest extends RepositoryTestCase {
 		deflate(pack, data);
 		digest(pack);
 
-		final byte[] raw = pack.toByteArray();
-		IndexPack ip = IndexPack.create(db, new ByteArrayInputStream(raw));
-		ip.index(NullProgressMonitor.INSTANCE);
-		ip.renameAndOpenPack();
+		PackParser p = index(new ByteArrayInputStream(pack.toByteArray()));
+		p.setAllowThin(false);
+		p.parse(NullProgressMonitor.INSTANCE);
 	}
 
 	private void packHeader(TemporaryBuffer.Heap tinyPack, int cnt)
@@ -197,5 +204,19 @@ public class IndexPackTest extends RepositoryTestCase {
 		MessageDigest md = Constants.newMessageDigest();
 		md.update(buf.toByteArray());
 		buf.write(md.digest());
+	}
+
+	private ObjectInserter inserter;
+
+	@After
+	public void release() {
+		if (inserter != null)
+			inserter.release();
+	}
+
+	private PackParser index(InputStream in) throws IOException {
+		if (inserter == null)
+			inserter = db.newObjectInserter();
+		return inserter.newPackParser(in);
 	}
 }
