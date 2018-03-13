@@ -76,7 +76,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.InternalHttpServerGlue;
@@ -201,7 +200,7 @@ class ReceivePackServlet extends HttpServlet {
 			consumeRequestBody(req);
 			out.close();
 
-		} catch (UnpackException | PackProtocolException e) {
+		} catch (UnpackException e) {
 			// This should be already reported to the client.
 			log(rp.getRepository(), e.getCause());
 			consumeRequestBody(req);
