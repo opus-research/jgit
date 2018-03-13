@@ -300,10 +300,10 @@ class TextHashFunctions extends TextBuiltin {
 
 		long fileCnt = 0;
 		long lineCnt = 0;
-		try (ObjectReader or = db.newObjectReader();
-			RevWalk rw = new RevWalk(or);
-			TreeWalk tw = new TreeWalk(or)) {
+		try (ObjectReader or = db.newObjectReader()) {
 			final MutableObjectId id = new MutableObjectId();
+			RevWalk rw = new RevWalk(or);
+			TreeWalk tw = new TreeWalk(or);
 			tw.reset(rw.parseTree(db.resolve(Constants.HEAD)));
 			tw.setRecursive(true);
 

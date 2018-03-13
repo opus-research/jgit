@@ -64,7 +64,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -209,16 +208,6 @@ public abstract class Repository implements AutoCloseable {
 	 * @return the configuration of this repository
 	 */
 	public abstract StoredConfig getConfig();
-
-	/**
-	 * @return a new {@link AttributesNodeProvider}. This
-	 *         {@link AttributesNodeProvider} is lazy loaded only once. It means
-	 *         that it will not be updated after loading. Prefer creating new
-	 *         instance for each use.
-	 * @since 4.2
-	 */
-	public abstract AttributesNodeProvider createAttributesNodeProvider();
-
 
 	/**
 	 * @return the used file system abstraction
@@ -860,9 +849,8 @@ public abstract class Repository implements AutoCloseable {
 	 * Except when HEAD is detached, in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
-	 * @return name of current branch (for example {@code refs/heads/master}),
-	 *         an ObjectId in hex format if the current branch is detached,
-	 *         or null if the repository is corrupt and has no HEAD reference.
+	 * @return name of current branch (for example {@code refs/heads/master}) or
+	 *         an ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
 	public String getFullBranch() throws IOException {
@@ -883,9 +871,8 @@ public abstract class Repository implements AutoCloseable {
 	 * leading prefix {@code refs/heads/} is removed from the reference before
 	 * it is returned to the caller.
 	 *
-	 * @return name of current branch (for example {@code master}), an
-	 *         ObjectId in hex format if the current branch is detached,
-	 *         or null if the repository is corrupt and has no HEAD reference.
+	 * @return name of current branch (for example {@code master}), or an
+	 *         ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
 	public String getBranch() throws IOException {
