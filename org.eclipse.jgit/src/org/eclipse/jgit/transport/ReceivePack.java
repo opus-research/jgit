@@ -64,10 +64,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.UnpackException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -115,8 +115,9 @@ public class ReceivePack {
 			if (nul >= 0) {
 				for (String c : line.substring(nul + 1).split(" "))
 					caps.add(c);
-			}
-			this.line = line.substring(0, nul);
+				this.line = line.substring(0, nul);
+			} else
+				this.line = line;
 			this.capabilities = Collections.unmodifiableSet(caps);
 		}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,24 +40,59 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport;
 
-package org.eclipse.jgit.dircache;
+import java.util.Collections;
+import java.util.Set;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.lib.Repository;
 
 /**
- * Thrown when JGit detects and refuses to use an invalid path
+ * Transport protocol contributed via service provider
  */
-public class InvalidPathException extends IllegalArgumentException {
-
-	private static final long serialVersionUID = 1L;
+public class SpiTransport extends Transport {
 
 	/**
-	 * @param path
+	 * Transport protocol scheme
 	 */
-	public InvalidPathException(String path) {
-		super(MessageFormat.format(JGitText.get().invalidPath, path));
+	public static final String SCHEME = "testspi";
+
+	/**
+	 * Instance
+	 */
+	public static final TransportProtocol PROTO = new TransportProtocol() {
+
+		public String getName() {
+			return "Test SPI Transport Protocol";
+		}
+
+		public Set<String> getSchemes() {
+			return Collections.singleton(SCHEME);
+		}
+
+		public Transport open(URIish uri, Repository local, String remoteName)
+				throws NotSupportedException, TransportException {
+			throw new NotSupportedException("not supported");
+		}
+	};
+
+	private SpiTransport(Repository local, URIish uri) {
+		super(local, uri);
+	}
+
+	public FetchConnection openFetch() throws NotSupportedException,
+			TransportException {
+		throw new NotSupportedException("not supported");
+	}
+
+	public PushConnection openPush() throws NotSupportedException,
+			TransportException {
+		throw new NotSupportedException("not supported");
+	}
+
+	public void close() {
+		// Intentionally left blank
 	}
 }
