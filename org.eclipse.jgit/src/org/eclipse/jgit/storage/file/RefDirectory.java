@@ -839,10 +839,9 @@ public class RefDirectory extends RefDatabase {
 		} else if (modified == 0)
 			return null;
 
-		final int limit = 4096;
 		final byte[] buf;
 		try {
-			buf = IO.readSome(path, limit);
+			buf = IO.readFully(path, 4096);
 		} catch (FileNotFoundException noFile) {
 			return null; // doesn't exist; not a reference.
 		}
@@ -852,9 +851,6 @@ public class RefDirectory extends RefDatabase {
 			return null; // empty file; not a reference.
 
 		if (isSymRef(buf, n)) {
-			if (n == limit)
-				return null; // possibly truncated ref
-
 			// trim trailing whitespace
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
