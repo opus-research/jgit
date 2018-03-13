@@ -50,10 +50,10 @@ import java.util.concurrent.ThreadFactory;
 /**
  * Simple work queue to run tasks in the background
  */
-class AlarmQueue {
-	private static final ScheduledThreadPoolExecutor alarmQueue;
+class WorkQueue {
+	private static final ScheduledThreadPoolExecutor executor;
 
-	static final Object alarmQueueKiller;
+	static final Object executorKiller;
 
 	static {
 		// To support garbage collection, start our thread but
@@ -62,7 +62,7 @@ class AlarmQueue {
 		// to shutdown, ending the worker.
 		//
 		int threads = 1;
-		alarmQueue = new ScheduledThreadPoolExecutor(threads,
+		executor = new ScheduledThreadPoolExecutor(threads,
 				new ThreadFactory() {
 					private final ThreadFactory baseFactory = Executors
 							.defaultThreadFactory();
@@ -74,26 +74,26 @@ class AlarmQueue {
 						return thr;
 					}
 				});
-		alarmQueue.setRemoveOnCancelPolicy(true);
-		alarmQueue.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-		alarmQueue.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-		alarmQueue.prestartAllCoreThreads();
+		executor.setRemoveOnCancelPolicy(true);
+		executor.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+		executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+		executor.prestartAllCoreThreads();
 
 		// Now that the threads are running, its critical to swap out
 		// our own thread factory for one that isn't in the ClassLoader.
 		// This allows the class to GC.
 		//
-		alarmQueue.setThreadFactory(Executors.defaultThreadFactory());
+		executor.setThreadFactory(Executors.defaultThreadFactory());
 
-		alarmQueueKiller = new Object() {
+		executorKiller = new Object() {
 			@Override
 			protected void finalize() {
-				alarmQueue.shutdownNow();
+				executor.shutdownNow();
 			}
 		};
 	}
 
 	static ScheduledThreadPoolExecutor getExecutor() {
-		return alarmQueue;
+		return executor;
 	}
 }
