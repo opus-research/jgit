@@ -206,21 +206,39 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		d2.close();
 		assertEquals(0, d2.useCnt.get());
 		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
+		assertTrue(RepositoryCache.isCached(d2));
 	}
 
 	@Test
-	public void testRepositoryUnregisteringWhenExpired()
-			throws InterruptedException {
-		RepositoryCache.register(db);
-		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
-		db.close();
-		assertEquals(0, ((Repository) db).useCnt.get());
-		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
-		RepositoryCacheConfig config = new RepositoryCacheConfig();
-		config.setExpireAfter(1);
-		config.setCleanupDelay(1);
-		RepositoryCache.reconfigure(config);
-		Thread.sleep(50);
-		assertEquals(0, RepositoryCache.getRegisteredKeys().size());
+	public void testRepositoryUnregisteringWhenExpired() throws Exception {
+		Repository repoA = createBareRepository();
+		Repository repoB = createBareRepository();
+		Repository repoC = createBareRepository();
+		RepositoryCache.register(repoA);
+		RepositoryCache.register(repoB);
+		RepositoryCache.register(repoC);
+
+		assertEquals(3, RepositoryCache.getRegisteredKeys().size());
+		assertTrue(RepositoryCache.isCached(repoA));
+		assertTrue(RepositoryCache.isCached(repoB));
+		assertTrue(RepositoryCache.isCached(repoC));
+
+		// fake that repoA was close more than 20000ms ago
+		repoA.close();
+		repoA.closedAt.set(System.currentTimeMillis() - 25000);
+		// close repoB but this one will not be expired
+		repoB.close();
+
+		assertEquals(3, RepositoryCache.getRegisteredKeys().size());
+		assertTrue(RepositoryCache.isCached(repoA));
+		assertTrue(RepositoryCache.isCached(repoB));
+		assertTrue(RepositoryCache.isCached(repoC));
+
+		RepositoryCache.clearExpired();
+
+		assertEquals(2, RepositoryCache.getRegisteredKeys().size());
+		assertFalse(RepositoryCache.isCached(repoA));
+		assertTrue(RepositoryCache.isCached(repoB));
+		assertTrue(RepositoryCache.isCached(repoC));
 	}
 }
