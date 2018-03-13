@@ -746,9 +746,9 @@ public class RepoCommandTest extends RepositoryTestCase {
 				FileBasedConfig c = new FileBasedConfig(gitmodules,
 						FS.DETECTED);
 				c.load();
-				assertEquals("standard branches work", "master",
+				assertEquals("Recording remote branches should work for short branch descriptions", "master",
 						c.getString("submodule", "with-branch", "branch"));
-				assertEquals("long branches work", "refs/heads/master",
+				assertEquals("Recording remote branches should work for full ref specs", "refs/heads/master",
 						c.getString("submodule", "with-long-branch", "branch"));
 			}
 		}
@@ -799,7 +799,7 @@ public class RepoCommandTest extends RepositoryTestCase {
 				expect.add("a2");
 				Set<String> actual = new HashSet<String>();
 				actual.addAll(Arrays.asList(c.getStringList("submodule", "test", "label")));
-				assertEquals("recording labels works", expect, actual);
+				assertEquals("Recorded labels should be the same as in the manifest", expect, actual);
 			}
 		}
 	}
