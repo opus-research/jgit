@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,51 +41,54 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit.http;
+package org.eclipse.jgit.errors;
 
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import org.eclipse.jgit.annotations.Nullable;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
+/**
+ * Exception thrown when encounters a corrupt pack index file.
+ *
+ * @since 4.9
+ */
+public class CorruptPackIndexException extends Exception {
+	private static final long serialVersionUID = 1L;
 
-public class MockServletConfig implements ServletConfig {
-	private final Map<String, String> parameters = new HashMap<>();
-
-	public void setInitParameter(String name, String value) {
-		parameters.put(name, value);
+	/** The error type of a corrupt index file. */
+	public enum ErrorType {
+		/** Offset does not match index in pack file. */
+		MISMATCH_OFFSET,
+		/** CRC does not match CRC of the object data in pack file. */
+		MISMATCH_CRC,
+		/** CRC is not present in index file. */
+		MISSING_CRC,
+		/** Object in pack is not present in index file. */
+		MISSING_OBJ,
+		/** Object in index file is not present in pack file. */
+		UNKNOWN_OBJ,
 	}
 
-	@Override
-	public String getInitParameter(String name) {
-		return parameters.get(name);
+	private ErrorType errorType;
+
+	/**
+	 * Report a specific error condition discovered in an index file.
+	 *
+	 * @param message
+	 *            the error message.
+	 * @param errorType
+	 *            the error type of corruption.
+	 */
+	public CorruptPackIndexException(String message, ErrorType errorType) {
+		super(message);
+		this.errorType = errorType;
 	}
 
-	@Override
-	public Enumeration<String> getInitParameterNames() {
-		final Iterator<String> i = parameters.keySet().iterator();
-		return new Enumeration<String>() {
-			@Override
-			public boolean hasMoreElements() {
-				return i.hasNext();
-			}
-
-			@Override
-			public String nextElement() {
-				return i.next();
-			}
-		};
-	}
-
-	@Override
-	public String getServletName() {
-		return "MOCK_SERVLET";
-	}
-
-	@Override
-	public ServletContext getServletContext() {
-		return null;
+	/**
+	 * Specific the reason of the corrupt index file.
+	 *
+	 * @return error condition or null.
+	 */
+	@Nullable
+	public ErrorType getErrorType() {
+		return errorType;
 	}
 }
