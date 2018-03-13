@@ -55,7 +55,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.internal.JGitText;
@@ -74,8 +73,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
-
-	private final FS fs;
 
 	private boolean utf8Bom;
 
@@ -110,7 +107,6 @@ public class FileBasedConfig extends StoredConfig {
 	public FileBasedConfig(Config base, File cfgLocation, FS fs) {
 		super(base);
 		configFile = cfgLocation;
-		this.fs = fs;
 		this.snapshot = FileSnapshot.DIRTY;
 		this.hash = ObjectId.zeroId();
 	}
@@ -243,31 +239,5 @@ public class FileBasedConfig extends StoredConfig {
 	 */
 	public boolean isOutdated() {
 		return snapshot.isModified(getFile());
-	}
-
-	/**
-	 * @since 4.10
-	 */
-	@Override
-	@Nullable
-	protected byte[] readIncludedConfig(String relPath)
-			throws ConfigInvalidException {
-		final File file;
-		if (relPath.startsWith("~/")) { //$NON-NLS-1$
-			file = fs.resolve(fs.userHome(), relPath.substring(2));
-		} else {
-			file = fs.resolve(configFile.getParentFile(), relPath);
-		}
-
-		if (!file.exists()) {
-			return null;
-		}
-
-		try {
-			return IO.readFully(file);
-		} catch (IOException ioe) {
-			throw new ConfigInvalidException(MessageFormat
-					.format(JGitText.get().cannotReadFile, relPath), ioe);
-		}
 	}
 }
