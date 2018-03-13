@@ -311,19 +311,23 @@ class PackWriterBitmapPreparer {
 		return revCommit.getCommitTime() > inactiveBranchTimestamp;
 	}
 
-	/**
-	 * A RevFilter that excludes the commits named in a bitmap from the walk.
-	 * <p>
-	 * If a commit is in {@code bitmap} then that commit is not emitted by the
-	 * walk and its parents are marked as SEEN so the walk can skip them.  The
-	 * bitmaps passed in have the property that the parents of any commit in
-	 * {@code bitmap} are also in {@code bitmap}, so marking the parents as
-	 * SEEN speeds up the RevWalk by saving it from walking down blind alleys
-	 * and does not change the commits emitted.
-	 */
 	private static class NotInBitmapFilter extends RevFilter {
 		private final BitmapBuilder bitmap;
 
+		/**
+		 * A RevFilter that excludes the commits named in a bitmap
+		 * from the walk.
+		 * <p>
+		 * If a commit is in {@code bitmap} then that commit
+		 * is not emitted by the walk and its parents are
+		 * marked as SEEN so the walk can skip them.  The
+		 * bitmaps passed in have the property that the
+		 * parents of any commit in {@code bitmap} are also in
+		 * {@code bitmap}, so marking the parents as SEEN
+		 * speeds up the RevWalk by saving it from walking
+		 * down blind alleys and does not change the commits
+		 * emitted.
+		 */
 		NotInBitmapFilter(BitmapBuilder bitmap) {
 			this.bitmap = bitmap;
 		}
@@ -341,7 +345,7 @@ class PackWriterBitmapPreparer {
 
 		@Override
 		public final NotInBitmapFilter clone() {
-			throw new UnsupportedOperationException();
+			return this;
 		}
 
 		@Override
