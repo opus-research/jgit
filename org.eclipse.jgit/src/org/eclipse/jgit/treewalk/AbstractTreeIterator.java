@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 
+import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
@@ -327,13 +328,13 @@ public abstract class AbstractTreeIterator {
 	 *            position to start reading the raw buffer.
 	 * @param end
 	 *            one past the end of the raw buffer (length is end - pos).
-	 * @param mode
+	 * @param pathMode
 	 *            the mode of the path.
 	 * @return -1 if this entry sorts first; 0 if the entries are equal; 1 if
 	 *         p's entry sorts first.
 	 */
-	public int pathCompare(byte[] buf, int pos, int end, int mode) {
-		return pathCompare(buf, pos, end, mode, 0);
+	public int pathCompare(byte[] buf, int pos, int end, int pathMode) {
+		return pathCompare(buf, pos, end, pathMode, 0);
 	}
 
 	private int pathCompare(byte[] b, int bPos, int bEnd, int bMode, int aPos) {
@@ -424,7 +425,14 @@ public abstract class AbstractTreeIterator {
 		return TreeWalk.pathOf(this);
 	}
 
-	/** @return the internal buffer holding the current path. */
+	/**
+	 * Get the current entry path buffer.
+	 * <p>
+	 * Note that the returned byte[] has to be used together with
+	 * {@link #getEntryPathLength()} (only use bytes up to this length).
+	 *
+	 * @return the internal buffer holding the current path.
+	 */
 	public byte[] getEntryPathBuffer() {
 		return path;
 	}
@@ -647,13 +655,33 @@ public abstract class AbstractTreeIterator {
 	}
 
 	/**
-	 * Get the name component of the current entry path into the provided buffer.
+	 * JGit internal API for use by {@link DirCacheCheckout}
 	 *
-	 * @param buffer the buffer to get the name into, it is assumed that buffer can hold the name
-	 * @param offset the offset of the name in the buffer
+	 * @return start of name component part within {@link #getEntryPathBuffer()}
+	 * @since 2.0
+	 */
+	public int getNameOffset() {
+		return pathOffset;
+	}
+
+	/**
+	 * Get the name component of the current entry path into the provided
+	 * buffer.
+	 *
+	 * @param buffer
+	 *            the buffer to get the name into, it is assumed that buffer can
+	 *            hold the name
+	 * @param offset
+	 *            the offset of the name in the buffer
 	 * @see #getNameLength()
 	 */
 	public void getName(byte[] buffer, int offset) {
 		System.arraycopy(path, pathOffset, buffer, offset, pathLen - pathOffset);
+	}
+
+	@SuppressWarnings("nls")
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + "[" + getEntryPathString() + "]"; //$NON-NLS-1$
 	}
 }

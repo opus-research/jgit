@@ -59,9 +59,12 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.StringUtils;
 
 /** A commit reference to a commit in the DAG. */
 public class RevCommit extends RevObject {
+	private static final int STACK_DEPTH = 500;
+
 	/**
 	 * Parse a commit from its canonical format.
 	 *
@@ -80,7 +83,11 @@ public class RevCommit extends RevObject {
 	 *         available to the caller.
 	 */
 	public static RevCommit parse(byte[] raw) {
-		return parse(new RevWalk((ObjectReader) null), raw);
+		try {
+			return parse(new RevWalk((ObjectReader) null), raw);
+		} catch (IOException ex) {
+			throw new RuntimeException(ex);
+		}
 	}
 
 	/**
@@ -88,7 +95,7 @@ public class RevCommit extends RevObject {
 	 *
 	 * This method inserts the commit directly into the caller supplied revision
 	 * pool, making it appear as though the commit exists in the repository,
-	 * even if it doesn't.  The repository under the pool is not affected.
+	 * even if it doesn't. The repository under the pool is not affected.
 	 *
 	 * @param rw
 	 *            the revision pool to allocate the commit within. The commit's
@@ -97,8 +104,10 @@ public class RevCommit extends RevObject {
 	 *            the canonical formatted commit to be parsed.
 	 * @return the parsed commit, in an isolated revision pool that is not
 	 *         available to the caller.
+	 * @throws IOException
+	 *             in case of RevWalk initialization fails
 	 */
-	public static RevCommit parse(RevWalk rw, byte[] raw) {
+	public static RevCommit parse(RevWalk rw, byte[] raw) throws IOException {
 		ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
 		boolean retain = rw.isRetainBody();
 		rw.setRetainBody(true);
@@ -146,7 +155,11 @@ public class RevCommit extends RevObject {
 		}
 	}
 
-	void parseCanonical(final RevWalk walk, final byte[] raw) {
+	void parseCanonical(final RevWalk walk, final byte[] raw)
+			throws IOException {
+		if (!walk.shallowCommitsInitialized)
+			walk.initializeShallowCommits();
+
 		final MutableObjectId idBuffer = walk.idBuffer;
 		idBuffer.fromString(raw, 5);
 		tree = walk.lookupTree(idBuffer);
@@ -202,27 +215,72 @@ public class RevCommit extends RevObject {
 		return Constants.OBJ_COMMIT;
 	}
 
-	static void carryFlags(RevCommit c, final int carry) {
-		for (;;) {
-			final RevCommit[] pList = c.parents;
-			if (pList == null)
-				return;
-			final int n = pList.length;
-			if (n == 0)
-				return;
+	static void carryFlags(RevCommit c, int carry) {
+		FIFORevQueue q = carryFlags1(c, carry, 0);
+		if (q != null)
+			slowCarryFlags(q, carry);
+	}
 
-			for (int i = 1; i < n; i++) {
-				final RevCommit p = pList[i];
-				if ((p.flags & carry) == carry)
-					continue;
-				p.flags |= carry;
-				carryFlags(p, carry);
+	private static FIFORevQueue carryFlags1(RevCommit c, int carry, int depth) {
+		for(;;) {
+			RevCommit[] pList = c.parents;
+			if (pList == null || pList.length == 0)
+				return null;
+			if (pList.length != 1) {
+				if (depth == STACK_DEPTH)
+					return defer(c);
+				for (int i = 1; i < pList.length; i++) {
+					RevCommit p = pList[i];
+					if ((p.flags & carry) == carry)
+						continue;
+					p.flags |= carry;
+					FIFORevQueue q = carryFlags1(c, carry, depth + 1);
+					if (q != null)
+						return defer(q, carry, pList, i + 1);
+				}
 			}
 
 			c = pList[0];
 			if ((c.flags & carry) == carry)
-				return;
+				return null;
 			c.flags |= carry;
+		}
+	}
+
+	private static FIFORevQueue defer(RevCommit c) {
+		FIFORevQueue q = new FIFORevQueue();
+		q.add(c);
+		return q;
+	}
+
+	private static FIFORevQueue defer(FIFORevQueue q, int carry,
+			RevCommit[] pList, int i) {
+		// In normal case the caller will run pList[0] in a tail recursive
+		// fashion by updating the variable. However the caller is unwinding
+		// the stack and will skip that pList[0] execution step.
+		carryOneStep(q, carry, pList[0]);
+
+		// Remaining parents (if any) need to have flags checked and be
+		// enqueued if they have ancestors.
+		for (; i < pList.length; i++)
+			carryOneStep(q, carry, pList[i]);
+		return q;
+	}
+
+	private static void slowCarryFlags(FIFORevQueue q, int carry) {
+		// Commits in q have non-null parent arrays and have set all
+		// flags in carry. This loop finishes copying over the graph.
+		for (RevCommit c; (c = q.next()) != null;) {
+			for (RevCommit p : c.parents)
+				carryOneStep(q, carry, p);
+		}
+	}
+
+	private static void carryOneStep(FIFORevQueue q, int carry, RevCommit c) {
+		if ((c.flags & carry) != carry) {
+			c.flags |= carry;
+			if (c.parents != null)
+				q.add(c);
 		}
 	}
 
@@ -381,7 +439,7 @@ public class RevCommit extends RevObject {
 		final byte[] raw = buffer;
 		final int msgB = RawParseUtils.commitMessage(raw, 0);
 		if (msgB < 0)
-			return "";
+			return ""; //$NON-NLS-1$
 		final Charset enc = RawParseUtils.parseEncoding(raw);
 		return RawParseUtils.decode(enc, raw, msgB, raw.length);
 	}
@@ -405,13 +463,13 @@ public class RevCommit extends RevObject {
 		final byte[] raw = buffer;
 		final int msgB = RawParseUtils.commitMessage(raw, 0);
 		if (msgB < 0)
-			return "";
+			return ""; //$NON-NLS-1$
 
 		final Charset enc = RawParseUtils.parseEncoding(raw);
 		final int msgE = RawParseUtils.endOfParagraph(raw, msgB);
 		String str = RawParseUtils.decode(enc, raw, msgB, msgE);
 		if (hasLF(raw, msgB, msgE))
-			str = str.replace('\n', ' ');
+			str = StringUtils.replaceLineBreaksWithSpace(str);
 		return str;
 	}
 

@@ -48,9 +48,9 @@ package org.eclipse.jgit.revwalk;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.filter.AndRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
@@ -127,8 +127,13 @@ class StartGenerator extends Generator {
 		else
 			pending = new DateRevQueue(q);
 		if (tf != TreeFilter.ALL) {
-			rf = AndRevFilter.create(rf, new RewriteTreeFilter(w, tf));
-			pendingOutputType |= HAS_REWRITE | NEEDS_REWRITE;
+			int rewriteFlag;
+			if (w.getRewriteParents()) {
+				pendingOutputType |= HAS_REWRITE | NEEDS_REWRITE;
+				rewriteFlag = RevWalk.REWRITE;
+			} else
+				rewriteFlag = 0;
+			rf = AndRevFilter.create(new TreeRevFilter(w, tf, rewriteFlag), rf);
 		}
 
 		walker.queue = q;

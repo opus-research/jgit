@@ -53,7 +53,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -62,7 +63,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackWriter;
 
 /**
  * Creates a Git bundle file, for sneaker-net transport to another system.
@@ -128,7 +128,8 @@ public class BundleWriter {
 	 *            object to pack. Multiple refs may point to the same object.
 	 */
 	public void include(final String name, final AnyObjectId id) {
-		if (!Repository.isValidRefName(name))
+		boolean validRefName = Repository.isValidRefName(name) || Constants.HEAD.equals(name);
+		if (!validRefName)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidRefName, name));
 		if (include.containsKey(name))
 			throw new IllegalStateException(JGitText.get().duplicateRef + name);
@@ -200,6 +201,7 @@ public class BundleWriter {
 			inc.addAll(include.values());
 			for (final RevCommit r : assume)
 				exc.add(r.getId());
+			packWriter.setIndexDisabled(true);
 			packWriter.setDeltaBaseAsOffset(true);
 			packWriter.setThin(exc.size() > 0);
 			packWriter.setReuseValidatingObjects(false);

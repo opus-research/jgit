@@ -48,6 +48,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -60,8 +61,8 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.junit.Before;
 import org.junit.Test;
@@ -429,6 +430,12 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		@Override
 		public void close() {
 			// nothing here
+		}
+
+		public void push(ProgressMonitor monitor,
+				Map<String, RemoteRefUpdate> refsToUpdate, OutputStream out)
+				throws TransportException {
+			push(monitor, refsToUpdate);
 		}
 
 		public void push(ProgressMonitor monitor,

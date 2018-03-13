@@ -61,14 +61,16 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -85,6 +87,42 @@ import org.eclipse.jgit.util.SystemReader;
  * @see FileRepositoryBuilder
  */
 public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Repository> {
+	private static boolean isSymRef(byte[] ref) {
+		if (ref.length < 9)
+			return false;
+		return /**/ref[0] == 'g' //
+				&& ref[1] == 'i' //
+				&& ref[2] == 't' //
+				&& ref[3] == 'd' //
+				&& ref[4] == 'i' //
+				&& ref[5] == 'r' //
+				&& ref[6] == ':' //
+				&& ref[7] == ' ';
+	}
+
+	private static File getSymRef(File workTree, File dotGit, FS fs)
+			throws IOException {
+		byte[] content = IO.readFully(dotGit);
+		if (!isSymRef(content))
+			throw new IOException(MessageFormat.format(
+					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
+
+		int pathStart = 8;
+		int lineEnd = RawParseUtils.nextLF(content, pathStart);
+		if (content[lineEnd - 1] == '\n')
+			lineEnd--;
+		if (lineEnd == pathStart)
+			throw new IOException(MessageFormat.format(
+					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
+
+		String gitdirPath = RawParseUtils.decode(content, pathStart, lineEnd);
+		File gitdirFile = fs.resolve(workTree, gitdirPath);
+		if (gitdirFile.isAbsolute())
+			return gitdirFile;
+		else
+			return new File(workTree, gitdirPath).getCanonicalFile();
+	}
+
 	private FS fs;
 
 	private File gitDir;
@@ -449,7 +487,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	public B findGitDir() {
 		if (getGitDir() == null)
-			findGitDir(new File("").getAbsoluteFile());
+			findGitDir(new File("").getAbsoluteFile()); //$NON-NLS-1$
 		return self();
 	}
 
@@ -475,6 +513,16 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 				File dir = new File(current, DOT_GIT);
 				if (FileKey.isGitRepository(dir, tryFS)) {
 					setGitDir(dir);
+					break;
+				} else if (dir.isFile()) {
+					try {
+						setGitDir(getSymRef(current, dir, tryFS));
+						break;
+					} catch (IOException ignored) {
+						// Continue searching if gitdir ref isn't found
+					}
+				} else if (FileKey.isGitRepository(current, tryFS)) {
+					setGitDir(current);
 					break;
 				}
 
@@ -546,10 +594,15 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 *             the repository could not be accessed
 	 */
 	protected void setupGitDir() throws IOException {
-		// No gitDir? Try to assume its under the workTree.
-		//
-		if (getGitDir() == null && getWorkTree() != null)
-			setGitDir(new File(getWorkTree(), DOT_GIT));
+		// No gitDir? Try to assume its under the workTree or a ref to another
+		// location
+		if (getGitDir() == null && getWorkTree() != null) {
+			File dotGit = new File(getWorkTree(), DOT_GIT);
+			if (!dotGit.isFile())
+				setGitDir(dotGit);
+			else
+				setGitDir(getSymRef(getWorkTree(), dotGit, safeFS()));
+		}
 	}
 
 	/**
@@ -579,7 +632,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			if (getGitDir() == null)
 				setGitDir(getWorkTree().getParentFile());
 			if (getIndexFile() == null)
-				setIndexFile(new File(getGitDir(), "index"));
+				setIndexFile(new File(getGitDir(), "index")); //$NON-NLS-1$
 		}
 	}
 
@@ -591,7 +644,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	protected void setupInternals() throws IOException {
 		if (getObjectDirectory() == null && getGitDir() != null)
-			setObjectDirectory(safeFS().resolve(getGitDir(), "objects"));
+			setObjectDirectory(safeFS().resolve(getGitDir(), "objects")); //$NON-NLS-1$
 	}
 
 	/**
@@ -623,7 +676,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			// the user file, as these parameters must be unique to this
 			// repository and not inherited from other files.
 			//
-			File path = safeFS().resolve(getGitDir(), "config");
+			File path = safeFS().resolve(getGitDir(), Constants.CONFIG);
 			FileBasedConfig cfg = new FileBasedConfig(path, safeFS());
 			try {
 				cfg.load();
@@ -646,7 +699,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 		String path = cfg.getString(CONFIG_CORE_SECTION, null,
 				CONFIG_KEY_WORKTREE);
 		if (path != null)
-			return safeFS().resolve(getGitDir(), path);
+			return safeFS().resolve(getGitDir(), path).getCanonicalFile();
 
 		// If core.bare is set, honor its value. Assume workTree is
 		// the parent directory of the repository.

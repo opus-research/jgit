@@ -50,7 +50,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>3.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.pgm</artifactId>
@@ -60,6 +60,11 @@
     Command line client tools built on top of JGit.
   </description>
 
+  <properties>
+    <translate-qualifier/>
+    <source-bundle-manifest>${project.build.directory}/META-INF/SOURCE-MANIFEST.MF</source-bundle-manifest>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>args4j</groupId>
@@ -67,14 +72,19 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit</artifactId>
+      <artifactId>org.eclipse.jgit.archive</artifactId>
       <version>${project.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.iplog</artifactId>
+      <artifactId>org.eclipse.jgit</artifactId>
       <version>${project.version}</version>
     </dependency>
 
@@ -89,9 +99,28 @@
     <profile>
       <id>java6</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <jdk>1.6</jdk>
+	  </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.eclipse.jgit</groupId>
+          <artifactId>org.eclipse.jgit.console</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>java7</id>
+      <activation>
+       <jdk>[1.7,)</jdk>
       </activation>
       <dependencies>
+        <dependency>
+          <groupId>org.eclipse.jgit</groupId>
+          <artifactId>org.eclipse.jgit.java7</artifactId>
+          <version>${project.version}</version>
+          <optional>true</optional>
+        </dependency>
         <dependency>
           <groupId>org.eclipse.jgit</groupId>
           <artifactId>org.eclipse.jgit.console</artifactId>
@@ -108,6 +137,7 @@
       <resource>
         <directory>.</directory>
         <includes>
+          <include>plugin.properties</include>
           <include>META-INF/services/org.eclipse.jgit.pgm.TextBuiltin</include>
           <include>about.html</include>
         </includes>
@@ -118,6 +148,15 @@
     </resources>
 
     <plugins>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestFile>${bundle-manifest}</manifestFile>
+          </archive>
+        </configuration>
+      </plugin>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -139,6 +178,20 @@
                   </manifestEntries>
                 </transformer>
               </transformers>
+              <filters>
+                <!-- exclude the signing data for individual jars, ueberjar will be signed again -->
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>OSGI-OPT/**</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>shaded</shadedClassifierName> <!-- Any name that makes sense -->
             </configuration>
           </execution>
         </executions>
@@ -163,6 +216,41 @@
             <goals>
               <goal>run</goal>
             </goals>
+          </execution>
+          <execution>
+            <id>translate-source-qualifier</id>
+            <phase>generate-resources</phase>
+            <configuration>
+              <tasks>
+                <copy file="META-INF/SOURCE-MANIFEST.MF" tofile="${source-bundle-manifest}" overwrite="true"/>
+                <replace file="${source-bundle-manifest}">
+                  <replacefilter token=".qualifier" value=".${maven.build.timestamp}"/>
+                </replace>
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <inherited>true</inherited>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <archive>
+                <manifestFile>${source-bundle-manifest}</manifestFile>
+              </archive>
+            </configuration>
           </execution>
         </executions>
       </plugin>

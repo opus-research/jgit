@@ -48,7 +48,7 @@ package org.eclipse.jgit.revwalk;
 import java.text.MessageFormat;
 import java.util.AbstractList;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 
 /**
  * An ordered list of {@link RevObject} subclasses.
@@ -80,11 +80,14 @@ public class RevObjectList<E extends RevObject> extends AbstractList<E> {
 
 	public void add(final int index, final E element) {
 		if (index != size)
-			throw new UnsupportedOperationException(MessageFormat.format(JGitText.get().unsupportedOperationNotAddAtEnd, index));
+			throw new UnsupportedOperationException(MessageFormat.format(
+					JGitText.get().unsupportedOperationNotAddAtEnd,
+					Integer.valueOf(index)));
 		set(index, element);
 		size++;
 	}
 
+	@SuppressWarnings("unchecked")
 	public E set(int index, E element) {
 		Block s = contents;
 		while (index >> s.shift >= BLOCK_SIZE) {
@@ -104,6 +107,7 @@ public class RevObjectList<E extends RevObject> extends AbstractList<E> {
 		return (E) old;
 	}
 
+	@SuppressWarnings("unchecked")
 	public E get(int index) {
 		Block s = contents;
 		if (index >> s.shift >= 1024)

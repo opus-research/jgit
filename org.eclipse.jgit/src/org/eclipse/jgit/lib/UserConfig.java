@@ -173,14 +173,14 @@ public class UserConfig {
 
 	private static String getNameInternal(Config rc, String envKey) {
 		// try to get the user name from the local and global configurations.
-		String username = rc.getString("user", null, "name");
+		String username = rc.getString("user", null, "name"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		if (username == null) {
 			// try to get the user name for the system property GIT_XXX_NAME
 			username = system().getenv(envKey);
 		}
 
-		return username;
+		return stripInvalidCharacters(username);
 	}
 
 	/**
@@ -197,14 +197,18 @@ public class UserConfig {
 
 	private static String getEmailInternal(Config rc, String envKey) {
 		// try to get the email from the local and global configurations.
-		String email = rc.getString("user", null, "email");
+		String email = rc.getString("user", null, "email"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		if (email == null) {
 			// try to get the email for the system property GIT_XXX_EMAIL
 			email = system().getenv(envKey);
 		}
 
-		return email;
+		return stripInvalidCharacters(email);
+	}
+
+	private static String stripInvalidCharacters(String s) {
+		return s == null ? null : s.replaceAll("<|>|\n", ""); //$NON-NLS-1$//$NON-NLS-2$
 	}
 
 	/**
@@ -214,7 +218,7 @@ public class UserConfig {
 	private static String getDefaultEmail() {
 		// try to construct an email
 		String username = getDefaultUserName();
-		return username + "@" + system().getHostname();
+		return username + "@" + system().getHostname(); //$NON-NLS-1$
 	}
 
 	private static SystemReader system() {

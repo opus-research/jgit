@@ -43,14 +43,16 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.CheckoutResult.Status;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -62,7 +64,8 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.errors.CheckoutConflictException;
+import org.eclipse.jgit.errors.UnmergedPathException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -79,18 +82,82 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
- * Checkout a branch to the working tree
+ * Checkout a branch to the working tree.
+ * <p>
+ * Examples (<code>git</code> is a {@link Git} instance):
+ * <p>
+ * Check out an existing branch:
+ *
+ * <pre>
+ * git.checkout().setName(&quot;feature&quot;).call();
+ * </pre>
+ * <p>
+ * Check out paths from the index:
+ *
+ * <pre>
+ * git.checkout().addPath(&quot;file1.txt&quot;).addPath(&quot;file2.txt&quot;).call();
+ * </pre>
+ * <p>
+ * Check out a path from a commit:
+ *
+ * <pre>
+ * git.checkout().setStartPoint(&quot;HEAD&circ;&quot;).addPath(&quot;file1.txt&quot;).call();
+ * </pre>
+ *
+ * <p>
+ * Create a new branch and check it out:
+ *
+ * <pre>
+ * git.checkout().setCreateBranch(true).setName(&quot;newbranch&quot;).call();
+ * </pre>
+ * <p>
+ * Create a new tracking branch for a remote branch and check it out:
+ *
+ * <pre>
+ * git.checkout().setCreateBranch(true).setName(&quot;stable&quot;)
+ * 		.setUpstreamMode(SetupUpstreamMode.SET_UPSTREAM)
+ * 		.setStartPoint(&quot;origin/stable&quot;).call();
+ * </pre>
  *
  * @see <a
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-checkout.html"
  *      >Git documentation about Checkout</a>
  */
 public class CheckoutCommand extends GitCommand<Ref> {
+
+	/**
+	 * Stage to check out, see {@link CheckoutCommand#setStage(Stage)}.
+	 */
+	public static enum Stage {
+		/**
+		 * Base stage (#1)
+		 */
+		BASE(DirCacheEntry.STAGE_1),
+
+		/**
+		 * Ours stage (#2)
+		 */
+		OURS(DirCacheEntry.STAGE_2),
+
+		/**
+		 * Theirs stage (#3)
+		 */
+		THEIRS(DirCacheEntry.STAGE_3);
+
+		private final int number;
+
+		private Stage(int number) {
+			this.number = number;
+		}
+	}
+
 	private String name;
 
 	private boolean force = false;
 
 	private boolean createBranch = false;
+
+	private boolean orphan = false;
 
 	private CreateBranchCommand.SetupUpstreamMode upstreamMode;
 
@@ -98,9 +165,13 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private RevCommit startCommit;
 
+	private Stage checkoutStage = null;
+
 	private CheckoutResult status;
 
 	private List<String> paths;
+
+	private boolean checkoutAllPaths;
 
 	/**
 	 * @param repo
@@ -119,16 +190,19 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @throws InvalidRefNameException
 	 *             if the provided name is <code>null</code> or otherwise
 	 *             invalid
+	 * @throws CheckoutConflictException
+	 *             if the checkout results in a conflict
 	 * @return the newly created branch
 	 */
-	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
-			RefNotFoundException, InvalidRefNameException {
+	public Ref call() throws GitAPIException, RefAlreadyExistsException,
+			RefNotFoundException, InvalidRefNameException,
+			CheckoutConflictException {
 		checkCallable();
-		processOptions();
 		try {
-			if (!paths.isEmpty()) {
+			processOptions();
+			if (checkoutAllPaths || !paths.isEmpty()) {
 				checkoutPaths();
-				status = CheckoutResult.OK_RESULT;
+				status = new CheckoutResult(Status.OK, paths);
 				setCallable(false);
 				return null;
 			}
@@ -137,7 +211,10 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				Git git = new Git(repo);
 				CreateBranchCommand command = git.branchCreate();
 				command.setName(name);
-				command.setStartPoint(getStartPoint().name());
+				if (startCommit != null)
+					command.setStartPoint(startCommit);
+				else
+					command.setStartPoint(startPoint);
 				if (upstreamMode != null)
 					command.setUpstreamMode(upstreamMode);
 				command.call();
@@ -145,11 +222,26 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 			Ref headRef = repo.getRef(Constants.HEAD);
 			String shortHeadRef = getShortBranchName(headRef);
-			String refLogMessage = "checkout: moving from " + shortHeadRef;
-			ObjectId branch = repo.resolve(name);
-			if (branch == null)
-				throw new RefNotFoundException(MessageFormat.format(JGitText
-						.get().refNotResolved, name));
+			String refLogMessage = "checkout: moving from " + shortHeadRef; //$NON-NLS-1$
+			ObjectId branch;
+			if (orphan) {
+				if (startPoint == null && startCommit == null) {
+					Result r = repo.updateRef(Constants.HEAD).link(
+							getBranchName());
+					if (!EnumSet.of(Result.NEW, Result.FORCED).contains(r))
+						throw new JGitInternalException(MessageFormat.format(
+								JGitText.get().checkoutUnexpectedResult,
+								r.name()));
+					this.status = CheckoutResult.NOT_TRIED_RESULT;
+					return repo.getRef(Constants.HEAD);
+				}
+				branch = getStartPointObjectId();
+			} else {
+				branch = repo.resolve(name);
+				if (branch == null)
+					throw new RefNotFoundException(MessageFormat.format(
+							JGitText.get().refNotResolved, name));
+			}
 
 			RevWalk revWalk = new RevWalk(repo);
 			AnyObjectId headId = headRef.getObjectId();
@@ -157,15 +249,21 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					.parseCommit(headId);
 			RevCommit newCommit = revWalk.parseCommit(branch);
 			RevTree headTree = headCommit == null ? null : headCommit.getTree();
-			DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
-					repo.lockDirCache(), newCommit.getTree());
-			dco.setFailOnConflict(true);
+			DirCacheCheckout dco;
+			DirCache dc = repo.lockDirCache();
 			try {
-				dco.checkout();
-			} catch (CheckoutConflictException e) {
-				status = new CheckoutResult(Status.CONFLICTS, dco
-						.getConflicts());
-				throw e;
+				dco = new DirCacheCheckout(repo, headTree, dc,
+						newCommit.getTree());
+				dco.setFailOnConflict(true);
+				try {
+					dco.checkout();
+				} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
+					status = new CheckoutResult(Status.CONFLICTS,
+							dco.getConflicts());
+					throw new CheckoutConflictException(dco.getConflicts(), e);
+				}
+			} finally {
+				dc.unlock();
 			}
 			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
@@ -173,11 +271,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			String toName = Repository.shortenRefName(name);
 			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, ref == null);
 			refUpdate.setForceUpdate(force);
-			refUpdate.setRefLogMessage(refLogMessage + " to " + toName, false);
+			refUpdate.setRefLogMessage(refLogMessage + " to " + toName, false); //$NON-NLS-1$
 			Result updateResult;
 			if (ref != null)
 				updateResult = refUpdate.link(ref.getName());
-			else {
+			else if (orphan) {
+				updateResult = refUpdate.link(getBranchName());
+				ref = repo.getRef(Constants.HEAD);
+			} else {
 				refUpdate.setNewObjectId(newCommit);
 				updateResult = refUpdate.forceUpdate();
 			}
@@ -202,12 +303,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
+
 			if (!dco.getToBeDeleted().isEmpty()) {
-				status = new CheckoutResult(Status.NONDELETED, dco
-						.getToBeDeleted());
-			}
-			else
-				status = CheckoutResult.OK_RESULT;
+				status = new CheckoutResult(Status.NONDELETED,
+						dco.getToBeDeleted());
+			} else
+				status = new CheckoutResult(new ArrayList<String>(dco
+						.getUpdated().keySet()), dco.getRemoved());
+
 			return ref;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
@@ -224,13 +327,43 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
+	 * Add a single slash-separated path to the list of paths to check out. To
+	 * check out all paths, use {@link #setAllPaths(boolean)}.
+	 * <p>
+	 * If this option is set, neither the {@link #setCreateBranch(boolean)} nor
+	 * {@link #setName(String)} option is considered. In other words, these
+	 * options are exclusive.
+	 *
 	 * @param path
-	 *            Path to update in the working tree and index.
+	 *            path to update in the working tree and index (with
+	 *            <code>/</code> as separator)
 	 * @return {@code this}
 	 */
 	public CheckoutCommand addPath(String path) {
 		checkCallable();
 		this.paths.add(path);
+		return this;
+	}
+
+	/**
+	 * Set whether to checkout all paths.
+	 * <p>
+	 * This options should be used when you want to do a path checkout on the
+	 * entire repository and so calling {@link #addPath(String)} is not possible
+	 * since empty paths are not allowed.
+	 * <p>
+	 * If this option is set, neither the {@link #setCreateBranch(boolean)} nor
+	 * {@link #setName(String)} option is considered. In other words, these
+	 * options are exclusive.
+	 *
+	 * @param all
+	 *            <code>true</code> to checkout all paths, <code>false</code>
+	 *            otherwise
+	 * @return {@code this}
+	 * @since 2.0
+	 */
+	public CheckoutCommand setAllPaths(boolean all) {
+		checkoutAllPaths = all;
 		return this;
 	}
 
@@ -246,43 +379,19 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		RevWalk revWalk = new RevWalk(repo);
 		DirCache dc = repo.lockDirCache();
 		try {
-			DirCacheEditor editor = dc.editor();
-			TreeWalk startWalk = new TreeWalk(revWalk.getObjectReader());
-			startWalk.setRecursive(true);
-			startWalk.setFilter(PathFilterGroup.createFromStrings(paths));
-			boolean checkoutIndex = startCommit == null && startPoint == null;
-			if (!checkoutIndex)
-				startWalk.addTree(revWalk.parseCommit(getStartPoint())
-						.getTree());
-			else
-				startWalk.addTree(new DirCacheIterator(dc));
-
-			final File workTree = repo.getWorkTree();
-			final ObjectReader r = repo.getObjectDatabase().newReader();
+			TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader());
+			treeWalk.setRecursive(true);
+			if (!checkoutAllPaths)
+				treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
 			try {
-				while (startWalk.next()) {
-					final ObjectId blobId = startWalk.getObjectId(0);
-					final FileMode mode = startWalk.getFileMode(0);
-					editor.add(new PathEdit(startWalk.getPathString()) {
-						public void apply(DirCacheEntry ent) {
-							ent.setObjectId(blobId);
-							ent.setFileMode(mode);
-							try {
-								DirCacheCheckout.checkoutEntry(repo, new File(
-										workTree, ent.getPathString()), ent, r);
-							} catch (IOException e) {
-								throw new JGitInternalException(
-										MessageFormat.format(
-												JGitText.get().checkoutConflictWithFile,
-												ent.getPathString()), e);
-							}
-						}
-					});
+				if (isCheckoutIndex())
+					checkoutPathsFromIndex(treeWalk, dc);
+				else {
+					RevCommit commit = revWalk.parseCommit(getStartPointObjectId());
+					checkoutPathsFromCommit(treeWalk, dc, commit);
 				}
-				editor.commit();
 			} finally {
-				startWalk.release();
-				r.release();
+				treeWalk.release();
 			}
 		} finally {
 			dc.unlock();
@@ -291,35 +400,124 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		return this;
 	}
 
-	private ObjectId getStartPoint() throws AmbiguousObjectException,
+	private void checkoutPathsFromIndex(TreeWalk treeWalk, DirCache dc)
+			throws IOException {
+		DirCacheIterator dci = new DirCacheIterator(dc);
+		treeWalk.addTree(dci);
+
+		final ObjectReader r = treeWalk.getObjectReader();
+		DirCacheEditor editor = dc.editor();
+		while (treeWalk.next()) {
+			DirCacheEntry entry = dci.getDirCacheEntry();
+			// Only add one edit per path
+			if (entry != null && entry.getStage() > DirCacheEntry.STAGE_1)
+				continue;
+			editor.add(new PathEdit(treeWalk.getPathString()) {
+				public void apply(DirCacheEntry ent) {
+					int stage = ent.getStage();
+					if (stage > DirCacheEntry.STAGE_0) {
+						if (checkoutStage != null) {
+							if (stage == checkoutStage.number)
+								checkoutPath(ent, r);
+						} else {
+							UnmergedPathException e = new UnmergedPathException(
+									ent);
+							throw new JGitInternalException(e.getMessage(), e);
+						}
+					} else {
+						checkoutPath(ent, r);
+					}
+				}
+			});
+		}
+		editor.commit();
+	}
+
+	private void checkoutPathsFromCommit(TreeWalk treeWalk, DirCache dc,
+			RevCommit commit) throws IOException {
+		treeWalk.addTree(commit.getTree());
+		final ObjectReader r = treeWalk.getObjectReader();
+		DirCacheEditor editor = dc.editor();
+		while (treeWalk.next()) {
+			final ObjectId blobId = treeWalk.getObjectId(0);
+			final FileMode mode = treeWalk.getFileMode(0);
+			editor.add(new PathEdit(treeWalk.getPathString()) {
+				public void apply(DirCacheEntry ent) {
+					ent.setObjectId(blobId);
+					ent.setFileMode(mode);
+					checkoutPath(ent, r);
+				}
+			});
+		}
+		editor.commit();
+	}
+
+	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
+		try {
+			DirCacheCheckout.checkoutEntry(repo, entry, reader);
+		} catch (IOException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().checkoutConflictWithFile,
+					entry.getPathString()), e);
+		}
+	}
+
+	private boolean isCheckoutIndex() {
+		return startCommit == null && startPoint == null;
+	}
+
+	private ObjectId getStartPointObjectId() throws AmbiguousObjectException,
 			RefNotFoundException, IOException {
 		if (startCommit != null)
 			return startCommit.getId();
-		ObjectId result = null;
-		try {
-			result = repo.resolve((startPoint == null) ? Constants.HEAD
-					: startPoint);
-		} catch (AmbiguousObjectException e) {
-			throw e;
-		}
+
+		String startPointOrHead = (startPoint != null) ? startPoint
+				: Constants.HEAD;
+		ObjectId result = repo.resolve(startPointOrHead);
 		if (result == null)
 			throw new RefNotFoundException(MessageFormat.format(
-					JGitText.get().refNotResolved,
-					startPoint != null ? startPoint : Constants.HEAD));
+					JGitText.get().refNotResolved, startPointOrHead));
 		return result;
 	}
 
-	private void processOptions() throws InvalidRefNameException {
-		if (paths.isEmpty()
+	private void processOptions() throws InvalidRefNameException,
+			RefAlreadyExistsException, IOException {
+		if (((!checkoutAllPaths && paths.isEmpty()) || orphan)
 				&& (name == null || !Repository
 						.isValidRefName(Constants.R_HEADS + name)))
 			throw new InvalidRefNameException(MessageFormat.format(JGitText
-					.get().branchNameInvalid, name == null ? "<null>" : name));
+					.get().branchNameInvalid, name == null ? "<null>" : name)); //$NON-NLS-1$
+
+		if (orphan) {
+			Ref refToCheck = repo.getRef(getBranchName());
+			if (refToCheck != null)
+				throw new RefAlreadyExistsException(MessageFormat.format(
+						JGitText.get().refAlreadyExists, name));
+		}
+	}
+
+	private String getBranchName() {
+		if (name.startsWith(Constants.R_REFS))
+			return name;
+
+		return Constants.R_HEADS + name;
 	}
 
 	/**
+	 * Specify the name of the branch or commit to check out, or the new branch
+	 * name.
+	 * <p>
+	 * When only checking out paths and not switching branches, use
+	 * {@link #setStartPoint(String)} or {@link #setStartPoint(RevCommit)} to
+	 * specify from which branch or commit to check out files.
+	 * <p>
+	 * When {@link #setCreateBranch(boolean)} is set to <code>true</code>, use
+	 * this method to set the name of the new branch to create and
+	 * {@link #setStartPoint(String)} or {@link #setStartPoint(RevCommit)} to
+	 * specify the start point of the branch.
+	 *
 	 * @param name
-	 *            the name of the new branch
+	 *            the name of the branch or commit
 	 * @return this instance
 	 */
 	public CheckoutCommand setName(String name) {
@@ -329,6 +527,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
+	 * Specify whether to create a new branch.
+	 * <p>
+	 * If <code>true</code> is used, the name of the new branch must be set
+	 * using {@link #setName(String)}. The commit at which to start the new
+	 * branch can be set using {@link #setStartPoint(String)} or
+	 * {@link #setStartPoint(RevCommit)}; if not specified, HEAD is used. Also
+	 * see {@link #setUpstreamMode} for setting up branch tracking.
+	 *
 	 * @param createBranch
 	 *            if <code>true</code> a branch will be created as part of the
 	 *            checkout and set to the specified start point
@@ -341,6 +547,28 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
+	 * Specify whether to create a new orphan branch.
+	 * <p>
+	 * If <code>true</code> is used, the name of the new orphan branch must be
+	 * set using {@link #setName(String)}. The commit at which to start the new
+	 * orphan branch can be set using {@link #setStartPoint(String)} or
+	 * {@link #setStartPoint(RevCommit)}; if not specified, HEAD is used.
+	 *
+	 * @param orphan
+	 *            if <code>true</code> a orphan branch will be created as part
+	 *            of the checkout to the specified start point
+	 * @return this instance
+	 * @since 3.3
+	 */
+	public CheckoutCommand setOrphan(boolean orphan) {
+		checkCallable();
+		this.orphan = orphan;
+		return this;
+	}
+
+	/**
+	 * Specify to force the ref update in case of a branch switch.
+	 *
 	 * @param force
 	 *            if <code>true</code> and the branch with the given name
 	 *            already exists, the start-point of an existing branch will be
@@ -355,32 +583,51 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
+	 * Set the name of the commit that should be checked out.
+	 * <p>
+	 * When checking out files and this is not specified or <code>null</code>,
+	 * the index is used.
+	 * <p>
+	 * When creating a new branch, this will be used as the start point. If not
+	 * specified or <code>null</code>, the current HEAD is used.
+	 *
 	 * @param startPoint
-	 *            corresponds to the start-point option; if <code>null</code>,
-	 *            the current HEAD will be used
+	 *            commit name to check out
 	 * @return this instance
 	 */
 	public CheckoutCommand setStartPoint(String startPoint) {
 		checkCallable();
 		this.startPoint = startPoint;
 		this.startCommit = null;
+		checkOptions();
 		return this;
 	}
 
 	/**
+	 * Set the commit that should be checked out.
+	 * <p>
+	 * When creating a new branch, this will be used as the start point. If not
+	 * specified or <code>null</code>, the current HEAD is used.
+	 * <p>
+	 * When checking out files and this is not specified or <code>null</code>,
+	 * the index is used.
+	 *
 	 * @param startCommit
-	 *            corresponds to the start-point option; if <code>null</code>,
-	 *            the current HEAD will be used
+	 *            commit to check out
 	 * @return this instance
 	 */
 	public CheckoutCommand setStartPoint(RevCommit startCommit) {
 		checkCallable();
 		this.startCommit = startCommit;
 		this.startPoint = null;
+		checkOptions();
 		return this;
 	}
 
 	/**
+	 * When creating a branch with {@link #setCreateBranch(boolean)}, this can
+	 * be used to configure branch tracking.
+	 *
 	 * @param mode
 	 *            corresponds to the --track/--no-track options; may be
 	 *            <code>null</code>
@@ -394,11 +641,36 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
-	 * @return the result
+	 * When checking out the index, check out the specified stage (ours or
+	 * theirs) for unmerged paths.
+	 * <p>
+	 * This can not be used when checking out a branch, only when checking out
+	 * the index.
+	 *
+	 * @param stage
+	 *            the stage to check out
+	 * @return this
+	 */
+	public CheckoutCommand setStage(Stage stage) {
+		checkCallable();
+		this.checkoutStage = stage;
+		checkOptions();
+		return this;
+	}
+
+	/**
+	 * @return the result, never <code>null</code>
 	 */
 	public CheckoutResult getResult() {
 		if (status == null)
 			return CheckoutResult.NOT_TRIED_RESULT;
 		return status;
+	}
+
+	private void checkOptions() {
+		if (checkoutStage != null && !isCheckoutIndex())
+			throw new IllegalStateException(
+					"Checking out ours/theirs is only possible when checking out index, "
+							+ "not when switching branches.");
 	}
 }

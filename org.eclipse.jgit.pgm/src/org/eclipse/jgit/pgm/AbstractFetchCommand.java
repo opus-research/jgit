@@ -47,23 +47,26 @@
 
 package org.eclipse.jgit.pgm;
 
+import static java.lang.Character.valueOf;
+
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.TrackingRefUpdate;
+import org.eclipse.jgit.util.io.ThrowingPrintWriter;
 import org.kohsuke.args4j.Option;
 
 abstract class AbstractFetchCommand extends TextBuiltin {
 	@Option(name = "--verbose", aliases = { "-v" }, usage = "usage_beMoreVerbose")
 	private boolean verbose;
 
-	protected void showFetchResult(final FetchResult r) {
+	protected void showFetchResult(final FetchResult r) throws IOException {
 		ObjectReader reader = db.newObjectReader();
 		try {
 			boolean shownURI = false;
@@ -77,22 +80,22 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 				final String dst = abbreviateRef(u.getLocalName(), true);
 
 				if (!shownURI) {
-					out.println(MessageFormat.format(CLIText.get().fromURI,
+					outw.println(MessageFormat.format(CLIText.get().fromURI,
 							r.getURI()));
 					shownURI = true;
 				}
 
-				out.format(" %c %-17s %-10s -> %s", type, longType, src, dst);
-				out.println();
+				outw.format(" %c %-17s %-10s -> %s", valueOf(type), longType, //$NON-NLS-1$
+						src, dst);
+				outw.println();
 			}
 		} finally {
 			reader.release();
 		}
-		showRemoteMessages(r.getMessages());
+		showRemoteMessages(errw, r.getMessages());
 	}
 
-	static void showRemoteMessages(String pkt) {
-		PrintWriter writer = new PrintWriter(System.err);
+	static void showRemoteMessages(ThrowingPrintWriter writer, String pkt) throws IOException {
 		while (0 < pkt.length()) {
 			final int lf = pkt.indexOf('\n');
 			final int cr = pkt.indexOf('\r');
@@ -125,7 +128,8 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 		writer.flush();
 	}
 
-	private String longTypeOf(ObjectReader reader, final TrackingRefUpdate u) {
+	private static String longTypeOf(ObjectReader reader,
+			final TrackingRefUpdate u) {
 		final RefUpdate.Result r = u.getResult();
 		if (r == RefUpdate.Result.LOCK_FAILURE)
 			return "[lock fail]";
@@ -147,21 +151,21 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 		if (r == RefUpdate.Result.FORCED) {
 			final String aOld = safeAbbreviate(reader, u.getOldObjectId());
 			final String aNew = safeAbbreviate(reader, u.getNewObjectId());
-			return aOld + "..." + aNew;
+			return aOld + "..." + aNew; //$NON-NLS-1$
 		}
 
 		if (r == RefUpdate.Result.FAST_FORWARD) {
 			final String aOld = safeAbbreviate(reader, u.getOldObjectId());
 			final String aNew = safeAbbreviate(reader, u.getNewObjectId());
-			return aOld + ".." + aNew;
+			return aOld + ".." + aNew; //$NON-NLS-1$
 		}
 
 		if (r == RefUpdate.Result.NO_CHANGE)
 			return "[up to date]";
-		return "[" + r.name() + "]";
+		return "[" + r.name() + "]"; //$NON-NLS-1$//$NON-NLS-2$
 	}
 
-	private String safeAbbreviate(ObjectReader reader, ObjectId id) {
+	private static String safeAbbreviate(ObjectReader reader, ObjectId id) {
 		try {
 			return reader.abbreviate(id).name();
 		} catch (IOException cannotAbbreviate) {

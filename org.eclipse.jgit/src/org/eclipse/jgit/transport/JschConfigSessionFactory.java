@@ -57,8 +57,8 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.FS;
 
 import com.jcraft.jsch.JSch;
@@ -110,22 +110,40 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 					pass, host, port, hc);
 
 			int retries = 0;
-			while (!session.isConnected() && retries < 3) {
+			while (!session.isConnected()) {
 				try {
 					retries++;
 					session.connect(tms);
 				} catch (JSchException e) {
 					session.disconnect();
 					session = null;
-					// if authentication failed maybe credentials changed at the
-					// remote end therefore reset credentials and retry
-					if (credentialsProvider != null && e.getCause() == null
-							&& e.getMessage().equals("Auth fail")) {
-						credentialsProvider.reset(uri);
-						session = createSession(credentialsProvider, fs, user,
-								pass, host, port, hc);
-					} else {
+					// Make sure our known_hosts is not outdated
+					knownHosts(getJSch(hc, fs), fs);
+
+					if (isAuthenticationCanceled(e)) {
 						throw e;
+					} else if (isAuthenticationFailed(e)
+							&& credentialsProvider != null) {
+						// if authentication failed maybe credentials changed at
+						// the remote end therefore reset credentials and retry
+						if (retries < 3) {
+							credentialsProvider.reset(uri);
+							session = createSession(credentialsProvider, fs,
+									user, pass, host, port, hc);
+						} else
+							throw e;
+					} else if (retries >= hc.getConnectionAttempts()) {
+						throw e;
+					} else {
+						try {
+							Thread.sleep(1000);
+							session = createSession(credentialsProvider, fs,
+									user, pass, host, port, hc);
+						} catch (InterruptedException e1) {
+							throw new TransportException(
+									JGitText.get().transportSSHRetryInterrupt,
+									e1);
+						}
 					}
 				}
 			}
@@ -143,20 +161,31 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 	}
 
+	private static boolean isAuthenticationFailed(JSchException e) {
+		return e.getCause() == null && e.getMessage().equals("Auth fail"); //$NON-NLS-1$
+	}
+
+	private static boolean isAuthenticationCanceled(JSchException e) {
+		return e.getCause() == null && e.getMessage().equals("Auth cancel"); //$NON-NLS-1$
+	}
+
 	private Session createSession(CredentialsProvider credentialsProvider,
 			FS fs, String user, final String pass, String host, int port,
 			final OpenSshConfig.Host hc) throws JSchException {
 		final Session session = createSession(hc, user, host, port, fs);
+		// We retry already in getSession() method. JSch must not retry
+		// on its own.
+		session.setConfig("MaxAuthTries", "1"); //$NON-NLS-1$ //$NON-NLS-2$
 		if (pass != null)
 			session.setPassword(pass);
 		final String strictHostKeyCheckingPolicy = hc
 				.getStrictHostKeyChecking();
 		if (strictHostKeyCheckingPolicy != null)
-			session.setConfig("StrictHostKeyChecking",
+			session.setConfig("StrictHostKeyChecking", //$NON-NLS-1$
 					strictHostKeyCheckingPolicy);
 		final String pauth = hc.getPreferredAuthentications();
 		if (pauth != null)
-			session.setConfig("PreferredAuthentications", pauth);
+			session.setConfig("PreferredAuthentications", pauth); //$NON-NLS-1$
 		if (credentialsProvider != null
 				&& (!hc.isBatchMode() || !credentialsProvider.isInteractive())) {
 			session.setUserInfo(new CredentialsProviderUserInfo(session,
@@ -254,7 +283,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		final File home = fs.userHome();
 		if (home == null)
 			return;
-		final File known_hosts = new File(new File(home, ".ssh"), "known_hosts");
+		final File known_hosts = new File(new File(home, ".ssh"), "known_hosts"); //$NON-NLS-1$ //$NON-NLS-2$
 		try {
 			final FileInputStream in = new FileInputStream(known_hosts);
 			try {
@@ -273,11 +302,11 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		final File home = fs.userHome();
 		if (home == null)
 			return;
-		final File sshdir = new File(home, ".ssh");
+		final File sshdir = new File(home, ".ssh"); //$NON-NLS-1$
 		if (sshdir.isDirectory()) {
-			loadIdentity(sch, new File(sshdir, "identity"));
-			loadIdentity(sch, new File(sshdir, "id_rsa"));
-			loadIdentity(sch, new File(sshdir, "id_dsa"));
+			loadIdentity(sch, new File(sshdir, "identity")); //$NON-NLS-1$
+			loadIdentity(sch, new File(sshdir, "id_rsa")); //$NON-NLS-1$
+			loadIdentity(sch, new File(sshdir, "id_dsa")); //$NON-NLS-1$
 		}
 	}
 

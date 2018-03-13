@@ -48,8 +48,10 @@ package org.eclipse.jgit.console;
 import java.io.Console;
 
 import org.eclipse.jgit.errors.UnsupportedCredentialItem;
+import org.eclipse.jgit.transport.ChainingCredentialsProvider;
 import org.eclipse.jgit.transport.CredentialItem;
 import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.NetRCCredentialsProvider;
 import org.eclipse.jgit.transport.URIish;
 
 /** Interacts with the user during authentication by using the text console. */
@@ -60,7 +62,9 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 		if (c.cons == null)
 			throw new NoClassDefFoundError(
 					ConsoleText.get().noSystemConsoleAvailable);
-		CredentialsProvider.setDefault(c);
+		CredentialsProvider cp = new ChainingCredentialsProvider(
+				new NetRCCredentialsProvider(), c);
+		CredentialsProvider.setDefault(cp);
 	}
 
 	private final Console cons = System.console();
@@ -99,16 +103,16 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 			CredentialItem item = items[i];
 
 			if (item instanceof CredentialItem.StringType)
-				ok = get(uri, (CredentialItem.StringType) item);
+				ok = get((CredentialItem.StringType) item);
 
 			else if (item instanceof CredentialItem.CharArrayType)
-				ok = get(uri, (CredentialItem.CharArrayType) item);
+				ok = get((CredentialItem.CharArrayType) item);
 
 			else if (item instanceof CredentialItem.YesNoType)
-				ok = get(uri, (CredentialItem.YesNoType) item);
+				ok = get((CredentialItem.YesNoType) item);
 
 			else if (item instanceof CredentialItem.InformationalMessage)
-				ok = get(uri, (CredentialItem.InformationalMessage) item);
+				ok = get((CredentialItem.InformationalMessage) item);
 
 			else
 				throw new UnsupportedCredentialItem(uri, item.getPromptText());
@@ -116,9 +120,9 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 		return ok;
 	}
 
-	private boolean get(URIish uri, CredentialItem.StringType item) {
+	private boolean get(CredentialItem.StringType item) {
 		if (item.isValueSecure()) {
-			char[] v = cons.readPassword("%s: ", item.getPromptText());
+			char[] v = cons.readPassword("%s: ", item.getPromptText()); //$NON-NLS-1$
 			if (v != null) {
 				item.setValue(new String(v));
 				return true;
@@ -126,7 +130,7 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 				return false;
 			}
 		} else {
-			String v = cons.readLine("%s: ", item.getPromptText());
+			String v = cons.readLine("%s: ", item.getPromptText()); //$NON-NLS-1$
 			if (v != null) {
 				item.setValue(v);
 				return true;
@@ -136,9 +140,9 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 		}
 	}
 
-	private boolean get(URIish uri, CredentialItem.CharArrayType item) {
+	private boolean get(CredentialItem.CharArrayType item) {
 		if (item.isValueSecure()) {
-			char[] v = cons.readPassword("%s: ", item.getPromptText());
+			char[] v = cons.readPassword("%s: ", item.getPromptText()); //$NON-NLS-1$
 			if (v != null) {
 				item.setValueNoCopy(v);
 				return true;
@@ -146,7 +150,7 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 				return false;
 			}
 		} else {
-			String v = cons.readLine("%s: ", item.getPromptText());
+			String v = cons.readLine("%s: ", item.getPromptText()); //$NON-NLS-1$
 			if (v != null) {
 				item.setValueNoCopy(v.toCharArray());
 				return true;
@@ -156,14 +160,14 @@ public class ConsoleCredentialsProvider extends CredentialsProvider {
 		}
 	}
 
-	private boolean get(URIish uri, CredentialItem.InformationalMessage item) {
-		cons.printf("%s\n", item.getPromptText());
+	private boolean get(CredentialItem.InformationalMessage item) {
+		cons.printf("%s\n", item.getPromptText()); //$NON-NLS-1$
 		cons.flush();
 		return true;
 	}
 
-	private boolean get(URIish uri, CredentialItem.YesNoType item) {
-		String r = cons.readLine("%s [%s/%s]? ", item.getPromptText(),
+	private boolean get(CredentialItem.YesNoType item) {
+		String r = cons.readLine("%s [%s/%s]? ", item.getPromptText(), //$NON-NLS-1$
 				ConsoleText.get().answerYes, ConsoleText.get().answerNo);
 		if (r != null) {
 			item.setValue(ConsoleText.get().answerYes.equalsIgnoreCase(r));
