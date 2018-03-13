@@ -46,7 +46,7 @@ package org.eclipse.jgit.util.sha1;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 
 import java.io.IOException;
@@ -81,13 +81,8 @@ public class SHA1Test {
 		s.update(new byte[] {});
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
-		s.reset();
-		s.update(new byte[] {});
-		ObjectId s2 = s.toObjectId();
-
 		assertEquals(m1, s1);
 		assertEquals(exp, s1);
-		assertEquals(exp, s2);
 	}
 
 	@Test
@@ -103,13 +98,8 @@ public class SHA1Test {
 		s.update(TEST1.getBytes(StandardCharsets.UTF_8));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
-		s.reset();
-		s.update(TEST1.getBytes(StandardCharsets.UTF_8));
-		ObjectId s2 = s.toObjectId();
-
 		assertEquals(m1, s1);
 		assertEquals(exp, s1);
-		assertEquals(exp, s2);
 	}
 
 	@Test
@@ -125,13 +115,8 @@ public class SHA1Test {
 		s.update(TEST2.getBytes(StandardCharsets.UTF_8));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
-		s.reset();
-		s.update(TEST2.getBytes(StandardCharsets.UTF_8));
-		ObjectId s2 = s.toObjectId();
-
 		assertEquals(m1, s1);
 		assertEquals(exp, s1);
-		assertEquals(exp, s2);
 	}
 
 	@Test
