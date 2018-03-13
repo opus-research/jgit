@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Google Inc.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -41,16 +40,51 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.transport;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 
-class Sets {
-	static <T> Set<T> of(T... elements) {
-		Set<T> ret = new HashSet<T>();
-		for (T element : elements)
-			ret.add(element);
-		return ret;
+import org.eclipse.jgit.storage.pack.PackStatistics;
+
+/**
+ * {@link PostUploadHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor.
+ *
+ * @since 4.1
+ */
+public class PostUploadHookChain implements PostUploadHook {
+	private final PostUploadHook[] hooks;
+	private final int count;
+
+	/**
+	 * Create a new hook chaining the given hooks together.
+	 *
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new chain of the given hooks.
+	 */
+	public static PostUploadHook newChain(List<? extends PostUploadHook> hooks) {
+		PostUploadHook[] newHooks = new PostUploadHook[hooks.size()];
+		int i = 0;
+		for (PostUploadHook hook : hooks)
+			if (hook != PostUploadHook.NULL)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return PostUploadHook.NULL;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new PostUploadHookChain(newHooks, i);
+	}
+
+	public void onPostUpload(PackStatistics stats) {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPostUpload(stats);
+	}
+
+	private PostUploadHookChain(PostUploadHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
 	}
 }
