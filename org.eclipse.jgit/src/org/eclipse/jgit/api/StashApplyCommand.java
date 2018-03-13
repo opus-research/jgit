@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
@@ -53,7 +52,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.StashApplyFailureException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
-import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
@@ -74,7 +72,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 
 /**
  * Command class to apply a stashed commit.
@@ -362,8 +359,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					}
 				}
 
-				checkoutPath(entry, reader,
-						walk.getAttributes(OperationType.CHECKOUT_OP));
+				checkoutPath(entry, reader);
 			}
 		} finally {
 			if (walk != null)
@@ -371,12 +367,10 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 		}
 	}
 
-	private void checkoutPath(DirCacheEntry entry, ObjectReader reader,
-			Set<Attribute> attributes) {
+	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		try {
 			File file = new File(repo.getWorkTree(), entry.getPathString());
-			DirCacheCheckout.checkoutEntry(repo, file, entry, reader,
-					attributes);
+			DirCacheCheckout.checkoutEntry(repo, file, entry, reader);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,
