@@ -153,8 +153,6 @@ public class ReceivePack {
 
 	private PrintWriter msgs;
 
-	private IndexPack ip;
-
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
@@ -236,18 +234,6 @@ public class ReceivePack {
 	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		return refs;
-	}
-
-	/**
-	 *  @return the set of objects the incoming pack assumed for delta purposes
-	 */
-	public final Set<ObjectId> getBaseObjectIds() {
-		return ip.getBaseObjectIds();
-	}
-
-	/** @return the new objects that were sent by the user */
-	public final Set<ObjectId> getNewObjectIds() {
-		return ip.getNewObjectIds();
 	}
 
 	/**
@@ -699,10 +685,8 @@ public class ReceivePack {
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(10 * timeout * 1000);
 
-		ip = IndexPack.create(db, rawIn);
+		final IndexPack ip = IndexPack.create(db, rawIn);
 		ip.setFixThin(true);
-		ip.setNeedNewObjectIds(true);
-		ip.setNeedBaseObjectIds(true);
 		ip.setObjectChecking(isCheckReceivedObjects());
 		ip.index(NullProgressMonitor.INSTANCE);
 
