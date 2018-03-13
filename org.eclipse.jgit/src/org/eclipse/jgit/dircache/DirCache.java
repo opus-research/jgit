@@ -566,14 +566,13 @@ public class DirCache {
 		dos.write(tmp, 0, 12);
 
 		// Write the individual file entries.
-
-		if (myLock != null) {
-			// For new files we need to smudge the index entry
-			// if they have been modified "now". Ideally we'd
-			// want the timestamp when we're done writing the index,
-			// so we use the current timestamp as a approximation.
-			myLock.createCommitSmapshot();
-			snapshot = myLock.getCommitSnapshot();
+		//
+		if (snapshot == null) {
+			// Write a new index, as no entries require smudging.
+			//
+			for (int i = 0; i < entryCnt; i++)
+				sortedEntries[i].write(dos);
+		} else {
 			final int smudge_s = (int) (snapshot.lastModified() / 1000);
 			final int smudge_ns = ((int) (snapshot.lastModified() % 1000)) * 1000000;
 			for (int i = 0; i < entryCnt; i++) {
