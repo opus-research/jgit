@@ -62,7 +62,6 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -92,7 +91,7 @@ public class DfsPackCompactor {
 
 	private final List<DfsPackFile> srcPacks;
 
-	private final List<ObjectIdSet> exclude;
+	private final List<PackWriter.ObjectIdSet> exclude;
 
 	private final List<DfsPackDescription> newPacks;
 
@@ -114,7 +113,7 @@ public class DfsPackCompactor {
 		repo = repository;
 		autoAddSize = 5 * 1024 * 1024; // 5 MiB
 		srcPacks = new ArrayList<DfsPackFile>();
-		exclude = new ArrayList<ObjectIdSet>(4);
+		exclude = new ArrayList<PackWriter.ObjectIdSet>(4);
 		newPacks = new ArrayList<DfsPackDescription>(1);
 		newStats = new ArrayList<PackStatistics>(1);
 	}
@@ -165,7 +164,7 @@ public class DfsPackCompactor {
 	 *            objects to not include.
 	 * @return {@code this}.
 	 */
-	public DfsPackCompactor exclude(ObjectIdSet set) {
+	public DfsPackCompactor exclude(PackWriter.ObjectIdSet set) {
 		exclude.add(set);
 		return this;
 	}
@@ -184,7 +183,11 @@ public class DfsPackCompactor {
 		try (DfsReader ctx = (DfsReader) repo.newObjectReader()) {
 			idx = pack.getPackIndex(ctx);
 		}
-		return exclude(idx);
+		return exclude(new PackWriter.ObjectIdSet() {
+			public boolean contains(AnyObjectId id) {
+				return idx.hasObject(id);
+			}
+		});
 	}
 
 	/**
@@ -340,7 +343,7 @@ public class DfsPackCompactor {
 			RevObject obj = rw.lookupOrNull(id);
 			if (obj != null && (obj.has(added) || obj.has(isBase)))
 				continue;
-			for (ObjectIdSet e : exclude)
+			for (PackWriter.ObjectIdSet e : exclude)
 				if (e.contains(id))
 					continue SCAN;
 			want.add(new ObjectIdWithOffset(id, ent.getOffset()));

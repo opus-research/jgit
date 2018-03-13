@@ -55,6 +55,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.ignore.IgnoreNode.MatchResult;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
@@ -508,7 +509,7 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 						.toString());
 	}
 
-	private void beginWalk() {
+	private void beginWalk() throws CorruptObjectException {
 		walk = new TreeWalk(db);
 		walk.addTree(new FileTreeIterator(db));
 	}

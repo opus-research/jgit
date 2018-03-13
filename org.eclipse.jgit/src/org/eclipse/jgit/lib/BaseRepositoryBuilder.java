@@ -109,8 +109,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 
 		int pathStart = 8;
 		int lineEnd = RawParseUtils.nextLF(content, pathStart);
-		while (content[lineEnd - 1] == '\n' ||
-		       (content[lineEnd - 1] == '\r' && SystemReader.getInstance().isWindows()))
+		if (content[lineEnd - 1] == '\n')
 			lineEnd--;
 		if (lineEnd == pathStart)
 			throw new IOException(MessageFormat.format(

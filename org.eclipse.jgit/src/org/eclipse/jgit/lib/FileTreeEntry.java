@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,80 +44,72 @@
 
 package org.eclipse.jgit.lib;
 
-/**
- * A reference that indirectly points at another {@link Ref}.
- * <p>
- * A symbolic reference always derives its current value from the target
- * reference.
- */
-public class SymbolicRef implements Ref {
-	private final String name;
+import java.io.IOException;
 
-	private final Ref target;
+/**
+ * A representation of a file (blob) object in a {@link Tree}.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class FileTreeEntry extends TreeEntry {
+	private FileMode mode;
 
 	/**
-	 * Create a new ref pairing.
+	 * Constructor for a File (blob) object.
 	 *
-	 * @param refName
-	 *            name of this ref.
-	 * @param target
-	 *            the ref we reference and derive our value from.
+	 * @param parent
+	 *            The {@link Tree} holding this object (or null)
+	 * @param id
+	 *            the SHA-1 of the blob (or null for a yet unhashed file)
+	 * @param nameUTF8
+	 *            raw object name in the parent tree
+	 * @param execute
+	 *            true if the executable flag is set
 	 */
-	public SymbolicRef(String refName, Ref target) {
-		this.name = refName;
-		this.target = target;
+	public FileTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8, final boolean execute) {
+		super(parent, id, nameUTF8);
+		setExecutable(execute);
 	}
 
-	public String getName() {
-		return name;
+	public FileMode getMode() {
+		return mode;
 	}
 
-	public boolean isSymbolic() {
-		return true;
+	/**
+	 * @return true if this file is executable
+	 */
+	public boolean isExecutable() {
+		return getMode().equals(FileMode.EXECUTABLE_FILE);
 	}
 
-	public Ref getLeaf() {
-		Ref dst = getTarget();
-		while (dst.isSymbolic())
-			dst = dst.getTarget();
-		return dst;
+	/**
+	 * @param execute set/reset the executable flag
+	 */
+	public void setExecutable(final boolean execute) {
+		mode = execute ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
 	}
 
-	public Ref getTarget() {
-		return target;
+	/**
+	 * @return an {@link ObjectLoader} that will return the data
+	 * @throws IOException
+	 */
+	public ObjectLoader openReader() throws IOException {
+		return getRepository().open(getId(), Constants.OBJ_BLOB);
 	}
 
-	public ObjectId getObjectId() {
-		return getLeaf().getObjectId();
-	}
-
-	public Storage getStorage() {
-		return Storage.LOOSE;
-	}
-
-	public ObjectId getPeeledObjectId() {
-		return getLeaf().getPeeledObjectId();
-	}
-
-	public boolean isPeeled() {
-		return getLeaf().isPeeled();
-	}
-
-	@SuppressWarnings("nls")
-	@Override
 	public String toString() {
-		StringBuilder r = new StringBuilder();
-		r.append("SymbolicRef[");
-		Ref cur = this;
-		while (cur.isSymbolic()) {
-			r.append(cur.getName());
-			r.append(" -> ");
-			cur = cur.getTarget();
-		}
-		r.append(cur.getName());
-		r.append('=');
-		r.append(ObjectId.toString(cur.getObjectId()));
-		r.append("]");
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(' ');
+		r.append(isExecutable() ? 'X' : 'F');
+		r.append(' ');
+		r.append(getFullName());
 		return r.toString();
 	}
 }
