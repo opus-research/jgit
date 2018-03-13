@@ -198,8 +198,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	boolean shallowCommitsInitialized;
 
-	private RevFlag startFlag;
-
 	/**
 	 * Create a new revision walker for a given repository.
 	 *
@@ -289,15 +287,10 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	public void markStart(final RevCommit c) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
-		if (startFlag != null) {
-			c.flags |= startFlag.mask;
-		}
-		if ((c.flags & SEEN) != 0) {
+		if ((c.flags & SEEN) != 0)
 			return;
-		}
-		if ((c.flags & PARSED) == 0) {
+		if ((c.flags & PARSED) == 0)
 			c.parseHeaders(this);
-		}
 		c.flags |= SEEN;
 		roots.add(c);
 		queue.add(c);
@@ -327,20 +320,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 			IOException {
 		for (final RevCommit c : list)
 			markStart(c);
-	}
-
-	/**
-	 * Specify a flag to be set on all start commits.
-	 * <p>
-	 * If this method is not used, there is no other way for a caller of a walk to
-	 * determine after the fact which commits were marked as start.
-	 *
-	 * @param flag
-	 *            flag allocated on this instance.
-	 * @since 4.1
-	 */
-	public void setStartFlag(RevFlag flag) {
-		this.startFlag = flag;
 	}
 
 	/**
