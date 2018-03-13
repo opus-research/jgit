@@ -463,6 +463,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
 		if (!eof()) {
+			canonLen = -1;
 			parseEntry();
 		}
 	}
@@ -481,7 +482,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ensurePathCapacity(pathOffset + nameLen, pathOffset);
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
-		canonLen = -1;
 	}
 
 	/**
