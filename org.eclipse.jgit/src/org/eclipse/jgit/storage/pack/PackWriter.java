@@ -2185,8 +2185,8 @@ public class PackWriter {
 		/** @return formatted message string for display to clients. */
 		public String getMessage() {
 			return MessageFormat.format(JGitText.get().packWriterStatistics, //
-					Long.valueOf(totalObjects), Long.valueOf(totalDeltas), //
-					Long.valueOf(reusedObjects), Long.valueOf(reusedDeltas));
+					totalObjects, totalDeltas, //
+					reusedObjects, reusedDeltas);
 		}
 	}
 

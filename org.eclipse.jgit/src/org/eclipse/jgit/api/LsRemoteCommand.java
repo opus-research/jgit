@@ -106,33 +106,27 @@ public class LsRemoteCommand extends
 	 * Include refs/heads in references results
 	 *
 	 * @param heads
-	 * @return {@code this}
 	 */
-	public LsRemoteCommand setHeads(boolean heads) {
+	public void setHeads(boolean heads) {
 		this.heads = heads;
-		return this;
 	}
 
 	/**
 	 * Include refs/tags in references results
 	 *
 	 * @param tags
-	 * @return {@code this}
 	 */
-	public LsRemoteCommand setTags(boolean tags) {
+	public void setTags(boolean tags) {
 		this.tags = tags;
-		return this;
 	}
 
 	/**
 	 * The full path of git-upload-pack on the remote host
 	 *
 	 * @param uploadPack
-	 * @return {@code this}
 	 */
-	public LsRemoteCommand setUploadPack(String uploadPack) {
+	public void setUploadPack(String uploadPack) {
 		this.uploadPack = uploadPack;
-		return this;
 	}
 
 	/**
