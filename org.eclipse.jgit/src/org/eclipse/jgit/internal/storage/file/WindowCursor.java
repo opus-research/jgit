@@ -330,8 +330,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	/** Release the current window cursor. */
-	@Override
-	public void close() {
+	public void release() {
 		window = null;
 		baseCache = null;
 		try {

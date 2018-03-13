@@ -430,5 +430,7 @@ public abstract class ObjectReader implements AutoCloseable {
 	 * @since 4.0
 	 */
 	@Override
-	public abstract void close();
+	public void close() {
+		// Do nothing.
+	}
 }

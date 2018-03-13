@@ -379,10 +379,10 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			try {
 				parser.read(inputStream);
 				for (RepoProject proj : parser.getFilteredProjects()) {
-					addSubmodule(proj.getUrl(),
-							proj.getPath(),
+					addSubmodule(proj.url,
+							proj.path,
 							proj.getRevision(),
-							proj.getCopyFiles());
+							proj.copyfiles);
 				}
 			} catch (GitAPIException | IOException e) {
 				throw new ManifestErrorException(e);
@@ -403,17 +403,17 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			try (RevWalk rw = new RevWalk(repo)) {
 				Config cfg = new Config();
 				for (RepoProject proj : bareProjects) {
-					String name = proj.getPath();
-					String nameUri = proj.getName();
+					String name = proj.path;
+					String nameUri = proj.name;
 					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
 					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
 					// create gitlink
 					DirCacheEntry dcEntry = new DirCacheEntry(name);
 					ObjectId objectId;
-					if (ObjectId.isId(proj.getRevision()))
-						objectId = ObjectId.fromString(proj.getRevision());
+					if (ObjectId.isId(proj.revision))
+						objectId = ObjectId.fromString(proj.revision);
 					else {
-						objectId = callback.sha1(nameUri, proj.getRevision());
+						objectId = callback.sha1(nameUri, proj.revision);
 					}
 					if (objectId == null)
 						throw new RemoteUnavailableException(nameUri);
@@ -421,9 +421,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					dcEntry.setFileMode(FileMode.GITLINK);
 					builder.add(dcEntry);
 
-					for (CopyFile copyfile : proj.getCopyFiles()) {
+					for (CopyFile copyfile : proj.copyfiles) {
 						byte[] src = callback.readFile(
-								nameUri, proj.getRevision(), copyfile.src);
+								nameUri, proj.revision, copyfile.src);
 						objectId = inserter.insert(Constants.OBJ_BLOB, src);
 						dcEntry = new DirCacheEntry(copyfile.dest);
 						dcEntry.setObjectId(objectId);
@@ -495,7 +495,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			List<CopyFile> copyfiles) throws GitAPIException, IOException {
 		if (repo.isBare()) {
 			RepoProject proj = new RepoProject(url, name, revision, null, null);
-			proj.addCopyFiles(copyfiles);
+			proj.copyfiles.addAll(copyfiles);
 			bareProjects.add(proj);
 		} else {
 			SubmoduleAddCommand add = git
