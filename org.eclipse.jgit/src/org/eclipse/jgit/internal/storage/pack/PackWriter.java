@@ -1306,7 +1306,8 @@ public class PackWriter implements AutoCloseable {
 		long totalWeight = 0;
 		for (int i = 0; i < cnt; i++) {
 			ObjectToPack o = list[i];
-			totalWeight += DeltaTask.getAdjustedWeight(o);
+			if (!o.isEdge() && !o.doNotAttemptDelta())
+				totalWeight += o.getWeight();
 		}
 
 		long bytesPerUnit = 1;
