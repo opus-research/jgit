@@ -495,7 +495,4 @@ public class JGitText extends TranslationBundle {
 	/***/ public String writingNotSupported;
 	/***/ public String writingObjects;
 	/***/ public String wrongDecompressedLength;
-
-	/***/
-	public String wrongRepositoryState;
 }
