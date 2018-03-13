@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,53 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import org.eclipse.jgit.api.DescribeCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.pgm.internal.CLIText;
+import org.kohsuke.args4j.Argument;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+@Command(common = true, usage = "usage_Describe")
+class Describe extends TextBuiltin {
 
-/**
- * PKWARE's ZIP format.
- */
-public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES =
-			Collections.unmodifiableList(Arrays.asList(".zip"));
+	@Argument(index = 0, metaVar = "metaVar_treeish")
+	private ObjectId tree;
 
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-		return new ZipArchiveOutputStream(s);
-	}
-
-	public void putEntry(ArchiveOutputStream out,
-			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
-
-		if (mode == FileMode.REGULAR_FILE) {
-			// ok
-		} else if (mode == FileMode.EXECUTABLE_FILE
-				|| mode == FileMode.SYMLINK) {
-			entry.setUnixMode(mode.getBits());
-		} else {
-			// TODO(jrn): Let the caller know the tree contained
-			// an entry with unsupported mode (e.g., a submodule).
+	@Override
+	protected void run() throws Exception {
+		DescribeCommand cmd = new Git(db).describe();
+		if (tree != null)
+			cmd.setTarget(tree);
+		String result = null;
+		try {
+			result = cmd.call();
+		} catch (RefNotFoundException e) {
+			throw die(CLIText.get().noNamesFound, e);
 		}
-		entry.setSize(loader.getSize());
-		out.putArchiveEntry(entry);
-		loader.copyTo(out);
-		out.closeArchiveEntry();
+		if (result == null)
+			throw die(CLIText.get().noNamesFound);
+
+		outw.println(result);
 	}
 
-	public Iterable<String> suffixes() {
-		return SUFFIXES;
-	}
 }

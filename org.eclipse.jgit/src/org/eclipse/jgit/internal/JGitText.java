@@ -75,6 +75,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String applyingCommit;
 	/***/ public String archiveFormatAlreadyAbsent;
 	/***/ public String archiveFormatAlreadyRegistered;
+	/***/ public String argumentIsNotAValidCommentString;
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
@@ -100,6 +101,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cachedPacksPreventsListingObjects;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
+	/***/ public String cannotChangeActionOnComment;
+	/***/ public String cannotChangeToComment;
 	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
@@ -137,6 +140,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadTree;
 	/***/ public String cannotRebaseWithoutCurrentHead;
 	/***/ public String cannotResolveLocalTrackingRefForUpdating;
+	/***/ public String cannotSquashFixupWithoutPreviousCommit;
 	/***/ public String cannotStoreObjects;
 	/***/ public String cannotUnloadAModifiedTree;
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
@@ -540,7 +544,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
-	/***/ public String targetIsNotSet;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
 	/***/ public String topologicalSortRequired;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,53 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertArrayEquals;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * PKWARE's ZIP format.
- */
-public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES =
-			Collections.unmodifiableList(Arrays.asList(".zip"));
+public class DescribeTest extends CLIRepositoryTestCase {
 
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-		return new ZipArchiveOutputStream(s);
+	private Git git;
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
 	}
 
-	public void putEntry(ArchiveOutputStream out,
-			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
-
-		if (mode == FileMode.REGULAR_FILE) {
-			// ok
-		} else if (mode == FileMode.EXECUTABLE_FILE
-				|| mode == FileMode.SYMLINK) {
-			entry.setUnixMode(mode.getBits());
-		} else {
-			// TODO(jrn): Let the caller know the tree contained
-			// an entry with unsupported mode (e.g., a submodule).
-		}
-		entry.setSize(loader.getSize());
-		out.putArchiveEntry(entry);
-		loader.copyTo(out);
-		out.closeArchiveEntry();
+	private void initialCommitAndTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		git.tag().setName("v1.0").call();
 	}
 
-	public Iterable<String> suffixes() {
-		return SUFFIXES;
+	@Test
+	public void testNoHead() throws Exception {
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
+
+	@Test
+	public void testHeadNoTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
+
+	@Test
+	public void testDescribeTag() throws Exception {
+		initialCommitAndTag();
+		assertArrayEquals(new String[] { "v1.0", "" },
+				execute("git describe HEAD"));
+	}
+
+	@Test
+	public void testDescribeCommit() throws Exception {
+		initialCommitAndTag();
+		writeTrashFile("greeting", "Hello, world!");
+		git.add().addFilepattern("greeting").call();
+		git.commit().setMessage("2nd commit").call();
+		assertArrayEquals(new String[] { "v1.0-1-g56f6ceb", "" },
+				execute("git describe"));
 	}
 }
