@@ -108,9 +108,28 @@ import org.eclipse.jgit.util.LongList;
 public class MyersDiff<S extends Sequence> {
 	/** Singleton instance of MyersDiff. */
 	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
-		public <S extends Sequence> EditList diffNonCommon(
-				SequenceComparator<? super S> cmp, S a, S b) {
-			return new MyersDiff<S>(cmp, a, b).edits;
+		public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
+				C cmp, S a, S b) {
+			Edit region = new Edit(0, a.size(), 0, b.size());
+			region = cmp.reduceCommonStartEnd(a, b, region);
+
+			switch (region.getType()) {
+			case INSERT:
+			case DELETE: {
+				EditList r = new EditList();
+				r.add(region);
+				return r;
+			}
+
+			case REPLACE:
+				return new MyersDiff<S>(cmp, a, b, region).getEdits();
+
+			case EMPTY:
+				return new EditList();
+
+			default:
+				throw new IllegalStateException();
+			}
 		}
 	};
 
@@ -120,27 +139,38 @@ public class MyersDiff<S extends Sequence> {
 	protected EditList edits;
 
 	/** Comparison function for sequences. */
-	protected HashedSequenceComparator<S> cmp;
+	protected HashedSequenceComparator<Subsequence<S>> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected HashedSequence<S> a;
+	protected HashedSequence<Subsequence<S>> a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected HashedSequence<S> b;
+	protected HashedSequence<Subsequence<S>> b;
 
-	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b) {
-		HashedSequencePair<S> pair;
+	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b, Edit region) {
+		Subsequence<S> as = Subsequence.a(a, region);
+		Subsequence<S> bs = Subsequence.b(b, region);
 
-		pair = new HashedSequencePair<S>(cmp, a, b);
+		HashedSequencePair<Subsequence<S>> pair = new HashedSequencePair<Subsequence<S>>(
+				new SubsequenceComparator<S>(cmp), as, bs);
+
 		this.cmp = pair.getComparator();
 		this.a = pair.getA();
 		this.b = pair.getB();
 
 		calculateEdits();
+		Subsequence.toBase(edits, as, bs);
+	}
+
+	/**
+	 * @return the list of edits found during the last call to {@link #calculateEdits()}
+	 */
+	public EditList getEdits() {
+		return edits;
 	}
 
 	// TODO: use ThreadLocal for future multi-threaded operations
@@ -535,8 +565,8 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			EditList r = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
-			System.out.println(r.toString());
+			EditList res = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
+			System.out.println(res.toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
