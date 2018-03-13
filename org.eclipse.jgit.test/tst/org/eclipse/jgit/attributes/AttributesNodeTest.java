@@ -49,8 +49,10 @@ import static org.junit.Assert.assertEquals;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ListIterator;
 
+import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
+import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.After;
 import org.junit.Test;
 
@@ -58,6 +60,9 @@ import org.junit.Test;
  * Test {@link AttributesNode}
  */
 public class AttributesNodeTest {
+	private static final TreeWalk DUMMY_WALK = new TreeWalk(
+			new InMemoryRepository(new DfsRepositoryDescription("FooBar")));
+
 	private static final Attribute A_SET_ATTR = new Attribute("A", SET);
 
 	private static final Attribute A_UNSET_ATTR = new Attribute("A", UNSET);
@@ -162,21 +167,10 @@ public class AttributesNodeTest {
 	}
 
 	private void assertAttribute(String path, AttributesNode node,
-			Attributes attrs) {
+			Attributes attrs) throws IOException {
 		Attributes attributes = new Attributes();
-
-		for (AttributesRule rule : node.getRules()) {
-			if (rule.isMatch(path, false)) {
-				ListIterator<Attribute> attributeIte = rule.getAttributes()
-						.listIterator(rule.getAttributes().size());
-				while (attributeIte.hasPrevious()) {
-					Attribute a = attributeIte.previous();
-					if (!attributes.containsKey(a.getKey())) {
-						attributes.put(a);
-					}
-				}
-			}
-		}
+		new AttributesHandler(DUMMY_WALK).mergeAttributes(node, path, false,
+				attributes);
 		assertEquals(attrs, attributes);
 	}
 
