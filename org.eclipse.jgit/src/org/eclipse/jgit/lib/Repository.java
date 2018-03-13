@@ -185,6 +185,7 @@ public class Repository {
 		objectDatabase.create();
 
 		new File(gitDir, "branches").mkdir();
+		new File(gitDir, "remotes").mkdir();
 		final String master = Constants.R_HEADS + Constants.MASTER;
 		refs.link(Constants.HEAD, master);
 
