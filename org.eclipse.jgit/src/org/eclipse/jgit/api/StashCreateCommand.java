@@ -52,14 +52,12 @@ import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -213,9 +211,8 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * and reset to the current HEAD commit.
 	 *
 	 * @return stashed commit or null if no changes to stash
-	 * @throws GitAPIException
 	 */
-	public RevCommit call() throws GitAPIException {
+	public RevCommit call() throws GitAPIException, JGitInternalException {
 		checkCallable();
 
 		Ref head = getHead();
@@ -249,10 +246,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 					WorkingTreeIterator wtIter = treeWalk.getTree(2,
 							WorkingTreeIterator.class);
 					if (headIter != null && indexIter != null && wtIter != null) {
-						if (!indexIter.getDirCacheEntry().isMerged())
-							throw new UnmergedPathsException(
-									new UnmergedPathException(
-											indexIter.getDirCacheEntry()));
 						if (wtIter.idEqual(indexIter)
 								|| wtIter.idEqual(headIter))
 							continue;

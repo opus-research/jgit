@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -103,12 +102,8 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 	 * method twice on an instance.
 	 *
 	 * @return an {@link ApplyResult} object representing the command result
-	 * @throws GitAPIException
-	 * @throws PatchFormatException
-	 * @throws PatchApplyException
 	 */
-	public ApplyResult call() throws GitAPIException, PatchFormatException,
-			PatchApplyException {
+	public ApplyResult call() throws GitAPIException {
 		checkCallable();
 		ApplyResult r = new ApplyResult();
 		try {
@@ -148,14 +143,10 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 				case COPY:
 					f = getFile(fh.getOldPath(), false);
 					byte[] bs = IO.readFully(f);
-					FileOutputStream fos = new FileOutputStream(getFile(
-							fh.getNewPath(),
+					FileWriter fw = new FileWriter(getFile(fh.getNewPath(),
 							true));
-					try {
-						fos.write(bs);
-					} finally {
-						fos.close();
-					}
+					fw.write(new String(bs));
+					fw.close();
 				}
 				r.addUpdatedFile(f);
 			}
@@ -172,8 +163,6 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 		File f = new File(getRepository().getWorkTree(), path);
 		if (create)
 			try {
-				File parent = f.getParentFile();
-				FileUtils.mkdirs(parent, true);
 				FileUtils.createNewFile(f);
 			} catch (IOException e) {
 				throw new PatchApplyException(MessageFormat.format(
@@ -232,16 +221,19 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 			}
 		}
 		if (!isNoNewlineAtEndOfFile(fh))
-			newLines.add(""); //$NON-NLS-1$
+			newLines.add("");
 		if (!rt.isMissingNewlineAtEnd())
-			oldLines.add(""); //$NON-NLS-1$
+			oldLines.add("");
 		if (!isChanged(oldLines, newLines))
 			return; // don't touch the file
 		StringBuilder sb = new StringBuilder();
+		final String eol = rt.size() == 0
+				|| (rt.size() == 1 && rt.isMissingNewlineAtEnd()) ? "\n" : rt
+				.getLineDelimiter();
 		for (String l : newLines) {
-			// don't bother handling line endings - if it was windows, the \r is
-			// still there!
-			sb.append(l).append('\n');
+			sb.append(l);
+			if (eol != null)
+				sb.append(eol);
 		}
 		sb.deleteCharAt(sb.length() - 1);
 		FileWriter fw = new FileWriter(f);
@@ -249,7 +241,7 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 		fw.close();
 	}
 
-	private static boolean isChanged(List<String> ol, List<String> nl) {
+	private boolean isChanged(List<String> ol, List<String> nl) {
 		if (ol.size() != nl.size())
 			return true;
 		for (int i = 0; i < ol.size(); i++)

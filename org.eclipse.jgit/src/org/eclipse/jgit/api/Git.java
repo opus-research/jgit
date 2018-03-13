@@ -618,31 +618,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code gc} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-gc.html"
-	 *      >Git documentation about gc</a>
-	 *
-	 * @return a {@link GarbageCollectCommand} used to collect all optional
-	 *         parameters and to finally execute the {@code gc} command
-	 * @since 2.2
-	 */
-	public GarbageCollectCommand gc() {
-		return new GarbageCollectCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to find human-readable names of revisions.
-	 *
-	 * @return a {@link NameRevCommand}.
-	 * @since 3.0
-	 */
-	public NameRevCommand nameRev() {
-		return new NameRevCommand(repo);
-	}
-
-	/**
 	 * @return the git repository this class is interacting with
 	 */
 	public Repository getRepository() {

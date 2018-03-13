@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,17 +47,16 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -65,7 +64,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -134,9 +132,8 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * twice on an instance.
 	 *
 	 * @return the Ref after reset
-	 * @throws GitAPIException
 	 */
-	public Ref call() throws GitAPIException, CheckoutConflictException {
+	public Ref call() throws IOException {
 		checkCallable();
 
 		Ref r;
@@ -149,13 +146,11 @@ public class ResetCommand extends GitCommand<Ref> {
 			final boolean cherryPicking = state
 					.equals(RepositoryState.CHERRY_PICKING)
 					|| state.equals(RepositoryState.CHERRY_PICKING_RESOLVED);
-			final boolean reverting = state.equals(RepositoryState.REVERTING)
-					|| state.equals(RepositoryState.REVERTING_RESOLVED);
 
 			// resolve the ref to a commit
 			final ObjectId commitId;
 			try {
-				commitId = repo.resolve(ref + "^{commit}"); //$NON-NLS-1$
+				commitId = repo.resolve(ref);
 				if (commitId == null) {
 					// @TODO throw an InvalidRefNameException. We can't do that
 					// now because this would break the API
@@ -197,10 +192,6 @@ public class ResetCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(
 						JGitText.get().cannotLock, ru.getName()));
 
-			ObjectId origHead = ru.getOldObjectId();
-			if (origHead != null)
-				repo.writeOrigHead(origHead);
-
 			switch (mode) {
 				case HARD:
 					checkoutIndex(commit);
@@ -221,10 +212,6 @@ public class ResetCommand extends GitCommand<Ref> {
 					resetMerge();
 				else if (cherryPicking)
 					resetCherryPick();
-				else if (reverting)
-					resetRevert();
-				else if (repo.readSquashCommitMsg() != null)
-					repo.writeSquashCommitMsg(null /* delete */);
 			}
 
 			setCallable(false);
@@ -257,7 +244,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		if (!filepaths.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$
+					"[--mixed | --soft | --hard]", "<paths>..."));
 		this.mode = mode;
 		return this;
 	}
@@ -271,37 +258,51 @@ public class ResetCommand extends GitCommand<Ref> {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments, "<paths>...",
-					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
+					"[--mixed | --soft | --hard]"));
 		filepaths.add(file);
 		return this;
 	}
 
 	private void resetIndexForPaths(RevCommit commit) {
 		DirCache dc = null;
+		final DirCacheEditor edit;
 		try {
 			dc = repo.lockDirCache();
-			DirCacheBuilder builder = dc.builder();
+			edit = dc.editor();
 
 			final TreeWalk tw = new TreeWalk(repo);
-			tw.addTree(new DirCacheBuildIterator(builder));
+			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(commit.getTree());
 			tw.setFilter(PathFilterGroup.createFromStrings(filepaths));
 			tw.setRecursive(true);
 
 			while (tw.next()) {
+				final String path = tw.getPathString();
+				// DirCacheIterator dci = tw.getTree(0, DirCacheIterator.class);
 				final CanonicalTreeParser tree = tw.getTree(1,
 						CanonicalTreeParser.class);
-				// only keep file in index if it's in the commit
-				if (tree != null) {
-				    // revert index to commit
-					DirCacheEntry entry = new DirCacheEntry(tw.getRawPath());
-					entry.setFileMode(tree.getEntryFileMode());
-					entry.setObjectId(tree.getEntryObjectId());
-					builder.add(entry);
+				if (tree == null)
+					// file is not in the commit, remove from index
+					edit.add(new DirCacheEditor.DeletePath(path));
+				else { // revert index to commit
+					// it seams that there is concurrent access to tree
+					// variable, therefore we need to keep references to
+					// entryFileMode and entryObjectId in local
+					// variables
+					final FileMode entryFileMode = tree.getEntryFileMode();
+					final ObjectId entryObjectId = tree.getEntryObjectId();
+					edit.add(new DirCacheEditor.PathEdit(path) {
+						@Override
+						public void apply(DirCacheEntry ent) {
+							ent.setFileMode(entryFileMode);
+							ent.setObjectId(entryObjectId);
+							ent.setLastModified(0);
+						}
+					});
 				}
 			}
 
-			builder.commit();
+			edit.commit();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		} finally {
@@ -312,59 +313,24 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndex(RevCommit commit) throws IOException {
 		DirCache dc = repo.lockDirCache();
-		TreeWalk walk = null;
 		try {
-			DirCacheBuilder builder = dc.builder();
-
-			walk = new TreeWalk(repo);
-			walk.addTree(commit.getTree());
-			walk.addTree(new DirCacheIterator(dc));
-			walk.setRecursive(true);
-
-			while (walk.next()) {
-				AbstractTreeIterator cIter = walk.getTree(0,
-						AbstractTreeIterator.class);
-				if (cIter == null) {
-					// Not in commit, don't add to new index
-					continue;
-				}
-
-				final DirCacheEntry entry = new DirCacheEntry(walk.getRawPath());
-				entry.setFileMode(cIter.getEntryFileMode());
-				entry.setObjectIdFromRaw(cIter.idBuffer(), cIter.idOffset());
-
-				DirCacheIterator dcIter = walk.getTree(1,
-						DirCacheIterator.class);
-				if (dcIter != null && dcIter.idEqual(cIter)) {
-					DirCacheEntry indexEntry = dcIter.getDirCacheEntry();
-					entry.setLastModified(indexEntry.getLastModified());
-					entry.setLength(indexEntry.getLength());
-				}
-
-				builder.add(entry);
-			}
-
-			builder.commit();
+			dc.clear();
+			DirCacheBuilder dcb = dc.builder();
+			dcb.addTree(new byte[0], 0, repo.newObjectReader(),
+					commit.getTree());
+			dcb.commit();
 		} finally {
 			dc.unlock();
-			if (walk != null)
-				walk.release();
 		}
 	}
 
-	private void checkoutIndex(RevCommit commit) throws IOException,
-			GitAPIException {
+	private void checkoutIndex(RevCommit commit) throws IOException {
 		DirCache dc = repo.lockDirCache();
 		try {
 			DirCacheCheckout checkout = new DirCacheCheckout(repo, dc,
 					commit.getTree());
 			checkout.setFailOnConflict(false);
-			try {
-				checkout.checkout();
-			} catch (org.eclipse.jgit.errors.CheckoutConflictException cce) {
-				throw new CheckoutConflictException(checkout.getConflicts(),
-						cce);
-			}
+			checkout.checkout();
 		} finally {
 			dc.unlock();
 		}
@@ -377,11 +343,6 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetCherryPick() throws IOException {
 		repo.writeCherryPickHead(null);
-		repo.writeMergeCommitMsg(null);
-	}
-
-	private void resetRevert() throws IOException {
-		repo.writeRevertHead(null);
 		repo.writeMergeCommitMsg(null);
 	}
 

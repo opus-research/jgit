@@ -52,17 +52,16 @@ import java.util.Collection;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.SubmoduleUpdateCommand;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
@@ -74,7 +73,7 @@ import org.junit.Test;
 public class SubmoduleUpdateTest extends RepositoryTestCase {
 
 	@Test
-	public void repositoryWithNoSubmodules() throws GitAPIException {
+	public void repositoryWithNoSubmodules() {
 		SubmoduleUpdateCommand command = new SubmoduleUpdateCommand(db);
 		Collection<String> modules = command.call();
 		assertNotNull(modules);
@@ -121,14 +120,12 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
 		Repository subRepo = generator.getRepository();
-		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(commit, subRepo.resolve(Constants.HEAD));
 	}
 
 	@Test
-	public void repositoryWithUnconfiguredSubmodule() throws IOException,
-			GitAPIException {
+	public void repositoryWithUnconfiguredSubmodule() throws IOException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";
@@ -162,8 +159,7 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void repositoryWithInitializedSubmodule() throws IOException,
-			GitAPIException {
+	public void repositoryWithInitializedSubmodule() throws IOException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";

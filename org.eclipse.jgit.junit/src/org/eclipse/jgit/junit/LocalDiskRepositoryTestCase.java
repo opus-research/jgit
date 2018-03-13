@@ -58,15 +58,17 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.After;
 import org.junit.Before;
@@ -149,7 +151,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		c.setPackedGitWindowSize(8 * WindowCacheConfig.KB);
 		c.setPackedGitMMAP(useMMAP);
 		c.setDeltaBaseCacheLimit(8 * WindowCacheConfig.KB);
-		c.install();
+		WindowCache.reconfigure(c);
 	}
 
 
@@ -161,7 +163,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		mockSystemReader.setProperty(Constants.GIT_CEILING_DIRECTORIES_KEY, makePath(ceilings));
 	}
 
-	private static String makePath(List<?> objects) {
+	private String makePath(List<?> objects) {
 		final StringBuilder stringBuilder = new StringBuilder();
 		for (Object object : objects) {
 			if (stringBuilder.length() > 0)
@@ -302,7 +304,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		toClose.add(r);
 	}
 
-	private static String createUniqueTestFolderPrefix() {
+	private String createUniqueTestFolderPrefix() {
 		return "test" + (System.currentTimeMillis() + "_" + (testCount++));
 	}
 
@@ -433,8 +435,19 @@ public abstract class LocalDiskRepositoryTestCase {
 		JGitTestUtil.write(f, body);
 	}
 
+	/**
+	 * Fully read a UTF-8 file and return as a string.
+	 *
+	 * @param f
+	 *            file to read the content of.
+	 * @return UTF-8 decoded content of the file, empty string if the file
+	 *         exists but has no content.
+	 * @throws IOException
+	 *             the file does not exist, or could not be read.
+	 */
 	protected String read(final File f) throws IOException {
-		return JGitTestUtil.read(f);
+		final byte[] body = IO.readFully(f);
+		return new String(body, 0, body.length, "UTF-8");
 	}
 
 	private static String[] toEnvArray(final Map<String, String> env) {

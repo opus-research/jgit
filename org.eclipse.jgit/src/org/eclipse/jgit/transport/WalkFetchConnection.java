@@ -63,10 +63,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
-import org.eclipse.jgit.internal.storage.file.PackIndex;
-import org.eclipse.jgit.internal.storage.file.PackLock;
-import org.eclipse.jgit.internal.storage.file.UnpackedObject;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -86,6 +82,10 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.ObjectDirectory;
+import org.eclipse.jgit.storage.file.PackIndex;
+import org.eclipse.jgit.storage.file.PackLock;
+import org.eclipse.jgit.storage.file.UnpackedObject;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FileUtils;
 
@@ -212,9 +212,9 @@ class WalkFetchConnection extends BaseFetchConnection {
 		revWalk = new RevWalk(reader);
 		revWalk.setRetainBody(false);
 		treeWalk = new TreeWalk(reader);
-		COMPLETE = revWalk.newFlag("COMPLETE"); //$NON-NLS-1$
-		IN_WORK_QUEUE = revWalk.newFlag("IN_WORK_QUEUE"); //$NON-NLS-1$
-		LOCALLY_SEEN = revWalk.newFlag("LOCALLY_SEEN"); //$NON-NLS-1$
+		COMPLETE = revWalk.newFlag("COMPLETE");
+		IN_WORK_QUEUE = revWalk.newFlag("IN_WORK_QUEUE");
+		LOCALLY_SEEN = revWalk.newFlag("LOCALLY_SEEN");
 
 		localCommitQueue = new DateRevQueue();
 		workQueue = new LinkedList<ObjectId>();
@@ -406,7 +406,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			final String idStr = id.name();
 			final String subdir = idStr.substring(0, 2);
 			final String file = idStr.substring(2);
-			final String looseName = subdir + "/" + file; //$NON-NLS-1$
+			final String looseName = subdir + "/" + file;
 
 			for (int i = lastRemoteIdx; i < remotes.size(); i++) {
 				if (downloadLooseObject(id, looseName, remotes.get(i))) {
@@ -791,18 +791,17 @@ class WalkFetchConnection extends BaseFetchConnection {
 		RemotePack(final WalkRemoteObjectDatabase c, final String pn) {
 			connection = c;
 			packName = pn;
-			idxName = packName.substring(0, packName.length() - 5) + ".idx"; //$NON-NLS-1$
+			idxName = packName.substring(0, packName.length() - 5) + ".idx";
 
 			String tn = idxName;
-			if (tn.startsWith("pack-")) //$NON-NLS-1$
+			if (tn.startsWith("pack-"))
 				tn = tn.substring(5);
-			if (tn.endsWith(".idx")) //$NON-NLS-1$
+			if (tn.endsWith(".idx"))
 				tn = tn.substring(0, tn.length() - 4);
 
 			if (local.getObjectDatabase() instanceof ObjectDirectory) {
 				tmpIdx = new File(((ObjectDirectory) local.getObjectDatabase())
-								.getDirectory(),
-						"walk-" + tn + ".walkidx"); //$NON-NLS-1$ //$NON-NLS-2$
+						.getDirectory(), "walk-" + tn + ".walkidx");
 			}
 		}
 
@@ -810,7 +809,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			if (index != null)
 				return;
 			if (tmpIdx == null)
-				tmpIdx = File.createTempFile("jgit-walk-", ".idx"); //$NON-NLS-1$ //$NON-NLS-2$
+				tmpIdx = File.createTempFile("jgit-walk-", ".idx");
 			else if (tmpIdx.isFile()) {
 				try {
 					index = PackIndex.open(tmpIdx);
@@ -821,8 +820,8 @@ class WalkFetchConnection extends BaseFetchConnection {
 			}
 
 			final WalkRemoteObjectDatabase.FileStream s;
-			s = connection.open("pack/" + idxName); //$NON-NLS-1$
-			pm.beginTask("Get " + idxName.substring(0, 12) + "..idx", //$NON-NLS-1$ //$NON-NLS-2$
+			s = connection.open("pack/" + idxName);
+			pm.beginTask("Get " + idxName.substring(0, 12) + "..idx",
 					s.length < 0 ? ProgressMonitor.UNKNOWN
 							: (int) (s.length / 1024));
 			try {
@@ -859,7 +858,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		}
 
 		void downloadPack(final ProgressMonitor monitor) throws IOException {
-			String name = "pack/" + packName; //$NON-NLS-1$
+			String name = "pack/" + packName;
 			WalkRemoteObjectDatabase.FileStream s = connection.open(name);
 			PackParser parser = inserter.newPackParser(s.in);
 			parser.setAllowThin(false);
