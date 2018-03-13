@@ -63,7 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -294,9 +293,9 @@ public class PushCertificateParserTest {
 		pckParser.receiveSignature(pckIn);
 		PushCertificate pckCert = pckParser.build();
 
-		// Nonce status is unsolicited since this was not parsed in the context of
-		// the wire protocol; as a result, certs are not actually equal.
-		assertEquals(NonceStatus.UNSOLICITED, streamCert.getNonceStatus());
+		// Nonce status is null since this was not parsed in the context of the wire
+		// protocol; as a result, certs are not actually equal.
+		assertNull(streamCert.getNonceStatus());
 
 		assertEquals(pckCert.getVersion(), streamCert.getVersion());
 		assertEquals(pckCert.getPusherIdent().getName(),
