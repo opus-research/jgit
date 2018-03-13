@@ -47,9 +47,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
@@ -57,7 +54,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -163,19 +159,16 @@ class Clone extends AbstractFetchCommand {
 
 	private static Ref guessHEAD(final FetchResult result) {
 		final Ref idHEAD = result.getAdvertisedRef(Constants.HEAD);
-		final List<Ref> availableRefs = new ArrayList<Ref>();
 		Ref head = null;
 		for (final Ref r : result.getAdvertisedRefs()) {
 			final String n = r.getName();
 			if (!n.startsWith(Constants.R_HEADS))
 				continue;
-			availableRefs.add(r);
 			if (idHEAD == null || head != null)
 				continue;
 			if (r.getObjectId().equals(idHEAD.getObjectId()))
 				head = r;
 		}
-		Collections.sort(availableRefs, RefComparator.INSTANCE);
 		if (idHEAD != null && head == null)
 			head = idHEAD;
 		return head;
