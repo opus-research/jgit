@@ -50,7 +50,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.util.StringUtils;
-import org.eclipse.jgit.util.SystemReader;
 
 /** Keeps track of diff related configuration options. */
 public class DiffConfig {
@@ -80,8 +79,6 @@ public class DiffConfig {
 
 	private final int renameLimit;
 
-	private final String external;
-
 	private DiffConfig(final Config rc) {
 		noPrefix = rc.getBoolean(ConfigConstants.CONFIG_DIFF_SECTION,
 				ConfigConstants.CONFIG_KEY_NOPREFIX, false);
@@ -89,16 +86,6 @@ public class DiffConfig {
 				ConfigConstants.CONFIG_DIFF_SECTION, null, ConfigConstants.CONFIG_KEY_RENAMES));
 		renameLimit = rc.getInt(ConfigConstants.CONFIG_DIFF_SECTION,
 				ConfigConstants.CONFIG_KEY_RENAMELIMIT, 200);
-		external = readExternal(rc);
-	}
-
-	private String readExternal(Config rc) {
-		String value = SystemReader.getInstance().getenv("GIT_EXTERNAL_DIFF"); //$NON-NLS-1$
-		if (!StringUtils.isEmptyOrNull(value)) {
-			return value;
-		}
-		return rc.getString(ConfigConstants.CONFIG_DIFF_SECTION, null,
-				ConfigConstants.CONFIG_KEY_EXTERNAL);
 	}
 
 	/** @return true if the prefix "a/" and "b/" should be suppressed. */
@@ -119,15 +106,6 @@ public class DiffConfig {
 	/** @return limit on number of paths to perform inexact rename detection. */
 	public int getRenameLimit() {
 		return renameLimit;
-	}
-
-	/**
-	 * @return path of an external diff tool.
-	 *
-	 * @since 4.9
-	 */
-	public String getExternal() {
-		return external;
 	}
 
 	private static RenameDetectionType parseRenameDetectionType(

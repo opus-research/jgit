@@ -933,7 +933,7 @@ public class DiffFormatter implements AutoCloseable {
 		return createFormatResult(ent).header;
 	}
 
-	static class FormatResult {
+	private static class FormatResult {
 		FileHeader header;
 
 		RawText a;
@@ -941,8 +941,7 @@ public class DiffFormatter implements AutoCloseable {
 		RawText b;
 	}
 
-	FormatResult createFormatResult(DiffEntry ent)
-			throws IOException,
+	private FormatResult createFormatResult(DiffEntry ent) throws IOException,
 			CorruptObjectException, MissingObjectException {
 		final FormatResult res = new FormatResult();
 		ByteArrayOutputStream buf = new ByteArrayOutputStream();
