@@ -1077,7 +1077,7 @@ public abstract class BaseReceivePack {
 	 */
 	protected void recvCommands() throws IOException {
 		PushCertificateParser certParser = getPushCertificateParser();
-		boolean firstPkt = true;
+		FirstLine firstLine = null;
 		try {
 			for (;;) {
 				String line;
@@ -1093,16 +1093,14 @@ public abstract class BaseReceivePack {
 				}
 
 				if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-					parseShallow(line.substring(8, 48));
+					clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
 					continue;
 				}
 
-				if (firstPkt) {
-					firstPkt = false;
-					FirstLine firstLine = new FirstLine(line);
+				if (firstLine == null) {
+					firstLine = new FirstLine(line);
 					enabledCapabilities = firstLine.getCapabilities();
 					line = firstLine.getLine();
-					enableCapabilities();
 
 					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
 						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
@@ -1115,7 +1113,13 @@ public abstract class BaseReceivePack {
 					continue;
 				}
 
-				ReceiveCommand cmd = parseCommand(line);
+				ReceiveCommand cmd;
+				try {
+					cmd = parseCommand(line);
+				} catch (PackProtocolException e) {
+					sendError(e.getMessage());
+					throw e;
+				}
 				if (cmd.getRefName().equals(Constants.HEAD)) {
 					cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
 				} else {
@@ -1131,16 +1135,6 @@ public abstract class BaseReceivePack {
 			sendError(e.getMessage());
 			throw e;
 		}
-	}
-
-	private void parseShallow(String idStr) throws PackProtocolException {
-		ObjectId id;
-		try {
-			id = ObjectId.fromString(idStr);
-		} catch (InvalidObjectIdException e) {
-			throw new PackProtocolException(e.getMessage(), e);
-		}
-		clientShallowCommits.add(id);
 	}
 
 	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
