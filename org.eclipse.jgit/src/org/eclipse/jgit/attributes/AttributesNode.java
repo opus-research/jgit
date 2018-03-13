@@ -153,7 +153,7 @@ public class AttributesNode {
 				while (attributeIte.hasPrevious()) {
 					Attribute attr = attributeIte.previous();
 					if (!attributes.containsKey(attr.getKey()))
-						attributes.putAttribute(attr);
+						attributes.put(attr);
 				}
 			}
 		}
