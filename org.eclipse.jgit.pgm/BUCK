@@ -9,7 +9,6 @@ java_library(
     '//org.eclipse.jgit:jgit',
     '//org.eclipse.jgit.archive:jgit-archive',
     '//org.eclipse.jgit.http.apache:http-apache',
-    '//org.eclipse.jgit.lfs:jgit-lfs',
     '//org.eclipse.jgit.lfs.server:jgit-lfs-server',
     '//org.eclipse.jgit.ui:ui',
     '//lib:args4j',
