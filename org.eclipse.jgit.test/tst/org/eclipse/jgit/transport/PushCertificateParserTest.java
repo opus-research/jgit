@@ -63,7 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -90,30 +89,6 @@ public class PushCertificateParserTest {
 			+ "000a=XFeC\n"
 			+ "0020-----END PGP SIGNATURE-----\n"
 			+ "0012push-cert-end\n";
-
-	// Same push certificate, with all trailing newlines stripped.
-	// (Note that the canonical signed payload is the same, so the same signature
-	// is still valid.)
-	private static final String INPUT_NO_NEWLINES = "001bcertificate version 0.1"
-			+ "0040pusher Dave Borowitz <dborowitz@google.com> 1433954361 -0700"
-			+ "0023pushee git://localhost/repo.git"
-			+ "0029nonce 1433954361-bde756572d665bba81d8"
-			+ "0004"
-			+ "00670000000000000000000000000000000000000000"
-			+ " 6c2b981a177396fb47345b7df3e4d3f854c6bea7"
-			+ " refs/heads/master"
-			+ "0021-----BEGIN PGP SIGNATURE-----"
-			+ "0015Version: GnuPG v1"
-			+ "0004"
-			+ "0044iQEcBAABAgAGBQJVeGg5AAoJEPfTicJkUdPkUggH/RKAeI9/i/LduuiqrL/SSdIa"
-			+ "00449tYaSqJKLbXz63M/AW4Sp+4u+dVCQvnAt/a35CVEnpZz6hN4Kn/tiswOWVJf4CO7"
-			+ "0044htNubGs5ZMwvD6sLYqKAnrM3WxV/2TbbjzjZW6Jkidz3jz/WRT4SmjGYiEO7aA+V"
-			+ "00444ZdIS9f7sW5VsHHYlNThCA7vH8Uu48bUovFXyQlPTX0pToSgrWV3JnTxDNxfn3iG"
-			+ "0044IL0zTY/qwVCdXgFownLcs6J050xrrBWIKqfcWr3u4D2aCLyR0v+S/KArr7ulZygY"
-			+ "0044+SOklImn8TAZiNxhWtA6ens66IiammUkZYFv7SSzoPLFZT4dC84SmGPWgf94NoQ="
-			+ "0009=XFeC"
-			+ "001f-----END PGP SIGNATURE-----"
-			+ "0011push-cert-end";
 
 	private Repository db;
 
@@ -143,10 +118,11 @@ public class PushCertificateParserTest {
 		ObjectId newId =
 				ObjectId.fromString("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
 		String line = oldId.name() + " " + newId.name() + " refs/heads/master";
-		ReceiveCommand cmd = BaseReceivePack.parseCommand(line);
+		String rawLine = line + "\n";
 
-		parser.addCommand(cmd);
-		parser.addCommand(line);
+		ReceiveCommand cmd = BaseReceivePack.parseCommand(line);
+		parser.addCommand(cmd, rawLine);
+		parser.addCommand(rawLine);
 		assertNull(parser.build());
 	}
 
@@ -159,8 +135,8 @@ public class PushCertificateParserTest {
 		assertNull(parser.build());
 
 		parser.receiveHeader(pckIn, false);
-		parser.addCommand(pckIn.readString());
-		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readString());
+		parser.addCommand(pckIn.readStringRaw());
+		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readStringRaw());
 		parser.receiveSignature(pckIn);
 		assertNull(parser.build());
 	}
@@ -189,8 +165,8 @@ public class PushCertificateParserTest {
 		PushCertificateParser parser =
 				new PushCertificateParser(db, newEnabledConfig());
 		parser.receiveHeader(pckIn, false);
-		parser.addCommand(pckIn.readString());
-		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readString());
+		parser.addCommand(pckIn.readStringRaw());
+		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readStringRaw());
 		parser.receiveSignature(pckIn);
 
 		PushCertificate cert = parser.build();
@@ -217,61 +193,13 @@ public class PushCertificateParserTest {
 
 		String signature = concatPacketLines(INPUT, 6, 17);
 		assertTrue(signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE));
-		assertTrue(signature.endsWith(PushCertificateParser.END_SIGNATURE + "\n"));
-		assertEquals(signature, cert.getSignature());
-	}
-
-	@Test
-	public void parseCertFromPktLineNoNewlines() throws Exception {
-		PacketLineIn pckIn = newPacketLineIn(INPUT_NO_NEWLINES);
-		PushCertificateParser parser =
-				new PushCertificateParser(db, newEnabledConfig());
-		parser.receiveHeader(pckIn, false);
-		parser.addCommand(pckIn.readString());
-		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readString());
-		parser.receiveSignature(pckIn);
-
-		PushCertificate cert = parser.build();
-		assertEquals("0.1", cert.getVersion());
-		assertEquals("Dave Borowitz", cert.getPusherIdent().getName());
-		assertEquals("dborowitz@google.com",
-				cert.getPusherIdent().getEmailAddress());
-		assertEquals(1433954361000L, cert.getPusherIdent().getWhen().getTime());
-		assertEquals(-7 * 60, cert.getPusherIdent().getTimeZoneOffset());
-		assertEquals("git://localhost/repo.git", cert.getPushee());
-		assertEquals("1433954361-bde756572d665bba81d8", cert.getNonce());
-
-		assertNotEquals(cert.getNonce(), parser.getAdvertiseNonce());
-		assertEquals(PushCertificate.NonceStatus.BAD, cert.getNonceStatus());
-
-		assertEquals(1, cert.getCommands().size());
-		ReceiveCommand cmd = cert.getCommands().get(0);
-		assertEquals("refs/heads/master", cmd.getRefName());
-		assertEquals(ObjectId.zeroId(), cmd.getOldId());
-		assertEquals("6c2b981a177396fb47345b7df3e4d3f854c6bea7",
-				cmd.getNewId().name());
-
-		// Canonical signed payload has reinserted newlines.
-		assertEquals(concatPacketLines(INPUT, 0, 6), cert.toText());
-
-		String signature = concatPacketLines(INPUT, 6, 17);
-		assertTrue(signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE));
-		assertTrue(signature.endsWith(PushCertificateParser.END_SIGNATURE + "\n"));
+		assertTrue(signature.endsWith(PushCertificateParser.END_SIGNATURE));
 		assertEquals(signature, cert.getSignature());
 	}
 
 	@Test
 	public void testConcatPacketLines() throws Exception {
 		String input = "000bline 1\n000bline 2\n000bline 3\n";
-		assertEquals("line 1\n", concatPacketLines(input, 0, 1));
-		assertEquals("line 1\nline 2\n", concatPacketLines(input, 0, 2));
-		assertEquals("line 2\nline 3\n", concatPacketLines(input, 1, 3));
-		assertEquals("line 2\nline 3\n", concatPacketLines(input, 1, 4));
-	}
-
-	@Test
-	public void testConcatPacketLinesInsertsNewlines() throws Exception {
-		String input = "000bline 1\n000aline 2000bline 3\n";
 		assertEquals("line 1\n", concatPacketLines(input, 0, 1));
 		assertEquals("line 1\nline 2\n", concatPacketLines(input, 0, 2));
 		assertEquals("line 2\nline 3\n", concatPacketLines(input, 1, 3));
@@ -289,14 +217,10 @@ public class PushCertificateParserTest {
 		PushCertificateParser pckParser =
 				new PushCertificateParser(db, newEnabledConfig());
 		pckParser.receiveHeader(pckIn, false);
-		pckParser.addCommand(pckIn.readString());
-		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readString());
+		pckParser.addCommand(pckIn.readStringRaw());
+		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readStringRaw());
 		pckParser.receiveSignature(pckIn);
 		PushCertificate pckCert = pckParser.build();
-
-		// Nonce status is unsolicited since this was not parsed in the context of
-		// the wire protocol; as a result, certs are not actually equal.
-		assertEquals(NonceStatus.UNSOLICITED, streamCert.getNonceStatus());
 
 		assertEquals(pckCert.getVersion(), streamCert.getVersion());
 		assertEquals(pckCert.getPusherIdent().getName(),
@@ -318,6 +242,8 @@ public class PushCertificateParserTest {
 		assertEquals(pckCmd.getRefName(), streamCmd.getRefName());
 		assertEquals(pckCmd.getOldId(), streamCmd.getOldId());
 		assertEquals(pckCmd.getNewId().name(), streamCmd.getNewId().name());
+
+		assertNull(streamCert.getNonceStatus());
 	}
 
 	@Test
@@ -334,26 +260,6 @@ public class PushCertificateParserTest {
 		assertNull(PushCertificateParser.fromReader(reader));
 	}
 
-	@Test
-	public void testMissingPusheeField() throws Exception {
-		// Omit pushee line from existing cert. (This means the signature would not
-		// match, but we're not verifying it here.)
-		String input = INPUT.replace("0024pushee git://localhost/repo.git\n", "");
-		assertFalse(input.contains(PushCertificateParser.PUSHEE));
-
-		PacketLineIn pckIn = newPacketLineIn(input);
-		PushCertificateParser parser =
-				new PushCertificateParser(db, newEnabledConfig());
-		parser.receiveHeader(pckIn, false);
-		parser.addCommand(pckIn.readString());
-		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readString());
-		parser.receiveSignature(pckIn);
-
-		PushCertificate cert = parser.build();
-		assertEquals("0.1", cert.getVersion());
-		assertNull(cert.getPushee());
-	}
-
 	private static String concatPacketLines(String input, int begin, int end)
 			throws IOException {
 		StringBuilder result = new StringBuilder();
@@ -362,12 +268,12 @@ public class PushCertificateParserTest {
 		while (i < end) {
 			String line;
 			try {
-				line = pckIn.readString();
+				line = pckIn.readStringRaw();
 			} catch (EOFException e) {
 				break;
 			}
 			if (++i > begin) {
-				result.append(line).append('\n');
+				result.append(line);
 			}
 		}
 		return result.toString();
