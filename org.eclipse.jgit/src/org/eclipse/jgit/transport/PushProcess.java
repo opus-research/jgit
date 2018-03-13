@@ -158,6 +158,14 @@ class PushProcess {
 
 			final PushResult res = new PushResult();
 			connection = transport.openPush();
+
+			if (connection instanceof BasePackPushConnection) {
+				BasePackPushConnection basePackPushConnection = (BasePackPushConnection) connection;
+				System.out.println(
+						"PushProcess: basePackPushConnection.getPushOptions() = "
+								+ basePackPushConnection.getPushOptions());
+			}
+
 			try {
 				res.setAdvertisedRefs(transport.getURI(), connection
 						.getRefsMap());
@@ -183,6 +191,7 @@ class PushProcess {
 			}
 			return res;
 		} finally {
+			System.out.println("PushProcess: pushOptions = " + pushOptions);
 			walker.close();
 		}
 	}
@@ -304,7 +313,6 @@ class PushProcess {
 	 * Gets the list of option strings associated with this push.
 	 *
 	 * @return pushOptions
-	 * @since 4.5
 	 */
 	public List<String> getPushOptions() {
 		return pushOptions;

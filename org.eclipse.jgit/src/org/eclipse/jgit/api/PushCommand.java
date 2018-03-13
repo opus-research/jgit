@@ -157,6 +157,9 @@ public class PushCommand extends
 				final Collection<RemoteRefUpdate> toPush = transport
 						.findRemoteRefUpdatesFor(refSpecs);
 
+				System.out.println("PushCommand: transports.size() = "
+						+ transports.size());
+
 				try {
 					PushResult result = transport.push(monitor, toPush, out);
 					pushResults.add(result);
@@ -168,6 +171,7 @@ public class PushCommand extends
 					throw new org.eclipse.jgit.api.errors.TooLargeObjectInPackException(
 							e.getMessage(), e);
 				} catch (TransportException e) {
+					e.printStackTrace();
 					throw new org.eclipse.jgit.api.errors.TransportException(
 							e.getMessage(), e);
 				} finally {
@@ -192,6 +196,7 @@ public class PushCommand extends
 		}
 
 		return pushResults;
+
 	}
 
 	/**

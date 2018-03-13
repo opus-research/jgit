@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,22 +41,23 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lfs.errors;
+package org.eclipse.jgit.transport;
+
+import java.util.List;
 
 /**
- * Thrown when the bandwidth limit for the user or repository has been exceeded.
- *
- * @since 4.5
- *
+ * A mock push option wrapper for testing purposes.
  */
-public class LfsBandwidthLimitExceeded extends LfsException {
-	private static final long serialVersionUID = 1L;
-
+public class MockPushOptionWrapper extends PushOptionWrapper {
 	/**
-	 * @param message
-	 *            error message, which may be shown to an end-user.
+	 * Sets the list of option strings.
+	 *
+	 * @param pushOptions
+	 * @return {@code this}
+	 * @since 4.5
 	 */
-	public LfsBandwidthLimitExceeded(String message) {
-		super(message);
+	public MockPushOptionWrapper setPushOptions(List<String> pushOptions) {
+		this.pushOptions = pushOptions;
+		return this;
 	}
 }

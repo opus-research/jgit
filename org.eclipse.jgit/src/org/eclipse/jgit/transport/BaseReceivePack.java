@@ -46,13 +46,12 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
+import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
@@ -69,7 +68,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TooLargePackException;
@@ -220,7 +218,6 @@ public abstract class BaseReceivePack {
 
 	/** Optional message output stream. */
 	protected OutputStream msgOut;
-	private SideBandOutputStream errOut;
 
 	/** Packet line input stream around {@link #rawIn}. */
 	protected PacketLineIn pckIn;
@@ -250,6 +247,12 @@ public abstract class BaseReceivePack {
 	private boolean sideBand;
 
 	private boolean quiet;
+
+	/** A list of option strings associated with a push. */
+	protected List<String> pushOptions;
+
+	/** Whether the client intends to use push options. */
+	protected boolean usePushOptions;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -316,6 +319,11 @@ public abstract class BaseReceivePack {
 		allowNonFastForwards = rc.allowNonFastForwards;
 		allowOfsDelta = rc.allowOfsDelta;
 		allowPushOptions = rc.allowPushOptions;
+		System.out.println(
+				"BaseReceivePack: into.toString() = " + into.toString());
+		System.out.println(
+				"BaseReceivePack: rc.allowPushOptions = "
+						+ rc.allowPushOptions);
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
@@ -769,7 +777,8 @@ public abstract class BaseReceivePack {
 	 *             read.
 	 */
 	public boolean isSideBand() throws RequestNotYetReadException {
-		checkRequestWasRead();
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
@@ -796,7 +805,7 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * @return true if the server supports receiving push options.
+	 * @return true if the server supports the receiving of push options.
 	 * @since 4.5
 	 */
 	public boolean isAllowPushOptions() {
@@ -804,10 +813,10 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Configure if the server supports receiving push options.
+	 * Configure if the server supports the receiving of push options.
 	 *
 	 * @param allow
-	 *            true to optionally accept option strings from the client.
+	 *            true to permit option strings.
 	 * @since 4.5
 	 */
 	public void setAllowPushOptions(boolean allow) {
@@ -820,14 +829,31 @@ public abstract class BaseReceivePack {
 	 * @return true if the client has requested the server to be less verbose.
 	 * @throws RequestNotYetReadException
 	 *             if the client's request has not yet been read from the wire,
-	 *             so we do not know if they expect side-band. Note that the
+	 *             so we do not know if they expect quiet. Note that the
 	 *             client may have already written the request, it just has not
 	 *             been read.
 	 * @since 4.0
 	 */
 	public boolean isQuiet() throws RequestNotYetReadException {
-		checkRequestWasRead();
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 		return quiet;
+	}
+
+	/**
+	 * Gets the list of string options associated with this push.
+	 *
+	 * @return pushOptions
+	 * @throws RequestNotYetReadException
+	 *             if the client's request has not yet been read from the wire,
+	 *             so we do not know if they expect push options. Note that the
+	 *             client may have already written the request, it just has not
+	 *             been read.
+	 */
+	public List<String> getPushOptions() throws RequestNotYetReadException {
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
+		return Collections.unmodifiableList(pushOptions);
 	}
 
 	/**
@@ -904,19 +930,6 @@ public abstract class BaseReceivePack {
 			advertiseError.append(what).append('\n');
 		} else {
 			msgOutWrapper.write(Constants.encode("error: " + what + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
-		}
-	}
-
-	private void fatalError(String msg) {
-		if (errOut != null) {
-			try {
-				errOut.write(Constants.encode(msg));
-				errOut.flush();
-			} catch (IOException e) {
-				// Ignore write failures
-			}
-		} else {
-			sendError(msg);
 		}
 	}
 
@@ -1104,6 +1117,10 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		if (allowPushOptions) {
 			adv.advertiseCapability(CAPABILITY_PUSH_OPTIONS);
+
+			if (pushOptions == null) {
+				pushOptions = new ArrayList<>();
+			}
 		}
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -1121,7 +1138,7 @@ public abstract class BaseReceivePack {
 	 */
 	protected void recvCommands() throws IOException {
 		PushCertificateParser certParser = getPushCertificateParser();
-		boolean firstPkt = true;
+		FirstLine firstLine = null;
 		try {
 			for (;;) {
 				String line;
@@ -1137,16 +1154,16 @@ public abstract class BaseReceivePack {
 				}
 
 				if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-					parseShallow(line.substring(8, 48));
+					clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
 					continue;
 				}
 
-				if (firstPkt) {
-					firstPkt = false;
-					FirstLine firstLine = new FirstLine(line);
+				if (firstLine == null) {
+					firstLine = new FirstLine(line);
 					enabledCapabilities = firstLine.getCapabilities();
+					System.out.println("BaseReceivePack: enabledCapabilities = "
+							+ enabledCapabilities.toString());
 					line = firstLine.getLine();
-					enableCapabilities();
 
 					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
 						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
@@ -1159,7 +1176,14 @@ public abstract class BaseReceivePack {
 					continue;
 				}
 
-				ReceiveCommand cmd = parseCommand(line);
+				ReceiveCommand cmd;
+				try {
+					System.out.println("BaseReceivePack: line = " + line);
+					cmd = parseCommand(line);
+				} catch (PackProtocolException e) {
+					sendError(e.getMessage());
+					throw e;
+				}
 				if (cmd.getRefName().equals(Constants.HEAD)) {
 					cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
 				} else {
@@ -1171,30 +1195,10 @@ public abstract class BaseReceivePack {
 				}
 			}
 			pushCert = certParser.build();
-			if (hasCommands()) {
-				readPostCommands(pckIn);
-			}
 		} catch (PackProtocolException e) {
-			if (sideBand) {
-				try {
-					pckIn.discardUntilEnd();
-				} catch (IOException e2) {
-					// Ignore read failures attempting to discard.
-				}
-			}
-			fatalError(e.getMessage());
+			sendError(e.getMessage());
 			throw e;
 		}
-	}
-
-	private void parseShallow(String idStr) throws PackProtocolException {
-		ObjectId id;
-		try {
-			id = ObjectId.fromString(idStr);
-		} catch (InvalidObjectIdException e) {
-			throw new PackProtocolException(e.getMessage(), e);
-		}
-		clientShallowCommits.add(id);
 	}
 
 	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
@@ -1208,7 +1212,7 @@ public abstract class BaseReceivePack {
 		try {
 			oldId = ObjectId.fromString(oldStr);
 			newId = ObjectId.fromString(newStr);
-		} catch (InvalidObjectIdException e) {
+		} catch (IllegalArgumentException e) {
 			throw new PackProtocolException(
 					JGitText.get().errorInvalidProtocolWantedOldNewRef, e);
 		}
@@ -1220,26 +1224,17 @@ public abstract class BaseReceivePack {
 		return new ReceiveCommand(oldId, newId, name);
 	}
 
-	/**
-	 * @param in
-	 *            request stream.
-	 * @throws IOException
-	 *             request line cannot be read.
-	 */
-	void readPostCommands(PacketLineIn in) throws IOException {
-		// Do nothing by default.
-	}
-
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
 		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
+		usePushOptions = allowPushOptions
+				&& isCapabilityEnabled(CAPABILITY_PUSH_OPTIONS);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
 			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
-			errOut = new SideBandOutputStream(CH_ERROR, MAX_BUF, out);
 
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
@@ -1254,12 +1249,9 @@ public abstract class BaseReceivePack {
 	 * @return true if the peer requested the capability to be enabled.
 	 */
 	protected boolean isCapabilityEnabled(String name) {
+		System.out.println("BaseReceivePack: " + name + " = "
+				+ enabledCapabilities.contains(name));
 		return enabledCapabilities.contains(name);
-	}
-
-	void checkRequestWasRead() {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */
@@ -1458,6 +1450,10 @@ public abstract class BaseReceivePack {
 					// advertised value, *OR* with the old id being 0{40}. Any
 					// other requested old id is invalid.
 					//
+
+					// System.out.println(
+					// "!ObjectId.zeroId().equals(cmd.getOldId()) &&
+					// !id.equals(cmd.getOldId())");
 					cmd.setResult(Result.REJECTED_OTHER_REASON,
 							JGitText.get().invalidOldIdSent);
 					continue;
@@ -1483,6 +1479,10 @@ public abstract class BaseReceivePack {
 					// A properly functioning client will send the same
 					// object id we advertised.
 					//
+
+					// System.out.println("!id.equals(cmd.getOldId())");
+					// System.out.println("id: " + id);
+					// System.out.println("cmd.getOldId(): " + cmd.getOldId());
 					cmd.setResult(Result.REJECTED_OTHER_REASON,
 							JGitText.get().invalidOldIdSent);
 					continue;

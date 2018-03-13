@@ -59,6 +59,7 @@ import java.util.List;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.PushOptionWrapper;
 import org.eclipse.jgit.transport.PushCertificate;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
@@ -307,10 +308,27 @@ public class BatchRefUpdate {
 	 * Gets the list of option strings associated with this update.
 	 *
 	 * @return pushOptions
-	 * @since 4.5
 	 */
 	public List<String> getPushOptions() {
 		return pushOptions;
+	}
+
+	/**
+	 * Execute this batch update without option strings.
+	 *
+	 * @param walk
+	 *            a RevWalk to parse tags in case the storage system wants to
+	 *            store them pre-peeled, a common performance optimization.
+	 * @param monitor
+	 *            progress monitor to receive update status on.
+	 * @throws IOException
+	 *             the database is unable to accept the update. Individual
+	 *             command status must be tested to determine if there is a
+	 *             partial failure, or a total failure.
+	 */
+	public void execute(RevWalk walk, ProgressMonitor monitor)
+			throws IOException {
+		execute(walk, monitor, null);
 	}
 
 	/**
@@ -328,16 +346,15 @@ public class BatchRefUpdate {
 	 *            store them pre-peeled, a common performance optimization.
 	 * @param monitor
 	 *            progress monitor to receive update status on.
-	 * @param options
-	 *            a list of option strings; set null to execute without
+	 * @param wrapper
+	 *            holds a list of option strings; set null to execute without
 	 * @throws IOException
 	 *             the database is unable to accept the update. Individual
 	 *             command status must be tested to determine if there is a
 	 *             partial failure, or a total failure.
-	 * @since 4.5
 	 */
 	public void execute(RevWalk walk, ProgressMonitor monitor,
-			List<String> options) throws IOException {
+			PushOptionWrapper wrapper) throws IOException {
 
 		if (atomic && !refdb.performsAtomicTransactions()) {
 			for (ReceiveCommand c : commands) {
@@ -349,13 +366,13 @@ public class BatchRefUpdate {
 			return;
 		}
 
-		if (options != null) {
-			pushOptions = options;
-		}
+		if (wrapper != null)
+			pushOptions = wrapper.getPushOptions();
 
 		monitor.beginTask(JGitText.get().updatingReferences, commands.size());
 		List<ReceiveCommand> commands2 = new ArrayList<ReceiveCommand>(
 				commands.size());
+		List<String> namesToCheck = new ArrayList<String>(commands.size());
 		// First delete refs. This may free the name space for some of the
 		// updates.
 		for (ReceiveCommand cmd : commands) {
@@ -364,6 +381,7 @@ public class BatchRefUpdate {
 					cmd.updateType(walk);
 					switch (cmd.getType()) {
 					case CREATE:
+						namesToCheck.add(cmd.getRefName());
 						commands2.add(cmd);
 						break;
 					case UPDATE:
@@ -430,24 +448,6 @@ public class BatchRefUpdate {
 			}
 		}
 		monitor.endTask();
-	}
-
-	/**
-	 * Execute this batch update without option strings.
-	 *
-	 * @param walk
-	 *            a RevWalk to parse tags in case the storage system wants to
-	 *            store them pre-peeled, a common performance optimization.
-	 * @param monitor
-	 *            progress monitor to receive update status on.
-	 * @throws IOException
-	 *             the database is unable to accept the update. Individual
-	 *             command status must be tested to determine if there is a
-	 *             partial failure, or a total failure.
-	 */
-	public void execute(RevWalk walk, ProgressMonitor monitor)
-			throws IOException {
-		execute(walk, monitor, null);
 	}
 
 	private static Collection<String> getTakenPrefixes(

@@ -47,7 +47,6 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -124,7 +123,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	private final boolean atomic;
 
 	/** A list of option strings associated with this push. */
-	private List<String> pushOptions;
+	protected List<String> pushOptions;
 
 	private boolean capableAtomic;
 	private boolean capableDeleteRefs;
@@ -149,6 +148,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		super(packTransport);
 		thinPack = transport.isPushThin();
 		atomic = transport.isPushAtomic();
+		capablePushOptions = transport.isCapablePushOptions();
 		pushOptions = transport.getPushOptions();
 	}
 
@@ -209,7 +209,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			OutputStream outputStream) throws TransportException {
 		try {
 			writeCommands(refUpdates.values(), monitor, outputStream);
-
 			if (pushOptions != null && capablePushOptions)
 				transmitOptions();
 			if (writePack)
@@ -233,6 +232,17 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		} catch (TransportException e) {
 			throw e;
 		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println(
+					"BasePackPushConnection: this = " + this.toString());
+			if (pushOptions != null) {
+				System.out.println("BasePackPushConnection: pushOptions = "
+					+ pushOptions.toString());
+			}
+			System.out.println("BasePackPushConnection: refUpdates = "
+					+ refUpdates.toString());
+			System.out.println("BasePackPushConnection: monitor = "
+					+ monitor.toString());
 			throw new TransportException(uri, e.getMessage(), e);
 		} finally {
 			close();
@@ -247,6 +257,10 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					JGitText.get().atomicPushNotSupported);
 		}
 
+		System.out.println(
+				"BasePackPushConnection: pushOptions = " + pushOptions);
+		System.out.println("BasePackPushConnection: capablePushOptions = "
+				+ capablePushOptions);
 		if (pushOptions != null && !capablePushOptions) {
 			throw new TransportException(uri,
 					MessageFormat.format(JGitText.get().pushOptionsNotSupported,
@@ -293,6 +307,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	private void transmitOptions() throws IOException {
 		for (final String pushOption : pushOptions) {
 			pckOut.writeString(pushOption);
+			// pckOut.end();
 		}
 
 		pckOut.end();
@@ -307,10 +322,11 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		capableDeleteRefs = wantCapability(line, CAPABILITY_DELETE_REFS);
 		capableOfsDelta = wantCapability(line, CAPABILITY_OFS_DELTA);
 
-		if (pushOptions != null) {
+		if (pushOptions != null && !capablePushOptions)
 			capablePushOptions = wantCapability(line, CAPABILITY_PUSH_OPTIONS);
-		}
 
+		System.out.println("BasePackPushConnection: capablePushOptions = "
+				+ capablePushOptions);
 		capableSideBand = wantCapability(line, CAPABILITY_SIDE_BAND_64K);
 		if (capableSideBand) {
 			in = new SideBandInputStream(in, monitor, getMessageWriter(),
@@ -351,12 +367,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			writer.setReuseValidatingObjects(false);
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
-
-			OutputStream packOut = out;
-			if (capableSideBand) {
-				packOut = new CheckingSideBandOutputStream(in, out);
-			}
-			writer.writePack(monitor, monitor, packOut);
+			writer.writePack(monitor, monitor, out);
 
 			packTransferTime = writer.getStatistics().getTimeWriting();
 		}
@@ -366,8 +377,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			throws IOException {
 		final String unpackLine = readStringLongTimeout();
 		if (!unpackLine.startsWith("unpack ")) //$NON-NLS-1$
-			throw new PackProtocolException(uri, MessageFormat
-					.format(JGitText.get().unexpectedReportLine, unpackLine));
+			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().unexpectedReportLine, unpackLine));
 		final String unpackStatus = unpackLine.substring("unpack ".length()); //$NON-NLS-1$
 		if (unpackStatus.startsWith("error Pack exceeds the limit of")) {//$NON-NLS-1$
 			throw new TooLargePackException(uri,
@@ -442,53 +452,8 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	 * Gets the list of option strings associated with this push.
 	 *
 	 * @return pushOptions
-	 * @since 4.5
 	 */
 	public List<String> getPushOptions() {
 		return pushOptions;
-	}
-
-	private static class CheckingSideBandOutputStream extends OutputStream {
-		private final InputStream in;
-		private final OutputStream out;
-
-		CheckingSideBandOutputStream(InputStream in, OutputStream out) {
-			this.in = in;
-			this.out = out;
-		}
-
-		@Override
-		public void write(int b) throws IOException {
-			write(new byte[] { (byte) b });
-		}
-
-		@Override
-		public void write(byte[] buf, int ptr, int cnt) throws IOException {
-			try {
-				out.write(buf, ptr, cnt);
-			} catch (IOException e) {
-				throw checkError(e);
-			}
-		}
-
-		@Override
-		public void flush() throws IOException {
-			try {
-				out.flush();
-			} catch (IOException e) {
-				throw checkError(e);
-			}
-		}
-
-		private IOException checkError(IOException e1) {
-			try {
-				in.read();
-			} catch (TransportException e2) {
-				return e2;
-			} catch (IOException e2) {
-				return e1;
-			}
-			return e1;
-		}
 	}
 }
