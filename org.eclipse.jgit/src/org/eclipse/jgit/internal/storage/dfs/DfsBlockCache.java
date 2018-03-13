@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 
 /**
@@ -309,14 +308,12 @@ public final class DfsBlockCache {
 	 *            offset within <code>pack</code> of the object.
 	 * @param ctx
 	 *            current thread's reader.
-	 * @param packChannel
-	 *            optional channel to read {@code pack}.
 	 * @return the object reference.
 	 * @throws IOException
 	 *             the reference was not in the cache and could not be loaded.
 	 */
-	DfsBlock getOrLoad(DfsPackFile pack, long position, DfsReader ctx,
-			@Nullable ReadableChannel packChannel) throws IOException {
+	DfsBlock getOrLoad(DfsPackFile pack, long position, DfsReader ctx)
+			throws IOException {
 		final long requestedPosition = position;
 		position = pack.alignToBlock(position);
 
@@ -348,7 +345,7 @@ public final class DfsBlockCache {
 			statMiss.incrementAndGet();
 			boolean credit = true;
 			try {
-				v = pack.readOneBlock(position, ctx, packChannel);
+				v = pack.readOneBlock(position, ctx);
 				credit = false;
 			} finally {
 				if (credit)
@@ -379,7 +376,7 @@ public final class DfsBlockCache {
 		// that was loaded is the wrong block for the requested position.
 		if (v.contains(pack.key, requestedPosition))
 			return v;
-		return getOrLoad(pack, requestedPosition, ctx, packChannel);
+		return getOrLoad(pack, requestedPosition, ctx);
 	}
 
 	@SuppressWarnings("unchecked")
