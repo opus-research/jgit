@@ -65,6 +65,7 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.TransferConfig;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.util.FS;
 

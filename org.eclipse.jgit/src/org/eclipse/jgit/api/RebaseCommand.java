@@ -509,7 +509,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		Collections.reverse(cherryPickList);
 		// create the folder for the meta information
-		FileUtils.mkdir(rebaseDir);
+		rebaseDir.mkdir();
 
 		createFile(repo.getDirectory(), Constants.ORIG_HEAD, headId.name());
 		createFile(rebaseDir, REBASE_HEAD, headId.name());

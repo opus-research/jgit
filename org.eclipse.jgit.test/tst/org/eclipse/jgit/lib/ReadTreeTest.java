@@ -45,15 +45,10 @@
  */
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -63,7 +58,6 @@ import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.junit.Test;
 
 public abstract class ReadTreeTest extends RepositoryTestCase {
 	protected Tree theHead;
@@ -72,7 +66,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	// Each of these rules are from the read-tree manpage
 	// go there to see what they mean.
 	// Rule 0 is left out for obvious reasons :)
-	@Test
 	public void testRules1thru3_NoIndexEntry() throws IOException {
 		Tree head = new Tree(db);
 		head = buildTree(mk("foo"));
@@ -161,7 +154,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	// for these rules, they all have clean yes/no options
 	// but it doesn't matter if the entry is clean or not
 	// so we can just ignore the state in the filesystem entirely
-	@Test
 	public void testRules4thru13_IndexEntryNotInHead() throws IOException {
 		// rules 4 and 5
 		HashMap<String, String> idxMap;
@@ -259,7 +251,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertTrue(getConflicts().isEmpty());
 	}
 
-	@Test
 	public void testDirectoryFileSimple() throws IOException {
 		Tree treeDF = buildTree(mkmap("DF", "DF"));
 		Tree treeDFDF = buildTree(mkmap("DF/DF", "DF/DF"));
@@ -309,7 +300,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	 *19   D	    0       F											  Update
 	 */
 
-	@Test
 	public void testDirectoryFileConflicts_1() throws Exception {
 		// 1
 		doit(mk("DF/DF"), mk("DF"), mk("DF/DF"));
@@ -318,7 +308,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertRemoved("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_2() throws Exception {
 		// 2
 		setupCase(mk("DF/DF"), mk("DF"), mk("DF/DF"));
@@ -328,7 +317,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_3() throws Exception {
 		// 3 - the first to break!
 		doit(mk("DF/DF"), mk("DF/DF"), mk("DF"));
@@ -336,7 +324,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertRemoved("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_4() throws Exception {
 		// 4 (basically same as 3, just with H and M different)
 		doit(mk("DF/DF"), mkmap("DF/DF", "foo"), mk("DF"));
@@ -345,7 +332,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_5() throws Exception {
 		// 5
 		doit(mk("DF/DF"), mk("DF"), mk("DF"));
@@ -353,7 +339,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_6() throws Exception {
 		// 6
 		setupCase(mk("DF/DF"), mk("DF"), mk("DF"));
@@ -362,7 +347,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertRemoved("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_7() throws Exception {
 		// 7
 		doit(mk("DF"), mk("DF"), mk("DF/DF"));
@@ -391,7 +375,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 								// This test would fail in DirCacheCheckoutTests.
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_8() throws Exception {
 		// 8
 		setupCase(mk("DF"), mk("DF"), mk("DF/DF"));
@@ -401,7 +384,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertConflict("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_9() throws Exception {
 		// 9
 		doit(mk("DF"), mkmap("DF", "QP"), mk("DF/DF"));
@@ -409,7 +391,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_10() throws Exception {
 		// 10
 		cleanUpDF();
@@ -417,14 +398,12 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_11() throws Exception {
 		// 11
 		doit(mk("DF"), mk("DF/DF"), mkmap("DF/DF", "asdf"));
 		assertConflict("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_12() throws Exception {
 		// 12
 		cleanUpDF();
@@ -433,7 +412,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_13() throws Exception {
 		// 13
 		cleanUpDF();
@@ -444,7 +422,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_14() throws Exception {
 		// 14
 		cleanUpDF();
@@ -453,7 +430,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_15() throws Exception {
 		// 15
 		doit(mkmap(), mk("DF/DF"), mk("DF"));
@@ -465,7 +441,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_15b() throws Exception {
 		// 15, take 2, just to check multi-leveled
 		doit(mkmap(), mk("DF/DF/DF/DF"), mk("DF"));
@@ -478,7 +453,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF/DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_16() throws Exception {
 		// 16
 		cleanUpDF();
@@ -487,7 +461,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_17() throws Exception {
 		// 17
 		cleanUpDF();
@@ -503,7 +476,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		// assertUpdated("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_18() throws Exception {
 		// 18
 		cleanUpDF();
@@ -512,7 +484,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF/DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_19() throws Exception {
 		// 19
 		cleanUpDF();
@@ -565,39 +536,10 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		return map;
 	}
 
-	@Test
 	public void testUntrackedConflicts() throws IOException {
 		setupCase(null, mk("foo"), null);
 		writeTrashFile("foo", "foo");
 		go();
-
-		// test that we don't overwrite untracked files when there is a HEAD
-		recursiveDelete(new File(trash, "foo"));
-		setupCase(mk("other"), mkmap("other", "other", "foo", "foo"),
-				mk("other"));
-		writeTrashFile("foo", "bar");
-		try {
-			checkout();
-			fail("didn't get the expected exception");
-		} catch (CheckoutConflictException e) {
-			assertConflict("foo");
-			assertWorkDir(mkmap("foo", "bar", "other", "other"));
-			assertIndex(mk("other"));
-		}
-
-		// test that we don't overwrite untracked files when there is no HEAD
-		recursiveDelete(new File(trash, "other"));
-		recursiveDelete(new File(trash, "foo"));
-		setupCase(null, mk("foo"), null);
-		writeTrashFile("foo", "bar");
-		try {
-			checkout();
-			fail("didn't get the expected exception");
-		} catch (CheckoutConflictException e) {
-			assertConflict("foo");
-			assertWorkDir(mkmap("foo", "bar"));
-			assertIndex(mkmap());
-		}
 
 		// TODO: Why should we expect conflicts here?
 		// H and M are emtpy and according to rule #5 of
@@ -609,7 +551,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		// assertConflict("foo");
 
 		recursiveDelete(new File(trash, "foo"));
-		recursiveDelete(new File(trash, "other"));
 		setupCase(null, mk("foo"), null);
 		writeTrashFile("foo/bar/baz", "");
 		writeTrashFile("foo/blahblah", "");
@@ -633,7 +574,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
 	public void testCloseNameConflictsX0() throws IOException {
 		setupCase(mkmap("a/a", "a/a-c"), mkmap("a/a","a/a", "b.b/b.b","b.b/b.bs"), mkmap("a/a", "a/a-c") );
 		checkout();
@@ -645,7 +585,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
 	public void testCloseNameConflicts1() throws IOException {
 		setupCase(mkmap("a/a", "a/a-c"), mkmap("a/a","a/a", "a.a/a.a","a.a/a.a"), mkmap("a/a", "a/a-c") );
 		checkout();
@@ -657,7 +596,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
 	public void testCheckoutHierarchy() throws IOException {
 		setupCase(
 				mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
@@ -675,7 +613,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckoutOutChanges() throws IOException {
 		setupCase(mk("foo"), mk("foo/bar"), mk("foo"));
 		checkout();
@@ -711,7 +648,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckoutUncachedChanges() throws IOException {
 		setupCase(mk("foo"), mk("foo"), mk("foo"));
 		writeTrashFile("foo", "otherData");
@@ -721,7 +657,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertTrue(new File(trash, "foo").isFile());
 	}
 
-	@Test
 	public void testDontOverwriteDirtyFile() throws IOException {
 		setupCase(mk("foo"), mk("other"), mk("foo"));
 		writeTrashFile("foo", "different");
@@ -734,6 +669,17 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 			assertTrue(getConflicts().equals(Arrays.asList("foo")));
 			assertTrue(new File(trash, "foo").isFile());
 		}
+	}
+
+	/**
+	 * The interface these tests need from a class implementing a checkout
+	 */
+	interface Checkout {
+		HashMap<String, ObjectId> updated();
+		ArrayList<String> conflicts();
+		ArrayList<String> removed();
+		void prescanTwoTrees() throws IOException;
+		void checkout() throws IOException;
 	}
 
 	public void assertWorkDir(HashMap<String, String> i)

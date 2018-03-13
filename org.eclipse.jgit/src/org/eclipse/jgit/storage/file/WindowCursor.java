@@ -48,7 +48,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -148,7 +147,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		src.pack.copyAsIs(out, src, this);
 	}
 
-	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
+	public void writeObjects(PackOutputStream out, Iterable<ObjectToPack> list)
 			throws IOException {
 		for (ObjectToPack otp : list)
 			out.writeObject(otp);
