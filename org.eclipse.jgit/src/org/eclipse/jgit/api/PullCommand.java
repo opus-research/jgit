@@ -418,7 +418,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 *
 	 * @param tagOpt
 	 * @return {@code this}
-	 * @since 4.7
+	 * @Since 4.7
 	 */
 	public PullCommand setTagOpt(TagOpt tagOpt) {
 		checkCallable();
