@@ -65,7 +65,6 @@ import org.eclipse.jgit.util.FS;
  */
 public class FileTreeIterator extends WorkingTreeIterator {
 	private final File directory;
-	private final FS fs;
 
 	/**
 	 * Create a new iterator to traverse the given directory and its children.
@@ -73,13 +72,9 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param root
 	 *            the starting directory. This directory should correspond to
 	 *            the root of the repository.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 */
-	public FileTreeIterator(final File root, FS fs) {
+	public FileTreeIterator(final File root) {
 		directory = root;
-		this.fs = fs;
 		init(entries());
 	}
 
@@ -88,24 +83,20 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *
 	 * @param p
 	 *            the parent iterator we were created from.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @param root
 	 *            the subdirectory. This should be a directory contained within
 	 *            the parent directory.
 	 */
-	protected FileTreeIterator(final FileTreeIterator p, final File root, FS fs) {
+	protected FileTreeIterator(final FileTreeIterator p, final File root) {
 		super(p);
 		directory = root;
-		this.fs = fs;
 		init(entries());
 	}
 
 	@Override
 	public AbstractTreeIterator createSubtreeIterator(final Repository repo)
 			throws IncorrectObjectTypeException, IOException {
-		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
+		return new FileTreeIterator(this, ((FileEntry) current()).file);
 	}
 
 	private Entry[] entries() {
@@ -114,7 +105,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			return EOF;
 		final Entry[] r = new Entry[all.length];
 		for (int i = 0; i < r.length; i++)
-			r[i] = new FileEntry(all[i], fs);
+			r[i] = new FileEntry(all[i]);
 		return r;
 	}
 
@@ -130,7 +121,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 		private long lastModified;
 
-		FileEntry(final File f, FS fs) {
+		FileEntry(final File f) {
 			file = f;
 
 			if (f.isDirectory()) {
@@ -138,7 +129,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 					mode = FileMode.GITLINK;
 				else
 					mode = FileMode.TREE;
-			} else if (fs.canExecute(file))
+			} else if (FS.INSTANCE.canExecute(file))
 				mode = FileMode.EXECUTABLE_FILE;
 			else
 				mode = FileMode.REGULAR_FILE;
