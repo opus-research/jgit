@@ -318,9 +318,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 			if (!dco.getToBeDeleted().isEmpty()) {
 				status = new CheckoutResult(Status.NONDELETED,
-						dco.getToBeDeleted(),
-						new ArrayList<String>(dco.getUpdated().keySet()),
-						dco.getRemoved());
+						dco.getToBeDeleted());
 			} else
 				status = new CheckoutResult(new ArrayList<String>(dco
 						.getUpdated().keySet()), dco.getRemoved());

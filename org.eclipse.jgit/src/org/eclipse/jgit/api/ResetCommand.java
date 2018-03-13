@@ -432,12 +432,4 @@ public class ResetCommand extends GitCommand<Ref> {
 		repo.writeMergeCommitMsg(null);
 	}
 
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return "ResetCommand [repo=" + repo + ", ref=" + ref + ", mode=" + mode
-				+ ", isReflogDisabled=" + isReflogDisabled + ", filepaths="
-				+ filepaths + "]";
-	}
-
 }
