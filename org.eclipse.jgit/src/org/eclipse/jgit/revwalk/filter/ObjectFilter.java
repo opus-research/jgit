@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
+/**
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,16 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.revwalk.filter;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.io.IOException;
 
-class Sets {
-	static <T> Set<T> of(T... elements) {
-		Set<T> ret = new HashSet<T>();
-		for (T element : elements)
-			ret.add(element);
-		return ret;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.revwalk.ObjectWalk;
+
+/**
+ * Selects interesting objects when walking.
+ * <p>
+ * Applications should install the filter on an ObjectWalk by
+ * {@link ObjectWalk#setObjectFilter(ObjectFilter)} prior to starting traversal.
+ *
+ * @since 4.0
+ */
+public abstract class ObjectFilter {
+	/** Default filter that always returns true. */
+	public static final ObjectFilter ALL = new AllFilter();
+
+	private static final class AllFilter extends ObjectFilter {
+		@Override
+		public boolean include(ObjectWalk walker, AnyObjectId o) {
+			return true;
+		}
 	}
+
+	/**
+	 * Determine if the named object should be included in the walk.
+	 *
+	 * @param walker
+	 *            the active walker this filter is being invoked from within.
+	 * @param objid
+	 *            the object currently being tested.
+	 * @return {@code true} if the named object should be included in the walk.
+	 * @throws MissingObjectException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was missing
+	 * @throws IncorrectObjectTypeException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was of the wrong type
+	 * @throws IOException
+	 *             an object the filter needed to consult to determine its
+	 *             answer could not be read.
+	 */
+	public abstract boolean include(ObjectWalk walker, AnyObjectId objid)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			       IOException;
 }

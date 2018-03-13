@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,26 +43,43 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.IOException;
+
 /**
- * Indicates UploadPack may not continue execution.
+ * An exception to be thrown when the write operation is aborted.
+ * <p>
+ * That can be thrown inside
+ * {@link ObjectCountCallback#setObjectCount(long)}.
  *
- * @deprecated use {@link ServiceMayNotContinueException} instead.
+ * @since 4.1
  */
-@Deprecated
-public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+public class WriteAbortedException extends IOException {
 	private static final long serialVersionUID = 1L;
 
-	/** Initialize with no message. */
-	public UploadPackMayNotContinueException() {
-		// Do not set a message.
+	/**
+	 * Construct a {@code WriteAbortedException}.
+	 */
+	public WriteAbortedException() {
 	}
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * Construct a {@code WriteAbortedException}.
+	 *
+	 * @param s message describing the issue
 	 */
-	public UploadPackMayNotContinueException(String msg) {
-		super(msg);
+	public WriteAbortedException(String s) {
+		super(s);
+	}
+
+	/**
+	 * Construct a {@code WriteAbortedException}.
+	 *
+	 * @param s
+	 *            message describing the issue
+	 * @param why
+	 *            a lower level implementation specific issue.
+	 */
+	public WriteAbortedException(String s, Throwable why) {
+		super(s, why);
 	}
 }

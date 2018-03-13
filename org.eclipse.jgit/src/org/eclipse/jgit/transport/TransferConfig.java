@@ -67,9 +67,11 @@ public class TransferConfig {
 
 	private final boolean checkReceivedObjects;
 	private final boolean allowLeadingZeroFileMode;
+	private final boolean allowInvalidPersonIdent;
 	private final boolean safeForWindows;
 	private final boolean safeForMacOS;
 	private final boolean allowTipSha1InWant;
+	private final boolean allowReachableSha1InWant;
 	private final String[] hideRefs;
 
 	TransferConfig(final Repository db) {
@@ -82,6 +84,8 @@ public class TransferConfig {
 				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
 		allowLeadingZeroFileMode = checkReceivedObjects
 				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
+		allowInvalidPersonIdent = checkReceivedObjects
+				&& rc.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
 		safeForWindows = checkReceivedObjects
 				&& rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
 						SystemReader.getInstance().isWindows());
@@ -91,16 +95,9 @@ public class TransferConfig {
 
 		allowTipSha1InWant = rc.getBoolean(
 				"uploadpack", "allowtipsha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
+		allowReachableSha1InWant = rc.getBoolean(
+				"uploadpack", "allowreachablesha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
 		hideRefs = rc.getStringList("uploadpack", null, "hiderefs"); //$NON-NLS-1$ //$NON-NLS-2$
-	}
-
-	/**
-	 * @return strictly verify received objects?
-	 * @deprecated use {@link #newObjectChecker()} instead.
-	 */
-	@Deprecated
-	public boolean isFsckObjects() {
-		return checkReceivedObjects;
 	}
 
 	/**
@@ -113,6 +110,7 @@ public class TransferConfig {
 			return null;
 		return new ObjectChecker()
 			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
+			.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
 			.setSafeForWindows(safeForWindows)
 			.setSafeForMacOS(safeForMacOS);
 	}
@@ -123,6 +121,14 @@ public class TransferConfig {
 	 */
 	public boolean isAllowTipSha1InWant() {
 		return allowTipSha1InWant;
+	}
+
+	/**
+	 * @return allow clients to request non-tip SHA-1s?
+	 * @since 4.1
+	 */
+	public boolean isAllowReachableSha1InWant() {
+		return allowReachableSha1InWant;
 	}
 
 	/**

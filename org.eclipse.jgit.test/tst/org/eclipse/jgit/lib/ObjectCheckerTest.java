@@ -121,6 +121,42 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
+	public void testCommitCorruptAuthor() throws CorruptObjectException {
+		StringBuilder b = new StringBuilder();
+		b.append("tree be9bfa841874ccc9f2ef7c48d0c76226f89b7189\n");
+		b.append("author b <b@c> <b@c> 0 +0000\n");
+		b.append("committer <> 0 +0000\n");
+
+		byte[] data = Constants.encodeASCII(b.toString());
+		try {
+			checker.checkCommit(data);
+			fail("Did not catch corrupt object");
+		} catch (CorruptObjectException e) {
+			assertEquals("invalid author", e.getMessage());
+		}
+		checker.setAllowInvalidPersonIdent(true);
+		checker.checkCommit(data);
+	}
+
+	@Test
+	public void testCommitCorruptCommitter() throws CorruptObjectException {
+		StringBuilder b = new StringBuilder();
+		b.append("tree be9bfa841874ccc9f2ef7c48d0c76226f89b7189\n");
+		b.append("author <> 0 +0000\n");
+		b.append("committer b <b@c> <b@c> 0 +0000\n");
+
+		byte[] data = Constants.encodeASCII(b.toString());
+		try {
+			checker.checkCommit(data);
+			fail("Did not catch corrupt object");
+		} catch (CorruptObjectException e) {
+			assertEquals("invalid committer", e.getMessage());
+		}
+		checker.setAllowInvalidPersonIdent(true);
+		checker.checkCommit(data);
+	}
+
+	@Test
 	public void testValidCommit1Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -940,7 +976,8 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
-	public void testInvalidTagInvalidTaggerHeader1() {
+	public void testInvalidTagInvalidTaggerHeader1()
+			throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
 		b.append("object ");
@@ -958,6 +995,8 @@ public class ObjectCheckerTest {
 		} catch (CorruptObjectException e) {
 			assertEquals("invalid tagger", e.getMessage());
 		}
+		checker.setAllowInvalidPersonIdent(true);
+		checker.checkTag(data);
 	}
 
 	@Test
@@ -1768,6 +1807,17 @@ public class ObjectCheckerTest {
 		} catch (CorruptObjectException e) {
 			assertEquals("invalid name ends with ' '", e.getMessage());
 		}
+	}
+
+	@Test
+	public void testBug477090() throws CorruptObjectException {
+		checker.setSafeForMacOS(true);
+		final byte[] bytes = {
+				// U+221E 0xe2889e INFINITY ∞
+				(byte) 0xe2, (byte) 0x88, (byte) 0x9e,
+				// .html
+				0x2e, 0x68, 0x74, 0x6d, 0x6c };
+		checker.checkPathSegment(bytes, 0, bytes.length);
 	}
 
 	@Test

@@ -98,8 +98,9 @@ public class DiffFormatterTest extends RepositoryTestCase {
 	@Override
 	@After
 	public void tearDown() throws Exception {
-		if (df != null)
-			df.release();
+		if (df != null) {
+			df.close();
+		}
 		super.tearDown();
 	}
 
@@ -240,8 +241,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		ObjectId bId = blob("b\n");
 
 		String diffHeader = makeDiffHeaderModeChange(PATH_A, PATH_A, aId, bId,
-				GITLINK, REGULAR_FILE)
-				+ "-Subproject commit " + aId.name() + "\n";
+				GITLINK, REGULAR_FILE);
 
 		DiffEntry ad = DiffEntry.delete(PATH_A, aId);
 		ad.oldMode = FileMode.GITLINK;
@@ -256,7 +256,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		assertEquals(1, fh.getHunks().size());
 
 		HunkHeader hh = fh.getHunks().get(0);
-		assertEquals(0, hh.toEditList().size());
+		assertEquals(1, hh.toEditList().size());
 	}
 
 	@Test

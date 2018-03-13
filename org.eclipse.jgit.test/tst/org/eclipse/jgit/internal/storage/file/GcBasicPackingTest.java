@@ -45,13 +45,16 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Iterator;
 
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
@@ -82,6 +85,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(4, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
 		assertEquals(0, stats.numberOfPackFiles);
+		assertEquals(0, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -99,6 +103,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(8, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
+		assertEquals(2, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -115,6 +120,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
+		assertEquals(1, stats.numberOfBitmaps);
 
 		// Do the gc again and check that it hasn't changed anything
 		gc.gc();
@@ -122,6 +128,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
+		assertEquals(1, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -140,6 +147,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(8, stats.numberOfPackedObjects);
 		assertEquals(2, stats.numberOfPackFiles);
+		assertEquals(1, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -174,6 +182,115 @@ public class GcBasicPackingTest extends GcTestCase {
 			assertEquals(2, c);
 			assertEquals(9, pIt.next().getObjectCount());
 		}
+	}
+
+	@Test
+	public void testDonePruneTooYoungPacks() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		bb.commit().message("M").add("M", "M").create();
+
+		gc.setExpireAgeMillis(0);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(3, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
+		File oldPackfile = tr.getRepository().getObjectDatabase().getPacks()
+				.iterator().next().getPackFile();
+
+		fsTick();
+		bb.commit().message("B").add("B", "Q").create();
+
+		// The old packfile is too young to be deleted. We should end up with
+		// two pack files
+		gc.setExpire(new Date(oldPackfile.lastModified() - 1));
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		// if objects exist in multiple packFiles then they are counted multiple
+		// times
+		assertEquals(9, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
+
+		// repack again but now without a grace period for packfiles. We should
+		// end up with one packfile
+		gc.setExpireAgeMillis(0);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		// if objects exist in multiple packFiles then they are counted multiple
+		// times
+		assertEquals(6, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
+
+	}
+
+	@Test
+	public void testCommitRangeForBitmaps() throws Exception {
+		BranchBuilder bb1 = tr.branch("refs/heads/master");
+		bb1.commit().message("A1").add("A1", "A1").create();
+		bb1.commit().message("B1").add("B1", "B1").create();
+		bb1.commit().message("C1").add("C1", "C1").create();
+		BranchBuilder bb2 = tr.branch("refs/heads/working");
+		bb2.commit().message("A2").add("A2", "A2").create();
+		bb2.commit().message("B2").add("B2", "B2").create();
+		bb2.commit().message("C2").add("C2", "C2").create();
+
+		// Consider all commits. Since history isn't deep all commits are
+		// selected.
+		configureGcRange(gc, -1);
+		gc.gc();
+		assertEquals(6, gc.getStatistics().numberOfBitmaps);
+
+		// Range==0 means don't examine commit history, create bitmaps only for
+		// branch tips, C1 & C2.
+		configureGcRange(gc, 0);
+		gc.gc();
+		assertEquals(2, gc.getStatistics().numberOfBitmaps);
+
+		// Consider only the most recent commit (C2, which is also a branch
+		// tip).
+		configureGcRange(gc, 1);
+		gc.gc();
+		assertEquals(2, gc.getStatistics().numberOfBitmaps);
+
+		// Consider only the two most recent commits, C2 & B2. C1 gets included
+		// too since it is a branch tip.
+		configureGcRange(gc, 2);
+		gc.gc();
+		assertEquals(3, gc.getStatistics().numberOfBitmaps);
+
+		// Consider C2 & B2 & A2. C1 gets included too since it is a branch tip.
+		configureGcRange(gc, 3);
+		gc.gc();
+		assertEquals(4, gc.getStatistics().numberOfBitmaps);
+
+		// Consider C2 & B2 & A2 & C1.
+		configureGcRange(gc, 4);
+		gc.gc();
+		assertEquals(4, gc.getStatistics().numberOfBitmaps);
+
+		// Consider C2 & B2 & A2 & C1 & B1.
+		configureGcRange(gc, 5);
+		gc.gc();
+		assertEquals(5, gc.getStatistics().numberOfBitmaps);
+
+		// Consider all six commits.
+		configureGcRange(gc, 6);
+		gc.gc();
+		assertEquals(6, gc.getStatistics().numberOfBitmaps);
+
+		// Input is out of range but should be capped to the total number of
+		// commits.
+		configureGcRange(gc, 1000);
+		gc.gc();
+		assertEquals(6, gc.getStatistics().numberOfBitmaps);
+	}
+
+	private void configureGcRange(GC myGc, int range) {
+		PackConfig pconfig = new PackConfig(repo);
+		pconfig.setBitmapCommitRange(range);
+		myGc.setPackConfig(pconfig);
 	}
 
 	private void configureGc(GC myGc, boolean aggressive) {
