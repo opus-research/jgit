@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,30 +44,68 @@
 
 package org.eclipse.jgit.diff;
 
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
+
 /**
- * Wraps a {@link Sequence} to assign hash codes to elements.
- *
- * This sequence acts as a proxy for the real sequence, caching element hash
- * codes so they don't need to be recomputed each time. Sequences of this type
- * must be used with a {@link HashedSequenceComparator}.
- *
- * To construct an instance of this type use {@link HashedSequencePair}.
- *
- * @param <S>
- *            the base sequence type.
+ * A version of {@link RawText} that ignores trailing whitespace.
  */
-public final class HashedSequence<S extends Sequence> extends Sequence {
-	final S base;
+public class RawTextIgnoreTrailingWhitespace extends RawText {
+	/** Creates RawText that ignores only trailing whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreTrailingWhitespace(input);
+		}
+	};
 
-	final int[] hashes;
-
-	HashedSequence(S base, int[] hashes) {
-		this.base = base;
-		this.hashes = hashes;
+	/**
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
+	 *
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
+	 */
+	public RawTextIgnoreTrailingWhitespace(byte[] input) {
+		super(input);
 	}
 
 	@Override
-	public int size() {
-		return base.size();
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
+
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes.get(ai) != b.hashes.get(bi))
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		ae = trimTrailingWhitespace(a.content, as, ae);
+		be = trimTrailingWhitespace(b.content, bs, be);
+
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		end = trimTrailingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
 	}
 }

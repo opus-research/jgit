@@ -45,26 +45,25 @@
 
 package org.eclipse.jgit.pgm;
 
-import static org.eclipse.jgit.lib.Constants.HEAD;
-import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
-
 import java.io.BufferedOutputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.diff.RawTextIgnoreAllWhitespace;
+import org.eclipse.jgit.diff.RawTextIgnoreLeadingWhitespace;
+import org.eclipse.jgit.diff.RawTextIgnoreTrailingWhitespace;
+import org.eclipse.jgit.diff.RawTextIgnoreWhitespaceChange;
 import org.eclipse.jgit.diff.RenameDetector;
-import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -74,14 +73,13 @@ class Diff extends TextBuiltin {
 	private final DiffFormatter diffFmt = new DiffFormatter( //
 			new BufferedOutputStream(System.out));
 
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private AbstractTreeIterator oldTree;
+	@Argument(index = 0, metaVar = "metaVar_treeish", required = true)
+	void tree_0(final AbstractTreeIterator c) {
+		trees.add(c);
+	}
 
-	@Argument(index = 1, metaVar = "metaVar_treeish")
-	private AbstractTreeIterator newTree;
-
-	@Option(name = "--cached", usage = "usage_cached")
-	private boolean cached;
+	@Argument(index = 1, metaVar = "metaVar_treeish", required = true)
+	private final List<AbstractTreeIterator> trees = new ArrayList<AbstractTreeIterator>();
 
 	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;
@@ -91,12 +89,7 @@ class Diff extends TextBuiltin {
 	boolean showPatch;
 
 	@Option(name = "-M", usage = "usage_detectRenames")
-	private Boolean detectRenames;
-
-	@Option(name = "--no-renames", usage = "usage_noRenames")
-	void noRenames(@SuppressWarnings("unused") boolean on) {
-		detectRenames = Boolean.FALSE;
-	}
+	private boolean detectRenames;
 
 	@Option(name = "-l", usage = "usage_renameLimit")
 	private Integer renameLimit;
@@ -106,22 +99,22 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--ignore-space-at-eol")
 	void ignoreSpaceAtEol(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_TRAILING);
+		diffFmt.setRawTextFactory(RawTextIgnoreTrailingWhitespace.FACTORY);
 	}
 
 	@Option(name = "--ignore-leading-space")
 	void ignoreLeadingSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_LEADING);
+		diffFmt.setRawTextFactory(RawTextIgnoreLeadingWhitespace.FACTORY);
 	}
 
 	@Option(name = "-b", aliases = { "--ignore-space-change" })
 	void ignoreSpaceChange(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_CHANGE);
+		diffFmt.setRawTextFactory(RawTextIgnoreWhitespaceChange.FACTORY);
 	}
 
 	@Option(name = "-w", aliases = { "--ignore-all-space" })
 	void ignoreAllSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_ALL);
+		diffFmt.setRawTextFactory(RawTextIgnoreAllWhitespace.FACTORY);
 	}
 
 	@Option(name = "-U", aliases = { "--unified" }, metaVar = "metaVar_linesOfContext")
@@ -136,71 +129,23 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--full-index")
 	void abbrev(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setAbbreviationLength(OBJECT_ID_STRING_LENGTH);
-	}
-
-	@Option(name = "--src-prefix", usage = "usage_srcPrefix")
-	void sourcePrefix(String path) {
-		diffFmt.setOldPrefix(path);
-	}
-
-	@Option(name = "--dst-prefix", usage = "usage_dstPrefix")
-	void dstPrefix(String path) {
-		diffFmt.setNewPrefix(path);
-	}
-
-	@Option(name = "--no-prefix", usage = "usage_noPrefix")
-	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix("");
-		diffFmt.setNewPrefix("");
+		diffFmt.setAbbreviationLength(Constants.OBJECT_ID_STRING_LENGTH);
 	}
 
 	// END -- Options shared with Log
 
 	@Override
 	protected void run() throws Exception {
-		diffFmt.setRepository(db);
-		try {
-			if (cached) {
-				if (oldTree == null) {
-					ObjectId head = db.resolve(HEAD + "^{tree}");
-					if (head == null)
-						die(MessageFormat.format(CLIText.get().notATree, HEAD));
-					CanonicalTreeParser p = new CanonicalTreeParser();
-					ObjectReader reader = db.newObjectReader();
-					try {
-						p.reset(reader, head);
-					} finally {
-						reader.release();
-					}
-					oldTree = p;
-				}
-				newTree = new DirCacheIterator(db.readDirCache());
-			} else if (oldTree == null) {
-				oldTree = new DirCacheIterator(db.readDirCache());
-				newTree = new FileTreeIterator(db);
-			} else if (newTree == null)
-				newTree = new FileTreeIterator(db);
+		List<DiffEntry> files = scan();
 
-			diffFmt.setProgressMonitor(new TextProgressMonitor());
-			diffFmt.setPathFilter(pathFilter);
-			if (detectRenames != null)
-				diffFmt.setDetectRenames(detectRenames.booleanValue());
-			if (renameLimit != null && diffFmt.isDetectRenames()) {
-				RenameDetector rd = diffFmt.getRenameDetector();
-				rd.setRenameLimit(renameLimit.intValue());
-			}
+		if (showNameAndStatusOnly) {
+			nameStatus(out, files);
+			out.flush();
 
-			if (showNameAndStatusOnly) {
-				nameStatus(out, diffFmt.scan(oldTree, newTree));
-				out.flush();
-
-			} else {
-				diffFmt.format(oldTree, newTree);
-				diffFmt.flush();
-			}
-		} finally {
-			diffFmt.release();
+		} else {
+			diffFmt.setRepository(db);
+			diffFmt.format(files);
+			diffFmt.flush();
 		}
 	}
 
@@ -228,5 +173,24 @@ class Diff extends TextBuiltin {
 				break;
 			}
 		}
+	}
+
+	private List<DiffEntry> scan() throws IOException {
+		final TreeWalk walk = new TreeWalk(db);
+		walk.reset();
+		walk.setRecursive(true);
+		for (final AbstractTreeIterator i : trees)
+			walk.addTree(i);
+		walk.setFilter(AndTreeFilter.create(TreeFilter.ANY_DIFF, pathFilter));
+
+		List<DiffEntry> files = DiffEntry.scan(walk);
+		if (detectRenames) {
+			RenameDetector rd = new RenameDetector(db);
+			if (renameLimit != null)
+				rd.setRenameLimit(renameLimit.intValue());
+			rd.addAll(files);
+			files = rd.compute(new TextProgressMonitor());
+		}
+		return files;
 	}
 }

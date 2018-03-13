@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,52 +41,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
+package org.eclipse.jgit.diff;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTag;
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
+import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
 
-public class FetchCommandTest extends RepositoryTestCase {
+/**
+ * A version of {@link RawText} that ignores leading whitespace.
+ */
+public class RawTextIgnoreLeadingWhitespace extends RawText {
+	/** Creates RawText that ignores only leading whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreLeadingWhitespace(input);
+		}
+	};
 
-	public void testFetch() throws JGitInternalException, IOException,
-			GitAPIException, URISyntaxException {
-
-		// create other repository
-		Repository db2 = createWorkRepository();
-		Git git2 = new Git(db2);
-
-		// setup the first repository to fetch from the second repository
-		final Config config = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
-		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
-		remoteConfig.addURI(uri);
-		remoteConfig.update(config);
-
-		// create some refs via commits and tag
-		RevCommit commit = git2.commit().setMessage("initial commit").call();
-		RevTag tag = git2.tag().setName("tag").call();
-
-		Git git1 = new Git(db);
-
-		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
-		git1.fetch().setRemote("test").setRefSpecs(spec)
-				.call();
-
-		assertEquals(commit.getId(),
-				db.resolve(commit.getId().getName() + "^{commit}"));
-		assertEquals(tag.getId(), db.resolve(tag.getId().getName()));
-
+	/**
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
+	 *
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
+	 */
+	public RawTextIgnoreLeadingWhitespace(byte[] input) {
+		super(input);
 	}
 
+	@Override
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
+
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes.get(ai) != b.hashes.get(bi))
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		as = trimLeadingWhitespace(a.content, as, ae);
+		bs = trimLeadingWhitespace(b.content, bs, be);
+
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		ptr = trimLeadingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
+	}
 }

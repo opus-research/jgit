@@ -61,6 +61,7 @@ import org.eclipse.jgit.errors.RevWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
@@ -95,8 +96,6 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * {@link #next()} does not.
  */
 public class RevWalk implements Iterable<RevCommit> {
-	private static final int MB = 1 << 20;
-
 	/**
 	 * Set on objects whose important header data has been loaded.
 	 * <p>
@@ -172,6 +171,9 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private final ObjectIdSubclassMap<RevObject> objects;
 
+	/** Largest commit or annotated tag we are willing to touch. */
+	private final int bigFileThreshold;
+
 	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
@@ -228,6 +230,13 @@ public class RevWalk implements Iterable<RevCommit> {
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
 		retainBody = true;
+
+		if (repo != null) {
+			CoreConfig cfg = repo.getConfig().get(CoreConfig.KEY);
+			bigFileThreshold = cfg.getStreamFileThreshold();
+		} else {
+			bigFileThreshold = 15 * 1024 * 1024;
+		}
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -858,7 +867,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	byte[] getCachedBytes(RevObject obj, ObjectLoader ldr)
 			throws LargeObjectException, MissingObjectException, IOException {
 		try {
-			return ldr.getCachedBytes(5 * MB);
+			return ldr.getCachedBytes(bigFileThreshold);
 		} catch (LargeObjectException tooBig) {
 			tooBig.setObjectId(obj);
 			throw tooBig;

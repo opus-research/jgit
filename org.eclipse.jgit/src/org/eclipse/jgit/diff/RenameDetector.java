@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.eclipse.jgit.diff.DiffEntry.Side.NEW;
-import static org.eclipse.jgit.diff.DiffEntry.Side.OLD;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,6 +55,7 @@ import java.util.List;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -102,11 +100,11 @@ public class RenameDetector {
 		}
 	};
 
-	private List<DiffEntry> entries;
+	private List<DiffEntry> entries = new ArrayList<DiffEntry>();
 
-	private List<DiffEntry> deleted;
+	private List<DiffEntry> deleted = new ArrayList<DiffEntry>();
 
-	private List<DiffEntry> added;
+	private List<DiffEntry> added = new ArrayList<DiffEntry>();
 
 	private boolean done;
 
@@ -139,8 +137,6 @@ public class RenameDetector {
 
 		DiffConfig cfg = repo.getConfig().get(DiffConfig.KEY);
 		renameLimit = cfg.getRenameLimit();
-
-		reset();
 	}
 
 	/**
@@ -309,57 +305,19 @@ public class RenameDetector {
 	 */
 	public List<DiffEntry> compute(ProgressMonitor pm) throws IOException {
 		if (!done) {
-			ObjectReader reader = repo.newObjectReader();
-			try {
-				return compute(reader, pm);
-			} finally {
-				reader.release();
-			}
-		}
-		return Collections.unmodifiableList(entries);
-	}
-
-	/**
-	 * Detect renames in the current file set.
-	 *
-	 * @param reader
-	 *            reader to obtain objects from the repository with.
-	 * @param pm
-	 *            report progress during the detection phases.
-	 * @return an unmodifiable list of {@link DiffEntry}s representing all files
-	 *         that have been changed.
-	 * @throws IOException
-	 *             file contents cannot be read from the repository.
-	 */
-	public List<DiffEntry> compute(ObjectReader reader, ProgressMonitor pm)
-			throws IOException {
-		final ContentSource cs = ContentSource.create(reader);
-		return compute(new ContentSource.Pair(cs, cs), pm);
-	}
-
-	/**
-	 * Detect renames in the current file set.
-	 *
-	 * @param reader
-	 *            reader to obtain objects from the repository with.
-	 * @param pm
-	 *            report progress during the detection phases.
-	 * @return an unmodifiable list of {@link DiffEntry}s representing all files
-	 *         that have been changed.
-	 * @throws IOException
-	 *             file contents cannot be read from the repository.
-	 */
-	public List<DiffEntry> compute(ContentSource.Pair reader, ProgressMonitor pm)
-			throws IOException {
-		if (!done) {
 			done = true;
 
 			if (pm == null)
 				pm = NullProgressMonitor.INSTANCE;
+			ObjectReader reader = repo.newObjectReader();
+			try {
 				breakModifies(reader, pm);
 				findExactRenames(pm);
 				findContentRenames(reader, pm);
 				rejoinModifies(pm);
+			} finally {
+				reader.release();
+			}
 
 			entries.addAll(added);
 			added = null;
@@ -372,15 +330,7 @@ public class RenameDetector {
 		return Collections.unmodifiableList(entries);
 	}
 
-	/** Reset this rename detector for another rename detection pass. */
-	public void reset() {
-		entries = new ArrayList<DiffEntry>();
-		deleted = new ArrayList<DiffEntry>();
-		added = new ArrayList<DiffEntry>();
-		done = false;
-	}
-
-	private void breakModifies(ContentSource.Pair reader, ProgressMonitor pm)
+	private void breakModifies(ObjectReader reader, ProgressMonitor pm)
 			throws IOException {
 		if (breakScore <= 0)
 			return;
@@ -443,20 +393,19 @@ public class RenameDetector {
 		deleted = new ArrayList<DiffEntry>(nameMap.values());
 	}
 
-	private int calculateModifyScore(ContentSource.Pair reader, DiffEntry d)
+	private int calculateModifyScore(ObjectReader reader, DiffEntry d)
 			throws IOException {
 		SimilarityIndex src = new SimilarityIndex();
-		src.hash(reader.open(OLD, d));
+		src.hash(reader.open(d.oldId.toObjectId(), Constants.OBJ_BLOB));
 		src.sort();
 
 		SimilarityIndex dst = new SimilarityIndex();
-		dst.hash(reader.open(NEW, d));
+		dst.hash(reader.open(d.newId.toObjectId(), Constants.OBJ_BLOB));
 		dst.sort();
 		return src.score(dst, 100);
 	}
 
-	private void findContentRenames(ContentSource.Pair reader,
-			ProgressMonitor pm)
+	private void findContentRenames(ObjectReader reader, ProgressMonitor pm)
 			throws IOException {
 		int cnt = Math.max(added.size(), deleted.size());
 		if (cnt == 0)
