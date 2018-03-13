@@ -168,6 +168,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	/** A default implementation of {@link RemoteReader} callback. */
 	public static class DefaultRemoteReader implements RemoteReader {
+		@Override
 		public ObjectId sha1(String uri, String ref) throws GitAPIException {
 			Map<String, Ref> map = Git
 					.lsRemoteRepository()
@@ -177,13 +178,13 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			return r != null ? r.getObjectId() : null;
 		}
 
+		@Override
 		public byte[] readFile(String uri, String ref, String path)
 				throws GitAPIException, IOException {
 			File dir = FileUtils.createTempDir("jgit_", ".git", null); //$NON-NLS-1$ //$NON-NLS-2$
 			try (Git git = Git.cloneRepository().setBare(true).setDirectory(dir)
-					.setURI(uri).call();
-					Repository repo = git.getRepository()) {
-				return readFileFromRepo(repo, ref, path);
+					.setURI(uri).call()) {
+				return readFileFromRepo(git.getRepository(), ref, path);
 			} finally {
 				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
@@ -463,7 +464,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			}
 
 			if (repo.isBare()) {
-				bareProjects = new ArrayList<RepoProject>();
+				bareProjects = new ArrayList<>();
 				if (author == null)
 					author = new PersonIdent(repo);
 				if (callback == null)

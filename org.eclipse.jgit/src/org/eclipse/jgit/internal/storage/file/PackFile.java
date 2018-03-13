@@ -47,17 +47,15 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
+import static org.eclipse.jgit.internal.storage.pack.PackExt.KEEP;
 
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.NoSuchFileException;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -72,13 +70,9 @@ import java.util.zip.Inflater;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.NoPackSignatureException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.errors.UnpackException;
-import org.eclipse.jgit.errors.UnsupportedPackIndexVersionException;
-import org.eclipse.jgit.errors.UnsupportedPackVersionException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -101,6 +95,7 @@ import org.eclipse.jgit.util.RawParseUtils;
 public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/** Sorts PackFiles to be most recently created to least recently created. */
 	public static final Comparator<PackFile> SORT = new Comparator<PackFile>() {
+		@Override
 		public int compare(final PackFile a, final PackFile b) {
 			return b.packLastModified - a.packLastModified;
 		}
@@ -251,7 +246,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 */
 	public boolean shouldBeKept() {
 		if (keepFile == null)
-			keepFile = new File(packFile.getPath() + ".keep"); //$NON-NLS-1$
+			keepFile = extFile(KEEP);
 		return keepFile.exists();
 	}
 
@@ -301,6 +296,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 *
 	 * @see PackIndex#iterator()
 	 */
+	@Override
 	public Iterator<PackIndex.MutableEntry> iterator() {
 		try {
 			return idx().iterator();
@@ -642,25 +638,15 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// don't invalidate the pack, we are interrupted from another thread
 			openFail(false);
 			throw e;
-		} catch (FileNotFoundException fn) {
-			// don't invalidate the pack if opening an existing file failed
-			// since it may be related to a temporary lack of resources (e.g.
-			// max open files)
-			openFail(!packFile.exists());
-			throw fn;
-		} catch (EOFException | AccessDeniedException | NoSuchFileException
-				| CorruptObjectException | NoPackSignatureException
-				| PackMismatchException | UnpackException
-				| UnsupportedPackIndexVersionException
-				| UnsupportedPackVersionException pe) {
-			// exceptions signaling permanent problems with a pack
+		} catch (IOException ioe) {
 			openFail(true);
-			throw pe;
-		} catch (IOException | RuntimeException ge) {
-			// generic exceptions could be transient so we should not mark the
-			// pack invalid to avoid false MissingObjectExceptions
-			openFail(false);
-			throw ge;
+			throw ioe;
+		} catch (RuntimeException re) {
+			openFail(true);
+			throw re;
+		} catch (Error re) {
+			openFail(true);
+			throw re;
 		}
 	}
 
@@ -727,31 +713,28 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 		fd.seek(0);
 		fd.readFully(buf, 0, 12);
-		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4) {
-			throw new NoPackSignatureException(JGitText.get().notAPACKFile);
-		}
+		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4)
+			throw new IOException(JGitText.get().notAPACKFile);
 		final long vers = NB.decodeUInt32(buf, 4);
 		final long packCnt = NB.decodeUInt32(buf, 8);
-		if (vers != 2 && vers != 3) {
-			throw new UnsupportedPackVersionException(vers);
-		}
+		if (vers != 2 && vers != 3)
+			throw new IOException(MessageFormat.format(
+					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
 
-		if (packCnt != idx.getObjectCount()) {
+		if (packCnt != idx.getObjectCount())
 			throw new PackMismatchException(MessageFormat.format(
 					JGitText.get().packObjectCountMismatch,
 					Long.valueOf(packCnt), Long.valueOf(idx.getObjectCount()),
 					getPackFile()));
-		}
 
 		fd.seek(length - 20);
 		fd.readFully(buf, 0, 20);
-		if (!Arrays.equals(buf, packChecksum)) {
+		if (!Arrays.equals(buf, packChecksum))
 			throw new PackMismatchException(MessageFormat.format(
 					JGitText.get().packObjectCountMismatch
 					, ObjectId.fromRaw(buf).name()
 					, ObjectId.fromRaw(idx.packChecksum).name()
 					, getPackFile()));
-		}
 	}
 
 	ObjectLoader load(final WindowCursor curs, long pos)

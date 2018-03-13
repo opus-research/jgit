@@ -184,7 +184,6 @@ public class AppServer {
 			return new UserPrincipal(username,
 					Credential.getCredential(Crypt.crypt(username, password)));
 		}
-
 	}
 
 	private void auth(ServletContextHandler ctx, Authenticator authType) {
@@ -263,7 +262,7 @@ public class AppServer {
 
 	/** @return all requests since the server was started. */
 	public List<AccessEvent> getRequests() {
-		return new ArrayList<AccessEvent>(log.getEvents());
+		return new ArrayList<>(log.getEvents());
 	}
 
 	/**
@@ -283,7 +282,7 @@ public class AppServer {
 	 * @return all requests which match the given path.
 	 */
 	public List<AccessEvent> getRequests(String path) {
-		ArrayList<AccessEvent> r = new ArrayList<AccessEvent>();
+		ArrayList<AccessEvent> r = new ArrayList<>();
 		for (AccessEvent event : log.getEvents()) {
 			if (event.getPath().equals(path)) {
 				r.add(event);
