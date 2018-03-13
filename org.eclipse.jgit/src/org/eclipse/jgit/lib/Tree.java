@@ -537,8 +537,10 @@ public class Tree extends TreeEntry implements Treeish {
 
 	private void ensureLoaded() throws IOException, MissingObjectException {
 		if (!isLoaded()) {
-			ObjectLoader ldr = db.open(getId(), Constants.OBJ_TREE);
-			readTree(ldr.getCachedBytes());
+			final ObjectLoader or = db.openTree(getId());
+			if (or == null)
+				throw new MissingObjectException(getId(), Constants.TYPE_TREE);
+			readTree(or.getBytes());
 		}
 	}
 
