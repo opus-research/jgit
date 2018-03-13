@@ -54,20 +54,17 @@ import org.eclipse.jgit.api.CherryPickResult.CherryPickStatus;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.junit.MockContentMerger;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.ReflogReader;
 import org.junit.Test;
 
 /**
  * Test cherry-pick command
  */
 public class CherryPickCommandTest extends RepositoryTestCase {
-
 	@Test
 	public void testCherryPick() throws IOException, JGitInternalException,
 			GitAPIException {
@@ -185,20 +182,6 @@ public class CherryPickCommandTest extends RepositoryTestCase {
 				.exists());
 	}
 
-	@Test
-	public void testCherryPickCustomMerger() throws Exception {
-		Git git = new Git(db);
-
-		RevCommit sideCommit = prepareCherryPick(git);
-		CherryPickResult result = git.cherryPick().include(sideCommit.getId())
-				.mergeWith(new MockContentMerger(db)).call();
-		// pattern base:ours:theirs
-		assertEquals("custom merge - a:a(master):a(side)\n",
-				read(new File(db.getWorkTree(), "a")));
-		assertEquals(CherryPickStatus.OK, result.getStatus());
-		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
-	}
-
 	private RevCommit prepareCherryPick(final Git git) throws Exception {
 		// create, add and commit file a
 		writeTrashFile("a", "a");
@@ -240,14 +223,5 @@ public class CherryPickCommandTest extends RepositoryTestCase {
 		// index shall be unchanged
 		assertEquals(indexState, indexState(CONTENT));
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
-
-		if (reason == null) {
-			ReflogReader reader = db.getReflogReader(Constants.HEAD);
-			assertTrue(reader.getLastEntry().getComment()
-					.startsWith("cherry-pick: "));
-			reader = db.getReflogReader(db.getBranch());
-			assertTrue(reader.getLastEntry().getComment()
-					.startsWith("cherry-pick: "));
-		}
 	}
 }

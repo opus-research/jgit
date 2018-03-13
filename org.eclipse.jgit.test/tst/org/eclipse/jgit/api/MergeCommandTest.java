@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -54,7 +53,6 @@ import java.util.Iterator;
 
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.InvalidMergeHeadsException;
-import org.eclipse.jgit.junit.MockContentMerger;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RepositoryState;
@@ -64,17 +62,8 @@ import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
 
-@RunWith(Theories.class)
 public class MergeCommandTest extends RepositoryTestCase {
-
-	public static @DataPoints
-	MergeStrategy[] mergeStrategies = MergeStrategy.get();
-
 	@Test
 	public void testMergeInItself() throws Exception {
 		Git git = new Git(db);
@@ -82,13 +71,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		MergeResult result = git.merge().include(db.getRef(Constants.HEAD)).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
-		// no reflog entry written by merge
-		assertEquals("commit: initial commit",
-				db
-				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals("commit: initial commit",
-				db
-				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -101,11 +83,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(db.getRef("refs/heads/branch1")).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
-		// no reflog entry written by merge
-		assertEquals("commit: second commit", db
-				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals("commit: second commit", db
-				.getReflogReader(db.getBranch()).getLastEntry().getComment());
+
 	}
 
 	@Test
@@ -122,10 +100,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
-		assertEquals("merge refs/heads/master: Fast-forward",
-				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals("merge refs/heads/master: Fast-forward",
-				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -153,10 +127,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertTrue(new File(db.getWorkTree(), "file2").exists());
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
-		assertEquals("merge refs/heads/master: Fast-forward",
-				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals("merge refs/heads/master: Fast-forward",
-				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -189,36 +159,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		} catch (InvalidMergeHeadsException e) {
 			// expected this exception
 		}
-	}
-
-	@Theory
-	public void testMergeSuccessAllStrategies(MergeStrategy mergeStrategy)
-			throws Exception {
-		Git git = new Git(db);
-
-		RevCommit first = git.commit().setMessage("first").call();
-		createBranch(first, "refs/heads/side");
-
-		writeTrashFile("a", "a");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("second").call();
-
-		checkoutBranch("refs/heads/side");
-		writeTrashFile("b", "b");
-		git.add().addFilepattern("b").call();
-		git.commit().setMessage("third").call();
-
-		MergeResult result = git.merge().setStrategy(mergeStrategy)
-				.include(db.getRef(Constants.MASTER)).call();
-		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
-		assertEquals(
-				"merge refs/heads/master: Merge made by "
-						+ mergeStrategy.getName() + ".",
-				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals(
-				"merge refs/heads/master: Merge made by "
-						+ mergeStrategy.getName() + ".",
-				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -264,40 +204,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(3, result.getConflicts().get("a")[0].length);
 
 		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
-	}
-
-	@Test
-	public void testCustomContentMerge() throws Exception {
-		Git git = new Git(db);
-
-		writeTrashFile("a", "1(master)");
-		git.add().addFilepattern("a").call();
-		RevCommit initialCommit = git.commit().setMessage("initial").call();
-
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-
-		writeTrashFile("a", "a(side)");
-		git.add().addFilepattern("a").call();
-		RevCommit secondCommit = git.commit().setMessage("side").call();
-
-		checkoutBranch("refs/heads/master");
-		writeTrashFile("a", "2(master)");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("side").call();
-
-		MergeResult result = git.merge().include(secondCommit.getId())
-				.setStrategy(MergeStrategy.RESOLVE)
-				.mergeWith(new MockContentMerger(git.getRepository()))
-				.call();
-		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
-		// pattern base:ours:theirs
-		assertEquals("custom merge - 1(master):2(master):a(side)\n",
-				read(new File(db.getWorkTree(), "a")));
-
-		assertNull(result.getConflicts());
-
-		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 	}
 
 	@Test
@@ -433,14 +339,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 				.setStrategy(MergeStrategy.RESOLVE).call();
 		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 		assertEquals("1\nb(1)\n3\n", read(new File(db.getWorkTree(), "b")));
-		assertEquals("merge " + secondCommit.getId().getName()
-				+ ": Merge made by resolve.", db
-				.getReflogReader(Constants.HEAD)
-				.getLastEntry().getComment());
-		assertEquals("merge " + secondCommit.getId().getName()
-				+ ": Merge made by resolve.", db
-				.getReflogReader(db.getBranch())
-				.getLastEntry().getComment());
 	}
 
 	@Test
