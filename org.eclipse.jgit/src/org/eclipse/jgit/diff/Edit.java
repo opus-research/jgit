@@ -125,7 +125,7 @@ public class Edit {
 			return Type.INSERT;
 		if (beginA < endA && beginB == endB)
 			return Type.DELETE;
-		if (beginA == endA && beginB == endB)
+		if (isEmpty())
 			return Type.EMPTY;
 		return Type.REPLACE;
 	}
@@ -155,12 +155,12 @@ public class Edit {
 		return endB;
 	}
 
-	/** @return length of the region in A. */
+	/** @return distance between begin and end of A. */
 	public final int getLengthA() {
 		return endA - beginA;
 	}
 
-	/** @return length of the region in B. */
+	/** @return distance between begin and end of B. */
 	public final int getLengthB() {
 		return endB - beginB;
 	}
