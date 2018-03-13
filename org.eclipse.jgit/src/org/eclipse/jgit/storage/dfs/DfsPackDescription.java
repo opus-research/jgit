@@ -69,7 +69,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private long lastModified;
 
-	private final Map<PackExt, Long> sizeMap;
+	private Map<PackExt, Long> sizeMap;
 
 	private long objectCount;
 
@@ -78,10 +78,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	private Set<ObjectId> tips;
 
 	private PackWriter.Statistics stats;
-
-	private int extensions;
-
-	private int indexVersion;
 
 	/**
 	 * Initialize a description by pack name and repository.
@@ -102,7 +98,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		this.repoDesc = repoDesc;
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
-		this.sizeMap = new HashMap<PackExt, Long>(PackExt.values().length * 2);
+		this.sizeMap = new HashMap<PackExt, Long>(5);
 	}
 
 	/** @return description of the repository. */
@@ -111,29 +107,10 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	}
 
 	/**
-	 * Adds the pack file extension to the known list.
-	 *
-	 * @param ext
-	 *            the file extension
-	 */
-	public void addFileExt(PackExt ext) {
-		extensions |= ext.getBit();
-	}
-
-	/**
-	 * @param ext
-	 *            the file extension
-	 * @return whether the pack file extensions is known to exist.
-	 */
-	public boolean hasFileExt(PackExt ext) {
-		return (extensions & ext.getBit()) != 0;
-	}
-
-	/**
 	 * @param ext
 	 *            the file extension
 	 * @return name of the file.
-	 */
+	 * */
 	public String getFileName(PackExt ext) {
 		return packName + '.' + ext.getExtension();
 	}
@@ -261,21 +238,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		return this;
 	}
 
-	/** @return the version of the index file written. */
-	public int getIndexVersion() {
-		return indexVersion;
-	}
-
-	/**
-	 * @param version
-	 *            the version of the index file written.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setIndexVersion(int version) {
-		indexVersion = version;
-		return this;
-	}
-
 	@Override
 	public int hashCode() {
 		return packName.hashCode();
@@ -303,15 +265,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *            the other pack.
 	 */
 	public int compareTo(DfsPackDescription b) {
-		// Cluster by PackSource, pushing UNREACHABLE_GARBAGE to the end.
-		PackSource as = getPackSource();
-		PackSource bs = b.getPackSource();
-		if (as != null && bs != null) {
-			int cmp = as.category - bs.category;
-			if (cmp != 0)
-				return cmp;
-		}
-
 		// Newer packs should sort first.
 		int cmp = Long.signum(b.getLastModified() - getLastModified());
 		if (cmp != 0)

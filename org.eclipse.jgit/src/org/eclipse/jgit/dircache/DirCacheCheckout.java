@@ -1129,8 +1129,7 @@ public class DirCacheCheckout {
 		if (!tmpFile.renameTo(f)) {
 			// tried to rename which failed. Let' delete the target file and try
 			// again
-			FileUtils.delete(f, FileUtils.EMPTY_DIRECTORIES_ONLY
-					| FileUtils.RECURSIVE);
+			FileUtils.delete(f);
 			if (!tmpFile.renameTo(f)) {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().couldNotWriteFile, tmpFile.getPath(),

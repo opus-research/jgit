@@ -43,9 +43,6 @@
  */
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -57,7 +54,6 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -67,7 +63,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -88,7 +83,6 @@ import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.storage.pack.PackWriter.ObjectIdSet;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -198,10 +192,8 @@ public class GC {
 
 			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
-				for (PackExt ext : PackExt.values()) {
-					File f = nameFor(oldName, "." + ext.getExtension()); //$NON-NLS-1$
-					FileUtils.delete(f, deleteOptions);
-				}
+				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions); //$NON-NLS-1$
+				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions); //$NON-NLS-1$
 			}
 		}
 		// close the complete object database. Thats my only chance to force
@@ -644,22 +636,7 @@ public class GC {
 			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
 			List<ObjectIdSet> excludeObjects) throws IOException {
 		File tmpPack = null;
-		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
-				new Comparator<PackExt>() {
-					public int compare(PackExt o1, PackExt o2) {
-						// INDEX entries must be returned last, so the pack
-						// scanner does pick up the new pack until all the
-						// PackExt entries have been written.
-						if (o1 == o2)
-							return 0;
-						if (o1 == PackExt.INDEX)
-							return 1;
-						if (o2 == PackExt.INDEX)
-							return -1;
-						return Integer.signum(o1.hashCode() - o2.hashCode());
-					}
-
-				});
+		File tmpIdx = null;
 		PackWriter pw = new PackWriter(repo);
 		try {
 			// prepare the PackWriter
@@ -678,10 +655,9 @@ public class GC {
 			String id = pw.computeName().getName();
 			File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
 			tmpPack = File.createTempFile("gc_", ".pack_tmp", packdir); //$NON-NLS-1$ //$NON-NLS-2$
-			final String tmpBase = tmpPack.getName()
-					.substring(0, tmpPack.getName().lastIndexOf('.'));
-			File tmpIdx = new File(packdir, tmpBase + ".idx_tmp"); //$NON-NLS-1$
-			tmpExts.put(INDEX, tmpIdx);
+			tmpIdx = new File(packdir, tmpPack.getName().substring(0,
+					tmpPack.getName().lastIndexOf('.'))
+					+ ".idx_tmp"); //$NON-NLS-1$
 
 			if (!tmpIdx.createNewFile())
 				throw new IOException(MessageFormat.format(
@@ -711,70 +687,38 @@ public class GC {
 				idxChannel.close();
 			}
 
-			if (pw.prepareBitmapIndex(pm)) {
-				File tmpBitmapIdx = new File(packdir, tmpBase + ".bitmap_tmp"); //$NON-NLS-1$
-				tmpExts.put(BITMAP_INDEX, tmpBitmapIdx);
-
-				if (!tmpBitmapIdx.createNewFile())
-					throw new IOException(MessageFormat.format(
-							JGitText.get().cannotCreateIndexfile,
-							tmpBitmapIdx.getPath()));
-
-				idxChannel = new FileOutputStream(tmpBitmapIdx).getChannel();
-				idxStream = Channels.newOutputStream(idxChannel);
-				try {
-					pw.writeBitmapIndex(idxStream);
-				} finally {
-					idxChannel.force(true);
-					idxStream.close();
-					idxChannel.close();
-				}
-			}
-
 			// rename the temporary files to real files
 			File realPack = nameFor(id, ".pack"); //$NON-NLS-1$
 			tmpPack.setReadOnly();
+			File realIdx = nameFor(id, ".idx"); //$NON-NLS-1$
+			realIdx.setReadOnly();
 			boolean delete = true;
 			try {
 				if (!tmpPack.renameTo(realPack))
 					return null;
 				delete = false;
-				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
-					File tmpExt = tmpEntry.getValue();
-					tmpExt.setReadOnly();
-
-					File realExt = nameFor(
-							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
-					if (!tmpExt.renameTo(realExt)) {
-						File newExt = new File(realExt.getParentFile(),
-								realExt.getName() + ".new"); //$NON-NLS-1$
-						if (!tmpExt.renameTo(newExt))
-							newExt = tmpExt;
-						throw new IOException(MessageFormat.format(
-								JGitText.get().panicCantRenameIndexFile, newExt,
-								realExt));
-					}
+				if (!tmpIdx.renameTo(realIdx)) {
+					File newIdx = new File(realIdx.getParentFile(),
+							realIdx.getName() + ".new"); //$NON-NLS-1$
+					if (!tmpIdx.renameTo(newIdx))
+						newIdx = tmpIdx;
+					throw new IOException(MessageFormat.format(
+							JGitText.get().panicCantRenameIndexFile, newIdx,
+							realIdx));
 				}
-
 			} finally {
-				if (delete) {
-					if (tmpPack.exists())
-						tmpPack.delete();
-					for (File tmpExt : tmpExts.values()) {
-						if (tmpExt.exists())
-							tmpExt.delete();
-					}
-				}
+				if (delete && tmpPack.exists())
+					tmpPack.delete();
+				if (delete && tmpIdx.exists())
+					tmpIdx.delete();
 			}
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
 			pw.release();
 			if (tmpPack != null && tmpPack.exists())
 				tmpPack.delete();
-			for (File tmpExt : tmpExts.values()) {
-				if (tmpExt.exists())
-					tmpExt.delete();
-			}
+			if (tmpIdx != null && tmpIdx.exists())
+				tmpIdx.delete();
 		}
 	}
 
@@ -824,18 +768,6 @@ public class GC {
 		 * The number of refs stored in pack files.
 		 */
 		public long numberOfPackedRefs;
-
-		public String toString() {
-			final StringBuilder b = new StringBuilder();
-			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
-			b.append(",numberOfPackFiles=").append(numberOfPackFiles); //$NON-NLS-1$
-			b.append(", numberOfLooseObjects=").append(numberOfLooseObjects); //$NON-NLS-1$
-			b.append(", numberOfLooseRefs=").append(numberOfLooseRefs); //$NON-NLS-1$
-			b.append(", numberOfPackedRefs=").append(numberOfPackedRefs); //$NON-NLS-1$
-			b.append(", sizeOfLooseObjects=").append(sizeOfLooseObjects); //$NON-NLS-1$
-			b.append(", sizeOfPackedObjects=").append(sizeOfPackedObjects); //$NON-NLS-1$
-			return b.toString();
-		}
 	}
 
 	/**

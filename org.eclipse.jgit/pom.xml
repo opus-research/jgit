@@ -73,11 +73,6 @@
       <groupId>com.jcraft</groupId>
       <artifactId>jsch</artifactId>
     </dependency>
-
-    <dependency>
-      <groupId>com.googlecode.javaewah</groupId>
-      <artifactId>JavaEWAH</artifactId>
-    </dependency>
   </dependencies>
 
   <build>
