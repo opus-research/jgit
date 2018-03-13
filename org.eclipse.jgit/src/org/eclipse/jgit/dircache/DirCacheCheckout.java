@@ -627,6 +627,7 @@ public class DirCacheCheckout {
 					keep(dce); // 5 6
 				else
 					conflict(name, dce, h, m); // 5b 6b
+				break;
 			case 0xFDD: // 10 11
 				// TODO: make use of tree extension as soon as available in jgit
 				// we would like to do something like
@@ -909,9 +910,9 @@ public class DirCacheCheckout {
 						// file content
 						update(name, mId, mMode);
 					} else if (dce != null
-							&& (f == null || f.isModified(dce, true,
+							&& (f != null && f.isModified(dce, true,
 									this.walk.getObjectReader()))) {
-						// File doesn't exist or is dirty
+						// File exists and is dirty
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
 						// Something in Merge
@@ -919,7 +920,7 @@ public class DirCacheCheckout {
 						// but the file is dirty. Report a conflict
 						conflict(name, dce, h, m);
 					} else {
-						// File exists and is clean
+						// File doesn't exist or is clean
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
 						// Something in Merge
