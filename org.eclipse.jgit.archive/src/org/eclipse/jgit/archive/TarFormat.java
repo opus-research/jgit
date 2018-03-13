@@ -40,32 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm.archive;
+package org.eclipse.jgit.archive;
 
 import java.io.IOException;
 import java.io.OutputStream;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
-class ZipFormat implements ArchiveCommand.Format {
+public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-		return new ZipArchiveOutputStream(s);
+		return new TarArchiveOutputStream(s);
 	}
 
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
+		if (mode == FileMode.SYMLINK) {
+			final TarArchiveEntry entry = new TarArchiveEntry(
+					path, TarConstants.LF_SYMLINK);
+			entry.setLinkName(new String(
+					loader.getCachedBytes(100), "UTF-8")); //$NON-NLS-1$
+			out.putArchiveEntry(entry);
+			out.closeArchiveEntry();
+			return;
+		}
 
-		if (mode == FileMode.REGULAR_FILE) {
-			// ok
-		} else if (mode == FileMode.EXECUTABLE_FILE
-				|| mode == FileMode.SYMLINK) {
-			entry.setUnixMode(mode.getBits());
+		final TarArchiveEntry entry = new TarArchiveEntry(path);
+		if (mode == FileMode.REGULAR_FILE ||
+		    mode == FileMode.EXECUTABLE_FILE) {
+			entry.setMode(mode.getBits());
 		} else {
 			// TODO(jrn): Let the caller know the tree contained
 			// an entry with unsupported mode (e.g., a submodule).

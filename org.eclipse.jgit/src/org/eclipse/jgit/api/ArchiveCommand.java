@@ -40,26 +40,26 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm.archive;
+package org.eclipse.jgit.api;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -71,24 +71,28 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * Create a tarball from HEAD:
  *
  * <pre>
- * cmd = new ArchiveCommand(git.getRepository());
+ * ArchiveCommand.registerFormat("tar", new TarFormat());
+ * cmd = git.archive();
  * try {
  *	cmd.setTree(db.resolve(&quot;HEAD&quot;))
  *		.setOutputStream(out).call();
  * } finally {
  *	cmd.release();
+ *	ArchiveCommand.unregisterFormat("tar");
  * }
  * </pre>
  * <p>
  * Create a ZIP file from master:
  *
  * <pre>
+ * ArchiveCommand.registerFormat("zip", new ZipFormat());
  * try {
  *	cmd.setTree(db.resolve(&quot;master&quot;))
  *		.setFormat("zip")
  *		.setOutputStream(out).call();
  * } finally {
  *	cmd.release();
+ *	ArchiveCommand.unregisterFormat("zip");
  * }
  * </pre>
  *
@@ -103,7 +107,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *
 	 * Usage:
 	 *	Repository repo = git.getRepository();
-	 *	ArchiveOutputStream out = format.createArchiveOutputStream(System.out);
+	 *	T out = format.createArchiveOutputStream(System.out);
 	 *	try {
 	 *		for (...) {
 	 *			format.putEntry(out, path, mode, repo.open(objectId));
@@ -112,9 +116,9 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *		out.close();
 	 *	}
 	 */
-	public static interface Format {
-		ArchiveOutputStream createArchiveOutputStream(OutputStream s);
-		void putEntry(ArchiveOutputStream out, String path, FileMode mode,
+	public static interface Format<T extends Closeable> {
+		T createArchiveOutputStream(OutputStream s);
+		void putEntry(T out, String path, FileMode mode,
 				ObjectLoader loader) throws IOException;
 	}
 
@@ -131,7 +135,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		 * @param format the problematic format name
 		 */
 		public UnsupportedFormatException(String format) {
-			super(MessageFormat.format(CLIText.get().unsupportedArchiveFormat, format));
+			super(MessageFormat.format(JGitText.get().unsupportedArchiveFormat, format));
 			this.format = format;
 		}
 
@@ -143,16 +147,50 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		}
 	}
 
-	private static final ConcurrentMap<String, Format> formats =
-			new ConcurrentHashMap<String, Format>();
+	/**
+	 * Available archival formats (corresponding to values for
+	 * the --format= option)
+	 */
+	private static final ConcurrentMap<String, Format<?>> formats =
+			new ConcurrentHashMap<String, Format<?>>();
 
-	static {
-		formats.put("zip", new ZipFormat());
-		formats.put("tar", new TarFormat());
+	/**
+	 * Adds support for an additional archival format.  To avoid
+	 * unnecessary dependencies, ArchiveCommand does not have support
+	 * for any formats built in; use this function to add them.
+	 *
+	 * OSGi plugins providing formats should call this function at
+	 * bundle activation time.
+	 *
+	 * @param name name of a format (e.g., "tar" or "zip").
+	 * @param fmt archiver for that format
+	 * @throws JGitInternalException
+	 *              An archival format with that name was already registered.
+	 */
+	public static void registerFormat(String name, Format<?> fmt) {
+		if (formats.putIfAbsent(name, fmt) != null)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().archiveFormatAlreadyRegistered,
+					name));
 	}
 
-	private static Format lookupFormat(String formatName) throws UnsupportedFormatException {
-		Format fmt = formats.get(formatName);
+	/**
+	 * Removes support for an archival format so its Format can be
+	 * garbage collected.
+	 *
+	 * @param name name of format (e.g., "tar" or "zip").
+	 * @throws JGitInternalException
+	 *              No such archival format was registered.
+	 */
+	public static void unregisterFormat(String name) {
+		if (formats.remove(name) == null)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().archiveFormatAlreadyAbsent,
+					name));
+	}
+
+	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
+		Format<?> fmt = formats.get(formatName);
 		if (fmt == null)
 			throw new UnsupportedFormatException(formatName);
 		return fmt;
@@ -180,14 +218,10 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		walk.release();
 	}
 
-	/**
-	 * @return the stream to which the archive has been written
-	 */
-	@Override
-	public OutputStream call() throws GitAPIException {
+	private <T extends Closeable>
+	OutputStream writeArchive(Format<T> fmt) throws GitAPIException {
 		final MutableObjectId idBuf = new MutableObjectId();
-		final Format fmt = lookupFormat(format);
-		final ArchiveOutputStream outa = fmt.createArchiveOutputStream(out);
+		final T outa = fmt.createArchiveOutputStream(out);
 		final ObjectReader reader = walk.getObjectReader();
 
 		try {
@@ -211,10 +245,19 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		} catch (IOException e) {
 			// TODO(jrn): Throw finer-grained errors.
 			throw new JGitInternalException(
-					CLIText.get().exceptionCaughtDuringExecutionOfArchiveCommand, e);
+					JGitText.get().exceptionCaughtDuringExecutionOfArchiveCommand, e);
 		}
 
 		return out;
+	}
+
+	/**
+	 * @return the stream to which the archive has been written
+	 */
+	@Override
+	public OutputStream call() throws GitAPIException {
+		final Format<?> fmt = lookupFormat(format);
+		return writeArchive(fmt);
 	}
 
 	/**
