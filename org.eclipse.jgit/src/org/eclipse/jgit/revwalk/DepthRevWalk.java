@@ -85,7 +85,7 @@ public class DepthRevWalk extends RevWalk {
 		super(repo);
 
 		this.depth = depth;
-		SHALLOW = shallow == null? newFlag("SHALLOW") : shallow;
+		SHALLOW = shallow == null ? newFlag("SHALLOW") : shallow;
 	}
 
 	/**
@@ -104,7 +104,7 @@ public class DepthRevWalk extends RevWalk {
 		super(or);
 
 		this.depth = depth;
-		SHALLOW = shallow == null? newFlag("SHALLOW") : shallow;
+		SHALLOW = shallow == null ? newFlag("SHALLOW") : shallow;
 	}
 
 	@Override
@@ -119,12 +119,18 @@ public class DepthRevWalk extends RevWalk {
 		return new DepthCommit(id);
 	}
 
+	/** Get the commit history depth this walk goes to */
+	/**
+	 * Set the commit history depth this walk goes to
+	 * @param depth
+	 *            how many commits deep the history should be
+	 */
 	public int getDepth() {
 		return depth;
 	}
 
 	// For unit testing
-	public void setDepth(int depth) {
+	void setDepth(int depth) {
 		this.depth = depth;
 	}
 

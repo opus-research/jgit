@@ -102,7 +102,7 @@ public class DepthObjectWalk extends ObjectWalk {
 		super(repo);
 
 		this.depth = depth;
-		SHALLOW = shallow == null? newFlag("SHALLOW") : shallow;
+		SHALLOW = shallow == null ? newFlag("SHALLOW") : shallow;
 		this.clientShallows = clientShallows;
 		BOUNDARY = newFlag("BOUNDARY");
 	}
@@ -126,7 +126,7 @@ public class DepthObjectWalk extends ObjectWalk {
 		super(or);
 
 		this.depth = depth;
-		SHALLOW = shallow == null? newFlag("SHALLOW") : shallow;
+		SHALLOW = shallow == null ? newFlag("SHALLOW") : shallow;
 		this.clientShallows = clientShallows;
 		BOUNDARY = newFlag("BOUNDARY");
 	}
@@ -136,6 +136,7 @@ public class DepthObjectWalk extends ObjectWalk {
 		return new DepthCommit(id);
 	}
 
+	/** Get the commit history depth this walk goes to */
 	public int getDepth() {
 		return depth;
 	}
@@ -185,8 +186,8 @@ public class DepthObjectWalk extends ObjectWalk {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		c.flags |= UNINTERESTING;
-		// Propogate uninterestingness until a shallow commit is found;
-		// commits below a shallow are interesting again
+		// Propagate uninterestingness until a shallow commit is found;
+		// commits below a shallow one are interesting again
 		if (clientShallows == null || !clientShallows.contains(c)) {
 			if ((c.flags & PARSED) == 0)
 				c.parseHeaders(this);
@@ -218,7 +219,12 @@ public class DepthObjectWalk extends ObjectWalk {
 	}
 
 	// For unit testing
-	public void setDepth(int depth) {
+	/**
+	 * Set the commit history depth this walk goes to
+	 * @param depth
+	 *            how many commits deep the history should be
+	 */
+	void setDepth(int depth) {
 		this.depth = depth;
 	}
 

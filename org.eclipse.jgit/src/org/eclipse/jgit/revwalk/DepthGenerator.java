@@ -157,7 +157,7 @@ class DepthGenerator extends Generator {
 					add = true;
 				}
 
-				// Detect boundaries and flag appropriate. Queue
+				// Detect boundaries and flag appropriately. Queue
 				// them for output, in case a shorter path where
 				// they aren't boundaries reached them already.
 				if ((c.flags & UNINTERESTING) == 0
