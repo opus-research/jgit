@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2014, Google Inc.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,30 +39,78 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport;
 
-package org.eclipse.jgit.gitrepo.internal;
-
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import org.eclipse.jgit.errors.UnsupportedCredentialItem;
+import org.eclipse.jgit.transport.NetRC.NetRCEntry;
 
 /**
- * Translation bundle for repo command
+ * Simple .netrc credentials provider. It can lookup the first machine entry
+ * from your .netrc file.
+ *
+ * @since 3.5
  */
-public class RepoText extends TranslationBundle {
+public class NetRCCredentialsProvider extends CredentialsProvider {
 
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static RepoText get() {
-		return NLS.getBundleFor(RepoText.class);
+	NetRC netrc = new NetRC();
+
+	/** */
+	public NetRCCredentialsProvider() {
 	}
 
-	// @formatter:off
-	/***/ public String copyFileFailed;
-	/***/ public String errorNoDefault;
-	/***/ public String errorNoDefaultFilename;
-	/***/ public String errorParsingManifestFile;
-	/***/ public String errorRemoteUnavailable;
-	/***/ public String invalidManifest;
-	/***/ public String repoCommitMessage;
+	/**
+	 * Install default provider for the .netrc parser.
+	 */
+	public static void install() {
+		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
+	}
+
+	@Override
+	public boolean supports(CredentialItem... items) {
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username)
+				continue;
+			else if (i instanceof CredentialItem.Password)
+				continue;
+			else
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	public boolean get(URIish uri, CredentialItem... items)
+			throws UnsupportedCredentialItem {
+		NetRCEntry cc = netrc.getEntry(uri.getHost());
+
+		if (cc == null)
+			return false;
+
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username) {
+				((CredentialItem.Username) i).setValue(cc.login);
+				continue;
+			}
+			if (i instanceof CredentialItem.Password) {
+				((CredentialItem.Password) i).setValue(cc.password);
+				continue;
+			}
+			if (i instanceof CredentialItem.StringType) {
+				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
+					((CredentialItem.StringType) i).setValue(new String(
+							cc.password));
+					continue;
+				}
+			}
+			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
+					+ ":" + i.getPromptText()); //$NON-NLS-1$
+		}
+		return true;
+	}
+
+	@Override
+	public boolean isInteractive() {
+		return false;
+	}
+
 }

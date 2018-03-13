@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.eclipse.jgit.internal.storage.file.WindowCache.getDefaultCache;
-
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.text.MessageFormat;
@@ -55,7 +53,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -92,11 +89,8 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	final FileObjectDatabase db;
 
-	final AtomicReference<WindowCache> windowCache;
-
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
-		windowCache = (db == null) ? getDefaultCache() : db.getWindowCache();
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {
@@ -360,12 +354,12 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			// it again.
 			//
 			window = null;
-			window = pack.getWindow(position);
+			window = WindowCache.get(pack, position);
 		}
 	}
 
 	int getStreamFileThreshold() {
-		return windowCache.get().getStreamFileThreshold();
+		return WindowCache.getStreamFileThreshold();
 	}
 
 	/** Release the current window cursor. */
