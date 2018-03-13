@@ -75,6 +75,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
@@ -439,8 +440,9 @@ public class GC {
 	 * Packs all objects which reachable from any of the heads into one pack
 	 * file. Additionally all objects which are not reachable from any head but
 	 * which are reachable from any of the other refs (e.g. tags), special refs
-	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. All old
-	 * pack files which existed before are deleted.
+	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. Objects
+	 * included in pack files which have a .keep file associated are never
+	 * repacked. All old pack files which existed before are deleted.
 	 *
 	 * @return a collection of the newly created pack files
 	 * @throws IOException
@@ -471,6 +473,11 @@ public class GC {
 				tagTargets.add(ref.getPeeledObjectId());
 		}
 
+		Set<PackIndex> excluded = new HashSet<PackIndex>();
+		for (PackFile f : repo.getObjectDatabase().getPacks())
+			if (new File(f.getPackFile().getPath() + ".keep").exists())
+				excluded.add(f.getIndex());
+
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
@@ -478,17 +485,14 @@ public class GC {
 		PackFile heads = null;
 		if (!allHeads.isEmpty()) {
 			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
-					tagTargets, null);
-			if (heads != null)
+					tagTargets, excluded);
+			if (heads != null) {
 				ret.add(heads);
+				excluded.add(heads.getIndex());
+			}
 		}
 		if (!nonHeads.isEmpty()) {
-			PackFile rest = writePack(
-					nonHeads,
-					allHeads,
-					tagTargets,
-					(heads == null) ? null : Collections.singleton(heads
-							.getIndex()));
+			PackFile rest = writePack(nonHeads, allHeads, tagTargets, excluded);
 			if (rest != null)
 				ret.add(rest);
 		}
@@ -693,9 +697,13 @@ public class GC {
 	 */
 	public RepoStatistics getStatistics() throws IOException {
 		RepoStatistics ret = new RepoStatistics();
-		ret.numberOfPackedObjects = 0;
-		for (PackFile f : repo.getObjectDatabase().getPacks())
-			ret.numberOfPackedObjects += f.getObjectCount();
+		Set<ObjectId> packedObjects = new HashSet<ObjectId>();
+		for (PackFile f : repo.getObjectDatabase().getPacks()) {
+			for (MutableEntry e : f.getIndex())
+				packedObjects.add(e.toObjectId());
+		}
+		ret.numberOfPackedObjects = packedObjects.size();
+
 		ret.numberOfPackFiles = repo.getObjectDatabase().getPacks().size();
 		ret.numberOfLooseObjects = 0;
 		File objDir = repo.getObjectsDirectory();
@@ -728,11 +736,12 @@ public class GC {
 
 	/**
 	 * During gc() or prune() each unreferenced, loose object which has been
-	 * created or modified in the last <expireAgeMillis> milliseconds will not
-	 * be pruned. Only older objects may be pruned. If set to 0 then every
-	 * object is a candidate for pruning.
+	 * created or modified in the last <code>expireAgeMillis</code> milliseconds
+	 * will not be pruned. Only older objects may be pruned. If set to 0 then
+	 * every object is a candidate for pruning.
 	 *
 	 * @param expireAgeMillis
+	 *            minimal age of objects to be pruned in milliseconds.
 	 */
 	public void setExpireAgeMillis(long expireAgeMillis) {
 		this.expireAgeMillis = expireAgeMillis;
