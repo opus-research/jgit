@@ -168,7 +168,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 */
 	public String indexState(int includedOptions)
 			throws IllegalStateException, IOException {
-		DirCache dc = db.readDirCache(false);
+		DirCache dc = db.readDirCache();
 		StringBuilder sb = new StringBuilder();
 		TreeSet<Long> timeStamps = null;
 
@@ -227,7 +227,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	protected void resetIndex(FileTreeIterator treeItr)
 			throws FileNotFoundException, IOException {
 		ObjectInserter inserter = db.newObjectInserter();
-		DirCacheBuilder builder = db.lockDirCache(false).builder();
+		DirCacheBuilder builder = db.lockDirCache().builder();
 		DirCacheEntry dce;
 
 		while (!treeItr.eof()) {

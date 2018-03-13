@@ -908,6 +908,30 @@ public abstract class Repository {
 	 * The new index will be read before it is returned to the caller. Read
 	 * failures are reported as exceptions and therefore prevent the method from
 	 * returning a partially populated index.
+	 *
+	 * @return a cache representing the contents of the specified index file (if
+	 *         it exists) or an empty cache if the file does not exist.
+	 * @throws NoWorkTreeException
+	 *             if this is bare, which implies it has no working directory.
+	 *             See {@link #isBare()}.
+	 * @throws IOException
+	 *             the index file is present but could not be read.
+	 * @throws CorruptObjectException
+	 *             the index file is using a format or extension that this
+	 *             library does not support.
+	 */
+	public DirCache readDirCache() throws NoWorkTreeException,
+			CorruptObjectException, IOException {
+		return readDirCache(false);
+	}
+
+	/**
+	 * Create a new in-core index representation and read an index from disk.
+	 * <p>
+	 * The new index will be read before it is returned to the caller. Read
+	 * failures are reported as exceptions and therefore prevent the method from
+	 * returning a partially populated index.
+	 *
 	 * @param readOnly
 	 *
 	 * @return a cache representing the contents of the specified index file (if
@@ -932,7 +956,6 @@ public abstract class Repository {
 	 * The new index will be locked and then read before it is returned to the
 	 * caller. Read failures are reported as exceptions and therefore prevent
 	 * the method from returning a partially populated index.
-	 * @param readOnly
 	 *
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
@@ -946,9 +969,9 @@ public abstract class Repository {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public DirCache lockDirCache(boolean readOnly) throws NoWorkTreeException,
+	public DirCache lockDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		return DirCache.lock(getIndexFile(), getFS(), readOnly);
+		return DirCache.lock(getIndexFile(), getFS());
 	}
 
 	static byte[] gitInternalSlash(byte[] bytes) {
@@ -990,7 +1013,7 @@ public abstract class Repository {
 		if (new File(getDirectory(), "MERGE_HEAD").exists()) {
 			// we are merging - now check whether we have unmerged paths
 			try {
-				if (!readDirCache(true).hasUnmergedPaths()) {
+				if (!readDirCache().hasUnmergedPaths()) {
 					// no unmerged paths -> return the MERGING_RESOLVED state
 					return RepositoryState.MERGING_RESOLVED;
 				}

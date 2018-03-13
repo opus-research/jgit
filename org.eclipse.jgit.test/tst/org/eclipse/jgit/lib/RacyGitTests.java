@@ -149,7 +149,7 @@ public class RacyGitTests extends RepositoryTestCase {
 		// mod time.
 		resetIndex(new FileTreeIteratorWithTimeControl(db, modTimes));
 
-		db.readDirCache(false);
+		db.readDirCache();
 		// although racily clean a should not be reported as being dirty
 		assertEquals(
 				"[a, mode:100644, time:t1, smudged, length:0, content:a2]" +

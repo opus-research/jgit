@@ -128,10 +128,9 @@ public class DirCache {
 	 * @return an empty cache which has no backing store file. The cache may not
 	 *         be read or written, but it may be queried and updated (in
 	 *         memory).
-	 * @param readOnly
 	 */
-	public static DirCache newInCore(boolean readOnly) {
-		return new DirCache(null, null, readOnly);
+	public static DirCache newInCore() {
+		return new DirCache(null, null, false);
 	}
 
 	/**
@@ -175,7 +174,6 @@ public class DirCache {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param readOnly
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -185,9 +183,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache lock(final File indexLocation, final FS fs,
-			boolean readOnly) throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs, readOnly);
+	public static DirCache lock(final File indexLocation, final FS fs)
+			throws CorruptObjectException, IOException {
+		final DirCache c = new DirCache(indexLocation, fs, false);
 		if (!c.lock())
 			throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLock, indexLocation));

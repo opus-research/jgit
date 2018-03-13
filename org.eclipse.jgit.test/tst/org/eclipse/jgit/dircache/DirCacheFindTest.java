@@ -48,7 +48,7 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 
 public class DirCacheFindTest extends RepositoryTestCase {
 	public void testEntriesWithin() throws Exception {
-		final DirCache dc = db.readDirCache(false);
+		final DirCache dc = db.readDirCache();
 
 		final String[] paths = { "a.", "a/b", "a/c", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
