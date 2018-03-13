@@ -113,8 +113,6 @@ public class RebaseResult {
 
 		/**
 		 * Continue with nothing left to commit (possibly want skip).
-		 *
-		 * @since 2.0
 		 */
 		NOTHING_TO_COMMIT {
 			@Override

@@ -184,10 +184,9 @@ public abstract class ContentSource {
 				@Override
 				public ObjectStream openStream() throws MissingObjectException,
 						IOException {
-					long contentLength = ptr.getEntryContentLength();
 					InputStream in = ptr.openEntryStream();
 					in = new BufferedInputStream(in);
-					return new ObjectStream.Filter(getType(), contentLength, in);
+					return new ObjectStream.Filter(getType(), getSize(), in);
 				}
 
 				@Override
