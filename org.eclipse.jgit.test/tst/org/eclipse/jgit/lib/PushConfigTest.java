@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,40 +41,48 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lib;
 
-import java.util.ArrayList;
-import java.util.List;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.transport.PushConfig.PushRecurseSubmodulesMode;
+import org.junit.Test;
 
-@Command(usage = "usage_MergeBase")
-class MergeBase extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_displayAllPossibleMergeBases")
-	private boolean all;
+public class PushConfigTest {
+	@Test
+	public void pushRecurseSubmoduleMatch() throws Exception {
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("check"));
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("CHECK"));
 
-	@Argument(index = 0, metaVar = "metaVar_commitish", required = true)
-	void commit_0(final RevCommit c) {
-		commits.add(c);
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on-demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON-DEMAND"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on_demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON_DEMAND"));
+
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("no"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("NO"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("false"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
 	}
 
-	@Argument(index = 1, metaVar = "metaVar_commitish", required = true)
-	private final List<RevCommit> commits = new ArrayList<>();
+	@Test
+	public void pushRecurseSubmoduleNoMatch() throws Exception {
+		assertFalse(PushRecurseSubmodulesMode.NO.matchConfigValue("N"));
+		assertFalse(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ONDEMAND"));
+	}
 
-	@Override
-	protected void run() throws Exception {
-		for (final RevCommit c : commits)
-			argWalk.markStart(c);
-		argWalk.setRevFilter(RevFilter.MERGE_BASE);
-		int max = all ? Integer.MAX_VALUE : 1;
-		while (max-- > 0) {
-			final RevCommit b = argWalk.next();
-			if (b == null)
-				break;
-			outw.println(b.getId().name());
-		}
+	@Test
+	public void pushRecurseSubmoduleToConfigValue() {
+		assertEquals("on-demand",
+				PushRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+		assertEquals("check", PushRecurseSubmodulesMode.CHECK.toConfigValue());
+		assertEquals("false", PushRecurseSubmodulesMode.NO.toConfigValue());
 	}
 }

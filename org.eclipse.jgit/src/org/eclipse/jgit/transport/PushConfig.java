@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,40 +41,55 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.transport;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.util.StringUtils;
 
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+/**
+ * Push section of a Git configuration file.
+ *
+ * @since 4.9
+ */
+public class PushConfig {
+	/**
+	 * Config values for push.recurseSubmodules.
+	 */
+	public enum PushRecurseSubmodulesMode implements Config.ConfigEnum {
+		/**
+		 * Verify that all submodule commits that changed in the revisions to be
+		 * pushed are available on at least one remote of the submodule.
+		 */
+		CHECK("check"), //$NON-NLS-1$
 
-@Command(usage = "usage_MergeBase")
-class MergeBase extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_displayAllPossibleMergeBases")
-	private boolean all;
+		/**
+		 * All submodules that changed in the revisions to be pushed will be
+		 * pushed.
+		 */
+		ON_DEMAND("on-demand"), //$NON-NLS-1$
 
-	@Argument(index = 0, metaVar = "metaVar_commitish", required = true)
-	void commit_0(final RevCommit c) {
-		commits.add(c);
-	}
+		/** Default behavior of ignoring submodules when pushing is retained. */
+		NO("false"); //$NON-NLS-1$
 
-	@Argument(index = 1, metaVar = "metaVar_commitish", required = true)
-	private final List<RevCommit> commits = new ArrayList<>();
+		private final String configValue;
 
-	@Override
-	protected void run() throws Exception {
-		for (final RevCommit c : commits)
-			argWalk.markStart(c);
-		argWalk.setRevFilter(RevFilter.MERGE_BASE);
-		int max = all ? Integer.MAX_VALUE : 1;
-		while (max-- > 0) {
-			final RevCommit b = argWalk.next();
-			if (b == null)
-				break;
-			outw.println(b.getId().name());
+		private PushRecurseSubmodulesMode(String configValue) {
+			this.configValue = configValue;
+		}
+
+		@Override
+		public String toConfigValue() {
+			return configValue;
+		}
+
+		@Override
+		public boolean matchConfigValue(String s) {
+			if (StringUtils.isEmptyOrNull(s)) {
+				return false;
+			}
+			s = s.replace('-', '_');
+			return name().equalsIgnoreCase(s)
+					|| configValue.equalsIgnoreCase(s);
 		}
 	}
 }
