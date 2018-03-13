@@ -50,11 +50,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,7 +78,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jgit.annotations.NonNull;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CancelledException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -180,8 +176,6 @@ public class GC {
 	 * Whether gc should do automatic housekeeping
 	 */
 	private boolean automatic;
-	private GcLog gcLog;
-	private boolean background;
 
 	/**
 	 * Creates a new garbage collector with default values. An expirationTime of
@@ -213,13 +207,11 @@ public class GC {
 	 * @throws ParseException
 	 *             If the configuration parameter "gc.pruneexpire" couldn't be
 	 *             parsed
-	 * @deprecated use collectGarbage() instead.
 	 */
 	public Collection<PackFile> gc() throws IOException, ParseException {
 		if (automatic && !needGc()) {
 			return Collections.emptyList();
 		}
-
 		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
@@ -227,75 +219,6 @@ public class GC {
 		prune(Collections.<ObjectId> emptySet());
 		// TODO: implement rerere_gc(pm);
 		return newPacks;
-	}
-
-	/**
-	 * Runs a garbage collector on a {@link FileRepository}. It will
-	 * <ul>
-	 * <li>pack loose references into packed-refs</li>
-	 * <li>repack all reachable objects into new pack files and delete the old
-	 * pack files</li>
-	 * <li>prune all loose objects which are now reachable by packs</li>
-	 * </ul>
-	 *
-	 * If {@link #setAuto(boolean)} was set to {@code true} {@code gc} will
-	 * first check whether any housekeeping is required; if not, it exits
-	 * without performing any work.
-	 *
-	 * If {@link #setBackground(boolean)} was set to {@code true}
-	 * {@code gc} will start the gc in the background ,and then
-	 * return immediately.  In this case, errors will not be
-	 * reported except in gc.log.
-	 *
-	 * @return the collection of {@link PackFile}'s which are newly created
-	 * @throws IOException
-	 * @throws ParseException
-	 *             If the configuration parameter "gc.pruneexpire" couldn't be
-	 *             parsed
-	 */
-	public void collectGarbage() throws IOException, ParseException {
-		if (gcLog != null && gcLog.lock(background)) {
-			return;
-		}
-		Runnable gcTask = () -> {
-			try {
-				gc();
-				if (automatic && tooManyLooseObjects() && gcLog != null) {
-					String message = JGitText.get().gcTooManyUnpruned;
-					gcLog.write(message.getBytes(StandardCharsets.UTF_8));
-				}
-			} catch (IOException | ParseException e) {
-				if (background) {
-					if (gcLog == null) {
-						// Lacking a log, there's no way to report this.
-						return;
-					}
-					try {
-						gcLog.write(e.getMessage().getBytes());
-						StringWriter sw = new StringWriter();
-						PrintWriter pw = new PrintWriter(sw);
-						e.printStackTrace(pw);
-						gcLog.write(sw.toString().getBytes(StandardCharsets.UTF_8));
-						gcLog.commit();
-					} catch (IOException e2) {
-						e2.addSuppressed(e);
-						LOG.error(e2.getMessage(), e2);
-					}
-				} else {
-					throw new JGitInternalException(e.getMessage(), e);
-				}
-			} finally {
-				if (gcLog != null) {
-					gcLog.unlock();
-				}
-			}
-		};
-		if (background) {
-			Thread thread = new Thread(gcTask);
-			thread.start();
-		} else {
-			gcTask.run();
-		}
 	}
 
 	/**
@@ -806,7 +729,9 @@ public class GC {
 		long time = System.currentTimeMillis();
 		Collection<Ref> refsBefore = getAllRefs();
 
+		Set<ObjectId> allHeadsAndTags = new HashSet<>();
 		Set<ObjectId> allHeads = new HashSet<>();
+		Set<ObjectId> allTags = new HashSet<>();
 		Set<ObjectId> nonHeads = new HashSet<>();
 		Set<ObjectId> txnHeads = new HashSet<>();
 		Set<ObjectId> tagTargets = new HashSet<>();
@@ -816,16 +741,21 @@ public class GC {
 		for (Ref ref : refsBefore) {
 			checkCancelled();
 			nonHeads.addAll(listRefLogObjects(ref, 0));
-			if (ref.isSymbolic() || ref.getObjectId() == null)
+			if (ref.isSymbolic() || ref.getObjectId() == null) {
 				continue;
-			if (isHead(ref) || isTag(ref))
+			}
+			if (isHead(ref)) {
 				allHeads.add(ref.getObjectId());
-			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
+			} else if (isTag(ref)) {
+				allTags.add(ref.getObjectId());
+			} else if (RefTreeNames.isRefTree(refdb, ref.getName())) {
 				txnHeads.add(ref.getObjectId());
-			else
+			} else {
 				nonHeads.add(ref.getObjectId());
-			if (ref.getPeeledObjectId() != null)
+			}
+			if (ref.getPeeledObjectId() != null) {
 				tagTargets.add(ref.getPeeledObjectId());
+			}
 		}
 
 		List<ObjectIdSet> excluded = new LinkedList<>();
@@ -835,13 +765,19 @@ public class GC {
 				excluded.add(f.getIndex());
 		}
 
-		tagTargets.addAll(allHeads);
+		// Don't exclude tags that are also branch tips
+		allTags.removeAll(allHeads);
+		allHeadsAndTags.addAll(allHeads);
+		allHeadsAndTags.addAll(allTags);
+
+		// Hoist all branch tips and tags earlier in the pack file
+		tagTargets.addAll(allHeadsAndTags);
 		nonHeads.addAll(indexObjects);
 
 		List<PackFile> ret = new ArrayList<>(2);
 		PackFile heads = null;
-		if (!allHeads.isEmpty()) {
-			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
+		if (!allHeadsAndTags.isEmpty()) {
+			heads = writePack(allHeadsAndTags, PackWriter.NONE, allTags,
 					tagTargets, excluded);
 			if (heads != null) {
 				ret.add(heads);
@@ -849,12 +785,14 @@ public class GC {
 			}
 		}
 		if (!nonHeads.isEmpty()) {
-			PackFile rest = writePack(nonHeads, allHeads, tagTargets, excluded);
+			PackFile rest = writePack(nonHeads, allHeadsAndTags, PackWriter.NONE,
+					tagTargets, excluded);
 			if (rest != null)
 				ret.add(rest);
 		}
 		if (!txnHeads.isEmpty()) {
-			PackFile txn = writePack(txnHeads, PackWriter.NONE, null, excluded);
+			PackFile txn = writePack(txnHeads, PackWriter.NONE, PackWriter.NONE,
+					null, excluded);
 			if (txn != null)
 				ret.add(txn);
 		}
@@ -1038,8 +976,9 @@ public class GC {
 	}
 
 	private PackFile writePack(@NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
-			List<ObjectIdSet> excludeObjects) throws IOException {
+			@NonNull Set<? extends ObjectId> have, @NonNull Set<ObjectId> tags,
+			Set<ObjectId> tagTargets, List<ObjectIdSet> excludeObjects)
+			throws IOException {
 		checkCancelled();
 		File tmpPack = null;
 		Map<PackExt, File> tmpExts = new TreeMap<>(
@@ -1065,12 +1004,13 @@ public class GC {
 			// prepare the PackWriter
 			pw.setDeltaBaseAsOffset(true);
 			pw.setReuseDeltaCommits(false);
-			if (tagTargets != null)
+			if (tagTargets != null) {
 				pw.setTagTargets(tagTargets);
+			}
 			if (excludeObjects != null)
 				for (ObjectIdSet idx : excludeObjects)
 					pw.excludeObjects(idx);
-			pw.preparePack(pm, want, have);
+			pw.preparePack(pm, want, have, PackWriter.NONE, tags);
 			if (pw.getObjectCount() == 0)
 				return null;
 			checkCancelled();
@@ -1194,23 +1134,6 @@ public class GC {
 		if (pm.isCancelled()) {
 			throw new CancelledException(JGitText.get().operationCanceled);
 		}
-	}
-
-	/**
-	 * Set the GcLog object used to store errors during background processing
-	 * @param gcLog
-	 * @since 4.7
-	 */
-	public void setLog(GcLog gcLog) {
-		this.gcLog = gcLog;
-	}
-
-	/**
-	 * @param background whether to run the gc in a background thread.
-	 * @since 4.7
-	 */
-	public void setBackground(boolean background) {
-		this.background = background;
 	}
 
 	/**
@@ -1480,7 +1403,8 @@ public class GC {
 	 * @return {@code true} if number of loose objects > gc.auto (default 6700)
 	 */
 	boolean tooManyLooseObjects() {
-		int auto = getLooseObjectLimit();
+		int auto = repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
+				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
 		if (auto <= 0) {
 			return false;
 		}
@@ -1511,10 +1435,5 @@ public class GC {
 			LOG.error(e.getMessage(), e);
 		}
 		return false;
-	}
-
-	private int getLooseObjectLimit() {
-		return repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
-				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
 	}
 }
