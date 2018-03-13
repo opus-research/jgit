@@ -134,7 +134,7 @@ public class DeltaEncoder {
 		}
 		buf[p++] = (byte) (((int) sz) & 0x7f);
 		size += p;
-		if (limit == 0 || size < limit)
+		if (limit <= 0 || size < limit)
 			out.write(buf, 0, p);
 	}
 
@@ -189,7 +189,7 @@ public class DeltaEncoder {
 			throws IOException {
 		if (cnt <= 0)
 			return true;
-		if (limit != 0) {
+		if (0 < limit) {
 			int hdrs = cnt / MAX_INSERT_DATA_SIZE;
 			if (cnt % MAX_INSERT_DATA_SIZE != 0)
 				hdrs++;
@@ -236,7 +236,7 @@ public class DeltaEncoder {
 			cnt -= MAX_V2_COPY;
 
 			if (buf.length < p + MAX_COPY_CMD_SIZE) {
-				if (limit != 0 && limit < size + p)
+				if (0 < limit && limit < size + p)
 					return false;
 				out.write(buf, 0, p);
 				size += p;
@@ -245,7 +245,7 @@ public class DeltaEncoder {
 		}
 
 		p = encodeCopy(p, offset, cnt);
-		if (limit != 0 && limit < size + p)
+		if (0 < limit && limit < size + p)
 			return false;
 		out.write(buf, 0, p);
 		size += p;
@@ -255,37 +255,36 @@ public class DeltaEncoder {
 	private int encodeCopy(int p, long offset, int cnt) {
 		int cmd = 0x80;
 		final int cmdPtr = p++; // save room for the command
-		byte b;
 
-		if ((b = (byte) (offset & 0xff)) != 0) {
+		if ((offset & 0xff) != 0) {
 			cmd |= 0x01;
-			buf[p++] = b;
+			buf[p++] = (byte) (offset & 0xff);
 		}
-		if ((b = (byte) ((offset >>> 8) & 0xff)) != 0) {
+		if ((offset & (0xff << 8)) != 0) {
 			cmd |= 0x02;
-			buf[p++] = b;
+			buf[p++] = (byte) ((offset >>> 8) & 0xff);
 		}
-		if ((b = (byte) ((offset >>> 16) & 0xff)) != 0) {
+		if ((offset & (0xff << 16)) != 0) {
 			cmd |= 0x04;
-			buf[p++] = b;
+			buf[p++] = (byte) ((offset >>> 16) & 0xff);
 		}
-		if ((b = (byte) ((offset >>> 24) & 0xff)) != 0) {
+		if ((offset & (0xff << 24)) != 0) {
 			cmd |= 0x08;
-			buf[p++] = b;
+			buf[p++] = (byte) ((offset >>> 24) & 0xff);
 		}
 
 		if (cnt != MAX_V2_COPY) {
-			if ((b = (byte) (cnt & 0xff)) != 0) {
+			if ((cnt & 0xff) != 0) {
 				cmd |= 0x10;
-				buf[p++] = b;
+				buf[p++] = (byte) (cnt & 0xff);
 			}
-			if ((b = (byte) ((cnt >>> 8) & 0xff)) != 0) {
+			if ((cnt & (0xff << 8)) != 0) {
 				cmd |= 0x20;
-				buf[p++] = b;
+				buf[p++] = (byte) ((cnt >>> 8) & 0xff);
 			}
-			if ((b = (byte) ((cnt >>> 16) & 0xff)) != 0) {
+			if ((cnt & (0xff << 16)) != 0) {
 				cmd |= 0x40;
-				buf[p++] = b;
+				buf[p++] = (byte) ((cnt >>> 16) & 0xff);
 			}
 		}
 

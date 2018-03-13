@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -84,9 +85,9 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 		super.tearDown();
 	}
 
-	protected TestRepository<Repository> createTestRepository()
+	protected TestRepository<FileRepository> createTestRepository()
 			throws IOException {
-		return new TestRepository<Repository>(createBareRepository());
+		return new TestRepository<FileRepository>(createBareRepository());
 	}
 
 	protected URIish toURIish(String path) throws URISyntaxException {
