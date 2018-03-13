@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
- * Copyright (C) 2012, Research In Motion Limited
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -87,15 +86,11 @@ public class JGitText extends TranslationBundle {
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
-	/***/ public String bitmapMissingObject;
-	/***/ public String bitmapsMustBePrepared;
 	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
-	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
-	/***/ public String cachedPacksPreventsListingObjects;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
 	/***/ public String cannotCombineSquashWithNoff;
@@ -186,7 +181,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
 	/***/ public String couldNotGetAdvertisedRef;
-	/***/ public String couldNotGetRepoStatistics;
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
 	/***/ public String couldNotReadObjectWhileParsingCommit;
@@ -262,7 +256,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String expectedCharacterEncodingGuesses;
 	/***/ public String expectedEOFReceived;
 	/***/ public String expectedGot;
-	/***/ public String expectedLessThanGot;
 	/***/ public String expectedPktLineWithService;
 	/***/ public String expectedReceivedContentType;
 	/***/ public String expectedReportForRefNotReceived;
@@ -355,8 +348,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
-	/***/ public String mergeRecursiveReturnedNoCommit;
-	/***/ public String mergeRecursiveTooManyMergeBasesFor;
 	/***/ public String minutesAgo;
 	/***/ public String missingAccesskey;
 	/***/ public String missingConfigurationForKey;
@@ -382,7 +373,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noClosingBracket;
 	/***/ public String noHEADExistsAndNoExplicitStartingRevisionWasSpecified;
 	/***/ public String noHMACsupport;
-	/***/ public String noMergeBase;
 	/***/ public String noMergeHeadSpecified;
 	/***/ public String noSuchRef;
 	/***/ public String notABoolean;
@@ -403,7 +393,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String objectAtPathDoesNotHaveId;
 	/***/ public String objectIsCorrupt;
 	/***/ public String objectIsNotA;
-	/***/ public String objectNotFound;
 	/***/ public String objectNotFoundIn;
 	/***/ public String obtainingCommitsForCherryPick;
 	/***/ public String offsetWrittenDeltaBaseForObjectNotFoundInAPack;
@@ -492,7 +481,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String searchForReuse;
 	/***/ public String searchForSizes;
 	/***/ public String secondsAgo;
-	/***/ public String selectingCommits;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
@@ -514,10 +502,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String squashCommitNotUpdatingHEAD;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
-	/***/ public String stashApplyConflict;
-	/***/ public String stashApplyConflictInIndex;
 	/***/ public String stashApplyFailed;
-	/***/ public String stashApplyWithoutHead;
 	/***/ public String stashApplyOnUnsafeRepository;
 	/***/ public String stashCommitMissingTwoParents;
 	/***/ public String stashDropDeleteRefFailed;
@@ -552,7 +537,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
 	/***/ public String treeEntryAlreadyExists;
-	/***/ public String treeFilterMarkerTooManyFilters;
 	/***/ public String treeIteratorDoesNotSupportRemove;
 	/***/ public String treeWalkMustHaveExactlyTwoTrees;
 	/***/ public String truncatedHunkLinesMissingForAncestor;

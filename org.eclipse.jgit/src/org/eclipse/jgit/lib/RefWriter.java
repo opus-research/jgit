@@ -51,7 +51,7 @@ import java.io.StringWriter;
 import java.util.Collection;
 import java.util.Map;
 
-import org.eclipse.jgit.internal.storage.file.RefDirectory;
+import org.eclipse.jgit.storage.file.RefDirectory;
 import org.eclipse.jgit.util.RefList;
 import org.eclipse.jgit.util.RefMap;
 
@@ -128,7 +128,7 @@ public abstract class RefWriter {
 				r.getPeeledObjectId().copyTo(tmp, w);
 				w.write('\t');
 				w.write(r.getName());
-				w.write("^{}\n"); //$NON-NLS-1$
+				w.write("^{}\n");
 			}
 		}
 		writeFile(Constants.INFO_REFS, Constants.encode(w.toString()));

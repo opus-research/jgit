@@ -74,6 +74,7 @@ public class CLIText extends TranslationBundle {
 	}
 
 	// @formatter:off
+	/***/ public String IPZillaPasswordPrompt;
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
 	/***/ public String archiveEntryModeIgnored;
@@ -180,7 +181,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String needApprovalToDestroyCurrentRepository;
 	/***/ public String noGitRepositoryConfigured;
 	/***/ public String noSuchFile;
-	/***/ public String noSuchRemoteRef;
 	/***/ public String noTREESectionInIndex;
 	/***/ public String nonFastForward;
 	/***/ public String notABranch;

@@ -53,6 +53,7 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
@@ -65,11 +66,11 @@ public class SimpleHttpServer {
 
 	AppServer server;
 
-	private final Repository db;
+	private final FileRepository db;
 
 	private URIish uri;
 
-	public SimpleHttpServer(Repository repository) {
+	public SimpleHttpServer(FileRepository repository) {
 		this.db = repository;
 		server = new AppServer();
 	}
@@ -108,7 +109,7 @@ public class SimpleHttpServer {
 		return ctx;
 	}
 
-	private static String nameOf(final Repository db) {
+	private static String nameOf(final FileRepository db) {
 		return db.getDirectory().getName();
 	}
 

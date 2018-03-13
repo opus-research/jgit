@@ -190,7 +190,7 @@ public abstract class RefUpdate {
 	protected RefUpdate(final Ref ref) {
 		this.ref = ref;
 		oldValue = ref.getObjectId();
-		refLogMessage = ""; //$NON-NLS-1$
+		refLogMessage = "";
 	}
 
 	/** @return the reference database this update modifies. */
@@ -372,7 +372,7 @@ public abstract class RefUpdate {
 		if (msg == null && !appendStatus)
 			disableRefLog();
 		else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
+			refLogMessage = "";
 			refLogIncludeResult = true;
 		} else {
 			refLogMessage = msg;
@@ -598,8 +598,7 @@ public abstract class RefUpdate {
 		RevObject newObj;
 		RevObject oldObj;
 
-		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(true))

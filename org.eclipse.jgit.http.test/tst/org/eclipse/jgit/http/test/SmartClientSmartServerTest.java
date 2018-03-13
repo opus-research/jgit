@@ -78,9 +78,6 @@ import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.internal.storage.file.ReflogEntry;
-import org.eclipse.jgit.internal.storage.file.ReflogReader;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.junit.http.AccessEvent;
@@ -92,7 +89,10 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.ReflogEntry;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
@@ -320,7 +320,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Create a new commit on the remote.
 		//
-		b = new TestRepository<Repository>(remoteRepository).branch(master);
+		b = new TestRepository(remoteRepository).branch(master);
 		RevCommit Z = b.commit().message("Z").create();
 
 		// Now incrementally update.
@@ -386,7 +386,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Create a new commit on the remote.
 		//
-		b = new TestRepository<Repository>(remoteRepository).branch(master);
+		b = new TestRepository(remoteRepository).branch(master);
 		RevCommit Z = b.commit().message("Z").create();
 
 		// Now incrementally update.
