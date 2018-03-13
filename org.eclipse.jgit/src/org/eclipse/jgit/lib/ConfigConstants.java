@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,52 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.awtui;
+/**
+ * Constants for use with the Configuration classes: section names,
+ * configuration keys
+ */
+public class ConfigConstants {
+	/** The "core" section */
+	public static final String CONFIG_CORE_SECTION = "core";
 
-import java.awt.Color;
-import java.util.LinkedList;
+	/** The "autocrlf" key */
+	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
-import org.eclipse.jgit.revplot.PlotCommitList;
-import org.eclipse.jgit.revplot.PlotLane;
+	/** The "bare" key */
+	public static final String CONFIG_KEY_BARE = "bare";
 
-class SwingCommitList extends PlotCommitList<SwingCommitList.SwingLane> {
-	final LinkedList<Color> colors;
+	/** The "filemode" key */
+	public static final String CONFIG_KEY_FILEMODE = "filemode";
 
-	SwingCommitList() {
-		colors = new LinkedList<Color>();
-		repackColors();
-	}
+	/** The "logallrefupdates" key */
+	public static final String CONFIG_KEY_LOGALLREFUPDATES = "logallrefupdates";
 
-	private void repackColors() {
-		colors.add(Color.green);
-		colors.add(Color.blue);
-		colors.add(Color.red);
-		colors.add(Color.magenta);
-		colors.add(Color.darkGray);
-		colors.add(Color.yellow.darker());
-		colors.add(Color.orange);
-	}
+	/** The "repositoryformatversion" key */
+	public static final String CONFIG_KEY_REPO_FORMAT_VERSION = "repositoryformatversion";
 
-	@Override
-	protected SwingLane createLane() {
-		final SwingLane lane = new SwingLane();
-		if (colors.isEmpty())
-			repackColors();
-		lane.color = colors.removeFirst();
-		return lane;
-	}
-
-	@Override
-	protected void recycleLane(final SwingLane lane) {
-		colors.add(lane.color);
-	}
-
-	static class SwingLane extends PlotLane {
-		Color color;
-		@Override
-		public boolean equals(Object o) {
-			return super.equals(o) && color.equals(((SwingLane)o).color);
-		}
-	}
+	/** The "worktree" key */
+	public static final String CONFIG_KEY_WORKTREE = "worktree";
 }
