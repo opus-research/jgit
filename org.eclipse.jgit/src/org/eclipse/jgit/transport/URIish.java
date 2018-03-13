@@ -46,7 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.File;
 import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -552,12 +551,7 @@ public class URIish implements Serializable {
 	public String getHumanishName() throws IllegalArgumentException {
 		if ("".equals(getPath()) || getPath() == null)
 			throw new IllegalArgumentException();
-		String s = getPath();
-		String[] elements;
-		if ("file".equals(scheme) || LOCAL_FILE.matcher(s).matches())
-			elements = s.split("[\\" + File.separatorChar + "/]");
-		else
-			elements = s.split("/");
+		String[] elements = getPath().split("/");
 		if (elements.length == 0)
 			throw new IllegalArgumentException();
 		String result = elements[elements.length - 1];
