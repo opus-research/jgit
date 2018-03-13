@@ -70,7 +70,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.DirCacheNameConflictException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
@@ -1042,7 +1041,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue(st.isClean());
 	}
 
-	@Test(expected = DirCacheNameConflictException.class) // BROKEN TEST
+	@Test
 	public void testCheckoutChangeLinkToNonEmptyDirsAndNewIndexEntry()
 			throws Exception {
 		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
@@ -1179,7 +1178,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue(st.isClean());
 	}
 
-	@Test(expected = DirCacheNameConflictException.class) // BROKEN TEST
+	@Test
 	public void testCheckoutChangeFileToNonEmptyDirsAndNewIndexEntry()
 			throws Exception {
 		String fname = "was_file";
