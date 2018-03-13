@@ -211,7 +211,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 
 	private FileBasedConfig configFor(File gitDir) throws IOException,
 			ConfigInvalidException {
-		File configPath = new File(gitDir, Constants.CONFIG);
+		File configPath = new File(gitDir, "config");
 		FileBasedConfig cfg = new FileBasedConfig(configPath, FS.DETECTED);
 		cfg.load();
 		return cfg;
