@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,28 +40,26 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server;
+
+package org.eclipse.jgit.lfs.errors;
+
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.lfs.internal.LfsText;
 
 /**
- * LFS object.
+ * Thrown when the user has read, but not write access. Only applicable when the
+ * operation in the request is "upload".
  *
  * @since 4.5
  */
-public class LfsObject {
-	String oid;
-	long size;
+public class LfsRepositoryReadOnly extends LfsException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @return the object ID.
+	 * @param name
 	 */
-	public String getOid() {
-		return oid;
-	}
-
-	/**
-	 * @return the object size.
-	 */
-	public long getSize() {
-		return size;
+	public LfsRepositoryReadOnly(String name) {
+		super(MessageFormat.format(LfsText.get().repositoryReadOnly, name));
 	}
 }

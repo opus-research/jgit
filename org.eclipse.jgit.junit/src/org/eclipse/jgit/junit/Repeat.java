@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,28 +40,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server;
+package org.eclipse.jgit.junit;
 
-/**
- * LFS object.
- *
- * @since 4.5
- */
-public class LfsObject {
-	String oid;
-	long size;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-	/**
-	 * @return the object ID.
-	 */
-	public String getOid() {
-		return oid;
-	}
-
-	/**
-	 * @return the object size.
-	 */
-	public long getSize() {
-		return size;
-	}
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ java.lang.annotation.ElementType.METHOD })
+public @interface Repeat {
+	public abstract int n();
 }
