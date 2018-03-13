@@ -126,16 +126,6 @@ public class T0003_Basic extends RepositoryTestCase {
 		assertTrue("Read-only " + o, !o.canWrite());
 	}
 
-	public void test004_CheckNewConfig() {
-		final RepositoryConfig c = db.getConfig();
-		assertNotNull(c);
-		assertEquals("0", c.getString("core", null, "repositoryformatversion"));
-		assertEquals("0", c.getString("CoRe", null, "REPOSITORYFoRmAtVeRsIoN"));
-		assertEquals("true", c.getString("core", null, "filemode"));
-		assertEquals("true", c.getString("cOrE", null, "fIlEModE"));
-		assertNull(c.getString("notavalue", null, "reallyNotAValue"));
-	}
-
 	public void test005_ReadSimpleConfig() {
 		final RepositoryConfig c = db.getConfig();
 		assertNotNull(c);
@@ -354,6 +344,9 @@ public class T0003_Basic extends RepositoryTestCase {
 		commit.setMessage("\u00dcbergeeks");
 		ObjectId cid = new ObjectWriter(db).writeCommit(commit);
 		assertEquals("4680908112778718f37e686cbebcc912730b3154", cid.name());
+		Commit loadedCommit = db.mapCommit(cid);
+		assertNotSame(loadedCommit, commit);
+		assertEquals(commit.getMessage(), loadedCommit.getMessage());
 	}
 
 	public void test024_createCommitNonAscii() throws IOException {
