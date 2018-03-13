@@ -189,13 +189,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 * this method twice on an instance.
 	 *
 	 * @return an object describing the result of this command
-	 * @throws GitAPIException
-	 * @throws WrongRepositoryStateException
-	 * @throws NoHeadException
-	 * @throws RefNotFoundException
 	 */
-	public RebaseResult call() throws GitAPIException, NoHeadException,
-			RefNotFoundException, WrongRepositoryStateException {
+	public RebaseResult call() throws NoHeadException, RefNotFoundException,
+			JGitInternalException, GitAPIException {
 		RevCommit newHead = null;
 		boolean lastStepWasForward = false;
 		checkCallable();
@@ -329,7 +325,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RevCommit checkoutCurrentHead() throws IOException, NoHeadException {
+	private RevCommit checkoutCurrentHead() throws IOException,
+			NoHeadException, JGitInternalException {
 		ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 		if (headTree == null)
 			throw new NoHeadException(
@@ -520,8 +517,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RebaseResult initFilesAndRewind() throws IOException,
-			GitAPIException {
+	private RebaseResult initFilesAndRewind() throws RefNotFoundException,
+			IOException, NoHeadException, JGitInternalException {
 		// we need to store everything into files so that we can implement
 		// --skip, --continue, and --abort
 
@@ -579,7 +576,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// create the folder for the meta information
 		FileUtils.mkdir(rebaseDir);
 
-		repo.writeOrigHead(headId);
+		createFile(repo.getDirectory(), Constants.ORIG_HEAD, headId.name());
 		createFile(rebaseDir, REBASE_HEAD, headId.name());
 		createFile(rebaseDir, HEAD_NAME, headName);
 		createFile(rebaseDir, ONTO, upstreamCommit.name());
@@ -629,11 +626,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 *
 	 * @param newCommit
 	 * @return the new head, or null
+	 * @throws RefNotFoundException
 	 * @throws IOException
-	 * @throws GitAPIException
 	 */
-	public RevCommit tryFastForward(RevCommit newCommit) throws IOException,
-			GitAPIException {
+	public RevCommit tryFastForward(RevCommit newCommit)
+			throws RefNotFoundException, IOException {
 		Ref head = repo.getRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
@@ -656,7 +653,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private RevCommit tryFastForward(String headName, RevCommit oldCommit,
-			RevCommit newCommit) throws IOException, GitAPIException {
+			RevCommit newCommit) throws IOException, JGitInternalException {
 		boolean tryRebase = false;
 		for (RevCommit parentCommit : newCommit.getParents())
 			if (parentCommit.equals(oldCommit))
@@ -736,8 +733,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private RebaseResult abort(RebaseResult result) throws IOException {
 		try {
-			ObjectId origHead = repo.readOrigHead();
-			String commitId = origHead != null ? origHead.name() : null;
+			String commitId = readFile(repo.getDirectory(), Constants.ORIG_HEAD);
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().abortingRebase, commitId),
 					ProgressMonitor.UNKNOWN);

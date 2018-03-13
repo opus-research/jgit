@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010-2012, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -78,6 +78,7 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
@@ -130,6 +131,8 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private Map<String, MergeFailureReason> failingPaths = new HashMap<String, MergeFailureReason>();
 
+	private ObjectInserter oi;
+
 	private boolean enterSubtree;
 
 	private boolean inCore;
@@ -152,6 +155,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				SupportedAlgorithm.HISTOGRAM);
 		mergeAlgorithm = new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
 		commitNames = new String[] { "BASE", "OURS", "THEIRS" };
+		oi = getObjectInserter();
 		this.inCore = inCore;
 
 		if (inCore) {
@@ -222,7 +226,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			}
 
 			if (getUnmergedPaths().isEmpty()) {
-				resultTree = dircache.writeTree(getObjectInserter());
+				resultTree = dircache.writeTree(oi);
 				return true;
 			} else {
 				resultTree = null;
@@ -395,7 +399,7 @@ public class ResolveMerger extends ThreeWayMerger {
 					else {
 						// the preferred version THEIRS has a different mode
 						// than ours. Check it out!
-						if (isWorktreeDirty(work))
+						if (isWorktreeDirty())
 							return false;
 						DirCacheEntry e = add(tw.getRawPath(), theirs,
 								DirCacheEntry.STAGE_0);
@@ -430,7 +434,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// THEIRS. THEIRS is chosen.
 
 			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty(work))
+			if (isWorktreeDirty())
 				return false;
 			if (nonTree(modeT)) {
 				DirCacheEntry e = add(tw.getRawPath(), theirs,
@@ -481,7 +485,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		if (nonTree(modeO) && nonTree(modeT)) {
 			// Check worktree before modifying files
-			if (isWorktreeDirty(work))
+			if (isWorktreeDirty())
 				return false;
 
 			MergeResult<RawText> result = contentMerge(base, ours, theirs);
@@ -503,7 +507,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				// OURS was deleted checkout THEIRS
 				if (modeO == 0) {
 					// Check worktree before checking out THEIRS
-					if (isWorktreeDirty(work))
+					if (isWorktreeDirty())
 						return false;
 					if (nonTree(modeT)) {
 						if (e != null)
@@ -559,7 +563,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		return isDirty;
 	}
 
-	private boolean isWorktreeDirty(WorkingTreeIterator work) {
+	private boolean isWorktreeDirty() {
 		if (inCore)
 			return false;
 
@@ -567,13 +571,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		final boolean isDirty;
-		if (nonTree(modeF))
-			isDirty = work.isModeDifferent(modeO)
-					|| !tw.idEqual(T_FILE, T_OURS);
-		else
-			isDirty = false;
-
+		final boolean isDirty = nonTree(modeF)
+				&& !(modeO == modeF && tw.idEqual(T_FILE, T_OURS));
 		if (isDirty)
 			failingPaths.put(tw.getPathString(),
 					MergeFailureReason.DIRTY_WORKTREE);
@@ -620,8 +619,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			dce.setLength((int) of.length());
 			InputStream is = new FileInputStream(of);
 			try {
-				dce.setObjectId(getObjectInserter().insert(
-				    Constants.OBJ_BLOB, of.length(), is));
+				dce.setObjectId(oi.insert(Constants.OBJ_BLOB, of.length(), is));
 			} finally {
 				is.close();
 				if (inCore)

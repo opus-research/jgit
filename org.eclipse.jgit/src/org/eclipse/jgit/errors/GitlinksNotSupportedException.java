@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,50 +42,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.errors;
 
-import java.util.Arrays;
-
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.util.GitDateFormatter;
-import org.eclipse.jgit.util.GitDateFormatter.Format;
-import org.junit.Before;
-import org.junit.Test;
+import java.io.IOException;
 
 /**
- * Test construction of squash message by {@link SquashMessageFormatterTest}.
+ * An exception thrown when a gitlink entry is found and cannot be
+ * handled.
  */
-public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
-	private GitDateFormatter dateFormatter;
-	private SquashMessageFormatter msgFormatter;
-	private RevCommit revCommit;
+public class GitlinksNotSupportedException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		dateFormatter = new GitDateFormatter(Format.DEFAULT);
-		msgFormatter = new SquashMessageFormatter();
-	}
-
-	@Test
-	public void testCommit() throws Exception {
-		Git git = new Git(db);
-		revCommit = git.commit().setMessage("squash_me").call();
-
-		Ref master = db.getRef("refs/heads/master");
-		String message = msgFormatter.format(Arrays.asList(revCommit), master);
-		assertEquals(
-				"Squashed commit of the following:\n\ncommit "
-						+ revCommit.getName() + "\nAuthor: "
-						+ revCommit.getAuthorIdent().getName() + " <"
-						+ revCommit.getAuthorIdent().getEmailAddress()
-						+ ">\nDate:   " + dateFormatter.formatDate(author)
-						+ "\n\n\tsquash_me\n", message);
+	/**
+	 * Construct a GitlinksNotSupportedException for the specified link
+	 *
+	 * @param s name of link in tree or workdir
+	 */
+	public GitlinksNotSupportedException(final String s) {
+		super(s);
 	}
 }
