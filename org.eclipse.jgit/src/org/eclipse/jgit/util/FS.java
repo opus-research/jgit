@@ -403,7 +403,6 @@ public abstract class FS {
 	 * @param command
 	 *            as component array
 	 * @param encoding
-	 *            to be used to parse the command's output
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
@@ -505,7 +504,10 @@ public abstract class FS {
 		return p.value;
 	}
 
-	/** @return the path to the Git executable. */
+	/**
+	 * @return the path to the Git executable.
+	 * @since 4.0
+	 */
 	protected abstract File discoverGitExe();
 
 	/** @return the $prefix directory C Git would use. */
@@ -513,6 +515,12 @@ public abstract class FS {
 		return resolveGrandparentFile(discoverGitExe());
 	}
 
+	/**
+	 * @param grandchild
+	 * @return the parent directory of this file's parent directory or
+	 *         {@code null} in case there's no grandparent directory
+	 * @since 4.0
+	 */
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
 			File parent = grandchild.getParentFile();
