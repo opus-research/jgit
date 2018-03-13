@@ -67,7 +67,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Replacements;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
@@ -88,14 +87,8 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	final FileObjectDatabase db;
 
-	private Replacements replacements;
-
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
-	}
-
-	protected Replacements getReplacements() {
-		return replacements;
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {

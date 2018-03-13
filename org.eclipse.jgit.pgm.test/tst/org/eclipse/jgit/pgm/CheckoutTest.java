@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Robin Rosenberg
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,20 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Assert;
+import org.junit.Test;
 
-/**
- * A repository that maps from a set of commits to a replacement list of
- * parents.
- */
-public interface GraftsDatabase {
-	/**
-	 * @return the mapping from child to grafted parents
-	 * @throws IOException
-	 */
-	public Map<AnyObjectId, List<ObjectId>> getGrafts() throws IOException;
+public class CheckoutTest extends CLIRepositoryTestCase {
+
+	@Test
+	public void testCheckoutSelf() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Already on 'master'", execute("git checkout master"));
+	}
+
+	@Test
+	public void testCheckoutBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+
+		assertEquals("Switched to branch 'side'", execute("git checkout side"));
+	}
+
+	@Test
+	public void testCheckoutNewBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Switched to a new branch 'side'",
+				execute("git checkout -b side"));
+	}
+
+	@Test
+	public void testCheckoutNonExistingBranch() throws Exception {
+		assertEquals(
+				"error: pathspec 'side' did not match any file(s) known to git.",
+				execute("git checkout side"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("A branch named 'master' already exists.",
+				execute("git checkout -b master"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
+		assertEquals("You are on a branch yet to be born",
+				execute("git checkout -b side"));
+	}
+
+	static private void assertEquals(String expected, String[] actual) {
+		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
+				actual.length); // ignore last line if empty
+		Assert.assertEquals(expected, actual[0]);
+	}
 }

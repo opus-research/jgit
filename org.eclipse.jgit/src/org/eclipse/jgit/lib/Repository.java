@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
  * Copyright (C) 2008-2010, Google Inc.
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,6 +43,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.lib;
 
 import java.io.File;
@@ -74,7 +75,7 @@ import org.eclipse.jgit.util.FS;
  * <p>
  * Subclasses of this class <em>should be</em> thread-safe. This class is.
  */
-public abstract class Repository implements Replacements {
+public abstract class Repository {
 	static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -86,11 +87,21 @@ public abstract class Repository implements Replacements {
 	public abstract ListenerList getListenerList();
 
 	/**
+	 * Initialize a new repository instance.
+	 * 
+	 * @param options
+	 *            options to configure the repository.
+	 */
+	protected Repository(final BaseRepositoryBuilder options) {
+		// empty
+	}
+
+	/**
 	 * Fire an event to all registered listeners.
 	 * <p>
 	 * The source repository of the event is automatically set to this
 	 * repository, before the event is delivered to any listeners.
-	 *
+	 * 
 	 * @param event
 	 *            the event to deliver.
 	 */
@@ -135,9 +146,6 @@ public abstract class Repository implements Replacements {
 
 	/** @return the reference database which stores the reference namespace. */
 	public abstract RefDatabase getRefDatabase();
-
-	/** @return the grafts database which store the grafted parents */
-	public abstract GraftsDatabase getGraftsDatabase();
 
 	/**
 	 * @return the configuration of this repository
@@ -297,6 +305,20 @@ public abstract class Repository implements Replacements {
 	public abstract ObjectId resolve(String revstr)
 			throws AmbiguousObjectException,
 			IOException;
+
+	/**
+	 * Simplify an expression, but unlike {@link #resolve(String)} it will not
+	 * resolve a branch passed or resulting from the expression, such as @{-}.
+	 * Thus this method can be used to process an expression to a method that
+	 * expects a branch or revision id.
+	 *
+	 * @param revstr
+	 * @return object id or ref name from resolved expression
+	 * @throws AmbiguousObjectException
+	 * @throws IOException
+	 */
+	public abstract String simplify(final String revstr)
+			throws AmbiguousObjectException, IOException;
 
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
 	public abstract void incrementOpen();
@@ -724,15 +746,4 @@ public abstract class Repository implements Replacements {
 	 */
 	public abstract void writeSquashCommitMsg(String msg) throws IOException;
 
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.lib.Replacements#getGrafts()
-	 */
-	public abstract Map<AnyObjectId, List<ObjectId>> getGrafts()
-			throws IOException;
-
-	/* (non-Javadoc)
-	 * @see org.eclipse.jgit.lib.Replacements#getReplacements()
-	 */
-	public abstract Map<AnyObjectId, ObjectId> getReplacements()
-			throws IOException;
 }
