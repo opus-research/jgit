@@ -44,7 +44,6 @@
 
 package org.eclipse.jgit.util;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -436,7 +435,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 		protected OutputStream overflow() throws IOException {
 			onDiskFile = File.createTempFile("jgit_", ".buf", directory); //$NON-NLS-1$ //$NON-NLS-2$
-			return new BufferedOutputStream(new FileOutputStream(onDiskFile));
+			return new FileOutputStream(onDiskFile);
 		}
 
 		public long length() {

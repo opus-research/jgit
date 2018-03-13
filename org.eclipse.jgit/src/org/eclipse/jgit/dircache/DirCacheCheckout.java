@@ -1284,8 +1284,10 @@ public class DirCacheCheckout {
 	 * @throws InvalidPathException
 	 *             if the path is invalid
 	 * @since 3.3
+	 * @deprecated Use {@link SystemReader#checkPath(String)}.
 	 */
-	static void checkValidPath(String path) throws InvalidPathException {
+	@Deprecated
+	public static void checkValidPath(String path) throws InvalidPathException {
 		try {
 			SystemReader.getInstance().checkPath(path);
 		} catch (CorruptObjectException e) {

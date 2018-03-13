@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.eclipse.jgit.lib.Constants.T_BASE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -134,7 +133,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 			assertEquals(pathIdx, i.ptr);
 			assertSame(ents[pathIdx], i.getDirCacheEntry());
 			assertEquals(paths[pathIdx], tw.getPathString());
-			assertEquals(modes[pathIdx].getBits(), tw.getRawMode(T_BASE));
+			assertEquals(modes[pathIdx].getBits(), tw.getRawMode(0));
 			assertSame(modes[pathIdx], tw.getFileMode(0));
 			pathIdx++;
 		}
@@ -169,7 +168,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 		int pathIdx = 0;
 		while (tw.next()) {
 			assertSame(i, tw.getTree(0, DirCacheIterator.class));
-			assertEquals(expModes[pathIdx].getBits(), tw.getRawMode(T_BASE));
+			assertEquals(expModes[pathIdx].getBits(), tw.getRawMode(0));
 			assertSame(expModes[pathIdx], tw.getFileMode(0));
 			assertEquals(expPaths[pathIdx], tw.getPathString());
 
@@ -213,7 +212,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 			assertEquals(pathIdx, c.ptr);
 			assertSame(ents[pathIdx], c.getDirCacheEntry());
 			assertEquals(paths[pathIdx], tw.getPathString());
-			assertEquals(mode.getBits(), tw.getRawMode(T_BASE));
+			assertEquals(mode.getBits(), tw.getRawMode(0));
 			assertSame(mode, tw.getFileMode(0));
 			pathIdx++;
 		}
@@ -247,7 +246,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 			assertEquals(pathIdx, c.ptr);
 			assertSame(ents[pathIdx], c.getDirCacheEntry());
 			assertEquals(paths[pathIdx], tw.getPathString());
-			assertEquals(mode.getBits(), tw.getRawMode(T_BASE));
+			assertEquals(mode.getBits(), tw.getRawMode(0));
 			assertSame(mode, tw.getFileMode(0));
 			pathIdx++;
 		}
@@ -411,7 +410,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 			assertEquals(victimIdx, c.ptr);
 			assertSame(ents[victimIdx], c.getDirCacheEntry());
 			assertEquals(paths[victimIdx], tw.getPathString());
-			assertEquals(mode.getBits(), tw.getRawMode(T_BASE));
+			assertEquals(mode.getBits(), tw.getRawMode(0));
 			assertSame(mode, tw.getFileMode(0));
 			assertFalse(tw.next());
 		}

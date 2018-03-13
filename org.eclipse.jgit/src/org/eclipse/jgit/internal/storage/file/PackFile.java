@@ -362,7 +362,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 	}
 
-	@SuppressWarnings("null")
 	private void copyAsIs2(PackOutputStream out, LocalObjectToPack src,
 			boolean validate, WindowCursor curs) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
@@ -704,7 +703,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					, getPackFile()));
 	}
 
-	@SuppressWarnings("null")
 	ObjectLoader load(final WindowCursor curs, long pos)
 			throws IOException, LargeObjectException {
 		try {

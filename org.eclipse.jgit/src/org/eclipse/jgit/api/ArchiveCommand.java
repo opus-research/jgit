@@ -365,11 +365,13 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 
 	private <T extends Closeable> OutputStream writeArchive(Format<T> fmt) {
 		final String pfx = prefix == null ? "" : prefix; //$NON-NLS-1$
-		try (final TreeWalk walk = new TreeWalk(repo)) {
+		final TreeWalk walk = new TreeWalk(repo);
+		try {
 			final T outa = fmt.createArchiveOutputStream(out, formatOptions);
-			try (final RevWalk rw = new RevWalk(walk.getObjectReader())) {
+			try {
 				final MutableObjectId idBuf = new MutableObjectId();
 				final ObjectReader reader = walk.getObjectReader();
+				final RevWalk rw = new RevWalk(walk.getObjectReader());
 
 				walk.reset(rw.parseTree(tree));
 				if (!paths.isEmpty())
@@ -403,6 +405,8 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 			// TODO(jrn): Throw finer-grained errors.
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfArchiveCommand, e);
+		} finally {
+			walk.release();
 		}
 	}
 

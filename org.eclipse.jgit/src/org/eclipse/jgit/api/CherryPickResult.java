@@ -63,21 +63,21 @@ public class CherryPickResult {
 		OK {
 			@Override
 			public String toString() {
-				return "Ok"; //$NON-NLS-1$
+				return "Ok";
 			}
 		},
 		/** */
 		FAILED {
 			@Override
 			public String toString() {
-				return "Failed"; //$NON-NLS-1$
+				return "Failed";
 			}
 		},
 		/** */
 		CONFLICTING {
 			@Override
 			public String toString() {
-				return "Conflicting"; //$NON-NLS-1$
+				return "Conflicting";
 			}
 		}
 	}
