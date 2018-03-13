@@ -275,7 +275,7 @@ public abstract class FS {
 
 	/**
 	 * Delete a file. Throws an exception if delete fails.
-	 * 
+	 *
 	 * @param f
 	 * @throws IOException
 	 *             this may be a Java7 subclass with detailed information
