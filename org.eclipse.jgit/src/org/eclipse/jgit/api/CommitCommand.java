@@ -77,7 +77,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -353,15 +352,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						dcEntry.setObjectId(fTree.getEntryObjectId());
 					} else {
 						if (FileMode.GITLINK.equals(dcEntry.getFileMode())) {
-							SubmoduleWalk sWalk = SubmoduleWalk.forPath(repo,
-									dcTree, path);
-							ObjectId submoduleHead = sWalk != null ? sWalk
-									.getHead() : null;
-							if (submoduleHead != null)
-								dcEntry.setObjectId(submoduleHead);
-							else
-								dcEntry.copyMetaData(index.getEntry(dcEntry
-										.getPathString()));
+							// Do not check the content of submodule entries
+							// Use the old entry information instead.
+							dcEntry.copyMetaData(index.getEntry(dcEntry
+									.getPathString()));
 						} else {
 							// insert object
 							if (inserter == null)
