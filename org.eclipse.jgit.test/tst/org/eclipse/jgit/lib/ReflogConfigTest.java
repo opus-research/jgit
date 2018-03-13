@@ -54,7 +54,8 @@ public class ReflogConfigTest extends RepositoryTestCase {
 
 		// check that there are no entries in the reflog and turn off writing
 		// reflogs
-		assertNull(db.getReflogReader(Constants.HEAD));
+		assertTrue("there should be no entries in reflog", db.getReflogReader(
+				Constants.HEAD).getReverseEntries().size() == 0);
 		db.getConfig().setBoolean("core", null, "logallrefupdates", false);
 
 		// do one commit and check that reflog size is 0: no reflogs should be
