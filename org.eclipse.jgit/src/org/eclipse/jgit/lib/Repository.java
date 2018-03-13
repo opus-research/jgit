@@ -850,11 +850,9 @@ public abstract class Repository implements AutoCloseable {
 	 * current ObjectId in hexadecimal string format.
 	 *
 	 * @return name of current branch (for example {@code refs/heads/master}) or
-	 *         an ObjectId in hex format if the current branch is detached or
-	 *         null.
+	 *         an ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
-	/* @Nullable */
 	public String getFullBranch() throws IOException {
 		Ref head = getRef(Constants.HEAD);
 		if (head == null)
@@ -874,10 +872,9 @@ public abstract class Repository implements AutoCloseable {
 	 * it is returned to the caller.
 	 *
 	 * @return name of current branch (for example {@code master}), or an
-	 *         ObjectId in hex format if the current branch is detached or null.
+	 *         ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
-	/* @Nullable */
 	public String getBranch() throws IOException {
 		String name = getFullBranch();
 		if (name != null)
