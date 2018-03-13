@@ -911,16 +911,12 @@ public abstract class Repository implements AutoCloseable {
 	@Nullable
 	public String getFullBranch() throws IOException {
 		Ref head = getRef(Constants.HEAD);
-		if (head == null) {
+		if (head == null)
 			return null;
-		}
-		if (head.isSymbolic()) {
+		if (head.isSymbolic())
 			return head.getTarget().getName();
-		}
-		ObjectId objectId = head.getObjectId();
-		if (objectId != null) {
-			return objectId.name();
-		}
+		if (head.getObjectId() != null)
+			return head.getObjectId().name();
 		return null;
 	}
 
