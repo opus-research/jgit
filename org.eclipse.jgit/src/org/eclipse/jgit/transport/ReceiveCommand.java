@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -197,8 +196,8 @@ public class ReceiveCommand {
 	 *
 	 * @param cmd
 	 *            command.
-	 * @return whether the command failed due to transaction aborted, as in
-	 *         {@link #abort(Iterable)}.
+	 * @return whether the command failed due to transaction aborted, as in {@link
+	 *         #abort(Iterable)}.
 	 * @since 4.9
 	 */
 	public static boolean isTransactionAborted(ReceiveCommand cmd) {
@@ -206,70 +205,13 @@ public class ReceiveCommand {
 				&& cmd.getMessage().equals(JGitText.get().transactionAborted);
 	}
 
-	/**
-	 * Create a command to switch a reference from object to symbolic.
-	 *
-	 * @param oldId
-	 *            expected oldId. May be {@code zeroId} to create.
-	 * @param newTarget
-	 *            new target; must begin with {@code "refs/"}.
-	 * @param name
-	 *            name of the reference to make symbolic.
-	 * @return command instance.
-	 * @since 4.9
-	 */
-	public static ReceiveCommand link(ObjectId oldId, @NonNull String newTarget,
-			@NonNull String name) {
-		return new ReceiveCommand(oldId, newTarget, name);
-	}
-
-	/**
-	 * Create a command to switch a symbolic reference's target.
-	 *
-	 * @param oldTarget
-	 *            expected old target. May be null to create.
-	 * @param newTarget
-	 *            new target; must begin with {@code "refs/"}.
-	 * @param name
-	 *            name of the reference to make symbolic.
-	 * @return command instance.
-	 * @since 4.9
-	 */
-	public static ReceiveCommand link(@Nullable String oldTarget,
-			@NonNull String newTarget, @NonNull String name) {
-		return new ReceiveCommand(oldTarget, newTarget, name);
-	}
-
-	/**
-	 * Create a command to switch a reference from symbolic to object.
-	 *
-	 * @param oldTarget
-	 *            expected old target.
-	 * @param newId
-	 *            new object identifier. May be {@code zeroId()} to delete.
-	 * @param name
-	 *            name of the reference to convert from symbolic.
-	 * @return command instance.
-	 * @since 4.9
-	 */
-	public static ReceiveCommand unlink(String oldTarget, ObjectId newId,
-			@NonNull String name) {
-		return new ReceiveCommand(oldTarget, newId, name);
-	}
-
 	private final ObjectId oldId;
 
-	private final String oldSymref;
-
 	private final ObjectId newId;
-
-	private final String newSymref;
 
 	private final String name;
 
 	private Type type;
-
-	private boolean typeIsCorrect;
 
 	private Ref ref;
 
@@ -284,6 +226,8 @@ public class ReceiveCommand {
 	private boolean refLogIncludeResult;
 
 	private Boolean forceRefLog;
+
+	private boolean typeIsCorrect;
 
 	/**
 	 * Create a new command for {@link BaseReceivePack}.
@@ -305,13 +249,8 @@ public class ReceiveCommand {
 		if (newId == null) {
 			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
 		}
-		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(JGitText.get().nameMustNotBeNullOrEmpty);
-		}
 		this.oldId = oldId;
-		this.oldSymref = null;
 		this.newId = newId;
-		this.newSymref = null;
 		this.name = name;
 
 		type = Type.UPDATE;
@@ -336,8 +275,7 @@ public class ReceiveCommand {
 	 *            name of the ref being affected.
 	 * @param type
 	 *            type of the command. Must be {@link Type#CREATE} if {@code
-	 *            oldId} is zero, or {@link Type#DELETE} if {@code newId} is
-	 *            zero.
+	 *            oldId} is zero, or {@link Type#DELETE} if {@code newId} is zero.
 	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
@@ -348,13 +286,8 @@ public class ReceiveCommand {
 		if (newId == null) {
 			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
 		}
-		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(JGitText.get().nameMustNotBeNullOrEmpty);
-		}
 		this.oldId = oldId;
-		this.oldSymref = null;
 		this.newId = newId;
-		this.newSymref = null;
 		this.name = name;
 		switch (type) {
 		case CREATE:
@@ -383,136 +316,14 @@ public class ReceiveCommand {
 		this.type = type;
 	}
 
-	/**
-	 * Create a command to switch a reference from object to symbolic.
-	 *
-	 * @param oldId
-	 *            the old object id; must not be null. Use
-	 *            {@link ObjectId#zeroId()} to indicate a ref creation.
-	 * @param newSymref
-	 *            new target, must begin with {@code "refs/"}. Use {@code null}
-	 *            to indicate a ref deletion.
-	 * @param name
-	 *            name of the reference to make symbolic.
-	 * @since 4.9
-	 */
-	private ReceiveCommand(ObjectId oldId, String newSymref, String name) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(
-					JGitText.get().oldIdMustNotBeNull);
-		}
-		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(
-					JGitText.get().nameMustNotBeNullOrEmpty);
-		}
-		this.oldId = oldId;
-		this.oldSymref = null;
-		this.newId = ObjectId.zeroId();
-		this.newSymref = newSymref;
-		this.name = name;
-		if (AnyObjectId.equals(ObjectId.zeroId(), oldId)) {
-			type = Type.CREATE;
-		} else if (newSymref != null) {
-			type = Type.UPDATE;
-		} else {
-			type = Type.DELETE;
-		}
-		typeIsCorrect = true;
-	}
-
-	/**
-	 * Create a command to switch a reference from symbolic to object.
-	 *
-	 * @param oldSymref
-	 *            expected old target. Use {@code null} to indicate a ref
-	 *            creation.
-	 * @param newId
-	 *            the new object id; must not be null. Use
-	 *            {@link ObjectId#zeroId()} to indicate a ref deletion.
-	 * @param name
-	 *            name of the reference to convert from symbolic.
-	 * @since 4.9
-	 */
-	private ReceiveCommand(String oldSymref, ObjectId newId, String name) {
-		if (newId == null) {
-			throw new IllegalArgumentException(
-					JGitText.get().newIdMustNotBeNull);
-		}
-		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(
-					JGitText.get().nameMustNotBeNullOrEmpty);
-		}
-		this.oldId = ObjectId.zeroId();
-		this.oldSymref = oldSymref;
-		this.newId = newId;
-		this.newSymref = null;
-		this.name = name;
-		if (oldSymref == null) {
-			type = Type.CREATE;
-		} else if (!AnyObjectId.equals(ObjectId.zeroId(), newId)) {
-			type = Type.UPDATE;
-		} else {
-			type = Type.DELETE;
-		}
-		typeIsCorrect = true;
-	}
-
-	/**
-	 * Create a command to switch a symbolic reference's target.
-	 *
-	 * @param oldTarget
-	 *            expected old target. Use {@code null} to indicate a ref
-	 *            creation.
-	 * @param newTarget
-	 *            new target. Use {@code null} to indicate a ref deletion.
-	 * @param name
-	 *            name of the reference to make symbolic.
-	 * @since 4.9
-	 */
-	private ReceiveCommand(@Nullable String oldTarget, String newTarget, String name) {
-		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(
-					JGitText.get().nameMustNotBeNullOrEmpty);
-		}
-		this.oldId = ObjectId.zeroId();
-		this.oldSymref = oldTarget;
-		this.newId = ObjectId.zeroId();
-		this.newSymref = newTarget;
-		this.name = name;
-		if (oldTarget == null) {
-			if (newTarget == null) {
-				throw new IllegalArgumentException(
-						JGitText.get().bothRefTargetsMustNotBeNull);
-			}
-			type = Type.CREATE;
-		} else if (newTarget != null) {
-			type = Type.UPDATE;
-		} else {
-			type = Type.DELETE;
-		}
-		typeIsCorrect = true;
-	}
-
 	/** @return the old value the client thinks the ref has. */
 	public ObjectId getOldId() {
 		return oldId;
 	}
 
-	/** @return expected old target for a symbolic reference. */
-	@Nullable
-	public String getOldSymref() {
-		return oldSymref;
-	}
-
 	/** @return the requested new value for this ref. */
 	public ObjectId getNewId() {
 		return newId;
-	}
-
-	/** @return requested new target for a symbolic reference. */
-	@Nullable
-	public String getNewSymref() {
-		return newSymref;
 	}
 
 	/** @return the name of the ref being updated. */
@@ -547,12 +358,11 @@ public class ReceiveCommand {
 	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
 	 *
 	 * @param msg
-	 *            the message to describe this change. If null and appendStatus
-	 *            is false, the reflog will not be updated.
+	 *            the message to describe this change. If null and appendStatus is
+	 *            false, the reflog will not be updated.
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied
-	 *            message.
+	 *            forced-update) should be appended to the user supplied message.
 	 * @since 4.9
 	 */
 	public void setRefLogMessage(String msg, boolean appendStatus) {
@@ -584,8 +394,7 @@ public class ReceiveCommand {
 	/**
 	 * Force writing a reflog for the updated ref.
 	 *
-	 * @param force
-	 *            whether to force.
+	 * @param force whether to force.
 	 * @since 4.9
 	 */
 	public void setForceRefLog(boolean force) {
@@ -593,8 +402,8 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Check whether this command has a custom reflog message setting that
-	 * should override defaults in any containing
+	 * Check whether this command has a custom reflog message setting that should
+	 * override defaults in any containing
 	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
 	 * <p>
 	 * Does not take into account whether {@code #setForceRefLog(boolean)} has
@@ -697,7 +506,8 @@ public class ReceiveCommand {
 		if (type == Type.UPDATE && !AnyObjectId.equals(oldId, newId)) {
 			RevObject o = walk.parseAny(oldId);
 			RevObject n = walk.parseAny(newId);
-			if (!(o instanceof RevCommit) || !(n instanceof RevCommit)
+			if (!(o instanceof RevCommit)
+					|| !(n instanceof RevCommit)
 					|| !walk.isMergedInto((RevCommit) o, (RevCommit) n))
 				setType(Type.UPDATE_NONFASTFORWARD);
 		}
@@ -715,18 +525,7 @@ public class ReceiveCommand {
 	 */
 	public void execute(final BaseReceivePack rp) {
 		try {
-			String expTarget = getOldSymref();
-			boolean detach = getNewSymref() != null
-					|| (type == Type.DELETE && expTarget != null);
-			RefUpdate ru = rp.getRepository().updateRef(getRefName(), detach);
-			if (expTarget != null) {
-				if (!ru.getRef().isSymbolic() || !ru.getRef().getTarget()
-						.getName().equals(expTarget)) {
-					setResult(Result.LOCK_FAILURE);
-					return;
-				}
-			}
-
+			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
 			ru.setRefLogIdent(rp.getRefLogIdent());
 			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
 			switch (getType()) {
@@ -747,13 +546,9 @@ public class ReceiveCommand {
 			case UPDATE_NONFASTFORWARD:
 				ru.setForceUpdate(rp.isAllowNonFastForwards());
 				ru.setExpectedOldObjectId(getOldId());
+				ru.setNewObjectId(getNewId());
 				ru.setRefLogMessage("push", true); //$NON-NLS-1$
-				if (getNewSymref() != null) {
-					setResult(ru.link(getNewSymref()));
-				} else {
-					ru.setNewObjectId(getNewId());
-					setResult(ru.update(rp.getRevWalk()));
-				}
+				setResult(ru.update(rp.getRevWalk()));
 				break;
 			}
 		} catch (IOException err) {
@@ -822,7 +617,7 @@ public class ReceiveCommand {
 
 	void reject(IOException err) {
 		setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
-						JGitText.get().lockError, err.getMessage()));
+				JGitText.get().lockError, err.getMessage()));
 	}
 
 	@SuppressWarnings("nls")
