@@ -57,6 +57,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
@@ -71,14 +72,15 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-submodule.html"
  *      >Git documentation about submodules</a>
  */
-public class SubmoduleAddCommand extends
-		TransportCommand<SubmoduleAddCommand, Repository> {
+public class SubmoduleAddCommand extends GitCommand<Repository> {
 
 	private String path;
 
 	private String uri;
 
 	private ProgressMonitor monitor;
+
+	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
@@ -123,6 +125,17 @@ public class SubmoduleAddCommand extends
 	}
 
 	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return this command
+	 */
+	public SubmoduleAddCommand setCredentialsProvider(
+			final CredentialsProvider credentialsProvider) {
+		this.credentialsProvider = credentialsProvider;
+		return this;
+	}
+
+	/**
 	 * Is the configured already a submodule in the index?
 	 *
 	 * @return true if submodule exists in index, false otherwise
@@ -151,11 +164,12 @@ public class SubmoduleAddCommand extends
 		// Clone submodule repository
 		File moduleDirectory = SubmoduleWalk.getSubmoduleDirectory(repo, path);
 		CloneCommand clone = Git.cloneRepository();
-		configure(clone);
 		clone.setDirectory(moduleDirectory);
 		clone.setURI(uri);
 		if (monitor != null)
 			clone.setProgressMonitor(monitor);
+		if (credentialsProvider != null)
+			clone.setCredentialsProvider(credentialsProvider);
 		Repository subRepo = clone.call().getRepository();
 
 		// Save submodule URL to parent repository's config
