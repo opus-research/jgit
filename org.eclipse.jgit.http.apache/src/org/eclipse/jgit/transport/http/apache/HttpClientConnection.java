@@ -323,16 +323,8 @@ public class HttpClientConnection implements HttpConnection {
 	}
 
 	public int getContentLength() {
-		Header contentLength = resp.getFirstHeader("content-length"); //$NON-NLS-1$
-		if (contentLength == null) {
-			return -1;
-		} else {
-			long l = Long.parseLong(contentLength.getValue());
-			if (l > Integer.MAX_VALUE) {
-				return -1;
-			}
-			return (int) l;
-		}
+		return Integer.parseInt(resp.getFirstHeader("content-length") //$NON-NLS-1$
+				.getValue());
 	}
 
 	public void setInstanceFollowRedirects(boolean followRedirects) {
