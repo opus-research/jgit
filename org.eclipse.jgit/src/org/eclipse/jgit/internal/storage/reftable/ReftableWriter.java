@@ -44,13 +44,7 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.lang.Math.log;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_MAGIC;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.*;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -86,10 +80,11 @@ import org.eclipse.jgit.util.NB;
  * all references. A {@link ReftableWriter} is single-use, and not thread-safe.
  */
 public class ReftableWriter {
-	private int refBlockSize = 4 << 10;
+	private ReftableConfig config = new ReftableConfig();
+	private int refBlockSize;
 	private int logBlockSize;
 	private int restartInterval;
-	private boolean indexObjects = true;
+	private boolean indexObjects;
 
 	private ReftableOutputStream out;
 	private ObjectIdSubclassMap<RefList> obj2ref;
@@ -123,62 +118,12 @@ public class ReftableWriter {
 	private Stats stats;
 
 	/**
-	 * @param szBytes
-	 *            desired output block size for references, in bytes.
+	 * @param cfg
+	 *            configuration for the writer.
 	 * @return {@code this}
 	 */
-	public ReftableWriter setRefBlockSize(int szBytes) {
-		if (out != null) {
-			throw new IllegalStateException();
-		} else if (szBytes < 1024 || szBytes >= (1 << 24)) {
-			throw new IllegalArgumentException();
-		}
-		refBlockSize = szBytes;
-		return this;
-	}
-
-	/**
-	 * @param szBytes
-	 *            desired output block size for log entries, in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableWriter setLogBlockSize(int szBytes) {
-		if (out != null) {
-			throw new IllegalStateException();
-		} else if (szBytes < 1024 || szBytes >= (1 << 24)) {
-			throw new IllegalArgumentException();
-		}
-		logBlockSize = szBytes;
-		return this;
-	}
-
-	/**
-	 * @param interval
-	 *            number of references between binary search markers. If
-	 *            {@code interval} is 0 (default), the writer will select a
-	 *            default value based on the block size.
-	 * @return {@code this}
-	 */
-	public ReftableWriter setRestartInterval(int interval) {
-		if (out != null) {
-			throw new IllegalStateException();
-		} else if (interval < 0) {
-			throw new IllegalArgumentException();
-		}
-		restartInterval = interval;
-		return this;
-	}
-
-	/**
-	 * @param index
-	 *            if {@code true} the reftable may include additional storage to
-	 *            efficiently map from {@code ObjectId} to reference names. By
-	 *            default, {@code true}. When set to {@code true},
-	 *            {@link #estimateTotalBytes()} may be inaccurate.
-	 * @return {@code this}
-	 */
-	public ReftableWriter setIndexObjects(boolean index) {
-		indexObjects = index;
+	public ReftableWriter setConfig(ReftableConfig cfg) {
+		this.config = cfg != null ? cfg : new ReftableConfig();
 		return this;
 	}
 
@@ -196,6 +141,19 @@ public class ReftableWriter {
 	 *             reftable header cannot be written.
 	 */
 	public ReftableWriter begin(OutputStream os) throws IOException {
+		refBlockSize = config.getRefBlockSize();
+		logBlockSize = config.getLogBlockSize();
+		restartInterval = config.getRestartInterval();
+		indexObjects = config.isIndexObjects();
+
+		if (refBlockSize <= 0) {
+			refBlockSize = 4 << 10;
+		} else if (refBlockSize > MAX_BLOCK_SIZE) {
+			throw new IllegalArgumentException();
+		}
+		if (logBlockSize <= 0) {
+			logBlockSize = 2 * refBlockSize;
+		}
 		if (restartInterval <= 0) {
 			restartInterval = refBlockSize < (60 << 10) ? 16 : 64;
 		}
@@ -379,7 +337,8 @@ public class ReftableWriter {
 	/**
 	 * @return an estimate of the current size in bytes of the reftable, if it
 	 *         was finished right now. The estimate is only accurate if the
-	 *         writer has {@link #setIndexObjects(boolean)} to {@code false}.
+	 *         configuration has {@link ReftableConfig#setIndexObjects(boolean)}
+	 *         to {@code false}.
 	 */
 	public long estimateTotalBytes() {
 		long bytes = out.size();

@@ -129,8 +129,9 @@ public class ReftableTest {
 		int expBytes = 8 + 4 + 3 + MASTER.length() + 20 + 6 + 52;
 
 		byte[] table;
-		ReftableWriter writer = new ReftableWriter();
-		writer.setIndexObjects(false);
+		ReftableConfig cfg = new ReftableConfig();
+		cfg.setIndexObjects(false);
+		ReftableWriter writer = new ReftableWriter().setConfig(cfg);
 		try (ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
 			writer.begin(buf);
 			assertEquals(8 + 52, writer.estimateTotalBytes());
@@ -436,10 +437,12 @@ public class ReftableTest {
 	@SuppressWarnings("boxing")
 	@Test
 	public void logScan() throws IOException {
+		ReftableConfig cfg = new ReftableConfig();
+		cfg.setLogBlockSize(2048);
+
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		ReftableWriter writer = new ReftableWriter();
-		writer.setLogBlockSize(2048);
-		writer.begin(buffer);
+		writer.setConfig(cfg).begin(buffer);
 
 		List<Ref> refs = new ArrayList<>();
 		for (int i = 1; i <= 567; i++) {
@@ -471,69 +474,6 @@ public class ReftableTest {
 				assertEquals("create " + exp.getName(), entry.getComment());
 			}
 			assertFalse(lc.next());
-		}
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void byObjectIdOneRefNoIndex() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 200; i++) {
-			refs.add(ref(String.format("refs/heads/%02d", i), i));
-		}
-		refs.add(ref("refs/heads/master", 100));
-
-		ReftableReader t = read(write(refs));
-		assertEquals(2, stats.refBlockCount());
-		assertEquals(0, stats.objIndexSize());
-
-		try (RefCursor rc = t.byObjectId(id(42))) {
-			assertTrue("has 42", rc.next());
-			assertEquals("refs/heads/42", rc.getRef().getName());
-			assertEquals(id(42), rc.getRef().getObjectId());
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = t.byObjectId(id(100))) {
-			assertTrue("has 100", rc.next());
-			assertEquals("refs/heads/100", rc.getRef().getName());
-			assertEquals(id(100), rc.getRef().getObjectId());
-
-			assertTrue("has master", rc.next());
-			assertEquals("refs/heads/master", rc.getRef().getName());
-			assertEquals(id(100), rc.getRef().getObjectId());
-
-			assertFalse(rc.next());
-		}
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void byObjectIdOneRefWithIndex() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 5200; i++) {
-			refs.add(ref(String.format("refs/heads/%02d", i), i));
-		}
-		refs.add(ref("refs/heads/master", 100));
-
-		ReftableReader t = read(write(refs));
-		assertTrue(stats.objIndexSize() > 0);
-
-		try (RefCursor rc = t.byObjectId(id(42))) {
-			assertTrue("has 42", rc.next());
-			assertEquals("refs/heads/42", rc.getRef().getName());
-			assertEquals(id(42), rc.getRef().getObjectId());
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = t.byObjectId(id(100))) {
-			assertTrue("has 100", rc.next());
-			assertEquals("refs/heads/100", rc.getRef().getName());
-			assertEquals(id(100), rc.getRef().getObjectId());
-
-			assertTrue("has master", rc.next());
-			assertEquals("refs/heads/master", rc.getRef().getName());
-			assertEquals(id(100), rc.getRef().getObjectId());
-
-			assertFalse(rc.next());
 		}
 	}
 
