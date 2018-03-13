@@ -49,24 +49,18 @@ import org.junit.Test;
 
 /** Tests for base receive-pack utilities. */
 public class BaseReceivePackTest {
-	private static final String CMD_STRING =
-			"0000000000000000000000000000000000000000"
-			+ " deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-			+ " refs/heads/master";
-
 	@Test
-	public void parseCommand() {
-		String input = CMD_STRING;
-		ReceiveCommand cmd = BaseReceivePack.parseCommand(input);
-		assertEquals(ObjectId.zeroId(), cmd.getOldId());
-		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-				cmd.getNewId().name());
-		assertEquals("refs/heads/master", cmd.getRefName());
+	public void chomp() {
+		assertEquals("foo", BaseReceivePack.chomp("foo"));
+		assertEquals("foo", BaseReceivePack.chomp("foo\n"));
+		assertEquals("foo\n", BaseReceivePack.chomp("foo\n\n"));
 	}
 
 	@Test
-	public void parseCommandWithTrailingNewline() {
-		String input = CMD_STRING + '\n';
+	public void parseCommand() {
+		String input = "0000000000000000000000000000000000000000"
+				+ " deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+				+ " refs/heads/master";
 		ReceiveCommand cmd = BaseReceivePack.parseCommand(input);
 		assertEquals(ObjectId.zeroId(), cmd.getOldId());
 		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",

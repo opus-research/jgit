@@ -252,19 +252,13 @@ public abstract class BaseReceivePack {
 	/** The size of the received pack, including index size */
 	private Long packSize;
 
-	private PushCertificateParser pushCertificateParser;
+	PushCertificateParser pushCertificateParser;
 
 	/**
-	 * Get the push certificate used to verify the pusher's identity.
-	 * <p>
-	 * Only valid after commands are read from the wire.
-	 *
-	 * @return the parsed certificate, or null if push certificates are disabled.
-	 * @throws IOException if the certificate was present but invalid.
-	 * @since 4.1
+	 * @return the push certificate used to verify the pushers identity.
 	 */
-	public PushCertificate getPushCertificate() throws IOException {
-		return pushCertificateParser.build();
+	PushCertificate getPushCertificate() {
+		return pushCertificateParser;
 	}
 
 	/**
@@ -1020,11 +1014,9 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowQuiet)
 			adv.advertiseCapability(CAPABILITY_QUIET);
-		String nonce = pushCertificateParser.getAdvertiseNonce();
-		if (nonce != null) {
+		if (pushCertificateParser.enabled())
 			adv.advertiseCapability(
 				pushCertificateParser.getAdvertiseNonce());
-		}
 		if (db.getRefDatabase().performsAtomicTransactions())
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
@@ -1045,16 +1037,18 @@ public abstract class BaseReceivePack {
 	 */
 	protected void recvCommands() throws IOException {
 		for (;;) {
-			String line;
+			String rawLine;
 			try {
-				line = pckIn.readStringRaw();
+				rawLine = pckIn.readStringRaw();
 			} catch (EOFException eof) {
 				if (commands.isEmpty())
 					return;
 				throw eof;
 			}
-			if (line == PacketLineIn.END)
+			if (rawLine == PacketLineIn.END) {
 				break;
+			}
+			String line = chomp(rawLine);
 
 			if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
 				clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
@@ -1071,8 +1065,13 @@ public abstract class BaseReceivePack {
 							!isBiDirectionalPipe());
 			}
 
-			if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
+			if (line.equals("-----BEGIN PGP SIGNATURE-----\n")) //$NON-NLS-1$
 				pushCertificateParser.receiveSignature(pckIn);
+
+			if (pushCertificateParser.enabled()) {
+				// Must use raw line with optional newline so signed payload can be
+				// reconstructed.
+				pushCertificateParser.addCommand(rawLine);
 			}
 
 			if (line.length() < 83) {
@@ -1088,17 +1087,20 @@ public abstract class BaseReceivePack {
 				cmd.setRef(refs.get(cmd.getRefName()));
 			}
 			commands.add(cmd);
-			pushCertificateParser.addCommand(cmd);
 		}
+	}
+
+	static String chomp(String line) {
+		if (line.charAt(line.length() - 1) == '\n') {
+			return line.substring(0, line.length() - 1);
+		}
+		return line;
 	}
 
 	static ReceiveCommand parseCommand(String line) {
 		final ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
 		final ObjectId newId = ObjectId.fromString(line.substring(41, 81));
 		String name = line.substring(82);
-		if (!name.isEmpty() && name.charAt(name.length() - 1) == '\n') {
-			name = name.substring(0, name.length() - 1);
-		}
 		final ReceiveCommand cmd = new ReceiveCommand(oldId, newId, name);
 		return cmd;
 	}
