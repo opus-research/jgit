@@ -9,13 +9,18 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.lib.SymbolicRef;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.RefList;
 
 /**
@@ -241,15 +246,49 @@ public class InMemoryRepository extends DfsRepository {
 		@Override
 		protected boolean compareAndPut(Ref oldRef, Ref newRef)
 				throws IOException {
+			ObjectId id = newRef.getObjectId();
+			if (id != null) {
+				try (RevWalk rw = new RevWalk(getRepository())) {
+					// Validate that the target exists in a new RevWalk, as the RevWalk
+					// from the RefUpdate might be reading back unflushed objects.
+					rw.parseAny(id);
+				}
+			}
 			String name = newRef.getName();
-			if (oldRef == null || oldRef.getStorage() == Storage.NEW)
+			if (oldRef == null)
 				return refs.putIfAbsent(name, newRef) == null;
-			Ref cur = refs.get(name);
-			if (cur != null && eq(cur, oldRef))
-				return refs.replace(name, cur, newRef);
-			else
-				return false;
 
+			synchronized (refs) {
+				Ref cur = refs.get(name);
+				Ref toCompare = cur;
+				if (toCompare != null) {
+					if (toCompare.isSymbolic()) {
+						// Arm's-length dereference symrefs before the compare, since
+						// DfsRefUpdate#doLink(String) stores them undereferenced.
+						Ref leaf = toCompare.getLeaf();
+						if (leaf.getObjectId() == null) {
+							leaf = refs.get(leaf.getName());
+							if (leaf.isSymbolic())
+								// Not supported at the moment.
+								throw new IllegalArgumentException();
+							toCompare = new SymbolicRef(
+									name,
+									new ObjectIdRef.Unpeeled(
+											Storage.NEW,
+											leaf.getName(),
+											leaf.getObjectId()));
+						} else
+							toCompare = toCompare.getLeaf();
+					}
+					if (eq(toCompare, oldRef))
+						return refs.replace(name, cur, newRef);
+				}
+			}
+
+			if (oldRef.getStorage() == Storage.NEW)
+				return refs.putIfAbsent(name, newRef) == null;
+
+			return false;
 		}
 
 		@Override
@@ -263,11 +302,12 @@ public class InMemoryRepository extends DfsRepository {
 		}
 
 		private boolean eq(Ref a, Ref b) {
-			if (a.getObjectId() == null && b.getObjectId() == null)
-				return true;
-			if (a.getObjectId() != null)
-				return a.getObjectId().equals(b.getObjectId());
-			return false;
+			if (!Objects.equals(a.getName(), b.getName()))
+				return false;
+			// Compare leaf object IDs, since the oldRef passed into compareAndPut
+			// when detaching a symref is an ObjectIdRef.
+			return Objects.equals(a.getLeaf().getObjectId(),
+					b.getLeaf().getObjectId());
 		}
 	}
 }

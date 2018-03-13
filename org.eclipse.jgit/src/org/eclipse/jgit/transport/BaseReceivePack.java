@@ -168,7 +168,8 @@ public abstract class BaseReceivePack {
 	private boolean allowCreates;
 
 	/** Should an incoming transfer permit delete requests? */
-	private boolean allowDeletes;
+	private boolean allowAnyDeletes;
+	private boolean allowBranchDeletes;
 
 	/** Should an incoming transfer permit non-fast-forward requests? */
 	private boolean allowNonFastForwards;
@@ -245,6 +246,15 @@ public abstract class BaseReceivePack {
 	/** The size of the received pack, including index size */
 	private Long packSize;
 
+	PushCertificateParser pushCertificateParser;
+
+	/**
+	 * @return the push certificate used to verify the pushers identity.
+	 */
+	PushCertificate getPushCertificate() {
+		return pushCertificateParser;
+	}
+
 	/**
 	 * Create a new pack receive for an open repository.
 	 *
@@ -258,13 +268,15 @@ public abstract class BaseReceivePack {
 		final ReceiveConfig cfg = db.getConfig().get(ReceiveConfig.KEY);
 		objectChecker = cfg.newObjectChecker();
 		allowCreates = cfg.allowCreates;
-		allowDeletes = cfg.allowDeletes;
+		allowAnyDeletes = true;
+		allowBranchDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
 		clientShallowCommits = new HashSet<ObjectId>();
+		pushCertificateParser = new PushCertificateParser(db, cfg);
 	}
 
 	/** Configuration for receive operations. */
@@ -285,6 +297,9 @@ public abstract class BaseReceivePack {
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
 
+		final String certNonceSeed;
+		final int certNonceSlopLimit;
+
 		ReceiveConfig(final Config config) {
 			checkReceivedObjects = config.getBoolean(
 					"receive", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
@@ -302,6 +317,8 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
+			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			certNonceSlopLimit = config.getInt("receive", "certnonceslop", 0); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 
 		ObjectChecker newObjectChecker() {
@@ -541,7 +558,7 @@ public abstract class BaseReceivePack {
 
 	/** @return true if the client can request refs to be deleted. */
 	public boolean isAllowDeletes() {
-		return allowDeletes;
+		return allowAnyDeletes;
 	}
 
 	/**
@@ -549,7 +566,25 @@ public abstract class BaseReceivePack {
 	 *            true to permit delete ref commands to be processed.
 	 */
 	public void setAllowDeletes(final boolean canDelete) {
-		allowDeletes = canDelete;
+		allowAnyDeletes = canDelete;
+	}
+
+	/**
+	 * @return true if the client can delete from {@code refs/heads/}.
+	 * @since 3.6
+	 */
+	public boolean isAllowBranchDeletes() {
+		return allowBranchDeletes;
+	}
+
+	/**
+	 * @param canDelete
+	 *            true to permit deletion of branches from the
+	 *            {@code refs/heads/} namespace.
+	 * @since 3.6
+	 */
+	public void setAllowBranchDeletes(boolean canDelete) {
+		allowBranchDeletes = canDelete;
 	}
 
 	/**
@@ -909,6 +944,9 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
+		if (pushCertificateParser.enabled())
+			adv.advertiseCapability(
+				pushCertificateParser.getAdvertiseNonce());
 		if (db.getRefDatabase().performsAtomicTransactions())
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
@@ -948,7 +986,17 @@ public abstract class BaseReceivePack {
 				final FirstLine firstLine = new FirstLine(line);
 				enabledCapabilities = firstLine.getCapabilities();
 				line = firstLine.getLine();
+
+				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT))
+					pushCertificateParser.receiveHeader(pckIn,
+							!isBiDirectionalPipe());
 			}
+
+			if (line.equals("-----BEGIN PGP SIGNATURE-----\n")) //$NON-NLS-1$
+				pushCertificateParser.receiveSignature(pckIn);
+
+			if (pushCertificateParser.enabled())
+				pushCertificateParser.addCommand(line);
 
 			if (line.length() < 83) {
 				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
@@ -1143,12 +1191,18 @@ public abstract class BaseReceivePack {
 			if (cmd.getResult() != Result.NOT_ATTEMPTED)
 				continue;
 
-			if (cmd.getType() == ReceiveCommand.Type.DELETE
-					&& !isAllowDeletes()) {
-				// Deletes are not supported on this repository.
-				//
-				cmd.setResult(Result.REJECTED_NODELETE);
-				continue;
+			if (cmd.getType() == ReceiveCommand.Type.DELETE) {
+				if (!isAllowDeletes()) {
+					// Deletes are not supported on this repository.
+					cmd.setResult(Result.REJECTED_NODELETE);
+					continue;
+				}
+				if (!isAllowBranchDeletes()
+						&& ref.getName().startsWith(Constants.R_HEADS)) {
+					// Branches cannot be deleted, but other refs can.
+					cmd.setResult(Result.REJECTED_NODELETE);
+					continue;
+				}
 			}
 
 			if (cmd.getType() == ReceiveCommand.Type.CREATE) {

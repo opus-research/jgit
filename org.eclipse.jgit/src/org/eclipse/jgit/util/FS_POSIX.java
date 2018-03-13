@@ -44,11 +44,14 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Repository;
 
 /**
  * Base FS for POSIX based systems
@@ -120,5 +123,16 @@ public abstract class FS_POSIX extends FS {
 		ProcessBuilder proc = new ProcessBuilder();
 		proc.command(argv);
 		return proc;
+	}
+
+	/**
+	 * @since 4.0
+	 */
+	@Override
+	public ProcessResult runHookIfPresent(Repository repository, String hookName,
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
+		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
+				errRedirect, stdinArgs);
 	}
 }
