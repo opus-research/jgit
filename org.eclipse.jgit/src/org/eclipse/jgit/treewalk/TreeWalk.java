@@ -57,7 +57,6 @@ import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
-import org.eclipse.jgit.attributes.MacroExpander;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -270,9 +269,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	/** Cached attribute for the current entry */
 	private Attributes attrs = null;
 
-	/** Cached macro expander */
-	private MacroExpander macroExpander;
-
 	private Config config;
 
 	/**
@@ -441,7 +437,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	/** Reset this walker so new tree iterators can be added to it. */
 	public void reset() {
 		attrs = null;
-		macroExpander = null;
 		trees = NO_TREES;
 		advance = false;
 		depth = 0;
@@ -1147,12 +1142,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 					"The tree walk should have one AttributesNodeProvider set in order to compute the git attributes."); //$NON-NLS-1$
 		}
 
-		WorkingTreeIterator workingTreeIterator = getCurrentTreeNode(
-				WorkingTreeIterator.class);
-		DirCacheIterator dirCacheIterator = getCurrentTreeNode(
-				DirCacheIterator.class);
-		CanonicalTreeParser other = getCurrentTreeNode(
-				CanonicalTreeParser.class);
+		WorkingTreeIterator workingTreeIterator = getTree(WorkingTreeIterator.class);
+		DirCacheIterator dirCacheIterator = getTree(DirCacheIterator.class);
+		CanonicalTreeParser other = getTree(CanonicalTreeParser.class);
 
 		if (workingTreeIterator == null && dirCacheIterator == null
 				&& other == null) {
@@ -1164,33 +1156,29 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		String path = currentHead.getEntryPathString();
 		final boolean isDir = FileMode.TREE.equals(currentHead.mode);
 		Attributes attributes = new Attributes();
-
 		try {
-			if (macroExpander == null) {
-				// Lazy create the macro expander on the first access of
-				// attributes. This requires the info, global and root
-				// attributes nodes
-				AttributesNode globalNode = attributesNodeProvider
-						.getGlobalAttributesNode();
-				AttributesNode infoNode = attributesNodeProvider
-						.getInfoAttributesNode();
-				AttributesNode rootNode = getRootAttributesNode();
-				macroExpander = new MacroExpander(globalNode, infoNode,
-						rootNode);
-			}
+			// Gets the global attributes node
+			AttributesNode globalNodeAttr = attributesNodeProvider
+					.getGlobalAttributesNode();
+			// Gets the info attributes node
+			AttributesNode infoNodeAttr = attributesNodeProvider
+					.getInfoAttributesNode();
 
 			// Gets the info attributes
-			macroExpander.mergeInfoAttributes(path, isDir, attributes);
+			if (infoNodeAttr != null) {
+				infoNodeAttr.getAttributes(path, isDir, attributes);
+			}
 
 			// Gets the attributes located on the current entry path
 			getPerDirectoryEntryAttributes(path, isDir, operationType,
 					workingTreeIterator, dirCacheIterator, other, attributes);
 
 			// Gets the attributes located in the global attribute file
-			macroExpander.mergeGlobalAttributes(path, isDir, attributes);
+			if (globalNodeAttr != null) {
+				globalNodeAttr.getAttributes(path, isDir, attributes);
+			}
 		} catch (IOException e) {
-			throw new JGitInternalException("Error while parsing attributes", //$NON-NLS-1$
-					e);
+			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
 		}
 		// now after all attributes are collected - in the correct hierarchy
 		// order - remove all unspecified entries (the ! marker)
@@ -1234,8 +1222,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			AttributesNode currentAttributesNode = getCurrentAttributesNode(
 					opType, workingTreeIterator, dirCacheIterator, other);
 			if (currentAttributesNode != null) {
-				macroExpander.mergeAttributes(currentAttributesNode, path,
-						isDir, attributes);
+				currentAttributesNode.getAttributes(path, isDir, attributes);
 			}
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
@@ -1255,24 +1242,12 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		return null;
 	}
 
-	private <T extends AbstractTreeIterator> T getCurrentTreeNode(
-			Class<T> type) {
+	private <T extends AbstractTreeIterator> T getTree(Class<T> type) {
 		for (int i = 0; i < trees.length; i++) {
 			AbstractTreeIterator tree = trees[i];
 			if (type.isInstance(tree)) {
 				return type.cast(tree);
 			}
-		}
-		return null;
-	}
-
-	private <T extends AbstractTreeIterator> T getRootTreeNode(Class<T> type) {
-		AbstractTreeIterator node = getCurrentTreeNode(type);
-		while (node != null && node.parent != null) {
-			node = node.parent;
-		}
-		if (type.isInstance(node)) {
-			return type.cast(node);
 		}
 		return null;
 	}
@@ -1306,12 +1281,14 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				attributesNode = workingTreeIterator.getEntryAttributesNode();
 			}
 			if (attributesNode == null && dirCacheIterator != null) {
-				attributesNode = dirCacheIterator
-						.getEntryAttributesNode(getObjectReader());
+				attributesNode = getAttributesNode(dirCacheIterator
+						.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
 			}
 			if (attributesNode == null && other != null) {
-				attributesNode = other
-						.getEntryAttributesNode(getObjectReader());
+				attributesNode = getAttributesNode(
+						other.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
 			}
 			break;
 		case CHECKOUT_OP:
@@ -1319,12 +1296,15 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				attributesNode = other
 						.getEntryAttributesNode(getObjectReader());
 			}
-			if (attributesNode == null && dirCacheIterator != null) {
-				attributesNode = dirCacheIterator
-						.getEntryAttributesNode(getObjectReader());
+			if (dirCacheIterator != null) {
+				attributesNode = getAttributesNode(dirCacheIterator
+						.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
 			}
 			if (attributesNode == null && workingTreeIterator != null) {
-				attributesNode = workingTreeIterator.getEntryAttributesNode();
+				attributesNode = getAttributesNode(
+						workingTreeIterator.getEntryAttributesNode(),
+						attributesNode);
 			}
 			break;
 		default:
@@ -1337,25 +1317,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		return attributesNode;
 	}
 
-	/**
-	 * Gets the {@link AttributesNode} for the root folder. This is needed for
-	 * the git macro expansion facilty that requires the global, the info and
-	 * the root attributes node.
-	 *
-	 * @return the root {@link AttributesNode} of the tree,
-	 *         {@link NullPointerException} otherwise.
-	 * @throws IOException
-	 *             It raises an {@link IOException} if a problem appears while
-	 *             parsing one on the attributes file.
-	 */
-	private AttributesNode getRootAttributesNode() throws IOException {
-		WorkingTreeIterator workingTreeIterator = getRootTreeNode(
-				WorkingTreeIterator.class);
-		DirCacheIterator dirCacheIterator = getRootTreeNode(
-				DirCacheIterator.class);
-		CanonicalTreeParser other = getRootTreeNode(CanonicalTreeParser.class);
-		return getCurrentAttributesNode(operationType, workingTreeIterator,
-				dirCacheIterator, other);
+	private static AttributesNode getAttributesNode(AttributesNode value,
+			AttributesNode defaultValue) {
+		return (value == null) ? defaultValue : value;
 	}
 
 	/**

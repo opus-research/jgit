@@ -257,8 +257,8 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 		else {
 
 			Attributes entryAttributes = new Attributes();
-			new MacroExpander().mergeAttributes(attributesNode, pathName, false,
-					entryAttributes);
+			attributesNode.getAttributes(pathName,
+					false, entryAttributes);
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {

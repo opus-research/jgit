@@ -164,7 +164,7 @@ public class AttributesNodeTest {
 	private void assertAttribute(String path, AttributesNode node,
 			Attributes attrs) {
 		Attributes attributes = new Attributes();
-		new MacroExpander().mergeAttributes(node, path, false, attributes);
+		node.getAttributes(path, false, attributes);
 		assertEquals(attrs, attributes);
 	}
 
