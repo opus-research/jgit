@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Google Inc.
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,29 +41,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.gitrepo.internal;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 
-/**
- * Translation bundle for repo command
- */
-public class RepoText extends TranslationBundle {
+class InMemoryOutputStream extends DfsOutputStream {
+	private final ByteArrayOutputStream dst = new ByteArrayOutputStream();
 
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static RepoText get() {
-		return NLS.getBundleFor(RepoText.class);
+	private byte[] data;
+
+	@Override
+	public void write(byte[] buf, int off, int len) {
+		data = null;
+		dst.write(buf, off, len);
 	}
 
-	// @formatter:off
-	/***/ public String copyFileFailed;
-	/***/ public String errorNoDefault;
-	/***/ public String errorNoDefaultFilename;
-	/***/ public String errorParsingManifestFile;
-	/***/ public String errorRemoteUnavailable;
-	/***/ public String invalidManifest;
-	/***/ public String repoCommitMessage;
+	@Override
+	public int read(long position, ByteBuffer buf) {
+		byte[] d = getData();
+		int n = Math.min(buf.remaining(), d.length - (int) position);
+		if (n <= 0)
+			return -1;
+		buf.put(d, (int) position, n);
+		return n;
+	}
+
+	byte[] getData() {
+		if (data == null)
+			data = dst.toByteArray();
+		return data;
+	}
+
+	@Override
+	public void flush() {
+		// Default implementation does nothing;
+	}
+
+	@Override
+	public void close() {
+		flush();
+	}
 }
