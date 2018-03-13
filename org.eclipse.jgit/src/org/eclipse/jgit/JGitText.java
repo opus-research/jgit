@@ -356,9 +356,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
-	/***/ public String renamesAlreadyFound;
-	/***/ public String renamesFindingByContent;
-	/***/ public String renamesFindingExact;
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryNotFound;
 	/***/ public String requiredHashFunctionNotAvailable;
@@ -368,7 +365,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
 	/***/ public String shortSkipOfBlock;
-	/***/ public String similarityScoreMustBeWithinBounds;
 	/***/ public String smartHTTPPushDisabled;
 	/***/ public String sourceDestinationMustMatch;
 	/***/ public String sourceIsNotAWildcard;
