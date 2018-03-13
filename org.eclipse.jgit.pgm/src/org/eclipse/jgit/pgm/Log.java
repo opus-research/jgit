@@ -228,7 +228,7 @@ class Log extends RevWalkTextBuiltin {
 	}
 
 	private void addNoteMap(String notesRef) throws IOException {
-		Ref notes = db.getRef(notesRef);
+		Ref notes = db.exactRef(notesRef);
 		if (notes == null)
 			return;
 		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());
@@ -324,7 +324,7 @@ class Log extends RevWalkTextBuiltin {
 			return false;
 		if (emptyLine)
 			outw.println();
-		outw.print("Notes");
+		outw.print("Notes"); //$NON-NLS-1$
 		if (label != null) {
 			outw.print(" ("); //$NON-NLS-1$
 			outw.print(label);

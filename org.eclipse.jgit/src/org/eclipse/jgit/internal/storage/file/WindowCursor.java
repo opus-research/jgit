@@ -53,6 +53,7 @@ import java.util.Set;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
@@ -69,6 +70,7 @@ import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -84,10 +86,22 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	private DeltaBaseCache baseCache;
 
+	@Nullable
+	private final ObjectInserter createdFromInserter;
+
 	final FileObjectDatabase db;
 
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
+		this.createdFromInserter = null;
+		this.streamFileThreshold = WindowCache.getStreamFileThreshold();
+	}
+
+	WindowCursor(FileObjectDatabase db,
+			@Nullable ObjectDirectoryInserter createdFromInserter) {
+		this.db = db;
+		this.createdFromInserter = createdFromInserter;
+		this.streamFileThreshold = WindowCache.getStreamFileThreshold();
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {
@@ -128,18 +142,18 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		if (id.isComplete())
 			return Collections.singleton(id.toObjectId());
 		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
-		db.resolve(matches, id, null);
+		db.resolve(matches, id);
 		return matches;
 	}
 
 	public boolean has(AnyObjectId objectId) throws IOException {
-		return db.has(objectId, null);
+		return db.has(objectId);
 	}
 
 	public ObjectLoader open(AnyObjectId objectId, int typeHint)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		final ObjectLoader ldr = db.openObject(this, objectId, null);
+		final ObjectLoader ldr = db.openObject(this, objectId);
 		if (ldr == null) {
 			if (typeHint == OBJ_ANY)
 				throw new MissingObjectException(objectId.copy(),
@@ -177,7 +191,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
 		for (ObjectToPack otp : objects) {
-			db.selectObjectRepresentation(packer, otp, this, null);
+			db.selectObjectRepresentation(packer, otp, this);
 			monitor.update(1);
 		}
 	}
@@ -325,8 +339,10 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		}
 	}
 
-	int getStreamFileThreshold() {
-		return WindowCache.getStreamFileThreshold();
+	@Override
+	@Nullable
+	public ObjectInserter getCreatedFromInserter() {
+		return createdFromInserter;
 	}
 
 	/** Release the current window cursor. */

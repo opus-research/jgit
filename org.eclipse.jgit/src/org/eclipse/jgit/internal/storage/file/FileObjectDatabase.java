@@ -48,7 +48,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -75,8 +74,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 		return new ObjectDirectoryInserter(this, getConfig());
 	}
 
-	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
-			Set<AlternateHandle> skips)
+	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
 			throws IOException;
 
 	abstract Config getConfig();
@@ -86,15 +84,13 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	abstract Set<ObjectId> getShallowCommits() throws IOException;
 
 	abstract void selectObjectRepresentation(PackWriter packer,
-			ObjectToPack otp, WindowCursor curs, Set<AlternateHandle> skips)
-					throws IOException;
+			ObjectToPack otp, WindowCursor curs) throws IOException;
 
 	abstract File getDirectory();
 
 	abstract File fileFor(AnyObjectId id);
 
-	abstract ObjectLoader openObject(WindowCursor curs, AnyObjectId objectId,
-			Set<AlternateHandle> skips)
+	abstract ObjectLoader openObject(WindowCursor curs, AnyObjectId objectId)
 			throws IOException;
 
 	abstract long getObjectSize(WindowCursor curs, AnyObjectId objectId)
@@ -109,7 +105,4 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	abstract PackFile openPack(File pack) throws IOException;
 
 	abstract Collection<PackFile> getPacks();
-
-	abstract boolean has(final AnyObjectId objectId, Set<AlternateHandle> skips)
-			throws IOException;
 }

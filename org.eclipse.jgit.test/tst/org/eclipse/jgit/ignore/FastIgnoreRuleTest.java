@@ -54,7 +54,9 @@ public class FastIgnoreRuleTest {
 
 	@Test
 	public void testSimpleCharClass() {
+		assertMatched("][a]", "]a");
 		assertMatched("[a]", "a");
+		assertMatched("][a]", "]a");
 		assertMatched("[a]", "a/");
 		assertMatched("[a]", "a/b");
 
@@ -118,6 +120,17 @@ public class FastIgnoreRuleTest {
 		assertMatched("/[v-z]/", "x/b");
 		assertMatched("/[v-z]/", "/x/");
 		assertMatched("/[v-z]/", "/x/b");
+	}
+
+	@Test
+	public void testTrailingSpaces() {
+		assertMatched("a ", "a");
+		assertMatched("a/ ", "a/");
+		assertMatched("a/ ", "a/b");
+		assertMatched("a/\\ ", "a/ ");
+		assertNotMatched("a/\\ ", "a/");
+		assertNotMatched("a/\\ ", "a/b");
+		assertNotMatched("/ ", "a");
 	}
 
 	@Test

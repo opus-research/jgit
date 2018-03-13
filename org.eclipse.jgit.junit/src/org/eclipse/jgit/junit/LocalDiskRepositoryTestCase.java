@@ -50,13 +50,21 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
@@ -92,10 +100,14 @@ public abstract class LocalDiskRepositoryTestCase {
 	/** A fake (but stable) identity for committer fields in the test. */
 	protected PersonIdent committer;
 
+	/**
+	 * A {@link SystemReader} used to coordinate time, envars, etc.
+	 * @since 4.2
+	 */
+	protected MockSystemReader mockSystemReader;
+
 	private final List<Repository> toClose = new ArrayList<Repository>();
 	private File tmp;
-
-	private MockSystemReader mockSystemReader;
 
 	@Before
 	public void setUp() throws Exception {
@@ -110,13 +122,8 @@ public abstract class LocalDiskRepositoryTestCase {
 		ceilTestDirectories(getCeilings());
 		SystemReader.setInstance(mockSystemReader);
 
-		final long now = mockSystemReader.getCurrentTime();
-		final int tz = mockSystemReader.getTimezone(now);
 		author = new PersonIdent("J. Author", "jauthor@example.com");
-		author = new PersonIdent(author, now, tz);
-
 		committer = new PersonIdent("J. Committer", "jcommitter@example.com");
-		committer = new PersonIdent(committer, now, tz);
 
 		final WindowCacheConfig c = new WindowCacheConfig();
 		c.setPackedGitLimit(128 * WindowCacheConfig.KB);
@@ -171,9 +178,8 @@ public abstract class LocalDiskRepositoryTestCase {
 
 	/** Increment the {@link #author} and {@link #committer} times. */
 	protected void tick() {
-		final long delta = TimeUnit.MILLISECONDS.convert(5 * 60,
-				TimeUnit.SECONDS);
-		final long now = author.getWhen().getTime() + delta;
+		mockSystemReader.tick(5 * 60);
+		final long now = mockSystemReader.getCurrentTime();
 		final int tz = mockSystemReader.getTimezone(now);
 
 		author = new PersonIdent(author, now, tz);
@@ -278,11 +284,10 @@ public abstract class LocalDiskRepositoryTestCase {
 			throws IllegalStateException, IOException {
 		DirCache dc = repo.readDirCache();
 		StringBuilder sb = new StringBuilder();
-		TreeSet<Long> timeStamps = null;
+		TreeSet<Long> timeStamps = new TreeSet<Long>();
 
 		// iterate once over the dircache just to collect all time stamps
 		if (0 != (includedOptions & MOD_TIME)) {
-			timeStamps = new TreeSet<Long>();
 			for (int i=0; i<dc.getEntryCount(); ++i)
 				timeStamps.add(Long.valueOf(dc.getEntry(i).getLastModified()));
 		}

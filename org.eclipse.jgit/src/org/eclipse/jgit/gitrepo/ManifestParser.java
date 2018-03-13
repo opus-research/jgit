@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
@@ -80,7 +81,7 @@ public class ManifestParser extends DefaultHandler {
 	private final String baseUrl;
 	private final String defaultBranch;
 	private final Repository rootRepo;
-	private final Map<String, String> remotes;
+	private final Map<String, Remote> remotes;
 	private final Set<String> plusGroups;
 	private final Set<String> minusGroups;
 	private final List<RepoProject> projects;
@@ -146,7 +147,7 @@ public class ManifestParser extends DefaultHandler {
 			}
 		}
 
-		remotes = new HashMap<String, String>();
+		remotes = new HashMap<String, Remote>();
 		projects = new ArrayList<RepoProject>();
 		filteredProjects = new ArrayList<RepoProject>();
 	}
@@ -192,17 +193,19 @@ public class ManifestParser extends DefaultHandler {
 					attributes.getValue("revision"), //$NON-NLS-1$
 					attributes.getValue("remote"), //$NON-NLS-1$
 					attributes.getValue("groups")); //$NON-NLS-1$
+			currentProject.setRecommendShallow(
+				attributes.getValue("clone-depth")); //$NON-NLS-1$
 		} else if ("remote".equals(qName)) { //$NON-NLS-1$
 			String alias = attributes.getValue("alias"); //$NON-NLS-1$
 			String fetch = attributes.getValue("fetch"); //$NON-NLS-1$
-			remotes.put(attributes.getValue("name"), fetch); //$NON-NLS-1$
+			String revision = attributes.getValue("revision"); //$NON-NLS-1$
+			Remote remote = new Remote(fetch, revision);
+			remotes.put(attributes.getValue("name"), remote); //$NON-NLS-1$
 			if (alias != null)
-				remotes.put(alias, fetch);
+				remotes.put(alias, remote);
 		} else if ("default".equals(qName)) { //$NON-NLS-1$
 			defaultRemote = attributes.getValue("remote"); //$NON-NLS-1$
 			defaultRevision = attributes.getValue("revision"); //$NON-NLS-1$
-			if (defaultRevision == null)
-				defaultRevision = defaultBranch;
 		} else if ("copyfile".equals(qName)) { //$NON-NLS-1$
 			if (currentProject == null)
 				throw new SAXException(RepoText.get().invalidManifest);
@@ -213,10 +216,13 @@ public class ManifestParser extends DefaultHandler {
 						attributes.getValue("dest"))); //$NON-NLS-1$
 		} else if ("include".equals(qName)) { //$NON-NLS-1$
 			String name = attributes.getValue("name"); //$NON-NLS-1$
-			InputStream is = null;
 			if (includedReader != null) {
-				try {
-					is = includedReader.readIncludeFile(name);
+				try (InputStream is = includedReader.readIncludeFile(name)) {
+					if (is == null) {
+						throw new SAXException(
+								RepoText.get().errorIncludeNotImplemented);
+					}
+					read(is);
 				} catch (Exception e) {
 					throw new SAXException(MessageFormat.format(
 							RepoText.get().errorIncludeFile, name), e);
@@ -224,21 +230,12 @@ public class ManifestParser extends DefaultHandler {
 			} else if (filename != null) {
 				int index = filename.lastIndexOf('/');
 				String path = filename.substring(0, index + 1) + name;
-				try {
-					is = new FileInputStream(path);
+				try (InputStream is = new FileInputStream(path)) {
+					read(is);
 				} catch (IOException e) {
 					throw new SAXException(MessageFormat.format(
 							RepoText.get().errorIncludeFile, path), e);
 				}
-			}
-			if (is == null) {
-				throw new SAXException(
-						RepoText.get().errorIncludeNotImplemented);
-			}
-			try {
-				read(is);
-			} catch (IOException e) {
-				throw new SAXException(e);
 			}
 		}
 	}
@@ -268,8 +265,18 @@ public class ManifestParser extends DefaultHandler {
 		} catch (URISyntaxException e) {
 			throw new SAXException(e);
 		}
+		if (defaultRevision == null && defaultRemote != null) {
+			Remote remote = remotes.get(defaultRemote);
+			if (remote != null) {
+				defaultRevision = remote.revision;
+			}
+			if (defaultRevision == null) {
+				defaultRevision = defaultBranch;
+			}
+		}
 		for (RepoProject proj : projects) {
 			String remote = proj.getRemote();
+			String revision = defaultRevision;
 			if (remote == null) {
 				if (defaultRemote == null) {
 					if (filename != null)
@@ -281,16 +288,22 @@ public class ManifestParser extends DefaultHandler {
 								RepoText.get().errorNoDefault);
 				}
 				remote = defaultRemote;
+			} else {
+				Remote r = remotes.get(remote);
+				if (r != null && r.revision != null) {
+					revision = r.revision;
+				}
 			}
 			String remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				remoteUrl = baseUri.resolve(remotes.get(remote)).toString();
+				remoteUrl =
+						baseUri.resolve(remotes.get(remote).fetch).toString();
 				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
 					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
 				remoteUrls.put(remote, remoteUrl);
 			}
 			proj.setUrl(remoteUrl + proj.getName())
-					.setDefaultRevision(defaultRevision);
+					.setDefaultRevision(revision);
 		}
 
 		filteredProjects.addAll(projects);
@@ -312,7 +325,7 @@ public class ManifestParser extends DefaultHandler {
 	 *
 	 * @return filtered projects list reference, never null
 	 */
-	public List<RepoProject> getFilteredProjects() {
+	public @NonNull List<RepoProject> getFilteredProjects() {
 		return filteredProjects;
 	}
 
@@ -338,6 +351,20 @@ public class ManifestParser extends DefaultHandler {
 			else
 				last = p;
 		}
+		removeNestedCopyfiles();
+	}
+
+	/** Remove copyfiles that sit in a subdirectory of any other project. */
+	void removeNestedCopyfiles() {
+		for (RepoProject proj : filteredProjects) {
+			List<CopyFile> copyfiles = new ArrayList<>(proj.getCopyFiles());
+			proj.clearCopyFiles();
+			for (CopyFile copyfile : copyfiles) {
+				if (!isNestedCopyfile(copyfile)) {
+					proj.addCopyFile(copyfile);
+				}
+			}
+		}
 	}
 
 	boolean inGroups(RepoProject proj) {
@@ -356,5 +383,33 @@ public class ManifestParser extends DefaultHandler {
 				return true;
 		}
 		return false;
+	}
+
+	private boolean isNestedCopyfile(CopyFile copyfile) {
+		if (copyfile.dest.indexOf('/') == -1) {
+			// If the copyfile is at root level then it won't be nested.
+			return false;
+		}
+		for (RepoProject proj : filteredProjects) {
+			if (proj.getPath().compareTo(copyfile.dest) > 0) {
+				// Early return as remaining projects can't be ancestor of this
+				// copyfile config (filteredProjects is sorted).
+				return false;
+			}
+			if (proj.isAncestorOf(copyfile.dest)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static class Remote {
+		final String fetch;
+		final String revision;
+
+		Remote(String fetch, String revision) {
+			this.fetch = fetch;
+			this.revision = revision;
+		}
 	}
 }

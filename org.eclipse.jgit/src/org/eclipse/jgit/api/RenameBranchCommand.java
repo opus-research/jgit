@@ -51,6 +51,7 @@ import org.eclipse.jgit.api.errors.DetachedHeadException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.internal.JGitText;
@@ -106,11 +107,11 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 		try {
 			String fullOldName;
 			String fullNewName;
-			if (repo.getRef(newName) != null)
+			if (repo.findRef(newName) != null)
 				throw new RefAlreadyExistsException(MessageFormat.format(
 						JGitText.get().refAlreadyExists1, newName));
 			if (oldName != null) {
-				Ref ref = repo.getRef(oldName);
+				Ref ref = repo.findRef(oldName);
 				if (ref == null)
 					throw new RefNotFoundException(MessageFormat.format(
 							JGitText.get().refNotResolved, oldName));
@@ -121,6 +122,10 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 				fullOldName = ref.getName();
 			} else {
 				fullOldName = repo.getFullBranch();
+				if (fullOldName == null) {
+					throw new NoHeadException(
+							JGitText.get().invalidRepositoryStateNoHead);
+				}
 				if (ObjectId.isId(fullOldName))
 					throw new DetachedHeadException();
 			}
@@ -181,7 +186,7 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 				repoConfig.save();
 			}
 
-			Ref resultRef = repo.getRef(newName);
+			Ref resultRef = repo.findRef(newName);
 			if (resultRef == null)
 				throw new JGitInternalException(
 						JGitText.get().renameBranchFailedUnknownReason);

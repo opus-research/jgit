@@ -57,8 +57,11 @@ import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.CommandFailedException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base FS for POSIX based systems
@@ -66,6 +69,8 @@ import org.eclipse.jgit.lib.Repository;
  * @since 3.0
  */
 public class FS_POSIX extends FS {
+	private final static Logger LOG = LoggerFactory.getLogger(FS_POSIX.class);
+
 	private static final int DEFAULT_UMASK = 0022;
 	private volatile int umask = -1;
 
@@ -122,7 +127,7 @@ public class FS_POSIX extends FS {
 							.defaultCharset().name()))) {
 				if (p.waitFor() == 0) {
 					String s = lineRead.readLine();
-					if (s.matches("0?\\d{3}")) { //$NON-NLS-1$
+					if (s != null && s.matches("0?\\d{3}")) { //$NON-NLS-1$
 						return Integer.parseInt(s, 8);
 					}
 				}
@@ -144,11 +149,18 @@ public class FS_POSIX extends FS {
 					// On MacOSX, PATH is shorter when Eclipse is launched from the
 					// Finder than from a terminal. Therefore try to launch bash as a
 					// login shell and search using that.
-					String w = readPipe(userHome(),
+					String w;
+					try {
+						w = readPipe(userHome(),
 							new String[]{"bash", "--login", "-c", "which git"}, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 							Charset.defaultCharset().name());
-					if (!StringUtils.isEmptyOrNull(w))
+					} catch (CommandFailedException e) {
+						LOG.warn(e.getMessage());
+						return null;
+					}
+					if (!StringUtils.isEmptyOrNull(w)) {
 						gitExe = new File(w);
+					}
 				}
 			}
 		}
@@ -168,7 +180,7 @@ public class FS_POSIX extends FS {
 
 	@Override
 	public boolean canExecute(File f) {
-		return FileUtil.canExecute(f);
+		return FileUtils.canExecute(f);
 	}
 
 	@Override
@@ -246,46 +258,6 @@ public class FS_POSIX extends FS {
 	}
 
 	@Override
-	public boolean isSymLink(File path) throws IOException {
-		return FileUtil.isSymlink(path);
-	}
-
-	@Override
-	public long lastModified(File path) throws IOException {
-		return FileUtil.lastModified(path);
-	}
-
-	@Override
-	public void setLastModified(File path, long time) throws IOException {
-		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public long length(File f) throws IOException {
-		return FileUtil.getLength(f);
-	}
-
-	@Override
-	public boolean exists(File path) {
-		return FileUtil.exists(path);
-	}
-
-	@Override
-	public boolean isDirectory(File path) {
-		return FileUtil.isDirectory(path);
-	}
-
-	@Override
-	public boolean isFile(File path) {
-		return FileUtil.isFile(path);
-	}
-
-	@Override
-	public boolean isHidden(File path) throws IOException {
-		return FileUtil.isHidden(path);
-	}
-
-	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		// no action on POSIX
 	}
@@ -295,7 +267,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributesPosix(this, path);
+		return FileUtils.getFileAttributesPosix(this, path);
 	}
 
 	/**
@@ -303,7 +275,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public File normalize(File file) {
-		return FileUtil.normalize(file);
+		return FileUtils.normalize(file);
 	}
 
 	/**
@@ -311,7 +283,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public String normalize(String name) {
-		return FileUtil.normalize(name);
+		return FileUtils.normalize(name);
 	}
 
 	/**

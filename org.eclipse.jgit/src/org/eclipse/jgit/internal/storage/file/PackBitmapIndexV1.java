@@ -49,8 +49,6 @@ import java.io.InputStream;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -58,6 +56,8 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
+
+import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 /**
  * Support for the pack bitmap index v1 format.
@@ -210,6 +210,11 @@ class PackBitmapIndexV1 extends BasePackBitmapIndex {
 			return tags.and(bitmap);
 		}
 		throw new IllegalArgumentException();
+	}
+
+	@Override
+	public int getBitmapCount() {
+		return bitmaps.size();
 	}
 
 	@Override
