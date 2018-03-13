@@ -82,13 +82,6 @@ public class DiffEntry {
 	}
 
 	/**
-	 * Create an empty DiffEntry
-	 */
-	protected DiffEntry(){
-		// reduce the visibility of the default constructor
-	}
-
-	/**
 	 * Convert the TreeWalk into DiffEntry headers.
 	 *
 	 * @param walk
