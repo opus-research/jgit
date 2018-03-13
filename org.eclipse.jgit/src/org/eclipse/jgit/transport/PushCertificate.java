@@ -123,11 +123,6 @@ public class PushCertificate {
 			throw new IllegalArgumentException(
 					JGitText.get().pushCertificateInvalidSignature);
 		}
-		if (!signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE)
-				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE)) {
-			throw new IllegalArgumentException(
-					JGitText.get().pushCertificateInvalidSignature);
-		}
 		this.version = version;
 		this.pusher = pusher;
 		this.pushee = pushee;
@@ -172,7 +167,7 @@ public class PushCertificate {
 
 	/**
 	 * @return the raw nonce value that was presented by the pusher.
-	 * @since 4.0
+	 * @since 4.1
 	 */
 	public String getNonce() {
 		return nonce;
@@ -198,14 +193,17 @@ public class PushCertificate {
 	/**
 	 * @return the raw signature, consisting of the lines received between the
 	 *     lines {@code "----BEGIN GPG SIGNATURE-----\n"} and
-	 *     {@code "----END GPG SIGNATURE-----\n}", inclusive.
+	 *     {@code "----END GPG SIGNATURE-----\n}", exclusive
 	 * @since 4.0
 	 */
 	public String getSignature() {
 		return signature;
 	}
 
-	/** @return text payload of the certificate for the signature verifier. */
+	/**
+	 * @return text payload of the certificate for the signature verifier.
+	 * @since 4.1
+	 */
 	public String toText() {
 		return new StringBuilder()
 				.append(VERSION).append(' ').append(version).append('\n')
