@@ -46,7 +46,6 @@ package org.eclipse.jgit.junit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -98,6 +97,7 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Wrapper to make creating test data easier.
@@ -544,24 +544,6 @@ public class TestRepository<R extends Repository> {
 	}
 
 	/**
-	 * Tag an object using a lightweight tag.
-	 *
-	 * @param name
-	 *            the tag name. The /refs/tags/ prefix will be added if the name
-	 *            doesn't start with it
-	 * @param obj
-	 *            the object to tag
-	 * @return the tagged object
-	 * @throws Exception
-	 */
-	public ObjectId lightweightTag(String name, ObjectId obj) throws Exception {
-		if (!name.startsWith(Constants.R_TAGS)) {
-			name = Constants.R_TAGS + name;
-		}
-		return update(name, obj);
-	}
-
-	/**
 	 * Run consistency checks against the object database.
 	 * <p>
 	 * This method completes silently if the checks pass. A temporary revision
@@ -642,7 +624,7 @@ public class TestRepository<R extends Repository> {
 				OutputStream out;
 
 				pack = nameFor(odb, name, ".pack");
-				out = new BufferedOutputStream(new FileOutputStream(pack));
+				out = new SafeBufferedOutputStream(new FileOutputStream(pack));
 				try {
 					pw.writePack(m, m, out);
 				} finally {
@@ -651,7 +633,7 @@ public class TestRepository<R extends Repository> {
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
-				out = new BufferedOutputStream(new FileOutputStream(idx));
+				out = new SafeBufferedOutputStream(new FileOutputStream(idx));
 				try {
 					pw.writeIndex(out);
 				} finally {

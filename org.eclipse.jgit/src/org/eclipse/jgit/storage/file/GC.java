@@ -68,6 +68,7 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
@@ -93,20 +94,25 @@ public class GC {
 	 *            a progressmonitor
 	 * @param repo
 	 *            the repo to work on
+	 * @param expireDays
+	 *            each unreferenced, loose object which has been created or
+	 *            modified in the last <expireDays> number of days will not be
+	 *            pruned. Only older objects may be pruned. If set to 0 then
+	 *            every object is a candidate for pruning.
 	 * @return the collection of {@link PackFile}'s which are created newly
 	 * @throws IOException
 	 *
 	 */
 	public static Collection<PackFile> gc(ProgressMonitor pm,
-			FileRepository repo)
+			FileRepository repo, int expireDays)
 			throws IOException {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 
 		packRefs(pm, repo);
-		// TODO: implment reflog_expire(pm, repo);
+		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack(pm, repo);
-		prunePacked(pm, repo, Collections.<ObjectId> emptySet());
+		prune(pm, repo, Collections.<ObjectId> emptySet(), expireDays);
 		// TODO: implement rerere_gc(pm);
 		return newPacks;
 	}
@@ -118,17 +124,25 @@ public class GC {
 	 * packfile then you create a file with the same name). Then this file
 	 * should not be deleted although it existed before gc.
 	 *
-	 * @param pm
-	 *            a progressmonitor
 	 * @param repo
 	 *            the repo to work on
 	 * @param oldPacks
 	 * @param newPacks
+	 * @param ignoreErrors
+	 *            <code>true</code> if we should ignore the fact that a certain
+	 *            packfile or indexfile couldn't be deleted. If set to
+	 *            <code>false</code> and {@link IOException} is thrown in such
+	 *            cases
 	 * @throws IOException
 	 */
-	private static void deleteOldPacks(ProgressMonitor pm, FileRepository repo,
-			Collection<PackFile> oldPacks, Collection<PackFile> newPacks)
+	private static void deleteOldPacks(FileRepository repo,
+			Collection<PackFile> oldPacks, Collection<PackFile> newPacks,
+			boolean ignoreErrors)
 			throws IOException {
+
+		int deleteOptions = FileUtils.RETRY | FileUtils.SKIP_MISSING;
+		if (ignoreErrors)
+			deleteOptions |= FileUtils.IGNORE_ERRORS;
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old Packfile is also among the list of new
@@ -136,14 +150,15 @@ public class GC {
 			for (PackFile newPack : newPacks)
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
-			FileUtils.delete(nameFor(repo, oldName, ".pack"));
-			FileUtils.delete(nameFor(repo, oldName, ".idx"));
+			FileUtils.delete(nameFor(repo, oldName, ".pack"), deleteOptions);
+			FileUtils.delete(nameFor(repo, oldName, ".idx"), deleteOptions);
 		}
 	}
 
 	/**
-	 * Like "git prune-packed" this will prune all loose objects which can be
-	 * found in packs.
+	 * Like "git prune-packed" this method tries to prune all loose objects
+	 * which can be found in packs. If certain objects can't be pruned (e.g.
+	 * because the filesystem delete operation fails) this is silently ignored.
 	 *
 	 * @param pm
 	 *            a progressmonitor
@@ -152,51 +167,137 @@ public class GC {
 	 * @param objectsToKeep
 	 *            a set of objects which should explicitly not be pruned
 	 * @throws IOException
-	 *
 	 */
 	public static void prunePacked(ProgressMonitor pm, FileRepository repo,
-			Set<ObjectId> objectsToKeep)
-			throws IOException {
+			Set<ObjectId> objectsToKeep) throws IOException {
 		ObjectDirectory objdb = repo.getObjectDatabase();
 		Collection<PackFile> packs = objdb.getPacks();
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
-		if (fanout == null)
-			fanout = new String[0];
-		pm.beginTask("prune loose objects", fanout.length);
-		for (String d : fanout) {
-			pm.update(1);
-			if (d.length() != 2)
-				continue;
-			String[] entries = new File(objects, d).list();
-			if (entries == null)
-				continue;
-			for (String e : entries) {
-				boolean found = false;
-				if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
-					continue;
-				ObjectId id;
-				try {
-					id = ObjectId.fromString(d + e);
-				} catch (IllegalArgumentException notAnObject) {
-					// ignoring the file that does not represent loose object
-					continue;
-				}
-				for (PackFile p : packs)
-					if (p.hasObject(id)) {
-						found = true;
-						break;
+
+		if (fanout != null && fanout.length > 0) {
+			if (pm == null)
+				pm = NullProgressMonitor.INSTANCE;
+			pm.beginTask("prune loose objects", fanout.length);
+			try {
+				for (String d : fanout) {
+					pm.update(1);
+					if (d.length() != 2)
+						continue;
+					String[] entries = new File(objects, d).list();
+					if (entries == null)
+						continue;
+					for (String e : entries) {
+						boolean found = false;
+						if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+							continue;
+						ObjectId id;
+						try {
+							id = ObjectId.fromString(d + e);
+						} catch (IllegalArgumentException notAnObject) {
+							// ignoring the file that does not represent loose
+							// object
+							continue;
+						}
+						for (PackFile p : packs)
+							if (p.hasObject(id)) {
+								found = true;
+								break;
+							}
+						if (found && !objectsToKeep.contains(id))
+							FileUtils.delete(objdb.fileFor(id), FileUtils.RETRY
+									| FileUtils.SKIP_MISSING
+									| FileUtils.IGNORE_ERRORS);
 					}
-				if (found && !objectsToKeep.contains(id))
-					FileUtils.delete(objdb.fileFor(id));
+				}
+
+			} finally {
+				pm.endTask();
 			}
 		}
-		pm.endTask();
+	}
+
+	/**
+	 * Like "git prune" this method tries to prune all loose objects which are
+	 * unreferenced. If certain objects can't be pruned (e.g. because the
+	 * filesystem delete operation fails) this is silently ignored.
+	 *
+	 * @param pm
+	 *            a progressmonitor
+	 * @param repo
+	 *            the repo to work on
+	 * @param objectsToKeep
+	 *            a set of objects which should explicitly not be pruned
+	 * @param expireDays
+	 *            each object which has been created or modified in the last
+	 *            <expireDays> number of days will not been pruned. Only older
+	 *            objects may be pruned. If set to 0 then every object is a
+	 *            candidate for pruning.
+	 * @throws IOException
+	 */
+	public static void prune(ProgressMonitor pm, FileRepository repo,
+			Set<ObjectId> objectsToKeep, int expireDays) throws IOException {
+		ObjectDirectory objdb = repo.getObjectDatabase();
+		File objects = repo.getObjectsDirectory();
+		String[] fanout = objects.list();
+		long expireDate = System.currentTimeMillis()
+				- (expireDays * 24 * 60 * 60 * 1000);
+
+		if (fanout != null && fanout.length > 0) {
+			if (pm == null)
+				pm = NullProgressMonitor.INSTANCE;
+			pm.beginTask("prune loose objects", fanout.length);
+			try {
+				// Expensive: create a Objectwalk which walks over all
+				// referenced objects.
+				ObjectWalk w=new ObjectWalk(repo);
+				for (Ref f:repo.getAllRefs().values())
+					w.markStart(w.parseAny(f.getObjectId()));
+				for (Ref f:repo.getRefDatabase().getAdditionalRefs())
+					w.markStart(w.parseAny(f.getObjectId()));
+				for (ObjectId oid:listNonHEADIndexObjects(repo))
+					w.markStart(w.parseAny(oid));
+				while(w.nextObject()!=null);
+
+				for (String d : fanout) {
+					pm.update(1);
+					if (d.length() != 2)
+						continue;
+					String[] entries = new File(objects, d).list();
+					if (entries == null)
+						continue;
+					for (String e : entries) {
+						if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+							continue;
+						ObjectId id;
+						try {
+							id = ObjectId.fromString(d + e);
+						} catch (IllegalArgumentException notAnObject) {
+							// ignoring the file that does not represent loose
+							// object
+							continue;
+						}
+
+						if (w.lookupOrNull(id) == null
+								&& !objectsToKeep.contains(id)) {
+							File f = objdb.fileFor(id);
+							if (f.lastModified() < expireDate)
+								FileUtils.delete(f, FileUtils.RETRY
+										| FileUtils.SKIP_MISSING
+										| FileUtils.IGNORE_ERRORS);
+						}
+					}
+				}
+
+			} finally {
+				pm.endTask();
+			}
+		}
 	}
 
 	/**
 	 * packs all non-symbolic, loose refs into the packed-refs.
-	 *
+	 * 
 	 * @param pm
 	 *            a progressmonitor
 	 * @param repo
@@ -206,17 +307,23 @@ public class GC {
 	public static void packRefs(ProgressMonitor pm, FileRepository repo)
 			throws IOException {
 		Set<Entry<String, Ref>> refEntries = repo.getAllRefs().entrySet();
+		if (pm == null)
+			pm = NullProgressMonitor.INSTANCE;
 		pm.beginTask("pack refs", refEntries.size());
-		Collection<RefDirectoryUpdate> updates = new LinkedList<RefDirectoryUpdate>();
-		for (Map.Entry<String, Ref> entry : refEntries) {
-			Ref ref = entry.getValue();
-			if (!ref.isSymbolic() && ref.getStorage().isLoose()) {
-				updates.add(new RefDirectoryUpdate((RefDirectory) repo
-						.getRefDatabase(), ref));
+		try {
+			Collection<RefDirectoryUpdate> updates = new LinkedList<RefDirectoryUpdate>();
+			for (Map.Entry<String, Ref> entry : refEntries) {
+				Ref ref = entry.getValue();
+				if (!ref.isSymbolic() && ref.getStorage().isLoose()) {
+					updates.add(new RefDirectoryUpdate((RefDirectory) repo
+							.getRefDatabase(), ref));
+				}
+				pm.update(1);
 			}
-			pm.update(1);
+			((RefDirectory) repo.getRefDatabase()).pack(updates);
+		} finally {
+			pm.endTask();
 		}
-		((RefDirectory) repo.getRefDatabase()).pack(updates);
 	}
 
 	/**
@@ -261,6 +368,11 @@ public class GC {
 				nonHeads.add(ref.getObjectId());
 			if (ref.getPeeledObjectId() != null)
 				tagTargets.add(ref.getPeeledObjectId());
+			List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
+					.getReverseEntries();
+			if (rlEntries != null)
+				for (ReflogEntry e : rlEntries)
+					nonHeads.add(e.getNewId());
 		}
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
@@ -268,7 +380,7 @@ public class GC {
 		List<PackFile> ret = new ArrayList<PackFile>(2);
 		if (!allHeads.isEmpty()) {
 			PackFile heads = writePack(pm, repo, allHeads,
-					Collections.<ObjectId> emptySet());
+					Collections.<ObjectId> emptySet(), tagTargets);
 			if (heads != null)
 				ret.add(heads);
 		}
@@ -280,13 +392,12 @@ public class GC {
 			// stop traversing when he finds a head?
 			// My problem: I don't have the PackIndex anymore and PackFile
 			// doesn't expose it.
-			PackFile rest = writePack(pm, repo, nonHeads, allHeads);
+			PackFile rest = writePack(pm, repo, nonHeads, allHeads, tagTargets);
 			if (rest != null)
 				ret.add(rest);
 		}
-		deleteOldPacks(pm, repo, toBeDeleted, ret);
-
-		// packGarbage(pm);
+		deleteOldPacks(repo, toBeDeleted, ret, true);
+		prunePacked(pm, repo, Collections.<ObjectId> emptySet());
 		return ret;
 	}
 
@@ -342,9 +453,15 @@ public class GC {
 	}
 
 	private static PackFile writePack(ProgressMonitor pm, FileRepository repo,
-			Set<? extends ObjectId> want, Set<? extends ObjectId> have)
+			Set<? extends ObjectId> want, Set<? extends ObjectId> have,
+			Set<ObjectId> tagTargets)
 			throws IOException {
+
 		PackWriter pw = new PackWriter(repo);
+		pw.setDeltaBaseAsOffset(true);
+		pw.setReuseDeltaCommits(false);
+		if (tagTargets != null)
+			pw.setTagTargets(tagTargets);
 		try {
 			pw.preparePack(pm, want, have);
 			if (0 < pw.getObjectCount()) {
