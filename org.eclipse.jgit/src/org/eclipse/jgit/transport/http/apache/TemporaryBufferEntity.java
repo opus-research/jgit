@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2009, JetBrains s.r.o.
- * Copyright (C) 2009, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2014 Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,65 +40,70 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport.http.apache;
 
-package org.eclipse.jgit.transport;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.http.HttpConnectionFactory;
-import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.AbstractHttpEntity;
+import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
- * The base class for transports that use HTTP as underlying protocol. This class
- * allows customizing HTTP connection settings.
+ * A {@link HttpEntity} which takes it's content from a {@link TemporaryBuffer}
+ *
+ * @since 3.3
  */
-public abstract class HttpTransport extends Transport {
-	/**
-	 * factory for creating HTTP connections
-	 *
-	 * @since 3.3
-	 */
-	protected static HttpConnectionFactory connectionFactory = new JDKHttpConnectionFactory();
+public class TemporaryBufferEntity extends AbstractHttpEntity {
+	private TemporaryBuffer buffer;
+
+	private Integer contentLength;
 
 	/**
-	 * @return the {@link HttpConnectionFactory} used to create new connections
-	 * @since 3.3
+	 * Construct a new {@link HttpEntity} which will contain the content stored
+	 * in the specified buffer
+	 *
+	 * @param buffer
 	 */
-	public static HttpConnectionFactory getConnectionFactory() {
-		return connectionFactory;
+	public TemporaryBufferEntity(TemporaryBuffer buffer) {
+		this.buffer = buffer;
 	}
 
 	/**
-	 * Set the {@link HttpConnectionFactory} to be used to create new
-	 * connections
-	 *
-	 * @param cf
-	 * @since 3.3
+	 * @return buffer containing the content
 	 */
-	public static void setConnectionFactory(HttpConnectionFactory cf) {
-		connectionFactory = cf;
+	public TemporaryBuffer getBuffer() {
+		return buffer;
+	}
+
+	public boolean isRepeatable() {
+		return true;
+	}
+
+	public long getContentLength() {
+		if (contentLength != null)
+			return contentLength.intValue();
+		return buffer.length();
+	}
+
+	public InputStream getContent() throws IOException, IllegalStateException {
+		return buffer.openInputStream();
+	}
+
+	public void writeTo(OutputStream outstream) throws IOException {
+		// TODO: dont we need a progressmonitor
+		buffer.writeTo(outstream, null);
+	}
+
+	public boolean isStreaming() {
+		return false;
 	}
 
 	/**
-	 * Create a new transport instance.
-	 *
-	 * @param local
-	 *            the repository this instance will fetch into, or push out of.
-	 *            This must be the repository passed to
-	 *            {@link #open(Repository, URIish)}.
-	 * @param uri
-	 *            the URI used to access the remote repository. This must be the
-	 *            URI passed to {@link #open(Repository, URIish)}.
+	 * @param contentLength
 	 */
-	protected HttpTransport(Repository local, URIish uri) {
-		super(local, uri);
-	}
-
-	/**
-	 * Create a minimal HTTP transport instance not tied to a single repository.
-	 *
-	 * @param uri
-	 */
-	protected HttpTransport(URIish uri) {
-		super(uri);
+	public void setContentLength(int contentLength) {
+		this.contentLength = new Integer(contentLength);
 	}
 }
