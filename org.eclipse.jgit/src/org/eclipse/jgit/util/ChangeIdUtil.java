@@ -115,10 +115,8 @@ public class ChangeIdUtil {
 		b.append(committer.toExternalString());
 		b.append("\n\n"); //$NON-NLS-1$
 		b.append(cleanMessage);
-		try (ObjectInserter f = new ObjectInserter.Formatter()) {
-			return f.idFor(Constants.OBJ_COMMIT, //
-					b.toString().getBytes(Constants.CHARACTER_ENCODING));
-		}
+		return new ObjectInserter.Formatter().idFor(Constants.OBJ_COMMIT, //
+				b.toString().getBytes(Constants.CHARACTER_ENCODING));
 	}
 
 	private static final Pattern issuePattern = Pattern
