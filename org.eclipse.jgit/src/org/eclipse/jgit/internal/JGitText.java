@@ -252,7 +252,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
 	/***/ public String errorSymlinksNotSupported;
-	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCherryPickCommand;
@@ -266,7 +265,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfRevertCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfRmCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
-	/***/ public String exceptionHookExecutionInterrupted;
 	/***/ public String exceptionOccurredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccurredDuringReadingOfGIT_DIR;
 	/***/ public String exceptionWhileReadingPack;
