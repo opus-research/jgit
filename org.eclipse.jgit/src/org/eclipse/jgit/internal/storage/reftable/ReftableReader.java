@@ -104,6 +104,7 @@ public class ReftableReader extends RefCursor {
 
 	private byte[] match;
 	private Ref ref;
+	private long logTimeUsec;
 	private ReflogEntry log;
 
 	/**
@@ -153,8 +154,8 @@ public class ReftableReader extends RefCursor {
 	}
 
 	@Override
-	public void seekLog(String refName, int time) throws IOException {
-		byte[] key = LogEntry.key(refName, time);
+	public void seekLog(String refName, long timeUsec) throws IOException {
+		byte[] key = LogEntry.key(refName, timeUsec);
 
 		initLogIndex();
 		initScan(LOG_BLOCK_TYPE, logEnd);
@@ -230,7 +231,8 @@ public class ReftableReader extends RefCursor {
 					continue;
 				}
 			} else if (blockType == LOG_BLOCK_TYPE) {
-				log = block.readLog();
+				logTimeUsec = block.readLogTimeUsec();
+				log = block.readLog(logTimeUsec);
 			}
 			return true;
 		}
@@ -251,6 +253,11 @@ public class ReftableReader extends RefCursor {
 	@Override
 	public Ref getRef() {
 		return ref;
+	}
+
+	@Override
+	public long getReflogTimeUsec() {
+		return logTimeUsec;
 	}
 
 	@Override
