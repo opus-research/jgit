@@ -505,6 +505,7 @@ public class LockFile {
 
 	/**
 	 * Update the commit snapshot {@link #getCommitSnapshot()} before commit.
+	 * <p>
 	 * This may be necessary if you need time stamp before commit occurs, e.g
 	 * while writing the index.
 	 */
