@@ -53,10 +53,11 @@ import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.Attributes;
+import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
-import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -64,6 +65,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.FileMode;
@@ -126,7 +128,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * The filter command as defined in gitattributes. The keys are
 	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
 	 */
-	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
+	private Map<String, String> filterCommandsByNameDotType = new HashMap<>();
 
 	/**
 	 * @param operationType
@@ -313,6 +315,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	private Config config;
 
+	private Set<String> filterCommands;
+
 	/**
 	 * Create a new tree walker for a given repository.
 	 *
@@ -357,6 +361,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		if (repo != null) {
 			config = repo.getConfig();
 			attributesNodeProvider = repo.createAttributesNodeProvider();
+			filterCommands = FilterCommandRegistry
+					.getRegisteredFilterCommands();
 		} else {
 			config = null;
 			attributesNodeProvider = null;
@@ -553,6 +559,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
 	 * @since 4.2
 	 */
+	@Override
 	public Attributes getAttributes() {
 		if (attrs != null)
 			return attrs;
@@ -819,7 +826,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				}
 
 				currentHead = t;
-				if (!filter.include(this)) {
+				if (filter.matchFilter(this) == 1) {
 					skipEntriesEqual();
 					continue;
 				}
@@ -1050,6 +1057,60 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	public int getPathLength() {
 		return currentHead.pathLen;
+	}
+
+	/**
+	 * Test if the supplied path matches the current entry's path.
+	 * <p>
+	 * This method detects if the supplied path is equal to, a subtree of, or
+	 * not similar at all to the current entry. It is faster to use this
+	 * method than to use {@link #getPathString()} to first create a String
+	 * object, then test <code>startsWith</code> or some other type of string
+	 * match function.
+	 * <p>
+	 * If the current entry is a subtree, then all paths within the subtree
+	 * are considered to match it.
+	 *
+	 * @param p
+	 *            path buffer to test. Callers should ensure the path does not
+	 *            end with '/' prior to invocation.
+	 * @param pLen
+	 *            number of bytes from <code>buf</code> to test.
+	 * @return -1 if the current path is a parent to p; 0 if p matches the current
+	 *         path; 1 if the current path is different and will never match
+	 *         again on this tree walk.
+	 * @since 4.7
+	 */
+	public int isPathMatch(final byte[] p, final int pLen) {
+		final AbstractTreeIterator t = currentHead;
+		final byte[] c = t.path;
+		final int cLen = t.pathLen;
+		int ci;
+
+		for (ci = 0; ci < cLen && ci < pLen; ci++) {
+			final int c_value = (c[ci] & 0xff) - (p[ci] & 0xff);
+			if (c_value != 0) {
+				// Paths do not and will never match
+				return 1;
+			}
+		}
+
+		if (ci < cLen) {
+			// Ran out of pattern but we still had current data.
+			// If c[ci] == '/' then pattern matches the subtree.
+			// Otherwise it is a partial match == miss
+			return c[ci] == '/' ? 0 : 1;
+		}
+
+		if (ci < pLen) {
+			// Ran out of current, but we still have pattern data.
+			// If p[ci] == '/' then this subtree is a parent in the pattern,
+			// otherwise it's a miss.
+			return p[ci] == '/' && FileMode.TREE.equals(t.mode) ? -1 : 1;
+		}
+
+		// Both strings are identical.
+		return 0;
 	}
 
 	/**
@@ -1367,10 +1428,22 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		String filterCommand = filterCommandsByNameDotType.get(key);
 		if (filterCommand != null)
 			return filterCommand;
-		filterCommand = config.getString(Constants.ATTR_FILTER,
+		filterCommand = config.getString(ConfigConstants.CONFIG_FILTER_SECTION,
 				filterDriverName, filterCommandType);
-		if (filterCommand != null)
+		boolean useBuiltin = config.getBoolean(
+				ConfigConstants.CONFIG_FILTER_SECTION,
+				filterDriverName, ConfigConstants.CONFIG_KEY_USEJGITBUILTIN, false);
+		if (useBuiltin) {
+			String builtinFilterCommand = Constants.BUILTIN_FILTER_PREFIX
+					+ filterDriverName + '/' + filterCommandType;
+			if (filterCommands != null
+					&& filterCommands.contains(builtinFilterCommand)) {
+				filterCommand = builtinFilterCommand;
+			}
+		}
+		if (filterCommand != null) {
 			filterCommandsByNameDotType.put(key, filterCommand);
+		}
 		return filterCommand;
 	}
 }

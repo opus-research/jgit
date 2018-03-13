@@ -528,15 +528,15 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testArchiveWithLongFilename() throws Exception {
-		String filename = "";
-		List<String> l = new ArrayList<String>();
+		StringBuilder filename = new StringBuilder();
+		List<String> l = new ArrayList<>();
 		for (int i = 0; i < 20; i++) {
-			filename = filename + "1234567890/";
-			l.add(filename);
+			filename.append("1234567890/");
+			l.add(filename.toString());
 		}
-		filename = filename + "1234567890";
-		l.add(filename);
-		writeTrashFile(filename, "file with long path");
+		filename.append("1234567890");
+		l.add(filename.toString());
+		writeTrashFile(filename.toString(), "file with long path");
 		git.add().addFilepattern("1234567890").call();
 		git.commit().setMessage("file with long name").call();
 
@@ -548,15 +548,15 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testTarWithLongFilename() throws Exception {
-		String filename = "";
-		List<String> l = new ArrayList<String>();
+		StringBuilder filename = new StringBuilder();
+		List<String> l = new ArrayList<>();
 		for (int i = 0; i < 20; i++) {
-			filename = filename + "1234567890/";
-			l.add(filename);
+			filename.append("1234567890/");
+			l.add(filename.toString());
 		}
-		filename = filename + "1234567890";
-		l.add(filename);
-		writeTrashFile(filename, "file with long path");
+		filename.append("1234567890");
+		l.add(filename.toString());
+		writeTrashFile(filename.toString(), "file with long path");
 		git.add().addFilepattern("1234567890").call();
 		git.commit().setMessage("file with long name").call();
 
@@ -691,7 +691,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 	}
 
 	private static String[] listZipEntries(byte[] zipData) throws IOException {
-		List<String> l = new ArrayList<String>();
+		List<String> l = new ArrayList<>();
 		ZipInputStream in = new ZipInputStream(
 				new ByteArrayInputStream(zipData));
 
@@ -706,6 +706,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 
 		return executor.submit(new Callable<Object>() {
+			@Override
 			public Object call() throws IOException {
 				try {
 					stream.write(data);
@@ -718,7 +719,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 	}
 
 	private String[] listTarEntries(byte[] tarData) throws Exception {
-		List<String> l = new ArrayList<String>();
+		List<String> l = new ArrayList<>();
 		Process proc = spawnAssumingCommandPresent("tar", "tf", "-");
 		BufferedReader reader = readFromProcess(proc);
 		OutputStream out = proc.getOutputStream();
@@ -749,7 +750,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 				continue;
 
 			// found!
-			List<String> l = new ArrayList<String>();
+			List<String> l = new ArrayList<>();
 			BufferedReader reader = new BufferedReader(
 					new InputStreamReader(in, "UTF-8"));
 			String line;
@@ -764,7 +765,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 
 	private String[] tarEntryContent(byte[] tarData, String path)
 			throws Exception {
-		List<String> l = new ArrayList<String>();
+		List<String> l = new ArrayList<>();
 		Process proc = spawnAssumingCommandPresent("tar", "Oxf", "-", path);
 		BufferedReader reader = readFromProcess(proc);
 		OutputStream out = proc.getOutputStream();
