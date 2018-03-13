@@ -44,13 +44,10 @@
 package org.eclipse.jgit.api;
 
 import java.text.MessageFormat;
-import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.merge.MergeChunk;
-import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 import org.eclipse.jgit.merge.MergeStrategy;
 
 /**
@@ -103,6 +100,8 @@ public class MergeResult {
 
 	private ObjectId[] mergedCommits;
 
+	private ObjectId base;
+
 	private ObjectId newHead;
 
 	private Map<String, int[][]> conflicts;
@@ -116,29 +115,48 @@ public class MergeResult {
 	/**
 	 * @param newHead
 	 *            the object the head points at after the merge
+	 * @param base
+	 *            the common base which was used to produce a content-merge. May
+	 *            be <code>null</code> if the merge-result was produced without
+	 *            computing a common base
 	 * @param mergedCommits
 	 *            all the commits which have been merged together
 	 * @param mergeStatus
 	 *            the status the merge resulted in
 	 * @param mergeStrategy
 	 *            the used {@link MergeStrategy}
-	 * @param lowLevelResults
+	 */
+	public MergeResult(ObjectId newHead, ObjectId base,
+			ObjectId[] mergedCommits, MergeStatus mergeStatus,
+			MergeStrategy mergeStrategy) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, null);
+	}
+
+	/**
+	 * @param newHead
+	 *            the object the head points at after the merge
+	 * @param base
+	 *            the common base which was used to produce a content-merge. May
+	 *            be <code>null</code> if the merge-result was produced without
+	 *            computing a common base
+	 * @param mergedCommits
+	 *            all the commits which have been merged together
+	 * @param mergeStatus
+	 *            the status the merge resulted in
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
 	 * @param description
 	 *            a user friendly description of the merge result
 	 */
-	public MergeResult(ObjectId newHead,
+	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			MergeStrategy mergeStrategy,
-			Map<String, org.eclipse.jgit.merge.MergeResult> lowLevelResults,
-			String description) {
+			MergeStrategy mergeStrategy, String description) {
 		this.newHead = newHead;
 		this.mergedCommits = mergedCommits;
+		this.base = base;
 		this.mergeStatus = mergeStatus;
 		this.mergeStrategy = mergeStrategy;
 		this.description = description;
-		if (lowLevelResults != null)
-			for (String path : lowLevelResults.keySet())
-				addConflict(path, lowLevelResults.get(path));
 	}
 
 	/**
@@ -162,12 +180,30 @@ public class MergeResult {
 		return mergedCommits;
 	}
 
+	/**
+	 * @return base the common base which was used to produce a content-merge.
+	 *         May be <code>null</code> if the merge-result was produced without
+	 *         computing a common base
+	 */
+	public ObjectId getBase() {
+		return base;
+	}
+
 	@Override
 	public String toString() {
+		boolean first = true;
+		StringBuilder commits = new StringBuilder();
+		for (ObjectId commit : mergedCommits) {
+			if (!first)
+				commits.append(", ");
+			else
+				first = false;
+			commits.append(ObjectId.toString(commit));
+		}
 		return MessageFormat.format(
 				JGitText.get().mergeUsingStrategyResultedInDescription,
-				mergeStrategy.getName(), mergeStatus, (description == null ? ""
-						: ", " + description));
+				commits, ObjectId.toString(base), mergeStrategy.getName(),
+				mergeStatus, (description == null ? "" : ", " + description));
 	}
 
 	/**
@@ -179,55 +215,6 @@ public class MergeResult {
 	}
 
 	/**
-	 * @param path
-	 * @param conflictingRanges
-	 *            the conflicts to set
-	 */
-	public void addConflict(String path, int[][] conflictingRanges) {
-		if (conflicts == null)
-			conflicts = new HashMap<String, int[][]>();
-		conflicts.put(path, conflictingRanges);
-	}
-
-	/**
-	 * @param path
-	 * @param lowLevelResult
-	 */
-	public void addConflict(String path, org.eclipse.jgit.merge.MergeResult lowLevelResult) {
-		if (conflicts == null)
-			conflicts = new HashMap<String, int[][]>();
-		int nrOfConflicts = 0;
-		// just counting
-		for (MergeChunk mergeChunk : lowLevelResult) {
-			if (mergeChunk.getConflictState().equals(ConflictState.FIRST_CONFLICTING_RANGE)) {
-				nrOfConflicts++;
-			}
-		}
-		int currentConflict = -1;
-		int[][] ret=new int[nrOfConflicts][mergedCommits.length+1];
-		for (MergeChunk mergeChunk : lowLevelResult) {
-			// to store the end of this chunk (end of the last conflicting range)
-			int endOfChunk = 0;
-			if (mergeChunk.getConflictState().equals(ConflictState.FIRST_CONFLICTING_RANGE)) {
-				if (currentConflict > -1) {
-					// there was a previous conflicting range for which the end
-					// is not set yet - set it!
-					ret[currentConflict][mergedCommits.length] = endOfChunk;
-				}
-				currentConflict++;
-				endOfChunk = mergeChunk.getEnd();
-				ret[currentConflict][mergeChunk.getSequenceIndex()] = mergeChunk.getBegin();
-			}
-			if (mergeChunk.getConflictState().equals(ConflictState.NEXT_CONFLICTING_RANGE)) {
-				if (mergeChunk.getEnd() > endOfChunk)
-					endOfChunk = mergeChunk.getEnd();
-				ret[currentConflict][mergeChunk.getSequenceIndex()] = mergeChunk.getBegin();
-			}
-		}
-		conflicts.put(path, ret);
-	}
-
-	/**
 	 * Returns information about the conflicts which occurred during a
 	 * {@link MergeCommand}. The returned value maps the path of a conflicting
 	 * file to a two-dimensional int-array of line-numbers telling where in the
@@ -236,10 +223,10 @@ public class MergeResult {
 	 * If the returned value contains a mapping "path"->[x][y]=z then this means
 	 * <ul>
 	 * <li>the file with path "path" contains conflicts</li>
-	 * <li>if y<"number of merged commits": for conflict number x in this file
+	 * <li>if y < "number of merged commits": for conflict number x in this file
 	 * the chunk which was copied from commit number y starts on line number z.
 	 * All numberings and line numbers start with 0.</li>
-	 * <li>if y=="number of merged commits": the first non-conflicting line
+	 * <li>if y == "number of merged commits": the first non-conflicting line
 	 * after conflict number x starts at line number z</li>
 	 * </ul>
 	 * <p>

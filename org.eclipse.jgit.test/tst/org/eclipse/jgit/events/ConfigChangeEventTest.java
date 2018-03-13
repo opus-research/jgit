@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,47 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.events;
 
-package org.eclipse.jgit.storage.pack;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
-import java.util.concurrent.locks.ReentrantLock;
+public class ConfigChangeEventTest extends RepositoryTestCase {
+	public void testFileRepository_ChangeEventsOnlyOnSave() throws Exception {
+		final ConfigChangedEvent[] events = new ConfigChangedEvent[1];
+		db.getListenerList().addConfigChangedListener(
+				new ConfigChangedListener() {
+					public void onConfigChanged(ConfigChangedEvent event) {
+						events[0] = event;
+					}
+				});
+		FileBasedConfig config = db.getConfig();
+		assertNull(events[0]);
 
-class ThreadSafeDeltaCache extends DeltaCache {
-	private final ReentrantLock lock;
+		// set a value to some arbitrary key
+		config.setString("test", "section", "event", "value");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 
-	ThreadSafeDeltaCache(PackConfig pc) {
-		super(pc);
-		lock = new ReentrantLock();
-	}
+		// reset for the next test
+		events[0] = null;
 
-	@Override
-	boolean canCache(int length, ObjectToPack src, ObjectToPack res) {
-		lock.lock();
-		try {
-			return super.canCache(length, src, res);
-		} finally {
-			lock.unlock();
-		}
-	}
-
-	@Override
-	void credit(int reservedSize) {
-		lock.lock();
-		try {
-			super.credit(reservedSize);
-		} finally {
-			lock.unlock();
-		}
-	}
-
-	@Override
-	Ref cache(byte[] data, int actLen, int reservedSize) {
-		data = resize(data, actLen);
-		lock.lock();
-		try {
-			return super.cache(data, actLen, reservedSize);
-		} finally {
-			lock.unlock();
-		}
+		// unset the value we have just set above
+		config.unset("test", "section", "event");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 	}
 }

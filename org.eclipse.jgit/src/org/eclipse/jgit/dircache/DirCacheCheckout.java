@@ -123,7 +123,7 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * @return a list of pathes (relative to the start of the working tree) of
+	 * @return a list of paths (relative to the start of the working tree) of
 	 *         files which couldn't be deleted during last call to
 	 *         {@link #checkout()} . {@link #checkout()} detected that these
 	 *         files should be deleted but the deletion in the filesystem failed
@@ -340,7 +340,7 @@ public class DirCacheCheckout {
 			file.getParentFile().mkdirs();
 			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
-			checkoutEntry(repo, file, entry, config_filemode());
+			checkoutEntry(file, entry, config_filemode());
 		}
 
 
@@ -484,8 +484,12 @@ public class DirCacheCheckout {
 				break;
 			case 0xDFF: // 5 6
 			case 0xFDD: // 10 11
-				if (!iId.equals(mId))
-					conflict(name, i.getDirCacheEntry(), h, m);
+				// we would like to do something like
+				// if (!iId.equals(mId))
+				//   conflict(name, i.getDirCacheEntry(), h, m);
+				// But since we don't know the id of a tree in the index we do
+				// nothing here and wait that conflicts between index and merge
+				// are found later
 				break;
 			case 0xD0F: // 19
 			case 0xDF0: // conflict without a rule
@@ -531,6 +535,10 @@ public class DirCacheCheckout {
 			}
 			return;
 		}
+
+		// if we have no file at all then there is nothing to do
+		if ((ffMask & 0x222) == 0)
+			return;
 
 		if (i == null) {
 			/**
@@ -745,7 +753,7 @@ public class DirCacheCheckout {
 	 * TODO: this method works directly on File IO, we may need another
 	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
 	 * Eclipse that Files in the workspace got changed
-	 * @param repo
+	 *
 	 * @param f
 	 *            the file to be modified. The parent directory for this file
 	 *            has to exist already
@@ -755,7 +763,7 @@ public class DirCacheCheckout {
 	 *            whether the mode bits should be handled at all.
 	 * @throws IOException
 	 */
-	public static void checkoutEntry(final Repository repo, File f, DirCacheEntry entry,
+	public void checkoutEntry(File f, DirCacheEntry entry,
 			boolean config_filemode) throws IOException {
 		ObjectLoader ol = repo.open(entry.getObjectId());
 		if (ol == null)
@@ -766,7 +774,7 @@ public class DirCacheCheckout {
 
 		File parentDir = f.getParentFile();
 		File tmpFile = java.io.File
-				.createTempFile(f.getName()+"tmp", null, parentDir);
+				.createTempFile("__"+f.getName(), null, parentDir);
 		FileChannel channel = new FileOutputStream(tmpFile).getChannel();
 		ByteBuffer buffer = ByteBuffer.wrap(bytes);
 		try {
