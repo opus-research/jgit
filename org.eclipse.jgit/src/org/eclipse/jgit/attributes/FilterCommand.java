@@ -84,13 +84,11 @@ public abstract class FilterCommand {
 	 * processed.
 	 *
 	 * @return the number of bytes read from the {@link InputStream} or -1. -1
-	 *         means that the {@link InputStream} is completely processed. In
-	 *         this case {@link #in} and {@link #out} should be closed by this
-	 *         method
+	 *         means that the {@link InputStream} is completely processed.
 	 * @throws IOException
 	 *             when {@link IOException} occured while reading from
-	 *             {@link #in} or writing to {@link #out}. {@link #in} and
-	 *             {@link #out} should be closed in this case
+	 *             {@link #in} or writing to {@link #out}
+	 *
 	 */
 	public abstract int run() throws IOException;
 }

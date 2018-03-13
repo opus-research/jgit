@@ -114,15 +114,12 @@ public class SmudgeFilter extends FilterCommand {
 	public int run() throws IOException {
 		int b;
 		if (in != null) {
-			try {
-				while ((b = in.read()) != -1) {
-					out.write(b);
-				}
-			} finally {
-				in.close();
-				out.close();
+			while ((b = in.read()) != -1) {
+				out.write(b);
 			}
+			in.close();
 		}
+		out.close();
 		return -1;
 	}
 }

@@ -85,8 +85,6 @@ public class FilterCommandsTest extends RepositoryTestCase {
 				public int run() throws IOException {
 					int b = in.read();
 					if (b == -1) {
-						in.close();
-						out.close();
 						return b;
 					}
 					out.write(prefix);

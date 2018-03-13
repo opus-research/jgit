@@ -485,7 +485,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 						RawParseUtils.decode(result.getStderr()
 								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
 			}
-			in.close();
 			return result.getStdout().openInputStream();
 		}
 		return in;

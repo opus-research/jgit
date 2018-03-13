@@ -52,6 +52,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -94,7 +95,6 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,8 +107,7 @@ import org.slf4j.LoggerFactory;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
-	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
-
+	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -245,7 +244,6 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@NonNull
 	public abstract AttributesNodeProvider createAttributesNodeProvider();
-
 
 	/**
 	 * @return the used file system abstraction, or or {@code null} if
@@ -654,7 +652,10 @@ public abstract class Repository implements AutoCloseable {
 							// detached
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-							throw new RevisionSyntaxException(revstr);
+							throw new RevisionSyntaxException(MessageFormat
+									.format(JGitText.get().invalidRefName,
+											name),
+									revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -704,7 +705,10 @@ public abstract class Repository implements AutoCloseable {
 						if (name.equals("")) //$NON-NLS-1$
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-							throw new RevisionSyntaxException(revstr);
+							throw new RevisionSyntaxException(MessageFormat
+									.format(JGitText.get().invalidRefName,
+											name),
+									revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -753,7 +757,9 @@ public abstract class Repository implements AutoCloseable {
 			return null;
 		name = revstr.substring(done);
 		if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-			throw new RevisionSyntaxException(revstr);
+			throw new RevisionSyntaxException(
+					MessageFormat.format(JGitText.get().invalidRefName, name),
+					revstr);
 		if (getRef(name) != null)
 			return name;
 		return resolveSimple(name);
@@ -870,6 +876,7 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/** Decrement the use count, and maybe close resources. */
+	@Override
 	public void close() {
 		int newCount = useCnt.decrementAndGet();
 		if (newCount == 0) {
@@ -903,8 +910,9 @@ public abstract class Repository implements AutoCloseable {
 		getRefDatabase().close();
 	}
 
-	@NonNull
 	@SuppressWarnings("nls")
+	@Override
+	@NonNull
 	public String toString() {
 		String desc;
 		File directory = getDirectory();
@@ -1176,7 +1184,7 @@ public abstract class Repository implements AutoCloseable {
 		// we want DirCache to inform us so that we can inform registered
 		// listeners about index changes
 		IndexChangedListener l = new IndexChangedListener() {
-
+			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				notifyIndexChanged();
 			}
@@ -1434,6 +1442,33 @@ public abstract class Repository implements AutoCloseable {
 				return remote;
 		}
 		return null;
+	}
+
+	/**
+	 * Read the {@code GIT_DIR/description} file for gitweb.
+	 *
+	 * @return description text; null if no description has been configured.
+	 * @throws IOException
+	 *             description cannot be accessed.
+	 * @since 4.6
+	 */
+	@Nullable
+	public String getGitwebDescription() throws IOException {
+		return null;
+	}
+
+	/**
+	 * Set the {@code GIT_DIR/description} file for gitweb.
+	 *
+	 * @param description
+	 *            new description; null to clear the description.
+	 * @throws IOException
+	 *             description cannot be persisted.
+	 * @since 4.6
+	 */
+	public void setGitwebDescription(@Nullable String description)
+			throws IOException {
+		throw new IOException(JGitText.get().unsupportedRepositoryDescription);
 	}
 
 	/**
@@ -1773,15 +1808,12 @@ public abstract class Repository implements AutoCloseable {
 			throws FileNotFoundException, IOException {
 		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
-			BufferedOutputStream bos = new SafeBufferedOutputStream(
-					new FileOutputStream(headsFile));
-			try {
+			try (OutputStream bos = new BufferedOutputStream(
+					new FileOutputStream(headsFile))) {
 				for (ObjectId id : heads) {
 					id.copyTo(bos);
 					bos.write('\n');
 				}
-			} finally {
-				bos.close();
 			}
 		} else {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);

@@ -98,6 +98,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
+	/***/ public String blockSizeNotPowerOf2;
 	/***/ public String branchNameInvalid;
 	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
@@ -174,6 +175,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String checkoutUnexpectedResult;
 	/***/ public String classCastNotA;
 	/***/ public String cloneNonEmptyDirectory;
+	/***/ public String closed;
 	/***/ public String collisionOn;
 	/***/ public String commandRejectedByHook;
 	/***/ public String commandWasCalledInTheWrongState;
@@ -664,6 +666,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
+	/***/ public String timeIsUncertain;
 	/***/ public String timerAlreadyTerminated;
 	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
@@ -732,6 +735,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
+	/***/ public String unsupportedRepositoryDescription;
 	/***/ public String updatingHeadFailed;
 	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;

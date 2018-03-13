@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,32 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.internal.storage.file;
 
-package org.eclipse.jgit.lfs.lib;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import static org.junit.Assert.assertEquals;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
-import org.eclipse.jgit.lfs.LfsPointer;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
-/*
- * Test LfsPointer file abstraction
- */
-public class LFSPointerTest {
+public class AutoGcTest extends GcTestCase {
+
 	@Test
-	public void testEncoding() throws IOException {
-		final String s = "27e15b72937fc8f558da24ac3d50ec20302a4cf21e33b87ae8e4ce90e89c4b10";
-		AnyLongObjectId id = LongObjectId.fromString(s);
-		LfsPointer ptr = new LfsPointer(id, 4);
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		ptr.encode(baos);
-		baos.close();
-		assertEquals("version https://git-lfs.github.com/spec/v1\noid sha256:"
-				+ s + "\nsize 4\n",
-				baos.toString(StandardCharsets.UTF_8.name()));
+	public void testNotTooManyLooseObjects() {
+		assertFalse("should not find too many loose objects",
+				gc.tooManyLooseObjects());
+	}
+
+	@Test
+	public void testTooManyLooseObjects() throws Exception {
+		FileBasedConfig c = repo.getConfig();
+		c.setInt(ConfigConstants.CONFIG_GC_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTO, 255);
+		c.save();
+		commitChain(10, 50);
+		assertTrue("should find too many loose objects",
+				gc.tooManyLooseObjects());
+	}
+
+	@Test
+	public void testNotTooManyPacks() {
+		assertFalse("should not find too many packs", gc.tooManyPacks());
+	}
+
+	@Test
+	public void testTooManyPacks() throws Exception {
+		FileBasedConfig c = repo.getConfig();
+		c.setInt(ConfigConstants.CONFIG_GC_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT, 1);
+		c.save();
+		SampleDataRepositoryTestCase.copyCGitTestPacks(repo);
+
+		assertTrue("should find too many packs", gc.tooManyPacks());
 	}
 }
