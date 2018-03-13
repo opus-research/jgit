@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,26 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
+package org.eclipse.jgit.pgm;
 
-/**
- * The commit to be cherry-pick'ed did not parent with specified index
- */
-public class NoSuchParentException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
+import static org.junit.Assert.assertArrayEquals;
 
-	/**
-	 * @param message
-	 * @param cause
-	 */
-	public NoSuchParentException(String message, Throwable cause) {
-		super(message, cause);
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
+
+public class ConfigTest extends CLIRepositoryTestCase {
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
-	/**
-	 * @param message
-	 */
-	public NoSuchParentException(String message) {
-		super(message);
+	@Test
+	public void testListConfig() throws Exception {
+		String[] output = execute("git config --list");
+		assertArrayEquals("expected default configuration", //
+				new String[] { "core.autocrlf=false", //
+						"core.filemode=true", //
+						"core.logallrefupdates=true", //
+						"core.repositoryformatversion=0", //
+						"" /* ends with LF (last line empty) */}, output);
 	}
 }
