@@ -55,7 +55,6 @@ import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -97,9 +96,6 @@ public class AppServer {
 
 	/** SSL keystore password; must have at least 6 characters. */
 	private static final String keyPassword = "mykeys";
-
-	/** Role for authentication. */
-	private static final String authRole = "can-access";
 
 	static {
 		// Install a logger that throws warning messages.
@@ -268,10 +264,9 @@ public class AppServer {
 		return ctx;
 	}
 
-	public ServletContextHandler authBasic(ServletContextHandler ctx,
-			String... methods) {
+	public ServletContextHandler authBasic(ServletContextHandler ctx) {
 		assertNotYetSetUp();
-		auth(ctx, new BasicAuthenticator(), methods);
+		auth(ctx, new BasicAuthenticator());
 		return ctx;
 	}
 
@@ -306,36 +301,22 @@ public class AppServer {
 		}
 	}
 
-	private ConstraintMapping createConstraintMapping() {
+	private void auth(ServletContextHandler ctx, Authenticator authType) {
+		final String role = "can-access";
+
+		AbstractLoginService users = new TestMappedLoginService(role);
 		ConstraintMapping cm = new ConstraintMapping();
 		cm.setConstraint(new Constraint());
 		cm.getConstraint().setAuthenticate(true);
 		cm.getConstraint().setDataConstraint(Constraint.DC_NONE);
-		cm.getConstraint().setRoles(new String[] { authRole });
+		cm.getConstraint().setRoles(new String[] { role });
 		cm.setPathSpec("/*");
-		return cm;
-	}
-
-	private void auth(ServletContextHandler ctx, Authenticator authType,
-			String... methods) {
-		AbstractLoginService users = new TestMappedLoginService(authRole);
-		List<ConstraintMapping> mappings = new ArrayList<>();
-		if (methods == null || methods.length == 0) {
-			mappings.add(createConstraintMapping());
-		} else {
-			for (String method : methods) {
-				ConstraintMapping cm = createConstraintMapping();
-				cm.setMethod(method.toUpperCase(Locale.ROOT));
-				mappings.add(cm);
-			}
-		}
 
 		ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
 		sec.setRealmName(realm);
 		sec.setAuthenticator(authType);
 		sec.setLoginService(users);
-		sec.setConstraintMappings(
-				mappings.toArray(new ConstraintMapping[mappings.size()]));
+		sec.setConstraintMappings(new ConstraintMapping[] { cm });
 		sec.setHandler(ctx);
 
 		contexts.removeHandler(ctx);
