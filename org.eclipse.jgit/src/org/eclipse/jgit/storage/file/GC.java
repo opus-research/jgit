@@ -52,16 +52,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -111,6 +110,17 @@ public class GC {
 	}
 
 	/**
+	 * Creates a new garbage collector with default values. An expirationTime of
+	 * weeks and <code>null</code> as progress monitor will be used.
+	 *
+	 * @param repo
+	 *            the repo to work on
+	 */
+	public GC(FileRepository repo) {
+		this(repo, NullProgressMonitor.INSTANCE, 14 * 24 * 60 * 60 * 1000l);
+	}
+
+	/**
 	 * Runs a garbage collector on a {@link FileRepository}. It will
 	 * <ul>
 	 * <li>repack all reachable objects into new pack files and delete the old
@@ -123,7 +133,7 @@ public class GC {
 	 *
 	 */
 	public Collection<PackFile> gc() throws IOException {
-		packRefs();
+		// TODO: implement packRefs(pm, repo);
 		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack();
 		prune(Collections.<ObjectId> emptySet());
@@ -280,10 +290,16 @@ public class GC {
 						if (w.lookupOrNull(id) == null
 								&& !objectsToKeep.contains(id)) {
 							File f = objdb.fileFor(id);
-							if (f.lastModified() < expireDate)
+							if (f.lastModified() < expireDate) {
 								FileUtils.delete(f, FileUtils.RETRY
 										| FileUtils.SKIP_MISSING
 										| FileUtils.IGNORE_ERRORS);
+								try {
+									objdb.open(id);
+								} catch (MissingObjectException moe) {
+									// expecting a MissingObjectException
+								}
+							}
 						}
 					}
 				}
@@ -297,45 +313,11 @@ public class GC {
 	}
 
 	/**
-<<<<<<< HEAD
 	 * Packs all objects which are reachable from any of the heads into one pack
 	 * file. Additionally all objects which are not reachable from any head but
 	 * which are reachable from any of the other refs (e.g. tags), special refs
 	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. All old
 	 * pack files which existed before are deleted.
-=======
-	 * packs all non-symbolic, loose refs into the packed-refs.
-	 *
-	 * @throws IOException
-	 */
-	public void packRefs() throws IOException {
-		Set<Entry<String, Ref>> refEntries = repo.getAllRefs().entrySet();
-		if (pm == null)
-			pm = NullProgressMonitor.INSTANCE;
-		pm.beginTask("pack refs", refEntries.size());
-		try {
-			Collection<RefDirectoryUpdate> updates = new LinkedList<RefDirectoryUpdate>();
-			for (Map.Entry<String, Ref> entry : refEntries) {
-				Ref ref = entry.getValue();
-				if (!ref.isSymbolic() && ref.getStorage().isLoose()) {
-					updates.add(new RefDirectoryUpdate((RefDirectory) repo
-							.getRefDatabase(), ref));
-				}
-				pm.update(1);
-			}
-			((RefDirectory) repo.getRefDatabase()).pack(updates);
-		} finally {
-			pm.endTask();
-		}
-	}
-
-	/**
-	 * Packs all objects which reachable from any of the heads into one
-	 * packfile. Additionally all objects which are not reachable from any head
-	 * but which are reachable from any of the other refs (e.g. tags), special
-	 * refs (e.g. FETCH_HEAD) or index are packed into a separate packfile. All
-	 * old packfiles which existed before are deleted.
->>>>>>> Allow to pack a set of loose and packed refs into a new packed-ref file
 	 *
 	 * @return a collection of the newly created pack files
 	 * @throws IOException
