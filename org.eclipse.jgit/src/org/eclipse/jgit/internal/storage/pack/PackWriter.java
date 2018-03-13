@@ -46,11 +46,6 @@ package org.eclipse.jgit.internal.storage.pack;
 
 import static org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation.PACK_DELTA;
 import static org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation.PACK_WHOLE;
-import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
-import static org.eclipse.jgit.lib.Constants.OBJ_TAG;
-import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -208,12 +203,12 @@ public class PackWriter {
 	}
 
 	@SuppressWarnings("unchecked")
-	private final BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
+	private final BlockList<ObjectToPack> objectsLists[] = new BlockList[Constants.OBJ_TAG + 1];
 	{
-		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
-		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
-		objectsLists[OBJ_BLOB] = new BlockList<ObjectToPack>();
-		objectsLists[OBJ_TAG] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
 	}
 
 	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
@@ -536,10 +531,10 @@ public class PackWriter {
 		if (stats.totalObjects == 0) {
 			long objCnt = 0;
 
-			objCnt += objectsLists[OBJ_COMMIT].size();
-			objCnt += objectsLists[OBJ_TREE].size();
-			objCnt += objectsLists[OBJ_BLOB].size();
-			objCnt += objectsLists[OBJ_TAG].size();
+			objCnt += objectsLists[Constants.OBJ_COMMIT].size();
+			objCnt += objectsLists[Constants.OBJ_TREE].size();
+			objCnt += objectsLists[Constants.OBJ_BLOB].size();
+			objCnt += objectsLists[Constants.OBJ_TAG].size();
 
 			for (CachedPack pack : cachedPacks)
 				objCnt += pack.getObjectCount();
@@ -812,11 +807,11 @@ public class PackWriter {
 	 * @return ObjectId representing SHA-1 name of a pack that was created.
 	 */
 	public ObjectId computeName() {
-		final byte[] buf = new byte[OBJECT_ID_LENGTH];
+		final byte[] buf = new byte[Constants.OBJECT_ID_LENGTH];
 		final MessageDigest md = Constants.newMessageDigest();
 		for (ObjectToPack otp : sortByName()) {
 			otp.copyRawTo(buf, 0);
-			md.update(buf, 0, OBJECT_ID_LENGTH);
+			md.update(buf, 0, Constants.OBJECT_ID_LENGTH);
 		}
 		return ObjectId.fromRaw(md.digest());
 	}
@@ -893,16 +888,16 @@ public class PackWriter {
 	private List<ObjectToPack> sortByName() {
 		if (sortedByName == null) {
 			int cnt = 0;
-			cnt += objectsLists[OBJ_COMMIT].size();
-			cnt += objectsLists[OBJ_TREE].size();
-			cnt += objectsLists[OBJ_BLOB].size();
-			cnt += objectsLists[OBJ_TAG].size();
+			cnt += objectsLists[Constants.OBJ_COMMIT].size();
+			cnt += objectsLists[Constants.OBJ_TREE].size();
+			cnt += objectsLists[Constants.OBJ_BLOB].size();
+			cnt += objectsLists[Constants.OBJ_TAG].size();
 
 			sortedByName = new BlockList<ObjectToPack>(cnt);
-			sortedByName.addAll(objectsLists[OBJ_COMMIT]);
-			sortedByName.addAll(objectsLists[OBJ_TREE]);
-			sortedByName.addAll(objectsLists[OBJ_BLOB]);
-			sortedByName.addAll(objectsLists[OBJ_TAG]);
+			sortedByName.addAll(objectsLists[Constants.OBJ_COMMIT]);
+			sortedByName.addAll(objectsLists[Constants.OBJ_TREE]);
+			sortedByName.addAll(objectsLists[Constants.OBJ_BLOB]);
+			sortedByName.addAll(objectsLists[Constants.OBJ_TAG]);
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -1070,41 +1065,39 @@ public class PackWriter {
 
 	private void searchForReuse(ProgressMonitor monitor) throws IOException {
 		long cnt = 0;
-		cnt += objectsLists[OBJ_COMMIT].size();
-		cnt += objectsLists[OBJ_TREE].size();
-		cnt += objectsLists[OBJ_BLOB].size();
-		cnt += objectsLists[OBJ_TAG].size();
+		cnt += objectsLists[Constants.OBJ_COMMIT].size();
+		cnt += objectsLists[Constants.OBJ_TREE].size();
+		cnt += objectsLists[Constants.OBJ_BLOB].size();
+		cnt += objectsLists[Constants.OBJ_TAG].size();
 
 		long start = System.currentTimeMillis();
 		beginPhase(PackingPhase.FINDING_SOURCES, monitor, cnt);
+
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
 			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>((int) cnt);
-			tmp.addAll(objectsLists[OBJ_TAG]);
-			tmp.addAll(objectsLists[OBJ_COMMIT]);
-			tmp.addAll(objectsLists[OBJ_TREE]);
-			tmp.addAll(objectsLists[OBJ_BLOB]);
+			tmp.addAll(objectsLists[Constants.OBJ_TAG]);
+			tmp.addAll(objectsLists[Constants.OBJ_COMMIT]);
+			tmp.addAll(objectsLists[Constants.OBJ_TREE]);
+			tmp.addAll(objectsLists[Constants.OBJ_BLOB]);
 			searchForReuse(monitor, tmp);
 			if (pruneCurrentObjectList) {
 				// If the list was pruned, we need to re-prune the main lists.
-				pruneEdgesFromObjectList(objectsLists[OBJ_COMMIT]);
-				pruneEdgesFromObjectList(objectsLists[OBJ_TREE]);
-				pruneEdgesFromObjectList(objectsLists[OBJ_BLOB]);
-				pruneEdgesFromObjectList(objectsLists[OBJ_TAG]);
+				pruneEdgesFromObjectList(objectsLists[Constants.OBJ_COMMIT]);
+				pruneEdgesFromObjectList(objectsLists[Constants.OBJ_TREE]);
+				pruneEdgesFromObjectList(objectsLists[Constants.OBJ_BLOB]);
+				pruneEdgesFromObjectList(objectsLists[Constants.OBJ_TAG]);
 			}
+
 		} else {
-			searchForReuse(monitor, objectsLists[OBJ_TAG]);
-			searchForReuse(monitor, objectsLists[OBJ_COMMIT]);
-			searchForReuse(monitor, objectsLists[OBJ_TREE]);
-			searchForReuse(monitor, objectsLists[OBJ_BLOB]);
+			searchForReuse(monitor, objectsLists[Constants.OBJ_TAG]);
+			searchForReuse(monitor, objectsLists[Constants.OBJ_COMMIT]);
+			searchForReuse(monitor, objectsLists[Constants.OBJ_TREE]);
+			searchForReuse(monitor, objectsLists[Constants.OBJ_BLOB]);
 		}
+
 		endPhase(monitor);
 		stats.timeSearchingForReuse = System.currentTimeMillis() - start;
-
-		if (config.isReuseDeltas() && config.getCutDeltaChains()) {
-			cutDeltaChains(objectsLists[OBJ_TREE]);
-			cutDeltaChains(objectsLists[OBJ_BLOB]);
-		}
 	}
 
 	private void searchForReuse(ProgressMonitor monitor, List<ObjectToPack> list)
@@ -1115,29 +1108,6 @@ public class PackWriter {
 			pruneEdgesFromObjectList(list);
 	}
 
-	private void cutDeltaChains(BlockList<ObjectToPack> list)
-			throws IOException {
-		int max = config.getMaxDeltaDepth();
-		for (int idx = list.size() - 1; idx >= 0; idx--) {
-			int d = 0;
-			ObjectToPack b = list.get(idx).getDeltaBase();
-			while (b != null) {
-				if (d < b.getChainLength())
-					break;
-				b.setChainLength(++d);
-				if (d >= max && b.isDeltaRepresentation()) {
-					reselectNonDelta(b);
-					break;
-				}
-				b = b.getDeltaBase();
-			}
-		}
-		if (config.isDeltaCompress()) {
-			for (ObjectToPack otp : list)
-				otp.clearChainLength();
-		}
-	}
-
 	private void searchForDeltas(ProgressMonitor monitor)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
@@ -1146,12 +1116,12 @@ public class PackWriter {
 		// bother examining those types here.
 		//
 		ObjectToPack[] list = new ObjectToPack[
-				  objectsLists[OBJ_TREE].size()
-				+ objectsLists[OBJ_BLOB].size()
+				  objectsLists[Constants.OBJ_TREE].size()
+				+ objectsLists[Constants.OBJ_BLOB].size()
 				+ edgeObjects.size()];
 		int cnt = 0;
-		cnt = findObjectsNeedingDelta(list, cnt, OBJ_TREE);
-		cnt = findObjectsNeedingDelta(list, cnt, OBJ_BLOB);
+		cnt = findObjectsNeedingDelta(list, cnt, Constants.OBJ_TREE);
+		cnt = findObjectsNeedingDelta(list, cnt, Constants.OBJ_BLOB);
 		if (cnt == 0)
 			return;
 		int nonEdgeCnt = cnt;
@@ -1177,9 +1147,7 @@ public class PackWriter {
 		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
 				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
 		try {
-			final long limit = Math.min(
-					config.getBigFileThreshold(),
-					Integer.MAX_VALUE);
+			final long limit = config.getBigFileThreshold();
 			for (;;) {
 				try {
 					if (!sizeQueue.next())
@@ -1189,13 +1157,13 @@ public class PackWriter {
 					if (ignoreMissingUninteresting) {
 						ObjectToPack otp = sizeQueue.getCurrent();
 						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta();
+							otp.setDoNotDelta(true);
 							continue;
 						}
 
 						otp = objectsMap.get(notFound.getObjectId());
 						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta();
+							otp.setDoNotDelta(true);
 							continue;
 						}
 					}
@@ -1207,10 +1175,14 @@ public class PackWriter {
 					otp = objectsMap.get(sizeQueue.getObjectId());
 
 				long sz = sizeQueue.getSize();
-				if (DeltaIndex.BLKSZ < sz && sz < limit)
-					otp.setWeight((int) sz);
+				if (limit <= sz || Integer.MAX_VALUE <= sz)
+					otp.setDoNotDelta(true); // too big, avoid costly files
+
+				else if (sz <= DeltaIndex.BLKSZ)
+					otp.setDoNotDelta(true); // too small, won't work
+
 				else
-					otp.setDoNotDelta(); // too small, or too big
+					otp.setWeight((int) sz);
 				monitor.update(1);
 			}
 		} finally {
@@ -1283,17 +1255,6 @@ public class PackWriter {
 			list[cnt++] = otp;
 		}
 		return cnt;
-	}
-
-	private void reselectNonDelta(ObjectToPack otp) throws IOException {
-		otp.clearDeltaBase();
-		otp.clearReuseAsIs();
-		boolean old = reuseDeltas;
-		reuseDeltas = false;
-		reuseSupport.selectObjectRepresentation(this,
-				NullProgressMonitor.INSTANCE,
-				Collections.singleton(otp));
-		reuseDeltas = old;
 	}
 
 	private void searchForDeltas(final ProgressMonitor monitor,
@@ -1449,10 +1410,10 @@ public class PackWriter {
 	}
 
 	private void writeObjects(PackOutputStream out) throws IOException {
-		writeObjects(out, objectsLists[OBJ_COMMIT]);
-		writeObjects(out, objectsLists[OBJ_TAG]);
-		writeObjects(out, objectsLists[OBJ_TREE]);
-		writeObjects(out, objectsLists[OBJ_BLOB]);
+		writeObjects(out, objectsLists[Constants.OBJ_COMMIT]);
+		writeObjects(out, objectsLists[Constants.OBJ_TAG]);
+		writeObjects(out, objectsLists[Constants.OBJ_TREE]);
+		writeObjects(out, objectsLists[Constants.OBJ_BLOB]);
 	}
 
 	private void writeObjects(PackOutputStream out, List<ObjectToPack> list)
@@ -1487,7 +1448,13 @@ public class PackWriter {
 			// (for example due to a concurrent repack) and a different base
 			// was chosen, forcing a cycle. Select something other than a
 			// delta, and write this object.
-			reselectNonDelta(otp);
+			//
+			reuseDeltas = false;
+			otp.clearDeltaBase();
+			otp.clearReuseAsIs();
+			reuseSupport.selectObjectRepresentation(this,
+					NullProgressMonitor.INSTANCE,
+					Collections.singleton(otp));
 		}
 		otp.markWantWrite();
 
@@ -2021,7 +1988,7 @@ public class PackWriter {
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
 				reader, writeBitmaps, pm, stats.interestingObjects);
 
-		int numCommits = objectsLists[OBJ_COMMIT].size();
+		int numCommits = objectsLists[Constants.OBJ_COMMIT].size();
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
 				bitmapPreparer.doCommitSelection(numCommits);
 
@@ -2053,14 +2020,18 @@ public class PackWriter {
 	}
 
 	private boolean reuseDeltaFor(ObjectToPack otp) {
-		int type = otp.getType();
-		if ((type & 2) != 0) // OBJ_TREE(2) or OBJ_BLOB(3)
-			return true;
-		if (type == OBJ_COMMIT)
+		switch (otp.getType()) {
+		case Constants.OBJ_COMMIT:
 			return reuseDeltaCommits;
-		if (type == OBJ_TAG)
+		case Constants.OBJ_TREE:
+			return true;
+		case Constants.OBJ_BLOB:
+			return true;
+		case Constants.OBJ_TAG:
 			return false;
-		return true;
+		default:
+			return true;
+		}
 	}
 
 	/** Summary of how PackWriter created the pack. */
@@ -2171,10 +2142,10 @@ public class PackWriter {
 
 		{
 			objectTypes = new ObjectType[5];
-			objectTypes[OBJ_COMMIT] = new ObjectType();
-			objectTypes[OBJ_TREE] = new ObjectType();
-			objectTypes[OBJ_BLOB] = new ObjectType();
-			objectTypes[OBJ_TAG] = new ObjectType();
+			objectTypes[Constants.OBJ_COMMIT] = new ObjectType();
+			objectTypes[Constants.OBJ_TREE] = new ObjectType();
+			objectTypes[Constants.OBJ_BLOB] = new ObjectType();
+			objectTypes[Constants.OBJ_TAG] = new ObjectType();
 		}
 
 		/**
@@ -2395,10 +2366,10 @@ public class PackWriter {
 
 		State snapshot() {
 			long objCnt = 0;
-			objCnt += objectsLists[OBJ_COMMIT].size();
-			objCnt += objectsLists[OBJ_TREE].size();
-			objCnt += objectsLists[OBJ_BLOB].size();
-			objCnt += objectsLists[OBJ_TAG].size();
+			objCnt += objectsLists[Constants.OBJ_COMMIT].size();
+			objCnt += objectsLists[Constants.OBJ_TREE].size();
+			objCnt += objectsLists[Constants.OBJ_BLOB].size();
+			objCnt += objectsLists[Constants.OBJ_TAG].size();
 			// Exclude CachedPacks.
 
 			long bytesUsed = OBJECT_TO_PACK_SIZE * objCnt;
