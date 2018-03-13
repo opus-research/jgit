@@ -56,15 +56,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Config;
@@ -102,7 +98,7 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 
 	@Test
 	public void repositoryWithRootLevelSubmodule() throws IOException,
-			ConfigInvalidException, NoWorkTreeException, GitAPIException {
+			ConfigInvalidException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";
@@ -128,8 +124,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		assertNull(gen.getRepository());
-		Status status = Git.wrap(db).status().call();
-		assertTrue(!status.isClean());
 		assertFalse(gen.next());
 	}
 

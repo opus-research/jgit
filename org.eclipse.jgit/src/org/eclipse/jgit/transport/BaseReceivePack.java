@@ -1254,10 +1254,7 @@ public abstract class BaseReceivePack {
 		}
 	}
 
-	/**
-	 * @return if any commands have been rejected so far.
-	 * @since 3.6
-	 */
+	/** @return if any commands have been rejected so far. */
 	protected boolean anyRejects() {
 		for (ReceiveCommand cmd : commands) {
 			if (cmd.getResult() != Result.NOT_ATTEMPTED && cmd.getResult() != Result.OK)
@@ -1266,10 +1263,7 @@ public abstract class BaseReceivePack {
 		return false;
 	}
 
-	/**
-	 * Set the result to fail for any command that was not processed yet.
-	 * @since 3.6
-	 */
+	/** Set the result to fail for any command that was not processed yet. */
 	protected void failPendingCommands() {
 		for (ReceiveCommand cmd : commands) {
 			if (cmd.getResult() == Result.NOT_ATTEMPTED)
