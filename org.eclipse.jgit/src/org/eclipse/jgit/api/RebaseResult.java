@@ -231,9 +231,8 @@ public class RebaseResult {
 	 * @param commit
 	 *            current commit
 	 * @return the RebaseResult
-	 * @since 3.6
 	 */
-	public static RebaseResult result(RebaseResult.Status status,
+	static RebaseResult result(RebaseResult.Status status,
 			RevCommit commit) {
 		return new RebaseResult(status, commit);
 	}
@@ -244,9 +243,8 @@ public class RebaseResult {
 	 * @param failingPaths
 	 *            list of paths causing this rebase to fail
 	 * @return the RebaseResult
-	 * @since 3.6
 	 */
-	public static RebaseResult failed(
+	static RebaseResult failed(
 			Map<String, MergeFailureReason> failingPaths) {
 		RebaseResult result = new RebaseResult(Status.FAILED);
 		result.failingPaths = failingPaths;
@@ -259,9 +257,8 @@ public class RebaseResult {
 	 * @param conflicts
 	 *            the list of conflicting paths
 	 * @return the RebaseResult
-	 * @since 3.6
 	 */
-	public static RebaseResult conflicts(List<String> conflicts) {
+	static RebaseResult conflicts(List<String> conflicts) {
 		RebaseResult result = new RebaseResult(Status.CONFLICTS);
 		result.conflicts = conflicts;
 		return result;

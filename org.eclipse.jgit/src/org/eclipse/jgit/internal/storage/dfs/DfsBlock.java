@@ -74,6 +74,11 @@ final class DfsBlock {
 		return block.length;
 	}
 
+	int remaining(long pos) {
+		int ptr = (int) (pos - start);
+		return block.length - ptr;
+	}
+
 	boolean contains(DfsPackKey want, long pos) {
 		return pack == want && start <= pos && pos < end;
 	}
@@ -89,11 +94,9 @@ final class DfsBlock {
 		return n;
 	}
 
-	int setInput(long pos, Inflater inf) {
+	void setInput(Inflater inf, long pos) {
 		int ptr = (int) (pos - start);
-		int cnt = block.length - ptr;
-		inf.setInput(block, ptr, cnt);
-		return cnt;
+		inf.setInput(block, ptr, block.length - ptr);
 	}
 
 	void crc32(CRC32 out, long pos, int cnt) {

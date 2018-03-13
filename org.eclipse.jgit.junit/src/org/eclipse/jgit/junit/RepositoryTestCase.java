@@ -119,10 +119,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		return JGitTestUtil.read(db, name);
 	}
 
-	protected boolean check(final String name) {
-		return JGitTestUtil.check(db, name);
-	}
-
 	protected void deleteTrashFile(final String name) throws IOException {
 		JGitTestUtil.deleteTrashFile(db, name);
 	}
@@ -379,7 +375,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 */
 	public static long fsTick(File lastFile) throws InterruptedException,
 			IOException {
-		long sleepTime = 64;
+		long sleepTime = 1;
 		FS fs = FS.DETECTED;
 		if (lastFile != null && !fs.exists(lastFile))
 			throw new FileNotFoundException(lastFile.getPath());
@@ -390,9 +386,8 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 			long actTime = fs.lastModified(tmp);
 			while (actTime <= startTime) {
 				Thread.sleep(sleepTime);
-				sleepTime *= 2;
-				FileOutputStream fos = new FileOutputStream(tmp);
-				fos.close();
+				sleepTime *= 5;
+				fs.setLastModified(tmp, System.currentTimeMillis());
 				actTime = fs.lastModified(tmp);
 			}
 			return actTime;

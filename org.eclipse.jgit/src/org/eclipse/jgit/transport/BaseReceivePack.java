@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
@@ -223,7 +222,7 @@ public abstract class BaseReceivePack {
 
 	/** Capabilities requested by the client. */
 	private Set<String> enabledCapabilities;
-	private Set<ObjectId> clientShallowCommits;
+
 	private List<ReceiveCommand> commands;
 
 	private StringBuilder advertiseError;
@@ -264,7 +263,6 @@ public abstract class BaseReceivePack {
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
-		clientShallowCommits = new HashSet<ObjectId>();
 	}
 
 	/** Configuration for receive operations. */
@@ -772,18 +770,6 @@ public abstract class BaseReceivePack {
 		throw new IllegalStateException(JGitText.get().packSizeNotSetYet);
 	}
 
-	/**
-	 * Get the commits from the client's shallow file.
-	 *
-	 * @return if the client is a shallow repository, the list of edge commits
-	 *     that define the client's shallow boundary. Empty set if the client
-	 *     is earlier than Git 1.9, or is a full clone.
-	 * @since 3.5
-	 */
-	protected Set<ObjectId> getClientShallowCommits() {
-		return clientShallowCommits;
-	}
-
 	/** @return true if any commands to be executed have been read. */
 	protected boolean hasCommands() {
 		return !commands.isEmpty();
@@ -909,8 +895,6 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
-		if (db.getRefDatabase().performsAtomicTransactions())
-			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -938,11 +922,6 @@ public abstract class BaseReceivePack {
 			}
 			if (line == PacketLineIn.END)
 				break;
-
-			if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-				clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
-				continue;
-			}
 
 			if (commands.isEmpty()) {
 				final FirstLine firstLine = new FirstLine(line);
@@ -1051,8 +1030,7 @@ public abstract class BaseReceivePack {
 
 	private boolean needCheckConnectivity() {
 		return isCheckReceivedObjects()
-				|| isCheckReferencedObjectsAreReachable()
-				|| !getClientShallowCommits().isEmpty();
+				|| isCheckReferencedObjectsAreReachable();
 	}
 
 	private void checkConnectivity() throws IOException {
@@ -1251,29 +1229,6 @@ public abstract class BaseReceivePack {
 					|| !Repository.isValidRefName(cmd.getRefName())) {
 				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().funnyRefname);
 			}
-		}
-	}
-
-	/**
-	 * @return if any commands have been rejected so far.
-	 * @since 3.6
-	 */
-	protected boolean anyRejects() {
-		for (ReceiveCommand cmd : commands) {
-			if (cmd.getResult() != Result.NOT_ATTEMPTED && cmd.getResult() != Result.OK)
-				return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Set the result to fail for any command that was not processed yet.
-	 * @since 3.6
-	 */
-	protected void failPendingCommands() {
-		for (ReceiveCommand cmd : commands) {
-			if (cmd.getResult() == Result.NOT_ATTEMPTED)
-				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().transactionAborted);
 		}
 	}
 

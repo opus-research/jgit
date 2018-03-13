@@ -195,9 +195,6 @@ public class ResetCommand extends GitCommand<Ref> {
 				result = repo.getRef(Constants.HEAD);
 			}
 
-			if (mode == null)
-				mode = ResetType.MIXED;
-
 			switch (mode) {
 				case HARD:
 					checkoutIndex(commitTree);
