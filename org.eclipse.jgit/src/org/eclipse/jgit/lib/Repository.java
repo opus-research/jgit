@@ -1052,7 +1052,6 @@ public abstract class Repository {
 			case '~': case '^': case ':':
 			case '?': case '[': case '*':
 			case '\\':
-			case '"':
 				return false;
 			}
 			p = c;
