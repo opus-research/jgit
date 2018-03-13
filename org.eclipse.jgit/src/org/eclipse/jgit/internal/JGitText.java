@@ -510,7 +510,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportExceptionInvalid;
 	/***/ public String transportExceptionMissingAssumed;
 	/***/ public String transportExceptionReadRef;
-	/***/ public String transportNeedsRepository;
 	/***/ public String transportProtoAmazonS3;
 	/***/ public String transportProtoBundleFile;
 	/***/ public String transportProtoFTP;
