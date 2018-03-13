@@ -220,16 +220,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return new ObjectDirectoryInserter(this, config);
 	}
 
-	/**
-	 * Create a new inserter that inserts all objects as pack files, not loose
-	 * objects.
-	 *
-	 * @return new inserter.
-	 */
-	public PackInserter newPackInserter() {
-		return new PackInserter(this);
-	}
-
 	@Override
 	public void close() {
 		unpackedObjectCache.clear();
@@ -715,7 +705,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		try {
-			Files.move(FileUtils.toPath(tmp), FileUtils.toPath(dst),
+			Files.move(tmp.toPath(), dst.toPath(),
 					StandardCopyOption.ATOMIC_MOVE);
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
@@ -732,7 +722,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		//
 		FileUtils.mkdir(dst.getParentFile(), true);
 		try {
-			Files.move(FileUtils.toPath(tmp), FileUtils.toPath(dst),
+			Files.move(tmp.toPath(), dst.toPath(),
 					StandardCopyOption.ATOMIC_MOVE);
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
@@ -824,6 +814,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			final PackFile[] oldList = o.packs;
 			final String name = pf.getPackFile().getName();
 			for (PackFile p : oldList) {
+				if (PackFile.SORT.compare(pf, p) < 0)
+					break;
 				if (name.equals(p.getPackFile().getName()))
 					return;
 			}
@@ -977,21 +969,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 				nameSet.add(name);
 		}
 		return nameSet;
-	}
-
-	void closeAllPackHandles(File packFile) {
-		// if the packfile already exists (because we are rewriting a
-		// packfile for the same set of objects maybe with different
-		// PackConfig) then make sure we get rid of all handles on the file.
-		// Windows will not allow for rename otherwise.
-		if (packFile.exists()) {
-			for (PackFile p : getPacks()) {
-				if (packFile.getPath().equals(p.getPackFile().getPath())) {
-					p.close();
-					break;
-				}
-			}
-		}
 	}
 
 	AlternateHandle[] myAlternates() {

@@ -950,7 +950,7 @@ public class GC {
 			} else {
 				if (base == null || !n.startsWith(base)) {
 					try {
-						Files.delete(FileUtils.toPath(new File(packDir.toFile(), n)));
+						Files.delete(new File(packDir.toFile(), n).toPath());
 					} catch (IOException e) {
 						LOG.error(e.getMessage(), e);
 					}
@@ -1173,7 +1173,16 @@ public class GC {
 			// rename the temporary files to real files
 			File realPack = nameFor(id, ".pack"); //$NON-NLS-1$
 
-			repo.getObjectDatabase().closeAllPackHandles(realPack);
+			// if the packfile already exists (because we are rewriting a
+			// packfile for the same set of objects maybe with different
+			// PackConfig) then make sure we get rid of all handles on the file.
+			// Windows will not allow for rename otherwise.
+			if (realPack.exists())
+				for (PackFile p : repo.getObjectDatabase().getPacks())
+					if (realPack.getPath().equals(p.getPackFile().getPath())) {
+						p.close();
+						break;
+					}
 			tmpPack.setReadOnly();
 
 			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);

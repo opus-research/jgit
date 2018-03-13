@@ -51,7 +51,6 @@ import java.nio.channels.FileLock;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -111,25 +110,6 @@ public class FileUtils {
 	 * @since 3.0
 	 */
 	public static final int EMPTY_DIRECTORIES_ONLY = 16;
-
-	/**
-	 * Safe conversion from {@link java.io.File} to {@link java.nio.file.Path}.
-	 *
-	 * @param f
-	 *            {@code File} to be converted to {@code Path}
-	 * @throws IOException
-	 *            in case the path represented by the file
-	 *            is not valid ({@link java.nio.file.InvalidPathException})
-	 *
-	 * @since 4.10
-	 */
-	public static Path toPath(final File f) throws IOException {
-		try {
-			return f.toPath();
-		} catch (InvalidPathException ex) {
-			throw new IOException(ex);
-		}
-	}
 
 	/**
 	 * Delete file or empty folder
@@ -279,7 +259,7 @@ public class FileUtils {
 		int attempts = FS.DETECTED.retryFailedLockFileCommit() ? 10 : 1;
 		while (--attempts >= 0) {
 			try {
-				Files.move(toPath(src), toPath(dst), options);
+				Files.move(src.toPath(), dst.toPath(), options);
 				return;
 			} catch (AtomicMoveNotSupportedException e) {
 				throw e;
@@ -289,7 +269,7 @@ public class FileUtils {
 						delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
 					}
 					// On *nix there is no try, you do or do not
-					Files.move(toPath(src), toPath(dst), options);
+					Files.move(src.toPath(), dst.toPath(), options);
 					return;
 				} catch (IOException e2) {
 					// ignore and continue retry
@@ -428,7 +408,7 @@ public class FileUtils {
 	 */
 	public static Path createSymLink(File path, String target)
 			throws IOException {
-		Path nioPath = toPath(path);
+		Path nioPath = path.toPath();
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
 			BasicFileAttributes attrs = Files.readAttributes(nioPath,
 					BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -441,7 +421,7 @@ public class FileUtils {
 		if (SystemReader.getInstance().isWindows()) {
 			target = target.replace('/', '\\');
 		}
-		Path nioTarget = toPath(new File(target));
+		Path nioTarget = new File(target).toPath();
 		return Files.createSymbolicLink(nioPath, nioTarget);
 	}
 
@@ -452,7 +432,7 @@ public class FileUtils {
 	 * @since 3.0
 	 */
 	public static String readSymLink(File path) throws IOException {
-		Path nioPath = toPath(path);
+		Path nioPath = path.toPath();
 		Path target = Files.readSymbolicLink(nioPath);
 		String targetString = target.toString();
 		if (SystemReader.getInstance().isWindows()) {
@@ -664,7 +644,7 @@ public class FileUtils {
 	 * @throws IOException
 	 */
 	static long lastModified(File file) throws IOException {
-		return Files.getLastModifiedTime(toPath(file), LinkOption.NOFOLLOW_LINKS)
+		return Files.getLastModifiedTime(file.toPath(), LinkOption.NOFOLLOW_LINKS)
 				.toMillis();
 	}
 
@@ -674,7 +654,7 @@ public class FileUtils {
 	 * @throws IOException
 	 */
 	static void setLastModified(File file, long time) throws IOException {
-		Files.setLastModifiedTime(toPath(file), FileTime.fromMillis(time));
+		Files.setLastModifiedTime(file.toPath(), FileTime.fromMillis(time));
 	}
 
 	/**
@@ -692,7 +672,7 @@ public class FileUtils {
 	 * @throws IOException
 	 */
 	static boolean isHidden(File file) throws IOException {
-		return Files.isHidden(toPath(file));
+		return Files.isHidden(file.toPath());
 	}
 
 	/**
@@ -702,7 +682,7 @@ public class FileUtils {
 	 * @since 4.1
 	 */
 	public static void setHidden(File file, boolean hidden) throws IOException {
-		Files.setAttribute(toPath(file), "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
+		Files.setAttribute(file.toPath(), "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
 				LinkOption.NOFOLLOW_LINKS);
 	}
 
@@ -713,7 +693,7 @@ public class FileUtils {
 	 * @since 4.1
 	 */
 	public static long getLength(File file) throws IOException {
-		Path nioPath = toPath(file);
+		Path nioPath = file.toPath();
 		if (Files.isSymbolicLink(nioPath))
 			return Files.readSymbolicLink(nioPath).toString()
 					.getBytes(Constants.CHARSET).length;
@@ -757,7 +737,7 @@ public class FileUtils {
 	 */
 	static Attributes getFileAttributesBasic(FS fs, File file) {
 		try {
-			Path nioPath = toPath(file);
+			Path nioPath = file.toPath();
 			BasicFileAttributes readAttributes = nioPath
 					.getFileSystem()
 					.provider()
@@ -789,7 +769,7 @@ public class FileUtils {
 	 */
 	public static Attributes getFileAttributesPosix(FS fs, File file) {
 		try {
-			Path nioPath = toPath(file);
+			Path nioPath = file.toPath();
 			PosixFileAttributes readAttributes = nioPath
 					.getFileSystem()
 					.provider()
