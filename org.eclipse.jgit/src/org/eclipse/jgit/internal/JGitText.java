@@ -80,7 +80,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
 	/***/ public String atomicPushNotSupported;
-	/***/ public String atomicRefUpdatesNotSupported;
 	/***/ public String authenticationNotSupported;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;
@@ -186,15 +185,14 @@ public class JGitText extends TranslationBundle {
 	/***/ public String connectionTimeOut;
 	/***/ public String contextMustBeNonNegative;
 	/***/ public String corruptionDetectedReReadingAt;
-	/***/ public String corruptObjectBadDate;
-	/***/ public String corruptObjectBadEmail;
 	/***/ public String corruptObjectBadStream;
 	/***/ public String corruptObjectBadStreamCorruptHeader;
-	/***/ public String corruptObjectBadTimezone;
 	/***/ public String corruptObjectDuplicateEntryNames;
 	/***/ public String corruptObjectGarbageAfterSize;
 	/***/ public String corruptObjectIncorrectLength;
 	/***/ public String corruptObjectIncorrectSorting;
+	/***/ public String corruptObjectInvalidAuthor;
+	/***/ public String corruptObjectInvalidCommitter;
 	/***/ public String corruptObjectInvalidEntryMode;
 	/***/ public String corruptObjectInvalidMode;
 	/***/ public String corruptObjectInvalidModeChar;
@@ -213,11 +211,11 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectInvalidNamePrn;
 	/***/ public String corruptObjectInvalidObject;
 	/***/ public String corruptObjectInvalidParent;
+	/***/ public String corruptObjectInvalidTagger;
 	/***/ public String corruptObjectInvalidTree;
 	/***/ public String corruptObjectInvalidType;
 	/***/ public String corruptObjectInvalidType2;
 	/***/ public String corruptObjectMalformedHeader;
-	/***/ public String corruptObjectMissingEmail;
 	/***/ public String corruptObjectNameContainsByte;
 	/***/ public String corruptObjectNameContainsChar;
 	/***/ public String corruptObjectNameContainsNullByte;
@@ -243,9 +241,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectTruncatedInMode;
 	/***/ public String corruptObjectTruncatedInName;
 	/***/ public String corruptObjectTruncatedInObjectId;
-	/***/ public String corruptObjectZeroId;
 	/***/ public String corruptPack;
-	/***/ public String corruptUseCnt;
 	/***/ public String couldNotCheckOutBecauseOfConflicts;
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
@@ -338,7 +334,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String expectedPktLineWithService;
 	/***/ public String expectedReceivedContentType;
 	/***/ public String expectedReportForRefNotReceived;
-	/***/ public String failedToDetermineFilterDefinition;
 	/***/ public String failedUpdatingRefs;
 	/***/ public String failureDueToOneOfTheFollowing;
 	/***/ public String failureUpdatingFETCH_HEAD;
@@ -364,7 +359,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
 	/***/ public String illegalCombinationOfArguments;
-	/***/ public String illegalHookName;
 	/***/ public String illegalPackingPhase;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
@@ -376,8 +370,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexSignatureIsInvalid;
 	/***/ public String indexWriteException;
 	/***/ public String initFailedBareRepoDifferentDirs;
-	/***/ public String initFailedDirIsNoDirectory;
-	/***/ public String initFailedGitDirIsNoDirectory;
 	/***/ public String initFailedNonBareRepoSameDirs;
 	/***/ public String inMemoryBufferLimitExceeded;
 	/***/ public String inputDidntMatchLength;
@@ -393,9 +385,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidChannel;
 	/***/ public String invalidCharacterInBase64Data;
 	/***/ public String invalidCommitParentNumber;
-	/***/ public String invalidDepth;
 	/***/ public String invalidEncryption;
-	/***/ public String invalidExpandWildcard;
 	/***/ public String invalidGitdirRef;
 	/***/ public String invalidGitType;
 	/***/ public String invalidId;
@@ -423,8 +413,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
-	/***/ public String invalidTimeUnitValue2;
-	/***/ public String invalidTimeUnitValue3;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
@@ -504,7 +492,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String objectAtHasBadZlibStream;
 	/***/ public String objectAtPathDoesNotHaveId;
 	/***/ public String objectIsCorrupt;
-	/***/ public String objectIsCorrupt3;
 	/***/ public String objectIsNotA;
 	/***/ public String objectNotFound;
 	/***/ public String objectNotFoundIn;
@@ -561,9 +548,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pushCertificateInvalidSignature;
 	/***/ public String pushIsNotSupportedForBundleTransport;
 	/***/ public String pushNotPermitted;
-	/***/ public String pushOptionsNotSupported;
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
-	/***/ public String readerIsRequired;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String readTimedOut;
 	/***/ public String receivePackObjectTooLarge1;
@@ -592,6 +577,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String renamesRejoiningModifies;
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
+	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
 	/***/ public String repositoryState_bare;
@@ -619,7 +605,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shallowCommitsAlreadyInitialized;
-	/***/ public String shallowPacksRequireDepthWalk;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
@@ -663,7 +648,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
-	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
 	/***/ public String transportExceptionBadRef;
 	/***/ public String transportExceptionEmptyRef;

@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.DataFormatException;
@@ -63,7 +62,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackList;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
@@ -93,8 +91,6 @@ import org.eclipse.jgit.util.BlockList;
  * reader is not thread safe.
  */
 public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
-	private static final int MAX_RESOLVE_MATCHES = 256;
-
 	/** Temporary buffer large enough for at least one raw object id. */
 	final byte[] tempId = new byte[OBJECT_ID_LENGTH];
 
@@ -167,25 +163,14 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			return Collections.singleton(id.toObjectId());
 		boolean noGarbage = avoidUnreachable;
 		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
-		PackList packList = db.getPackList();
-		resolveImpl(packList, id, noGarbage, matches);
-		if (matches.size() < MAX_RESOLVE_MATCHES && packList.dirty()) {
-			resolveImpl(db.scanPacks(packList), id, noGarbage, matches);
+		for (DfsPackFile pack : db.getPacks()) {
+			if (noGarbage && pack.isGarbage())
+				continue;
+			pack.resolve(this, matches, id, 256);
+			if (256 <= matches.size())
+				break;
 		}
 		return matches;
-	}
-
-	private void resolveImpl(PackList packList, AbbreviatedObjectId id,
-			boolean noGarbage, HashSet<ObjectId> matches) throws IOException {
-		for (DfsPackFile pack : packList.packs) {
-			if (noGarbage && pack.isGarbage()) {
-				continue;
-			}
-			pack.resolve(this, matches, id, MAX_RESOLVE_MATCHES);
-			if (matches.size() >= MAX_RESOLVE_MATCHES) {
-				break;
-			}
-		}
 	}
 
 	@Override
@@ -193,18 +178,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (last != null && last.hasObject(this, objectId))
 			return true;
 		boolean noGarbage = avoidUnreachable;
-		PackList packList = db.getPackList();
-		if (hasImpl(packList, objectId, noGarbage)) {
-			return true;
-		} else if (packList.dirty()) {
-			return hasImpl(db.scanPacks(packList), objectId, noGarbage);
-		}
-		return false;
-	}
-
-	private boolean hasImpl(PackList packList, AnyObjectId objectId,
-			boolean noGarbage) throws IOException {
-		for (DfsPackFile pack : packList.packs) {
+		for (DfsPackFile pack : db.getPacks()) {
 			if (pack == last || (noGarbage && pack.isGarbage()))
 				continue;
 			if (pack.hasObject(this, objectId)) {
@@ -219,24 +193,20 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	public ObjectLoader open(AnyObjectId objectId, int typeHint)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		ObjectLoader ldr;
 		if (last != null) {
-			ldr = last.get(this, objectId);
-			if (ldr != null) {
-				return checkType(ldr, objectId, typeHint);
-			}
+			ObjectLoader ldr = last.get(this, objectId);
+			if (ldr != null)
+				return ldr;
 		}
 
-		PackList packList = db.getPackList();
 		boolean noGarbage = avoidUnreachable;
-		ldr = openImpl(packList, objectId, noGarbage);
-		if (ldr != null) {
-			return checkType(ldr, objectId, typeHint);
-		}
-		if (packList.dirty()) {
-			ldr = openImpl(db.scanPacks(packList), objectId, noGarbage);
+		for (DfsPackFile pack : db.getPacks()) {
+			if (pack == last || (noGarbage && pack.isGarbage()))
+				continue;
+			ObjectLoader ldr = pack.get(this, objectId);
 			if (ldr != null) {
-				return checkType(ldr, objectId, typeHint);
+				last = pack;
+				return ldr;
 			}
 		}
 
@@ -244,29 +214,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			throw new MissingObjectException(objectId.copy(),
 					JGitText.get().unknownObjectType2);
 		throw new MissingObjectException(objectId.copy(), typeHint);
-	}
-
-	private static ObjectLoader checkType(ObjectLoader ldr, AnyObjectId id,
-			int typeHint) throws IncorrectObjectTypeException {
-		if (typeHint != OBJ_ANY && ldr.getType() != typeHint) {
-			throw new IncorrectObjectTypeException(id.copy(), typeHint);
-		}
-		return ldr;
-	}
-
-	private ObjectLoader openImpl(PackList packList, AnyObjectId objectId,
-			boolean noGarbage) throws IOException {
-		for (DfsPackFile pack : packList.packs) {
-			if (pack == last || (noGarbage && pack.isGarbage())) {
-				continue;
-			}
-			ObjectLoader ldr = pack.get(this, objectId);
-			if (ldr != null) {
-				last = pack;
-				return ldr;
-			}
-		}
-		return null;
 	}
 
 	@Override
@@ -306,58 +253,39 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private <T extends ObjectId> Iterable<FoundObject<T>> findAll(
 			Iterable<T> objectIds) throws IOException {
-		Collection<T> pending = new LinkedList<>();
-		for (T id : objectIds) {
-			pending.add(id);
+		ArrayList<FoundObject<T>> r = new ArrayList<FoundObject<T>>();
+		DfsPackFile[] packList = db.getPacks();
+		if (packList.length == 0) {
+			for (T t : objectIds)
+				r.add(new FoundObject<T>(t));
+			return r;
 		}
 
-		PackList packList = db.getPackList();
-		List<FoundObject<T>> r = new ArrayList<>();
-		findAllImpl(packList, pending, r);
-		if (!pending.isEmpty() && packList.dirty()) {
-			findAllImpl(db.scanPacks(packList), pending, r);
-		}
-		for (T t : pending) {
-			r.add(new FoundObject<T>(t));
-		}
-		Collections.sort(r, FOUND_OBJECT_SORT);
-		return r;
-	}
-
-	private <T extends ObjectId> void findAllImpl(PackList packList,
-			Collection<T> pending, List<FoundObject<T>> r) {
-		DfsPackFile[] packs = packList.packs;
-		if (packs.length == 0) {
-			return;
-		}
 		int lastIdx = 0;
-		DfsPackFile lastPack = packs[lastIdx];
+		DfsPackFile lastPack = packList[lastIdx];
 		boolean noGarbage = avoidUnreachable;
 
-		OBJECT_SCAN: for (Iterator<T> it = pending.iterator(); it.hasNext();) {
-			T t = it.next();
+		OBJECT_SCAN: for (T t : objectIds) {
 			try {
 				long p = lastPack.findOffset(this, t);
 				if (0 < p) {
 					r.add(new FoundObject<T>(t, lastIdx, lastPack, p));
-					it.remove();
 					continue;
 				}
 			} catch (IOException e) {
 				// Fall though and try to examine other packs.
 			}
 
-			for (int i = 0; i < packs.length; i++) {
+			for (int i = 0; i < packList.length; i++) {
 				if (i == lastIdx)
 					continue;
-				DfsPackFile pack = packs[i];
+				DfsPackFile pack = packList[i];
 				if (noGarbage && pack.isGarbage())
 					continue;
 				try {
 					long p = pack.findOffset(this, t);
 					if (0 < p) {
 						r.add(new FoundObject<T>(t, i, pack, p));
-						it.remove();
 						lastIdx = i;
 						lastPack = pack;
 						continue OBJECT_SCAN;
@@ -366,9 +294,13 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 					// Examine other packs.
 				}
 			}
+
+			r.add(new FoundObject<T>(t));
 		}
 
+		Collections.sort(r, FOUND_OBJECT_SORT);
 		last = lastPack;
+		return r;
 	}
 
 	@Override
@@ -486,43 +418,24 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			IOException {
 		if (last != null) {
 			long sz = last.getObjectSize(this, objectId);
-			if (0 <= sz) {
+			if (0 <= sz)
 				return sz;
-			}
 		}
 
-		PackList packList = db.getPackList();
-		long sz = getObjectSizeImpl(packList, objectId);
-		if (0 <= sz) {
-			return sz;
-		}
-		if (packList.dirty()) {
-			sz = getObjectSizeImpl(packList, objectId);
-			if (0 <= sz) {
-				return sz;
-			}
-		}
-
-		if (typeHint == OBJ_ANY) {
-			throw new MissingObjectException(objectId.copy(),
-					JGitText.get().unknownObjectType2);
-		}
-		throw new MissingObjectException(objectId.copy(), typeHint);
-	}
-
-	private long getObjectSizeImpl(PackList packList, AnyObjectId objectId)
-			throws IOException {
-		for (DfsPackFile pack : packList.packs) {
-			if (pack == last) {
+		for (DfsPackFile pack : db.getPacks()) {
+			if (pack == last)
 				continue;
-			}
 			long sz = pack.getObjectSize(this, objectId);
 			if (0 <= sz) {
 				last = pack;
 				return sz;
 			}
 		}
-		return -1;
+
+		if (typeHint == OBJ_ANY)
+			throw new MissingObjectException(objectId.copy(),
+					JGitText.get().unknownObjectType2);
+		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
 	public DfsObjectToPack newObjectToPack(AnyObjectId objectId, int type) {
@@ -538,8 +451,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	public void selectObjectRepresentation(PackWriter packer,
 			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
-		// Don't check dirty bit on PackList; assume ObjectToPacks all came from the
-		// current list.
 		for (DfsPackFile pack : db.getPacks()) {
 			List<DfsObjectToPack> tmp = findAllFromPack(pack, objects);
 			if (tmp.isEmpty())
@@ -565,7 +476,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		PackIndex idx = pack.getPackIndex(this);
 		for (ObjectToPack otp : objects) {
 			long p = idx.findOffset(otp);
-			if (0 < p && !pack.isCorrupt(p)) {
+			if (0 < p) {
 				otp.setOffset(p);
 				tmp.add((DfsObjectToPack) otp);
 			}

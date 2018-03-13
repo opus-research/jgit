@@ -175,7 +175,6 @@ public final class DfsBlockCache {
 	/** Number of bytes currently loaded in the cache. */
 	private volatile long liveBytes;
 
-	@SuppressWarnings("unchecked")
 	private DfsBlockCache(final DfsBlockCacheConfig cfg) {
 		tableSize = tableSize(cfg);
 		if (tableSize < 1)
@@ -185,6 +184,14 @@ public final class DfsBlockCache {
 		loadLocks = new ReentrantLock[32];
 		for (int i = 0; i < loadLocks.length; i++)
 			loadLocks[i] = new ReentrantLock(true /* fair */);
+
+		int eb = (int) (tableSize * .1);
+		if (64 < eb)
+			eb = 64;
+		else if (eb < 4)
+			eb = 4;
+		if (tableSize < eb)
+			eb = tableSize;
 
 		maxBytes = cfg.getBlockLimit();
 		maxStreamThroughCache = (long) (maxBytes * cfg.getStreamRatio());
@@ -417,7 +424,6 @@ public final class DfsBlockCache {
 		clockLock.unlock();
 	}
 
-	@SuppressWarnings("unchecked")
 	private void addToClock(Ref ref, int credit) {
 		clockLock.lock();
 		try {

@@ -103,20 +103,18 @@ public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 			});
 			assertTrue(dce.commit());
 		}
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("Adding link").call();
-			git.reset().setMode(ResetType.HARD).call();
-			DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
-			FileTreeIterator fti = new FileTreeIterator(db);
+		new Git(db).commit().setMessage("Adding link").call();
+		new Git(db).reset().setMode(ResetType.HARD).call();
+		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
+		FileTreeIterator fti = new FileTreeIterator(db);
 
-			// self-check
-			assertEquals("link", fti.getEntryPathString());
-			assertEquals("link", dci.getEntryPathString());
+		// self-check
+		assertEquals("link", fti.getEntryPathString());
+		assertEquals("link", dci.getEntryPathString());
 
-			// test
-			assertFalse(fti.isModified(dci.getDirCacheEntry(), true,
-					db.newObjectReader()));
-		}
+		// test
+		assertFalse(fti.isModified(dci.getDirCacheEntry(), true,
+				db.newObjectReader()));
 	}
 
 	/**
@@ -144,20 +142,18 @@ public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 			});
 			assertTrue(dce.commit());
 		}
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("Adding link").call();
-			git.reset().setMode(ResetType.HARD).call();
-			DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
-			FileTreeIterator fti = new FileTreeIterator(db);
+		new Git(db).commit().setMessage("Adding link").call();
+		new Git(db).reset().setMode(ResetType.HARD).call();
+		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
+		FileTreeIterator fti = new FileTreeIterator(db);
 
-			// self-check
-			assertEquals("link", fti.getEntryPathString());
-			assertEquals("link", dci.getEntryPathString());
+		// self-check
+		assertEquals("link", fti.getEntryPathString());
+		assertEquals("link", dci.getEntryPathString());
 
-			// test
-			assertFalse(fti.isModified(dci.getDirCacheEntry(), true,
-					db.newObjectReader()));
-		}
+		// test
+		assertFalse(fti.isModified(dci.getDirCacheEntry(), true,
+				db.newObjectReader()));
 	}
 
 	/**
@@ -186,22 +182,20 @@ public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 			});
 			assertTrue(dce.commit());
 		}
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("Adding link").call();
-			git.reset().setMode(ResetType.HARD).call();
+		new Git(db).commit().setMessage("Adding link").call();
+		new Git(db).reset().setMode(ResetType.HARD).call();
 
-			FileUtils.delete(new File(trash, "link"), FileUtils.NONE);
-			FS.DETECTED.createSymLink(new File(trash, "link"), "newtarget");
-			DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
-			FileTreeIterator fti = new FileTreeIterator(db);
+		FileUtils.delete(new File(trash, "link"), FileUtils.NONE);
+		FS.DETECTED.createSymLink(new File(trash, "link"), "newtarget");
+		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
+		FileTreeIterator fti = new FileTreeIterator(db);
 
-			// self-check
-			assertEquals("link", fti.getEntryPathString());
-			assertEquals("link", dci.getEntryPathString());
+		// self-check
+		assertEquals("link", fti.getEntryPathString());
+		assertEquals("link", dci.getEntryPathString());
 
-			// test
-			assertTrue(fti.isModified(dci.getDirCacheEntry(), true,
-					db.newObjectReader()));
-		}
+		// test
+		assertTrue(fti.isModified(dci.getDirCacheEntry(), true,
+				db.newObjectReader()));
 	}
 }

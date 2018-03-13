@@ -376,10 +376,8 @@ public class URIish implements Serializable {
 	public URIish(final URL u) {
 		scheme = u.getProtocol();
 		path = u.getPath();
-		path = cleanLeadingSlashes(path, scheme);
 		try {
 			rawPath = u.toURI().getRawPath();
-			rawPath = cleanLeadingSlashes(rawPath, scheme);
 		} catch (URISyntaxException e) {
 			throw new RuntimeException(e); // Impossible
 		}
@@ -717,7 +715,7 @@ public class URIish implements Serializable {
 	 */
 	public String getHumanishName() throws IllegalArgumentException {
 		String s = getPath();
-		if ("/".equals(s) || "".equals(s)) //$NON-NLS-1$ //$NON-NLS-2$
+		if ("/".equals(s) || "".equals(s)) //$NON-NLS-1$
 			s = getHost();
 		if (s == null) // $NON-NLS-1$
 			throw new IllegalArgumentException();

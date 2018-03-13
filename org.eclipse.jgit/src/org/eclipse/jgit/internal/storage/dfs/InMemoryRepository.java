@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.ObjectId;
@@ -23,7 +24,7 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
-import org.eclipse.jgit.lib.RefDatabase;
+import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -53,7 +54,7 @@ public class InMemoryRepository extends DfsRepository {
 	static final AtomicInteger packId = new AtomicInteger();
 
 	private final DfsObjDatabase objdb;
-	private final RefDatabase refdb;
+	private final DfsRefDatabase refdb;
 	private boolean performsAtomicTransactions = true;
 
 	/**
@@ -79,7 +80,7 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	@Override
-	public RefDatabase getRefDatabase() {
+	public DfsRefDatabase getRefDatabase() {
 		return refdb;
 	}
 
@@ -251,20 +252,11 @@ public class InMemoryRepository extends DfsRepository {
 		}
 	}
 
-	/**
-	 * A ref database storing all refs in-memory.
-	 * <p>
-	 * This class is protected (and not private) to facilitate testing using
-	 * subclasses of InMemoryRepository.
-	 */
-    protected class MemRefDatabase extends DfsRefDatabase {
+	private class MemRefDatabase extends DfsRefDatabase {
 		private final ConcurrentMap<String, Ref> refs = new ConcurrentHashMap<String, Ref>();
 		private final ReadWriteLock lock = new ReentrantReadWriteLock(true /* fair */);
 
-		/**
-		 * Initialize a new in-memory ref database.
-		 */
-		protected MemRefDatabase() {
+		MemRefDatabase() {
 			super(InMemoryRepository.this);
 		}
 
@@ -279,10 +271,10 @@ public class InMemoryRepository extends DfsRepository {
 				@Override
 				public void execute(RevWalk walk, ProgressMonitor monitor)
 						throws IOException {
-					if (performsAtomicTransactions() && isAtomic()) {
+					if (performsAtomicTransactions()) {
 						try {
 							lock.writeLock().lock();
-							batch(getCommands());
+							batch(walk, getCommands());
 						} finally {
 							lock.writeLock().unlock();
 						}
@@ -309,21 +301,15 @@ public class InMemoryRepository extends DfsRepository {
 			}
 			ids.sort();
 			sym.sort();
-			objdb.getCurrentPackList().markDirty();
 			return new RefCache(ids.toRefList(), sym.toRefList());
 		}
 
-		private void batch(List<ReceiveCommand> cmds) {
+		private void batch(RevWalk walk, List<ReceiveCommand> cmds) {
 			// Validate that the target exists in a new RevWalk, as the RevWalk
 			// from the RefUpdate might be reading back unflushed objects.
 			Map<ObjectId, ObjectId> peeled = new HashMap<>();
 			try (RevWalk rw = new RevWalk(getRepository())) {
 				for (ReceiveCommand c : cmds) {
-					if (c.getResult() != ReceiveCommand.Result.NOT_ATTEMPTED) {
-						ReceiveCommand.abort(cmds);
-						return;
-					}
-
 					if (!ObjectId.zeroId().equals(c.getNewId())) {
 						try {
 							RevObject o = rw.parseAny(c.getNewId());
@@ -332,7 +318,7 @@ public class InMemoryRepository extends DfsRepository {
 							}
 						} catch (IOException e) {
 							c.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
-							ReceiveCommand.abort(cmds);
+							reject(cmds);
 							return;
 						}
 					}
@@ -345,7 +331,7 @@ public class InMemoryRepository extends DfsRepository {
 				if (r == null) {
 					if (c.getType() != ReceiveCommand.Type.CREATE) {
 						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						ReceiveCommand.abort(cmds);
+						reject(cmds);
 						return;
 					}
 				} else {
@@ -353,7 +339,7 @@ public class InMemoryRepository extends DfsRepository {
 					if (r.isSymbolic() || objectId == null
 							|| !objectId.equals(c.getOldId())) {
 						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						ReceiveCommand.abort(cmds);
+						reject(cmds);
 						return;
 					}
 				}
@@ -382,6 +368,15 @@ public class InMemoryRepository extends DfsRepository {
 			clearCache();
 		}
 
+		private void reject(List<ReceiveCommand> cmds) {
+			for (ReceiveCommand c : cmds) {
+				if (c.getResult() == ReceiveCommand.Result.NOT_ATTEMPTED) {
+					c.setResult(ReceiveCommand.Result.REJECTED_OTHER_REASON,
+							JGitText.get().transactionAborted);
+				}
+			}
+		}
+
 		@Override
 		protected boolean compareAndPut(Ref oldRef, Ref newRef)
 				throws IOException {
@@ -400,8 +395,27 @@ public class InMemoryRepository extends DfsRepository {
 					return refs.putIfAbsent(name, newRef) == null;
 
 				Ref cur = refs.get(name);
-				if (cur != null) {
-					if (eq(cur, oldRef))
+				Ref toCompare = cur;
+				if (toCompare != null) {
+					if (toCompare.isSymbolic()) {
+						// Arm's-length dereference symrefs before the compare, since
+						// DfsRefUpdate#doLink(String) stores them undereferenced.
+						Ref leaf = toCompare.getLeaf();
+						if (leaf.getObjectId() == null) {
+							leaf = refs.get(leaf.getName());
+							if (leaf.isSymbolic())
+								// Not supported at the moment.
+								throw new IllegalArgumentException();
+							toCompare = new SymbolicRef(
+									name,
+									new ObjectIdRef.Unpeeled(
+											Storage.NEW,
+											leaf.getName(),
+											leaf.getObjectId()));
+						} else
+							toCompare = toCompare.getLeaf();
+					}
+					if (eq(toCompare, oldRef))
 						return refs.replace(name, cur, newRef);
 				}
 
@@ -432,12 +446,10 @@ public class InMemoryRepository extends DfsRepository {
 		private boolean eq(Ref a, Ref b) {
 			if (!Objects.equals(a.getName(), b.getName()))
 				return false;
-			if (a.isSymbolic() != b.isSymbolic())
-				return false;
-			if (a.isSymbolic())
-				return Objects.equals(a.getTarget().getName(), b.getTarget().getName());
-			else
-				return Objects.equals(a.getObjectId(), b.getObjectId());
+			// Compare leaf object IDs, since the oldRef passed into compareAndPut
+			// when detaching a symref is an ObjectIdRef.
+			return Objects.equals(a.getLeaf().getObjectId(),
+					b.getLeaf().getObjectId());
 		}
 	}
 }

@@ -195,7 +195,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		local = wt.local;
 		objCheck = wt.getObjectChecker();
 		inserter = local.newObjectInserter();
-		reader = inserter.newReader();
+		reader = local.newObjectReader();
 
 		remotes = new ArrayList<WalkRemoteObjectDatabase>();
 		remotes.add(w);
@@ -239,12 +239,6 @@ class WalkFetchConnection extends BaseFetchConnection {
 			if (!(id instanceof RevObject) || !((RevObject) id).has(COMPLETE))
 				downloadObject(monitor, id);
 			process(id);
-		}
-
-		try {
-			inserter.flush();
-		} catch (IOException e) {
-			throw new TransportException(e.getMessage(), e);
 		}
 	}
 
@@ -643,11 +637,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final byte[] raw = uol.getCachedBytes();
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, raw);
+				objCheck.check(type, raw);
 			} catch (CorruptObjectException e) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().transportExceptionInvalid,
-						Constants.typeString(type), id.name(), e.getMessage()));
+				throw new TransportException(MessageFormat.format(JGitText.get().transportExceptionInvalid
+						, Constants.typeString(type), id.name(), e.getMessage()));
 			}
 		}
 
@@ -658,6 +651,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					Constants.typeString(type),
 					Integer.valueOf(compressed.length)));
 		}
+		inserter.flush();
 	}
 
 	private Collection<WalkRemoteObjectDatabase> expandOneAlternate(
@@ -888,6 +882,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			PackLock lock = parser.parse(monitor);
 			if (lock != null)
 				packLocks.add(lock);
+			inserter.flush();
 		}
 	}
 }

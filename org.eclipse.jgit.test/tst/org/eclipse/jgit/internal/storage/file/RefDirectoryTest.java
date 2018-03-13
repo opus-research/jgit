@@ -1444,8 +1444,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 			// empty
 		}
 
-		public void beginTask(String title, int total) {
-			this.totalWork = total;
+		public void beginTask(String title, int totalWork) {
+			this.totalWork = totalWork;
 			lastWork = 0;
 		}
 

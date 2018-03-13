@@ -56,7 +56,6 @@ import org.eclipse.jgit.lib.Repository;
 class RefDirectoryUpdate extends RefUpdate {
 	private final RefDirectory database;
 
-	private boolean shouldDeref;
 	private LockFile lock;
 
 	RefDirectoryUpdate(final RefDirectory r, final Ref ref) {
@@ -76,12 +75,11 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected boolean tryLock(boolean deref) throws IOException {
-		shouldDeref = deref;
 		Ref dst = getRef();
 		if (deref)
 			dst = dst.getLeaf();
 		String name = dst.getName();
-		lock = new LockFile(database.fileFor(name));
+		lock = new LockFile(database.fileFor(name), getRepository().getFS());
 		if (lock.lock()) {
 			dst = database.getRef(name);
 			setOldObjectId(dst != null ? dst.getObjectId() : null);
@@ -119,7 +117,7 @@ class RefDirectoryUpdate extends RefUpdate {
 						msg = strResult;
 				}
 			}
-			database.log(this, msg, shouldDeref);
+			database.log(this, msg, true);
 		}
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
@@ -142,7 +140,7 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected Result doDelete(final Result status) throws IOException {
-		if (getRef().getStorage() != Ref.Storage.NEW)
+		if (getRef().getLeaf().getStorage() != Ref.Storage.NEW)
 			database.delete(this);
 		return status;
 	}

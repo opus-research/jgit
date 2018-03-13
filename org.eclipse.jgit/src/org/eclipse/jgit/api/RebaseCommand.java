@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, 2013 Mathias Kinzler <mathias.kinzler@sap.com>
- * Copyright (C) 2016, Laurent Delaigue <laurent.delaigue@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -419,7 +418,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void updateStashRef(ObjectId commitId, PersonIdent refLogIdent,
 			String refLogMessage) throws IOException {
-		Ref currentRef = repo.exactRef(Constants.R_STASH);
+		Ref currentRef = repo.getRef(Constants.R_STASH);
 		RefUpdate refUpdate = repo.updateRef(Constants.R_STASH);
 		refUpdate.setNewObjectId(commitId);
 		refUpdate.setRefLogIdent(refLogIdent);
@@ -612,7 +611,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					// their non-first parents rewritten
 					MergeCommand merge = git.merge()
 							.setFastForward(MergeCommand.FastForwardMode.NO_FF)
-							.setProgressMonitor(monitor)
 							.setCommit(false);
 					for (int i = 1; i < commitToPick.getParentCount(); i++)
 						merge.include(newParents.get(i));
@@ -750,7 +748,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void resetSoftToParent() throws IOException,
 			GitAPIException, CheckoutConflictException {
-		Ref ref = repo.exactRef(Constants.ORIG_HEAD);
+		Ref ref = repo.getRef(Constants.ORIG_HEAD);
 		ObjectId orig_head = ref == null ? null : ref.getObjectId();
 		try {
 			// we have already commited the cherry-picked commit.
@@ -1207,7 +1205,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private Ref getHead() throws IOException, RefNotFoundException {
-		Ref head = repo.exactRef(Constants.HEAD);
+		Ref head = repo.getRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
 					JGitText.get().refNotResolved, Constants.HEAD));

@@ -249,15 +249,7 @@ public class DirCacheTree {
 		return children[i];
 	}
 
-	/**
-	 * Get the tree's ObjectId.
-	 * <p>
-	 * If {@link #isValid()} returns false this method will return null.
-	 *
-	 * @return ObjectId of this tree or null.
-	 * @since 4.3
-	 */
-	public ObjectId getObjectId() {
+	ObjectId getObjectId() {
 		return id;
 	}
 

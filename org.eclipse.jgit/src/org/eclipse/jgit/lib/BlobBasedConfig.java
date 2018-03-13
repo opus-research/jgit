@@ -80,7 +80,8 @@ public class BlobBasedConfig extends Config {
 			throws ConfigInvalidException {
 		super(base);
 		final String decoded;
-		if (isUtf8(blob)) {
+		if (blob.length >= 3 && blob[0] == (byte) 0xEF
+				&& blob[1] == (byte) 0xBB && blob[2] == (byte) 0xBF) {
 			decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
 					blob, 3, blob.length);
 		} else {

@@ -52,12 +52,11 @@ import java.util.Set;
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
+import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.attributes.Attributes;
+import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
-import org.eclipse.jgit.attributes.FilterCommandRegistry;
-import org.eclipse.jgit.dircache.DirCacheBuildIterator;
-import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -66,7 +65,6 @@ import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -77,7 +75,6 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.EolStreamTypeUtil;
 
 /**
  * Walks one or more {@link AbstractTreeIterator}s in parallel.
@@ -165,44 +162,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	public static TreeWalk forPath(final ObjectReader reader, final String path,
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		return forPath(null, reader, path, trees);
-	}
-
-	/**
-	 * Open a tree walk and filter to exactly one path.
-	 * <p>
-	 * The returned tree walk is already positioned on the requested path, so
-	 * the caller should not need to invoke {@link #next()} unless they are
-	 * looking for a possible directory/file name conflict.
-	 *
-	 * @param repo
-	 *            repository to read config data and
-	 *            {@link AttributesNodeProvider} from.
-	 * @param reader
-	 *            the reader the walker will obtain tree data from.
-	 * @param path
-	 *            single path to advance the tree walk instance into.
-	 * @param trees
-	 *            one or more trees to walk through, all with the same root.
-	 * @return a new tree walk configured for exactly this one path; null if no
-	 *         path was found in any of the trees.
-	 * @throws IOException
-	 *             reading a pack file or loose object failed.
-	 * @throws CorruptObjectException
-	 *             an tree object could not be read as its data stream did not
-	 *             appear to be a tree, or could not be inflated.
-	 * @throws IncorrectObjectTypeException
-	 *             an object we expected to be a tree was not a tree.
-	 * @throws MissingObjectException
-	 *             a tree object was not found.
-	 * @since 4.3
-	 */
-	public static TreeWalk forPath(final @Nullable Repository repo,
-			final ObjectReader reader, final String path,
-			final AnyObjectId... trees)
-					throws MissingObjectException, IncorrectObjectTypeException,
-					CorruptObjectException, IOException {
-		TreeWalk tw = new TreeWalk(repo, reader);
+		TreeWalk tw = new TreeWalk(reader);
 		PathFilter f = PathFilter.create(path);
 		tw.setFilter(f);
 		tw.reset(trees);
@@ -247,7 +207,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		try (ObjectReader reader = db.newObjectReader()) {
-			return forPath(db, reader, path, trees);
+			return forPath(reader, path, trees);
 		}
 	}
 
@@ -296,7 +256,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	private boolean postOrderTraversal;
 
-	int depth;
+	private int depth;
 
 	private boolean advance;
 
@@ -309,12 +269,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	/** Cached attribute for the current entry */
 	private Attributes attrs = null;
 
-	/** Cached attributes handler */
-	private AttributesHandler attributesHandler;
-
 	private Config config;
-
-	private Set<String> filterCommands;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -325,23 +280,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *            when the walker is closed.
 	 */
 	public TreeWalk(final Repository repo) {
-		this(repo, repo.newObjectReader(), true);
-	}
-
-	/**
-	 * Create a new tree walker for a given repository.
-	 *
-	 * @param repo
-	 *            the repository the walker will obtain data from. An
-	 *            ObjectReader will be created by the walker, and will be closed
-	 *            when the walker is closed.
-	 * @param or
-	 *            the reader the walker will obtain tree data from. The reader
-	 *            is not closed when the walker is closed.
-	 * @since 4.3
-	 */
-	public TreeWalk(final @Nullable Repository repo, final ObjectReader or) {
-		this(repo, or, false);
+		this(repo.newObjectReader(), true);
+		config = repo.getConfig();
+		attributesNodeProvider = repo.createAttributesNodeProvider();
 	}
 
 	/**
@@ -352,20 +293,10 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *            is not closed when the walker is closed.
 	 */
 	public TreeWalk(final ObjectReader or) {
-		this(null, or, false);
+		this(or, false);
 	}
 
-	private TreeWalk(final @Nullable Repository repo, final ObjectReader or,
-			final boolean closeReader) {
-		if (repo != null) {
-			config = repo.getConfig();
-			attributesNodeProvider = repo.createAttributesNodeProvider();
-			filterCommands = FilterCommandRegistry
-					.getRegisteredFilterCommands();
-		} else {
-			config = null;
-			attributesNodeProvider = null;
-		}
+	private TreeWalk(final ObjectReader or, final boolean closeReader) {
 		reader = or;
 		filter = TreeFilter.ALL;
 		trees = NO_TREES;
@@ -375,14 +306,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	/** @return the reader this walker is using to load objects. */
 	public ObjectReader getObjectReader() {
 		return reader;
-	}
-
-	/**
-	 * @return the {@link OperationType}
-	 * @since 4.3
-	 */
-	public OperationType getOperationType() {
-		return operationType;
 	}
 
 	/**
@@ -511,110 +434,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		attributesNodeProvider = provider;
 	}
 
-	/**
-	 * @return the {@link AttributesNodeProvider} for this {@link TreeWalk}.
-	 * @since 4.3
-	 */
-	public AttributesNodeProvider getAttributesNodeProvider() {
-		return attributesNodeProvider;
-	}
-
-	/**
-	 * Retrieve the git attributes for the current entry.
-	 *
-	 * <h4>Git attribute computation</h4>
-	 *
-	 * <ul>
-	 * <li>Get the attributes matching the current path entry from the info file
-	 * (see {@link AttributesNodeProvider#getInfoAttributesNode()}).</li>
-	 * <li>Completes the list of attributes using the .gitattributes files
-	 * located on the current path (the further the directory that contains
-	 * .gitattributes is from the path in question, the lower its precedence).
-	 * For a checkin operation, it will look first on the working tree (if any).
-	 * If there is no attributes file, it will fallback on the index. For a
-	 * checkout operation, it will first use the index entry and then fallback
-	 * on the working tree if none.</li>
-	 * <li>In the end, completes the list of matching attributes using the
-	 * global attribute file define in the configuration (see
-	 * {@link AttributesNodeProvider#getGlobalAttributesNode()})</li>
-	 *
-	 * </ul>
-	 *
-	 *
-	 * <h4>Iterator constraints</h4>
-	 *
-	 * <p>
-	 * In order to have a correct list of attributes for the current entry, this
-	 * {@link TreeWalk} requires to have at least one
-	 * {@link AttributesNodeProvider} and a {@link DirCacheIterator} set up. An
-	 * {@link AttributesNodeProvider} is used to retrieve the attributes from
-	 * the info attributes file and the global attributes file. The
-	 * {@link DirCacheIterator} is used to retrieve the .gitattributes files
-	 * stored in the index. A {@link WorkingTreeIterator} can also be provided
-	 * to access the local version of the .gitattributes files. If none is
-	 * provided it will fallback on the {@link DirCacheIterator}.
-	 * </p>
-	 *
-	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
-	 * @since 4.2
-	 */
-	public Attributes getAttributes() {
-		if (attrs != null)
-			return attrs;
-
-		if (attributesNodeProvider == null) {
-			// The work tree should have a AttributesNodeProvider to be able to
-			// retrieve the info and global attributes node
-			throw new IllegalStateException(
-					"The tree walk should have one AttributesNodeProvider set in order to compute the git attributes."); //$NON-NLS-1$
-		}
-
-		try {
-			// Lazy create the attributesHandler on the first access of
-			// attributes. This requires the info, global and root
-			// attributes nodes
-			if (attributesHandler == null) {
-				attributesHandler = new AttributesHandler(this);
-			}
-			attrs = attributesHandler.getAttributes();
-			return attrs;
-		} catch (IOException e) {
-			throw new JGitInternalException("Error while parsing attributes", //$NON-NLS-1$
-					e);
-		}
-	}
-
-	/**
-	 * @param opType
-	 *            the operationtype (checkin/checkout) which should be used
-	 * @return the EOL stream type of the current entry using the config and
-	 *         {@link #getAttributes()} Note that this method may return null if
-	 *         the {@link TreeWalk} is not based on a working tree
-	 */
-	// TODO(msohn) make this method public in 4.4
-	@Nullable
-	EolStreamType getEolStreamType(OperationType opType) {
-			if (attributesNodeProvider == null || config == null)
-				return null;
-		return EolStreamTypeUtil.detectStreamType(opType,
-					config.get(WorkingTreeOptions.KEY), getAttributes());
-	}
-
-	/**
-	 * @return the EOL stream type of the current entry using the config and
-	 *         {@link #getAttributes()} Note that this method may return null if
-	 *         the {@link TreeWalk} is not based on a working tree
-	 * @since 4.3
-	 */
-	// TODO(msohn) deprecate this method in 4.4
-	public @Nullable EolStreamType getEolStreamType() {
-		return (getEolStreamType(operationType));
-	}
-
 	/** Reset this walker so new tree iterators can be added to it. */
 	public void reset() {
 		attrs = null;
-		attributesHandler = null;
 		trees = NO_TREES;
 		advance = false;
 		depth = 0;
@@ -751,13 +573,18 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @param p
 	 *            an iterator to walk over. The iterator should be new, with no
 	 *            parent, and should still be positioned before the first entry.
-	 *            The tree which the iterator operates on must have the same
-	 *            root as other trees in the walk.
+	 *            The tree which the iterator operates on must have the same root
+	 *            as other trees in the walk.
+	 *
 	 * @return position of this tree within the walker.
+	 * @throws CorruptObjectException
+	 *             the iterator was unable to obtain its first entry, due to
+	 *             possible data corruption within the backing data store.
 	 */
-	public int addTree(AbstractTreeIterator p) {
-		int n = trees.length;
-		AbstractTreeIterator[] newTrees = new AbstractTreeIterator[n + 1];
+	public int addTree(final AbstractTreeIterator p)
+			throws CorruptObjectException {
+		final int n = trees.length;
+		final AbstractTreeIterator[] newTrees = new AbstractTreeIterator[n + 1];
 
 		System.arraycopy(trees, 0, newTrees, 0, n);
 		newTrees[n] = p;
@@ -800,6 +627,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	public boolean next() throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		try {
+			attrs = null;
 			if (advance) {
 				advance = false;
 				postChildren = false;
@@ -807,7 +635,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			}
 
 			for (;;) {
-				attrs = null;
 				final AbstractTreeIterator t = min();
 				if (t.eof()) {
 					if (depth > 0) {
@@ -838,26 +665,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				return true;
 			}
 		} catch (StopWalkException stop) {
-			stopWalk();
+			for (final AbstractTreeIterator t : trees)
+				t.stopWalk();
 			return false;
-		}
-	}
-
-	/**
-	 * Notify iterators the walk is aborting.
-	 * <p>
-	 * Primarily to notify {@link DirCacheBuildIterator} the walk is aborting so
-	 * that it can copy any remaining entries.
-	 *
-	 * @throws IOException
-	 *             if traversal of remaining entries throws an exception during
-	 *             object access. This should never occur as remaining trees
-	 *             should already be in memory, however the methods used to
-	 *             finish traversal are declared to throw IOException.
-	 */
-	void stopWalk() throws IOException {
-		for (AbstractTreeIterator t : trees) {
-			t.stopWalk();
 		}
 	}
 
@@ -914,16 +724,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	public FileMode getFileMode(final int nth) {
 		return FileMode.fromBits(getRawMode(nth));
-	}
-
-	/**
-	 * Obtain the {@link FileMode} for the current entry on the currentHead tree
-	 *
-	 * @return mode for the current entry of the currentHead tree.
-	 * @since 4.3
-	 */
-	public FileMode getFileMode() {
-		return FileMode.fromBits(currentHead.mode);
 	}
 
 	/**
@@ -1206,12 +1006,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		for (int i = 0; i < trees.length; i++) {
 			final AbstractTreeIterator t = trees[i];
 			final AbstractTreeIterator n;
-			// If we find a GITLINK when attempting to enter a subtree, then the
-			// GITLINK must exist as a TREE in the index, meaning the working tree
-			// entry should be treated as a TREE
-			if (t.matches == ch && !t.eof() &&
-					(FileMode.TREE.equals(t.mode)
-							|| (FileMode.GITLINK.equals(t.mode) && t.isWorkTree())))
+			if (t.matches == ch && !t.eof() && FileMode.TREE.equals(t.mode))
 				n = t.createSubtreeIterator(reader, idBuffer);
 			else
 				n = t.createEmptyTreeIterator();
@@ -1270,7 +1065,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		}
 	}
 
-	void exitSubtree() {
+	private void exitSubtree() {
 		depth--;
 		for (int i = 0; i < trees.length; i++)
 			trees[i] = trees[i].parent;
@@ -1301,13 +1096,156 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
-	 * @param type
-	 *            of the tree to be queried
-	 * @return the tree of that type or null if none is present
-	 * @since 4.3
+	 * Retrieve the git attributes for the current entry.
+	 *
+	 * <h4>Git attribute computation</h4>
+	 *
+	 * <ul>
+	 * <li>Get the attributes matching the current path entry from the info file
+	 * (see {@link AttributesNodeProvider#getInfoAttributesNode()}).</li>
+	 * <li>Completes the list of attributes using the .gitattributes files
+	 * located on the current path (the further the directory that contains
+	 * .gitattributes is from the path in question, the lower its precedence).
+	 * For a checkin operation, it will look first on the working tree (if any).
+	 * If there is no attributes file, it will fallback on the index. For a
+	 * checkout operation, it will first use the index entry and then fallback
+	 * on the working tree if none.</li>
+	 * <li>In the end, completes the list of matching attributes using the
+	 * global attribute file define in the configuration (see
+	 * {@link AttributesNodeProvider#getGlobalAttributesNode()})</li>
+	 *
+	 * </ul>
+	 *
+	 *
+	 * <h4>Iterator constraints</h4>
+	 *
+	 * <p>
+	 * In order to have a correct list of attributes for the current entry, this
+	 * {@link TreeWalk} requires to have at least one
+	 * {@link AttributesNodeProvider} and a {@link DirCacheIterator} set up. An
+	 * {@link AttributesNodeProvider} is used to retrieve the attributes from
+	 * the info attributes file and the global attributes file. The
+	 * {@link DirCacheIterator} is used to retrieve the .gitattributes files
+	 * stored in the index. A {@link WorkingTreeIterator} can also be provided
+	 * to access the local version of the .gitattributes files. If none is
+	 * provided it will fallback on the {@link DirCacheIterator}.
+	 * </p>
+	 *
+	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
+	 * @since 4.2
 	 */
-	public <T extends AbstractTreeIterator> T getTree(
+	public Attributes getAttributes() {
+		if (attrs != null)
+			return attrs;
+
+		if (attributesNodeProvider == null) {
+			// The work tree should have a AttributesNodeProvider to be able to
+			// retrieve the info and global attributes node
+			throw new IllegalStateException(
+					"The tree walk should have one AttributesNodeProvider set in order to compute the git attributes."); //$NON-NLS-1$
+		}
+
+		WorkingTreeIterator workingTreeIterator = getTree(WorkingTreeIterator.class);
+		DirCacheIterator dirCacheIterator = getTree(DirCacheIterator.class);
+		CanonicalTreeParser other = getTree(CanonicalTreeParser.class);
+
+		if (workingTreeIterator == null && dirCacheIterator == null
+				&& other == null) {
+			// Can not retrieve the attributes without at least one of the above
+			// iterators.
+			return new Attributes();
+		}
+
+		String path = currentHead.getEntryPathString();
+		final boolean isDir = FileMode.TREE.equals(currentHead.mode);
+		Attributes attributes = new Attributes();
+		try {
+			// Gets the global attributes node
+			AttributesNode globalNodeAttr = attributesNodeProvider
+					.getGlobalAttributesNode();
+			// Gets the info attributes node
+			AttributesNode infoNodeAttr = attributesNodeProvider
+					.getInfoAttributesNode();
+
+			// Gets the info attributes
+			if (infoNodeAttr != null) {
+				infoNodeAttr.getAttributes(path, isDir, attributes);
+			}
+
+			// Gets the attributes located on the current entry path
+			getPerDirectoryEntryAttributes(path, isDir, operationType,
+					workingTreeIterator, dirCacheIterator, other, attributes);
+
+			// Gets the attributes located in the global attribute file
+			if (globalNodeAttr != null) {
+				globalNodeAttr.getAttributes(path, isDir, attributes);
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
+		}
+		// now after all attributes are collected - in the correct hierarchy
+		// order - remove all unspecified entries (the ! marker)
+		for (Attribute a : attributes.getAll()) {
+			if (a.getState() == State.UNSPECIFIED)
+				attributes.remove(a.getKey());
+		}
+		return attributes;
+	}
+
+	/**
+	 * Get the attributes located on the current entry path.
+	 *
+	 * @param path
+	 *            current entry path
+	 * @param isDir
+	 *            holds true if the current entry is a directory
+	 * @param opType
+	 *            type of operation
+	 * @param workingTreeIterator
+	 *            a {@link WorkingTreeIterator} matching the current entry
+	 * @param dirCacheIterator
+	 *            a {@link DirCacheIterator} matching the current entry
+	 * @param other
+	 *            a {@link CanonicalTreeParser} matching the current entry
+	 * @param attributes
+	 *            Non null map holding the existing attributes. This map will be
+	 *            augmented with new entry. None entry will be overrided.
+	 * @throws IOException
+	 *             It raises an {@link IOException} if a problem appears while
+	 *             parsing one on the attributes file.
+	 */
+	private void getPerDirectoryEntryAttributes(String path, boolean isDir,
+			OperationType opType, WorkingTreeIterator workingTreeIterator,
+			DirCacheIterator dirCacheIterator, CanonicalTreeParser other,
+			Attributes attributes)
+			throws IOException {
+		// Prevents infinite recurrence
+		if (workingTreeIterator != null || dirCacheIterator != null
+				|| other != null) {
+			AttributesNode currentAttributesNode = getCurrentAttributesNode(
+					opType, workingTreeIterator, dirCacheIterator, other);
+			if (currentAttributesNode != null) {
+				currentAttributesNode.getAttributes(path, isDir, attributes);
+			}
+			getPerDirectoryEntryAttributes(path, isDir, opType,
+					getParent(workingTreeIterator, WorkingTreeIterator.class),
+					getParent(dirCacheIterator, DirCacheIterator.class),
+					getParent(other, CanonicalTreeParser.class), attributes);
+		}
+	}
+
+	private static <T extends AbstractTreeIterator> T getParent(T current,
 			Class<T> type) {
+		if (current != null) {
+			AbstractTreeIterator parent = current.parent;
+			if (type.isInstance(parent)) {
+				return type.cast(parent);
+			}
+		}
+		return null;
+	}
+
+	private <T extends AbstractTreeIterator> T getTree(Class<T> type) {
 		for (int i = 0; i < trees.length; i++) {
 			AbstractTreeIterator tree = trees[i];
 			if (type.isInstance(tree)) {
@@ -1315,6 +1253,76 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Get the {@link AttributesNode} for the current entry.
+	 * <p>
+	 * This method implements the fallback mechanism between the index and the
+	 * working tree depending on the operation type
+	 * </p>
+	 *
+	 * @param opType
+	 * @param workingTreeIterator
+	 * @param dirCacheIterator
+	 * @param other
+	 * @return a {@link AttributesNode} of the current entry,
+	 *         {@link NullPointerException} otherwise.
+	 * @throws IOException
+	 *             It raises an {@link IOException} if a problem appears while
+	 *             parsing one on the attributes file.
+	 */
+	private AttributesNode getCurrentAttributesNode(OperationType opType,
+			@Nullable WorkingTreeIterator workingTreeIterator,
+			@Nullable DirCacheIterator dirCacheIterator,
+			@Nullable CanonicalTreeParser other)
+					throws IOException {
+		AttributesNode attributesNode = null;
+		switch (opType) {
+		case CHECKIN_OP:
+			if (workingTreeIterator != null) {
+				attributesNode = workingTreeIterator.getEntryAttributesNode();
+			}
+			if (attributesNode == null && dirCacheIterator != null) {
+				attributesNode = getAttributesNode(dirCacheIterator
+						.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
+			}
+			if (attributesNode == null && other != null) {
+				attributesNode = getAttributesNode(
+						other.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
+			}
+			break;
+		case CHECKOUT_OP:
+			if (other != null) {
+				attributesNode = other
+						.getEntryAttributesNode(getObjectReader());
+			}
+			if (dirCacheIterator != null) {
+				attributesNode = getAttributesNode(dirCacheIterator
+						.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
+			}
+			if (attributesNode == null && workingTreeIterator != null) {
+				attributesNode = getAttributesNode(
+						workingTreeIterator.getEntryAttributesNode(),
+						attributesNode);
+			}
+			break;
+		default:
+			throw new IllegalStateException(
+					"The only supported operation types are:" //$NON-NLS-1$
+							+ OperationType.CHECKIN_OP + "," //$NON-NLS-1$
+							+ OperationType.CHECKOUT_OP);
+		}
+
+		return attributesNode;
+	}
+
+	private static AttributesNode getAttributesNode(AttributesNode value,
+			AttributesNode defaultValue) {
+		return (value == null) ? defaultValue : value;
 	}
 
 	/**
@@ -1374,19 +1382,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			return filterCommand;
 		filterCommand = config.getString(Constants.ATTR_FILTER,
 				filterDriverName, filterCommandType);
-		boolean useBuiltin = config.getBoolean(Constants.ATTR_FILTER,
-				filterDriverName, Constants.ATTR_FILTER_USE_BUILTIN, false);
-		if (useBuiltin) {
-			String builtinFilterCommand = Constants.BUILTIN_FILTER_PREFIX
-					+ filterDriverName + '/' + filterCommandType;
-			if (filterCommands != null
-					&& filterCommands.contains(builtinFilterCommand)) {
-				filterCommand = builtinFilterCommand;
-			}
-		}
-		if (filterCommand != null) {
+		if (filterCommand != null)
 			filterCommandsByNameDotType.put(key, filterCommand);
-		}
 		return filterCommand;
 	}
 }

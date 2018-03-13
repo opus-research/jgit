@@ -98,7 +98,7 @@ import org.eclipse.jgit.storage.pack.PackConfig;
  * Transport instances and the connections they create are not thread-safe.
  * Callers must ensure a transport is accessed by only one thread at a time.
  */
-public abstract class Transport implements AutoCloseable {
+public abstract class Transport {
 	/** Type of operation a Transport is being opened for. */
 	public enum Operation {
 		/** Transport is to fetch objects locally. */
@@ -629,7 +629,7 @@ public abstract class Transport implements AutoCloseable {
 
 		for (final RefSpec spec : procRefs) {
 			String srcSpec = spec.getSource();
-			final Ref srcRef = db.findRef(srcSpec);
+			final Ref srcRef = db.getRef(srcSpec);
 			if (srcRef != null)
 				srcSpec = srcRef.getName();
 
@@ -772,9 +772,6 @@ public abstract class Transport implements AutoCloseable {
 
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
-
-	/** The option strings associated with the push operation. */
-	private List<String> pushOptions;
 
 	private PrintStream hookOutRedirect;
 
@@ -1124,25 +1121,6 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
-	 * @return the option strings associated with the push operation
-	 * @since 4.5
-	 */
-	public List<String> getPushOptions() {
-		return pushOptions;
-	}
-
-	/**
-	 * Sets the option strings associated with the push operation.
-	 *
-	 * @param pushOptions
-	 *            null if push options are unsupported
-	 * @since 4.5
-	 */
-	public void setPushOptions(final List<String> pushOptions) {
-		this.pushOptions = pushOptions;
-	}
-
-	/**
 	 * Fetch objects and refs from the remote repository to the local one.
 	 * <p>
 	 * This is a utility function providing standard fetch behavior. Local
@@ -1375,10 +1353,6 @@ public abstract class Transport implements AutoCloseable {
 	 * must close that network socket, disconnecting the two peers. If the
 	 * remote repository is actually local (same system) this method must close
 	 * any open file handles used to read the "remote" repository.
-	 * <p>
-	 * {@code AutoClosable.close()} declares that it throws {@link Exception}.
-	 * Implementers shouldn't throw checked exceptions. This override narrows
-	 * the signature to prevent them from doing so.
 	 */
 	public abstract void close();
 }

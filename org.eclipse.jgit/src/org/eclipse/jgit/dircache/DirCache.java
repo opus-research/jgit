@@ -344,6 +344,9 @@ public class DirCache {
 	/** Our active lock (if we hold it); null if we don't have it locked. */
 	private LockFile myLock;
 
+	/** file system abstraction **/
+	private final FS fs;
+
 	/** Keep track of whether the index has changed or not */
 	private FileSnapshot snapshot;
 
@@ -373,6 +376,7 @@ public class DirCache {
 	 */
 	public DirCache(final File indexLocation, final FS fs) {
 		liveFile = indexLocation;
+		this.fs = fs;
 		clear();
 	}
 
@@ -607,7 +611,7 @@ public class DirCache {
 	public boolean lock() throws IOException {
 		if (liveFile == null)
 			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
-		final LockFile tmp = new LockFile(liveFile);
+		final LockFile tmp = new LockFile(liveFile, fs);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
 			myLock = tmp;
@@ -796,11 +800,8 @@ public class DirCache {
 	 *         information. If &lt; 0 the entry does not exist in the index.
 	 * @since 3.4
 	 */
-	public int findEntry(byte[] p, int pLen) {
-		return findEntry(0, p, pLen);
-	}
-
-	int findEntry(int low, byte[] p, int pLen) {
+	public int findEntry(final byte[] p, final int pLen) {
+		int low = 0;
 		int high = entryCnt;
 		while (low < high) {
 			int mid = (low + high) >>> 1;

@@ -65,7 +65,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheCheckout.CheckoutMetadata;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -114,7 +113,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		return dco.getRemoved();
 	}
 
-	private Map<String, CheckoutMetadata> getUpdated() {
+	private Map<String, String> getUpdated() {
 		return dco.getUpdated();
 	}
 
@@ -141,53 +140,52 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testResetHard() throws IOException, NoFilepatternException,
 			GitAPIException {
-		try (Git git = new Git(db)) {
-			writeTrashFile("f", "f()");
-			writeTrashFile("D/g", "g()");
-			git.add().addFilepattern(".").call();
-			git.commit().setMessage("inital").call();
-			assertIndex(mkmap("f", "f()", "D/g", "g()"));
+		Git git = new Git(db);
+		writeTrashFile("f", "f()");
+		writeTrashFile("D/g", "g()");
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("inital").call();
+		assertIndex(mkmap("f", "f()", "D/g", "g()"));
 
-			git.branchCreate().setName("topic").call();
+		git.branchCreate().setName("topic").call();
 
-			writeTrashFile("f", "f()\nmaster");
-			writeTrashFile("D/g", "g()\ng2()");
-			writeTrashFile("E/h", "h()");
-			git.add().addFilepattern(".").call();
-			RevCommit master = git.commit().setMessage("master-1").call();
-			assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
+		writeTrashFile("f", "f()\nmaster");
+		writeTrashFile("D/g", "g()\ng2()");
+		writeTrashFile("E/h", "h()");
+		git.add().addFilepattern(".").call();
+		RevCommit master = git.commit().setMessage("master-1").call();
+		assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
 
-			checkoutBranch("refs/heads/topic");
-			assertIndex(mkmap("f", "f()", "D/g", "g()"));
+		checkoutBranch("refs/heads/topic");
+		assertIndex(mkmap("f", "f()", "D/g", "g()"));
 
-			writeTrashFile("f", "f()\nside");
-			assertTrue(new File(db.getWorkTree(), "D/g").delete());
-			writeTrashFile("G/i", "i()");
-			git.add().addFilepattern(".").call();
-			git.add().addFilepattern(".").setUpdate(true).call();
-			RevCommit topic = git.commit().setMessage("topic-1").call();
-			assertIndex(mkmap("f", "f()\nside", "G/i", "i()"));
+		writeTrashFile("f", "f()\nside");
+		assertTrue(new File(db.getWorkTree(), "D/g").delete());
+		writeTrashFile("G/i", "i()");
+		git.add().addFilepattern(".").call();
+		git.add().addFilepattern(".").setUpdate(true).call();
+		RevCommit topic = git.commit().setMessage("topic-1").call();
+		assertIndex(mkmap("f", "f()\nside", "G/i", "i()"));
 
-			writeTrashFile("untracked", "untracked");
+		writeTrashFile("untracked", "untracked");
 
-			resetHard(master);
-			assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
-			resetHard(topic);
-			assertIndex(mkmap("f", "f()\nside", "G/i", "i()"));
-			assertWorkDir(mkmap("f", "f()\nside", "G/i", "i()", "untracked",
-					"untracked"));
+		resetHard(master);
+		assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
+		resetHard(topic);
+		assertIndex(mkmap("f", "f()\nside", "G/i", "i()"));
+		assertWorkDir(mkmap("f", "f()\nside", "G/i", "i()", "untracked",
+				"untracked"));
 
-			assertEquals(MergeStatus.CONFLICTING, git.merge().include(master)
-					.call().getMergeStatus());
-			assertEquals(
-					"[D/g, mode:100644, stage:1][D/g, mode:100644, stage:3][E/h, mode:100644][G/i, mode:100644][f, mode:100644, stage:1][f, mode:100644, stage:2][f, mode:100644, stage:3]",
-					indexState(0));
+		assertEquals(MergeStatus.CONFLICTING, git.merge().include(master)
+				.call().getMergeStatus());
+		assertEquals(
+				"[D/g, mode:100644, stage:1][D/g, mode:100644, stage:3][E/h, mode:100644][G/i, mode:100644][f, mode:100644, stage:1][f, mode:100644, stage:2][f, mode:100644, stage:3]",
+				indexState(0));
 
-			resetHard(master);
-			assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
-			assertWorkDir(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h",
-					"h()", "untracked", "untracked"));
-		}
+		resetHard(master);
+		assertIndex(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h", "h()"));
+		assertWorkDir(mkmap("f", "f()\nmaster", "D/g", "g()\ng2()", "E/h",
+				"h()", "untracked", "untracked"));
 	}
 
 	/**
@@ -202,22 +200,21 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testResetHardFromIndexEntryWithoutFileToTreeWithoutFile()
 			throws Exception {
-		try (Git git = new Git(db)) {
-			writeTrashFile("x", "x");
-			git.add().addFilepattern("x").call();
-			RevCommit id1 = git.commit().setMessage("c1").call();
+		Git git = new Git(db);
+		writeTrashFile("x", "x");
+		git.add().addFilepattern("x").call();
+		RevCommit id1 = git.commit().setMessage("c1").call();
 
-			writeTrashFile("f/g", "f/g");
-			git.rm().addFilepattern("x").call();
-			git.add().addFilepattern("f/g").call();
-			git.commit().setMessage("c2").call();
-			deleteTrashFile("f/g");
-			deleteTrashFile("f");
+		writeTrashFile("f/g", "f/g");
+		git.rm().addFilepattern("x").call();
+		git.add().addFilepattern("f/g").call();
+		git.commit().setMessage("c2").call();
+		deleteTrashFile("f/g");
+		deleteTrashFile("f");
 
-			// The actual test
-			git.reset().setMode(ResetType.HARD).setRef(id1.getName()).call();
-			assertIndex(mkmap("x", "x"));
-		}
+		// The actual test
+		git.reset().setMode(ResetType.HARD).setRef(id1.getName()).call();
+		assertIndex(mkmap("x", "x"));
 	}
 
 	/**
@@ -227,14 +224,14 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	 */
 	@Test
 	public void testInitialCheckout() throws Exception {
-		try (Git git = new Git(db)) {
-			TestRepository<Repository> db_t = new TestRepository<Repository>(db);
-			BranchBuilder master = db_t.branch("master");
-			master.commit().add("f", "1").message("m0").create();
-			assertFalse(new File(db.getWorkTree(), "f").exists());
-			git.checkout().setName("master").call();
-			assertTrue(new File(db.getWorkTree(), "f").exists());
-		}
+		Git git = new Git(db);
+
+		TestRepository<Repository> db_t = new TestRepository<Repository>(db);
+		BranchBuilder master = db_t.branch("master");
+		master.commit().add("f", "1").message("m0").create();
+		assertFalse(new File(db.getWorkTree(), "f").exists());
+		git.checkout().setName("master").call();
+		assertTrue(new File(db.getWorkTree(), "f").exists());
 	}
 
 	private DirCacheCheckout resetHard(RevCommit commit)
@@ -798,7 +795,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			fail("didn't get the expected exception");
 		} catch (CheckoutConflictException e) {
 			assertConflict("foo");
-			assertEquals("foo", e.getConflictingFiles()[0]);
 			assertWorkDir(mkmap("foo", "bar", "other", "other"));
 			assertIndex(mk("other"));
 		}
@@ -886,7 +882,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			assertWorkDir(mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f",
 					"e/f", "e/g", "e/g3"));
 			assertConflict("e/g");
-			assertEquals("e/g", e.getConflictingFiles()[0]);
 		}
 	}
 
@@ -1089,7 +1084,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertWorkDir(mkmap(linkName, "a", fname, "a"));
 
 		Status st = git.status().call();
-		assertTrue(st.isClean());
+		assertFalse(st.isClean());
 	}
 
 	@Test
@@ -1218,7 +1213,9 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertWorkDir(mkmap(fname, "a"));
 
 		Status st = git.status().call();
-		assertTrue(st.isClean());
+		assertFalse(st.isClean());
+		assertEquals(1, st.getAdded().size());
+		assertTrue(st.getAdded().contains(fname + "/dir/file1"));
 	}
 
 	@Test
@@ -1614,108 +1611,49 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertNotNull(git.checkout().setName(Constants.MASTER).call());
 	}
 
-	@Test(expected = CheckoutConflictException.class)
-	public void testFolderFileConflict() throws Exception {
-		RevCommit headCommit = commitFile("f/a", "initial content", "master");
-		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
-		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
-		writeTrashFile("f", "file instead of folder");
-		new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-				checkoutCommit.getTree()).checkout();
-	}
-
-	@Test
-	public void testMultipleContentConflicts() throws Exception {
-		commitFile("a", "initial content", "master");
-		RevCommit headCommit = commitFile("b", "initial content", "master");
-		commitFile("a", "side content", "side");
-		RevCommit checkoutCommit = commitFile("b", "side content", "side");
-		writeTrashFile("a", "changed content");
-		writeTrashFile("b", "changed content");
-
-		try {
-			new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-					checkoutCommit.getTree()).checkout();
-			fail();
-		} catch (CheckoutConflictException expected) {
-			assertEquals(2, expected.getConflictingFiles().length);
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("a"));
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("b"));
-			assertEquals("changed content", read("a"));
-			assertEquals("changed content", read("b"));
-		}
-	}
-
-	@Test
-	public void testFolderFileAndContentConflicts() throws Exception {
-		RevCommit headCommit = commitFile("f/a", "initial content", "master");
-		commitFile("b", "side content", "side");
-		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
-		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
-		writeTrashFile("f", "file instead of a folder");
-		writeTrashFile("b", "changed content");
-
-		try {
-			new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-					checkoutCommit.getTree()).checkout();
-			fail();
-		} catch (CheckoutConflictException expected) {
-			assertEquals(2, expected.getConflictingFiles().length);
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("b"));
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("f"));
-			assertEquals("file instead of a folder", read("f"));
-			assertEquals("changed content", read("b"));
-		}
-	}
-
 	public void assertWorkDir(Map<String, String> i)
 			throws CorruptObjectException,
 			IOException {
-		try (TreeWalk walk = new TreeWalk(db)) {
-			walk.setRecursive(false);
-			walk.addTree(new FileTreeIterator(db));
-			String expectedValue;
-			String path;
-			int nrFiles = 0;
-			FileTreeIterator ft;
-			while (walk.next()) {
-				ft = walk.getTree(0, FileTreeIterator.class);
-				path = ft.getEntryPathString();
-				expectedValue = i.get(path);
-				File file = new File(db.getWorkTree(), path);
-				assertTrue(file.exists());
-				if (file.isFile()) {
-					assertNotNull("found unexpected file for path " + path
-							+ " in workdir", expectedValue);
-					FileInputStream is = new FileInputStream(file);
-					byte[] buffer = new byte[(int) file.length()];
-					int offset = 0;
-					int numRead = 0;
-					while (offset < buffer.length
-							&& (numRead = is.read(buffer, offset, buffer.length
-									- offset)) >= 0) {
-						offset += numRead;
-					}
-					is.close();
-					assertArrayEquals("unexpected content for path " + path
-							+ " in workDir. ", buffer, i.get(path).getBytes());
-					nrFiles++;
-				} else if (file.isDirectory()) {
-					if (file.list().length == 0) {
-						assertEquals("found unexpected empty folder for path "
-								+ path + " in workDir. ", "/", i.get(path));
-						nrFiles++;
-					}
+		TreeWalk walk = new TreeWalk(db);
+		walk.setRecursive(false);
+		walk.addTree(new FileTreeIterator(db));
+		String expectedValue;
+		String path;
+		int nrFiles = 0;
+		FileTreeIterator ft;
+		while (walk.next()) {
+			ft = walk.getTree(0, FileTreeIterator.class);
+			path = ft.getEntryPathString();
+			expectedValue = i.get(path);
+			File file = new File(db.getWorkTree(), path);
+			assertTrue(file.exists());
+			if (file.isFile()) {
+				assertNotNull("found unexpected file for path " + path
+						+ " in workdir", expectedValue);
+				FileInputStream is = new FileInputStream(file);
+				byte[] buffer = new byte[(int) file.length()];
+				int offset = 0;
+				int numRead = 0;
+				while (offset < buffer.length
+						&& (numRead = is.read(buffer, offset, buffer.length
+								- offset)) >= 0) {
+					offset += numRead;
 				}
-				if (walk.isSubtree()) {
-					walk.enterSubtree();
+				is.close();
+				assertArrayEquals("unexpected content for path " + path
+						+ " in workDir. ", buffer, i.get(path).getBytes());
+				nrFiles++;
+			} else if (file.isDirectory()) {
+				if (file.list().length == 0) {
+					assertEquals("found unexpected empty folder for path "
+							+ path + " in workDir. ", "/", i.get(path));
+					nrFiles++;
 				}
 			}
-			assertEquals("WorkDir has not the right size.", i.size(), nrFiles);
+			if (walk.isSubtree()) {
+				walk.enterSubtree();
+			}
 		}
+		assertEquals("WorkDir has not the right size.", i.size(), nrFiles);
 	}
 }

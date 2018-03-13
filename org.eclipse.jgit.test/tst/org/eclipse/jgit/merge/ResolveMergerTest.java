@@ -62,7 +62,6 @@ import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Assert;
 import org.junit.experimental.theories.DataPoint;
@@ -89,36 +88,35 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		file = new File(folder1, "file2.txt");
 		write(file, "folder1--file2.txt");
 
-		try (Git git = new Git(db)) {
-			git.add().addFilepattern(folder1.getName()).call();
-			RevCommit base = git.commit().setMessage("adding folder").call();
+		Git git = new Git(db);
+		git.add().addFilepattern(folder1.getName()).call();
+		RevCommit base = git.commit().setMessage("adding folder").call();
 
-			recursiveDelete(folder1);
-			git.rm().addFilepattern("folder1/file1.txt")
-					.addFilepattern("folder1/file2.txt").call();
-			RevCommit other = git.commit()
-					.setMessage("removing folders on 'other'").call();
+		recursiveDelete(folder1);
+		git.rm().addFilepattern("folder1/file1.txt")
+				.addFilepattern("folder1/file2.txt").call();
+		RevCommit other = git.commit()
+				.setMessage("removing folders on 'other'").call();
 
-			git.checkout().setName(base.name()).call();
+		git.checkout().setName(base.name()).call();
 
-			file = new File(db.getWorkTree(), "unrelated.txt");
-			write(file, "unrelated");
+		file = new File(db.getWorkTree(), "unrelated.txt");
+		write(file, "unrelated");
 
-			git.add().addFilepattern("unrelated.txt").call();
-			RevCommit head = git.commit().setMessage("Adding another file").call();
+		git.add().addFilepattern("unrelated.txt").call();
+		RevCommit head = git.commit().setMessage("Adding another file").call();
 
-			// Untracked file to cause failing path for delete() of folder1
-			// but that's ok.
-			file = new File(folder1, "file3.txt");
-			write(file, "folder1--file3.txt");
+		// Untracked file to cause failing path for delete() of folder1
+		// but that's ok.
+		file = new File(folder1, "file3.txt");
+		write(file, "folder1--file3.txt");
 
-			ResolveMerger merger = (ResolveMerger) strategy.newMerger(db, false);
-			merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
-			merger.setWorkingTreeIterator(new FileTreeIterator(db));
-			boolean ok = merger.merge(head.getId(), other.getId());
-			assertTrue(ok);
-			assertTrue(file.exists());
-		}
+		ResolveMerger merger = (ResolveMerger) strategy.newMerger(db, false);
+		merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
+		merger.setWorkingTreeIterator(new FileTreeIterator(db));
+		boolean ok = merger.merge(head.getId(), other.getId());
+		assertTrue(ok);
+		assertTrue(file.exists());
 	}
 
 	/**
@@ -695,7 +693,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 
 		// Create initial content and remember when the last file was written.
 		f = writeTrashFiles(false, "orig", "orig", "1\n2\n3", "orig", "orig");
-		lastTs4 = FS.DETECTED.lastModified(f);
+		lastTs4 = f.lastModified();
 
 		// add all files, commit and check this doesn't update any working tree
 		// files and that the index is in a new file system timer tick. Make
@@ -708,8 +706,8 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "2", "3", "4", "<.git/index");
 		assertEquals("Commit should not touch working tree file 4", lastTs4,
-				FS.DETECTED.lastModified(new File(db.getWorkTree(), "4")));
-		lastTsIndex = FS.DETECTED.lastModified(indexFile);
+				new File(db.getWorkTree(), "4").lastModified());
+		lastTsIndex = indexFile.lastModified();
 
 		// Do modifications on the master branch. Then add and commit. This
 		// should touch only "0", "2 and "3"
@@ -723,7 +721,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "4", "*" + lastTs4, "<*"
 				+ lastTsIndex, "<0", "2", "3", "<.git/index");
-		lastTsIndex = FS.DETECTED.lastModified(indexFile);
+		lastTsIndex = indexFile.lastModified();
 
 		// Checkout a side branch. This should touch only "0", "2 and "3"
 		fsTick(indexFile);
@@ -732,7 +730,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "4", "*" + lastTs4, "<*"
 				+ lastTsIndex, "<0", "2", "3", ".git/index");
-		lastTsIndex = FS.DETECTED.lastModified(indexFile);
+		lastTsIndex = indexFile.lastModified();
 
 		// This checkout may have populated worktree and index so fast that we
 		// may have smudged entries now. Check that we have the right content
@@ -745,13 +743,13 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				indexState(CONTENT));
 		fsTick(indexFile);
 		f = writeTrashFiles(false, "orig", "orig", "1\n2\n3", "orig", "orig");
-		lastTs4 = FS.DETECTED.lastModified(f);
+		lastTs4 = f.lastModified();
 		fsTick(f);
 		git.add().addFilepattern(".").call();
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("*" + lastTsIndex, "<0", "1", "2", "3",
 				"4", "<.git/index");
-		lastTsIndex = FS.DETECTED.lastModified(indexFile);
+		lastTsIndex = indexFile.lastModified();
 
 		// Do modifications on the side branch. Touch only "1", "2 and "3"
 		fsTick(indexFile);
@@ -762,7 +760,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("0", "4", "*" + lastTs4, "<*"
 				+ lastTsIndex, "<1", "2", "3", "<.git/index");
-		lastTsIndex = FS.DETECTED.lastModified(indexFile);
+		lastTsIndex = indexFile.lastModified();
 
 		// merge master and side. Should only touch "0," "2" and "3"
 		fsTick(indexFile);
@@ -790,7 +788,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 					"IndexEntry with path "
 							+ path
 							+ " has lastmodified with is different from the worktree file",
-					FS.DETECTED.lastModified(new File(workTree, path)), dc.getEntry(path)
+					new File(workTree, path).lastModified(), dc.getEntry(path)
 							.getLastModified());
 	}
 
@@ -800,15 +798,14 @@ public class ResolveMergerTest extends RepositoryTestCase {
 	// then this file must be younger then file i. A path "*<modtime>"
 	// represents a file with a modification time of <modtime>
 	// E.g. ("a", "b", "<c", "f/a.txt") means: a<=b<c<=f/a.txt
-	private void checkModificationTimeStampOrder(String... pathes)
-			throws IOException {
+	private void checkModificationTimeStampOrder(String... pathes) {
 		long lastMod = Long.MIN_VALUE;
 		for (String p : pathes) {
 			boolean strong = p.startsWith("<");
 			boolean fixed = p.charAt(strong ? 1 : 0) == '*';
 			p = p.substring((strong ? 1 : 0) + (fixed ? 1 : 0));
-			long curMod = fixed ? Long.valueOf(p).longValue()
-					: FS.DETECTED.lastModified(new File(db.getWorkTree(), p));
+			long curMod = fixed ? Long.valueOf(p).longValue() : new File(
+					db.getWorkTree(), p).lastModified();
 			if (strong)
 				assertTrue("path " + p + " is not younger than predecesssor",
 						curMod > lastMod);

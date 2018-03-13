@@ -56,6 +56,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.jgit.attributes.Attribute.State;
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
@@ -219,16 +220,14 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 	}
 
 	private void assertAttributesNode(String pathName,
-			AttributesNode attributesNode, List<Attribute> nodeAttrs)
-					throws IOException {
+			AttributesNode attributesNode, List<Attribute> nodeAttrs) {
 		if (attributesNode == null)
 			assertTrue(nodeAttrs == null || nodeAttrs.isEmpty());
 		else {
 
 			Attributes entryAttributes = new Attributes();
-			new AttributesHandler(walk).mergeAttributes(attributesNode,
-					pathName, false,
-					entryAttributes);
+			attributesNode.getAttributes(pathName,
+					false, entryAttributes);
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {
@@ -254,7 +253,7 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		writeTrashFile(name, data.toString());
 	}
 
-	private TreeWalk beginWalk() {
+	private TreeWalk beginWalk() throws CorruptObjectException {
 		TreeWalk newWalk = new TreeWalk(db);
 		newWalk.addTree(new FileTreeIterator(db));
 		return newWalk;
