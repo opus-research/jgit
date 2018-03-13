@@ -881,20 +881,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				InputStream dcIn = null;
 				try {
 					ObjectLoader loader = repository.open(entry.getObjectId());
-					// We need to compute the length, but only if it is not
-					// a binary stream.
-					dcIn = new EolCanonicalizingInputStream(
-							loader.openStream(), true, true /* abort if binary */);
-					long dcInLen;
-					try {
-						dcInLen = computeLength(dcIn);
-					} catch (EolCanonicalizingInputStream.IsBinaryException e) {
-						// ok, we know it's different so unsmudge the entry
-						entry.setLength(loader.getSize());
+					dcIn = loader.openStream();
+					if (RawText.isBinary(dcIn))
 						return true;
-					} finally {
-						dcIn.close();
-					}
+					dcIn.close();
+
+					dcIn = new EolCanonicalizingInputStream(
+							loader.openStream(), true);
+					long dcInLen = computeLength(dcIn);
+					dcIn.close();
 
 					dcIn = new EolCanonicalizingInputStream(
 							loader.openStream(), true);
