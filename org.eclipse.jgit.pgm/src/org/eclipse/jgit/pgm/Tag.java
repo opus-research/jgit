@@ -51,8 +51,6 @@ package org.eclipse.jgit.pgm;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.TagCommand;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -65,7 +63,7 @@ class Tag extends TextBuiltin {
 	@Option(name = "-m", metaVar = "metaVar_message", usage = "usage_tagMessage")
 	private String message = "";
 
-	@Argument(index = 0, required = false, metaVar = "metaVar_name")
+	@Argument(index = 0, required = true, metaVar = "metaVar_name")
 	private String tagName;
 
 	@Argument(index = 1, metaVar = "metaVar_object")
@@ -74,20 +72,13 @@ class Tag extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		Git git = new Git(db);
-		if (tagName != null) {
-			TagCommand command = git.tag().setForceUpdate(force)
-					.setMessage(message).setName(tagName);
+		TagCommand command = git.tag().setForceUpdate(force).setMessage(message).setName(tagName);
 
-			if (object != null) {
-				RevWalk walk = new RevWalk(db);
-				command.setObjectId(walk.parseAny(object));
-			}
-
-			command.call();
-		} else {
-			for (Ref tagRef : git.tagList().call()) {
-				System.out.println(Repository.shortenRefName(tagRef.getName()));
-			}
+		if (object != null) {
+			RevWalk walk = new RevWalk(db);
+			command.setObjectId(walk.parseAny(object));
 		}
+
+		command.call();
 	}
 }
