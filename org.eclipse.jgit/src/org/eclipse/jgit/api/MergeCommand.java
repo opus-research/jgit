@@ -63,6 +63,7 @@ import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Config.ConfigEnum;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -81,6 +82,7 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.RevWalkUtils;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.util.StringUtils;
 
 /**
  * A class used to execute a {@code Merge} command. It has setters for all
@@ -98,6 +100,100 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	private List<Ref> commits = new LinkedList<Ref>();
 
 	private boolean squash;
+
+	private FastForwardMode fastForwardMode = FastForwardMode.FF;
+
+	/**
+	 * The modes available for fast forward merges corresponding to the
+	 * <code>--ff</code>, <code>--no-ff</code> and <code>--ff-only</code>
+	 * options under <code>branch.<name>.mergeoptions</code>.
+	 */
+	public enum FastForwardMode implements ConfigEnum {
+		/**
+		 * Corresponds to the default --ff option (for a fast forward update the
+		 * branch pointer only).
+		 */
+		FF,
+		/**
+		 * Corresponds to the --no-ff option (create a merge commit even for a
+		 * fast forward).
+		 */
+		NO_FF,
+		/**
+		 * Corresponds to the --ff-only option (abort unless the merge is a fast
+		 * forward).
+		 */
+		FF_ONLY;
+
+		public String toConfigValue() {
+			return "--" + name().toLowerCase().replace('_', '-'); //$NON-NLS-1$
+		}
+
+		public boolean matchConfigValue(String in) {
+			if (StringUtils.isEmptyOrNull(in))
+				return false;
+			if (!in.startsWith("--")) //$NON-NLS-1$
+				return false;
+			return name().equalsIgnoreCase(in.substring(2).replace('-', '_'));
+		}
+
+		/**
+		 * The modes available for fast forward merges corresponding to the
+		 * options under <code>merge.ff</code>.
+		 */
+		public enum Merge {
+			/**
+			 * {@link FastForwardMode#FF}.
+			 */
+			TRUE,
+			/**
+			 * {@link FastForwardMode#NO_FF}.
+			 */
+			FALSE,
+			/**
+			 * {@link FastForwardMode#FF_ONLY}.
+			 */
+			ONLY;
+
+			/**
+			 * Map from <code>FastForwardMode</code> to
+			 * <code>FastForwardMode.Merge</code>.
+			 *
+			 * @param ffMode
+			 *            the <code>FastForwardMode</code> value to be mapped
+			 * @return the mapped code>FastForwardMode.Merge</code> value
+			 */
+			public static Merge valueOf(FastForwardMode ffMode) {
+				switch (ffMode) {
+				case NO_FF:
+					return FALSE;
+				case FF_ONLY:
+					return ONLY;
+				default:
+					return TRUE;
+				}
+			}
+		}
+
+		/**
+		 * Map from <code>FastForwardMode.Merge</code> to
+		 * <code>FastForwardMode</code>.
+		 *
+		 * @param ffMode
+		 *            the <code>FastForwardMode.Merge</code> value to be mapped
+		 * @return the mapped code>FastForwardMode</code> value
+		 */
+		public static FastForwardMode valueOf(FastForwardMode.Merge ffMode) {
+			switch (ffMode) {
+			case FALSE:
+				return NO_FF;
+			case ONLY:
+				return FF_ONLY;
+			default:
+				return FF;
+			}
+		}
+	}
 
 	/**
 	 * @param repo
@@ -118,14 +214,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			ConcurrentRefUpdateException, CheckoutConflictException,
 			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
 		checkCallable();
-
-		if (commits.size() != 1)
-			throw new InvalidMergeHeadsException(
-					commits.isEmpty() ? JGitText.get().noMergeHeadSpecified
-							: MessageFormat.format(
-									JGitText.get().mergeStrategyDoesNotSupportHeads,
-									mergeStrategy.getName(),
-									Integer.valueOf(commits.size())));
+		checkParameters();
 
 		RevWalk revWalk = null;
 		DirCacheCheckout dco = null;
@@ -134,7 +223,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			if (head == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
-			StringBuilder refLogMessage = new StringBuilder("merge ");
+			StringBuilder refLogMessage = new StringBuilder("merge "); //$NON-NLS-1$
 
 			// Check for FAST_FORWARD, ALREADY_UP_TO_DATE
 			revWalk = new RevWalk(repo);
@@ -162,7 +251,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						.updateRef(head.getTarget().getName());
 				refUpdate.setNewObjectId(objectId);
 				refUpdate.setExpectedOldObjectId(null);
-				refUpdate.setRefLogMessage("initial pull", false);
+				refUpdate.setRefLogMessage("initial pull", false); //$NON-NLS-1$
 				if (refUpdate.update() != Result.NEW)
 					throw new NoHeadException(
 							JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
@@ -179,10 +268,11 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				return new MergeResult(headCommit, srcCommit, new ObjectId[] {
 						headCommit, srcCommit },
 						MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy, null, null);
-			} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
+			} else if (revWalk.isMergedInto(headCommit, srcCommit)
+					&& fastForwardMode == FastForwardMode.FF) {
 				// FAST_FORWARD detected: skip doing a real merge but only
 				// update HEAD
-				refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
+				refLogMessage.append(": " + MergeStatus.FAST_FORWARD); //$NON-NLS-1$
 				dco = new DirCacheCheckout(repo,
 						headCommit.getTree(), repo.lockDirCache(),
 						srcCommit.getTree());
@@ -210,7 +300,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						headCommit, srcCommit }, mergeStatus, mergeStrategy,
 						null, msg);
 			} else {
-				String mergeMessage = "";
+				if (fastForwardMode == FastForwardMode.FF_ONLY) {
+					return new MergeResult(headCommit, srcCommit,
+							new ObjectId[] { headCommit, srcCommit },
+							MergeStatus.ABORTED, mergeStrategy, null, null);
+				}
+				String mergeMessage = ""; //$NON-NLS-1$
 				if (!squash) {
 					mergeMessage = new MergeMessageFormatter().format(
 							commits, head);
@@ -231,7 +326,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				if (merger instanceof ResolveMerger) {
 					ResolveMerger resolveMerger = (ResolveMerger) merger;
 					resolveMerger.setCommitNames(new String[] {
-							"BASE", "HEAD", ref.getName() });
+							"BASE", "HEAD", ref.getName() }); //$NON-NLS-1$
 					resolveMerger.setWorkingTreeIterator(new FileTreeIterator(repo));
 					noProblems = merger.merge(headCommit, srcCommit);
 					lowLevelResults = resolveMerger
@@ -240,8 +335,11 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
-				refLogMessage.append(": Merge made by ");
-				refLogMessage.append(mergeStrategy.getName());
+				refLogMessage.append(": Merge made by "); //$NON-NLS-1$
+				if (!revWalk.isMergedInto(headCommit, srcCommit))
+					refLogMessage.append(mergeStrategy.getName());
+				else
+					refLogMessage.append("recursive"); //$NON-NLS-1$
 				refLogMessage.append('.');
 				if (noProblems) {
 					dco = new DirCacheCheckout(repo,
@@ -303,6 +401,21 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			if (revWalk != null)
 				revWalk.release();
 		}
+	}
+
+	private void checkParameters() throws InvalidMergeHeadsException {
+		if (squash && fastForwardMode == FastForwardMode.NO_FF) {
+			throw new JGitInternalException(
+					JGitText.get().cannotCombineSquashWithNoff);
+		}
+
+		if (commits.size() != 1)
+			throw new InvalidMergeHeadsException(
+					commits.isEmpty() ? JGitText.get().noMergeHeadSpecified
+							: MessageFormat.format(
+									JGitText.get().mergeStrategyDoesNotSupportHeads,
+									mergeStrategy.getName(),
+									Integer.valueOf(commits.size())));
 	}
 
 	private void updateHead(StringBuilder refLogMessage, ObjectId newHeadId,
@@ -390,6 +503,21 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	public MergeCommand setSquash(boolean squash) {
 		checkCallable();
 		this.squash = squash;
+		return this;
+	}
+
+	/**
+	 * Sets the fast forward mode.
+	 *
+	 * @param fastForwardMode
+	 *            corresponds to the --ff/--no-ff/--ff-only options. --ff is the
+	 *            default option.
+	 * @return {@code this}
+	 * @since 2.2
+	 */
+	public MergeCommand setFastForward(FastForwardMode fastForwardMode) {
+		checkCallable();
+		this.fastForwardMode = fastForwardMode;
 		return this;
 	}
 }

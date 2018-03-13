@@ -55,7 +55,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -116,7 +115,7 @@ public abstract class BaseReceivePack {
 			final HashSet<String> caps = new HashSet<String>();
 			final int nul = line.indexOf('\0');
 			if (nul >= 0) {
-				for (String c : line.substring(nul + 1).split(" "))
+				for (String c : line.substring(nul + 1).split(" ")) //$NON-NLS-1$
 					caps.add(c);
 				this.line = line.substring(0, nul);
 			} else
@@ -275,13 +274,13 @@ public abstract class BaseReceivePack {
 		final boolean allowOfsDelta;
 
 		ReceiveConfig(final Config config) {
-			checkReceivedObjects = config.getBoolean("receive", "fsckobjects",
+			checkReceivedObjects = config.getBoolean("receive", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
 					false);
 			allowCreates = true;
-			allowDeletes = !config.getBoolean("receive", "denydeletes", false);
-			allowNonFastForwards = !config.getBoolean("receive",
-					"denynonfastforwards", false);
-			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset",
+			allowDeletes = !config.getBoolean("receive", "denydeletes", false); //$NON-NLS-1$ //$NON-NLS-2$
+			allowNonFastForwards = !config.getBoolean("receive", //$NON-NLS-1$
+					"denynonfastforwards", false); //$NON-NLS-1$
+			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
 		}
 	}
@@ -674,7 +673,7 @@ public abstract class BaseReceivePack {
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			msgOutWrapper.write(Constants.encode("error: " + what + "\n"));
+			msgOutWrapper.write(Constants.encode("error: " + what + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 	}
 
@@ -689,7 +688,7 @@ public abstract class BaseReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		msgOutWrapper.write(Constants.encode(what + "\n"));
+		msgOutWrapper.write(Constants.encode(what + "\n")); //$NON-NLS-1$
 	}
 
 	/** @return an underlying stream for sending messages to the client. */
@@ -733,7 +732,7 @@ public abstract class BaseReceivePack {
 
 		if (timeout > 0) {
 			final Thread caller = Thread.currentThread();
-			timer = new InterruptTimer(caller.getName() + "-Timer");
+			timer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
 			timeoutIn = new TimeoutInputStream(rawIn, timer);
 			TimeoutOutputStream o = new TimeoutOutputStream(rawOut, timer);
 			timeoutIn.setTimeout(timeout * 1000);
@@ -796,7 +795,7 @@ public abstract class BaseReceivePack {
 	public void sendAdvertisedRefs(final RefAdvertiser adv)
 			throws IOException, ServiceMayNotContinueException {
 		if (advertiseError != null) {
-			adv.writeOne("ERR " + advertiseError);
+			adv.writeOne("ERR " + advertiseError); //$NON-NLS-1$
 			return;
 		}
 
@@ -804,7 +803,7 @@ public abstract class BaseReceivePack {
 			advertiseRefsHook.advertiseRefs(this);
 		} catch (ServiceMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
-				adv.writeOne("ERR " + fail.getMessage());
+				adv.writeOne("ERR " + fail.getMessage()); //$NON-NLS-1$
 				fail.setOutput();
 			}
 			throw fail;
@@ -820,7 +819,7 @@ public abstract class BaseReceivePack {
 		for (ObjectId obj : advertisedHaves)
 			adv.advertiseHave(obj);
 		if (adv.isEmpty())
-			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}");
+			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
 	}
 
@@ -922,9 +921,9 @@ public abstract class BaseReceivePack {
 
 		ObjectInserter ins = db.newObjectInserter();
 		try {
-			String lockMsg = "jgit receive-pack";
+			String lockMsg = "jgit receive-pack"; //$NON-NLS-1$
 			if (getRefLogIdent() != null)
-				lockMsg += " from " + getRefLogIdent().toExternalString();
+				lockMsg += " from " + getRefLogIdent().toExternalString(); //$NON-NLS-1$
 
 			parser = ins.newPackParser(rawIn);
 			parser.setAllowThin(true);
@@ -1055,8 +1054,8 @@ public abstract class BaseReceivePack {
 					// A well behaved client shouldn't have sent us a
 					// create command for a ref we advertised to it.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat
-							.format(JGitText.get().refAlreadyExists, ref));
+					cmd.setResult(Result.REJECTED_OTHER_REASON,
+							JGitText.get().refAlreadyExists);
 					continue;
 				}
 			}
@@ -1168,7 +1167,7 @@ public abstract class BaseReceivePack {
 		BatchRefUpdate batch = db.getRefDatabase().newBatchUpdate();
 		batch.setAllowNonFastForwards(isAllowNonFastForwards());
 		batch.setRefLogIdent(getRefLogIdent());
-		batch.setRefLogMessage("push", true);
+		batch.setRefLogMessage("push", true); //$NON-NLS-1$
 		batch.addCommand(toApply);
 		try {
 			batch.execute(walk, updating);
@@ -1196,70 +1195,70 @@ public abstract class BaseReceivePack {
 	protected void sendStatusReport(final boolean forClient,
 			final Throwable unpackError, final Reporter out) throws IOException {
 		if (unpackError != null) {
-			out.sendString("unpack error " + unpackError.getMessage());
+			out.sendString("unpack error " + unpackError.getMessage()); //$NON-NLS-1$
 			if (forClient) {
 				for (final ReceiveCommand cmd : commands) {
-					out.sendString("ng " + cmd.getRefName()
-							+ " n/a (unpacker error)");
+					out.sendString("ng " + cmd.getRefName() //$NON-NLS-1$
+							+ " n/a (unpacker error)"); //$NON-NLS-1$
 				}
 			}
 			return;
 		}
 
 		if (forClient)
-			out.sendString("unpack ok");
+			out.sendString("unpack ok"); //$NON-NLS-1$
 		for (final ReceiveCommand cmd : commands) {
 			if (cmd.getResult() == Result.OK) {
 				if (forClient)
-					out.sendString("ok " + cmd.getRefName());
+					out.sendString("ok " + cmd.getRefName()); //$NON-NLS-1$
 				continue;
 			}
 
 			final StringBuilder r = new StringBuilder();
 			if (forClient)
-				r.append("ng ").append(cmd.getRefName()).append(" ");
+				r.append("ng ").append(cmd.getRefName()).append(" "); //$NON-NLS-1$ //$NON-NLS-2$
 			else
-				r.append(" ! [rejected] ").append(cmd.getRefName()).append(" (");
+				r.append(" ! [rejected] ").append(cmd.getRefName()).append(" ("); //$NON-NLS-1$ //$NON-NLS-2$
 
 			switch (cmd.getResult()) {
 			case NOT_ATTEMPTED:
-				r.append("server bug; ref not processed");
+				r.append("server bug; ref not processed"); //$NON-NLS-1$
 				break;
 
 			case REJECTED_NOCREATE:
-				r.append("creation prohibited");
+				r.append("creation prohibited"); //$NON-NLS-1$
 				break;
 
 			case REJECTED_NODELETE:
-				r.append("deletion prohibited");
+				r.append("deletion prohibited"); //$NON-NLS-1$
 				break;
 
 			case REJECTED_NONFASTFORWARD:
-				r.append("non-fast forward");
+				r.append("non-fast forward"); //$NON-NLS-1$
 				break;
 
 			case REJECTED_CURRENT_BRANCH:
-				r.append("branch is currently checked out");
+				r.append("branch is currently checked out"); //$NON-NLS-1$
 				break;
 
 			case REJECTED_MISSING_OBJECT:
 				if (cmd.getMessage() == null)
-					r.append("missing object(s)");
+					r.append("missing object(s)"); //$NON-NLS-1$
 				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH)
-					r.append("object " + cmd.getMessage() + " missing");
+					r.append("object " + cmd.getMessage() + " missing"); //$NON-NLS-1$ //$NON-NLS-2$
 				else
 					r.append(cmd.getMessage());
 				break;
 
 			case REJECTED_OTHER_REASON:
 				if (cmd.getMessage() == null)
-					r.append("unspecified reason");
+					r.append("unspecified reason"); //$NON-NLS-1$
 				else
 					r.append(cmd.getMessage());
 				break;
 
 			case LOCK_FAILURE:
-				r.append("failed to lock");
+				r.append("failed to lock"); //$NON-NLS-1$
 				break;
 
 			case OK:
@@ -1267,7 +1266,7 @@ public abstract class BaseReceivePack {
 				continue;
 			}
 			if (!forClient)
-				r.append(")");
+				r.append(")"); //$NON-NLS-1$
 			out.sendString(r.toString());
 		}
 	}
