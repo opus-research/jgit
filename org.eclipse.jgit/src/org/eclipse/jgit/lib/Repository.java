@@ -697,7 +697,7 @@ public abstract class Repository {
 			return rev.copy();
 		if (name != null)
 			return name;
-		if (done == revstr.length())
+		if (rev == null && done == revstr.length())
 			return null;
 		name = revstr.substring(done);
 		if (!Repository.isValidRefName("x/" + name))
