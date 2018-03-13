@@ -125,9 +125,9 @@ public class Main {
 			System.exit(128);
 		} catch (Exception err) {
 			// Try to detect errno == EPIPE and exit normally if that happens
-			// There may be issues with operating system versions and locale,
-			// but we can probably assume that these messages will not be thrown
-			// under other circumstances.
+			// There may have issues with operating system versions and locale, but we can
+			// probably assume that these messages will not be thrown under other
+			// circumstances.
 			if (err.getClass() == IOException.class) {
 				// Linux, OS X
 				if (err.getMessage().equals("Broken pipe")) //$NON-NLS-1$
