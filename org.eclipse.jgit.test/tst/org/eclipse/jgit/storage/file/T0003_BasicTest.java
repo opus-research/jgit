@@ -81,7 +81,6 @@ import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 public class T0003_BasicTest extends SampleDataRepositoryTestCase {
@@ -203,7 +202,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 			throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
-		FileUtils.mkdir(workdir);
+		workdir.mkdir();
 		FileRepository repo1initial = new FileRepository(new File(repo1Parent,
 				Constants.DOT_GIT));
 		repo1initial.create();
@@ -232,7 +231,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 			throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
-		FileUtils.mkdir(workdir);
+		workdir.mkdir();
 		FileRepository repo1initial = new FileRepository(new File(repo1Parent,
 				Constants.DOT_GIT));
 		repo1initial.create();

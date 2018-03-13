@@ -113,8 +113,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 			RevCommit headCommit = revWalk.parseCommit(headRef.getObjectId());
 
-			newHead = headCommit;
-
 			// loop through all refs to be reverted
 			for (Ref src : commits) {
 				// get the commit to be reverted
@@ -138,9 +136,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 				merger.setBase(srcCommit.getTree());
 
 				if (merger.merge(headCommit, srcParent)) {
-					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
-							.getResultTreeId()))
-						continue;
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
 							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());

@@ -190,12 +190,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testListAllBranchesShouldNotDie() throws Exception {
-		Git git = setUpRepoWithRemote();
-		git.branchList().setListMode(ListMode.ALL).call();
-	}
-
-	@Test
 	public void testCreateFromCommit() throws Exception {
 		Ref branch = git.branchCreate().setName("FromInitial").setStartPoint(
 				initialCommit).call();
