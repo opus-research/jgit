@@ -947,8 +947,7 @@ public class ReceivePack {
 					// A well behaved client shouldn't have sent us a
 					// create command for a ref we advertised to it.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat
-							.format(JGitText.get().refAlreadyExists, ref));
+					cmd.setResult(Result.REJECTED_OTHER_REASON, "ref exists");
 					continue;
 				}
 			}
