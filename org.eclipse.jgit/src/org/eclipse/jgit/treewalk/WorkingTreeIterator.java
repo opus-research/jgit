@@ -101,8 +101,7 @@ import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
  *
  * @see FileTreeIterator
  */
-public abstract class WorkingTreeIterator extends AbstractTreeIterator
-		implements AttributeNodeProvider {
+public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** An empty entry array, suitable for {@link #init(Entry[])}. */
 	protected static final Entry[] EOF = {};
 
