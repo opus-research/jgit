@@ -71,6 +71,9 @@ public final class ServletUtils {
 	/** Request attribute which stores the {@link Repository} instance. */
 	public static final String ATTRIBUTE_REPOSITORY = "org.eclipse.jgit.Repository";
 
+	/** Request attribute storing either UploadPack or ReceivePack. */
+	public static final String ATTRIBUTE_HANDLER = "org.eclipse.jgit.transport.UploadPackOrReceivePack";
+
 	/**
 	 * Get the selected repository from the request.
 	 *
@@ -113,6 +116,50 @@ public final class ServletUtils {
 			throw new IOException(MessageFormat.format(HttpServerText.get().encodingNotSupportedByThisLibrary
 					, HDR_CONTENT_ENCODING, enc));
 		return in;
+	}
+
+	/**
+	 * Consume the entire request body, if one was supplied.
+	 *
+	 * @param req
+	 *            the request whose body must be consumed.
+	 */
+	public static void consumeRequestBody(HttpServletRequest req) {
+		if (0 < req.getContentLength() || isChunked(req)) {
+			try {
+				consumeRequestBody(req.getInputStream());
+			} catch (IOException e) {
+				// Ignore any errors obtaining the input stream.
+			}
+		}
+	}
+
+	static boolean isChunked(HttpServletRequest req) {
+		return "chunked".equals(req.getHeader("Transfer-Encoding"));
+	}
+
+	/**
+	 * Consume the rest of the input stream and discard it.
+	 *
+	 * @param in
+	 *            the stream to discard, closed if not null.
+	 */
+	public static void consumeRequestBody(InputStream in) {
+		if (in == null)
+			return;
+		try {
+			while (0 < in.skip(2048) || 0 <= in.read()) {
+				// Discard until EOF.
+			}
+		} catch (IOException err) {
+			// Discard IOException during read or skip.
+		} finally {
+			try {
+				in.close();
+			} catch (IOException err) {
+				// Discard IOException during close of input stream.
+			}
+		}
 	}
 
 	/**
@@ -191,8 +238,23 @@ public final class ServletUtils {
 	}
 
 	static boolean acceptsGzipEncoding(final HttpServletRequest req) {
-		final String accepts = req.getHeader(HDR_ACCEPT_ENCODING);
-		return accepts != null && 0 <= accepts.indexOf(ENCODING_GZIP);
+		return acceptsGzipEncoding(req.getHeader(HDR_ACCEPT_ENCODING));
+	}
+
+	static boolean acceptsGzipEncoding(String accepts) {
+		if (accepts == null)
+			return false;
+
+		int b = 0;
+		while (b < accepts.length()) {
+			int comma = accepts.indexOf(',', b);
+			int e = 0 <= comma ? comma : accepts.length();
+			String term = accepts.substring(b, e).trim();
+			if (term.equals(ENCODING_GZIP))
+				return true;
+			b = e + 1;
+		}
+		return false;
 	}
 
 	private static byte[] compress(final byte[] raw) throws IOException {

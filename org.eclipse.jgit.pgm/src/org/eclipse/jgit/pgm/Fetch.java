@@ -65,7 +65,7 @@ class Fetch extends AbstractFetchCommand {
 	private Boolean fsck;
 
 	@Option(name = "--no-fsck")
-	void nofsck(final boolean ignored) {
+	void nofsck(@SuppressWarnings("unused") final boolean ignored) {
 		fsck = Boolean.FALSE;
 	}
 
@@ -79,7 +79,7 @@ class Fetch extends AbstractFetchCommand {
 	private Boolean thin;
 
 	@Option(name = "--no-thin")
-	void nothin(final boolean ignored) {
+	void nothin(@SuppressWarnings("unused") final boolean ignored) {
 		thin = Boolean.FALSE;
 	}
 
@@ -93,13 +93,18 @@ class Fetch extends AbstractFetchCommand {
 	protected void run() throws Exception {
 		Git git = new Git(db);
 		FetchCommand fetch = git.fetch();
-		fetch.setCheckFetchedObjects(fsck.booleanValue());
-		fetch.setRemoveDeletedRefs(prune.booleanValue());
-		fetch.setRefSpecs(toget);
-		fetch.setTimeout(timeout);
+		if (fsck != null)
+			fetch.setCheckFetchedObjects(fsck.booleanValue());
+		if (prune != null)
+			fetch.setRemoveDeletedRefs(prune.booleanValue());
+		if (toget != null)
+			fetch.setRefSpecs(toget);
+		if (0 <= timeout)
+			fetch.setTimeout(timeout);
 		fetch.setDryRun(dryRun);
 		fetch.setRemote(remote);
-		fetch.setThin(thin.booleanValue());
+		if (thin != null)
+			fetch.setThin(thin.booleanValue());
 		fetch.setProgressMonitor(new TextProgressMonitor());
 
 		FetchResult result = fetch.call();

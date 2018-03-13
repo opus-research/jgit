@@ -45,6 +45,11 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
@@ -56,16 +61,18 @@ import java.util.Set;
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.junit.Test;
 
 public class BundleWriterTest extends SampleDataRepositoryTestCase {
 
+	@Test
 	public void testWrite0() throws Exception {
 		// Create a tiny bundle, (well one of) the first commits only
 		final byte[] bundle = makeBundle("refs/heads/firstcommit",
@@ -92,6 +99,7 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
+	@Test
 	public void testWrite1() throws Exception {
 		byte[] bundle;
 
@@ -132,7 +140,7 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 		}
 	}
 
-	private FetchResult fetchFromBundle(final Repository newRepo,
+	private static FetchResult fetchFromBundle(final Repository newRepo,
 			final byte[] bundle) throws URISyntaxException,
 			NotSupportedException, TransportException {
 		final URIish uri = new URIish("in-memory://");

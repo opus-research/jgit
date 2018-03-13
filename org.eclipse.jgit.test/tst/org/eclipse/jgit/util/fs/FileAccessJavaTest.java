@@ -44,12 +44,18 @@
 
 package org.eclipse.jgit.util.fs;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
+import org.junit.Before;
+import org.junit.Test;
 
 public class FileAccessJavaTest extends LocalDiskRepositoryTestCase {
 	private Repository db;
@@ -59,13 +65,15 @@ public class FileAccessJavaTest extends LocalDiskRepositoryTestCase {
 	private FileAccessJava access;
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
 		root = db.getWorkTree();
 		access = new FileAccessJava(db.getFS());
 	}
 
+	@Test
 	public void testStatRegularFile() throws IOException {
 		File path = write("Hello Java");
 		FileInfo stat = access.lstat(path);
@@ -83,6 +91,7 @@ public class FileAccessJavaTest extends LocalDiskRepositoryTestCase {
 		assertEquals(FileMode.REGULAR_FILE.getBits(), stat.mode());
 	}
 
+	@Test
 	public void testStatDirectory() throws IOException {
 		File path = new File(root, "src");
 		assertTrue("created " + path, path.mkdir());
@@ -92,6 +101,7 @@ public class FileAccessJavaTest extends LocalDiskRepositoryTestCase {
 		assertEquals(FileMode.TREE.getBits(), stat.mode());
 	}
 
+	@Test
 	public void testMissingFile() throws IOException {
 		final File file = new File("this.not.here");
 		try {
@@ -102,6 +112,7 @@ public class FileAccessJavaTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testNotDirectory() throws IOException {
 		final File dir = write("a file");
 		final File file = new File(dir, "this.not.here");

@@ -70,16 +70,9 @@ public class FileAccessNative extends FileAccess {
 		symlinkImp(file.getPath(), target);
 	}
 
-	@Override
-	public DirEnt[] list(File dir) throws AccessDeniedException {
-		return listNative(dir.getPath());
-	}
-
 	private static native FileInfo lstatImp(String path);
 
 	private static native String readlinkImp(String path);
 
 	private static native void symlinkImp(String path, String target);
-
-	private static native DirEnt[] listNative(String path);
 }

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,60 +44,50 @@
 package org.eclipse.jgit.treewalk;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 
-/**
- * Contains options used by the WorkingTreeIterator.
- */
+/** Options used by the {@link WorkingTreeIterator}. */
 public class WorkingTreeOptions {
+	/** Key for {@link Config#get(SectionParser)}. */
+	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
+		public WorkingTreeOptions parse(final Config cfg) {
+			return new WorkingTreeOptions(cfg);
+		}
+	};
 
-	/**
-	 * Creates default options which reflect the original configuration of Git
-	 * on Unix systems.
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createDefaultInstance() {
-		return new WorkingTreeOptions(AutoCRLF.FALSE);
-	}
+	private final boolean fileMode;
 
-	/**
-	 * Creates options based on the specified repository configuration.
-	 *
-	 * @param config
-	 *            repository configuration to create options for
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createConfigurationInstance(Config config) {
-		return new WorkingTreeOptions(config.get(CoreConfig.KEY).getAutoCRLF());
-	}
-
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 **/
 	private final AutoCRLF autoCRLF;
 
-	/**
-	 * Creates new options.
-	 *
-	 * @param autoCRLF
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
-	 */
-	public WorkingTreeOptions(AutoCRLF autoCRLF) {
-		this.autoCRLF = autoCRLF;
+	private final CheckStat checkStat;
+
+	private WorkingTreeOptions(final Config rc) {
+		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_FILEMODE, true);
+		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
+		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
+	}
+
+	/** @return true if the execute bit on working files should be trusted. */
+	public boolean isFileMode() {
+		return fileMode;
+	}
+
+	/** @return how automatic CRLF conversion has been configured. */
+	public AutoCRLF getAutoCRLF() {
+		return autoCRLF;
 	}
 
 	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 *
-	 * @return true if EOLs should be canonicalized.
+	 * @return how stat data is compared
+	 * @since 2.3
 	 */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+	public CheckStat getCheckStat() {
+		return checkStat;
 	}
 }

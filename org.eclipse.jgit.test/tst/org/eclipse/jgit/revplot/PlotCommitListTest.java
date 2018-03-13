@@ -42,8 +42,12 @@
  */
 package org.eclipse.jgit.revplot;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalkTestCase;
+import org.junit.Test;
 
 public class PlotCommitListTest extends RevWalkTestCase {
 
@@ -71,6 +75,13 @@ public class PlotCommitListTest extends RevWalkTestCase {
 			return this;
 		}
 
+		public CommitListAssert nrOfPassingLanes(int lanes) {
+			assertEquals("Number of passing lanes of commit #"
+					+ (nextIndex - 1)
+					+ " not as expected.", lanes, current.passingLanes.length);
+			return this;
+		}
+
 		public CommitListAssert parents(RevCommit... parents) {
 			assertEquals("Number of parents of commit #" + (nextIndex - 1)
 					+ " not as expected.", parents.length,
@@ -87,7 +98,7 @@ public class PlotCommitListTest extends RevWalkTestCase {
 		}
 	}
 
-	@SuppressWarnings("boxing")
+	@Test
 	public void testLinear() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -107,7 +118,7 @@ public class PlotCommitListTest extends RevWalkTestCase {
 		test.noMoreCommits();
 	}
 
-	@SuppressWarnings("boxing")
+	@Test
 	public void testMerged() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -129,7 +140,7 @@ public class PlotCommitListTest extends RevWalkTestCase {
 		test.noMoreCommits();
 	}
 
-	@SuppressWarnings("boxing")
+	@Test
 	public void testSideBranch() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -150,7 +161,7 @@ public class PlotCommitListTest extends RevWalkTestCase {
 		test.noMoreCommits();
 	}
 
-	@SuppressWarnings("boxing")
+	@Test
 	public void test2SideBranches() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -174,7 +185,7 @@ public class PlotCommitListTest extends RevWalkTestCase {
 		test.noMoreCommits();
 	}
 
-	@SuppressWarnings("boxing")
+	@Test
 	public void testBug300282_1() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
@@ -212,6 +223,7 @@ public class PlotCommitListTest extends RevWalkTestCase {
 	}
 
 	// test the history of the egit project between 9fdaf3c1 and e76ad9170f
+	@Test
 	public void testEgitHistory() throws Exception {
 		final RevCommit merge_fix = commit();
 		final RevCommit add_simple = commit(merge_fix);
@@ -303,4 +315,31 @@ public class PlotCommitListTest extends RevWalkTestCase {
 		test.commit(merge_fix).parents().lanePos(3);
 		test.noMoreCommits();
 	}
+
+	// test a history where a merge commit has two time the same parent
+	@Test
+	public void testDuplicateParents() throws Exception {
+		final RevCommit m1 = commit();
+		final RevCommit m2 = commit(m1);
+		final RevCommit m3 = commit(m2, m2);
+
+		final RevCommit s1 = commit(m2);
+		final RevCommit s2 = commit(s1);
+
+		PlotWalk pw = new PlotWalk(db);
+		pw.markStart(pw.lookupCommit(m3));
+		pw.markStart(pw.lookupCommit(s2));
+		PlotCommitList<PlotLane> pcl = new PlotCommitList<PlotLane>();
+		pcl.source(pw);
+		pcl.fillTo(Integer.MAX_VALUE);
+
+		CommitListAssert test = new CommitListAssert(pcl);
+		test.commit(s2).nrOfPassingLanes(0);
+		test.commit(s1).nrOfPassingLanes(0);
+		test.commit(m3).nrOfPassingLanes(1);
+		test.commit(m2).nrOfPassingLanes(0);
+		test.commit(m1).nrOfPassingLanes(0);
+		test.noMoreCommits();
+	}
+
 }
