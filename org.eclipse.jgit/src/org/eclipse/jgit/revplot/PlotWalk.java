@@ -51,7 +51,6 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Ref;
@@ -87,7 +86,7 @@ public class PlotWalk extends RevWalk {
 	@Override
 	public void sort(final RevSort s, final boolean use) {
 		if (s == RevSort.TOPO && !use)
-			throw new IllegalArgumentException(JGitText.get().topologicalSortRequired);
+			throw new IllegalArgumentException("Topological sort required.");
 		super.sort(s, use);
 	}
 

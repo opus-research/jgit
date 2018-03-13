@@ -59,8 +59,6 @@ public class StreamCopyThread extends Thread {
 
 	private final AtomicInteger flushCounter = new AtomicInteger(0);
 
-	private volatile boolean done;
-
 	/**
 	 * Create a thread to copy data from an input stream to an output stream.
 	 *
@@ -89,26 +87,6 @@ public class StreamCopyThread extends Thread {
 		interrupt();
 	}
 
-	/**
-	 * Request that the thread terminate, and wait for it.
-	 * <p>
-	 * This method signals to the copy thread that it should stop as soon as
-	 * there is no more IO occurring.
-	 *
-	 * @throws InterruptedException
-	 *             the calling thread was interrupted.
-	 */
-	public void halt() throws InterruptedException {
-		for (;;) {
-			join(250 /* milliseconds */);
-			if (isAlive()) {
-				done = true;
-				interrupt();
-			} else
-				break;
-		}
-	}
-
 	@Override
 	public void run() {
 		try {
@@ -118,14 +96,14 @@ public class StreamCopyThread extends Thread {
 					if (needFlush())
 						dst.flush();
 
-					if (done)
-						break;
-
 					final int n;
 					try {
 						n = src.read(buf);
 					} catch (InterruptedIOException wakey) {
-						continue;
+						if (flushCounter.get() > 0)
+							continue;
+						else
+							throw wakey;
 					}
 					if (n < 0)
 						break;
@@ -134,7 +112,10 @@ public class StreamCopyThread extends Thread {
 						try {
 							dst.write(buf, 0, n);
 						} catch (InterruptedIOException wakey) {
-							continue;
+							if (flushCounter.get() > 0)
+								continue;
+							else
+								throw wakey;
 						}
 						break;
 					}

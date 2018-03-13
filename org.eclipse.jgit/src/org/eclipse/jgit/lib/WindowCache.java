@@ -53,8 +53,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.eclipse.jgit.JGitText;
-
 /**
  * Caches slices of a {@link PackFile} in memory for faster read access.
  * <p>
@@ -123,9 +121,9 @@ import org.eclipse.jgit.JGitText;
 public class WindowCache {
 	private static final int bits(int newSize) {
 		if (newSize < 4096)
-			throw new IllegalArgumentException(JGitText.get().invalidWindowSize);
+			throw new IllegalArgumentException("Invalid window size");
 		if (Integer.bitCount(newSize) != 1)
-			throw new IllegalArgumentException(JGitText.get().windowSizeMustBePowerOf2);
+			throw new IllegalArgumentException("Window size must be power of 2");
 		return Integer.numberOfTrailingZeros(newSize);
 	}
 
@@ -249,9 +247,9 @@ public class WindowCache {
 		tableSize = tableSize(cfg);
 		final int lockCount = lockCount(cfg);
 		if (tableSize < 1)
-			throw new IllegalArgumentException(JGitText.get().tSizeMustBeGreaterOrEqual1);
+			throw new IllegalArgumentException("tSize must be >= 1");
 		if (lockCount < 1)
-			throw new IllegalArgumentException(JGitText.get().lockCountMustBeGreaterOrEqual1);
+			throw new IllegalArgumentException("lockCount must be >= 1");
 
 		queue = new ReferenceQueue<ByteWindow>();
 		clock = new AtomicLong(1);
@@ -280,9 +278,9 @@ public class WindowCache {
 		openBytes = new AtomicLong();
 
 		if (maxFiles < 1)
-			throw new IllegalArgumentException(JGitText.get().openFilesMustBeAtLeast1);
+			throw new IllegalArgumentException("Open files must be >= 1");
 		if (maxBytes < windowSize)
-			throw new IllegalArgumentException(JGitText.get().windowSizeMustBeLesserThanLimit);
+			throw new IllegalArgumentException("Window size must be < limit");
 	}
 
 	int getOpenFiles() {
@@ -345,9 +343,9 @@ public class WindowCache {
 		final int wsz = cfg.getPackedGitWindowSize();
 		final long limit = cfg.getPackedGitLimit();
 		if (wsz <= 0)
-			throw new IllegalArgumentException(JGitText.get().invalidWindowSize);
+			throw new IllegalArgumentException("Invalid window size");
 		if (limit < wsz)
-			throw new IllegalArgumentException(JGitText.get().windowSizeMustBeLesserThanLimit);
+			throw new IllegalArgumentException("Window size must be < limit");
 		return (int) Math.min(5 * (limit / wsz) / 2, 2000000000);
 	}
 
