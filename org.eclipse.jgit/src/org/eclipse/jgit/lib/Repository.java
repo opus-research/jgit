@@ -721,20 +721,6 @@ public abstract class Repository {
 	}
 
 	/**
-	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
-	 * <p>
-	 * When a repository borrows objects from another repository, it can
-	 * advertise that it safely has that other repository's references, without
-	 * exposing any other details about the other repository.  This may help
-	 * a client trying to push changes avoid pushing more than it needs to.
-	 *
-	 * @return unmodifiable collection of other known objects.
-	 */
-	public Set<ObjectId> getAdditionalHaves() {
-		return Collections.emptySet();
-	}
-
-	/**
 	 * Get a ref by name.
 	 *
 	 * @param name
@@ -869,7 +855,7 @@ public abstract class Repository {
 		final int len = refName.length();
 		if (len == 0)
 			return false;
-		if (refName.endsWith(LockFile.SUFFIX))
+		if (refName.endsWith(".lock"))
 			return false;
 
 		int components = 1;
@@ -992,8 +978,6 @@ public abstract class Repository {
 			return new ArrayList<RepositoryListener>(allListeners);
 		}
 	}
-
-	abstract void fireRefsChanged();
 
 	abstract void fireIndexChanged();
 
