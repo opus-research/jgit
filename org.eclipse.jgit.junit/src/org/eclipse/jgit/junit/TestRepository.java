@@ -667,13 +667,13 @@ public class TestRepository<R extends Repository> {
 				pw.release();
 			}
 
-			odb.openPack(pack);
+			odb.openPack(pack, idx);
 			updateServerInfo();
 			prunePacked(odb);
 		}
 	}
 
-	private static void prunePacked(ObjectDirectory odb) throws IOException {
+	private void prunePacked(ObjectDirectory odb) throws IOException {
 		for (PackFile p : odb.getPacks()) {
 			for (MutableEntry e : p)
 				FileUtils.delete(odb.fileFor(e.toObjectId()));

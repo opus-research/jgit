@@ -155,10 +155,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
 		config = cfg;
 		objects = dir;
-		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
-		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
-		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
-		cachedPacksFile = new File(infoDirectory, "cached-packs"); //$NON-NLS-1$
+		infoDirectory = new File(objects, "info");
+		packDirectory = new File(objects, "pack");
+		alternatesFile = new File(infoDirectory, "alternates");
+		cachedPacksFile = new File(infoDirectory, "cached-packs");
 		packList = new AtomicReference<PackList>(NO_PACKS);
 		cachedPacks = new AtomicReference<CachedPackList>();
 		unpackedObjectCache = new UnpackedObjectCache();
@@ -327,25 +327,35 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *
 	 * @param pack
 	 *            path of the pack file to open.
+	 * @param idx
+	 *            path of the corresponding index file.
 	 * @return the pack that was opened and added to the database.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public PackFile openPack(final File pack)
+	public PackFile openPack(final File pack, final File idx)
 			throws IOException {
 		final String p = pack.getName();
-		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$
+		final String i = idx.getName();
+
+		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack"))
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
 
-		PackFile res = new PackFile(pack);
+		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx"))
+			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, idx));
+
+		if (!p.substring(0, 45).equals(i.substring(0, 45)))
+			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
+
+		PackFile res = new PackFile(idx, pack);
 		insertPack(res);
 		return res;
 	}
 
 	@Override
 	public String toString() {
-		return "ObjectDirectory[" + getDirectory() + "]"; //$NON-NLS-1$
+		return "ObjectDirectory[" + getDirectory() + "]";
 	}
 
 	boolean hasObject1(final AnyObjectId objectId) {
@@ -577,7 +587,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
-		FileUtils.mkdir(dst.getParentFile(), true);
+		FileUtils.mkdir(dst.getParentFile());
 		if (tmp.renameTo(dst)) {
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
@@ -717,11 +727,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 		for (final String indexName : names) {
 			// Must match "pack-[0-9a-f]{40}.idx" to be an index.
 			//
-			if (indexName.length() != 49 || !indexName.endsWith(".idx")) //$NON-NLS-1$
+			if (indexName.length() != 49 || !indexName.endsWith(".idx"))
 				continue;
 
 			final String base = indexName.substring(0, indexName.length() - 4);
-			final String packName = base + ".pack"; //$NON-NLS-1$
+			final String packName = base + ".pack";
 			if (!names.contains(packName)) {
 				// Sometimes C Git's HTTP fetch transport leaves a
 				// .idx file behind and does not download the .pack.
@@ -737,7 +747,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 
 			final File packFile = new File(packDirectory, packName);
-			list.add(new PackFile(packFile));
+			final File idxFile = new File(packDirectory, indexName);
+			list.add(new PackFile(idxFile, packFile));
 			foundNew = true;
 		}
 
@@ -795,7 +806,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return Collections.emptySet();
 		final Set<String> nameSet = new HashSet<String>(nameList.length << 1);
 		for (final String name : nameList) {
-			if (name.startsWith("pack-")) //$NON-NLS-1$
+			if (name.startsWith("pack-"))
 				nameSet.add(name);
 		}
 		return nameSet;

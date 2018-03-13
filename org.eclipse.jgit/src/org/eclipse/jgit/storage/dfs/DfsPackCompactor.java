@@ -44,8 +44,6 @@
 package org.eclipse.jgit.storage.dfs;
 
 import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.COMPACT;
-import static org.eclipse.jgit.storage.pack.PackConstants.PACK_EXT;
-import static org.eclipse.jgit.storage.pack.PackConstants.PACK_INDEX_EXT;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -240,7 +238,7 @@ public class DfsPackCompactor {
 		});
 
 		RevWalk rw = new RevWalk(ctx);
-		RevFlag added = rw.newFlag("ADDED"); //$NON-NLS-1$
+		RevFlag added = rw.newFlag("ADDED");
 
 		pm.beginTask(JGitText.get().countingObjects, ProgressMonitor.UNKNOWN);
 		for (DfsPackFile src : srcPacks) {
@@ -285,7 +283,7 @@ public class DfsPackCompactor {
 
 	private void writePack(DfsObjDatabase objdb, DfsPackDescription pack,
 			PackWriter pw, ProgressMonitor pm) throws IOException {
-		DfsOutputStream out = objdb.writeFile(pack, PACK_EXT);
+		DfsOutputStream out = objdb.writePackFile(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writePack(pm, pm, cnt);
@@ -298,7 +296,7 @@ public class DfsPackCompactor {
 
 	private void writeIndex(DfsObjDatabase objdb, DfsPackDescription pack,
 			PackWriter pw) throws IOException {
-		DfsOutputStream out = objdb.writeFile(pack, PACK_INDEX_EXT);
+		DfsOutputStream out = objdb.writePackIndex(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);

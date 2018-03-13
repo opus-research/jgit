@@ -6,9 +6,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -79,7 +77,7 @@ public class InMemoryRepository extends DfsRepository {
 		protected DfsPackDescription newPack(PackSource source) {
 			int id = packId.incrementAndGet();
 			DfsPackDescription desc = new MemPack(
-					"pack-" + id + "-" + source.name(), //$NON-NLS-1$ //$NON-NLS-2$
+					"pack-" + id + "-" + source.name(),
 					getRepository().getDescription());
 			return desc.setPackSource(source);
 		}
@@ -103,31 +101,50 @@ public class InMemoryRepository extends DfsRepository {
 		}
 
 		@Override
-		protected ReadableChannel openFile(DfsPackDescription desc, String ext)
-				throws FileNotFoundException, IOException {
+		protected ReadableChannel openPackFile(DfsPackDescription desc)
+				throws FileNotFoundException {
 			MemPack memPack = (MemPack) desc;
-			byte[] file = memPack.fileMap.get(ext);
-			if (file == null)
-				throw new FileNotFoundException(desc.getFileName(ext));
-			return new ByteArrayReadableChannel(file);
+			if (memPack.packFile == null)
+				throw new FileNotFoundException(desc.getPackName());
+			return new ByteArrayReadableChannel(memPack.packFile);
 		}
 
 		@Override
-		protected DfsOutputStream writeFile(
-				DfsPackDescription desc, final String ext) throws IOException {
+		protected ReadableChannel openPackIndex(DfsPackDescription desc)
+				throws FileNotFoundException {
+			MemPack memPack = (MemPack) desc;
+			if (memPack.packIndex == null)
+				throw new FileNotFoundException(desc.getIndexName());
+			return new ByteArrayReadableChannel(memPack.packIndex);
+		}
+
+		@Override
+		protected DfsOutputStream writePackFile(DfsPackDescription desc) {
 			final MemPack memPack = (MemPack) desc;
 			return new Out() {
 				@Override
 				public void flush() {
-					memPack.fileMap.put(ext, getData());
+					memPack.packFile = getData();
+				}
+			};
+		}
+
+		@Override
+		protected DfsOutputStream writePackIndex(DfsPackDescription desc) {
+			final MemPack memPack = (MemPack) desc;
+			return new Out() {
+				@Override
+				public void flush() {
+					memPack.packIndex = getData();
 				}
 			};
 		}
 	}
 
 	private static class MemPack extends DfsPackDescription {
-		private final Map<String, byte[]>
-				fileMap = new HashMap<String, byte[]>();
+		private byte[] packFile;
+
+		private byte[] packIndex;
 
 		MemPack(String name, DfsRepositoryDescription repoDesc) {
 			super(repoDesc, name);

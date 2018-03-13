@@ -87,25 +87,25 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	 * The client expects a status report after the server processes the pack.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_REPORT_STATUS = "report-status"; //$NON-NLS-1$
+	public static final String CAPABILITY_REPORT_STATUS = "report-status";
 
 	/**
 	 * The server supports deleting refs.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_DELETE_REFS = "delete-refs"; //$NON-NLS-1$
+	public static final String CAPABILITY_DELETE_REFS = "delete-refs";
 
 	/**
 	 * The server supports packs with OFS deltas.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_OFS_DELTA = "ofs-delta"; //$NON-NLS-1$
+	public static final String CAPABILITY_OFS_DELTA = "ofs-delta";
 
 	/**
 	 * The client supports using the 64K side-band for progress messages.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k"; //$NON-NLS-1$
+	public static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
 
 	private final boolean thinPack;
 
@@ -291,10 +291,10 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)
 			throws IOException {
 		final String unpackLine = readStringLongTimeout();
-		if (!unpackLine.startsWith("unpack ")) //$NON-NLS-1$
+		if (!unpackLine.startsWith("unpack "))
 			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().unexpectedReportLine, unpackLine));
-		final String unpackStatus = unpackLine.substring("unpack ".length()); //$NON-NLS-1$
-		if (!unpackStatus.equals("ok")) //$NON-NLS-1$
+		final String unpackStatus = unpackLine.substring("unpack ".length());
+		if (!unpackStatus.equals("ok"))
 			throw new TransportException(uri, MessageFormat.format(
 					JGitText.get().errorOccurredDuringUnpackingOnTheRemoteEnd, unpackStatus));
 
@@ -302,12 +302,12 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		while ((refLine = pckIn.readString()) != PacketLineIn.END) {
 			boolean ok = false;
 			int refNameEnd = -1;
-			if (refLine.startsWith("ok ")) { //$NON-NLS-1$
+			if (refLine.startsWith("ok ")) {
 				ok = true;
 				refNameEnd = refLine.length();
-			} else if (refLine.startsWith("ng ")) { //$NON-NLS-1$
+			} else if (refLine.startsWith("ng ")) {
 				ok = false;
-				refNameEnd = refLine.indexOf(" ", 3); //$NON-NLS-1$
+				refNameEnd = refLine.indexOf(" ", 3);
 			}
 			if (refNameEnd == -1)
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().unexpectedReportLine2

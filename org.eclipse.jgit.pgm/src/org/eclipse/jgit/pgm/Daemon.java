@@ -155,8 +155,7 @@ class Daemon extends TextBuiltin {
 		outw.println(MessageFormat.format(CLIText.get().listeningOn, d.getAddress()));
 	}
 
-	private static DaemonService service(
-			final org.eclipse.jgit.transport.Daemon d,
+	private DaemonService service(final org.eclipse.jgit.transport.Daemon d,
 			final String n) {
 		final DaemonService svc = d.getService(n);
 		if (svc == null)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,17 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.pack;
+package org.eclipse.jgit.pgm.eclipse;
 
-/** Misc. constants used with pack files. */
-public class PackConstants {
+import java.io.File;
+import java.net.Authenticator;
+import java.net.CookieHandler;
+import java.net.PasswordAuthentication;
+import java.net.URL;
 
-	/** A pack file extension. */
-	public static final String PACK_EXT = "pack"; //$NON-NLS-1$
+import org.eclipse.jgit.iplog.IpLogMeta;
+import org.eclipse.jgit.iplog.SimpleCookieManager;
+import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.kohsuke.args4j.Option;
 
-	/** A pack index file extension. */
-	public static final String PACK_INDEX_EXT = "idx"; //$NON-NLS-1$
+@Command(name = "eclipse-ipzilla", common = false, usage = "usage_synchronizeIPZillaData")
+class Ipzilla extends TextBuiltin {
+	@Option(name = "--url", metaVar = "metaVar_url", usage = "usage_IPZillaURL")
+	private String url = "https://dev.eclipse.org/ipzilla/";
 
-	private PackConstants() {
+	@Option(name = "--username", metaVar = "metaVar_user", usage = "usage_IPZillaUsername")
+	private String username;
+
+	@Option(name = "--password", metaVar = "metaVar_pass", usage = "usage_IPZillaPassword")
+	private String password;
+
+	@Option(name = "--file", aliases = { "-f" }, metaVar = "metaVar_file", usage = "usage_inputOutputFile")
+	private File output;
+
+	@Override
+	protected void run() throws Exception {
+		if (CookieHandler.getDefault() == null)
+			CookieHandler.setDefault(new SimpleCookieManager());
+
+		final URL ipzilla = new URL(url);
+		if (username == null) {
+			final PasswordAuthentication auth = Authenticator
+					.requestPasswordAuthentication(ipzilla.getHost(), //
+							null, //
+							ipzilla.getPort(), //
+							ipzilla.getProtocol(), //
+							CLIText.get().IPZillaPasswordPrompt, //
+							ipzilla.getProtocol(), //
+							ipzilla, //
+							Authenticator.RequestorType.SERVER);
+			username = auth.getUserName();
+			password = new String(auth.getPassword());
+		}
+
+		if (output == null)
+			output = new File(db.getWorkTree(), IpLogMeta.IPLOG_CONFIG_FILE);
+
+		IpLogMeta meta = new IpLogMeta();
+		meta.syncCQs(output, db.getFS(), ipzilla, username, password);
 	}
 }
