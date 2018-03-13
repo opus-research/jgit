@@ -109,7 +109,7 @@ class Commit extends TextBuiltin {
 			if (branchName.startsWith(Constants.R_HEADS))
 				branchName = branchName.substring(Constants.R_HEADS.length());
 		}
-		outw.println("[" + branchName + " " + commit.name() + "] "
+		out.println("[" + branchName + " " + commit.name() + "] "
 				+ commit.getShortMessage());
 	}
 }
