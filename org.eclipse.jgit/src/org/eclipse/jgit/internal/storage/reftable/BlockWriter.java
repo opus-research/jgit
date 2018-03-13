@@ -51,8 +51,10 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_B
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_INDEX_RECORD;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_LOG_RECORD;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableOutputStream.computeVarintSize;
@@ -198,7 +200,7 @@ class BlockWriter {
 		for (int i = 0; i < restartOffsets.size(); i++) {
 			os.writeInt32(restartOffsets.get(i));
 		}
-		os.writeInt16(restartOffsets.size() - 1);
+		os.writeInt16(restartOffsets.size());
 		os.flushBlock();
 	}
 
@@ -306,7 +308,7 @@ class BlockWriter {
 
 		@Override
 		int valueType() {
-			return 0;
+			return VALUE_INDEX_RECORD;
 		}
 
 		@Override
@@ -336,7 +338,7 @@ class BlockWriter {
 		@Override
 		int valueType() {
 			if (ref.isSymbolic()) {
-				return VALUE_SYMREF;
+				return VALUE_TEXT;
 			} else if (ref.getStorage() == NEW && ref.getObjectId() == null) {
 				return VALUE_NONE;
 			} else if (ref.getPeeledObjectId() != null) {
@@ -349,7 +351,7 @@ class BlockWriter {
 		@Override
 		int valueSize() {
 			if (ref.isSymbolic()) {
-				int nameLen = nameUtf8(ref.getTarget()).length;
+				int nameLen = 5 + nameUtf8(ref.getTarget()).length;
 				return computeVarintSize(nameLen) + nameLen;
 			} else if (ref.getStorage() == NEW && ref.getObjectId() == null) {
 				return 0;
@@ -363,7 +365,8 @@ class BlockWriter {
 		@Override
 		void writeValue(ReftableOutputStream os) throws IOException {
 			if (ref.isSymbolic()) {
-				os.writeVarintString(ref.getTarget().getName());
+				String target = ref.getTarget().getName();
+				os.writeVarintString("ref: " + target); //$NON-NLS-1$
 				return;
 			}
 
@@ -482,7 +485,7 @@ class BlockWriter {
 
 		@Override
 		int valueType() {
-			return 0;
+			return VALUE_LOG_RECORD;
 		}
 
 		@Override
