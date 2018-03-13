@@ -245,7 +245,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectTruncatedInObjectId;
 	/***/ public String corruptObjectZeroId;
 	/***/ public String corruptPack;
-	/***/ public String corruptUseCnt;
 	/***/ public String couldNotCheckOutBecauseOfConflicts;
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
@@ -391,9 +390,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidChannel;
 	/***/ public String invalidCharacterInBase64Data;
 	/***/ public String invalidCommitParentNumber;
-	/***/ public String invalidDepth;
 	/***/ public String invalidEncryption;
-	/***/ public String invalidExpandWildcard;
 	/***/ public String invalidGitdirRef;
 	/***/ public String invalidGitType;
 	/***/ public String invalidId;
@@ -401,6 +398,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidIdLength;
 	/***/ public String invalidIgnoreParamSubmodule;
 	/***/ public String invalidIgnoreRule;
+	/***/ public String invalidIncludedPathInConfigFile;
 	/***/ public String invalidIntegerValue;
 	/***/ public String invalidKey;
 	/***/ public String invalidLineInConfigFile;
@@ -559,9 +557,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pushCertificateInvalidSignature;
 	/***/ public String pushIsNotSupportedForBundleTransport;
 	/***/ public String pushNotPermitted;
-	/***/ public String pushOptionsNotSupported;
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
-	/***/ public String readerIsRequired;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String readTimedOut;
 	/***/ public String receivePackObjectTooLarge1;
@@ -590,6 +586,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String renamesRejoiningModifies;
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
+	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
 	/***/ public String repositoryState_bare;
@@ -617,7 +614,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shallowCommitsAlreadyInitialized;
-	/***/ public String shallowPacksRequireDepthWalk;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
