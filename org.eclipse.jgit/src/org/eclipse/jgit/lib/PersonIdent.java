@@ -268,10 +268,7 @@ public class PersonIdent {
 	}
 
 	public int hashCode() {
-		int hc = getEmailAddress().hashCode();
-		hc *= 31;
-		hc += (int) (when / 1000L);
-		return hc;
+		return getEmailAddress().hashCode() ^ (int) when;
 	}
 
 	public boolean equals(final Object o) {
@@ -279,7 +276,7 @@ public class PersonIdent {
 			final PersonIdent p = (PersonIdent) o;
 			return getName().equals(p.getName())
 					&& getEmailAddress().equals(p.getEmailAddress())
-					&& when / 1000L == p.when / 1000L;
+					&& when == p.when;
 		}
 		return false;
 	}

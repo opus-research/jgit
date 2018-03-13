@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.LinkedList;
@@ -78,8 +79,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	private PersonIdent committer;
 
 	private String message;
-
-	private boolean all;
 
 	/**
 	 * parents this commit should have. The current HEAD will be in this list
@@ -129,18 +128,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		processOptions(state);
 
 		try {
-			if (all && !repo.isBare() && repo.getWorkTree() != null) {
-				Git git = new Git(repo);
-				try {
-					git.add()
-							.addFilepattern(".")
-							.setUpdate(true).call();
-				} catch (NoFilepatternException e) {
-					// should really not happen
-					throw new JGitInternalException(e.getMessage(), e);
-				}
-			}
-
 			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
@@ -162,12 +149,12 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					ObjectId indexTreeId = index.writeTree(odi);
 
 					// Create a Commit object, populate it and write it
-					Commit commit = new Commit();
+					Commit commit = new Commit(repo);
 					commit.setCommitter(committer);
 					commit.setAuthor(author);
 					commit.setMessage(message);
 
-					commit.setParentIds(parents);
+					commit.setParentIds(parents.toArray(new ObjectId[] {}));
 					commit.setTreeId(indexTreeId);
 					ObjectId commitId = odi.insert(Constants.OBJ_COMMIT, odi
 							.format(commit));
@@ -187,11 +174,13 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						case NEW:
 						case FAST_FORWARD: {
 							setCallable(false);
-							if (state == RepositoryState.MERGING_RESOLVED) {
+							File meta = repo.getDirectory();
+							if (state == RepositoryState.MERGING_RESOLVED
+									&& meta != null) {
 								// Commit was successful. Now delete the files
 								// used for merge commits
-								repo.writeMergeCommitMsg(null);
-								repo.writeMergeHeads(null);
+								new File(meta, Constants.MERGE_HEAD).delete();
+								new File(meta, Constants.MERGE_MSG).delete();
 							}
 							return revCommit;
 						}
@@ -367,19 +356,4 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public PersonIdent getAuthor() {
 		return author;
 	}
-
-	/**
-	 * If set to true the Commit command automatically stages files that have
-	 * been modified and deleted, but new files you not known by the repository
-	 * are not affected. This corresponds to the parameter -a on the command
-	 * line.
-	 *
-	 * @param all
-	 * @return {@code this}
-	 */
-	public CommitCommand setAll(boolean all) {
-		this.all = all;
-		return this;
-	}
-
 }

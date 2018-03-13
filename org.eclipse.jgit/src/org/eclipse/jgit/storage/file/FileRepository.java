@@ -54,8 +54,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.events.ConfigChangedEvent;
-import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -126,20 +124,6 @@ public class FileRepository extends Repository {
 	}
 
 	/**
-	 * A convenience API for {@link #FileRepository(File)}.
-	 *
-	 * @param gitDir
-	 *            GIT_DIR (the location of the repository metadata).
-	 * @throws IOException
-	 *             the repository appears to already exist but cannot be
-	 *             accessed.
-	 * @see FileRepositoryBuilder
-	 */
-	public FileRepository(final String gitDir) throws IOException {
-		this(new File(gitDir));
-	}
-
-	/**
 	 * Create a repository using the local file system.
 	 *
 	 * @param options
@@ -158,12 +142,6 @@ public class FileRepository extends Repository {
 
 		loadUserConfig();
 		loadRepoConfig();
-
-		getConfig().addChangeListener(new ConfigChangedListener() {
-			public void onConfigChanged(ConfigChangedEvent event) {
-				fireEvent(event);
-			}
-		});
 
 		refs = new RefDirectory(this);
 		objectDatabase = new ObjectDirectory(repoConfig, //
