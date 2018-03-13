@@ -297,7 +297,6 @@ public class RevCommitList<E extends RevCommit> extends RevObjectList<E> {
 	 * @throws MissingObjectException
 	 *             see {@link RevWalk#next()}
 	 */
-	@SuppressWarnings("unchecked")
 	public void fillTo(final int highMark) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		if (walker == null || size > highMark)
@@ -362,7 +361,6 @@ public class RevCommitList<E extends RevCommit> extends RevObjectList<E> {
 	 * @throws MissingObjectException
 	 *             see {@link RevWalk#next()}
 	 */
-	@SuppressWarnings("unchecked")
 	public void fillTo(final RevCommit commitToLoad, int highMark)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
