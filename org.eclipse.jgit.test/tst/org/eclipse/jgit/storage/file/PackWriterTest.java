@@ -44,7 +44,6 @@
 package org.eclipse.jgit.storage.file;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -135,9 +134,9 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testContructor() throws IOException {
 		writer = new PackWriter(config, db.newObjectReader());
-		assertFalse(writer.isDeltaBaseAsOffset());
-		assertTrue(config.isReuseDeltas());
-		assertTrue(config.isReuseObjects());
+		assertEquals(false, writer.isDeltaBaseAsOffset());
+		assertEquals(true, config.isReuseDeltas());
+		assertEquals(true, config.isReuseObjects());
 		assertEquals(0, writer.getObjectCount());
 	}
 
@@ -149,14 +148,14 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		config.setReuseDeltas(false);
 		config.setReuseObjects(false);
 		config.setDeltaBaseAsOffset(false);
-		assertFalse(config.isReuseDeltas());
-		assertFalse(config.isReuseObjects());
-		assertFalse(config.isDeltaBaseAsOffset());
+		assertEquals(false, config.isReuseDeltas());
+		assertEquals(false, config.isReuseObjects());
+		assertEquals(false, config.isDeltaBaseAsOffset());
 
 		writer = new PackWriter(config, db.newObjectReader());
 		writer.setDeltaBaseAsOffset(true);
-		assertTrue(writer.isDeltaBaseAsOffset());
-		assertFalse(config.isDeltaBaseAsOffset());
+		assertEquals(true, writer.isDeltaBaseAsOffset());
+		assertEquals(false, config.isDeltaBaseAsOffset());
 	}
 
 	/**
