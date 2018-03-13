@@ -71,61 +71,20 @@ import com.google.gson.GsonBuilder;
  *
  * @since 4.3
  */
-public class LfsProtocolServlet extends HttpServlet {
+public abstract class LfsProtocolServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
 	private static final String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json"; //$NON-NLS-1$
 
-	private static class LfsRequest {
-		String operation;
-		List<LfsObject> objects;
-	}
-
-	private final LargeFileRepository repository;
-
-	private Gson gson;
+	private Gson gson = createGson();
 
 	/**
-	 * Constructs a LFS protocol handler.
-	 * <p>
-	 * Use this constructor if the repository instance can be cached and doesn't
-	 * change at runtime. Otherwise use {@link #LfsProtocolServlet()} and
-	 * override {@link #getLargeFileRepository()} to provide the repository
-	 * instance per-request at runtime.
-	 *
-	 * @param repository
-	 *            the large file repository storing large files
-	 */
-	public LfsProtocolServlet(LargeFileRepository repository) {
-		this.repository = repository;
-		GsonBuilder gb = new GsonBuilder()
-				.setFieldNamingPolicy(
-						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.setPrettyPrinting().disableHtmlEscaping();
-		gson = gb.create();
-	}
-
-	/**
-	 * Constructs a LFS protocol handler. To be used by subclasses which need to
-	 * override the {@link #getLargeFileRepository} method.
-	 */
-	protected LfsProtocolServlet() {
-	  this.repository = null;
-	}
-
-	/**
-	 * If the repository is the same for each request then it could be set in
-	 * the constructor {@link #LfsProtocolServlet(LargeFileRepository)}.
-	 * <p>
-	 * Otherwise, subclasses can override this method to provide a per-request
-	 * {@code getLargeFileRepository()} implementation.
+	 * Get the large file repository
 	 *
 	 * @return the large file repository storing large files
 	 */
-	protected LargeFileRepository getLargeFileRepository() {
-		return repository;
-	}
+	protected abstract LargeFileRepository getLargeFileRepository();
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse res)
@@ -149,5 +108,19 @@ public class LfsProtocolServlet extends HttpServlet {
 				.forOperation(request.operation, repo, request.objects);
 		gson.toJson(handler.process(), w);
 		w.flush();
+	}
+
+	private static class LfsRequest {
+		String operation;
+
+		List<LfsObject> objects;
+	}
+
+	private static Gson createGson() {
+		GsonBuilder gb = new GsonBuilder()
+				.setFieldNamingPolicy(
+						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+				.setPrettyPrinting().disableHtmlEscaping();
+		return gb.create();
 	}
 }

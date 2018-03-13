@@ -43,15 +43,12 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import java.io.File;
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.MessageFormat;
 
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -61,18 +58,12 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lfs.server.LargeFileRepository;
 import org.eclipse.jgit.lfs.server.LfsProtocolServlet;
 import org.eclipse.jgit.lfs.server.fs.FileLfsServlet;
 import org.eclipse.jgit.lfs.server.fs.FileLfsRepository;
-import org.eclipse.jgit.lfs.server.s3.S3Config;
-import org.eclipse.jgit.lfs.server.s3.S3Repository;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.util.FS;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -162,11 +153,7 @@ class LfsStore extends TextBuiltin {
 	}
 
 	private static enum StoreType {
-		FS, S3;
-	}
-
-	private static enum StorageClass {
-		REDUCED_REDUNDANCY, STANDARD
+		FS;
 	}
 
 	private static final String OBJECTS = "objects/"; //$NON-NLS-1$
@@ -175,8 +162,8 @@ class LfsStore extends TextBuiltin {
 
 	private static final String PROTOCOL_PATH = "/lfs/objects/batch"; //$NON-NLS-1$
 
-	@Option(name = "--port", aliases = {"-p" },
-			metaVar = "metaVar_port", usage = "usage_LFSPort")
+	@Option(name = "--port", aliases = {"-p" }, metaVar = "metaVar_port",
+			usage = "usage_LFSPort")
 	int port;
 
 	@Option(name = "--store", metaVar = "metaVar_lfsStorage", usage = "usage_LFSRunStore")
@@ -185,25 +172,6 @@ class LfsStore extends TextBuiltin {
 	@Option(name = "--store-url", aliases = {"-u" }, metaVar = "metaVar_url",
 			usage = "usage_LFSStoreUrl")
 	String storeUrl;
-
-	@Option(name = "--region", aliases = {"-r" },
-			metaVar = "metaVar_s3Region", usage = "usage_S3Region")
-	String region; // $NON-NLS-1$
-
-	@Option(name = "--bucket", aliases = {"-b" },
-			metaVar = "metaVar_s3Bucket", usage = "usage_S3Bucket")
-	String bucket; // $NON-NLS-1$
-
-	@Option(name = "--storage-class", aliases = {"-c" },
-			metaVar = "metaVar_s3StorageClass", usage = "usage_S3StorageClass")
-	StorageClass storageClass = StorageClass.REDUCED_REDUNDANCY;
-
-	@Option(name = "--expire", aliases = {"-e" },
-			metaVar = "metaVar_seconds", usage = "usage_S3Expiration")
-	int expirationSeconds = 600;
-
-	@Option(name = "--no-ssl-verify", usage = "usage_S3NoSslVerify")
-	boolean disableSslVerify = false;
 
 	@Argument(required = false, metaVar = "metaVar_directory", usage = "usage_LFSDirectory")
 	String directory;
@@ -221,77 +189,50 @@ class LfsStore extends TextBuiltin {
 
 	protected void run() throws Exception {
 		AppServer server = new AppServer(port);
+		URI baseURI = server.getURI();
 		ServletContextHandler app = server.addContext("/"); //$NON-NLS-1$
-		LargeFileRepository repository;
 
+		final LargeFileRepository repository;
 		switch (storeType) {
 		case FS:
 			Path dir = Paths.get(directory);
-			FileLfsRepository plainFSRepo = new FileLfsRepository(
-					getStoreUrl(server), dir);
-			FileLfsServlet content = new FileLfsServlet(plainFSRepo,
-					30000);
+			FileLfsRepository fsRepo = new FileLfsRepository(
+					getStoreUrl(baseURI), dir);
+			FileLfsServlet content = new FileLfsServlet(fsRepo, 30000);
 			app.addServlet(new ServletHolder(content), STORE_PATH);
-			repository = plainFSRepo;
+			repository = fsRepo;
 			break;
 
-		case S3:
-			readAWSKeys();
-			checkOptions();
-			S3Config config = new S3Config(region.toString(), bucket,
-					storageClass.toString(), accessKey, secretKey,
-					expirationSeconds, disableSslVerify);
-			repository = new S3Repository(config);
-			break;
 		default:
-			throw new IllegalArgumentException(MessageFormat
-					.format(CLIText.get().lfsUnknownStoreType, storeType));
+			throw new IllegalArgumentException(
+					"Unknown store type: " + storeType); //$NON-NLS-1$
 		}
 
-		LfsProtocolServlet protocol = new LfsProtocolServlet(repository);
+		LfsProtocolServlet protocol = new LfsProtocolServlet() {
+
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			protected LargeFileRepository getLargeFileRepository() {
+				return repository;
+			}
+
+		};
 		app.addServlet(new ServletHolder(protocol), PROTOCOL_PATH);
 
 		server.start();
 
-		outw.println(MessageFormat.format(CLIText.get().lfsProtocolUrl,
-				getProtocolUrl(server)));
+		outw.println("LFS protocol URL: " + getProtocolUrl(baseURI)); //$NON-NLS-1$
 		if (storeType == StoreType.FS) {
-			outw.println(MessageFormat.format(CLIText.get().lfsStoreDirectory,
-					directory));
-			outw.println(MessageFormat.format(CLIText.get().lfsStoreUrl,
-					getStoreUrl(server)));
+			outw.println("LFS objects located in: " + directory); //$NON-NLS-1$
+			outw.println("LFS store URL: " + getStoreUrl(baseURI)); //$NON-NLS-1$
 		}
 	}
 
-	private void checkOptions() {
-		if (bucket == null || bucket.length() == 0) {
-			throw die(MessageFormat.format(CLIText.get().s3InvalidBucket,
-					bucket));
-		}
-	}
-
-	private void readAWSKeys() throws IOException, ConfigInvalidException {
-		String credentialsPath = System.getProperty("user.home") //$NON-NLS-1$
-				+ "/.aws/credentials"; //$NON-NLS-1$
-		FileBasedConfig c = new FileBasedConfig(new File(credentialsPath),
-				FS.DETECTED);
-		c.load();
-		accessKey = c.getString("default", null, "accessKey"); //$NON-NLS-1$//$NON-NLS-2$
-		secretKey = c.getString("default", null, "secretKey"); //$NON-NLS-1$ //$NON-NLS-2$
-		if (accessKey == null || accessKey.isEmpty()) {
-			throw die(MessageFormat.format(CLIText.get().lfsNoAccessKey,
-					credentialsPath));
-		}
-		if (secretKey == null || secretKey.isEmpty()) {
-			throw die(MessageFormat.format(CLIText.get().lfsNoSecretKey,
-					credentialsPath));
-		}
-	}
-
-	private String getStoreUrl(AppServer server) {
+	private String getStoreUrl(URI baseURI) {
 		if (storeUrl == null) {
 			if (storeType == StoreType.FS) {
-				storeUrl = server.getURI() + "/" + OBJECTS; //$NON-NLS-1$
+				storeUrl = baseURI + "/" + OBJECTS; //$NON-NLS-1$
 			} else {
 				die("Local store not running and no --store-url specified"); //$NON-NLS-1$
 			}
@@ -299,9 +240,9 @@ class LfsStore extends TextBuiltin {
 		return storeUrl;
 	}
 
-	private String getProtocolUrl(AppServer server) {
+	private String getProtocolUrl(URI baseURI) {
 		if (protocolUrl == null) {
-			protocolUrl = server.getURI() + PROTOCOL_PATH;
+			protocolUrl = baseURI + PROTOCOL_PATH;
 		}
 		return protocolUrl;
 	}
