@@ -58,20 +58,20 @@ import org.eclipse.jgit.lib.ObjectId;
 public interface PreUploadHook {
 	/** A simple no-op hook. */
 	public static final PreUploadHook NULL = new PreUploadHook() {
-		public void onBeginNegotiateRound(UploadPack up,
+		public void onBeginNegotiateRound(UploadSession up,
 				Collection<? extends ObjectId> wants, int cntOffered)
 				throws ServiceMayNotContinueException {
 			// Do nothing.
 		}
 
-		public void onEndNegotiateRound(UploadPack up,
+		public void onEndNegotiateRound(UploadSession up,
 				Collection<? extends ObjectId> wants, int cntCommon,
 				int cntNotFound, boolean ready)
 				throws ServiceMayNotContinueException {
 			// Do nothing.
 		}
 
-		public void onSendPack(UploadPack up,
+		public void onSendPack(UploadSession up,
 				Collection<? extends ObjectId> wants,
 				Collection<? extends ObjectId> haves)
 				throws ServiceMayNotContinueException {
@@ -91,7 +91,7 @@ public interface PreUploadHook {
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void onBeginNegotiateRound(UploadPack up,
+	public void onBeginNegotiateRound(UploadSession up,
 			Collection<? extends ObjectId> wants, int cntOffered)
 			throws ServiceMayNotContinueException;
 
@@ -115,7 +115,7 @@ public interface PreUploadHook {
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void onEndNegotiateRound(UploadPack up,
+	public void onEndNegotiateRound(UploadSession up,
 			Collection<? extends ObjectId> wants, int cntCommon,
 			int cntNotFound, boolean ready)
 			throws ServiceMayNotContinueException;
@@ -136,7 +136,7 @@ public interface PreUploadHook {
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void onSendPack(UploadPack up, Collection<? extends ObjectId> wants,
+	public void onSendPack(UploadSession up, Collection<? extends ObjectId> wants,
 			Collection<? extends ObjectId> haves)
 			throws ServiceMayNotContinueException;
 }

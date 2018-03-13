@@ -55,19 +55,19 @@ import org.eclipse.jgit.revwalk.RevWalk;
  * upload-pack and receive-pack.
  */
 public abstract class AbstractAdvertiseRefsHook implements AdvertiseRefsHook {
-	public void advertiseRefs(UploadPack uploadPack)
+	public void advertiseRefs(UploadSession uploadSession)
 			throws ServiceMayNotContinueException {
-		uploadPack.setAdvertisedRefs(getAdvertisedRefs(
-				uploadPack.getRepository(), uploadPack.getRevWalk()));
+		uploadSession.setAdvertisedRefs(getAdvertisedRefs(
+				uploadSession.getRepository(), uploadSession.getRevWalk()));
 	}
 
-	public void advertiseRefs(ReceivePack receivePack)
+	public void advertiseRefs(ReceiveSession receiveSession)
 			throws ServiceMayNotContinueException {
-		Map<String, Ref> refs = getAdvertisedRefs(receivePack.getRepository(),
-				receivePack.getRevWalk());
-		Set<ObjectId> haves = getAdvertisedHaves(receivePack.getRepository(),
-				receivePack.getRevWalk());
-		receivePack.setAdvertisedRefs(refs, haves);
+		Map<String, Ref> refs = getAdvertisedRefs(receiveSession.getRepository(),
+				receiveSession.getRevWalk());
+		Set<ObjectId> haves = getAdvertisedHaves(receiveSession.getRepository(),
+				receiveSession.getRevWalk());
+		receiveSession.setAdvertisedRefs(refs, haves);
 	}
 
 	/**
@@ -93,7 +93,7 @@ public abstract class AbstractAdvertiseRefsHook implements AdvertiseRefsHook {
 	 * @param revWalk
 	 *            open rev walk on the repository.
 	 * @return set of additional haves; see
-	 *         {@link ReceivePack#getAdvertisedObjects()}.
+	 *         {@link ReceiveSession#getAdvertisedObjects()}.
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
