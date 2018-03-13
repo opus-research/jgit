@@ -60,7 +60,7 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.IndexDiffFilter;
+import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
 import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
@@ -105,9 +105,7 @@ public class IndexDiff {
 
 	private Set<String> untracked = new HashSet<String>();
 
-	private Set<String> assumeUnchanged;
-
-	private DirCache dirCache;
+	private Set<String> assumeUnchanged = new HashSet<String>();
 
 	/**
 	 * Construct an IndexDiff
@@ -168,9 +166,10 @@ public class IndexDiff {
 	 * @throws IOException
 	 */
 	public boolean diff() throws IOException {
-		dirCache = repository.readDirCache();
-
+		boolean changesExist = false;
+		DirCache dirCache = repository.readDirCache();
 		TreeWalk treeWalk = new TreeWalk(repository);
+		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		// add the trees (tree, dirchache, workdir)
 		if (tree != null)
@@ -179,11 +178,13 @@ public class IndexDiff {
 			treeWalk.addTree(new EmptyTreeIterator());
 		treeWalk.addTree(new DirCacheIterator(dirCache));
 		treeWalk.addTree(initialWorkingTreeIterator);
-		Collection<TreeFilter> filters = new ArrayList<TreeFilter>(4);
+		Collection<TreeFilter> filters = new ArrayList<TreeFilter>(
+				filter == null ? 3 : 4);
 		if (filter != null)
 			filters.add(filter);
+		filters.add(new NotIgnoredFilter(WORKDIR));
 		filters.add(new SkipWorkTreeFilter(INDEX));
-		filters.add(new IndexDiffFilter(INDEX, WORKDIR));
+		filters.add(TreeFilter.ANY_DIFF);
 		treeWalk.setFilter(AndTreeFilter.create(filters));
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
@@ -192,30 +193,42 @@ public class IndexDiff {
 					DirCacheIterator.class);
 			WorkingTreeIterator workingTreeIterator = treeWalk.getTree(WORKDIR,
 					WorkingTreeIterator.class);
+			FileMode fileModeTree = treeWalk.getFileMode(TREE);
+
+			if (dirCacheIterator != null) {
+				if (dirCacheIterator.getDirCacheEntry().isAssumeValid())
+					assumeUnchanged.add(dirCacheIterator.getEntryPathString());
+			}
 
 			if (treeIterator != null) {
 				if (dirCacheIterator != null) {
-					if (!treeIterator.idEqual(dirCacheIterator)
-							|| treeIterator.getEntryRawMode()
-							!= dirCacheIterator.getEntryRawMode()) {
+					if (!treeIterator.getEntryObjectId().equals(
+							dirCacheIterator.getEntryObjectId())) {
 						// in repo, in index, content diff => changed
-						changed.add(treeWalk.getPathString());
+						changed.add(dirCacheIterator.getEntryPathString());
+						changesExist = true;
 					}
 				} else {
 					// in repo, not in index => removed
-					removed.add(treeWalk.getPathString());
-					if (workingTreeIterator != null)
-						untracked.add(treeWalk.getPathString());
+					if (!fileModeTree.equals(FileMode.TYPE_TREE)) {
+						removed.add(treeIterator.getEntryPathString());
+						changesExist = true;
+						if (workingTreeIterator != null)
+							untracked.add(workingTreeIterator
+									.getEntryPathString());
+					}
 				}
 			} else {
 				if (dirCacheIterator != null) {
 					// not in repo, in index => added
-					added.add(treeWalk.getPathString());
+					added.add(dirCacheIterator.getEntryPathString());
+					changesExist = true;
 				} else {
 					// not in repo, not in index => untracked
 					if (workingTreeIterator != null
 							&& !workingTreeIterator.isEntryIgnored()) {
-						untracked.add(treeWalk.getPathString());
+						untracked.add(workingTreeIterator.getEntryPathString());
+						changesExist = true;
 					}
 				}
 			}
@@ -223,23 +236,18 @@ public class IndexDiff {
 			if (dirCacheIterator != null) {
 				if (workingTreeIterator == null) {
 					// in index, not in workdir => missing
-					missing.add(treeWalk.getPathString());
+					missing.add(dirCacheIterator.getEntryPathString());
+					changesExist = true;
 				} else {
-					if (workingTreeIterator.isModified(
-							dirCacheIterator.getDirCacheEntry(), true)) {
+					if (!dirCacheIterator.idEqual(workingTreeIterator)) {
 						// in index, in workdir, content differs => modified
-						modified.add(treeWalk.getPathString());
+						modified.add(dirCacheIterator.getEntryPathString());
+						changesExist = true;
 					}
 				}
 			}
 		}
-
-		if (added.isEmpty() && changed.isEmpty() && removed.isEmpty()
-				&& missing.isEmpty() && modified.isEmpty()
-				&& untracked.isEmpty())
-			return false;
-		else
-			return true;
+		return changesExist;
 	}
 
 	/**
@@ -278,7 +286,7 @@ public class IndexDiff {
 	}
 
 	/**
-	 * @return list of files that are not ignored, and not in the index.
+	 * @return list of files on modified on disk relative to the index
 	 */
 	public Set<String> getUntracked() {
 		return untracked;
@@ -288,13 +296,6 @@ public class IndexDiff {
 	 * @return list of files with the flag assume-unchanged
 	 */
 	public Set<String> getAssumeUnchanged() {
-		if (assumeUnchanged == null) {
-			HashSet<String> unchanged = new HashSet<String>();
-			for (int i = 0; i < dirCache.getEntryCount(); i++)
-				if (dirCache.getEntry(i).isAssumeValid())
-					unchanged.add(dirCache.getEntry(i).getPathString());
-			assumeUnchanged = unchanged;
-		}
 		return assumeUnchanged;
 	}
 }

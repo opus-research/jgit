@@ -59,10 +59,10 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm;
+import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.Sequence;
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -183,6 +183,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
 			tw = new NameConflictTreeWalk(db);
+			tw.reset();
 			tw.addTree(mergeBase());
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
@@ -244,7 +245,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				createDir(f.getParentFile());
 				DirCacheCheckout.checkoutEntry(db,
 						f,
-						entry.getValue());
+						entry.getValue(), true);
 			} else {
 				if (!f.delete())
 					failingPathes.put(entry.getKey(),
@@ -446,7 +447,8 @@ public class ResolveMerger extends ThreeWayMerger {
 				// is not modified
 				if (work != null
 						&& (!nonTree(work.getEntryRawMode()) || work
-								.isModified(index.getDirCacheEntry(), true))) {
+								.isModified(index.getDirCacheEntry(), true,
+										true))) {
 					failingPathes.put(tw.getPathString(),
 							MergeFailureReason.DIRTY_WORKTREE);
 					return false;
