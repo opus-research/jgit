@@ -84,7 +84,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 	private InMemoryRepository client;
 	private ObjectId obj1;
 	private ObjectId obj2;
-	private ReceivePack receivePack;
+	private BaseReceivePack baseReceivePack;
 
 	@Before
 	public void setUp() throws Exception {
@@ -96,12 +96,13 @@ public class PushOptionsTest extends RepositoryTestCase {
 		testProtocol = new TestProtocol<>(null,
 				new ReceivePackFactory<Object>() {
 					@Override
-					public ReceivePack create(Object req, Repository git)
+					public ReceivePack create(Object req, Repository database)
 							throws ServiceNotEnabledException,
 							ServiceNotAuthorizedException {
-						receivePack = new ReceivePack(git);
+						ReceivePack receivePack = new ReceivePack(database);
 						receivePack.setAllowPushOptions(true);
 						receivePack.setAtomic(true);
+						baseReceivePack = receivePack;
 						return receivePack;
 					}
 				});
@@ -117,6 +118,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 
 	@After
 	public void tearDown() {
+		baseReceivePack = null;
 		Transport.unregister(testProtocol);
 	}
 
@@ -174,7 +176,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 		assertSame(RemoteRefUpdate.Status.OK, one.getStatus());
 		assertSame(RemoteRefUpdate.Status.REJECTED_REMOTE_CHANGED,
 				two.getStatus());
-		assertEquals(pushOptions, receivePack.getPushOptions());
+		assertEquals(pushOptions, baseReceivePack.getPushOptions());
 	}
 
 	@Test
@@ -195,7 +197,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 
 		assertSame(RemoteRefUpdate.Status.OK, one.getStatus());
 		assertSame(RemoteRefUpdate.Status.OK, two.getStatus());
-		assertEquals(pushOptions, receivePack.getPushOptions());
+		assertEquals(pushOptions, baseReceivePack.getPushOptions());
 	}
 
 	@Test
@@ -218,7 +220,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 				one.getStatus());
 		assertSame(RemoteRefUpdate.Status.REJECTED_REMOTE_CHANGED,
 				two.getStatus());
-		assertEquals(new ArrayList<String>(), receivePack.getPushOptions());
+		assertEquals(new ArrayList<String>(), baseReceivePack.getPushOptions());
 	}
 
 	@Test
@@ -239,7 +241,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 		assertSame(RemoteRefUpdate.Status.OK, one.getStatus());
 		assertSame(RemoteRefUpdate.Status.REJECTED_REMOTE_CHANGED,
 				two.getStatus());
-		assertEquals(pushOptions, receivePack.getPushOptions());
+		assertEquals(pushOptions, baseReceivePack.getPushOptions());
 	}
 
 	@Test
