@@ -385,12 +385,12 @@ public class FileHeader extends DiffEntry {
 					if (buf[sp - 2] != '"') {
 						return eol;
 					}
-					oldPath = QuotedString.GIT_PATH.dequote(buf, bol, sp - 1);
-					oldPath = p1(oldPath);
+					oldName = QuotedString.GIT_PATH.dequote(buf, bol, sp - 1);
+					oldName = p1(oldName);
 				} else {
-					oldPath = decode(Constants.CHARSET, buf, aStart, sp - 1);
+					oldName = decode(Constants.CHARSET, buf, aStart, sp - 1);
 				}
-				newPath = oldPath;
+				newName = oldName;
 				return eol;
 			}
 
@@ -431,27 +431,27 @@ public class FileHeader extends DiffEntry {
 				parseNewFileMode(ptr, eol);
 
 			} else if (match(buf, ptr, COPY_FROM) >= 0) {
-				oldPath = parseName(oldPath, ptr + COPY_FROM.length, eol);
+				oldName = parseName(oldName, ptr + COPY_FROM.length, eol);
 				changeType = ChangeType.COPY;
 
 			} else if (match(buf, ptr, COPY_TO) >= 0) {
-				newPath = parseName(newPath, ptr + COPY_TO.length, eol);
+				newName = parseName(newName, ptr + COPY_TO.length, eol);
 				changeType = ChangeType.COPY;
 
 			} else if (match(buf, ptr, RENAME_OLD) >= 0) {
-				oldPath = parseName(oldPath, ptr + RENAME_OLD.length, eol);
+				oldName = parseName(oldName, ptr + RENAME_OLD.length, eol);
 				changeType = ChangeType.RENAME;
 
 			} else if (match(buf, ptr, RENAME_NEW) >= 0) {
-				newPath = parseName(newPath, ptr + RENAME_NEW.length, eol);
+				newName = parseName(newName, ptr + RENAME_NEW.length, eol);
 				changeType = ChangeType.RENAME;
 
 			} else if (match(buf, ptr, RENAME_FROM) >= 0) {
-				oldPath = parseName(oldPath, ptr + RENAME_FROM.length, eol);
+				oldName = parseName(oldName, ptr + RENAME_FROM.length, eol);
 				changeType = ChangeType.RENAME;
 
 			} else if (match(buf, ptr, RENAME_TO) >= 0) {
-				newPath = parseName(newPath, ptr + RENAME_TO.length, eol);
+				newName = parseName(newName, ptr + RENAME_TO.length, eol);
 				changeType = ChangeType.RENAME;
 
 			} else if (match(buf, ptr, SIMILARITY_INDEX) >= 0) {
@@ -474,14 +474,14 @@ public class FileHeader extends DiffEntry {
 	}
 
 	void parseOldName(int ptr, final int eol) {
-		oldPath = p1(parseName(oldPath, ptr + OLD_NAME.length, eol));
-		if (oldPath == DEV_NULL)
+		oldName = p1(parseName(oldName, ptr + OLD_NAME.length, eol));
+		if (oldName == DEV_NULL)
 			changeType = ChangeType.ADD;
 	}
 
 	void parseNewName(int ptr, final int eol) {
-		newPath = p1(parseName(newPath, ptr + NEW_NAME.length, eol));
-		if (newPath == DEV_NULL)
+		newName = p1(parseName(newName, ptr + NEW_NAME.length, eol));
+		if (newName == DEV_NULL)
 			changeType = ChangeType.DELETE;
 	}
 

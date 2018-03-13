@@ -60,7 +60,7 @@ class DeltaWindow {
 
 	private static final int NEXT_SRC = 1;
 
-	private final PackWriter writer;
+	private final PackConfig config;
 
 	private final DeltaCache deltaCache;
 
@@ -101,8 +101,8 @@ class DeltaWindow {
 	/** Used to compress cached deltas. */
 	private Deflater deflater;
 
-	DeltaWindow(PackWriter pw, DeltaCache dc, ObjectReader or) {
-		writer = pw;
+	DeltaWindow(PackConfig pc, DeltaCache dc, ObjectReader or) {
+		config = pc;
 		deltaCache = dc;
 		reader = or;
 
@@ -117,12 +117,12 @@ class DeltaWindow {
 		// PackWriter has a minimum of 2 for the window size, but then
 		// users might complain that JGit is creating a bigger pack file.
 		//
-		window = new DeltaWindowEntry[pw.getDeltaSearchWindowSize() + 1];
+		window = new DeltaWindowEntry[config.getDeltaSearchWindowSize() + 1];
 		for (int i = 0; i < window.length; i++)
 			window[i] = new DeltaWindowEntry();
 
-		maxMemory = pw.getDeltaSearchMemoryLimit();
-		maxDepth = pw.getMaxDeltaDepth();
+		maxMemory = config.getDeltaSearchMemoryLimit();
+		maxDepth = config.getMaxDeltaDepth();
 	}
 
 	void search(ProgressMonitor monitor, ObjectToPack[] toSearch, int off,
@@ -143,11 +143,8 @@ class DeltaWindow {
 				}
 				res.set(toSearch[off]);
 
-				if (res.object.isDoNotDelta()) {
-					// PackWriter marked edge objects with the
-					// do-not-delta flag. They are the only ones
-					// that appear in toSearch with it set, but
-					// we don't actually want to make a delta for
+				if (res.object.isEdge()) {
+					// We don't actually want to make a delta for
 					// them, just need to push them into the window
 					// so they can be read by other objects.
 					//
@@ -211,7 +208,7 @@ class DeltaWindow {
 		//
 		ObjectToPack srcObj = window[bestSlot].object;
 		ObjectToPack resObj = res.object;
-		if (srcObj.isDoNotDelta()) {
+		if (srcObj.isEdge()) {
 			// The source (the delta base) is an edge object outside of the
 			// pack. Its part of the common base set that the peer already
 			// has on hand, so we don't want to send it. We have to store
@@ -280,7 +277,7 @@ class DeltaWindow {
 			dropFromWindow(srcSlot);
 			return NEXT_SRC;
 		} catch (IOException notAvailable) {
-			if (src.object.isDoNotDelta()) {
+			if (src.object.isEdge()) {
 				// This is an edge that is suddenly not available.
 				dropFromWindow(srcSlot);
 				return NEXT_SRC;
@@ -442,7 +439,7 @@ class DeltaWindow {
 			IncorrectObjectTypeException, IOException, LargeObjectException {
 		byte[] buf = ent.buffer;
 		if (buf == null) {
-			buf = writer.buffer(reader, ent.object);
+			buf = PackWriter.buffer(config, reader, ent.object);
 			if (0 < maxMemory)
 				loaded += buf.length;
 			ent.buffer = buf;
@@ -452,7 +449,7 @@ class DeltaWindow {
 
 	private Deflater deflater() {
 		if (deflater == null)
-			deflater = new Deflater(writer.getCompressionLevel());
+			deflater = new Deflater(config.getCompressionLevel());
 		else
 			deflater.reset();
 		return deflater;

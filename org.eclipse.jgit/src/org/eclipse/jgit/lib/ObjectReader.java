@@ -44,9 +44,14 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Iterator;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.revwalk.ObjectWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 
 /**
@@ -57,7 +62,7 @@ import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
  */
 public abstract class ObjectReader {
 	/** Type hint indicating the caller doesn't know the type. */
-	protected static final int OBJ_ANY = -1;
+	public static final int OBJ_ANY = -1;
 
 	/**
 	 * Construct a new reader from the same data.
@@ -146,6 +151,60 @@ public abstract class ObjectReader {
 			IOException;
 
 	/**
+	 * Asynchronous object opening.
+	 *
+	 * @param <T>
+	 *            type of identifier being supplied.
+	 * @param objectIds
+	 *            objects to open from the object store. The supplied collection
+	 *            must not be modified until the queue has finished.
+	 * @param reportMissing
+	 *            if true missing objects are reported by calling failure with a
+	 *            MissingObjectException. This may be more expensive for the
+	 *            implementation to guarantee. If false the implementation may
+	 *            choose to report MissingObjectException, or silently skip over
+	 *            the object with no warning.
+	 * @return queue to read the objects from.
+	 */
+	public <T extends ObjectId> AsyncObjectLoaderQueue<T> open(
+			Iterable<T> objectIds, final boolean reportMissing) {
+		final Iterator<T> idItr = objectIds.iterator();
+		return new AsyncObjectLoaderQueue<T>() {
+			private T cur;
+
+			public boolean next() throws MissingObjectException, IOException {
+				if (idItr.hasNext()) {
+					cur = idItr.next();
+					return true;
+				} else {
+					return false;
+				}
+			}
+
+			public T getCurrent() {
+				return cur;
+			}
+
+			public ObjectId getObjectId() {
+				return cur;
+			}
+
+			public ObjectLoader open() throws IOException {
+				return ObjectReader.this.open(cur, OBJ_ANY);
+			}
+
+			public boolean cancel(boolean mayInterruptIfRunning) {
+				return true;
+			}
+
+			public void release() {
+				// Since we are sequential by default, we don't
+				// have any state to clean up if we terminate early.
+			}
+		};
+	}
+
+	/**
 	 * Get only the size of an object.
 	 * <p>
 	 * The default implementation of this method opens an ObjectLoader.
@@ -171,6 +230,101 @@ public abstract class ObjectReader {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		return open(objectId, typeHint).getSize();
+	}
+
+	/**
+	 * Asynchronous object size lookup.
+	 *
+	 * @param <T>
+	 *            type of identifier being supplied.
+	 * @param objectIds
+	 *            objects to get the size of from the object store. The supplied
+	 *            collection must not be modified until the queue has finished.
+	 * @param reportMissing
+	 *            if true missing objects are reported by calling failure with a
+	 *            MissingObjectException. This may be more expensive for the
+	 *            implementation to guarantee. If false the implementation may
+	 *            choose to report MissingObjectException, or silently skip over
+	 *            the object with no warning.
+	 * @return queue to read object sizes from.
+	 */
+	public <T extends ObjectId> AsyncObjectSizeQueue<T> getObjectSize(
+			Iterable<T> objectIds, final boolean reportMissing) {
+		final Iterator<T> idItr = objectIds.iterator();
+		return new AsyncObjectSizeQueue<T>() {
+			private T cur;
+
+			private long sz;
+
+			public boolean next() throws MissingObjectException, IOException {
+				if (idItr.hasNext()) {
+					cur = idItr.next();
+					sz = getObjectSize(cur, OBJ_ANY);
+					return true;
+				} else {
+					return false;
+				}
+			}
+
+			public T getCurrent() {
+				return cur;
+			}
+
+			public ObjectId getObjectId() {
+				return cur;
+			}
+
+			public long getSize() {
+				return sz;
+			}
+
+			public boolean cancel(boolean mayInterruptIfRunning) {
+				return true;
+			}
+
+			public void release() {
+				// Since we are sequential by default, we don't
+				// have any state to clean up if we terminate early.
+			}
+		};
+	}
+
+	/**
+	 * Advice from a {@link RevWalk} that a walk is starting from these roots.
+	 *
+	 * @param walk
+	 *            the revision pool that is using this reader.
+	 * @param roots
+	 *            starting points of the revision walk. The starting points have
+	 *            their headers parsed, but might be missing bodies.
+	 * @throws IOException
+	 *             the reader cannot initialize itself to support the walk.
+	 */
+	public void walkAdviceBeginCommits(RevWalk walk, Collection<RevCommit> roots)
+			throws IOException {
+		// Do nothing by default, most readers don't want or need advice.
+	}
+
+	/**
+	 * Advice from an {@link ObjectWalk} that trees will be traversed.
+	 *
+	 * @param ow
+	 *            the object pool that is using this reader.
+	 * @param min
+	 *            the first commit whose root tree will be read.
+	 * @param max
+	 *            the last commit whose root tree will be read.
+	 * @throws IOException
+	 *             the reader cannot initialize itself to support the walk.
+	 */
+	public void walkAdviceBeginTrees(ObjectWalk ow, RevCommit min, RevCommit max)
+			throws IOException {
+		// Do nothing by default, most readers don't want or need advice.
+	}
+
+	/** Advice from that a walk is over. */
+	public void walkAdviceEnd() {
+		// Do nothing by default, most readers don't want or need advice.
 	}
 
 	/**
