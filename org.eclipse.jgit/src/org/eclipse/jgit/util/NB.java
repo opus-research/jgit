@@ -122,6 +122,7 @@ public final class NB {
 	 *            position and the next 2 bytes after it (for a total of 3
 	 *            bytes) will be read.
 	 * @return signed integer value that matches the 24 bits read.
+	 * @since 4.9
 	 */
 	public static int decodeUInt24(byte[] intbuf, int offset) {
 		int r = intbuf[offset] << 8;
@@ -250,6 +251,7 @@ public final class NB {
 	 *            replaced.
 	 * @param v
 	 *            the value to write.
+	 * @since 4.9
 	 */
 	public static void encodeInt24(byte[] intbuf, int offset, int v) {
 		intbuf[offset + 2] = (byte) v;
