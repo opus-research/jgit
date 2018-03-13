@@ -27,8 +27,8 @@ public class PathFilterGroupTest {
 	public void setup() {
 		// @formatter:off
 		String[] paths = new String[] {
-				"/a",
-				"/a/b",
+				"/a", // never match
+				"/a/b", // never match
 				"a",
 				"b/c",
 				"c/d/e",
@@ -94,13 +94,29 @@ public class PathFilterGroupTest {
 	@Test
 	public void testStopWalk() throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
+		// Obvious
 		filter.include(fakeWalk("d/e/f/f"));
+
+		// Obvious
 		try {
 			filter.include(fakeWalk("de"));
 			fail("StopWalkException expected");
 		} catch (StopWalkException e) {
 			// good
 		}
+
+		// less obvious due to git sorting order
+		filter.include(fakeWalk("d."));
+
+		// less obvious due to git sorting order
+		try {
+			filter.include(fakeWalk("d0"));
+			fail("StopWalkException expected");
+		} catch (StopWalkException e) {
+			// good
+		}
+
+		// non-ascii
 		try {
 			filter.include(fakeWalk("\u00C0"));
 			fail("StopWalkException expected");
