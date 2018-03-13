@@ -576,7 +576,7 @@ public class WalkEncryptionTest {
 						.forName("javax.crypto.JceSecurity")
 						.getDeclaredField("isRestricted");
 				isRestricted.setAccessible(true);
-				isRestricted.set(null, Boolean.valueOf(restrictedOn));
+				isRestricted.set(null, new Boolean(restrictedOn));
 			} catch (Throwable e) {
 				logger.info(
 						"Could not setup JCE security policy restrictions.");

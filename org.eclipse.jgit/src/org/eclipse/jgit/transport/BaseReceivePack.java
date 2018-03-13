@@ -46,9 +46,9 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
+import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
@@ -69,7 +69,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -252,6 +251,18 @@ public abstract class BaseReceivePack {
 
 	private boolean quiet;
 
+	/**
+	 * A list of option strings associated with a push.
+	 * @since 4.5
+	 */
+	protected List<String> pushOptions;
+
+	/**
+	 * Whether the client intends to use push options.
+	 * @since 4.5
+	 */
+	protected boolean usePushOptions;
+
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
 
@@ -269,7 +280,6 @@ public abstract class BaseReceivePack {
 	private PushCertificateParser pushCertificateParser;
 	private SignedPushConfig signedPushConfig;
 	private PushCertificate pushCert;
-	private ReceivedPackStatistics stats;
 
 	/**
 	 * Get the push certificate used to verify the pusher's identity.
@@ -771,7 +781,8 @@ public abstract class BaseReceivePack {
 	 *             read.
 	 */
 	public boolean isSideBand() throws RequestNotYetReadException {
-		checkRequestWasRead();
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
@@ -798,7 +809,7 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * @return true if the server supports receiving push options.
+	 * @return true if the server supports the receiving of push options.
 	 * @since 4.5
 	 */
 	public boolean isAllowPushOptions() {
@@ -806,10 +817,10 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Configure if the server supports receiving push options.
+	 * Configure if the server supports the receiving of push options.
 	 *
 	 * @param allow
-	 *            true to optionally accept option strings from the client.
+	 *            true to permit option strings.
 	 * @since 4.5
 	 */
 	public void setAllowPushOptions(boolean allow) {
@@ -828,8 +839,27 @@ public abstract class BaseReceivePack {
 	 * @since 4.0
 	 */
 	public boolean isQuiet() throws RequestNotYetReadException {
-		checkRequestWasRead();
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 		return quiet;
+	}
+
+	/**
+	 * Gets the list of string options associated with this push.
+	 *
+	 * @return pushOptions
+	 * @throws RequestNotYetReadException
+	 *             if the client's request has not yet been read from the wire,
+	 *             so we do not know if they expect push options. Note that the
+	 *             client may have already written the request, it just has not
+	 *             been read.
+	 * @since 4.5
+	 */
+	public List<String> getPushOptions() throws RequestNotYetReadException {
+		if (enabledCapabilities == null) {
+			throw new RequestNotYetReadException();
+		}
+		return Collections.unmodifiableList(pushOptions);
 	}
 
 	/**
@@ -1106,6 +1136,7 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		if (allowPushOptions) {
 			adv.advertiseCapability(CAPABILITY_PUSH_OPTIONS);
+			pushOptions = new ArrayList<>();
 		}
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -1114,18 +1145,6 @@ public abstract class BaseReceivePack {
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
-	}
-
-	/**
-	 * Returns the statistics on the received pack if available. This should be
-	 * called after {@link #receivePack} is called.
-	 *
-	 * @return ReceivedPackStatistics
-	 * @since 4.6
-	 */
-	@Nullable
-	public ReceivedPackStatistics getReceivedPackStatistics() {
-		return stats;
 	}
 
 	/**
@@ -1185,9 +1204,6 @@ public abstract class BaseReceivePack {
 				}
 			}
 			pushCert = certParser.build();
-			if (hasCommands()) {
-				readPostCommands(pckIn);
-			}
 		} catch (PackProtocolException e) {
 			if (sideBand) {
 				try {
@@ -1234,20 +1250,12 @@ public abstract class BaseReceivePack {
 		return new ReceiveCommand(oldId, newId, name);
 	}
 
-	/**
-	 * @param in
-	 *            request stream.
-	 * @throws IOException
-	 *             request line cannot be read.
-	 */
-	void readPostCommands(PacketLineIn in) throws IOException {
-		// Do nothing by default.
-	}
-
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
 		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
+		usePushOptions = allowPushOptions
+				&& isCapabilityEnabled(CAPABILITY_PUSH_OPTIONS);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -1261,6 +1269,17 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
+	 * Sets the client's intention regarding push options.
+	 *
+	 * @param usePushOptions
+	 *            whether the client intends to use push options
+	 * @since 4.5
+	 */
+	public void setUsePushOptions(boolean usePushOptions) {
+		this.usePushOptions = usePushOptions;
+	}
+
+	/**
 	 * Check if the peer requested a capability.
 	 *
 	 * @param name
@@ -1269,11 +1288,6 @@ public abstract class BaseReceivePack {
 	 */
 	protected boolean isCapabilityEnabled(String name) {
 		return enabledCapabilities.contains(name);
-	}
-
-	void checkRequestWasRead() {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */
@@ -1321,7 +1335,6 @@ public abstract class BaseReceivePack {
 			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
 			packLock = parser.parse(receiving, resolving);
 			packSize = Long.valueOf(parser.getPackSize());
-			stats = parser.getReceivedPackStatistics();
 			ins.flush();
 		}
 

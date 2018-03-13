@@ -175,14 +175,13 @@ public final class DfsBlockCache {
 	/** Number of bytes currently loaded in the cache. */
 	private volatile long liveBytes;
 
-	@SuppressWarnings("unchecked")
 	private DfsBlockCache(final DfsBlockCacheConfig cfg) {
 		tableSize = tableSize(cfg);
 		if (tableSize < 1)
 			throw new IllegalArgumentException(JGitText.get().tSizeMustBeGreaterOrEqual1);
 
 		table = new AtomicReferenceArray<HashEntry>(tableSize);
-		loadLocks = new ReentrantLock[cfg.getConcurrencyLevel()];
+		loadLocks = new ReentrantLock[32];
 		for (int i = 0; i < loadLocks.length; i++)
 			loadLocks[i] = new ReentrantLock(true /* fair */);
 
@@ -417,7 +416,6 @@ public final class DfsBlockCache {
 		clockLock.unlock();
 	}
 
-	@SuppressWarnings("unchecked")
 	private void addToClock(Ref ref, int credit) {
 		clockLock.lock();
 		try {
