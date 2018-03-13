@@ -50,7 +50,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -148,9 +147,12 @@ public abstract class FS {
 				System.out.println("Found Java7");
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
-				System.out.println("Java7 not found");
+				System.out.println("Java7 module not found");
 				factory = new FS.FSFactory();
 				// Silently ignore failure find Java7 FS factory
+			} catch (UnsupportedClassVersionError e) {
+				System.out.println("Java7 module not accessible");
+				factory = new FS.FSFactory();
 			} catch (Exception e) {
 				factory = new FS.FSFactory();
 				throw new Error(e);
@@ -275,19 +277,6 @@ public abstract class FS {
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
-	}
-
-	/**
-	 * Delete a file. Throws an exception if delete fails.
-	 * 
-	 * @param f
-	 * @throws IOException
-	 *             , this may be a Java7 subclass with detailed information
-	 */
-	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
