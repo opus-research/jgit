@@ -50,7 +50,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NotSupportedException;
@@ -114,7 +113,7 @@ public class PushCommand extends
 	 *             exception can be retrieved by calling
 	 *             {@link Exception#getCause()}.
 	 */
-	public Iterable<PushResult> call() throws GitAPIException, JGitInternalException,
+	public Iterable<PushResult> call() throws JGitInternalException,
 			InvalidRemoteException {
 		checkCallable();
 
