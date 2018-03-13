@@ -114,63 +114,47 @@ public abstract class DfsOutputStream extends OutputStream {
 
 	private static class ReadBackStream extends InputStream {
 		private final DfsOutputStream os;
-		private ByteBuffer buf;
+		private final ByteBuffer buf;
 		private long position;
 
 		private ReadBackStream(DfsOutputStream os, long position) {
 			this.os = os;
+			int bs = os.blockSize();
 			this.position = position;
-		}
-
-		private void prepare() throws IOException {
-			if (buf == null) {
-				int bs = os.blockSize();
-				buf = ByteBuffer.allocate(bs > 0 ? bs : 8192);
-				os.read(position, buf);
-				buf.flip();
-			}
+			buf = ByteBuffer.allocate(bs > 0 ? bs : 8192);
+			buf.position(buf.capacity());
 		}
 
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException {
-			prepare();
-			int p = off;
-			int n = 0;
-			while (true) {
-				if (len <= buf.remaining()) {
-					buf.get(b, off, len);
-					return n + len;
+			int cnt = 0;
+			while (0 < len) {
+				if (!buf.hasRemaining()) {
+					buf.rewind();
+					int nr = os.read(position, buf);
+					if (nr < 0) {
+						buf.position(buf.remaining());
+						break;
+					}
+					position += nr;
+					buf.flip();
 				}
-				int r = buf.remaining();
-				buf.get(b, p, r);
-				n += r;
-				p += r;
-				buf.rewind();
-				position += buf.capacity();
-				int nr = os.read(position, buf);
-				if (nr < 0) {
-					buf.limit(0);
-					return n > 0 ? n : -1;
-				}
-				buf.flip();
+				int n = Math.min(len, buf.remaining());
+				buf.get(b, off, n);
+				off += n;
+				len -= n;
+				cnt += n;
 			}
+			if (cnt == 0 && len > 0)
+				return -1;
+			return cnt;
 		}
 
 		@Override
 		public int read() throws IOException {
-			prepare();
-			if (buf.remaining() > 0) {
-				return buf.get();
-			}
-			buf.rewind();
-			position += buf.capacity();
-			int nr = os.read(position, buf);
-			if (nr < 0) {
-				buf.limit(0);
-				return -1;
-			}
-			buf.flip();
-			return buf.get();
+			byte[] b = new byte[1];
+			int n = read(b);
+			return n == 1 ? b[0] & 0xff : -1;
 		}
 	}
 }
