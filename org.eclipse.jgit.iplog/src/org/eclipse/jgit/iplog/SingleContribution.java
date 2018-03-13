@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,47 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.pack;
+package org.eclipse.jgit.iplog;
 
-/** A pack file extension. */
-public class PackExt {
+import java.util.Comparator;
+import java.util.Date;
 
-	/** A pack file extension. */
-	public static final PackExt PACK = new PackExt("pack"); //$NON-NLS-1$
+/** A single contribution by a {@link Contributor}. */
+class SingleContribution {
+	/** Sorts contributors by their name first name, then last name. */
+	public static final Comparator<SingleContribution> COMPARATOR = new Comparator<SingleContribution>() {
+		public int compare(SingleContribution a, SingleContribution b) {
+			return a.created.compareTo(b.created);
+		}
+	};
 
-	/** A pack index file extension. */
-	public static final PackExt INDEX = new PackExt("idx"); //$NON-NLS-1$
+	private final String id;
 
-	private final String ext;
+	private String summary;
+
+	private Date created;
+
+	private String size;
 
 	/**
-	 * @param ext
-	 *            the file extension.
+	 * @param id
+	 * @param created
+	 * @param summary
 	 */
-	public PackExt(String ext) {
-		this.ext = ext;
+	SingleContribution(String id, Date created, String summary) {
+		this.id = id;
+		this.summary = summary;
+		this.created = created;
 	}
 
-	/** @return the file extension. */
-	public String getExtension() {
-		return ext;
+	/** @return unique identity of the contribution. */
+	String getID() {
+		return id;
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		if (obj instanceof PackExt) {
-			return ((PackExt) obj).getExtension().equals(getExtension());
-		}
-		return false;
+	/** @return date the contribution was created. */
+	Date getCreated() {
+		return created;
 	}
 
-	@Override
-	public int hashCode() {
-		return getExtension().hashCode();
+	/** @return summary of the contribution. */
+	String getSummary() {
+		return summary;
 	}
 
-	@Override
-	public String toString() {
-		return String.format("PackExt[%s]", getExtension()); //$NON-NLS-1$
+	String getSize() {
+		return size;
+	}
+
+	void setSize(String sz) {
+		size = sz;
 	}
 }

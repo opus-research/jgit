@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008-2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,33 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.pgm.eclipse;
 
 import java.io.File;
+import java.net.Authenticator;
+import java.net.CookieHandler;
+import java.net.PasswordAuthentication;
+import java.net.URL;
 
+import org.eclipse.jgit.iplog.IpLogMeta;
+import org.eclipse.jgit.iplog.SimpleCookieManager;
+import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.kohsuke.args4j.Option;
 
-/** Test case which includes C Git generated pack files for testing. */
-public abstract class SampleDataRepositoryTestCase extends RepositoryTestCase {
+@Command(name = "eclipse-ipzilla", common = false, usage = "usage_synchronizeIPZillaData")
+class Ipzilla extends TextBuiltin {
+	@Option(name = "--url", metaVar = "metaVar_url", usage = "usage_IPZillaURL")
+	private String url = "https://dev.eclipse.org/ipzilla/"; //$NON-NLS-1$
+
+	@Option(name = "--username", metaVar = "metaVar_user", usage = "usage_IPZillaUsername")
+	private String username;
+
+	@Option(name = "--password", metaVar = "metaVar_pass", usage = "usage_IPZillaPassword")
+	private String password;
+
+	@Option(name = "--file", aliases = { "-f" }, metaVar = "metaVar_file", usage = "usage_inputOutputFile")
+	private File output;
+
 	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+	protected void run() throws Exception {
+		if (CookieHandler.getDefault() == null)
+			CookieHandler.setDefault(new SimpleCookieManager());
 
-		final String[] packs = {
-				"pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f",
-				"pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371",
-				"pack-9fb5b411fe6dfa89cc2e6b89d2bd8e5de02b5745",
-				"pack-546ff360fe3488adb20860ce3436a2d6373d2796",
-				"pack-cbdeda40019ae0e6e789088ea0f51f164f489d14",
-				"pack-e6d07037cbcf13376308a0a995d1fa48f8f76aaa",
-				"pack-3280af9c07ee18a87705ef50b0cc4cd20266cf12"
-		};
-		final File packDir = new File(db.getObjectDatabase().getDirectory(), "pack");
-		for (String n : packs) {
-			copyFile(JGitTestUtil.getTestResourceFile(n + ".pack"), new File(packDir, n + ".pack"));
-			copyFile(JGitTestUtil.getTestResourceFile(n + ".idx"), new File(packDir, n + ".idx"));
+		final URL ipzilla = new URL(url);
+		if (username == null) {
+			final PasswordAuthentication auth = Authenticator
+					.requestPasswordAuthentication(ipzilla.getHost(), //
+							null, //
+							ipzilla.getPort(), //
+							ipzilla.getProtocol(), //
+							CLIText.get().IPZillaPasswordPrompt, //
+							ipzilla.getProtocol(), //
+							ipzilla, //
+							Authenticator.RequestorType.SERVER);
+			username = auth.getUserName();
+			password = new String(auth.getPassword());
 		}
 
-		copyFile(JGitTestUtil.getTestResourceFile("packed-refs"), new File(db
-				.getDirectory(), "packed-refs"));
+		if (output == null)
+			output = new File(db.getWorkTree(), IpLogMeta.IPLOG_CONFIG_FILE);
+
+		IpLogMeta meta = new IpLogMeta();
+		meta.syncCQs(output, db.getFS(), ipzilla, username, password);
 	}
 }

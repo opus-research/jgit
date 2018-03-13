@@ -327,18 +327,28 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *
 	 * @param pack
 	 *            path of the pack file to open.
+	 * @param idx
+	 *            path of the corresponding index file.
 	 * @return the pack that was opened and added to the database.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public PackFile openPack(final File pack)
+	public PackFile openPack(final File pack, final File idx)
 			throws IOException {
 		final String p = pack.getName();
+		final String i = idx.getName();
+
 		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
 
-		PackFile res = new PackFile(pack);
+		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx")) //$NON-NLS-1$
+			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, idx));
+
+		if (!p.substring(0, 45).equals(i.substring(0, 45)))
+			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
+
+		PackFile res = new PackFile(idx, pack);
 		insertPack(res);
 		return res;
 	}
@@ -577,7 +587,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
-		FileUtils.mkdir(dst.getParentFile(), true);
+		FileUtils.mkdir(dst.getParentFile());
 		if (tmp.renameTo(dst)) {
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
@@ -737,7 +747,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 
 			final File packFile = new File(packDirectory, packName);
-			list.add(new PackFile(packFile));
+			final File idxFile = new File(packDirectory, indexName);
+			list.add(new PackFile(idxFile, packFile));
 			foundNew = true;
 		}
 

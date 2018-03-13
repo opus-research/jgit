@@ -70,7 +70,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -84,7 +83,6 @@ import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.storage.pack.PackWriter.ObjectIdSet;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
@@ -500,10 +498,10 @@ public class GC {
 				tagTargets.add(ref.getPeeledObjectId());
 		}
 
-		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
-		for (final PackFile f : repo.getObjectDatabase().getPacks())
+		List<PackIndex> excluded = new LinkedList<PackIndex>();
+		for (PackFile f : repo.getObjectDatabase().getPacks())
 			if (f.shouldBeKept())
-				excluded.add(objectIdSet(f.getIndex()));
+				excluded.add(f.getIndex());
 
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
@@ -515,7 +513,7 @@ public class GC {
 					tagTargets, excluded);
 			if (heads != null) {
 				ret.add(heads);
-				excluded.add(0, objectIdSet(heads.getIndex()));
+				excluded.add(0, heads.getIndex());
 			}
 		}
 		if (!nonHeads.isEmpty()) {
@@ -634,7 +632,7 @@ public class GC {
 
 	private PackFile writePack(Set<? extends ObjectId> want,
 			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
-			List<ObjectIdSet> excludeObjects) throws IOException {
+			List<PackIndex> excludeObjects) throws IOException {
 		File tmpPack = null;
 		File tmpIdx = null;
 		PackWriter pw = new PackWriter(repo);
@@ -645,7 +643,7 @@ public class GC {
 			if (tagTargets != null)
 				pw.setTagTargets(tagTargets);
 			if (excludeObjects != null)
-				for (ObjectIdSet idx : excludeObjects)
+				for (PackIndex idx : excludeObjects)
 					pw.excludeObjects(idx);
 			pw.preparePack(pm, want, have);
 			if (pw.getObjectCount() == 0)
@@ -712,7 +710,7 @@ public class GC {
 				if (delete && tmpIdx.exists())
 					tmpIdx.delete();
 			}
-			return repo.getObjectDatabase().openPack(realPack);
+			return repo.getObjectDatabase().openPack(realPack, realIdx);
 		} finally {
 			pw.release();
 			if (tmpPack != null && tmpPack.exists())
@@ -857,11 +855,4 @@ public class GC {
 		expireAgeMillis = -1;
 	}
 
-	private static ObjectIdSet objectIdSet(final PackIndex idx) {
-		return new ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return idx.hasObject(objectId);
-			}
-		};
-	}
 }

@@ -47,7 +47,6 @@ package org.eclipse.jgit.storage.dfs;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
-import static org.eclipse.jgit.storage.pack.PackExt.PACK;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -662,7 +661,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				pack.setInvalid();
 				throw new IOException(MessageFormat.format(
 						JGitText.get().packfileCorruptionDetected,
-						pack.getPackDescription().getFileName(PACK)));
+						pack.getPackDescription().getPackName()));
 			}
 		}
 	}

@@ -252,8 +252,8 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	PackFile openPack(File pack) throws IOException {
-		return wrapped.openPack(pack);
+	PackFile openPack(File pack, File idx) throws IOException {
+		return wrapped.openPack(pack, idx);
 	}
 
 	@Override
