@@ -55,7 +55,6 @@ import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.lfs.errors.CorruptMediaFile;
 import org.eclipse.jgit.lfs.internal.AtomicObjectOutputStream;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FileUtils;
 
@@ -74,8 +73,6 @@ import org.eclipse.jgit.util.FileUtils;
  * @since 4.6
  */
 public class CleanFilter extends FilterCommand {
-	private static final String LFS_FILTER_EXTERNAL_CLEAN_ALIAS = "git-lfs clean -- %f"; //$NON-NLS-1$
-
 	/**
 	 * The factory is responsible for creating instances of {@link CleanFilter}
 	 */
@@ -93,12 +90,9 @@ public class CleanFilter extends FilterCommand {
 	 * {@link FilterCommandRegistry#register(String, FilterCommandFactory)}
 	 */
 	public final static void register() {
-		FilterCommandRegistry
-				.register(org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
-						+ Constants.ATTR_FILTER_DRIVER_PREFIX
-						+ Constants.ATTR_FILTER_TYPE_CLEAN, FACTORY);
-
-		FilterCommandRegistry.register(LFS_FILTER_EXTERNAL_CLEAN_ALIAS,
+		FilterCommandRegistry.register(
+				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
+						+ "lfs/clean", //$NON-NLS-1$
 				FACTORY);
 	}
 
@@ -130,7 +124,7 @@ public class CleanFilter extends FilterCommand {
 	public CleanFilter(Repository db, InputStream in, OutputStream out)
 			throws IOException {
 		super(in, out);
-		lfsUtil = new Lfs(db);
+		lfsUtil = new Lfs(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
 		Files.createDirectories(lfsUtil.getLfsTmpDir());
 		tmpFile = lfsUtil.createTmpFile();
 		this.aOut = new AtomicObjectOutputStream(tmpFile.toAbsolutePath());
