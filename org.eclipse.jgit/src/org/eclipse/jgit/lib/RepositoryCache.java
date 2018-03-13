@@ -305,9 +305,11 @@ public class RepositoryCache {
 	private void unregisterAndCloseRepository(final Key location,
 			Repository db) {
 		synchronized (lockFor(location)) {
-			Repository oldDb = unregisterRepository(location);
-			if (oldDb != null) {
-				oldDb.doClose();
+			if (isExpired(db)) {
+				Repository oldDb = unregisterRepository(location);
+				if (oldDb != null) {
+					oldDb.close();
+				}
 			}
 		}
 	}
