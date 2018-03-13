@@ -54,6 +54,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
@@ -112,7 +113,7 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	public ObjectDirectoryInserter newInserter() {
+	public ObjectInserter newInserter() {
 		return wrapped.newInserter();
 	}
 
@@ -210,11 +211,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 			throws IOException {
 		// This method should never be invoked.
 		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	boolean insertUnpackedObject(File tmp, ObjectId objectId) {
-		return wrapped.insertUnpackedObject(tmp, objectId);
 	}
 
 	@Override
