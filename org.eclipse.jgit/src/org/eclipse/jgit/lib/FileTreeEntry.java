@@ -1,6 +1,4 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -44,65 +42,74 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
 
 /**
- * Exception thrown when an object cannot be read from Git.
+ * A representation of a file (blob) object in a {@link Tree}.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
  */
-public class CorruptObjectException extends IOException {
-	private static final long serialVersionUID = 1L;
+@Deprecated
+public class FileTreeEntry extends TreeEntry {
+	private FileMode mode;
 
 	/**
-	 * Construct a CorruptObjectException for reporting a problem specified
-	 * object id
+	 * Constructor for a File (blob) object.
 	 *
+	 * @param parent
+	 *            The {@link Tree} holding this object (or null)
 	 * @param id
-	 * @param why
+	 *            the SHA-1 of the blob (or null for a yet unhashed file)
+	 * @param nameUTF8
+	 *            raw object name in the parent tree
+	 * @param execute
+	 *            true if the executable flag is set
 	 */
-	public CorruptObjectException(final AnyObjectId id, final String why) {
-		this(id.toObjectId(), why);
+	public FileTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8, final boolean execute) {
+		super(parent, id, nameUTF8);
+		setExecutable(execute);
+	}
+
+	public FileMode getMode() {
+		return mode;
 	}
 
 	/**
-	 * Construct a CorruptObjectException for reporting a problem specified
-	 * object id
-	 *
-	 * @param id
-	 * @param why
+	 * @return true if this file is executable
 	 */
-	public CorruptObjectException(final ObjectId id, final String why) {
-		super(MessageFormat.format(JGitText.get().objectIsCorrupt, id.name(), why));
+	public boolean isExecutable() {
+		return getMode().equals(FileMode.EXECUTABLE_FILE);
 	}
 
 	/**
-	 * Construct a CorruptObjectException for reporting a problem not associated
-	 * with a specific object id.
-	 *
-	 * @param why
+	 * @param execute set/reset the executable flag
 	 */
-	public CorruptObjectException(final String why) {
-		super(why);
+	public void setExecutable(final boolean execute) {
+		mode = execute ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
 	}
 
 	/**
-	 * Construct a CorruptObjectException for reporting a problem not associated
-	 * with a specific object id.
-	 *
-	 * @param why
-	 *            message describing the corruption.
-	 * @param cause
-	 *            optional root cause exception
-	 * @since 3.4
+	 * @return an {@link ObjectLoader} that will return the data
+	 * @throws IOException
 	 */
-	public CorruptObjectException(String why, Throwable cause) {
-		super(why);
-		initCause(cause);
+	public ObjectLoader openReader() throws IOException {
+		return getRepository().open(getId(), Constants.OBJ_BLOB);
+	}
+
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(' ');
+		r.append(isExecutable() ? 'X' : 'F');
+		r.append(' ');
+		r.append(getFullName());
+		return r.toString();
 	}
 }

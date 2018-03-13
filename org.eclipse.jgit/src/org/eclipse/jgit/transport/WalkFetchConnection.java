@@ -637,11 +637,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final byte[] raw = uol.getCachedBytes();
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, raw);
+				objCheck.check(type, raw);
 			} catch (CorruptObjectException e) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().transportExceptionInvalid,
-						Constants.typeString(type), id.name(), e.getMessage()));
+				throw new TransportException(MessageFormat.format(JGitText.get().transportExceptionInvalid
+						, Constants.typeString(type), id.name(), e.getMessage()));
 			}
 		}
 
