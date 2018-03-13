@@ -82,8 +82,6 @@ class SwingCommitList extends PlotCommitList<SwingCommitList.SwingLane> {
 	}
 
 	static class SwingLane extends PlotLane {
-		private static final long serialVersionUID = 1L;
-
 		Color color;
 	}
 }
