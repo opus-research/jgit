@@ -49,7 +49,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
@@ -112,7 +111,7 @@ class PackIndexV2 extends PackIndex {
 
 			final long nameLen = bucketCnt * Constants.OBJECT_ID_LENGTH;
 			if (nameLen > Integer.MAX_VALUE)
-				throw new IOException(JGitText.get().indexFileIsTooLargeForJgit);
+				throw new IOException("Index file is too large for jgit");
 
 			final int intNameLen = (int) nameLen;
 			final byte[] raw = new byte[intNameLen];

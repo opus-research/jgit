@@ -57,7 +57,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.text.MessageFormat;
 import java.util.Enumeration;
 
 import javax.servlet.http.HttpServletRequest;
@@ -101,7 +100,7 @@ final class FileSender {
 			}
 
 			final FileNotFoundException r;
-			r = new FileNotFoundException(MessageFormat.format(HttpServerText.get().cannotGetLengthOf, path));
+			r = new FileNotFoundException("Cannot get length of " + path);
 			r.initCause(e);
 			throw r;
 		}
@@ -144,7 +143,7 @@ final class FileSender {
 					final int r = (int) Math.min(buf.length, end - pos);
 					final int n = source.read(buf, 0, r);
 					if (n < 0) {
-						throw new EOFException(MessageFormat.format(HttpServerText.get().unexpectedeOFOn, path));
+						throw new EOFException("Unexpected EOF on " + path);
 					}
 					out.write(buf, 0, n);
 					pos += n;

@@ -50,11 +50,9 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -375,7 +373,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b = enc.encode(CharBuffer.wrap(getName()));
 			} catch (CharacterCodingException e) {
 				// This should so never happen.
-				throw new RuntimeException(MessageFormat.format(JGitText.get().unencodeableFile, getName()));
+				throw new RuntimeException("Unencodeable file: " + getName());
 			}
 
 			encodedNameLen = b.limit();

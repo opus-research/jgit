@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.patch.FileHeader;
 
 /**
@@ -76,7 +75,7 @@ public class DiffFormatter {
 	 */
 	public void setContext(final int lineCount) {
 		if (lineCount < 0)
-			throw new IllegalArgumentException(JGitText.get().contextMustBeNonNegative);
+			throw new IllegalArgumentException("context must be >= 0");
 		context = lineCount;
 	}
 

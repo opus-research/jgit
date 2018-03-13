@@ -3,7 +3,6 @@
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,8 +46,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.PrintWriter;
-
 import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -58,7 +55,7 @@ import org.eclipse.jgit.transport.TrackingRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 
 abstract class AbstractFetchCommand extends TextBuiltin {
-	@Option(name = "--verbose", aliases = { "-v" }, usage = "usage_beMoreVerbose")
+	@Option(name = "--verbose", aliases = { "-v" }, usage = "be more verbose")
 	private boolean verbose;
 
 	protected void showFetchResult(final Transport tn, final FetchResult r) {
@@ -73,7 +70,8 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			final String dst = abbreviateRef(u.getLocalName(), true);
 
 			if (!shownURI) {
-				out.format(CLIText.get().fromURI, tn.getURI());
+				out.print("From ");
+				out.print(tn.getURI());
 				out.println();
 				shownURI = true;
 			}
@@ -86,7 +84,6 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 	}
 
 	static void showRemoteMessages(String pkt) {
-		PrintWriter writer = new PrintWriter(System.err);
 		while (0 < pkt.length()) {
 			final int lf = pkt.indexOf('\n');
 			final int cr = pkt.indexOf('\r');
@@ -98,21 +95,18 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			else if (0 <= cr)
 				s = cr;
 			else {
-				writer.format(CLIText.get().remoteMessage, pkt);
-				writer.println();
+				System.err.println("remote: " + pkt);
 				break;
 			}
 
 			if (pkt.charAt(s) == '\r')
-				writer.format(CLIText.get().remoteMessage, pkt.substring(0, s) + "\r");
-			else {
-				writer.format(CLIText.get().remoteMessage, pkt.substring(0, s));
-				writer.println();
-			}
+				System.err.print("remote: " + pkt.substring(0, s) + "\r");
+			else
+				System.err.println("remote: " + pkt.substring(0, s));
 
 			pkt = pkt.substring(s + 1);
 		}
-		writer.flush();
+		System.err.flush();
 	}
 
 	private String longTypeOf(final TrackingRefUpdate u) {

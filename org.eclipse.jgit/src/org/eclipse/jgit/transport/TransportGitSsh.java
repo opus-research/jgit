@@ -51,9 +51,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
@@ -174,8 +172,8 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			IOException cause = null;
 			if (why != null && why.length() > 0)
 				cause = new IOException(why);
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().cannotExecute, commandFor(exe)), cause);
+			throw new TransportException(uri, "cannot execute: "
+					+ commandFor(exe), cause);
 		}
 	}
 
@@ -234,7 +232,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	class SshFetchConnection extends BasePackFetchConnection {
 		private ChannelExec channel;
 
-		private Thread errorThread;
+		private StreamCopyThread errorThread;
 
 		private int exitStatus;
 
@@ -259,7 +257,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 
 			try {
@@ -277,7 +275,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 			if (errorThread != null) {
 				try {
-					errorThread.join();
+					errorThread.halt();
 				} catch (InterruptedException e) {
 					// Stop waiting and return anyway.
 				} finally {
@@ -302,7 +300,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	class SshPushConnection extends BasePackPushConnection {
 		private ChannelExec channel;
 
-		private Thread errorThread;
+		private StreamCopyThread errorThread;
 
 		private int exitStatus;
 
@@ -327,7 +325,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 
 			try {
@@ -345,7 +343,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 			if (errorThread != null) {
 				try {
-					errorThread.join();
+					errorThread.halt();
 				} catch (InterruptedException e) {
 					// Stop waiting and return anyway.
 				} finally {

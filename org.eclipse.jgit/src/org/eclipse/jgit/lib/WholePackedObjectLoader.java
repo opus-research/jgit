@@ -46,19 +46,17 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.zip.DataFormatException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 
 /** Reader for a non-delta (just deflated) object in a pack file. */
 class WholePackedObjectLoader extends PackedObjectLoader {
 	private static final int OBJ_COMMIT = Constants.OBJ_COMMIT;
 
-	WholePackedObjectLoader(final PackFile pr, final long dataOffset,
-			final long objectOffset, final int type, final int size) {
-		super(pr, dataOffset, objectOffset);
+	WholePackedObjectLoader(final PackFile pr, final long objectOffset,
+			final int headerSize, final int type, final int size) {
+		super(pr, objectOffset, headerSize);
 		objectType = type;
 		objectSize = size;
 	}
@@ -70,7 +68,7 @@ class WholePackedObjectLoader extends PackedObjectLoader {
 		}
 
 		if (objectType != OBJ_COMMIT) {
-			final UnpackedObjectCache.Entry cache = pack.readCache(dataOffset);
+			UnpackedObjectCache.Entry cache = pack.readCache(objectOffset);
 			if (cache != null) {
 				curs.release();
 				cachedBytes = cache.data;
@@ -79,14 +77,15 @@ class WholePackedObjectLoader extends PackedObjectLoader {
 		}
 
 		try {
-			cachedBytes = pack.decompress(dataOffset, objectSize, curs);
+			cachedBytes = pack.decompress(objectOffset + headerSize,
+					objectSize, curs);
 			curs.release();
 			if (objectType != OBJ_COMMIT)
-				pack.saveCache(dataOffset, cachedBytes, objectType);
+				pack.saveCache(objectOffset, cachedBytes, objectType);
 		} catch (DataFormatException dfe) {
 			final CorruptObjectException coe;
-			coe = new CorruptObjectException(MessageFormat.format(JGitText.get().objectAtHasBadZlibStream
-					, dataOffset, pack.getPackFile()));
+			coe = new CorruptObjectException("Object at " + objectOffset
+					+ " in " + pack.getPackFile() + " has bad zlib stream");
 			coe.initCause(dfe);
 			throw coe;
 		}

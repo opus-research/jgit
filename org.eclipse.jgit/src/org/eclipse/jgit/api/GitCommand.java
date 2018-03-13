@@ -37,10 +37,8 @@
  */
 package org.eclipse.jgit.api;
 
-import java.text.MessageFormat;
 import java.util.concurrent.Callable;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -112,8 +110,8 @@ public abstract class GitCommand<T> implements Callable<T> {
 	 */
 	protected void checkCallable() {
 		if (!callable)
-			throw new IllegalStateException(MessageFormat.format(
-					JGitText.get().commandWasCalledInTheWrongState
-					, this.getClass().getName()));
+			throw new IllegalStateException("Command "
+					+ this.getClass().getName()
+					+ " was called in the wrong state");
 	}
 }
