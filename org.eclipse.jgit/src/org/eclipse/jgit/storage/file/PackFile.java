@@ -96,8 +96,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final File packFile;
 
-	private volatile String packName;
-
 	final int hash;
 
 	private RandomAccessFile fd;
@@ -179,15 +177,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	/** @return name extracted from {@code pack-*.pack} pattern. */
 	public String getPackName() {
-		String name = packName;
-		if (name == null) {
-			name = getPackFile().getName();
-			if (name.startsWith("pack-"))
-				name = name.substring("pack-".length());
-			if (name.endsWith(".pack"))
-				name = name.substring(0, name.length() - ".pack".length());
-			packName = name;
-		}
+		String name = getPackFile().getName();
+		if (name.startsWith("pack-"))
+			name = name.substring("pack-".length());
+		if (name.endsWith(".pack"))
+			name = name.substring(0, name.length() - ".pack".length());
 		return name;
 	}
 

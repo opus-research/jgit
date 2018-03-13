@@ -317,19 +317,24 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	private void markReachable(final Set<ObjectId> have, final int maxTime)
 			throws IOException {
 		for (final Ref r : local.getAllRefs().values()) {
-			ObjectId id = r.getPeeledObjectId();
-			if (id == null)
-				id = r.getObjectId();
-			if (id == null)
-				continue;
-			parseReachable(id);
+			try {
+				final RevCommit o = walk.parseCommit(r.getObjectId());
+				o.add(REACHABLE);
+				reachableCommits.add(o);
+			} catch (IOException readError) {
+				// If we cannot read the value of the ref skip it.
+			}
 		}
 
-		for (ObjectId id : local.getAdditionalHaves())
-			parseReachable(id);
-
-		for (ObjectId id : have)
-			parseReachable(id);
+		for (final ObjectId id : have) {
+			try {
+				final RevCommit o = walk.parseCommit(id);
+				o.add(REACHABLE);
+				reachableCommits.add(o);
+			} catch (IOException readError) {
+				// If we cannot read the value of the ref skip it.
+			}
+		}
 
 		if (maxTime > 0) {
 			// Mark reachable commits until we reach maxTime. These may
@@ -353,18 +358,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					reachableCommits.add(c);
 				}
 			}
-		}
-	}
-
-	private void parseReachable(ObjectId id) {
-		try {
-			RevCommit o = walk.parseCommit(id);
-			if (!o.has(REACHABLE)) {
-				o.add(REACHABLE);
-				reachableCommits.add(o);
-			}
-		} catch (IOException readError) {
-			// If we cannot read the value of the ref skip it.
 		}
 	}
 
