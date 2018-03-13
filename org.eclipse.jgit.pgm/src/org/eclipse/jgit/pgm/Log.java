@@ -223,12 +223,12 @@ class Log extends RevWalkTextBuiltin {
 
 			super.run();
 		} finally {
-			diffFmt.release();
+			diffFmt.close();
 		}
 	}
 
 	private void addNoteMap(String notesRef) throws IOException {
-		Ref notes = db.getRef(notesRef);
+		Ref notes = db.exactRef(notesRef);
 		if (notes == null)
 			return;
 		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());
@@ -267,6 +267,7 @@ class Log extends RevWalkTextBuiltin {
 			outw.print(s);
 			outw.println();
 		}
+		c.disposeBody();
 
 		outw.println();
 		if (showNotes(c))
@@ -323,7 +324,7 @@ class Log extends RevWalkTextBuiltin {
 			return false;
 		if (emptyLine)
 			outw.println();
-		outw.print("Notes");
+		outw.print("Notes"); //$NON-NLS-1$
 		if (label != null) {
 			outw.print(" ("); //$NON-NLS-1$
 			outw.print(label);

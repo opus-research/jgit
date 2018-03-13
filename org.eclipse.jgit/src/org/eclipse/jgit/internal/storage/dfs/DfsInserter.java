@@ -69,6 +69,7 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
@@ -95,17 +96,18 @@ public class DfsInserter extends ObjectInserter {
 	/** Always produce version 2 indexes, to get CRC data. */
 	private static final int INDEX_VERSION = 2;
 
-	private final DfsObjDatabase db;
-	private int compression = Deflater.BEST_COMPRESSION;
+	final DfsObjDatabase db;
+	int compression = Deflater.BEST_COMPRESSION;
 
-	private List<PackedObjectInfo> objectList;
-	private ObjectIdOwnerMap<PackedObjectInfo> objectMap;
+	List<PackedObjectInfo> objectList;
+	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
-	private DfsBlockCache cache;
-	private DfsPackKey packKey;
-	private DfsPackDescription packDsc;
-	private PackStream packOut;
+	DfsBlockCache cache;
+	DfsPackKey packKey;
+	DfsPackDescription packDsc;
+	PackStream packOut;
 	private boolean rollback;
+	private boolean checkExisting = true;
 
 	/**
 	 * Initialize a new inserter.
@@ -115,6 +117,15 @@ public class DfsInserter extends ObjectInserter {
 	 */
 	protected DfsInserter(DfsObjDatabase db) {
 		this.db = db;
+	}
+
+	/**
+	 * @param check
+	 *            if false, will write out possibly-duplicate objects without
+	 *            first checking whether they exist in the repo; default is true.
+	 */
+	public void checkExisting(boolean check) {
+		checkExisting = check;
 	}
 
 	void setCompressionLevel(int compression) {
@@ -137,7 +148,8 @@ public class DfsInserter extends ObjectInserter {
 		ObjectId id = idFor(type, data, off, len);
 		if (objectMap != null && objectMap.contains(id))
 			return id;
-		if (db.has(id))
+		// Ignore unreachable (garbage) objects here.
+		if (checkExisting && db.has(id, true))
 			return id;
 
 		long offset = beginObject(type, len);
@@ -216,7 +228,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	public void release() {
+	public void close() {
 		if (packOut != null) {
 			try {
 				packOut.close();
@@ -300,8 +312,7 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		DfsOutputStream os = db.writeFile(pack, INDEX);
-		try {
-			CountingOutputStream cnt = new CountingOutputStream(os);
+		try (CountingOutputStream cnt = new CountingOutputStream(os)) {
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
@@ -309,7 +320,9 @@ public class DfsInserter extends ObjectInserter {
 			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
 		} finally {
-			os.close();
+			if (buf != null) {
+				buf.close();
+			}
 		}
 		return packIndex;
 	}
@@ -322,7 +335,7 @@ public class DfsInserter extends ObjectInserter {
 	private class PackStream extends OutputStream {
 		private final DfsOutputStream out;
 		private final MessageDigest md;
-		private final byte[] hdrBuf;
+		final byte[] hdrBuf;
 		private final Deflater deflater;
 		private final int blockSize;
 
@@ -473,7 +486,8 @@ public class DfsInserter extends ObjectInserter {
 			}
 		}
 
-		private int setInput(long pos, Inflater inf) throws IOException {
+		private int setInput(long pos, Inflater inf)
+				throws IOException, DataFormatException {
 			if (pos < currPos)
 				return getOrLoadBlock(pos).setInput(pos, inf);
 			if (pos < currPos + currPtr) {
@@ -558,6 +572,9 @@ public class DfsInserter extends ObjectInserter {
 			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
 				throw new IOException(MessageFormat.format(
 						DfsText.get().cannotReadBackDelta, Integer.toString(type)));
+			if (typeHint != OBJ_ANY && type != typeHint) {
+				throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
+			}
 
 			long sz = c & 0x0f;
 			int ptr = 1;
@@ -600,8 +617,13 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		@Override
-		public void release() {
-			ctx.release();
+		public ObjectInserter getCreatedFromInserter() {
+			return DfsInserter.this;
+		}
+
+		@Override
+		public void close() {
+			ctx.close();
 		}
 	}
 
@@ -631,7 +653,7 @@ public class DfsInserter extends ObjectInserter {
 					// The newly created pack is registered in the cache.
 					return ctx.open(id, type).openStream();
 				} finally {
-					ctx.release();
+					ctx.close();
 				}
 			}
 
@@ -642,7 +664,7 @@ public class DfsInserter extends ObjectInserter {
 							new ReadBackStream(pos), inf, bufsz), bufsz)) {
 				@Override
 				public void close() throws IOException {
-					ctx.release();
+					ctx.close();
 					super.close();
 				}
 			};

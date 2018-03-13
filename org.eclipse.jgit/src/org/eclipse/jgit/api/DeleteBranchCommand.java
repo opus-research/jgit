@@ -108,18 +108,21 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 			if (!force) {
 				// check if the branches to be deleted
 				// are all merged into the current branch
-				RevWalk walk = new RevWalk(repo);
-				RevCommit tip = walk.parseCommit(repo.resolve(Constants.HEAD));
-				for (String branchName : branchNames) {
-					if (branchName == null)
-						continue;
-					Ref currentRef = repo.getRef(branchName);
-					if (currentRef == null)
-						continue;
+				try (RevWalk walk = new RevWalk(repo)) {
+					RevCommit tip = walk
+							.parseCommit(repo.resolve(Constants.HEAD));
+					for (String branchName : branchNames) {
+						if (branchName == null)
+							continue;
+						Ref currentRef = repo.findRef(branchName);
+						if (currentRef == null)
+							continue;
 
-					RevCommit base = walk.parseCommit(repo.resolve(branchName));
-					if (!walk.isMergedInto(base, tip)) {
-						throw new NotMergedException();
+						RevCommit base = walk
+								.parseCommit(repo.resolve(branchName));
+						if (!walk.isMergedInto(base, tip)) {
+							throw new NotMergedException();
+						}
 					}
 				}
 			}
@@ -127,7 +130,7 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 			for (String branchName : branchNames) {
 				if (branchName == null)
 					continue;
-				Ref currentRef = repo.getRef(branchName);
+				Ref currentRef = repo.findRef(branchName);
 				if (currentRef == null)
 					continue;
 				String fullName = currentRef.getName();

@@ -108,7 +108,7 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 			Collection<Ref> refs = new ArrayList<Ref>();
 
 			// Also return HEAD if it's detached
-			Ref head = repo.getRef(Constants.HEAD);
+			Ref head = repo.exactRef(Constants.HEAD);
 			if (head != null && head.getLeaf().getName().equals(Constants.HEAD))
 				refs.add(head);
 
@@ -139,8 +139,7 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 		if (containsCommitish == null)
 			return refs;
 
-		RevWalk walk = new RevWalk(repo);
-		try {
+		try (RevWalk walk = new RevWalk(repo)) {
 			ObjectId resolved = repo.resolve(containsCommitish);
 			if (resolved == null)
 				throw new RefNotFoundException(MessageFormat.format(
@@ -149,8 +148,6 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 			RevCommit containsCommit = walk.parseCommit(resolved);
 			return RevWalkUtils.findBranchesReachableFrom(containsCommit, walk,
 					refs);
-		} finally {
-			walk.release();
 		}
 	}
 

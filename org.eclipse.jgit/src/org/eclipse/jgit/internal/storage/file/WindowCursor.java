@@ -45,9 +45,6 @@
 package org.eclipse.jgit.internal.storage.file;
 
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.text.MessageFormat;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -56,6 +53,7 @@ import java.util.Set;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
@@ -72,6 +70,7 @@ import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -87,10 +86,22 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	private DeltaBaseCache baseCache;
 
+	@Nullable
+	private final ObjectInserter createdFromInserter;
+
 	final FileObjectDatabase db;
 
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
+		this.createdFromInserter = null;
+		this.streamFileThreshold = WindowCache.getStreamFileThreshold();
+	}
+
+	WindowCursor(FileObjectDatabase db,
+			@Nullable ObjectDirectoryInserter createdFromInserter) {
+		this.db = db;
+		this.createdFromInserter = createdFromInserter;
+		this.streamFileThreshold = WindowCache.getStreamFileThreshold();
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {
@@ -145,7 +156,8 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		final ObjectLoader ldr = db.openObject(this, objectId);
 		if (ldr == null) {
 			if (typeHint == OBJ_ANY)
-				throw new MissingObjectException(objectId.copy(), "unknown");
+				throw new MissingObjectException(objectId.copy(),
+						JGitText.get().unknownObjectType2);
 			throw new MissingObjectException(objectId.copy(), typeHint);
 		}
 		if (typeHint != OBJ_ANY && ldr.getType() != typeHint)
@@ -164,7 +176,8 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		long sz = db.getObjectSize(this, objectId);
 		if (sz < 0) {
 			if (typeHint == OBJ_ANY)
-				throw new MissingObjectException(objectId.copy(), "unknown");
+				throw new MissingObjectException(objectId.copy(),
+						JGitText.get().unknownObjectType2);
 			throw new MissingObjectException(objectId.copy(), typeHint);
 		}
 		return sz;
@@ -232,27 +245,13 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return cnt - need;
 	}
 
-	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
-			boolean validate) throws IOException {
-		((LocalCachedPack) pack).copyAsIs(out, validate, this);
+	public void copyPackAsIs(PackOutputStream out, CachedPack pack)
+			throws IOException {
+		((LocalCachedPack) pack).copyAsIs(out, this);
 	}
 
-	void copyPackAsIs(final PackFile pack, final long length, boolean validate,
+	void copyPackAsIs(final PackFile pack, final long length,
 			final PackOutputStream out) throws IOException {
-		MessageDigest md = null;
-		if (validate) {
-			md = Constants.newMessageDigest();
-			byte[] buf = out.getCopyBuffer();
-			pin(pack, 0);
-			if (window.copy(0, buf, 0, 12) != 12) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileIsTruncated, pack.getPackFile()
-								.getPath()));
-			}
-			md.update(buf, 0, 12);
-		}
-
 		long position = 12;
 		long remaining = length - (12 + 20);
 		while (0 < remaining) {
@@ -260,28 +259,9 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 			int ptr = (int) (position - window.start);
 			int n = (int) Math.min(window.size() - ptr, remaining);
-			window.write(out, position, n, md);
+			window.write(out, position, n);
 			position += n;
 			remaining -= n;
-		}
-
-		if (md != null) {
-			byte[] buf = new byte[20];
-			byte[] actHash = md.digest();
-
-			pin(pack, position);
-			if (window.copy(position, buf, 0, 20) != 20) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileIsTruncated, pack.getPackFile()
-								.getPath()));
-			}
-			if (!Arrays.equals(actHash, buf)) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileCorruptionDetected, pack
-								.getPackFile().getPath()));
-			}
 		}
 	}
 
@@ -359,12 +339,15 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		}
 	}
 
-	int getStreamFileThreshold() {
-		return WindowCache.getStreamFileThreshold();
+	@Override
+	@Nullable
+	public ObjectInserter getCreatedFromInserter() {
+		return createdFromInserter;
 	}
 
 	/** Release the current window cursor. */
-	public void release() {
+	@Override
+	public void close() {
 		window = null;
 		baseCache = null;
 		try {

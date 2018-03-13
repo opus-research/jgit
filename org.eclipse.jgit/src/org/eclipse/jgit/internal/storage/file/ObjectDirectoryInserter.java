@@ -136,7 +136,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 
 	@Override
 	public ObjectReader newReader() {
-		return new WindowCursor(db);
+		return new WindowCursor(db, this);
 	}
 
 	@Override
@@ -145,7 +145,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	public void release() {
+	public void close() {
 		if (deflate != null) {
 			try {
 				deflate.end();

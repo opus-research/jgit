@@ -46,7 +46,6 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import java.io.IOException;
-import java.security.MessageDigest;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -89,9 +88,16 @@ final class DfsBlock {
 		return n;
 	}
 
-	int setInput(long pos, Inflater inf) {
+	int setInput(long pos, Inflater inf) throws DataFormatException {
 		int ptr = (int) (pos - start);
 		int cnt = block.length - ptr;
+		if (cnt <= 0) {
+			throw new DataFormatException(cnt + " bytes to inflate:" //$NON-NLS-1$
+					+ " at pos=" + pos //$NON-NLS-1$
+					+ "; block.start=" + start //$NON-NLS-1$
+					+ "; ptr=" + ptr //$NON-NLS-1$
+					+ "; block.length=" + block.length); //$NON-NLS-1$
+		}
 		inf.setInput(block, ptr, cnt);
 		return cnt;
 	}
@@ -101,12 +107,9 @@ final class DfsBlock {
 		out.update(block, ptr, cnt);
 	}
 
-	void write(PackOutputStream out, long pos, int cnt, MessageDigest digest)
+	void write(PackOutputStream out, long pos, int cnt)
 			throws IOException {
-		int ptr = (int) (pos - start);
-		out.write(block, ptr, cnt);
-		if (digest != null)
-			digest.update(block, ptr, cnt);
+		out.write(block, (int) (pos - start), cnt);
 	}
 
 	void check(Inflater inf, byte[] tmp, long pos, int cnt)

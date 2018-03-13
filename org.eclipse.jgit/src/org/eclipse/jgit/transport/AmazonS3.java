@@ -56,10 +56,10 @@ import java.net.ProxySelector;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.DigestOutputStream;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -175,7 +175,7 @@ public class AmazonS3 {
 	private final String acl;
 
 	/** Maximum number of times to try an operation. */
-	private final int maxAttempts;
+	final int maxAttempts;
 
 	/** Encryption algorithm, may be a null instance that provides pass-through. */
 	private final WalkEncryption encryption;
@@ -185,6 +185,19 @@ public class AmazonS3 {
 
 	/** S3 Bucket Domain. */
 	private final String domain;
+
+	/** Property names used in amazon connection configuration file. */
+	interface Keys {
+		String ACCESS_KEY = "accesskey"; //$NON-NLS-1$
+		String SECRET_KEY = "secretkey"; //$NON-NLS-1$
+		String PASSWORD = "password"; //$NON-NLS-1$
+		String CRYPTO_ALG = "crypto.algorithm"; //$NON-NLS-1$
+		String CRYPTO_VER = "crypto.version"; //$NON-NLS-1$
+		String ACL = "acl"; //$NON-NLS-1$
+		String DOMAIN = "domain"; //$NON-NLS-1$
+		String HTTP_RETRY = "httpclient.retry-max"; //$NON-NLS-1$
+		String TMP_DIR = "tmpdir"; //$NON-NLS-1$
+	}
 
 	/**
 	 * Create a new S3 client for the supplied user information.
@@ -219,17 +232,18 @@ public class AmazonS3 {
 	 *
 	 */
 	public AmazonS3(final Properties props) {
-		domain = props.getProperty("domain", "s3.amazonaws.com"); //$NON-NLS-1$ //$NON-NLS-2$
-		publicKey = props.getProperty("accesskey"); //$NON-NLS-1$
+		domain = props.getProperty(Keys.DOMAIN, "s3.amazonaws.com"); //$NON-NLS-1$
+
+		publicKey = props.getProperty(Keys.ACCESS_KEY);
 		if (publicKey == null)
 			throw new IllegalArgumentException(JGitText.get().missingAccesskey);
 
-		final String secret = props.getProperty("secretkey"); //$NON-NLS-1$
+		final String secret = props.getProperty(Keys.SECRET_KEY);
 		if (secret == null)
 			throw new IllegalArgumentException(JGitText.get().missingSecretkey);
 		privateKey = new SecretKeySpec(Constants.encodeASCII(secret), HMAC);
 
-		final String pacl = props.getProperty("acl", "PRIVATE"); //$NON-NLS-1$ //$NON-NLS-2$
+		final String pacl = props.getProperty(Keys.ACL, "PRIVATE"); //$NON-NLS-1$
 		if (StringUtils.equalsIgnoreCase("PRIVATE", pacl)) //$NON-NLS-1$
 			acl = "private"; //$NON-NLS-1$
 		else if (StringUtils.equalsIgnoreCase("PUBLIC", pacl)) //$NON-NLS-1$
@@ -242,26 +256,16 @@ public class AmazonS3 {
 			throw new IllegalArgumentException("Invalid acl: " + pacl); //$NON-NLS-1$
 
 		try {
-			final String cPas = props.getProperty("password"); //$NON-NLS-1$
-			if (cPas != null) {
-				String cAlg = props.getProperty("crypto.algorithm"); //$NON-NLS-1$
-				if (cAlg == null)
-					cAlg = "PBEWithMD5AndDES"; //$NON-NLS-1$
-				encryption = new WalkEncryption.ObjectEncryptionV2(cAlg, cPas);
-			} else {
-				encryption = WalkEncryption.NONE;
-			}
-		} catch (InvalidKeySpecException e) {
-			throw new IllegalArgumentException(JGitText.get().invalidEncryption, e);
-		} catch (NoSuchAlgorithmException e) {
+			encryption = WalkEncryption.instance(props);
+		} catch (GeneralSecurityException e) {
 			throw new IllegalArgumentException(JGitText.get().invalidEncryption, e);
 		}
 
-		maxAttempts = Integer.parseInt(props.getProperty(
-				"httpclient.retry-max", "3")); //$NON-NLS-1$ //$NON-NLS-2$
+		maxAttempts = Integer
+				.parseInt(props.getProperty(Keys.HTTP_RETRY, "3")); //$NON-NLS-1$
 		proxySelector = ProxySelector.getDefault();
 
-		String tmp = props.getProperty("tmpdir"); //$NON-NLS-1$
+		String tmp = props.getProperty(Keys.TMP_DIR);
 		tmpDir = tmp != null && tmp.length() > 0 ? new File(tmp) : null;
 	}
 
@@ -292,10 +296,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error("Reading", key, c);
+				throw error(JGitText.get().s3ActionReading, key, c);
 			}
 		}
-		throw maxAttempts("Reading", key);
+		throw maxAttempts(JGitText.get().s3ActionReading, key);
 	}
 
 	/**
@@ -365,10 +369,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error("Deletion", key, c);
+				throw error(JGitText.get().s3ActionDeletion, key, c);
 			}
 		}
-		throw maxAttempts("Deletion", key);
+		throw maxAttempts(JGitText.get().s3ActionDeletion, key);
 	}
 
 	/**
@@ -426,10 +430,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error("Writing", key, c);
+				throw error(JGitText.get().s3ActionWriting, key, c);
 			}
 		}
-		throw maxAttempts("Writing", key);
+		throw maxAttempts(JGitText.get().s3ActionWriting, key);
 	}
 
 	/**
@@ -479,7 +483,7 @@ public class AmazonS3 {
 		return encryption.encrypt(new DigestOutputStream(buffer, md5));
 	}
 
-	private void putImpl(final String bucket, final String key,
+	void putImpl(final String bucket, final String key,
 			final byte[] csum, final TemporaryBuffer buf,
 			ProgressMonitor monitor, String monitorTask) throws IOException {
 		if (monitor == null)
@@ -489,16 +493,14 @@ public class AmazonS3 {
 
 		final String md5str = Base64.encodeBytes(csum);
 		final long len = buf.length();
-		final String lenstr = String.valueOf(len);
 		for (int curAttempt = 0; curAttempt < maxAttempts; curAttempt++) {
 			final HttpURLConnection c = open("PUT", bucket, key); //$NON-NLS-1$
-			c.setRequestProperty("Content-Length", lenstr); //$NON-NLS-1$
+			c.setFixedLengthStreamingMode(len);
 			c.setRequestProperty("Content-MD5", md5str); //$NON-NLS-1$
 			c.setRequestProperty(X_AMZ_ACL, acl);
 			encryption.request(c, X_AMZ_META);
 			authorize(c);
 			c.setDoOutput(true);
-			c.setFixedLengthStreamingMode((int) len);
 			monitor.beginTask(monitorTask, (int) (len / 1024));
 			final OutputStream os = c.getOutputStream();
 			try {
@@ -514,38 +516,46 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error("Writing", key, c);
+				throw error(JGitText.get().s3ActionWriting, key, c);
 			}
 		}
-		throw maxAttempts("Writing", key);
+		throw maxAttempts(JGitText.get().s3ActionWriting, key);
 	}
 
-	private IOException error(final String action, final String key,
+	IOException error(final String action, final String key,
 			final HttpURLConnection c) throws IOException {
 		final IOException err = new IOException(MessageFormat.format(
 				JGitText.get().amazonS3ActionFailed, action, key,
 				Integer.valueOf(HttpSupport.response(c)),
 				c.getResponseMessage()));
 		final InputStream errorStream = c.getErrorStream();
-		if (errorStream == null)
+		if (errorStream == null) {
 			return err;
-
-		final ByteArrayOutputStream b = new ByteArrayOutputStream();
-		byte[] buf = new byte[2048];
-		for (;;) {
-			final int n = errorStream.read(buf);
-			if (n < 0)
-				break;
-			if (n > 0)
-				b.write(buf, 0, n);
 		}
-		buf = b.toByteArray();
-		if (buf.length > 0)
-			err.initCause(new IOException("\n" + new String(buf))); //$NON-NLS-1$
+
+		try {
+			final ByteArrayOutputStream b = new ByteArrayOutputStream();
+			byte[] buf = new byte[2048];
+			for (;;) {
+				final int n = errorStream.read(buf);
+				if (n < 0) {
+					break;
+				}
+				if (n > 0) {
+					b.write(buf, 0, n);
+				}
+			}
+			buf = b.toByteArray();
+			if (buf.length > 0) {
+				err.initCause(new IOException("\n" + new String(buf))); //$NON-NLS-1$
+			}
+		} finally {
+			errorStream.close();
+		}
 		return err;
 	}
 
-	private IOException maxAttempts(final String action, final String key) {
+	IOException maxAttempts(final String action, final String key) {
 		return new IOException(MessageFormat.format(
 				JGitText.get().amazonS3ActionFailedGivingUp, action, key,
 				Integer.valueOf(maxAttempts)));
@@ -557,7 +567,7 @@ public class AmazonS3 {
 		return open(method, bucket, key, noArgs);
 	}
 
-	private HttpURLConnection open(final String method, final String bucket,
+	HttpURLConnection open(final String method, final String bucket,
 			final String key, final Map<String, String> args)
 			throws IOException {
 		final StringBuilder urlstr = new StringBuilder();
@@ -594,7 +604,7 @@ public class AmazonS3 {
 		return c;
 	}
 
-	private void authorize(final HttpURLConnection c) throws IOException {
+	void authorize(final HttpURLConnection c) throws IOException {
 		final Map<String, List<String>> reqHdr = c.getRequestProperties();
 		final SortedMap<String, String> sigHdr = new TreeMap<String, String>();
 		for (final Map.Entry<String, List<String>> entry : reqHdr.entrySet()) {

@@ -122,18 +122,20 @@ public abstract class PackParser {
 
 	private InputStream in;
 
-	private byte[] buf;
+	byte[] buf;
 
 	/** Position in the input stream of {@code buf[0]}. */
 	private long bBase;
 
 	private int bOffset;
 
-	private int bAvail;
+	int bAvail;
 
 	private ObjectChecker objCheck;
 
 	private boolean allowThin;
+
+	private boolean checkObjectCollisions;
 
 	private boolean needBaseObjectIds;
 
@@ -184,6 +186,9 @@ public abstract class PackParser {
 	/** Git object size limit */
 	private long maxObjectSizeLimit;
 
+	private final ReceivedPackStatistics.Builder stats =
+			new ReceivedPackStatistics.Builder();
+
 	/**
 	 * Initialize a pack parser.
 	 *
@@ -204,6 +209,7 @@ public abstract class PackParser {
 		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
+		checkObjectCollisions = true;
 	}
 
 	/** @return true if a thin pack (missing base objects) is permitted. */
@@ -222,6 +228,39 @@ public abstract class PackParser {
 	 */
 	public void setAllowThin(final boolean allow) {
 		allowThin = allow;
+	}
+
+	/**
+	 * @return if true received objects are verified to prevent collisions.
+	 * @since 4.1
+	 */
+	protected boolean isCheckObjectCollisions() {
+		return checkObjectCollisions;
+	}
+
+	/**
+	 * Enable checking for collisions with existing objects.
+	 * <p>
+	 * By default PackParser looks for each received object in the repository.
+	 * If the object already exists, the existing object is compared
+	 * byte-for-byte with the newly received copy to ensure they are identical.
+	 * The receive is aborted with an exception if any byte differs. This check
+	 * is necessary to prevent an evil attacker from supplying a replacement
+	 * object into this repository in the event that a discovery enabling SHA-1
+	 * collisions is made.
+	 * <p>
+	 * This check may be very costly to perform, and some repositories may have
+	 * other ways to segregate newly received object data. The check is enabled
+	 * by default, but can be explicitly disabled if the implementation can
+	 * provide the same guarantee, or is willing to accept the risks associated
+	 * with bypassing the check.
+	 *
+	 * @param check
+	 *            true to enable collision checking (strongly encouraged).
+	 * @since 4.1
+	 */
+	protected void setCheckObjectCollisions(boolean check) {
+		checkObjectCollisions = check;
 	}
 
 	/**
@@ -419,8 +458,8 @@ public abstract class PackParser {
 	}
 
 	/**
-	 * Get the size of the parsed pack.
-	 *
+	 * Get the size of the newly created pack.
+	 * <p>
 	 * This will also include the pack index size if an index was created. This
 	 * method should only be called after pack parsing is finished.
 	 *
@@ -430,6 +469,18 @@ public abstract class PackParser {
 	 */
 	public long getPackSize() {
 		return -1;
+	}
+
+	/**
+	 * Returns the statistics of the parsed pack.
+	 * <p>
+	 * This should only be called after pack parsing is finished.
+	 *
+	 * @return {@link ReceivedPackStatistics}
+	 * @since 4.6
+	 */
+	public ReceivedPackStatistics getReceivedPackStatistics() {
+		return stats.build();
 	}
 
 	/**
@@ -590,6 +641,7 @@ public abstract class PackParser {
 	private void resolveDeltas(DeltaVisit visit, final int type,
 			ObjectTypeAndSize info, ProgressMonitor progress)
 			throws IOException {
+		stats.addDeltaObject(type);
 		do {
 			progress.update(1);
 			info = openDatabase(visit.delta, info);
@@ -883,6 +935,7 @@ public abstract class PackParser {
 
 	// Cleanup all resources associated with our input parsing.
 	private void endInput() {
+		stats.setNumBytesRead(streamPosition());
 		in = null;
 	}
 
@@ -911,12 +964,14 @@ public abstract class PackParser {
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
+			stats.addWholeObject(typeCode);
 			onBeginWholeObject(streamPosition, typeCode, sz);
 			onObjectHeader(Source.INPUT, hdrBuf, 0, hdrPtr);
 			whole(streamPosition, typeCode, sz);
 			break;
 
 		case Constants.OBJ_OFS_DELTA: {
+			stats.addOffsetDelta();
 			c = readFrom(Source.INPUT);
 			hdrBuf[hdrPtr++] = (byte) c;
 			long ofs = c & 127;
@@ -939,6 +994,7 @@ public abstract class PackParser {
 		}
 
 		case Constants.OBJ_REF_DELTA: {
+			stats.addRefDelta();
 			c = fill(Source.INPUT, 20);
 			final ObjectId base = ObjectId.fromRaw(buf, c);
 			System.arraycopy(buf, c, hdrBuf, hdrPtr, 20);
@@ -988,7 +1044,8 @@ public abstract class PackParser {
 			}
 			inf.close();
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			checkContentLater = readCurs.has(tempObjectId);
+			checkContentLater = isCheckObjectCollisions()
+					&& readCurs.has(tempObjectId);
 			data = null;
 
 		} else {
@@ -1012,8 +1069,11 @@ public abstract class PackParser {
 			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
-				objCheck.check(type, data);
+				objCheck.check(id, type, data);
 			} catch (CorruptObjectException e) {
+				if (e.getErrorType() != null) {
+					throw e;
+				}
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().invalidObject,
 						Constants.typeString(type),
@@ -1022,17 +1082,19 @@ public abstract class PackParser {
 			}
 		}
 
-		try {
-			final ObjectLoader ldr = readCurs.open(id, type);
-			final byte[] existingData = ldr.getCachedBytes(data.length);
-			if (!Arrays.equals(data, existingData)) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, id.name()));
+		if (isCheckObjectCollisions()) {
+			try {
+				final ObjectLoader ldr = readCurs.open(id, type);
+				final byte[] existingData = ldr.getCachedBytes(data.length);
+				if (!Arrays.equals(data, existingData)) {
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, id.name()));
+				}
+			} catch (MissingObjectException notLocal) {
+				// This is OK, we don't have a copy of the object locally
+				// but the API throws when we try to read it as usually its
+				// an error to read something that doesn't exist.
 			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
 		}
 	}
 
@@ -1102,13 +1164,13 @@ public abstract class PackParser {
 	}
 
 	// Consume cnt bytes from the buffer.
-	private void use(final int cnt) {
+	void use(final int cnt) {
 		bOffset += cnt;
 		bAvail -= cnt;
 	}
 
 	// Ensure at least need bytes are available in in {@link #buf}.
-	private int fill(final Source src, final int need) throws IOException {
+	int fill(final Source src, final int need) throws IOException {
 		while (bAvail < need) {
 			int next = bOffset + bAvail;
 			int free = buf.length - next;

@@ -91,6 +91,13 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	}
 
 	@Override
+	public Ref exactRef(String name) throws IOException {
+		RefCache curr = read();
+		Ref ref = curr.ids.get(name);
+		return ref != null ? resolve(ref, 0, curr.ids) : null;
+	}
+
+	@Override
 	public Ref getRef(String needle) throws IOException {
 		RefCache curr = read();
 		for (String prefix : SEARCH_PATH) {
@@ -101,14 +108,6 @@ public abstract class DfsRefDatabase extends RefDatabase {
 			}
 		}
 		return null;
-	}
-
-	private Ref getOneRef(String refName) throws IOException {
-		RefCache curr = read();
-		Ref ref = curr.ids.get(refName);
-		if (ref != null)
-			return resolve(ref, 0, curr.ids);
-		return ref;
 	}
 
 	@Override
@@ -183,8 +182,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	private Ref doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
-		RevWalk rw = new RevWalk(repository);
-		try {
+		try (RevWalk rw = new RevWalk(repository)) {
 			RevObject obj = rw.parseAny(leaf.getObjectId());
 			if (obj instanceof RevTag) {
 				return new ObjectIdRef.PeeledTag(
@@ -198,8 +196,6 @@ public abstract class DfsRefDatabase extends RefDatabase {
 						leaf.getName(),
 						leaf.getObjectId());
 			}
-		} finally {
-			rw.release();
 		}
 	}
 
@@ -215,15 +211,11 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	public RefUpdate newUpdate(String refName, boolean detach)
 			throws IOException {
 		boolean detachingSymbolicRef = false;
-		Ref ref = getOneRef(refName);
+		Ref ref = exactRef(refName);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, refName, null);
 		else
 			detachingSymbolicRef = detach && ref.isSymbolic();
-
-		if (detachingSymbolicRef) {
-			ref = new ObjectIdRef.Unpeeled(NEW, refName, ref.getObjectId());
-		}
 
 		DfsRefUpdate update = new DfsRefUpdate(this, ref);
 		if (detachingSymbolicRef)
@@ -263,6 +255,11 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	@Override
 	public void create() {
 		// Nothing to do.
+	}
+
+	@Override
+	public void refresh() {
+		clearCache();
 	}
 
 	@Override
@@ -314,6 +311,15 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	/**
 	 * Compare a reference, and put if it matches.
+	 * <p>
+	 * Two reference match if and only if they satisfy the following:
+	 *
+	 * <ul>
+	 * <li>If one reference is a symbolic ref, the other one should be a symbolic
+	 * ref.
+	 * <li>If both are symbolic refs, the target names should be same.
+	 * <li>If both are object ID refs, the object IDs should be same.
+	 * </ul>
 	 *
 	 * @param oldRef
 	 *            old value to compare to. If the reference is expected to not

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2016, Laurent Delaigue <laurent.delaigue@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -54,10 +55,12 @@ import org.eclipse.jgit.api.errors.InvalidConfigurationException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.RefNotAdvertisedException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.BranchConfig.BranchRebaseMode;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -81,40 +84,13 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
-	private PullRebaseMode pullRebaseMode = null;
+	private BranchRebaseMode pullRebaseMode = null;
 
 	private String remote;
 
 	private String remoteBranchName;
 
 	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
-
-	private enum PullRebaseMode implements Config.ConfigEnum {
-		REBASE_PRESERVE("preserve", true, true), //$NON-NLS-1$
-		REBASE("true", true, false), //$NON-NLS-1$
-		NO_REBASE("false", false, false); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private final boolean rebase;
-
-		private final boolean preserveMerges;
-
-		PullRebaseMode(String configValue, boolean rebase,
-				boolean preserveMerges) {
-			this.configValue = configValue;
-			this.rebase = rebase;
-			this.preserveMerges = preserveMerges;
-		}
-
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		public boolean matchConfigValue(String in) {
-			return in.equals(configValue);
-		}
-	}
 
 	/**
 	 * @param repo
@@ -129,6 +105,9 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @return this instance
 	 */
 	public PullCommand setProgressMonitor(ProgressMonitor monitor) {
+		if (monitor == null) {
+			monitor = NullProgressMonitor.INSTANCE;
+		}
 		this.monitor = monitor;
 		return this;
 	}
@@ -153,7 +132,46 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 */
 	public PullCommand setRebase(boolean useRebase) {
 		checkCallable();
-		pullRebaseMode = useRebase ? PullRebaseMode.REBASE : PullRebaseMode.NO_REBASE;
+		pullRebaseMode = useRebase ? BranchRebaseMode.REBASE
+				: BranchRebaseMode.NONE;
+		return this;
+	}
+
+	/**
+	 * Sets the {@link BranchRebaseMode} to use after fetching.
+	 *
+	 * <dl>
+	 * <dt>BranchRebaseMode.REBASE</dt>
+	 * <dd>Equivalent to {@code --rebase} on the command line: use rebase
+	 * instead of merge after fetching.</dd>
+	 * <dt>BranchRebaseMode.PRESERVE</dt>
+	 * <dd>Equivalent to {@code --preserve-merges} on the command line: rebase
+	 * preserving local merge commits.</dd>
+	 * <dt>BranchRebaseMode.INTERACTIVE</dt>
+	 * <dd>Equivalent to {@code --interactive} on the command line: use
+	 * interactive rebase.</dd>
+	 * <dt>BranchRebaseMode.NONE</dt>
+	 * <dd>Equivalent to {@code --no-rebase}: merge instead of rebasing.
+	 * <dt>{@code null}</dt>
+	 * <dd>Use the setting defined in the git configuration, either {@code
+	 * branch.[name].rebase} or, if not set, {@code pull.rebase}</dd>
+	 * </dl>
+	 *
+	 * This setting overrides the settings in the configuration file. By
+	 * default, the setting in the repository configuration file is used.
+	 * <p>
+	 * A branch can be configured to use rebase by default. See
+	 * {@code branch.[name].rebase}, {@code branch.autosetuprebase}, and
+	 * {@code pull.rebase}.
+	 *
+	 * @param rebaseMode
+	 *            the {@link BranchRebaseMode} to use
+	 * @return {@code this}
+	 * @since 4.5
+	 */
+	public PullCommand setRebase(BranchRebaseMode rebaseMode) {
+		checkCallable();
+		pullRebaseMode = rebaseMode;
 		return this;
 	}
 
@@ -171,6 +189,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @throws InvalidRemoteException
 	 * @throws CanceledException
 	 * @throws RefNotFoundException
+	 * @throws RefNotAdvertisedException
 	 * @throws NoHeadException
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 * @throws GitAPIException
@@ -178,7 +197,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	public PullResult call() throws GitAPIException,
 			WrongRepositoryStateException, InvalidConfigurationException,
 			DetachedHeadException, InvalidRemoteException, CanceledException,
-			RefNotFoundException, NoHeadException,
+			RefNotFoundException, RefNotAdvertisedException, NoHeadException,
 			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
 
@@ -261,7 +280,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			fetchRes = fetch.call();
 		} else {
 			// we can skip the fetch altogether
-			remoteUri = "local repository";
+			remoteUri = JGitText.get().localRepository;
 			fetchRes = null;
 		}
 
@@ -284,11 +303,13 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 					r = fetchRes.getAdvertisedRef(Constants.R_HEADS
 							+ remoteBranchName);
 			}
-			if (r == null)
-				throw new JGitInternalException(MessageFormat.format(JGitText
-						.get().couldNotGetAdvertisedRef, remoteBranchName));
-			else
+			if (r == null) {
+				throw new RefNotAdvertisedException(MessageFormat.format(
+						JGitText.get().couldNotGetAdvertisedRef, remote,
+						remoteBranchName));
+			} else {
 				commitToMerge = r.getObjectId();
+			}
 		} else {
 			try {
 				commitToMerge = repo.resolve(remoteBranchName);
@@ -302,23 +323,25 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			}
 		}
 
-		String upstreamName = "branch \'"
-				+ Repository.shortenRefName(remoteBranchName) + "\' of "
-				+ remoteUri;
+		String upstreamName = MessageFormat.format(
+				JGitText.get().upstreamBranchName,
+				Repository.shortenRefName(remoteBranchName), remoteUri);
 
 		PullResult result;
-		if (pullRebaseMode.rebase) {
+		if (pullRebaseMode != BranchRebaseMode.NONE) {
 			RebaseCommand rebase = new RebaseCommand(repo);
 			RebaseResult rebaseRes = rebase.setUpstream(commitToMerge)
 					.setUpstreamName(upstreamName).setProgressMonitor(monitor)
 					.setOperation(Operation.BEGIN).setStrategy(strategy)
-					.setPreserveMerges(pullRebaseMode.preserveMerges)
+					.setPreserveMerges(
+							pullRebaseMode == BranchRebaseMode.PRESERVE)
 					.call();
 			result = new PullResult(fetchRes, remote, rebaseRes);
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
 			merge.include(upstreamName, commitToMerge);
 			merge.setStrategy(strategy);
+			merge.setProgressMonitor(monitor);
 			MergeResult mergeRes = merge.call();
 			monitor.update(1);
 			result = new PullResult(fetchRes, remote, mergeRes);
@@ -388,13 +411,29 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 		return this;
 	}
 
-	private static PullRebaseMode getRebaseMode(String branchName, Config config) {
-		PullRebaseMode mode = config.getEnum(PullRebaseMode.values(),
-				ConfigConstants.CONFIG_PULL_SECTION, null,
-				ConfigConstants.CONFIG_KEY_REBASE, PullRebaseMode.NO_REBASE);
-		mode = config.getEnum(PullRebaseMode.values(),
+	/**
+	 * Reads the rebase mode to use for a pull command from the repository
+	 * configuration. This is the value defined for the configurations
+	 * {@code branch.[branchName].rebase}, or,if not set, {@code pull.rebase}.
+	 * If neither is set, yields {@link BranchRebaseMode#NONE}.
+	 *
+	 * @param branchName
+	 *            name of the local branch
+	 * @param config
+	 *            the {@link Config} to read the value from
+	 * @return the {@link BranchRebaseMode}
+	 * @since 4.5
+	 */
+	public static BranchRebaseMode getRebaseMode(String branchName,
+			Config config) {
+		BranchRebaseMode mode = config.getEnum(BranchRebaseMode.values(),
 				ConfigConstants.CONFIG_BRANCH_SECTION,
-				branchName, ConfigConstants.CONFIG_KEY_REBASE, mode);
+				branchName, ConfigConstants.CONFIG_KEY_REBASE, null);
+		if (mode == null) {
+			mode = config.getEnum(BranchRebaseMode.values(),
+					ConfigConstants.CONFIG_PULL_SECTION, null,
+					ConfigConstants.CONFIG_KEY_REBASE, BranchRebaseMode.NONE);
+		}
 		return mode;
 	}
 }

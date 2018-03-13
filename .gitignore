@@ -1,1 +1,6 @@
+/.buckd
+/.project
+/buck-cache
+/buck-out
 /target
+infer-out

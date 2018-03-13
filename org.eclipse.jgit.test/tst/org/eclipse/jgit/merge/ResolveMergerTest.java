@@ -62,6 +62,7 @@ import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Assert;
 import org.junit.experimental.theories.DataPoint;
@@ -88,35 +89,36 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		file = new File(folder1, "file2.txt");
 		write(file, "folder1--file2.txt");
 
-		Git git = new Git(db);
-		git.add().addFilepattern(folder1.getName()).call();
-		RevCommit base = git.commit().setMessage("adding folder").call();
+		try (Git git = new Git(db)) {
+			git.add().addFilepattern(folder1.getName()).call();
+			RevCommit base = git.commit().setMessage("adding folder").call();
 
-		recursiveDelete(folder1);
-		git.rm().addFilepattern("folder1/file1.txt")
-				.addFilepattern("folder1/file2.txt").call();
-		RevCommit other = git.commit()
-				.setMessage("removing folders on 'other'").call();
+			recursiveDelete(folder1);
+			git.rm().addFilepattern("folder1/file1.txt")
+					.addFilepattern("folder1/file2.txt").call();
+			RevCommit other = git.commit()
+					.setMessage("removing folders on 'other'").call();
 
-		git.checkout().setName(base.name()).call();
+			git.checkout().setName(base.name()).call();
 
-		file = new File(db.getWorkTree(), "unrelated.txt");
-		write(file, "unrelated");
+			file = new File(db.getWorkTree(), "unrelated.txt");
+			write(file, "unrelated");
 
-		git.add().addFilepattern("unrelated.txt").call();
-		RevCommit head = git.commit().setMessage("Adding another file").call();
+			git.add().addFilepattern("unrelated.txt").call();
+			RevCommit head = git.commit().setMessage("Adding another file").call();
 
-		// Untracked file to cause failing path for delete() of folder1
-		// but that's ok.
-		file = new File(folder1, "file3.txt");
-		write(file, "folder1--file3.txt");
+			// Untracked file to cause failing path for delete() of folder1
+			// but that's ok.
+			file = new File(folder1, "file3.txt");
+			write(file, "folder1--file3.txt");
 
-		ResolveMerger merger = (ResolveMerger) strategy.newMerger(db, false);
-		merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
-		merger.setWorkingTreeIterator(new FileTreeIterator(db));
-		boolean ok = merger.merge(head.getId(), other.getId());
-		assertTrue(ok);
-		assertTrue(file.exists());
+			ResolveMerger merger = (ResolveMerger) strategy.newMerger(db, false);
+			merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
+			merger.setWorkingTreeIterator(new FileTreeIterator(db));
+			boolean ok = merger.merge(head.getId(), other.getId());
+			assertTrue(ok);
+			assertTrue(file.exists());
+		}
 	}
 
 	/**
@@ -223,6 +225,80 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		assertEquals(MergeStatus.MERGED, mergeRes.getMergeStatus());
 		assertEquals(
 				"[d/1, mode:100644, content:1][e/1, mode:100644, content:4][f/1, mode:100644, content:5]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * A tracked file is replaced by a folder in THEIRS.
+	 *
+	 * @param strategy
+	 * @throws Exception
+	 */
+	@Theory
+	public void checkFileReplacedByFolderInTheirs(MergeStrategy strategy)
+			throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("sub", "file");
+		git.add().addFilepattern("sub").call();
+		RevCommit first = git.commit().setMessage("initial").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+
+		git.rm().addFilepattern("sub").call();
+		writeTrashFile("sub/file", "subfile");
+		git.add().addFilepattern("sub/file").call();
+		RevCommit masterCommit = git.commit().setMessage("file -> folder")
+				.call();
+
+		git.checkout().setName("master").call();
+		writeTrashFile("noop", "other");
+		git.add().addFilepattern("noop").call();
+		git.commit().setAll(true).setMessage("noop").call();
+
+		MergeResult mergeRes = git.merge().setStrategy(strategy)
+				.include(masterCommit).call();
+		assertEquals(MergeStatus.MERGED, mergeRes.getMergeStatus());
+		assertEquals(
+				"[noop, mode:100644, content:other][sub/file, mode:100644, content:subfile]",
+				indexState(CONTENT));
+	}
+
+	/**
+	 * A tracked file is replaced by a folder in OURS.
+	 *
+	 * @param strategy
+	 * @throws Exception
+	 */
+	@Theory
+	public void checkFileReplacedByFolderInOurs(MergeStrategy strategy)
+			throws Exception {
+		Git git = Git.wrap(db);
+
+		writeTrashFile("sub", "file");
+		git.add().addFilepattern("sub").call();
+		RevCommit first = git.commit().setMessage("initial").call();
+
+		git.checkout().setCreateBranch(true).setStartPoint(first)
+				.setName("side").call();
+		writeTrashFile("noop", "other");
+		git.add().addFilepattern("noop").call();
+		RevCommit sideCommit = git.commit().setAll(true).setMessage("noop")
+				.call();
+
+		git.checkout().setName("master").call();
+		git.rm().addFilepattern("sub").call();
+		writeTrashFile("sub/file", "subfile");
+		git.add().addFilepattern("sub/file").call();
+		git.commit().setMessage("file -> folder")
+				.call();
+
+		MergeResult mergeRes = git.merge().setStrategy(strategy)
+				.include(sideCommit).call();
+		assertEquals(MergeStatus.MERGED, mergeRes.getMergeStatus());
+		assertEquals(
+				"[noop, mode:100644, content:other][sub/file, mode:100644, content:subfile]",
 				indexState(CONTENT));
 	}
 
@@ -556,7 +632,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		// ResolveMerge
 		try {
 			MergeResult mergeResult = git.merge().setStrategy(strategy)
-					.include(git.getRepository().getRef("refs/heads/side"))
+					.include(git.getRepository().exactRef("refs/heads/side"))
 					.call();
 			assertEquals(MergeStrategy.RECURSIVE, strategy);
 			assertEquals(MergeResult.MergeStatus.MERGED,
@@ -619,7 +695,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 
 		// Create initial content and remember when the last file was written.
 		f = writeTrashFiles(false, "orig", "orig", "1\n2\n3", "orig", "orig");
-		lastTs4 = f.lastModified();
+		lastTs4 = FS.DETECTED.lastModified(f);
 
 		// add all files, commit and check this doesn't update any working tree
 		// files and that the index is in a new file system timer tick. Make
@@ -632,8 +708,8 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "2", "3", "4", "<.git/index");
 		assertEquals("Commit should not touch working tree file 4", lastTs4,
-				new File(db.getWorkTree(), "4").lastModified());
-		lastTsIndex = indexFile.lastModified();
+				FS.DETECTED.lastModified(new File(db.getWorkTree(), "4")));
+		lastTsIndex = FS.DETECTED.lastModified(indexFile);
 
 		// Do modifications on the master branch. Then add and commit. This
 		// should touch only "0", "2 and "3"
@@ -647,7 +723,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "4", "*" + lastTs4, "<*"
 				+ lastTsIndex, "<0", "2", "3", "<.git/index");
-		lastTsIndex = indexFile.lastModified();
+		lastTsIndex = FS.DETECTED.lastModified(indexFile);
 
 		// Checkout a side branch. This should touch only "0", "2 and "3"
 		fsTick(indexFile);
@@ -656,7 +732,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("1", "4", "*" + lastTs4, "<*"
 				+ lastTsIndex, "<0", "2", "3", ".git/index");
-		lastTsIndex = indexFile.lastModified();
+		lastTsIndex = FS.DETECTED.lastModified(indexFile);
 
 		// This checkout may have populated worktree and index so fast that we
 		// may have smudged entries now. Check that we have the right content
@@ -669,13 +745,13 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				indexState(CONTENT));
 		fsTick(indexFile);
 		f = writeTrashFiles(false, "orig", "orig", "1\n2\n3", "orig", "orig");
-		lastTs4 = f.lastModified();
+		lastTs4 = FS.DETECTED.lastModified(f);
 		fsTick(f);
 		git.add().addFilepattern(".").call();
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("*" + lastTsIndex, "<0", "1", "2", "3",
 				"4", "<.git/index");
-		lastTsIndex = indexFile.lastModified();
+		lastTsIndex = FS.DETECTED.lastModified(indexFile);
 
 		// Do modifications on the side branch. Touch only "1", "2 and "3"
 		fsTick(indexFile);
@@ -686,7 +762,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		checkConsistentLastModified("0", "1", "2", "3", "4");
 		checkModificationTimeStampOrder("0", "4", "*" + lastTs4, "<*"
 				+ lastTsIndex, "<1", "2", "3", "<.git/index");
-		lastTsIndex = indexFile.lastModified();
+		lastTsIndex = FS.DETECTED.lastModified(indexFile);
 
 		// merge master and side. Should only touch "0," "2" and "3"
 		fsTick(indexFile);
@@ -714,7 +790,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 					"IndexEntry with path "
 							+ path
 							+ " has lastmodified with is different from the worktree file",
-					new File(workTree, path).lastModified(), dc.getEntry(path)
+					FS.DETECTED.lastModified(new File(workTree, path)), dc.getEntry(path)
 							.getLastModified());
 	}
 
@@ -724,14 +800,15 @@ public class ResolveMergerTest extends RepositoryTestCase {
 	// then this file must be younger then file i. A path "*<modtime>"
 	// represents a file with a modification time of <modtime>
 	// E.g. ("a", "b", "<c", "f/a.txt") means: a<=b<c<=f/a.txt
-	private void checkModificationTimeStampOrder(String... pathes) {
+	private void checkModificationTimeStampOrder(String... pathes)
+			throws IOException {
 		long lastMod = Long.MIN_VALUE;
 		for (String p : pathes) {
 			boolean strong = p.startsWith("<");
 			boolean fixed = p.charAt(strong ? 1 : 0) == '*';
 			p = p.substring((strong ? 1 : 0) + (fixed ? 1 : 0));
-			long curMod = fixed ? Long.valueOf(p).longValue() : new File(
-					db.getWorkTree(), p).lastModified();
+			long curMod = fixed ? Long.valueOf(p).longValue()
+					: FS.DETECTED.lastModified(new File(db.getWorkTree(), p));
 			if (strong)
 				assertTrue("path " + p + " is not younger than predecesssor",
 						curMod > lastMod);

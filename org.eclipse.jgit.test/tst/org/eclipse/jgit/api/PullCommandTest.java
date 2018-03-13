@@ -58,6 +58,7 @@ import java.util.concurrent.Callable;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -140,11 +141,12 @@ public class PullCommandTest extends RepositoryTestCase {
 		ObjectId[] mergedCommits = mergeResult.getMergedCommits();
 		assertEquals(targetCommit.getId(), mergedCommits[0]);
 		assertEquals(sourceCommit.getId(), mergedCommits[1]);
-		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
-				.getNewHead());
-		String message = "Merge branch 'master' of "
-				+ db.getWorkTree().getAbsolutePath();
-		assertEquals(message, mergeCommit.getShortMessage());
+		try (RevWalk rw = new RevWalk(dbTarget)) {
+			RevCommit mergeCommit = rw.parseCommit(mergeResult.getNewHead());
+			String message = "Merge branch 'master' of "
+					+ db.getWorkTree().getAbsolutePath();
+			assertEquals(message, mergeCommit.getShortMessage());
+		}
 	}
 
 	@Test
@@ -181,6 +183,40 @@ public class PullCommandTest extends RepositoryTestCase {
 		assertFileContentsEqual(targetFile, result);
 		assertEquals(RepositoryState.MERGING, target.getRepository()
 				.getRepositoryState());
+	}
+
+	@Test
+	public void testPullWithUntrackedStash() throws Exception {
+		target.pull().call();
+
+		// change the source file
+		writeToFile(sourceFile, "Source change");
+		source.add().addFilepattern("SomeFile.txt").call();
+		source.commit().setMessage("Source change in remote").call();
+
+		// write untracked file
+		writeToFile(new File(dbTarget.getWorkTree(), "untracked.txt"),
+				"untracked");
+		RevCommit stash = target.stashCreate().setIndexMessage("message here")
+				.setIncludeUntracked(true).call();
+		assertNotNull(stash);
+		assertTrue(target.status().call().isClean());
+
+		// pull from source
+		assertTrue(target.pull().call().isSuccessful());
+		assertEquals("[SomeFile.txt, mode:100644, content:Source change]",
+				indexState(dbTarget, CONTENT));
+		assertFalse(JGitTestUtil.check(dbTarget, "untracked.txt"));
+		assertEquals("Source change",
+				JGitTestUtil.read(dbTarget, "SomeFile.txt"));
+
+		// apply the stash
+		target.stashApply().setStashRef(stash.getName()).call();
+		assertEquals("[SomeFile.txt, mode:100644, content:Source change]",
+				indexState(dbTarget, CONTENT));
+		assertEquals("untracked", JGitTestUtil.read(dbTarget, "untracked.txt"));
+		assertEquals("Source change",
+				JGitTestUtil.read(dbTarget, "SomeFile.txt"));
 	}
 
 	@Test
@@ -259,11 +295,12 @@ public class PullCommandTest extends RepositoryTestCase {
 		ObjectId[] mergedCommits = mergeResult.getMergedCommits();
 		assertEquals(targetCommit.getId(), mergedCommits[0]);
 		assertEquals(sourceCommit.getId(), mergedCommits[1]);
-		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
-				.getNewHead());
-		String message = "Merge branch 'other' of "
-				+ db.getWorkTree().getAbsolutePath();
-		assertEquals(message, mergeCommit.getShortMessage());
+		try (RevWalk rw = new RevWalk(dbTarget)) {
+			RevCommit mergeCommit = rw.parseCommit(mergeResult.getNewHead());
+			String message = "Merge branch 'other' of "
+					+ db.getWorkTree().getAbsolutePath();
+			assertEquals(message, mergeCommit.getShortMessage());
+		}
 	}
 
 	@Test
@@ -293,11 +330,12 @@ public class PullCommandTest extends RepositoryTestCase {
 		ObjectId[] mergedCommits = mergeResult.getMergedCommits();
 		assertEquals(targetCommit.getId(), mergedCommits[0]);
 		assertEquals(sourceCommit.getId(), mergedCommits[1]);
-		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
-				.getNewHead());
-		String message = "Merge branch 'other' of "
-				+ db.getWorkTree().getAbsolutePath() + " into other";
-		assertEquals(message, mergeCommit.getShortMessage());
+		try (RevWalk rw = new RevWalk(dbTarget)) {
+			RevCommit mergeCommit = rw.parseCommit(mergeResult.getNewHead());
+			String message = "Merge branch 'other' of "
+					+ db.getWorkTree().getAbsolutePath() + " into other";
+			assertEquals(message, mergeCommit.getShortMessage());
+		}
 	}
 
 	private enum TestPullMode {
@@ -474,34 +512,35 @@ public class PullCommandTest extends RepositoryTestCase {
 		}
 		assertFileContentsEqual(sourceFile, "content");
 
-		RevWalk rw = new RevWalk(dbTarget);
-		rw.sort(RevSort.TOPO);
-		rw.markStart(rw.parseCommit(dbTarget.resolve("refs/heads/master")));
+		try (RevWalk rw = new RevWalk(dbTarget)) {
+			rw.sort(RevSort.TOPO);
+			rw.markStart(rw.parseCommit(dbTarget.resolve("refs/heads/master")));
 
-		RevCommit next;
-		if (expectedPullMode == TestPullMode.MERGE) {
-			next = rw.next();
-			assertEquals(2, next.getParentCount());
-			assertEquals(merge, next.getParent(0));
-			assertEquals(sourceCommit, next.getParent(1));
-			// since both parents are known do no further checks here
-		} else {
-			if (expectedPullMode == TestPullMode.REBASE_PREASERVE) {
+			RevCommit next;
+			if (expectedPullMode == TestPullMode.MERGE) {
 				next = rw.next();
 				assertEquals(2, next.getParentCount());
+				assertEquals(merge, next.getParent(0));
+				assertEquals(sourceCommit, next.getParent(1));
+				// since both parents are known do no further checks here
+			} else {
+				if (expectedPullMode == TestPullMode.REBASE_PREASERVE) {
+					next = rw.next();
+					assertEquals(2, next.getParentCount());
+				}
+				next = rw.next();
+				assertEquals(t2.getShortMessage(), next.getShortMessage());
+				next = rw.next();
+				assertEquals(t1.getShortMessage(), next.getShortMessage());
+				next = rw.next();
+				assertEquals(sourceCommit, next);
+				next = rw.next();
+				assertEquals("Initial commit for source",
+						next.getShortMessage());
+				next = rw.next();
+				assertNull(next);
 			}
-			next = rw.next();
-			assertEquals(t2.getShortMessage(), next.getShortMessage());
-			next = rw.next();
-			assertEquals(t1.getShortMessage(), next.getShortMessage());
-			next = rw.next();
-			assertEquals(sourceCommit, next);
-			next = rw.next();
-			assertEquals("Initial commit for source", next.getShortMessage());
-			next = rw.next();
-			assertNull(next);
 		}
-		rw.release();
 	}
 
 	@Override

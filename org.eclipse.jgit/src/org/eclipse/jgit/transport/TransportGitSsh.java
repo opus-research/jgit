@@ -46,6 +46,7 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
@@ -63,11 +64,11 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.MessageWriter;
 import org.eclipse.jgit.util.io.StreamCopyThread;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Transport through an SSH tunnel.
@@ -235,9 +236,10 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			ProcessBuilder pb = new ProcessBuilder();
 			pb.command(args);
 
-			if (local.getDirectory() != null)
+			File directory = local.getDirectory();
+			if (directory != null)
 				pb.environment().put(Constants.GIT_DIR_KEY,
-						local.getDirectory().getPath());
+						directory.getPath());
 
 			try {
 				return pb.start();

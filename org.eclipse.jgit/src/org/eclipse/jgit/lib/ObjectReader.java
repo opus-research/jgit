@@ -50,12 +50,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
-import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
  * Reads an {@link ObjectDatabase} for a single thread.
@@ -66,6 +64,13 @@ import org.eclipse.jgit.revwalk.RevWalk;
 public abstract class ObjectReader implements AutoCloseable {
 	/** Type hint indicating the caller doesn't know the type. */
 	public static final int OBJ_ANY = -1;
+
+	/**
+	 * The threshold at which a file will be streamed rather than loaded
+	 * entirely into memory.
+	 * @since 4.6
+	 */
+	protected int streamFileThreshold;
 
 	/**
 	 * Construct a new reader from the same data.
@@ -399,44 +404,6 @@ public abstract class ObjectReader implements AutoCloseable {
 	}
 
 	/**
-	 * Advice from a {@link RevWalk} that a walk is starting from these roots.
-	 *
-	 * @param walk
-	 *            the revision pool that is using this reader.
-	 * @param roots
-	 *            starting points of the revision walk. The starting points have
-	 *            their headers parsed, but might be missing bodies.
-	 * @throws IOException
-	 *             the reader cannot initialize itself to support the walk.
-	 */
-	public void walkAdviceBeginCommits(RevWalk walk, Collection<RevCommit> roots)
-			throws IOException {
-		// Do nothing by default, most readers don't want or need advice.
-	}
-
-	/**
-	 * Advice from an {@link ObjectWalk} that trees will be traversed.
-	 *
-	 * @param ow
-	 *            the object pool that is using this reader.
-	 * @param min
-	 *            the first commit whose root tree will be read.
-	 * @param max
-	 *            the last commit whose root tree will be read.
-	 * @throws IOException
-	 *             the reader cannot initialize itself to support the walk.
-	 */
-	public void walkAdviceBeginTrees(ObjectWalk ow, RevCommit min, RevCommit max)
-			throws IOException {
-		// Do nothing by default, most readers don't want or need advice.
-	}
-
-	/** Advice from that a walk is over. */
-	public void walkAdviceEnd() {
-		// Do nothing by default, most readers don't want or need advice.
-	}
-
-	/**
 	 * Advise the reader to avoid unreachable objects.
 	 * <p>
 	 * While enabled the reader will skip over anything previously proven to be
@@ -463,14 +430,14 @@ public abstract class ObjectReader implements AutoCloseable {
 	}
 
 	/**
-	 * Release any resources used by this reader.
-	 * <p>
-	 * A reader that has been released can be used again, but may need to be
-	 * released after the subsequent usage. Use {@link #close()} instead.
+	 * @return the {@link ObjectInserter} from which this reader was created
+	 *         using {@code inserter.newReader()}, or null if this reader was not
+	 *         created from an inserter.
+	 * @since 4.4
 	 */
-	@Deprecated
-	public void release() {
-		close();
+	@Nullable
+	public ObjectInserter getCreatedFromInserter() {
+		return null;
 	}
 
 	/**
@@ -482,7 +449,132 @@ public abstract class ObjectReader implements AutoCloseable {
 	 * @since 4.0
 	 */
 	@Override
-	public void close() {
-		// Do nothing.
+	public abstract void close();
+
+	/**
+	 * Sets the threshold at which a file will be streamed rather than loaded
+	 * entirely into memory
+	 *
+	 * @param threshold
+	 *            the new threshold
+	 * @since 4.6
+	 */
+	public void setStreamFileThreshold(int threshold) {
+		streamFileThreshold = threshold;
+	}
+
+	/**
+	 * Returns the threshold at which a file will be streamed rather than loaded
+	 * entirely into memory
+	 *
+	 * @return the threshold in bytes
+	 * @since 4.6
+	 */
+	public int getStreamFileThreshold() {
+		return streamFileThreshold;
+	}
+
+	/**
+	 * Wraps a delegate ObjectReader.
+	 *
+	 * @since 4.4
+	 */
+	public static abstract class Filter extends ObjectReader {
+		/**
+		 * @return delegate ObjectReader to handle all processing.
+		 * @since 4.4
+		 */
+		protected abstract ObjectReader delegate();
+
+		@Override
+		public ObjectReader newReader() {
+			return delegate().newReader();
+		}
+
+		@Override
+		public AbbreviatedObjectId abbreviate(AnyObjectId objectId)
+				throws IOException {
+			return delegate().abbreviate(objectId);
+		}
+
+		@Override
+		public AbbreviatedObjectId abbreviate(AnyObjectId objectId, int len)
+				throws IOException {
+			return delegate().abbreviate(objectId, len);
+		}
+
+		@Override
+		public Collection<ObjectId> resolve(AbbreviatedObjectId id)
+				throws IOException {
+			return delegate().resolve(id);
+		}
+
+		@Override
+		public boolean has(AnyObjectId objectId) throws IOException {
+			return delegate().has(objectId);
+		}
+
+		@Override
+		public boolean has(AnyObjectId objectId, int typeHint) throws IOException {
+			return delegate().has(objectId, typeHint);
+		}
+
+		@Override
+		public ObjectLoader open(AnyObjectId objectId)
+				throws MissingObjectException, IOException {
+			return delegate().open(objectId);
+		}
+
+		@Override
+		public ObjectLoader open(AnyObjectId objectId, int typeHint)
+				throws MissingObjectException, IncorrectObjectTypeException,
+				IOException {
+			return delegate().open(objectId, typeHint);
+		}
+
+		@Override
+		public Set<ObjectId> getShallowCommits() throws IOException {
+			return delegate().getShallowCommits();
+		}
+
+		@Override
+		public <T extends ObjectId> AsyncObjectLoaderQueue<T> open(
+				Iterable<T> objectIds, boolean reportMissing) {
+			return delegate().open(objectIds, reportMissing);
+		}
+
+		@Override
+		public long getObjectSize(AnyObjectId objectId, int typeHint)
+				throws MissingObjectException, IncorrectObjectTypeException,
+				IOException {
+			return delegate().getObjectSize(objectId, typeHint);
+		}
+
+		@Override
+		public <T extends ObjectId> AsyncObjectSizeQueue<T> getObjectSize(
+				Iterable<T> objectIds, boolean reportMissing) {
+			return delegate().getObjectSize(objectIds, reportMissing);
+		}
+
+		@Override
+		public void setAvoidUnreachableObjects(boolean avoid) {
+			delegate().setAvoidUnreachableObjects(avoid);
+		}
+
+		@Override
+		public BitmapIndex getBitmapIndex() throws IOException {
+			return delegate().getBitmapIndex();
+		}
+
+		@Override
+		@Nullable
+		public ObjectInserter getCreatedFromInserter() {
+			return delegate().getCreatedFromInserter();
+		}
+
+		@Override
+		public void close() {
+			delegate().close();
+		}
 	}
 }

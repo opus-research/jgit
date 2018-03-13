@@ -136,6 +136,7 @@ class FetchProcess {
 		conn = transport.openFetch();
 		try {
 			result.setAdvertisedRefs(transport.getURI(), conn.getRefsMap());
+			result.peerUserAgent = conn.getPeerUserAgent();
 			final Set<Ref> matched = new HashSet<Ref>();
 			for (final RefSpec spec : toFetch) {
 				if (spec.getSource() == null)
@@ -313,8 +314,7 @@ class FetchProcess {
 		File meta = transport.local.getDirectory();
 		if (meta == null)
 			return;
-		final LockFile lock = new LockFile(new File(meta, "FETCH_HEAD"), //$NON-NLS-1$
-				transport.local.getFS());
+		final LockFile lock = new LockFile(new File(meta, "FETCH_HEAD")); //$NON-NLS-1$
 		try {
 			if (lock.lock()) {
 				final Writer w = new OutputStreamWriter(lock.getOutputStream());
@@ -396,11 +396,17 @@ class FetchProcess {
 	private void expandFetchTags() throws TransportException {
 		final Map<String, Ref> haveRefs = localRefs();
 		for (final Ref r : conn.getRefs()) {
-			if (!isTag(r))
+			if (!isTag(r)) {
 				continue;
+			}
+			ObjectId id = r.getObjectId();
+			if (id == null) {
+				continue;
+			}
 			final Ref local = haveRefs.get(r.getName());
-			if (local == null || !r.getObjectId().equals(local.getObjectId()))
+			if (local == null || !id.equals(local.getObjectId())) {
 				wantTag(r);
+			}
 		}
 	}
 
@@ -412,6 +418,11 @@ class FetchProcess {
 	private void want(final Ref src, final RefSpec spec)
 			throws TransportException {
 		final ObjectId newId = src.getObjectId();
+		if (newId == null) {
+			throw new NullPointerException(MessageFormat.format(
+					JGitText.get().transportProvidedRefWithNoObjectId,
+					src.getName()));
+		}
 		if (spec.getDestination() != null) {
 			final TrackingRefUpdate tru = createUpdate(spec, newId);
 			if (newId.equals(tru.getOldObjectId()))

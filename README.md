@@ -18,10 +18,6 @@ there, but the automated builds use Maven.
     All portions of JGit are covered by the EDL. Absolutely no GPL,
     LGPL or EPL contributions are accepted within this package.
 
-- org.eclipse.jgit.java7
-
-    Extensions for users of Java 7.
-
 - org.eclipse.jgit.ant
 
     Ant tasks based on JGit.
@@ -59,10 +55,6 @@ Tests
 
     Unit tests for org.eclipse.jgit
 
-- org.eclipse.jgit.java7.test
-
-    Unit tests for Java 7 specific features
-
 - org.eclipse.jgit.ant.test
 - org.eclipse.jgit.pgm.test
 - org.eclipse.jgit.http.test
@@ -73,11 +65,9 @@ Tests
 Warnings/Caveats
 ----------------
 
-- Native smbolic links are supported, but only if you are using Java 7
-  or newer and include the org.eclipse.jgit.java7 jar/bundle in the
-  classpath, provided the file system supports them. For Windows you
-  must have Windows Vista/Windows 2008 or newer, use a
-  non-administrator account and have the SeCreateSymbolicLinkPrivilege.
+- Native smbolic links are supported, provided the file system supports
+  them. For Windows you must have Windows Vista/Windows 2008 or newer,
+  use a non-administrator account and have the SeCreateSymbolicLinkPrivilege.
 
 - Only the timestamp of the index is used by jgit if the index is
   dirty.
@@ -94,9 +84,9 @@ Warnings/Caveats
   Git is installed. Make sure Git can be found via the PATH
   environment variable. When installing Git for Windows check the "Run
   Git from the Windows Command Prompt" option. There are other options
-  like the jgit.gitprefix system property or Eclipse settings that can
-  be used for pointing out where C Git is installed. Modifying PATH is
-  the recommended option if C Git is installed.
+  like Eclipse settings that can be used for pointing out where C Git
+  is installed. Modifying PATH is the recommended option if C Git is
+  installed.
 
 - We try to use the same notation of $HOME as C Git does. On Windows
   this is often not the same value as the user.home system property.
@@ -152,12 +142,6 @@ Package Features
 
     * Assorted set of command line utilities. Mostly for ad-hoc testing of jgit
       log, glog, fetch etc.
-
-- org.eclipse.jgit.java7/
-
-    * Support for symbolic links.
-
-    * Optimizations for reading file system attributes
 
 - org.eclipse.jgit.ant/
 
