@@ -548,6 +548,8 @@ public class UploadPack {
 	}
 
 	private void sendPack() throws IOException {
+		final boolean thin = options.contains(OPTION_THIN_PACK);
+		final boolean progress = !options.contains(OPTION_NO_PROGRESS);
 		final boolean sideband = options.contains(OPTION_SIDE_BAND)
 				|| options.contains(OPTION_SIDE_BAND_64K);
 
@@ -561,7 +563,7 @@ public class UploadPack {
 
 			packOut = new SideBandOutputStream(SideBandOutputStream.CH_DATA,
 					bufsz, rawOut);
-			if (!options.contains(OPTION_NO_PROGRESS))
+			if (progress)
 				pm = new SideBandProgressMonitor(new SideBandOutputStream(
 						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut));
 		}
@@ -569,7 +571,7 @@ public class UploadPack {
 		final PackWriter pw = new PackWriter(db, walk.getObjectReader());
 		try {
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
-			pw.setThin(options.contains(OPTION_THIN_PACK));
+			pw.setThin(thin);
 			pw.preparePack(pm, wantAll, commonBase);
 			if (options.contains(OPTION_INCLUDE_TAG)) {
 				for (final Ref r : refs.values()) {

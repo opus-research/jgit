@@ -61,70 +61,70 @@ import org.eclipse.jgit.storage.file.PackIndexWriter;
  */
 public class PackConfig {
 	/**
-	 * Default value of deltas reuse option.
+	 * Default value of deltas reuse option: {@value}
 	 *
 	 * @see #setReuseDeltas(boolean)
 	 */
 	public static final boolean DEFAULT_REUSE_DELTAS = true;
 
 	/**
-	 * Default value of objects reuse option.
+	 * Default value of objects reuse option: {@value}
 	 *
 	 * @see #setReuseObjects(boolean)
 	 */
 	public static final boolean DEFAULT_REUSE_OBJECTS = true;
 
 	/**
-	 * Default value of delta compress option.
+	 * Default value of delta compress option: {@value}
 	 *
 	 * @see #setDeltaCompress(boolean)
 	 */
 	public static final boolean DEFAULT_DELTA_COMPRESS = true;
 
 	/**
-	 * Default value of delta base as offset option.
+	 * Default value of delta base as offset option: {@value}
 	 *
 	 * @see #setDeltaBaseAsOffset(boolean)
 	 */
 	public static final boolean DEFAULT_DELTA_BASE_AS_OFFSET = false;
 
 	/**
-	 * Default value of maximum delta chain depth.
+	 * Default value of maximum delta chain depth: {@value}
 	 *
 	 * @see #setMaxDeltaDepth(int)
 	 */
 	public static final int DEFAULT_MAX_DELTA_DEPTH = 50;
 
 	/**
-	 * Default window size during packing.
+	 * Default window size during packing: {@value}
 	 *
 	 * @see #setDeltaSearchWindowSize(int)
 	 */
 	public static final int DEFAULT_DELTA_SEARCH_WINDOW_SIZE = 10;
 
 	/**
-	 * Default big file threshold.
+	 * Default big file threshold: {@value}
 	 *
 	 * @see #setBigFileThreshold(long)
 	 */
 	public static final long DEFAULT_BIG_FILE_THRESHOLD = 50 * 1024 * 1024;
 
 	/**
-	 * Default delta cache size.
+	 * Default delta cache size: {@value}
 	 *
 	 * @see #setDeltaCacheSize(long)
 	 */
 	public static final long DEFAULT_DELTA_CACHE_SIZE = 50 * 1024 * 1024;
 
 	/**
-	 * Default delta cache limit.
+	 * Default delta cache limit: {@value}
 	 *
 	 * @see #setDeltaCacheLimit(int)
 	 */
 	public static final int DEFAULT_DELTA_CACHE_LIMIT = 100;
 
 	/**
-	 * Default index version.
+	 * Default index version: {@value}
 	 *
 	 * @see #setIndexVersion(int)
 	 */
@@ -606,7 +606,7 @@ public class PackConfig {
 		setDeltaSearchMemoryLimit(rc.getLong("pack", "windowmemory", getDeltaSearchMemoryLimit()));
 		setDeltaCacheSize(rc.getLong("pack", "deltacachesize", getDeltaCacheSize()));
 		setDeltaCacheLimit(rc.getInt("pack", "deltacachelimit", getDeltaCacheLimit()));
-		setCompressionLevel(rc.getInt("pack", "compression", //
+		setCompressionLevel(rc.getInt("pack", "compression",
 				rc.getInt("core", "compression", getCompressionLevel())));
 		setIndexVersion(rc.getInt("pack", "indexversion", getIndexVersion()));
 		setBigFileThreshold(rc.getLong("core", "bigfilethreshold", getBigFileThreshold()));
