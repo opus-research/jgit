@@ -753,7 +753,7 @@ public class DirCache {
 	 * <p>
 	 * If no path matches the entry -(position+1) is returned, where position is
 	 * the location it would have gone within the index.
-	 * 
+	 *
 	 * @param p
 	 *            the byte array starting with the path to search for.
 	 * @param pLen
