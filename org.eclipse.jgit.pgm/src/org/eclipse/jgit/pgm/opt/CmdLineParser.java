@@ -267,8 +267,8 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 	class MyOptionDef extends OptionDef {
 
 		public MyOptionDef(OptionDef o) {
-		    super(o.usage(), o.metaVar(), o.required(), o.hidden(),
-				o.handler(), o.isMultiValued());
+			super(o.usage(), o.metaVar(), o.required(), o.handler(), o
+					.isMultiValued());
 		}
 
 		@Override
@@ -301,8 +301,7 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 	}
 
 	@SuppressWarnings("unchecked")
-	@Override
-	public List<OptionHandler> getOptions() {
+	private List<OptionHandler> getOptions() {
 		List<OptionHandler> options = null;
 		try {
 			Field field = org.kohsuke.args4j.CmdLineParser.class
