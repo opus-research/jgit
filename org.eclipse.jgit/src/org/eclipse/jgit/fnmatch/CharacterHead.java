@@ -59,7 +59,7 @@ final class CharacterHead extends AbstractHead {
 
 	@Override
 	public String toString() {
-		return String.valueOf(expectedCharacter);
+		return Character.valueOf(expectedCharacter).toString();
 	}
 
 }
