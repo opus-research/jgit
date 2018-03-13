@@ -47,6 +47,7 @@ package org.eclipse.jgit.storage.dfs;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
+import static org.eclipse.jgit.storage.pack.PackExt.PACK;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -75,7 +76,6 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.BitmapIndex;
-import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
@@ -150,17 +150,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				return new BitmapIndexImpl(bitmapIndex);
 		}
 		return null;
-	}
-
-	public Collection<CachedPack> getCachedPacksAndUpdate(
-		BitmapBuilder needBitmap) throws IOException {
-		for (DfsPackFile pack : db.getPacks()) {
-			PackBitmapIndex bitmapIndex = pack.getPackBitmapIndex(this);
-			if (needBitmap.removeAllOrNone(bitmapIndex))
-				return Collections.<CachedPack> singletonList(
-						new DfsCachedPack(pack));
-		}
-		return Collections.emptyList();
 	}
 
 	@Override
@@ -685,7 +674,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				pack.setInvalid();
 				throw new IOException(MessageFormat.format(
 						JGitText.get().packfileCorruptionDetected,
-						pack.getPackDescription().getPackName()));
+						pack.getPackDescription().getFileName(PACK)));
 			}
 		}
 	}

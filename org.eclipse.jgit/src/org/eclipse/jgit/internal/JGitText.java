@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -86,13 +86,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
-	/***/ public String bitmapMissingObject;
 	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
-	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
+	/***/ public String cachedPacksPreventsListingObjects;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
 	/***/ public String cannotCombineSquashWithNoff;
@@ -485,7 +484,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String searchForReuse;
 	/***/ public String searchForSizes;
 	/***/ public String secondsAgo;
-	/***/ public String selectingCommits;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
@@ -542,6 +540,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
 	/***/ public String treeEntryAlreadyExists;
+	/***/ public String treeFilterMarkerTooManyFilters;
 	/***/ public String treeIteratorDoesNotSupportRemove;
 	/***/ public String treeWalkMustHaveExactlyTwoTrees;
 	/***/ public String truncatedHunkLinesMissingForAncestor;

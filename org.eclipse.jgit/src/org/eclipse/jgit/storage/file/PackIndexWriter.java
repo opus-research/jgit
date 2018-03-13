@@ -94,43 +94,23 @@ public abstract class PackIndexWriter {
 	 * @throws IllegalArgumentException
 	 *             no recognized pack index version can support the supplied
 	 *             objects. This is likely a bug in the implementation.
-	 * @see #oldestPossibleFormat(List)
 	 */
+	@SuppressWarnings("fallthrough")
 	public static PackIndexWriter createOldestPossible(final OutputStream dst,
 			final List<? extends PackedObjectInfo> objs) {
-		return createVersion(dst, oldestPossibleFormat(objs));
-	}
-
-	/**
-	 * Return the oldest (most widely understood) index format.
-	 * <p>
-	 * This method selects an index format that can accurate describe the
-	 * supplied objects and that will be the most compatible format with older
-	 * Git implementations.
-	 * <p>
-	 * Index version 1 is widely recognized by all Git implementations, but
-	 * index version 2 (and later) is not as well recognized as it was
-	 * introduced more than a year later. Index version 1 can only be used if
-	 * the resulting pack file is under 4 gigabytes in size; packs larger than
-	 * that limit must use index version 2.
-	 *
-	 * @param objs
-	 *            the objects the caller needs to store in the index. Entries
-	 *            will be examined until a format can be conclusively selected.
-	 * @return the index format.
-	 * @throws IllegalArgumentException
-	 *             no recognized pack index version can support the supplied
-	 *             objects. This is likely a bug in the implementation.
-	 */
-	public static int oldestPossibleFormat(
-			final List<? extends PackedObjectInfo> objs) {
-		for (final PackedObjectInfo oe : objs) {
-			if (!PackIndexWriterV1.canStore(oe))
-				return 2;
+		int version = 1;
+		LOOP: for (final PackedObjectInfo oe : objs) {
+			switch (version) {
+			case 1:
+				if (PackIndexWriterV1.canStore(oe))
+					continue;
+				version = 2;
+			case 2:
+				break LOOP;
+			}
 		}
-		return 1;
+		return createVersion(dst, version);
 	}
-
 
 	/**
 	 * Create a new writer instance for a specific index format version.
@@ -155,8 +135,6 @@ public abstract class PackIndexWriter {
 			return new PackIndexWriterV1(dst);
 		case 2:
 			return new PackIndexWriterV2(dst);
-		case 0xE003:
-			return new PackIndexWriterVE003(dst);
 		default:
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().unsupportedPackIndexVersion,
@@ -175,9 +153,6 @@ public abstract class PackIndexWriter {
 
 	/** SHA-1 checksum for the entire pack data. */
 	protected byte[] packChecksum;
-
-	/** Bitmap index data to write, if not null. */
-	protected PackBitmapIndexBuilder bitmaps;
 
 	/**
 	 * Create a new writer instance.
@@ -212,35 +187,8 @@ public abstract class PackIndexWriter {
 	 */
 	public void write(final List<? extends PackedObjectInfo> toStore,
 			final byte[] packDataChecksum) throws IOException {
-		write(toStore, packDataChecksum, null);
-	}
-
-	/**
-	 * Write all object entries to the index stream.
-	 * <p>
-	 * After writing the stream passed to the factory is flushed but remains
-	 * open. Callers are always responsible for closing the output stream.
-	 *
-	 * @param toStore
-	 *            sorted list of objects to store in the index. The caller must
-	 *            have previously sorted the list using
-	 *            {@link PackedObjectInfo}'s native {@link Comparable}
-	 *            implementation.
-	 * @param packDataChecksum
-	 *            checksum signature of the entire pack data content. This is
-	 *            traditionally the last 20 bytes of the pack file's own stream.
-	 * @param writeBitmaps
-	 *            the index data for the bitmaps
-	 * @throws IOException
-	 *             an error occurred while writing to the output stream, or this
-	 *             index format cannot store the object data supplied.
-	 */
-	public void write(final List<? extends PackedObjectInfo> toStore,
-			final byte[] packDataChecksum,
-			final PackBitmapIndexBuilder writeBitmaps) throws IOException {
 		entries = toStore;
 		packChecksum = packDataChecksum;
-		bitmaps = writeBitmaps;
 		writeImpl();
 		out.flush();
 	}
