@@ -93,7 +93,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * overall size of a Git repository on disk.
  */
 class RefDirectory extends RefDatabase {
-	static final String SYMREF = "ref: ";//$NON-NLS-1$
+	private static final String SYMREF = "ref: ";//$NON-NLS-1$
 
 	private static final String PACKED_REFS_HEADER = "# pack-refs with:";//$NON-NLS-1$
 
@@ -271,6 +271,26 @@ class RefDirectory extends RefDatabase {
 	}
 
 	@Override
+	public void link(String name, String target) throws IOException {
+		long m = write(fileFor(name), encode(SYMREF + target + '\n'));
+
+		synchronized (cacheLock) {
+			RefHolder holder = cache.get(name);
+			if (holder != null)
+				name = holder.currRef.getName();
+			else {
+				holder = new RefHolder();
+				cache.put(name, holder);
+			}
+
+			holder.currRef = newSymbolicRef(name, target);
+			holder.looseModified = m;
+			modCnt++;
+		}
+		fireRefsChanged();
+	}
+
+	@Override
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
 		Ref ref;
@@ -320,29 +340,6 @@ class RefDirectory extends RefDatabase {
 		fireRefsChanged();
 	}
 
-	void storedSymbolicRef(RefDirectoryUpdate u, long modified, String target)
-			throws IOException {
-		String name = u.getRef().getName();
-		synchronized (cacheLock) {
-			RefHolder holder = cache.get(name);
-			if (holder != null) {
-				if (holder.packRef != null) {
-					holder.packRef = null;
-					savePackedRefs();
-				}
-				name = holder.currRef.getName();
-			} else {
-				holder = new RefHolder();
-				cache.put(name, holder);
-			}
-
-			holder.currRef = newSymbolicRef(name, target);
-			holder.looseModified = modified;
-			modCnt++;
-		}
-		fireRefsChanged();
-	}
-
 	void delete(RefDirectoryUpdate update) throws IOException {
 		Ref dst = update.getRef().getLeaf();
 		String name = dst.getName();
@@ -367,8 +364,7 @@ class RefDirectory extends RefDatabase {
 		fireRefsChanged();
 	}
 
-	void log(final RefUpdate update, final String msg, final boolean deref)
-			throws IOException {
+	void log(final RefUpdate update, final String msg) throws IOException {
 		final ObjectId oldId = update.getOldObjectId();
 		final ObjectId newId = update.getNewObjectId();
 		final Ref ref = update.getRef();
@@ -390,12 +386,9 @@ class RefDirectory extends RefDatabase {
 		r.append('\n');
 		final byte[] rec = encode(r.toString());
 
-		if (deref && ref instanceof SymbolicRef) {
+		if (ref instanceof SymbolicRef)
 			log(ref.getName(), rec);
-			log(ref.getLeaf().getName(), rec);
-		} else {
-			log(ref.getName(), rec);
-		}
+		log(ref.getLeaf().getName(), rec);
 	}
 
 	private void log(final String refName, final byte[] rec) throws IOException {

@@ -208,16 +208,8 @@ class RefDirectoryRename extends RefRename {
 
 	private boolean linkHEAD(RefUpdate target) {
 		try {
-			RefUpdate u = refdb.newUpdate(Constants.HEAD, false);
-			u.disableRefLog();
-			switch (u.link(target.getName())) {
-			case NEW:
-			case FORCED:
-			case NO_CHANGE:
-				return true;
-			default:
-				return false;
-			}
+			refdb.link(Constants.HEAD, target.getName());
+			return true;
 		} catch (IOException e) {
 			return false;
 		}
