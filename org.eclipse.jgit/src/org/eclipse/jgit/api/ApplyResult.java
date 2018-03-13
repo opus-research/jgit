@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2011, 2012 IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,19 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm.debug;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.GC;
+/**
+ * Encapsulates the result of a {@link ApplyCommand}
+ */
+public class ApplyResult {
 
-class Gc extends TextBuiltin {
-	@Override
-	protected void run() throws Exception {
-		GC gc = new GC((FileRepository) db);
-		gc.setProgressMonitor(new TextProgressMonitor());
-		gc.gc();
+	private List<File> updatedFiles = new ArrayList<File>();
+
+	/**
+	 * @param f
+	 *            an updated file
+	 * @return this instance
+	 */
+	public ApplyResult addUpdatedFile(File f) {
+		updatedFiles.add(f);
+		return this;
+
+	}
+
+	/**
+	 * @return updated files
+	 */
+	public List<File> getUpdatedFiles() {
+		return updatedFiles;
 	}
 }
