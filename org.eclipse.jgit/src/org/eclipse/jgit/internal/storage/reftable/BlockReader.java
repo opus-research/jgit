@@ -49,6 +49,11 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
@@ -56,6 +61,7 @@ import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -89,7 +95,6 @@ class BlockReader {
 
 	private byte[] nameBuf = new byte[256];
 	private int nameLen;
-	private int type;
 
 	byte type() {
 		return blockType;
@@ -105,8 +110,7 @@ class BlockReader {
 
 	void parseEntryName() {
 		int pfx = readVarint32();
-		type = readVarint32();
-		int sfx = type >>> 2;
+		int sfx = readVarint32();
 		if (pfx + sfx > nameBuf.length) {
 			int n = Math.max(pfx + sfx, nameBuf.length * 2);
 			nameBuf = Arrays.copyOf(nameBuf, n);
@@ -119,7 +123,7 @@ class BlockReader {
 	String name() {
 		int len = nameLen;
 		if (blockType == LOG_BLOCK_TYPE) {
-			len -= 5;
+			len -= 9;
 		}
 		return RawParseUtils.decode(UTF_8, nameBuf, 0, len);
 	}
@@ -127,7 +131,7 @@ class BlockReader {
 	boolean checkNameMatches(byte[] match) {
 		int len = nameLen;
 		if (blockType == LOG_BLOCK_TYPE) {
-			len -= 5;
+			len -= 9;
 		}
 		if (len < match.length) {
 			return false;
@@ -146,27 +150,27 @@ class BlockReader {
 		}
 
 		readVarint32(); // skip prefix length
-		int n = readVarint32() >>> 2;
+		int n = readVarint32();
 		ptr += n; // skip name
 		return readVarint64();
 	}
 
 	Ref readRef() throws IOException {
 		String name = RawParseUtils.decode(UTF_8, nameBuf, 0, nameLen);
-		switch (type & 0x03) {
-		case 0x00: // delete
+		switch (readVarint32()) {
+		case VALUE_NONE: // delete
 			return newRef(name);
 
-		case 0x01: // single ObjectId
+		case VALUE_1ID:
 			return new ObjectIdRef.PeeledNonTag(PACKED, name, readValueId());
 
-		case 0x02: { // annotated tag, two ObjectIds
+		case VALUE_2ID: { // annotated tag
 			ObjectId id1 = readValueId();
 			ObjectId id2 = readValueId();
 			return new ObjectIdRef.PeeledTag(PACKED, name, id1, id2);
 		}
 
-		case 0x03: // symbolic ref
+		case VALUE_SYMREF:
 			return new SymbolicRef(name, newRef(readValueString()));
 
 		default:
@@ -174,8 +178,11 @@ class BlockReader {
 		}
 	}
 
-	ReflogEntry readLog() {
-		int when = 0xffffffff - NB.decodeInt32(nameBuf, nameLen - 4);
+	long readLogTimeUsec() {
+		return reverseTime(NB.decodeInt64(nameBuf, nameLen - 8));
+	}
+
+	ReflogEntry readLog(long timeUsec) {
 		ObjectId oldId = readValueId();
 		ObjectId newId = readValueId();
 		short tz = readInt16();
@@ -196,7 +203,8 @@ class BlockReader {
 
 			@Override
 			public PersonIdent getWho() {
-				return new PersonIdent(name, email, when * 1000L, tz);
+				long ms = TimeUnit.MICROSECONDS.toMillis(timeUsec);
+				return new PersonIdent(name, email, ms, tz);
 			}
 
 			@Override
@@ -342,7 +350,7 @@ class BlockReader {
 			int mid = (low + end) >>> 1;
 			int p = NB.decodeInt32(buf, restartIdx + mid * 4);
 			ptr = p + 1; // skip 0 prefix length
-			int len = readVarint32() >>> 2;
+			int len = readVarint32();
 			int cmp = compare(name, buf, ptr, len);
 			if (cmp < 0) {
 				end = mid;
@@ -388,16 +396,16 @@ class BlockReader {
 	void skipValue() {
 		switch (blockType) {
 		case REF_BLOCK_TYPE:
-			switch (type & 0x03) {
-			case 0x00: // deletion
+			switch (readVarint32()) {
+			case VALUE_NONE:
 				return;
-			case 0x01:
+			case VALUE_1ID:
 				ptr += OBJECT_ID_LENGTH;
 				return;
-			case 0x02:
+			case VALUE_2ID:
 				ptr += 2 * OBJECT_ID_LENGTH;
 				return;
-			case 0x03:
+			case VALUE_SYMREF:
 				skipString();
 				return;
 			}

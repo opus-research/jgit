@@ -100,13 +100,14 @@ public abstract class RefCursor implements AutoCloseable {
 	 *
 	 * @param refName
 	 *            exact name of the reference whose log to read.
-	 * @param time
-	 *            time in seconds since the epoch to scan from. Records at this
-	 *            time and older will be returned.
+	 * @param timeUsec
+	 *            time in microseconds since the epoch to scan backwards from.
+	 *            Records at this time and older will be returned.
 	 * @throws IOException
 	 *             logs cannot be read.
 	 */
-	public abstract void seekLog(String refName, int time) throws IOException;
+	public abstract void seekLog(String refName, long timeUsec)
+			throws IOException;
 
 	/**
 	 * Check if another reference or log record is available.
@@ -128,6 +129,9 @@ public abstract class RefCursor implements AutoCloseable {
 		Ref r = getRef();
 		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
 	}
+
+	/** @return time of reflog entry, microseconds since the epoch. */
+	public abstract long getReflogTimeUsec();
 
 	/** @return current log entry, if scanning the log. */
 	public abstract ReflogEntry getReflogEntry();
