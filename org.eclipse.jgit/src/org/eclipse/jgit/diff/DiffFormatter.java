@@ -139,15 +139,15 @@ public class DiffFormatter {
 
 			while (aCur < aEnd || bCur < bEnd) {
 				if (aCur < curEdit.getBeginA() || endIdx + 1 < curIdx) {
-					writeContextLine(out, a, aCur, isEndOfLineMissing(a, aCur));
+					writeLine(out, ' ', a, aCur);
 					aCur++;
 					bCur++;
+
 				} else if (aCur < curEdit.getEndA()) {
-					writeRemovedLine(out, a, aCur, isEndOfLineMissing(a, aCur));
-					aCur++;
+					writeLine(out, '-', a, aCur++);
+
 				} else if (bCur < curEdit.getEndB()) {
-					writeAddedLine(out, b, bCur, isEndOfLineMissing(b, bCur));
-					bCur++;
+					writeLine(out, '+', b, bCur++);
 				}
 
 				if (end(curEdit, aCur, bCur) && ++curIdx < edits.size())
@@ -156,85 +156,12 @@ public class DiffFormatter {
 		}
 	}
 
-	/**
-	 * Output a line of diff context
-	 *
-	 * @param out
-	 *            OutputStream
-	 * @param text
-	 *            RawText for accessing raw data
-	 * @param line
-	 *            the line number within text
-	 * @param endOfLineMissing
-	 *            true if we should add the GNU end of line missing warning
-	 * @throws IOException
-	 */
-	protected void writeContextLine(final OutputStream out, final RawText text,
-			final int line, boolean endOfLineMissing) throws IOException {
-		writeLine(out, ' ', text, line, endOfLineMissing);
-	}
-
-	private boolean isEndOfLineMissing(final RawText text, final int line) {
-		return line + 1 == text.size() && text.isMissingNewlineAtEnd();
-	}
-
-	/**
-	 * Output an added line
-	 *
-	 * @param out
-	 *            OutputStream
-	 * @param text
-	 *            RawText for accessing raw data
-	 * @param line
-	 *            the line number within text
-	 * @param endOfLineMissing
-	 *            true if we should add the gnu end of line missing warning
-	 * @throws IOException
-	 */
-	protected void writeAddedLine(final OutputStream out, final RawText text, final int line, boolean endOfLineMissing)
-			throws IOException {
-		writeLine(out, '+', text, line, endOfLineMissing);
-	}
-
-	/**
-	 * Output a removed line
-	 *
-	 * @param out
-	 *            OutputStream
-	 * @param text
-	 *            RawText for accessing raw data
-	 * @param line
-	 *            the line number within text
-	 * @param endOfLineMissing
-	 *            true if we should add the gnu end of line missing warning
-	 * @throws IOException
-	 */
-	protected void writeRemovedLine(final OutputStream out, final RawText text,
-			final int line, boolean endOfLineMissing) throws IOException {
-		writeLine(out, '-', text, line, endOfLineMissing);
-	}
-
-	/**
-	 * Output a hunk header
-	 *
-	 * @param out
-	 *            OutputStream
-	 * @param aStartLine
-	 *            within first source
-	 * @param aEndLine
-	 *            within first source
-	 * @param bStartLine
-	 *            within second source
-	 * @param bEndLine
-	 *            within second source
-	 * @throws IOException
-	 */
-	protected void writeHunkHeader(final OutputStream out, int aStartLine, int aEndLine,
-			int bStartLine, int bEndLine) throws IOException {
+	private void writeHunkHeader(final OutputStream out, int aCur, int aEnd,
+			int bCur, int bEnd) throws IOException {
 		out.write('@');
 		out.write('@');
-		writeRange(out, '-', aStartLine + 1, aEndLine - aStartLine);
-		writeRange(out, '+', bStartLine + 1, bEndLine - bStartLine);
+		writeRange(out, '-', aCur + 1, aEnd - aCur);
+		writeRange(out, '+', bCur + 1, bEnd - bCur);
 		out.write(' ');
 		out.write('@');
 		out.write('@');
@@ -272,17 +199,12 @@ public class DiffFormatter {
 	}
 
 	private static void writeLine(final OutputStream out, final char prefix,
-			final RawText text, final int cur, boolean noNewLineIndicator) throws IOException {
+			final RawText text, final int cur) throws IOException {
 		out.write(prefix);
 		text.writeLine(out, cur);
 		out.write('\n');
-		if (noNewLineIndicator)
-			writeNoNewLine(out);
-	}
-
-	private static void writeNoNewLine(final OutputStream out)
-			throws IOException {
-		out.write(noNewLine);
+		if (cur + 1 == text.size() && text.isMissingNewlineAtEnd())
+			out.write(noNewLine);
 	}
 
 	private int findCombinedEnd(final List<Edit> edits, final int i) {

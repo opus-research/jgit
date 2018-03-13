@@ -1,8 +1,7 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2009, Yann Simon <yann.simon.fr@gmail.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,71 +45,72 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
+import java.io.InputStream;
 
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
+import junit.framework.TestCase;
 
 /**
- * Base class for most JGit unit tests.
- *
- * Sets up a predefined test repository and has support for creating additional
- * repositories and destroying them when the tests are finished.
+ * Base class for performance unit test.
  */
-public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
-	protected static void copyFile(final File src, final File dst)
-			throws IOException {
-		final FileInputStream fis = new FileInputStream(src);
+public abstract class SpeedTestBase extends TestCase {
+
+	/**
+	 * The time used by native git as this is our reference.
+	 */
+	protected long nativeTime;
+
+	/**
+	 * Reference to the location of the Linux kernel repo.
+	 */
+	protected String kernelrepo;
+
+	/**
+	 * Prepare test by running a test against the Linux kernel repo first.
+	 *
+	 * @param refcmd
+	 *            git command to execute
+	 *
+	 * @throws Exception
+	 */
+	protected void prepare(String[] refcmd) throws Exception {
 		try {
-			final FileOutputStream fos = new FileOutputStream(dst);
+			BufferedReader bufferedReader = new BufferedReader(new FileReader("kernel.ref"));
 			try {
-				final byte[] buf = new byte[4096];
-				int r;
-				while ((r = fis.read(buf)) > 0) {
-					fos.write(buf, 0, r);
-				}
+				kernelrepo = bufferedReader.readLine();
 			} finally {
-				fos.close();
+				bufferedReader.close();
 			}
-		} finally {
-			fis.close();
+			timeNativeGit(kernelrepo, refcmd);
+			nativeTime = timeNativeGit(kernelrepo, refcmd);
+		} catch (Exception e) {
+			System.out.println("Create a file named kernel.ref and put the path to the Linux kernels repository there");
+			throw e;
 		}
 	}
 
-	protected File writeTrashFile(final String name, final String data)
-			throws IOException {
-		File path = new File(db.getWorkDir(), name);
-		write(path, data);
-		return path;
-	}
-
-	protected static void checkFile(File f, final String checkData)
-			throws IOException {
-		Reader r = new InputStreamReader(new FileInputStream(f), "ISO-8859-1");
-		try {
-			char[] data = new char[(int) f.length()];
-			if (f.length() !=  r.read(data))
-				throw new IOException("Internal error reading file data from "+f);
-			assertEquals(checkData, new String(data));
-		} finally {
-			r.close();
+	private static long timeNativeGit(String kernelrepo, String[] refcmd) throws IOException,
+			InterruptedException, Exception {
+		long start = System.currentTimeMillis();
+		Process p = Runtime.getRuntime().exec(refcmd, null, new File(kernelrepo,".."));
+		InputStream inputStream = p.getInputStream();
+		InputStream errorStream = p.getErrorStream();
+		byte[] buf=new byte[1024*1024];
+		for (;;)
+			if (inputStream.read(buf) < 0)
+				break;
+		if (p.waitFor()!=0) {
+			int c;
+			while ((c=errorStream.read())!=-1)
+				System.err.print((char)c);
+			throw new Exception("git log failed");
 		}
-	}
-
-	/** Test repository, initialized for this test case. */
-	protected Repository db;
-
-	/** Working directory of {@link #db}. */
-	protected File trash;
-
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-		db = createWorkRepository();
-		trash = db.getWorkDir();
+		inputStream.close();
+		errorStream.close();
+		long stop = System.currentTimeMillis();
+		return stop - start;
 	}
 }

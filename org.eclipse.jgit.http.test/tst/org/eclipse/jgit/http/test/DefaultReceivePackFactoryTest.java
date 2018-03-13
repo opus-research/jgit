@@ -174,7 +174,7 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 		assertNotNull("have ReceivePack", rp);
 	}
 
-	private static final class R extends HttpServletRequestWrapper {
+	private final class R extends HttpServletRequestWrapper {
 		private final String user;
 
 		private final String host;

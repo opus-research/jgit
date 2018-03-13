@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PackIndex;
 import org.eclipse.jgit.lib.PackLock;
@@ -241,10 +240,8 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 	@Override
 	public void close() {
-		for (final RemotePack p : unfetchedPacks) {
-			if (p.tmpIdx != null)
-				p.tmpIdx.delete();
-		}
+		for (final RemotePack p : unfetchedPacks)
+			p.tmpIdx.delete();
 		for (final WalkRemoteObjectDatabase r : remotes)
 			r.close();
 	}
@@ -515,8 +512,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 				// it failed the index and pack are unusable and we
 				// shouldn't consult them again.
 				//
-				if (pack.tmpIdx != null)
-					pack.tmpIdx.delete();
+				pack.tmpIdx.delete();
 				packItr.remove();
 			}
 
@@ -792,11 +788,12 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 		final String idxName;
 
-		File tmpIdx;
+		final File tmpIdx;
 
 		PackIndex index;
 
 		RemotePack(final WalkRemoteObjectDatabase c, final String pn) {
+			final File objdir = local.getObjectsDirectory();
 			connection = c;
 			packName = pn;
 			idxName = packName.substring(0, packName.length() - 5) + ".idx";
@@ -806,19 +803,13 @@ class WalkFetchConnection extends BaseFetchConnection {
 				tn = tn.substring(5);
 			if (tn.endsWith(".idx"))
 				tn = tn.substring(0, tn.length() - 4);
-
-			if (local.getObjectDatabase() instanceof ObjectDirectory) {
-				tmpIdx = new File(((ObjectDirectory) local.getObjectDatabase())
-						.getDirectory(), "walk-" + tn + ".walkidx");
-			}
+			tmpIdx = new File(objdir, "walk-" + tn + ".walkidx");
 		}
 
 		void openIndex(final ProgressMonitor pm) throws IOException {
 			if (index != null)
 				return;
-			if (tmpIdx == null)
-				tmpIdx = File.createTempFile("jgit-walk-", ".idx");
-			else if (tmpIdx.isFile()) {
+			if (tmpIdx.isFile()) {
 				try {
 					index = PackIndex.open(tmpIdx);
 					return;
