@@ -811,36 +811,9 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		for (;;) {
-			int v = useCnt.intValue();
-			if (v == 0) {
-				break;
-			} else if (useCnt.compareAndSet(v, v - 1)) {
-				if (v == 1) {
-					doClose();
-				}
-				break;
-			}
+		if (useCnt.decrementAndGet() == 0) {
+			doClose();
 		}
-	}
-
-	/**
-	 * @return true if this repository is closed
-	 * @since 4.2
-	 */
-	public boolean isClosed() {
-		return useCnt.get() == 0;
-	}
-
-	/**
-	 * Forcibly close all opened object and ref databases, independently of the
-	 * use count. The use count will be set to zero.
-	 *
-	 * @since 4.2
-	 */
-	public void closeForcibly() {
-		useCnt.set(0);
-		doClose();
 	}
 
 	/**

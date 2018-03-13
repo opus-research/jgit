@@ -2018,7 +2018,7 @@ public class PackWriter implements AutoCloseable {
 				reader, writeBitmaps, pm, stats.interestingObjects);
 
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
-				bitmapPreparer.selectCommits(numCommits);
+				bitmapPreparer.doCommitSelection(numCommits);
 
 		beginPhase(PackingPhase.BUILDING_BITMAPS, pm, selectedCommits.size());
 

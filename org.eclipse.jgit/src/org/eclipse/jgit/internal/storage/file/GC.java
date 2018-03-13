@@ -877,11 +877,6 @@ public class GC {
 		 */
 		public long numberOfPackedRefs;
 
-		/**
-		 * The number of bitmaps in the bitmap indices.
-		 */
-		public long numberOfBitmaps;
-
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -891,15 +886,15 @@ public class GC {
 			b.append(", numberOfPackedRefs=").append(numberOfPackedRefs); //$NON-NLS-1$
 			b.append(", sizeOfLooseObjects=").append(sizeOfLooseObjects); //$NON-NLS-1$
 			b.append(", sizeOfPackedObjects=").append(sizeOfPackedObjects); //$NON-NLS-1$
-			b.append(", numberOfBitmaps=").append(numberOfBitmaps); //$NON-NLS-1$
 			return b.toString();
 		}
 	}
 
 	/**
-	 * Returns information about objects and pack files for a FileRepository.
+	 * Returns the number of objects stored in pack files. If an object is
+	 * contained in multiple pack files it is counted as often as it occurs.
 	 *
-	 * @return information about objects and pack files for a FileRepository
+	 * @return the number of objects stored in pack files
 	 * @throws IOException
 	 */
 	public RepoStatistics getStatistics() throws IOException {
@@ -909,8 +904,6 @@ public class GC {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
 			ret.numberOfPackFiles++;
 			ret.sizeOfPackedObjects += f.getPackFile().length();
-			if (f.getBitmapIndex() != null)
-				ret.numberOfBitmaps += f.getBitmapIndex().getBitmapCount();
 		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();

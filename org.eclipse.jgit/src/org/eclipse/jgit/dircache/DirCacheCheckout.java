@@ -318,8 +318,16 @@ public class DirCacheCheckout {
 				// The index entry is missing
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
-					// don't overwrite an untracked and not ignored file
-					conflicts.add(walk.getPathString());
+					if (failOnConflict) {
+						// don't overwrite an untracked and not ignored file
+						conflicts.add(walk.getPathString());
+					} else {
+						// failOnConflict is false. Putting something to conflicts
+						// would mean we delete it. Instead we want the mergeCommit
+						// content to be checked out.
+						update(m.getEntryPathString(), m.getEntryObjectId(),
+								m.getEntryFileMode());
+					}
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
@@ -354,6 +362,9 @@ public class DirCacheCheckout {
 			if (f != null) {
 				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
+					// We put it in conflicts. Even if failOnConflict is false
+					// this would cause the path to be deleted. Thats exactly what
+					// we want in this situation
 					conflicts.add(walk.getPathString());
 				} else {
 					// No file/folder conflict exists. All entries are files or
@@ -447,7 +458,7 @@ public class DirCacheCheckout {
 			for (String path : updated.keySet()) {
 				DirCacheEntry entry = dc.getEntry(path);
 				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader, false);
+					checkoutEntry(repo, entry, objectReader);
 			}
 
 			// commit the index builder - a new index is persisted
@@ -1127,13 +1138,6 @@ public class DirCacheCheckout {
 	 * final filename.
 	 *
 	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a non-empty
-	 * directory, and the target entry type is a link or file, the checkout will
-	 * fail with {@link IOException} since existing non-empty directory cannot
-	 * be renamed to file or link without deleting it recursively.
-	 * </p>
-	 *
-	 * <p>
 	 * TODO: this method works directly on File IO, we may need another
 	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
 	 * Eclipse that Files in the workspace got changed
@@ -1150,42 +1154,6 @@ public class DirCacheCheckout {
 	 */
 	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
 			ObjectReader or) throws IOException {
-		checkoutEntry(repo, entry, or, false);
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a file, it
-	 * will be deleted and if it exists as a directory, it will be deleted
-	 * recursively, independently if has any content.
-	 * </p>
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 *            repository managing the destination work tree.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @param deleteRecursive
-	 *            true to recursively delete final path if it exists on the file
-	 *            system
-	 *
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or, boolean deleteRecursive) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File f = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = f.getParentFile();
@@ -1196,9 +1164,6 @@ public class DirCacheCheckout {
 				&& opt.getSymLinks() == SymLinks.TRUE) {
 			byte[] bytes = ol.getBytes();
 			String target = RawParseUtils.decode(bytes);
-			if (deleteRecursive && f.isDirectory()) {
-				FileUtils.delete(f, FileUtils.RECURSIVE);
-			}
 			fs.createSymLink(f, target);
 			entry.setLength(bytes.length);
 			entry.setLastModified(fs.lastModified(f));
@@ -1229,18 +1194,11 @@ public class DirCacheCheckout {
 			}
 		}
 		try {
-			if (deleteRecursive && f.isDirectory()) {
-				FileUtils.delete(f, FileUtils.RECURSIVE);
-			}
 			FileUtils.rename(tmpFile, f);
 		} catch (IOException e) {
 			throw new IOException(MessageFormat.format(
 					JGitText.get().renameFileFailed, tmpFile.getPath(),
 					f.getPath()));
-		} finally {
-			if (tmpFile.exists()) {
-				FileUtils.delete(tmpFile);
-			}
 		}
 		entry.setLastModified(f.lastModified());
 	}
