@@ -121,23 +121,22 @@ class Merge extends TextBuiltin {
 					CLIText.get().refDoesNotExistOrNoCommit, ref));
 
 		Ref oldHead = db.getRef(Constants.HEAD);
+		Git git = new Git(db);
+		MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
+				.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
+		if (srcRef != null)
+			mergeCmd.include(srcRef);
+		else
+			mergeCmd.include(src);
+
+		if (message != null)
+			mergeCmd.setMessage(message);
+
 		MergeResult result;
-		try (Git git = new Git(db)) {
-			MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
-					.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
-			if (srcRef != null)
-				mergeCmd.include(srcRef);
-			else
-				mergeCmd.include(src);
-
-			if (message != null)
-				mergeCmd.setMessage(message);
-
-			try {
-				result = mergeCmd.call();
-			} catch (CheckoutConflictException e) {
-				result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
-			}
+		try {
+			result = mergeCmd.call();
+		} catch (CheckoutConflictException e) {
+			result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
 		}
 
 		switch (result.getMergeStatus()) {
@@ -207,13 +206,12 @@ class Merge extends TextBuiltin {
 
 	private boolean isMergedInto(Ref oldHead, AnyObjectId src)
 			throws IOException {
-		try (RevWalk revWalk = new RevWalk(db)) {
-			ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
-			if (oldHeadObjectId == null)
-				oldHeadObjectId = oldHead.getObjectId();
-			RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
-			RevCommit srcCommit = revWalk.lookupCommit(src);
-			return revWalk.isMergedInto(oldHeadCommit, srcCommit);
-		}
+		RevWalk revWalk = new RevWalk(db);
+		ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
+		if (oldHeadObjectId == null)
+			oldHeadObjectId = oldHead.getObjectId();
+		RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
+		RevCommit srcCommit = revWalk.lookupCommit(src);
+		return revWalk.isMergedInto(oldHeadCommit, srcCommit);
 	}
 }
