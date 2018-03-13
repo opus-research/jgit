@@ -132,8 +132,8 @@ public class UploadPack {
 		TIP,
 
 		/**
-		 * Client may ask for any commit reachable from a any reference, even if
-		 * that reference wasn't advertised.
+		 * Client may ask for any commit reachable from any reference, even if that
+		 * reference wasn't advertised.
 		 */
 		REACHABLE_COMMIT_TIP,
 
@@ -351,10 +351,7 @@ public class UploadPack {
 			refs = allRefs;
 		else
 			refs = db.getAllRefs();
-		if (refFilter == RefFilter.DEFAULT)
-			refs = transferConfig.getRefFilter().filter(refs);
-		else
-			refs = refFilter.filter(refs);
+		refs = refFilter.filter(refs);
 	}
 
 	/** @return timeout (in seconds) before aborting an IO operation. */
@@ -447,8 +444,7 @@ public class UploadPack {
 	 * <p>
 	 * Only refs allowed by this filter will be sent to the client.
 	 * The filter is run against the refs specified by the
-	 * {@link AdvertiseRefsHook} (if applicable). If null or not set, uses the
-	 * filter implied by the {@link TransferConfig}.
+	 * {@link AdvertiseRefsHook} (if applicable).
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -603,7 +599,6 @@ public class UploadPack {
 			rp = RequestPolicy.TIP;
 		else
 			rp = RequestPolicy.ADVERTISED;
-
 
 		if (!biDirectionalPipe) {
 			if (rp == RequestPolicy.ADVERTISED)
@@ -991,8 +986,8 @@ public class UploadPack {
 		try {
 			List<RevCommit> checkReachable = null;
 			Set<ObjectId> reachableFrom = null;
-			RevObject obj;
 			Set<ObjectId> tips = null;
+			RevObject obj;
 			while ((obj = q.next()) != null) {
 				if (!advertised.contains(obj)) {
 					switch (requestPolicy) {
