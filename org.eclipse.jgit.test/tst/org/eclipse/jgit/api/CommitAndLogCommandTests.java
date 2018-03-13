@@ -64,6 +64,7 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.junit.Test;
@@ -164,7 +165,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	// try to do a commit without specifying a message. Should fail!
 	@Test
-	public void testWrongParams() throws JGitInternalException, GitAPIException {
+	public void testWrongParams() throws GitAPIException {
 		Git git = new Git(db);
 		try {
 			git.commit().setAuthor(author).call();
@@ -177,8 +178,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	// try to work with Commands after command has been invoked. Should throw
 	// exceptions
 	@Test
-	public void testMultipleInvocations() throws JGitInternalException,
-			GitAPIException {
+	public void testMultipleInvocations() throws GitAPIException {
 		Git git = new Git(db);
 		CommitCommand commitCmd = git.commit();
 		commitCmd.setMessage("initial commit").call();
@@ -255,9 +255,37 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCommitRange() throws JGitInternalException,
-			IncorrectObjectTypeException, MissingObjectException,
-			GitAPIException {
+	public void testModeChange() throws IOException, GitAPIException {
+		Git git = new Git(db);
+
+		// create file
+		File file = new File(db.getWorkTree(), "a.txt");
+		FileUtils.createNewFile(file);
+		PrintWriter writer = new PrintWriter(file);
+		writer.print("content1");
+		writer.close();
+
+		// First commit - a.txt file
+		git.add().addFilepattern("a.txt").call();
+		git.commit().setMessage("commit1").setCommitter(committer).call();
+
+		// pure mode change should be committable
+		FS fs = db.getFS();
+		fs.setExecute(file, true);
+		git.add().addFilepattern("a.txt").call();
+		git.commit().setMessage("mode change").setCommitter(committer).call();
+
+		// pure mode change should be committable with -o option
+		fs.setExecute(file, false);
+		git.add().addFilepattern("a.txt").call();
+		git.commit().setMessage("mode change").setCommitter(committer)
+				.setOnly("a.txt").call();
+	}
+
+	@Test
+	public void testCommitRange() throws GitAPIException,
+			JGitInternalException, MissingObjectException,
+			IncorrectObjectTypeException {
 		// do 4 commits and set the range to the second and fourth one
 		Git git = new Git(db);
 		git.commit().setMessage("first commit").call();

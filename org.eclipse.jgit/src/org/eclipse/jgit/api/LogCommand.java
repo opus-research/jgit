@@ -47,12 +47,12 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -60,6 +60,9 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.filter.AndRevFilter;
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
+import org.eclipse.jgit.revwalk.filter.SkipRevFilter;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -86,6 +89,10 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 
 	private final List<PathFilter> pathFilters = new ArrayList<PathFilter>();
 
+	private int maxCount = -1;
+
+	private int skip = -1;
+
 	/**
 	 * @param repo
 	 */
@@ -109,6 +116,13 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 		if (pathFilters.size() > 0)
 			walk.setTreeFilter(AndTreeFilter.create(
 					PathFilterGroup.create(pathFilters), TreeFilter.ANY_DIFF));
+		if (skip > -1 && maxCount > -1)
+			walk.setRevFilter(AndRevFilter.create(SkipRevFilter.create(skip),
+					MaxCountRevFilter.create(maxCount)));
+		else if (skip > -1)
+			walk.setRevFilter(SkipRevFilter.create(skip));
+		else if (maxCount > -1)
+			walk.setRevFilter(MaxCountRevFilter.create(maxCount));
 		if (!startSpecified) {
 			try {
 				ObjectId headId = repo.resolve(Constants.HEAD);
@@ -245,6 +259,32 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	public LogCommand addPath(String path) {
 		checkCallable();
 		pathFilters.add(PathFilter.create(path));
+		return this;
+	}
+
+	/**
+	 * Skip the number of commits before starting to show the commit output.
+	 *
+	 * @param skip
+	 *            the number of commits to skip
+	 * @return {@code this}
+	 */
+	public LogCommand setSkip(int skip) {
+		checkCallable();
+		this.skip = skip;
+		return this;
+	}
+
+	/**
+	 * Limit the number of commits to output.
+	 *
+	 * @param maxCount
+	 *            the limit
+	 * @return {@code this}
+	 */
+	public LogCommand setMaxCount(int maxCount) {
+		checkCallable();
+		this.maxCount = maxCount;
 		return this;
 	}
 

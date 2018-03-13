@@ -125,8 +125,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCheckoutToNonExistingBranch() throws JGitInternalException,
-			GitAPIException {
+	public void testCheckoutToNonExistingBranch() throws GitAPIException {
 		try {
 			git.checkout().setName("badbranch").call();
 			fail("Should have failed");

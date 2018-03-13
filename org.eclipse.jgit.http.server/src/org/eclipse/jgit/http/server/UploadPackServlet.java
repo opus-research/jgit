@@ -52,6 +52,7 @@ import static org.eclipse.jgit.http.server.GitSmartHttpTools.UPLOAD_PACK_REQUEST
 import static org.eclipse.jgit.http.server.GitSmartHttpTools.UPLOAD_PACK_RESULT_TYPE;
 import static org.eclipse.jgit.http.server.GitSmartHttpTools.sendError;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
+import static org.eclipse.jgit.http.server.ServletUtils.consumeRequestBody;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
@@ -72,7 +73,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
-import org.eclipse.jgit.transport.UploadPackMayNotContinueException;
+import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
@@ -160,22 +161,26 @@ class UploadPackServlet extends HttpServlet {
 			return;
 		}
 
+		SmartOutputStream out = new SmartOutputStream(req, rsp) {
+			@Override
+			public void flush() throws IOException {
+				doFlush();
+			}
+		};
+
 		UploadPack up = (UploadPack) req.getAttribute(ATTRIBUTE_HANDLER);
 		try {
 			up.setBiDirectionalPipe(false);
 			rsp.setContentType(UPLOAD_PACK_RESULT_TYPE);
 
-			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
-				@Override
-				public void flush() throws IOException {
-					doFlush();
-				}
-			};
 			up.upload(getInputStream(req), out, null);
 			out.close();
 
-		} catch (UploadPackMayNotContinueException e) {
-			if (!e.isOutput() && !rsp.isCommitted()) {
+		} catch (ServiceMayNotContinueException e) {
+			if (e.isOutput()) {
+				consumeRequestBody(req);
+				out.close();
+			} else if (!rsp.isCommitted()) {
 				rsp.reset();
 				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
 			}
@@ -186,8 +191,10 @@ class UploadPackServlet extends HttpServlet {
 			getServletContext().log(
 					HttpServerText.get().internalErrorDuringUploadPack,
 					e.getCause());
+			consumeRequestBody(req);
+			out.close();
 
-		} catch (IOException e) {
+		} catch (Throwable e) {
 			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
 			if (!rsp.isCommitted()) {
 				rsp.reset();

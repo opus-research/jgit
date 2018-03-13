@@ -48,7 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
@@ -172,6 +172,9 @@ public class DiffEntry {
 					r.add(entry);
 				else
 					r.addAll(breakModify(entry));
+			} else if (entry.oldMode != entry.newMode) {
+				entry.changeType = ChangeType.MODIFY;
+				r.add(entry);
 			}
 
 			if (includeTrees && walk.isSubtree())
