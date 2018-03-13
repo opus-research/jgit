@@ -3,7 +3,7 @@ package(default_visibility = ["//visibility:public"])
 java_library(
     name = "junit",
     testonly = 1,
-    srcs = glob(["src/**/*.java"]),
+    srcs = glob(["src/**"]),
     resource_strip_prefix = "org.eclipse.jgit.junit/resources",
     resources = glob(["resources/**"]),
     deps = [
