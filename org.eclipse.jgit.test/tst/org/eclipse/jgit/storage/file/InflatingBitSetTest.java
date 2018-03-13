@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Research In Motion Limited
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,27 +41,66 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.lib.Repository;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-/**
- * A three-way merge strategy performing a content-merge if necessary
- */
-public class StrategyRecursive extends StrategyResolve {
+import javaewah.EWAHCompressedBitmap;
 
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new RecursiveMerger(db, false);
+import org.junit.Test;
+
+public class InflatingBitSetTest {
+
+	@Test
+	public void testMaybeContains() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(63);
+		ecb.set(64);
+		ecb.set(128);
+
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertTrue(ibs.maybeContains(0));
+		assertFalse(ibs.contains(0)); // Advance
+		assertFalse(ibs.maybeContains(0));
+		assertTrue(ibs.maybeContains(63));
+		assertTrue(ibs.maybeContains(64));
+		assertTrue(ibs.maybeContains(65));
+		assertFalse(ibs.maybeContains(129));
 	}
 
-	@Override
-	public ThreeWayMerger newMerger(Repository db, boolean inCore) {
-		return new RecursiveMerger(db, inCore);
+	@Test
+	public void testContainsMany() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(64);
+		ecb.set(65);
+		ecb.set(1024);
+
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertFalse(ibs.contains(0));
+		assertTrue(ibs.contains(64));
+		assertTrue(ibs.contains(65));
+		assertFalse(ibs.contains(66));
+		assertTrue(ibs.contains(1024));
+		assertFalse(ibs.contains(1025));
 	}
 
-	@Override
-	public String getName() {
-		return "recursive";
+	@Test
+	public void testContainsOne() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(64);
+
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertTrue(ibs.contains(64));
+		assertTrue(ibs.contains(64));
+		assertFalse(ibs.contains(65));
+		assertFalse(ibs.contains(63));
+	}
+
+	@Test
+	public void testContainsEmpty() {
+		InflatingBitSet ibs = new InflatingBitSet(new EWAHCompressedBitmap());
+		assertFalse(ibs.maybeContains(0));
+		assertFalse(ibs.contains(0));
 	}
 }

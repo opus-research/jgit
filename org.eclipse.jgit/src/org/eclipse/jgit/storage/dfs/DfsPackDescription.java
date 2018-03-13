@@ -44,6 +44,7 @@
 package org.eclipse.jgit.storage.dfs;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -69,7 +70,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private long lastModified;
 
-	private Map<PackExt, Long> sizeMap;
+	private final Map<PackExt, Long> sizeMap;
 
 	private long objectCount;
 
@@ -78,6 +79,10 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	private Set<ObjectId> tips;
 
 	private PackWriter.Statistics stats;
+
+	private final Set<PackExt> extensions;
+
+	private int indexVersion;
 
 	/**
 	 * Initialize a description by pack name and repository.
@@ -98,7 +103,8 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		this.repoDesc = repoDesc;
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
-		this.sizeMap = new HashMap<PackExt, Long>(5);
+		this.sizeMap = new HashMap<PackExt, Long>(PackExt.values().length * 2);
+		this.extensions = new HashSet<PackExt>(PackExt.values().length * 2);
 	}
 
 	/** @return description of the repository. */
@@ -107,10 +113,29 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	}
 
 	/**
+	 * Adds the pack file extension to the known list.
+	 *
+	 * @param ext
+	 *            the file extension
+	 */
+	public void addFileExt(PackExt ext) {
+		extensions.add(ext);
+	}
+
+	/**
+	 * @param ext
+	 *            the file extension
+	 * @return whether the pack file extensions is known to exist.
+	 */
+	public boolean hasFileExt(PackExt ext) {
+		return extensions.contains(ext);
+	}
+
+	/**
 	 * @param ext
 	 *            the file extension
 	 * @return name of the file.
-	 * */
+	 */
 	public String getFileName(PackExt ext) {
 		return packName + '.' + ext.getExtension();
 	}
@@ -235,6 +260,21 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 */
 	public DfsPackDescription clearPackStats() {
 		stats = null;
+		return this;
+	}
+
+	/** @return the version of the index file written. */
+	public int getIndexVersion() {
+		return indexVersion;
+	}
+
+	/**
+	 * @param version
+	 *            the version of the index file written.
+	 * @return {@code this}
+	 */
+	public DfsPackDescription setIndexVersion(int version) {
+		indexVersion = version;
 		return this;
 	}
 

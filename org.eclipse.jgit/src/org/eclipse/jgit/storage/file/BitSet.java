@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008-2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,33 +41,75 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.storage.file;
 
-import java.io.File;
+import javaewah.EWAHCompressedBitmap;
 
+/**
+ * A random access BitSet to supports efficient conversions to
+ * EWAHCompressedBitmap.
+ */
+final class BitSet {
 
-/** Test case which includes C Git generated pack files for testing. */
-public abstract class SampleDataRepositoryTestCase extends RepositoryTestCase {
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+	private long[] words;
 
-		final String[] packs = {
-				"pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f",
-				"pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371",
-				"pack-9fb5b411fe6dfa89cc2e6b89d2bd8e5de02b5745",
-				"pack-546ff360fe3488adb20860ce3436a2d6373d2796",
-				"pack-cbdeda40019ae0e6e789088ea0f51f164f489d14",
-				"pack-e6d07037cbcf13376308a0a995d1fa48f8f76aaa",
-				"pack-3280af9c07ee18a87705ef50b0cc4cd20266cf12"
-		};
-		final File packDir = new File(db.getObjectDatabase().getDirectory(), "pack");
-		for (String n : packs) {
-			copyFile(JGitTestUtil.getTestResourceFile(n + ".pack"), new File(packDir, n + ".pack"));
-			copyFile(JGitTestUtil.getTestResourceFile(n + ".idx"), new File(packDir, n + ".idx"));
+	BitSet(int initialCapacity) {
+		words = new long[block(initialCapacity) + 1];
+	}
+
+	final void set(int position) {
+		int block = block(position);
+		if (block >= words.length) {
+			long[] buf = new long[2 * block(position)];
+			System.arraycopy(words, 0, buf, 0, words.length);
+			words = buf;
 		}
+		words[block] |= mask(position);
+	}
 
-		copyFile(JGitTestUtil.getTestResourceFile("packed-refs"), new File(db
-				.getDirectory(), "packed-refs"));
+	final void clear(int position) {
+		int block = block(position);
+		if (block < words.length)
+			words[block] &= ~mask(position);
+	}
+
+	final boolean get(int position) {
+		int block = block(position);
+		return block < words.length && (words[block] & mask(position)) != 0;
+	}
+
+	final EWAHCompressedBitmap toEWAHCompressedBitmap() {
+		EWAHCompressedBitmap compressed = new EWAHCompressedBitmap(
+				words.length);
+		int runningEmptyWords = 0;
+		long lastNonEmptyWord = 0;
+		for (long word : words) {
+			if (word == 0) {
+				runningEmptyWords++;
+				continue;
+			}
+
+			if (lastNonEmptyWord != 0)
+				compressed.add(lastNonEmptyWord);
+
+			if (runningEmptyWords > 0) {
+				compressed.addStreamOfEmptyWords(false, runningEmptyWords);
+				runningEmptyWords = 0;
+			}
+
+			lastNonEmptyWord = word;
+		}
+		int bitsThatMatter = 64 - Long.numberOfLeadingZeros(lastNonEmptyWord);
+		if (bitsThatMatter > 0)
+			compressed.add(lastNonEmptyWord, bitsThatMatter);
+		return compressed;
+	}
+
+	private static final int block(int position) {
+		return position >> 6;
+	}
+
+	private static final long mask(int position) {
+		return 1L << position;
 	}
 }
