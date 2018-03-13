@@ -62,11 +62,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
@@ -74,6 +76,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
+import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -82,6 +85,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
@@ -203,6 +207,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
+	 * @return the repository this iterator works with
+	 *
+	 * @since 3.3
+	 */
+	public Repository getRepository() {
+		return repository;
+	}
+
+	/**
 	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
 	 *
 	 * Once the DirCacheIterator has been set this iterator must only be
@@ -252,14 +265,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		switch (mode & FileMode.TYPE_MASK) {
+		case FileMode.TYPE_SYMLINK:
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
 			return contentId = idBufferBlob(entries[ptr]);
-		case FileMode.TYPE_SYMLINK:
-			// Java does not support symbolic links, so we should not
-			// have reached this particular part of the walk code.
-			//
-			return zeroid;
 		case FileMode.TYPE_GITLINK:
 			contentIdFromPtr = ptr;
 			return contentId = idSubmodule(entries[ptr]);
@@ -465,7 +474,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
 		if (!eof()) {
-			canonLen = -1;
 			parseEntry();
 		}
 	}
@@ -484,6 +492,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ensurePathCapacity(pathOffset + nameLen, pathOffset);
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
+		canonLen = -1;
 	}
 
 	/**
@@ -723,8 +732,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return false;
 
 		// Do not rely on filemode differences in case of symbolic links
-		if (FileMode.SYMLINK.equals(rawMode))
-			return false;
+		if (getOptions().getSymLinks() == SymLinks.FALSE)
+			if (FileMode.SYMLINK.equals(rawMode))
+				return false;
 
 		// Ignore the executable file bits if WorkingTreeOptions tell me to
 		// do so. Ignoring is done by setting the bits representing a
@@ -801,7 +811,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
-		return isModified(entry, false, null);
+		try {
+			return isModified(entry, forceContentCheck, null);
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
 	}
 
 	/**
@@ -820,10 +834,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @param reader
 	 *            access to repository objects if necessary. Should not be null.
 	 * @return true if content is most likely different.
+	 * @throws IOException
 	 * @since 3.3
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
-			ObjectReader reader) {
+			ObjectReader reader) throws IOException {
 		MetadataDiff diff = compareMetadata(entry);
 		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
@@ -841,6 +856,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		case EQUAL:
 			return false;
 		case DIFFER_BY_METADATA:
+			if (mode == FileMode.SYMLINK.getBits())
+				return contentCheck(entry, reader);
 			return true;
 		default:
 			throw new IllegalStateException(MessageFormat.format(
@@ -884,8 +901,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            acccess to repository data if necessary
 	 * @return <code>true</code> if the content doesn't match,
 	 *         <code>false</code> if it matches
+	 * @throws IOException
 	 */
-	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader) {
+	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader)
+			throws IOException {
 		if (getEntryObjectId().equals(entry.getObjectId())) {
 			// Content has not changed
 
@@ -901,6 +920,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 			return false;
 		} else {
+			if (mode == FileMode.SYMLINK.getBits())
+				return !new File(readContentAsNormalizedString(current()))
+						.equals(new File((readContentAsNormalizedString(entry))));
 			// Content differs: that's a real change, perhaps
 			if (reader == null) // deprecated use, do no further checks
 				return true;
@@ -947,6 +969,21 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 			return true;
 		}
+	}
+
+	private String readContentAsNormalizedString(DirCacheEntry entry)
+			throws MissingObjectException, IOException {
+		ObjectLoader open = repository.open(entry.getObjectId());
+		byte[] cachedBytes = open.getCachedBytes();
+		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
+	}
+
+	private static String readContentAsNormalizedString(Entry entry) throws IOException {
+		long length = entry.getLength();
+		byte[] content = new byte[(int) length];
+		InputStream is = entry.openInputStream();
+		IO.readFully(is, content, 0, (int) length);
+		return FS.detect().normalize(RawParseUtils.decode(content));
 	}
 
 	private long computeLength(InputStream in) throws IOException {
@@ -1154,7 +1191,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		private void loadRulesFromFile(IgnoreNode r, File exclude)
 				throws FileNotFoundException, IOException {
-			if (exclude.exists()) {
+			if (FS.DETECTED.exists(exclude)) {
 				FileInputStream in = new FileInputStream(exclude);
 				try {
 					r.parse(in);
