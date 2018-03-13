@@ -106,9 +106,14 @@ public class PackExt {
 		return pos;
 	}
 
+	/** @return the bit mask of the extension e.g {@code 1 << getPosition()}. */
+	public int getBit() {
+		return 1 << getPosition();
+	}
+
 	@Override
 	public String toString() {
 		return String.format("PackExt[%s, bit=0x%s]", getExtension(), //$NON-NLS-1$
-				Integer.toHexString(1 << getPosition()));
+				Integer.toHexString(getBit()));
 	}
 }
