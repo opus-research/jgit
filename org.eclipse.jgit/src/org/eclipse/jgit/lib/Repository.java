@@ -215,7 +215,7 @@ public abstract class Repository implements AutoCloseable {
 	 *         {@link AttributesNodeProvider} is lazy loaded only once. It means
 	 *         that it will not be updated after loading. Prefer creating new
 	 *         instance for each use.
-	 * @since 4.1
+	 * @since 4.2
 	 */
 	public abstract AttributesNodeProvider newAttributesNodeProvider();
 

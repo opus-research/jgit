@@ -53,8 +53,8 @@ import org.eclipse.jgit.lib.CoreConfig;
  * Implementor of this interface should be able to retrieve the global
  * {@link AttributesNode} and the info {@link AttributesNode}
  * </p>
- * 
- * @since 4.1
+ *
+ * @since 4.2
  *
  */
 public interface AttributesNodeProvider {
