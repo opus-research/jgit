@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.transport.DaemonClient;
@@ -110,7 +111,11 @@ class Daemon extends TextBuiltin {
 
 			FileBasedConfig cfg = new FileBasedConfig(configFile, FS.DETECTED);
 			cfg.load();
-			new WindowCacheConfig().fromConfig(cfg).install();
+
+			WindowCacheConfig wcc = new WindowCacheConfig();
+			wcc.fromConfig(cfg);
+			WindowCache.reconfigure(wcc);
+
 			packConfig.fromConfig(cfg);
 		}
 
