@@ -108,10 +108,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		return JGitTestUtil.writeTrashFile(db, subdir, name, data);
 	}
 
-	protected String read(final String name) throws IOException {
-		return JGitTestUtil.read(db, name);
-	}
-
 	protected void deleteTrashFile(final String name) throws IOException {
 		JGitTestUtil.deleteTrashFile(db, name);
 	}
