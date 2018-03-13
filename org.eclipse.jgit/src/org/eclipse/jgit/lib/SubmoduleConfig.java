@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,59 +41,46 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+/**
+ * Submodule section of a Git configuration file.
+ *
+ * @since 4.7
+ */
+public class SubmoduleConfig {
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+	/**
+	 * Config values for submodule.[name].fetchRecurseSubmodules.
+	 */
+	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
+		/** Unconditionally recurse into all populated submodules. */
+		YES("true"), //$NON-NLS-1$
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+		/**
+		 * Only recurse into a populated submodule when the superproject
+		 * retrieves a commit that updates the submodule's reference to a commit
+		 * that isn't already in the local submodule clone.
+		 */
+		ON_DEMAND("on-demand"), //$NON-NLS-1$
 
-public class FileUtils7Test {
+		/** Completely disable recursion. */
+		NO("false"); //$NON-NLS-1$
 
-	private final File trash = new File(new File("target"), "trash");
+		private final String configValue;
 
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
-	}
+		private FetchRecurseSubmodulesMode(String configValue) {
+			this.configValue = configValue;
+		}
 
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
-	}
+		@Override
+		public String toConfigValue() {
+			return configValue;
+		}
 
-	@Test
-	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
-			throws IOException {
-		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
-		FS fs = FS.DETECTED;
-		File dir = new File(trash, "dir");
-		File file = new File(dir, "file");
-		File link = new File(trash, "link");
-		FileUtils.mkdirs(dir);
-		FileUtils.createNewFile(file);
-		fs.createSymLink(link, "dir");
-		FileUtils.delete(link, FileUtils.RECURSIVE);
-		assertFalse(link.exists());
-		assertTrue(dir.exists());
-		assertTrue(file.exists());
-	}
-
-	@Test
-	public void testAtomicMove() throws IOException {
-		File src = new File(trash, "src");
-		Files.createFile(src.toPath());
-		File dst = new File(trash, "dst");
-		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
-		assertFalse(Files.exists(src.toPath()));
-		assertTrue(Files.exists(dst.toPath()));
+		@Override
+		public boolean matchConfigValue(String s) {
+			return configValue.equals(s);
+		}
 	}
 }
