@@ -98,6 +98,10 @@ public class PushCertificate {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, PUSHER));
 		}
+		if (pushee == null || pushee.isEmpty()) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().pushCertificateInvalidField, PUSHEE));
+		}
 		if (nonce == null || nonce.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, NONCE));

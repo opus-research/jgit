@@ -272,11 +272,7 @@ public class PushCertificateParser {
 
 	private static String parseHeader(StringReader reader, String header)
 			throws IOException {
-		return parseHeader(reader.read(), header);
-	}
-
-	private static String parseHeader(String s, String header)
-			throws IOException {
+		String s = reader.read();
 		if (s.isEmpty()) {
 			throw new EOFException();
 		}
@@ -337,13 +333,8 @@ public class PushCertificateParser {
 						JGitText.get().pushCertificateInvalidFieldValue,
 						PUSHER, rawPusher));
 			}
-			String next = reader.read();
-			if (next.startsWith(PUSHEE)) {
-				pushee = parseHeader(next, PUSHEE);
-				receivedNonce = parseHeader(reader, NONCE);
-			} else {
-				receivedNonce = parseHeader(next, NONCE);
-			}
+			pushee = parseHeader(reader, PUSHEE);
+			receivedNonce = parseHeader(reader, NONCE);
 			// An empty line.
 			if (!reader.read().isEmpty()) {
 				throw new PackProtocolException(
