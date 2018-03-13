@@ -49,8 +49,8 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.IO;
 
 /**
@@ -114,7 +114,7 @@ public abstract class DeltaStream extends InputStream {
 		int c, shift = 0;
 		do {
 			c = cmdbuf[cmdptr++] & 0xff;
-			baseSize |= ((long) (c & 0x7f)) << shift;
+			baseSize |= (c & 0x7f) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 
@@ -123,7 +123,7 @@ public abstract class DeltaStream extends InputStream {
 		shift = 0;
 		do {
 			c = cmdbuf[cmdptr++] & 0xff;
-			resultSize |= ((long) (c & 0x7f)) << shift;
+			resultSize |= (c & 0x7f) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 
@@ -215,8 +215,7 @@ public abstract class DeltaStream extends InputStream {
 				if (n < 0)
 					throw new CorruptObjectException(
 							JGitText.get().baseLengthIncorrect);
-				copyOffset += n;
-				baseOffset = copyOffset;
+				baseOffset += n;
 				break;
 
 			case CMD_INSERT:
@@ -226,7 +225,6 @@ public abstract class DeltaStream extends InputStream {
 
 			case CMD_EOF:
 				return 0 < act ? act : -1;
-
 			default:
 				throw new CorruptObjectException(
 						JGitText.get().unsupportedCommand0);
@@ -286,7 +284,7 @@ public abstract class DeltaStream extends InputStream {
 			if ((cmd & 0x04) != 0)
 				copyOffset |= (cmdbuf[cmdptr++] & 0xff) << 16;
 			if ((cmd & 0x08) != 0)
-				copyOffset |= ((long) (cmdbuf[cmdptr++] & 0xff)) << 24;
+				copyOffset |= (cmdbuf[cmdptr++] & 0xff) << 24;
 
 			copySize = 0;
 			if ((cmd & 0x10) != 0)

@@ -43,23 +43,18 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -123,7 +118,7 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
-	public DirCache call() throws GitAPIException, NoFilepatternException {
+	public DirCache call() throws NoFilepatternException {
 
 		if (filepatterns.isEmpty())
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
@@ -133,13 +128,14 @@ public class AddCommand extends GitCommand<DirCache> {
 		if (filepatterns.contains("."))
 			addAll = true;
 
-		ObjectInserter inserter = repo.newObjectInserter();
 		try {
 			dc = repo.lockDirCache();
+			ObjectWriter ow = new ObjectWriter(repo);
 			DirCacheIterator c;
 
 			DirCacheBuilder builder = dc.builder();
 			final TreeWalk tw = new TreeWalk(repo);
+			tw.reset();
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (workingTreeIterator == null)
 				workingTreeIterator = new FileTreeIterator(repo);
@@ -153,6 +149,7 @@ public class AddCommand extends GitCommand<DirCache> {
 			while (tw.next()) {
 				String path = tw.getPathString();
 
+				final File file = new File(repo.getWorkTree(), path);
 				WorkingTreeIterator f = tw.getTree(1, WorkingTreeIterator.class);
 				if (tw.getTree(0, DirCacheIterator.class) == null &&
 						f != null && f.isEntryIgnored()) {
@@ -164,51 +161,28 @@ public class AddCommand extends GitCommand<DirCache> {
 				// new DirCacheEntry per path.
 				else if (!(path.equals(lastAddedFile))) {
 					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
-						c = tw.getTree(0, DirCacheIterator.class);
 						if (f != null) { // the file exists
-							long sz = f.getEntryLength();
 							DirCacheEntry entry = new DirCacheEntry(path);
-							if (c == null || c.getDirCacheEntry() == null
-									|| !c.getDirCacheEntry().isAssumeValid()) {
-								FileMode mode = f.getIndexFileMode(c);
-								entry.setFileMode(mode);
+							entry.setLength((int)f.getEntryLength());
+							entry.setLastModified(f.getEntryLastModified());
+							entry.setFileMode(f.getEntryFileMode());
+							entry.setObjectId(ow.writeBlob(file));
 
-								if (FileMode.GITLINK != mode) {
-									entry.setLength(sz);
-									entry.setLastModified(f
-											.getEntryLastModified());
-									long contentSize = f
-											.getEntryContentLength();
-									InputStream in = f.openEntryStream();
-									try {
-										entry.setObjectId(inserter.insert(
-												Constants.OBJ_BLOB, contentSize, in));
-									} finally {
-										in.close();
-									}
-								} else
-									entry.setObjectId(f.getEntryObjectId());
-								builder.add(entry);
-								lastAddedFile = path;
-							} else {
-								builder.add(c.getDirCacheEntry());
-							}
-
-						} else if (c != null
-								&& (!update || FileMode.GITLINK == c
-										.getEntryFileMode()))
+							builder.add(entry);
+							lastAddedFile = path;
+						} else if (!update){
+							c = tw.getTree(0, DirCacheIterator.class);
 							builder.add(c.getDirCacheEntry());
+						}
 					}
 				}
 			}
-			inserter.flush();
 			builder.commit();
 			setCallable(false);
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfAddCommand, e);
 		} finally {
-			inserter.release();
 			if (dc != null)
 				dc.unlock();
 		}

@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
@@ -48,6 +47,7 @@
 package org.eclipse.jgit.lib;
 
 import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
+import static org.eclipse.jgit.lib.ObjectLoader.STREAM_THRESHOLD;
 
 import org.eclipse.jgit.lib.Config.SectionParser;
 
@@ -62,35 +62,24 @@ public class CoreConfig {
 		}
 	};
 
-	/** Permissible values for {@code core.autocrlf}. */
-	public static enum AutoCRLF {
-		/** Automatic CRLF->LF conversion is disabled. */
-		FALSE,
-
-		/** Automatic CRLF->LF conversion is enabled. */
-		TRUE,
-
-		/** CRLF->LF performed, but no LF->CRLF. */
-		INPUT;
-	}
-
 	private final int compression;
 
 	private final int packIndexVersion;
 
 	private final boolean logAllRefUpdates;
 
-	private final String excludesfile;
+	private final int streamFileThreshold;
 
 	private CoreConfig(final Config rc) {
-		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_COMPRESSION, DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
-				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
-		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
-		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
+		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
+		packIndexVersion = rc.getInt("pack", "indexversion", 2);
+		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
+
+		long maxMem = Runtime.getRuntime().maxMemory();
+		long sft = rc.getLong("core", null, "streamfilethreshold", STREAM_THRESHOLD);
+		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
+		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
+		streamFileThreshold = (int) sft;
 	}
 
 	/**
@@ -102,6 +91,7 @@ public class CoreConfig {
 
 	/**
 	 * @return the preferred pack index file format; 0 for oldest possible.
+	 * @see org.eclipse.jgit.transport.IndexPack
 	 */
 	public int getPackIndexVersion() {
 		return packIndexVersion;
@@ -114,10 +104,8 @@ public class CoreConfig {
 		return logAllRefUpdates;
 	}
 
-	/**
-	 * @return path of excludesfile
-	 */
-	public String getExcludesFile() {
-		return excludesfile;
+	/** @return the size threshold beyond which objects must be streamed. */
+	public int getStreamFileThreshold() {
+		return streamFileThreshold;
 	}
 }

@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.iplog;
 
-import static java.lang.Long.valueOf;
-
 import java.text.MessageFormat;
 import java.util.Comparator;
 
@@ -159,6 +157,6 @@ class CQ {
 
 	@Override
 	public String toString() {
-		return MessageFormat.format(IpLogText.get().CQString, valueOf(getID()));
+		return MessageFormat.format(IpLogText.get().CQString, getID());
 	}
 }

@@ -77,7 +77,6 @@ import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.iplog.Committer.ActiveRange;
 import org.eclipse.jgit.lib.BlobBasedConfig;
@@ -384,9 +383,8 @@ public class IpLogGenerator {
 					else
 						oldImage = new byte[0];
 
-					EditList edits = MyersDiff.INSTANCE.diff(
-							RawTextComparator.DEFAULT, new RawText(oldImage),
-							new RawText(openBlob(1)));
+					EditList edits = new MyersDiff(new RawText(oldImage),
+							new RawText(openBlob(1))).getEdits();
 					for (Edit e : edits)
 						addedLines += e.getEndB() - e.getBeginB();
 				}
@@ -552,16 +550,9 @@ public class IpLogGenerator {
 		required(r, "description", cq.getDescription());
 		optional(r, "license", cq.getLicense());
 		optional(r, "use", cq.getUse());
-		optional(r, "state", mapCQState(cq.getState()));
+		optional(r, "state", cq.getState());
 		optional(r, "comments", cq.getComments());
 		return r;
-	}
-
-	private String mapCQState(String state) {
-		// "approved" CQs shall be listed as "active" in the iplog
-		if (state.equals("approved"))
-			return "active";
-		return state;
 	}
 
 	private Element createCommitter(Committer who) {

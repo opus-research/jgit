@@ -46,8 +46,8 @@ package org.eclipse.jgit.merge;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -108,30 +108,11 @@ public abstract class Merger {
 
 	/**
 	 * @return an object writer to create objects in {@link #getRepository()}.
-	 *         If no inserter has been set on this instance, one will be created
-	 *         and returned by all future calls.
 	 */
 	public ObjectInserter getObjectInserter() {
 		if (inserter == null)
 			inserter = getRepository().newObjectInserter();
 		return inserter;
-	}
-
-	/**
-	 * Set the inserter this merger will use to create objects.
-	 * <p>
-	 * If an inserter was already set on this instance (such as by a prior set,
-	 * or a prior call to {@link #getObjectInserter()}), the prior inserter will
-	 * be released first.
-	 *
-	 * @param oi
-	 *            the inserter instance to use. Must be associated with the
-	 *            repository instance returned by {@link #getRepository()}.
-	 */
-	public void setObjectInserter(ObjectInserter oi) {
-		if (inserter != null)
-			inserter.release();
-		inserter = oi;
 	}
 
 	/**
@@ -153,7 +134,7 @@ public abstract class Merger {
 	 *             one or more sources could not be read, or outputs could not
 	 *             be written to the Repository.
 	 */
-	public boolean merge(final AnyObjectId... tips) throws IOException {
+	public boolean merge(final AnyObjectId[] tips) throws IOException {
 		sourceObjects = new RevObject[tips.length];
 		for (int i = 0; i < tips.length; i++)
 			sourceObjects[i] = walk.parseAny(tips[i]);
@@ -172,10 +153,7 @@ public abstract class Merger {
 			sourceTrees[i] = walk.parseTree(sourceObjects[i]);
 
 		try {
-			boolean ok = mergeImpl();
-			if (ok && inserter != null)
-				inserter.flush();
-			return ok;
+			return mergeImpl();
 		} finally {
 			if (inserter != null)
 				inserter.release();
@@ -198,46 +176,27 @@ public abstract class Merger {
 	 */
 	protected AbstractTreeIterator mergeBase(final int aIdx, final int bIdx)
 			throws IOException {
-		RevCommit base = getBaseCommit(aIdx, bIdx);
-		return (base == null) ? new EmptyTreeIterator() : openTree(base.getTree());
-	}
-
-	/**
-	 * Return the merge base of two commits.
-	 *
-	 * @param aIdx
-	 *            index of the first commit in {@link #sourceObjects}.
-	 * @param bIdx
-	 *            index of the second commit in {@link #sourceObjects}.
-	 * @return the merge base of two commits
-	 * @throws IncorrectObjectTypeException
-	 *             one of the input objects is not a commit.
-	 * @throws IOException
-	 *             objects are missing or multiple merge bases were found.
-	 */
-	public RevCommit getBaseCommit(final int aIdx, final int bIdx)
-			throws IncorrectObjectTypeException,
-			IOException {
 		if (sourceCommits[aIdx] == null)
 			throw new IncorrectObjectTypeException(sourceObjects[aIdx],
 					Constants.TYPE_COMMIT);
 		if (sourceCommits[bIdx] == null)
 			throw new IncorrectObjectTypeException(sourceObjects[bIdx],
 					Constants.TYPE_COMMIT);
+
 		walk.reset();
 		walk.setRevFilter(RevFilter.MERGE_BASE);
 		walk.markStart(sourceCommits[aIdx]);
 		walk.markStart(sourceCommits[bIdx]);
 		final RevCommit base = walk.next();
 		if (base == null)
-			return null;
+			return new EmptyTreeIterator();
 		final RevCommit base2 = walk.next();
 		if (base2 != null) {
 			throw new IOException(MessageFormat.format(JGitText.get().multipleMergeBasesFor
 					, sourceCommits[aIdx].name(), sourceCommits[bIdx].name()
 					, base.name(), base2.name()));
 		}
-		return base;
+		return openTree(base.getTree());
 	}
 
 	/**

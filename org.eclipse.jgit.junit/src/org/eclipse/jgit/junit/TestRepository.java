@@ -43,9 +43,7 @@
 
 package org.eclipse.jgit.junit;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -58,17 +56,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import junit.framework.Assert;
+import junit.framework.AssertionFailedError;
+
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeleteTree;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -80,7 +82,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.TagBuilder;
+import org.eclipse.jgit.lib.Tag;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -96,8 +98,6 @@ import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Wrapper to make creating test data easier.
@@ -185,17 +185,6 @@ public class TestRepository<R extends Repository> {
 	}
 
 	/**
-	 * Set the author and committer using {@link #getClock()}.
-	 *
-	 * @param c
-	 *            the commit builder to store.
-	 */
-	public void setAuthorAndCommitter(org.eclipse.jgit.lib.CommitBuilder c) {
-		c.setAuthor(new PersonIdent(author, new Date(now)));
-		c.setCommitter(new PersonIdent(committer, new Date(now)));
-	}
-
-	/**
 	 * Create a new blob object in the repository.
 	 *
 	 * @param content
@@ -277,10 +266,12 @@ public class TestRepository<R extends Repository> {
 	 * @param path
 	 *            the path to find the entry of.
 	 * @return the parsed object entry at this path, never null.
+	 * @throws AssertionFailedError
+	 *             if the path does not exist in the given tree.
 	 * @throws Exception
 	 */
 	public RevObject get(final RevTree tree, final String path)
-			throws Exception {
+			throws AssertionFailedError, Exception {
 		final TreeWalk tw = new TreeWalk(pool.getObjectReader());
 		tw.setFilter(PathFilterGroup.createFromStrings(Collections
 				.singleton(path)));
@@ -294,7 +285,7 @@ public class TestRepository<R extends Repository> {
 			final FileMode entmode = tw.getFileMode(0);
 			return pool.lookupAny(entid, entmode.getObjectType());
 		}
-		fail("Can't find " + path + " in tree " + tree.name());
+		Assert.fail("Can't find " + path + " in tree " + tree.name());
 		return null; // never reached.
 	}
 
@@ -368,9 +359,7 @@ public class TestRepository<R extends Repository> {
 			final RevCommit... parents) throws Exception {
 		tick(secDelta);
 
-		final org.eclipse.jgit.lib.CommitBuilder c;
-
-		c = new org.eclipse.jgit.lib.CommitBuilder();
+		final Commit c = new Commit(db);
 		c.setTreeId(tree);
 		c.setParentIds(parents);
 		c.setAuthor(new PersonIdent(author, new Date(now)));
@@ -378,7 +367,7 @@ public class TestRepository<R extends Repository> {
 		c.setMessage("");
 		ObjectId id;
 		try {
-			id = inserter.insert(c);
+			id = inserter.insert(Constants.OBJ_COMMIT, inserter.format(c));
 			inserter.flush();
 		} finally {
 			inserter.release();
@@ -408,14 +397,15 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public RevTag tag(final String name, final RevObject dst) throws Exception {
-		final TagBuilder t = new TagBuilder();
-		t.setObjectId(dst);
+		final Tag t = new Tag(db);
+		t.setType(Constants.typeString(dst.getType()));
+		t.setObjId(dst.toObjectId());
 		t.setTag(name);
 		t.setTagger(new PersonIdent(committer, new Date(now)));
 		t.setMessage("");
 		ObjectId id;
 		try {
-			id = inserter.insert(t);
+			id = inserter.insert(Constants.OBJ_TAG, inserter.format(t));
 			inserter.flush();
 		} finally {
 			inserter.release();
@@ -459,13 +449,9 @@ public class TestRepository<R extends Repository> {
 	 */
 	public <T extends AnyObjectId> T update(String ref, T obj) throws Exception {
 		if (Constants.HEAD.equals(ref)) {
-			// nothing
 		} else if ("FETCH_HEAD".equals(ref)) {
-			// nothing
 		} else if ("MERGE_HEAD".equals(ref)) {
-			// nothing
 		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
 		} else
 			ref = Constants.R_HEADS + ref;
 
@@ -541,29 +527,10 @@ public class TestRepository<R extends Repository> {
 	 */
 	public BranchBuilder branch(String ref) {
 		if (Constants.HEAD.equals(ref)) {
-			// nothing
 		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
 		} else
 			ref = Constants.R_HEADS + ref;
 		return new BranchBuilder(ref);
-	}
-
-	/**
-	 * Tag an object using a lightweight tag.
-	 *
-	 * @param name
-	 *            the tag name. The /refs/tags/ prefix will be added if the name
-	 *            doesn't start with it
-	 * @param obj
-	 *            the object to tag
-	 * @return the tagged object
-	 * @throws Exception
-	 */
-	public ObjectId lightweightTag(String name, ObjectId obj) throws Exception {
-		if (!name.startsWith(Constants.R_TAGS))
-			name = Constants.R_TAGS + name;
-		return update(name, obj);
 	}
 
 	/**
@@ -619,7 +586,7 @@ public class TestRepository<R extends Repository> {
 		md.update(Constants.encodeASCII(bin.length));
 		md.update((byte) 0);
 		md.update(bin);
-		assertEquals(id, ObjectId.fromRaw(md.digest()));
+		Assert.assertEquals(id.copy(), ObjectId.fromRaw(md.digest()));
 	}
 
 	/**
@@ -647,7 +614,7 @@ public class TestRepository<R extends Repository> {
 				OutputStream out;
 
 				pack = nameFor(odb, name, ".pack");
-				out = new SafeBufferedOutputStream(new FileOutputStream(pack));
+				out = new BufferedOutputStream(new FileOutputStream(pack));
 				try {
 					pw.writePack(m, m, out);
 				} finally {
@@ -656,7 +623,7 @@ public class TestRepository<R extends Repository> {
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
-				out = new SafeBufferedOutputStream(new FileOutputStream(idx));
+				out = new BufferedOutputStream(new FileOutputStream(idx));
 				try {
 					pw.writeIndex(out);
 				} finally {
@@ -673,10 +640,10 @@ public class TestRepository<R extends Repository> {
 		}
 	}
 
-	private void prunePacked(ObjectDirectory odb) throws IOException {
+	private void prunePacked(ObjectDirectory odb) {
 		for (PackFile p : odb.getPacks()) {
 			for (MutableEntry e : p)
-				FileUtils.delete(odb.fileFor(e.toObjectId()));
+				odb.fileFor(e.toObjectId()).delete();
 		}
 	}
 
@@ -750,8 +717,6 @@ public class TestRepository<R extends Repository> {
 
 		private final DirCache tree = DirCache.newInCore();
 
-		private ObjectId topLevelTree;
-
 		private final List<RevCommit> parents = new ArrayList<RevCommit>(2);
 
 		private int tick = 1;
@@ -806,29 +771,20 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public CommitBuilder setTopLevelTree(ObjectId treeId) {
-			topLevelTree = treeId;
-			return this;
-		}
-
 		public CommitBuilder add(String path, String content) throws Exception {
 			return add(path, blob(content));
 		}
 
 		public CommitBuilder add(String path, final RevBlob id)
 				throws Exception {
-			return edit(new PathEdit(path) {
+			DirCacheEditor e = tree.editor();
+			e.add(new PathEdit(path) {
 				@Override
 				public void apply(DirCacheEntry ent) {
 					ent.setFileMode(FileMode.REGULAR_FILE);
 					ent.setObjectId(id);
 				}
 			});
-		}
-
-		public CommitBuilder edit(PathEdit edit) {
-			DirCacheEditor e = tree.editor();
-			e.add(edit);
 			e.finish();
 			return this;
 		}
@@ -855,20 +811,17 @@ public class TestRepository<R extends Repository> {
 			if (self == null) {
 				TestRepository.this.tick(tick);
 
-				final org.eclipse.jgit.lib.CommitBuilder c;
-
-				c = new org.eclipse.jgit.lib.CommitBuilder();
-				c.setParentIds(parents);
-				setAuthorAndCommitter(c);
+				final Commit c = new Commit(db);
+				c.setParentIds(parents.toArray(new RevCommit[parents.size()]));
+				c.setAuthor(new PersonIdent(author, new Date(now)));
+				c.setCommitter(new PersonIdent(committer, new Date(now)));
 				c.setMessage(message);
 
 				ObjectId commitId;
 				try {
-					if (topLevelTree != null)
-						c.setTreeId(topLevelTree);
-					else
-						c.setTreeId(tree.writeTree(inserter));
-					commitId = inserter.insert(c);
+					c.setTreeId(tree.writeTree(inserter));
+					commitId = inserter.insert(Constants.OBJ_COMMIT, inserter
+							.format(c));
 					inserter.flush();
 				} finally {
 					inserter.release();

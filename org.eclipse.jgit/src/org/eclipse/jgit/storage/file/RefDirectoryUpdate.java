@@ -99,10 +99,6 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected Result doUpdate(final Result status) throws IOException {
-		WriteConfig wc = database.getRepository().getConfig()
-				.get(WriteConfig.KEY);
-
-		lock.setFSync(wc.getFSyncRefFiles());
 		lock.setNeedStatInformation(true);
 		lock.write(getNewObjectId());
 
@@ -121,7 +117,7 @@ class RefDirectoryUpdate extends RefUpdate {
 		}
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
-		database.stored(this, lock.getCommitSnapshot());
+		database.stored(this, lock.getCommitLastModified());
 		return status;
 	}
 
@@ -147,10 +143,6 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected Result doLink(final String target) throws IOException {
-		WriteConfig wc = database.getRepository().getConfig()
-				.get(WriteConfig.KEY);
-
-		lock.setFSync(wc.getFSyncRefFiles());
 		lock.setNeedStatInformation(true);
 		lock.write(encode(RefDirectory.SYMREF + target + '\n'));
 
@@ -159,7 +151,7 @@ class RefDirectoryUpdate extends RefUpdate {
 			database.log(this, msg, false);
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
-		database.storedSymbolicRef(this, lock.getCommitSnapshot(), target);
+		database.storedSymbolicRef(this, lock.getCommitLastModified(), target);
 
 		if (getRef().getStorage() == Ref.Storage.NEW)
 			return Result.NEW;

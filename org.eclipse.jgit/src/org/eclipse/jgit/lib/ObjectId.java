@@ -58,8 +58,7 @@ import java.io.Serializable;
  */
 public class ObjectId extends AnyObjectId implements Serializable {
 	private static final long serialVersionUID = 1L;
-
-	private static final ObjectId ZEROID;
+        private static final ObjectId ZEROID;
 
 	private static final String ZEROID_STR;
 
@@ -227,7 +226,7 @@ public class ObjectId extends AnyObjectId implements Serializable {
 	 *            the string to read from. Must be 40 characters long.
 	 * @return the converted object id.
 	 */
-	public static ObjectId fromString(final String str) {
+	public static final ObjectId fromString(final String str) {
 		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
 			throw new IllegalArgumentException("Invalid id: " + str);
 		return fromHexString(Constants.encodeASCII(str), 0);
@@ -279,7 +278,7 @@ public class ObjectId extends AnyObjectId implements Serializable {
 		return this;
 	}
 
-	private void writeObject(ObjectOutputStream os) throws IOException {
+	private void writeObject(ObjectOutputStream os)  throws IOException {
 		os.writeInt(w1);
 		os.writeInt(w2);
 		os.writeInt(w3);
@@ -287,7 +286,7 @@ public class ObjectId extends AnyObjectId implements Serializable {
 		os.writeInt(w5);
 	}
 
-	private void readObject(ObjectInputStream ois) throws IOException {
+        private void readObject(ObjectInputStream ois)  throws IOException {
 		w1 = ois.readInt();
 		w2 = ois.readInt();
 		w3 = ois.readInt();

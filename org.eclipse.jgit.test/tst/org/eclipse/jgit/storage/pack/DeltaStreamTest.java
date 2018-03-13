@@ -43,28 +43,21 @@
 
 package org.eclipse.jgit.storage.pack;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 
+import junit.framework.TestCase;
+
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.IO;
-import org.junit.Before;
-import org.junit.Test;
 
-public class DeltaStreamTest {
+public class DeltaStreamTest extends TestCase {
 	private TestRng rng;
 
 	private ByteArrayOutputStream deltaBuf;
@@ -79,25 +72,18 @@ public class DeltaStreamTest {
 
 	private byte[] delta;
 
-	private TestRng getRng() {
-		if (rng == null)
-			rng = new TestRng(JGitTestUtil.getName());
-		return rng;
-	}
-
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
+		rng = new TestRng(getName());
 		deltaBuf = new ByteArrayOutputStream();
 	}
 
-	@Test
 	public void testCopy_SingleOp() throws IOException {
 		init((1 << 16) + 1, (1 << 8) + 1);
 		copy(0, data.length);
 		assertValidState();
 	}
 
-	@Test
 	public void testCopy_MaxSize() throws IOException {
 		int max = (0xff << 16) + (0xff << 8) + 0xff;
 		init(1 + max, max);
@@ -105,7 +91,6 @@ public class DeltaStreamTest {
 		assertValidState();
 	}
 
-	@Test
 	public void testCopy_64k() throws IOException {
 		init(0x10000 + 2, 0x10000 + 1);
 		copy(1, 0x10000);
@@ -113,7 +98,6 @@ public class DeltaStreamTest {
 		assertValidState();
 	}
 
-	@Test
 	public void testCopy_Gap() throws IOException {
 		init(256, 8);
 		copy(4, 4);
@@ -121,7 +105,6 @@ public class DeltaStreamTest {
 		assertValidState();
 	}
 
-	@Test
 	public void testCopy_OutOfOrder() throws IOException {
 		init((1 << 16) + 1, (1 << 16) + 1);
 		copy(1 << 8, 1 << 8);
@@ -129,14 +112,12 @@ public class DeltaStreamTest {
 		assertValidState();
 	}
 
-	@Test
 	public void testInsert_SingleOp() throws IOException {
 		init((1 << 16) + 1, 2);
 		insert("hi");
 		assertValidState();
 	}
 
-	@Test
 	public void testInsertAndCopy() throws IOException {
 		init(8, 512);
 		insert(new byte[127]);
@@ -147,7 +128,6 @@ public class DeltaStreamTest {
 		assertValidState();
 	}
 
-	@Test
 	public void testSkip() throws IOException {
 		init(32, 15);
 		copy(2, 2);
@@ -195,7 +175,6 @@ public class DeltaStreamTest {
 		assertTrue("now open", opened[0]);
 	}
 
-	@Test
 	public void testIncorrectBaseSize() throws IOException {
 		init(4, 4);
 		copy(0, 4);
@@ -239,7 +218,7 @@ public class DeltaStreamTest {
 	}
 
 	private void init(int baseSize, int dataSize) throws IOException {
-		base = getRng().nextBytes(baseSize);
+		base = rng.nextBytes(baseSize);
 		data = new byte[dataSize];
 		deltaEnc = new DeltaEncoder(deltaBuf, baseSize, dataSize);
 	}
@@ -268,31 +247,14 @@ public class DeltaStreamTest {
 		delta = deltaBuf.toByteArray();
 		assertEquals(base.length, BinaryDelta.getBaseSize(delta));
 		assertEquals(data.length, BinaryDelta.getResultSize(delta));
-		assertArrayEquals(data, BinaryDelta.apply(base, delta));
+		assertTrue(Arrays.equals(data, BinaryDelta.apply(base, delta)));
 
-		// Assert that a single bulk read produces the correct result.
-		//
 		byte[] act = new byte[data.length];
 		DeltaStream in = open();
 		assertEquals(data.length, in.getSize());
 		assertEquals(data.length, in.read(act));
 		assertEquals(-1, in.read());
-		assertTrue("bulk read has same content", Arrays.equals(data, act));
-
-		// Assert that smaller tiny reads have the same result too.
-		//
-		act = new byte[data.length];
-		in = open();
-		int read = 0;
-		while (read < data.length) {
-			int n = in.read(act, read, 128);
-			if (n <= 0)
-				break;
-			read += n;
-		}
-		assertEquals(data.length, read);
-		assertEquals(-1, in.read());
-		assertTrue("small reads have same content", Arrays.equals(data, act));
+		assertTrue(Arrays.equals(data, act));
 	}
 
 	private DeltaStream open() throws IOException {

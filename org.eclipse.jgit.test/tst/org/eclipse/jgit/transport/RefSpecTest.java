@@ -44,19 +44,12 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.junit.Test;
 
-public class RefSpecTest {
-	@Test
+public class RefSpecTest extends TestCase {
 	public void testMasterMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec(sn + ":" + sn);
@@ -77,7 +70,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testSplitLastColon() {
 		final String lhs = ":m:a:i:n:t";
 		final String rhs = "refs/heads/maint";
@@ -90,7 +82,6 @@ public class RefSpecTest {
 		assertEquals(rs, new RefSpec(rs.toString()));
 	}
 
-	@Test
 	public void testForceMasterMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec("+" + sn + ":" + sn);
@@ -111,7 +102,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec(sn);
@@ -132,7 +122,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testForceMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec("+" + sn);
@@ -153,7 +142,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testDeleteMaster() {
 		final String sn = "refs/heads/master";
 		final RefSpec rs = new RefSpec(":" + sn);
@@ -174,7 +162,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testForceRemotesOrigin() {
 		final String srcn = "refs/heads/*";
 		final String dstn = "refs/remotes/origin/*";
@@ -208,7 +195,6 @@ public class RefSpecTest {
 		assertFalse(rs.matchDestination(r));
 	}
 
-	@Test
 	public void testCreateEmpty() {
 		final RefSpec rs = new RefSpec();
 		assertFalse(rs.isForceUpdate());
@@ -218,7 +204,6 @@ public class RefSpecTest {
 		assertEquals("HEAD", rs.toString());
 	}
 
-	@Test
 	public void testSetForceUpdate() {
 		final String s = "refs/heads/*:refs/remotes/origin/*";
 		final RefSpec a = new RefSpec(s);
@@ -231,7 +216,6 @@ public class RefSpecTest {
 		assertEquals("+" + s, b.toString());
 	}
 
-	@Test
 	public void testSetSource() {
 		final RefSpec a = new RefSpec();
 		final RefSpec b = a.setSource("refs/heads/master");
@@ -240,7 +224,6 @@ public class RefSpecTest {
 		assertEquals("refs/heads/master", b.toString());
 	}
 
-	@Test
 	public void testSetDestination() {
 		final RefSpec a = new RefSpec();
 		final RefSpec b = a.setDestination("refs/heads/master");
@@ -249,7 +232,6 @@ public class RefSpecTest {
 		assertEquals("HEAD:refs/heads/master", b.toString());
 	}
 
-	@Test
 	public void testSetDestination_SourceNull() {
 		final RefSpec a = new RefSpec();
 		RefSpec b;
@@ -261,7 +243,6 @@ public class RefSpecTest {
 		assertEquals(":refs/heads/master", b.toString());
 	}
 
-	@Test
 	public void testSetSourceDestination() {
 		final RefSpec a = new RefSpec();
 		final RefSpec b;
@@ -271,7 +252,6 @@ public class RefSpecTest {
 		assertEquals("refs/heads/*:refs/remotes/origin/*", b.toString());
 	}
 
-	@Test
 	public void testExpandFromDestination_NonWildcard() {
 		final String src = "refs/heads/master";
 		final String dst = "refs/remotes/origin/master";
@@ -283,7 +263,6 @@ public class RefSpecTest {
 		assertEquals(dst, r.getDestination());
 	}
 
-	@Test
 	public void testExpandFromDestination_Wildcard() {
 		final String src = "refs/heads/master";
 		final String dst = "refs/remotes/origin/master";

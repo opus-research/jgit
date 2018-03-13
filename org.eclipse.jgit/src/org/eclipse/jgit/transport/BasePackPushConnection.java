@@ -46,16 +46,16 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
@@ -81,31 +81,15 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
  * {@link #readAdvertisedRefs()} methods in constructor or before any use. They
  * should also handle resources releasing in {@link #close()} method if needed.
  */
-public abstract class BasePackPushConnection extends BasePackConnection implements
+class BasePackPushConnection extends BasePackConnection implements
 		PushConnection {
-	/**
-	 * The client expects a status report after the server processes the pack.
-	 * @since 2.0
-	 */
-	public static final String CAPABILITY_REPORT_STATUS = "report-status";
+	static final String CAPABILITY_REPORT_STATUS = "report-status";
 
-	/**
-	 * The server supports deleting refs.
-	 * @since 2.0
-	 */
-	public static final String CAPABILITY_DELETE_REFS = "delete-refs";
+	static final String CAPABILITY_DELETE_REFS = "delete-refs";
 
-	/**
-	 * The server supports packs with OFS deltas.
-	 * @since 2.0
-	 */
-	public static final String CAPABILITY_OFS_DELTA = "ofs-delta";
+	static final String CAPABILITY_OFS_DELTA = "ofs-delta";
 
-	/**
-	 * The client supports using the 64K side-band for progress messages.
-	 * @since 2.0
-	 */
-	public static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
+	static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
 
 	private final boolean thinPack;
 
@@ -124,13 +108,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	/** Time in milliseconds spent transferring the pack data. */
 	private long packTransferTime;
 
-	/**
-	 * Create a new connection to push using the native git transport.
-	 *
-	 * @param packTransport
-	 *            the transport.
-	 */
-	public BasePackPushConnection(final PackTransport packTransport) {
+	BasePackPushConnection(final PackTransport packTransport) {
 		super(packTransport);
 		thinPack = transport.isPushThin();
 	}
@@ -165,16 +143,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		return new TransportException(uri, JGitText.get().pushNotPermitted);
 	}
 
-	/**
-	 * Push one or more objects and update the remote repository.
-	 *
-	 * @param monitor
-	 *            progress monitor to receive status updates.
-	 * @param refUpdates
-	 *            update commands to be applied to the remote repository.
-	 * @throws TransportException
-	 *             if any exception occurs.
-	 */
 	protected void doPush(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
@@ -193,9 +161,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					//
 					int b = in.read();
 					if (0 <= b)
-						throw new TransportException(uri, MessageFormat.format(
-								JGitText.get().expectedEOFReceived,
-								Character.valueOf((char) b)));
+						throw new TransportException(uri, MessageFormat.format(JGitText.get().expectedEOFReceived, (char) b));
 				}
 			}
 		} catch (TransportException e) {
@@ -261,9 +227,10 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 
 	private void writePack(final Map<String, RemoteRefUpdate> refUpdates,
 			final ProgressMonitor monitor) throws IOException {
-		Set<ObjectId> remoteObjects = new HashSet<ObjectId>();
-		Set<ObjectId> newObjects = new HashSet<ObjectId>();
+		List<ObjectId> remoteObjects = new ArrayList<ObjectId>(getRefs().size());
+		List<ObjectId> newObjects = new ArrayList<ObjectId>(refUpdates.size());
 
+		final long start;
 		final PackWriter writer = new PackWriter(transport.getPackConfig(),
 				local.newObjectReader());
 		try {
@@ -276,16 +243,16 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					newObjects.add(r.getNewObjectId());
 			}
 
-			writer.setUseCachedPacks(true);
 			writer.setThin(thinPack);
-			writer.setReuseValidatingObjects(false);
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
+			start = System.currentTimeMillis();
 			writer.writePack(monitor, monitor, out);
 		} finally {
 			writer.release();
 		}
-		packTransferTime = writer.getStatistics().getTimeWriting();
+		out.flush();
+		packTransferTime = System.currentTimeMillis() - start;
 	}
 
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)

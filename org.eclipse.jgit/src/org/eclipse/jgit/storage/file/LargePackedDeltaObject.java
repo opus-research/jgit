@@ -44,12 +44,9 @@
 package org.eclipse.jgit.storage.file;
 
 import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.DataFormatException;
-import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -61,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.storage.pack.DeltaStream;
-import org.eclipse.jgit.util.io.TeeInputStream;
 
 class LargePackedDeltaObject extends ObjectLoader {
 	private static final long SIZE_UNKNOWN = -1;
@@ -159,47 +155,20 @@ class LargePackedDeltaObject extends ObjectLoader {
 		try {
 			throw new LargeObjectException(getObjectId());
 		} catch (IOException cannotObtainId) {
-			LargeObjectException err = new LargeObjectException();
-			err.initCause(cannotObtainId);
-			throw err;
+			throw new LargeObjectException();
 		}
 	}
 
 	@Override
 	public ObjectStream openStream() throws MissingObjectException, IOException {
-		// If the object was recently unpacked, its available loose.
-		// The loose format is going to be faster to access than a
-		// delta applied on top of a base. Use that whenever we can.
-		//
-		final ObjectId myId = getObjectId();
 		final WindowCursor wc = new WindowCursor(db);
-		ObjectLoader ldr = db.openObject2(wc, myId.name(), myId);
-		if (ldr != null)
-			return ldr.openStream();
-
 		InputStream in = open(wc);
 		in = new BufferedInputStream(in, 8192);
-
-		// While we inflate the object, also deflate it back as a loose
-		// object. This will later be cleaned up by a gc pass, but until
-		// then we will reuse the loose form by the above code path.
-		//
-		int myType = getType();
-		long mySize = getSize();
-		final ObjectDirectoryInserter odi = db.newInserter();
-		final File tmp = odi.newTempFile();
-		DeflaterOutputStream dOut = odi.compress(new FileOutputStream(tmp));
-		odi.writeHeader(dOut, myType, mySize);
-
-		in = new TeeInputStream(in, dOut);
-		return new ObjectStream.Filter(myType, mySize, in) {
+		return new ObjectStream.Filter(getType(), size, in) {
 			@Override
 			public void close() throws IOException {
-				super.close();
-
-				odi.release();
 				wc.release();
-				db.insertUnpackedObject(tmp, myId, true /* force creation */);
+				super.close();
 			}
 		};
 	}
@@ -250,10 +219,6 @@ class LargePackedDeltaObject extends ObjectLoader {
 				return baseSize;
 			}
 		};
-		if (type == Constants.OBJ_BAD) {
-			if (!(base instanceof LargePackedDeltaObject))
-				type = base.getType();
-		}
 		if (size == SIZE_UNKNOWN)
 			size = ds.getSize();
 		return ds;

@@ -59,7 +59,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.LockFile;
-import org.eclipse.jgit.util.FileUtils;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -97,7 +96,8 @@ class Iplog extends TextBuiltin {
 		log.scan(db, rw.parseCommit(start), version);
 
 		if (output != null) {
-			FileUtils.mkdirs(output.getParentFile(), true);
+			if (!output.getParentFile().exists())
+				output.getParentFile().mkdirs();
 			LockFile lf = new LockFile(output, db.getFS());
 			if (!lf.lock())
 				throw die(MessageFormat.format(CLIText.get().cannotLock, output));
@@ -114,8 +114,8 @@ class Iplog extends TextBuiltin {
 				lf.unlock();
 			}
 		} else {
-			log.writeTo(outs);
-			outs.flush();
+			log.writeTo(System.out);
+			System.out.flush();
 		}
 	}
 }

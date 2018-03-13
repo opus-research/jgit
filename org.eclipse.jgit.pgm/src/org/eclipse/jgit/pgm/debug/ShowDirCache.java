@@ -2,7 +2,6 @@
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,8 +45,6 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static java.lang.Integer.valueOf;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -60,7 +57,7 @@ class ShowDirCache extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		final SimpleDateFormat fmt;
-		fmt = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS");
+		fmt = new SimpleDateFormat("yyyyMMdd,HHmmss.SSS");
 
 		final DirCache cache = db.readDirCache();
 		for (int i = 0; i < cache.getEntryCount(); i++) {
@@ -68,19 +65,16 @@ class ShowDirCache extends TextBuiltin {
 			final FileMode mode = FileMode.fromBits(ent.getRawMode());
 			final int len = ent.getLength();
 			final Date mtime = new Date(ent.getLastModified());
-			final int stage = ent.getStage();
 
-			outw.print(mode);
-			outw.format(" %6d", valueOf(len));
-			outw.print(' ');
-			outw.print(fmt.format(mtime));
-			outw.print(' ');
-			outw.print(ent.getObjectId().name());
-			outw.print(' ');
-			outw.print(stage);
-			outw.print('\t');
-			outw.print(ent.getPathString());
-			outw.println();
+			out.print(mode);
+			out.format(" %6d", len);
+			out.print(' ');
+			out.print(fmt.format(mtime));
+			out.print(' ');
+			out.print(ent.getObjectId().name());
+			out.print('\t');
+			out.print(ent.getPathString());
+			out.println();
 		}
 	}
 }

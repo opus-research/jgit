@@ -43,16 +43,10 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
-
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Test;
 
 public class DirCacheFindTest extends RepositoryTestCase {
-	@Test
 	public void testEntriesWithin() throws Exception {
 		final DirCache dc = db.readDirCache();
 
@@ -87,13 +81,6 @@ public class DirCacheFindTest extends RepositoryTestCase {
 			assertEquals(aLast - aFirst + 1, aContents.length);
 			for (int i = aFirst, j = 0; i <= aLast; i++, j++)
 				assertSame(ents[i], aContents[j]);
-		}
-		{
-			final DirCacheEntry[] aContents = dc.getEntriesWithin("");
-			assertNotNull(aContents);
-			assertEquals(ents.length, aContents.length);
-			for (int i = 0; i < ents.length; i++)
-				assertSame(ents[i], aContents[i]);
 		}
 
 		assertNotNull(dc.getEntriesWithin("a."));

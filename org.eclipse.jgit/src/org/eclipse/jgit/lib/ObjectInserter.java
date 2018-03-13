@@ -47,12 +47,17 @@
 package org.eclipse.jgit.lib;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.transport.PackParser;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.ObjectWritingException;
 
 /**
  * Inserts objects into an existing {@code ObjectDatabase}.
@@ -67,6 +72,16 @@ import org.eclipse.jgit.transport.PackParser;
  * otherwise making the returned ObjectIds visible to other code.
  */
 public abstract class ObjectInserter {
+	private static final byte[] htree = Constants.encodeASCII("tree");
+
+	private static final byte[] hparent = Constants.encodeASCII("parent");
+
+	private static final byte[] hauthor = Constants.encodeASCII("author");
+
+	private static final byte[] hcommitter = Constants.encodeASCII("committer");
+
+	private static final byte[] hencoding = Constants.encodeASCII("encoding");
+
 	/** An inserter that can be used for formatting and id generation only. */
 	public static class Formatter extends ObjectInserter {
 		@Override
@@ -76,11 +91,6 @@ public abstract class ObjectInserter {
 		}
 
 		@Override
-		public PackParser newPackParser(InputStream in) throws IOException {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
 		public void flush() throws IOException {
 			// Do nothing.
 		}
@@ -88,60 +98,6 @@ public abstract class ObjectInserter {
 		@Override
 		public void release() {
 			// Do nothing.
-		}
-	}
-
-	/** Wraps a delegate ObjectInserter. */
-	public static abstract class Filter extends ObjectInserter {
-		/** @return delegate ObjectInserter to handle all processing. */
-		protected abstract ObjectInserter delegate();
-
-		@Override
-		protected byte[] buffer() {
-			return delegate().buffer();
-		}
-
-		public ObjectId idFor(int type, byte[] data) {
-			return delegate().idFor(type, data);
-		}
-
-		public ObjectId idFor(int type, byte[] data, int off, int len) {
-			return delegate().idFor(type, data, off, len);
-		}
-
-		public ObjectId idFor(int objectType, long length, InputStream in)
-				throws IOException {
-			return delegate().idFor(objectType, length, in);
-		}
-
-		public ObjectId idFor(TreeFormatter formatter) {
-			return delegate().idFor(formatter);
-		}
-
-		public ObjectId insert(int type, byte[] data) throws IOException {
-			return delegate().insert(type, data);
-		}
-
-		public ObjectId insert(int type, byte[] data, int off, int len)
-				throws IOException {
-			return delegate().insert(type, data, off, len);
-		}
-
-		public ObjectId insert(int objectType, long length, InputStream in)
-				throws IOException {
-			return delegate().insert(objectType, length, in);
-		}
-
-		public PackParser newPackParser(InputStream in) throws IOException {
-			return delegate().newPackParser(in);
-		}
-
-		public void flush() throws IOException {
-			delegate().flush();
-		}
-
-		public void release() {
-			delegate().release();
 		}
 	}
 
@@ -156,35 +112,11 @@ public abstract class ObjectInserter {
 		digest = Constants.newMessageDigest();
 	}
 
-	/**
-	 * Obtain a temporary buffer for use by the ObjectInserter or its subclass.
-	 * <p>
-	 * This buffer is supplied by the ObjectInserter base class to itself and
-	 * its subclasses for the purposes of pulling data from a supplied
-	 * InputStream, passing it through a Deflater, or formatting the canonical
-	 * format of a small object like a small tree or commit.
-	 * <p>
-	 * <strong>This buffer IS NOT for translation such as auto-CRLF or content
-	 * filtering and must not be used for such purposes.</strong>
-	 * <p>
-	 * The returned buffer is small, around a few KiBs, and the size may change
-	 * between versions of JGit. Callers using this buffer must always check the
-	 * length of the returned array to ascertain how much space was provided.
-	 * <p>
-	 * There is a single buffer for each ObjectInserter, repeated calls to this
-	 * method will (usually) always return the same buffer. If the caller needs
-	 * more than one buffer, or needs a buffer of a larger size, it must manage
-	 * that buffer on its own.
-	 * <p>
-	 * The buffer is usually on first demand for a buffer.
-	 *
-	 * @return a temporary byte array for use by the caller.
-	 */
+	/** @return a temporary byte array for use by the caller. */
 	protected byte[] buffer() {
-		byte[] b = tempBuffer;
-		if (b == null)
-			tempBuffer = b = new byte[8192];
-		return b;
+		if (tempBuffer == null)
+			tempBuffer = new byte[8192];
+		return tempBuffer;
 	}
 
 	/** @return digest to help compute an ObjectId */
@@ -262,58 +194,6 @@ public abstract class ObjectInserter {
 	}
 
 	/**
-	 * Compute the ObjectId for the given tree without inserting it.
-	 *
-	 * @param formatter
-	 * @return the computed ObjectId
-	 */
-	public ObjectId idFor(TreeFormatter formatter) {
-		return formatter.computeId(this);
-	}
-
-	/**
-	 * Insert a single tree into the store, returning its unique name.
-	 *
-	 * @param formatter
-	 *            the formatter containing the proposed tree's data.
-	 * @return the name of the tree object.
-	 * @throws IOException
-	 *             the object could not be stored.
-	 */
-	public final ObjectId insert(TreeFormatter formatter) throws IOException {
-		// Delegate to the formatter, as then it can pass the raw internal
-		// buffer back to this inserter, avoiding unnecessary data copying.
-		//
-		return formatter.insertTo(this);
-	}
-
-	/**
-	 * Insert a single commit into the store, returning its unique name.
-	 *
-	 * @param builder
-	 *            the builder containing the proposed commit's data.
-	 * @return the name of the commit object.
-	 * @throws IOException
-	 *             the object could not be stored.
-	 */
-	public final ObjectId insert(CommitBuilder builder) throws IOException {
-		return insert(Constants.OBJ_COMMIT, builder.build());
-	}
-
-	/**
-	 * Insert a single annotated tag into the store, returning its unique name.
-	 *
-	 * @param builder
-	 *            the builder containing the proposed tag's data.
-	 * @return the name of the tag object.
-	 * @throws IOException
-	 *             the object could not be stored.
-	 */
-	public final ObjectId insert(TagBuilder builder) throws IOException {
-		return insert(Constants.OBJ_TAG, builder.build());
-	}
-
-	/**
 	 * Insert a single object into the store, returning its unique name.
 	 *
 	 * @param type
@@ -368,19 +248,6 @@ public abstract class ObjectInserter {
 			throws IOException;
 
 	/**
-	 * Initialize a parser to read from a pack formatted stream.
-	 *
-	 * @param in
-	 *            the input stream. The stream is not closed by the parser, and
-	 *            must instead be closed by the caller once parsing is complete.
-	 * @return the pack parser.
-	 * @throws IOException
-	 *             the parser instance, which can be configured and then used to
-	 *             parse objects into the ObjectDatabase.
-	 */
-	public abstract PackParser newPackParser(InputStream in) throws IOException;
-
-	/**
 	 * Make all inserted objects visible.
 	 * <p>
 	 * The flush may take some period of time to make the objects available to
@@ -399,4 +266,134 @@ public abstract class ObjectInserter {
 	 * released after the subsequent usage.
 	 */
 	public abstract void release();
+
+	/**
+	 * Format a Tree in canonical format.
+	 *
+	 * @param tree
+	 *            the tree object to format
+	 * @return canonical encoding of the tree object.
+	 * @throws IOException
+	 *             the tree cannot be loaded, or its not in a writable state.
+	 */
+	public final byte[] format(Tree tree) throws IOException {
+		ByteArrayOutputStream o = new ByteArrayOutputStream();
+		for (TreeEntry e : tree.members()) {
+			ObjectId id = e.getId();
+			if (id == null)
+				throw new ObjectWritingException(MessageFormat.format(JGitText
+						.get().objectAtPathDoesNotHaveId, e.getFullName()));
+
+			e.getMode().copyTo(o);
+			o.write(' ');
+			o.write(e.getNameUTF8());
+			o.write(0);
+			id.copyRawTo(o);
+		}
+		return o.toByteArray();
+	}
+
+	/**
+	 * Format a Commit in canonical format.
+	 *
+	 * @param commit
+	 *            the commit object to format
+	 * @return canonical encoding of the commit object.
+	 * @throws UnsupportedEncodingException
+	 *             the commit's chosen encoding isn't supported on this JVM.
+	 */
+	public final byte[] format(Commit commit)
+			throws UnsupportedEncodingException {
+		String encoding = commit.getEncoding();
+		if (encoding == null)
+			encoding = Constants.CHARACTER_ENCODING;
+
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		OutputStreamWriter w = new OutputStreamWriter(os, encoding);
+		try {
+			os.write(htree);
+			os.write(' ');
+			commit.getTreeId().copyTo(os);
+			os.write('\n');
+
+			ObjectId[] ps = commit.getParentIds();
+			for (int i = 0; i < ps.length; ++i) {
+				os.write(hparent);
+				os.write(' ');
+				ps[i].copyTo(os);
+				os.write('\n');
+			}
+
+			os.write(hauthor);
+			os.write(' ');
+			w.write(commit.getAuthor().toExternalString());
+			w.flush();
+			os.write('\n');
+
+			os.write(hcommitter);
+			os.write(' ');
+			w.write(commit.getCommitter().toExternalString());
+			w.flush();
+			os.write('\n');
+
+			if (!encoding.equals(Constants.CHARACTER_ENCODING)) {
+				os.write(hencoding);
+				os.write(' ');
+				os.write(Constants.encodeASCII(encoding));
+				os.write('\n');
+			}
+
+			os.write('\n');
+			w.write(commit.getMessage());
+			w.flush();
+		} catch (IOException err) {
+			// This should never occur, the only way to get it above is
+			// for the ByteArrayOutputStream to throw, but it doesn't.
+			//
+			throw new RuntimeException(err);
+		}
+		return os.toByteArray();
+	}
+
+	/**
+	 * Format a Tag in canonical format.
+	 *
+	 * @param tag
+	 *            the tag object to format
+	 * @return canonical encoding of the tag object.
+	 */
+	public final byte[] format(Tag tag) {
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
+		try {
+			w.write("object ");
+			tag.getObjId().copyTo(w);
+			w.write('\n');
+
+			w.write("type ");
+			w.write(tag.getType());
+			w.write("\n");
+
+			w.write("tag ");
+			w.write(tag.getTag());
+			w.write("\n");
+
+			if (tag.getTagger() != null) {
+				w.write("tagger ");
+				w.write(tag.getTagger().toExternalString());
+				w.write('\n');
+			}
+
+			w.write('\n');
+			if (tag.getMessage() != null)
+				w.write(tag.getMessage());
+			w.close();
+		} catch (IOException err) {
+			// This should never occur, the only way to get it above is
+			// for the ByteArrayOutputStream to throw, but it doesn't.
+			//
+			throw new RuntimeException(err);
+		}
+		return os.toByteArray();
+	}
 }

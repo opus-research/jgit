@@ -44,38 +44,28 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.fail;
-
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class ConcurrentRepackTest extends RepositoryTestCase {
-	@Before
 	public void setUp() throws Exception {
 		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
 		windowCacheConfig.setPackedGitOpenFiles(1);
@@ -83,14 +73,12 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		super.setUp();
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		super.tearDown();
 		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
 		WindowCache.reconfigure(windowCacheConfig);
 	}
 
-	@Test
 	public void testObjectInNewPack() throws IncorrectObjectTypeException,
 			IOException {
 		// Create a new object in a new pack, and test that it is present.
@@ -101,7 +89,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertEquals(o1.name(), parse(o1).name());
 	}
 
-	@Test
 	public void testObjectMovedToNewPack1()
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it. Then remove that pack and put the
@@ -128,7 +115,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertEquals(o1.name(), parse(o1).name());
 	}
 
-	@Test
 	public void testObjectMovedWithinPack()
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it.
@@ -161,7 +147,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertEquals(o2.name(), parse(o2).name());
 	}
 
-	@Test
 	public void testObjectMovedToNewPack2()
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it. Then remove that pack and put the
@@ -197,7 +182,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertNotNull(data2);
 		assertNotNull(data1);
 		assertNotSame(data1, data2); // cache should be per-pack, not per object
-		assertArrayEquals(data1, data2);
+		assertTrue(Arrays.equals(data1, data2));
 		assertEquals(load2.getType(), load1.getType());
 	}
 
@@ -234,14 +219,14 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		NullProgressMonitor m = NullProgressMonitor.INSTANCE;
 		OutputStream out;
 
-		out = new SafeBufferedOutputStream(new FileOutputStream(files[0]));
+		out = new BufferedOutputStream(new FileOutputStream(files[0]));
 		try {
 			pw.writePack(m, m, out);
 		} finally {
 			out.close();
 		}
 
-		out = new SafeBufferedOutputStream(new FileOutputStream(files[1]));
+		out = new BufferedOutputStream(new FileOutputStream(files[1]));
 		try {
 			pw.writeIndex(out);
 		} finally {
@@ -251,10 +236,10 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		touch(begin, files[0].getParentFile());
 	}
 
-	private static void delete(final File[] list) throws IOException {
+	private static void delete(final File[] list) {
 		final long begin = list[0].getParentFile().lastModified();
 		for (final File f : list) {
-			FileUtils.delete(f);
+			f.delete();
 			assertFalse(f + " was removed", f.exists());
 		}
 		touch(begin, list[0].getParentFile());
@@ -280,14 +265,8 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 			throws IOException {
 		final RevWalk revWalk = new RevWalk(repo);
 		final byte[] bytes = Constants.encode(data);
-		final ObjectInserter inserter = repo.newObjectInserter();
-		final ObjectId id;
-		try {
-			id = inserter.insert(Constants.OBJ_BLOB, bytes);
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
+		final ObjectWriter ow = new ObjectWriter(repo);
+		final ObjectId id = ow.writeBlob(bytes);
 		try {
 			parse(id);
 			fail("Object " + id.name() + " should not exist in test repository");

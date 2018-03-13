@@ -55,13 +55,10 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /** Extra utilities to support usage of HTTP. */
 public class HttpSupport {
-	/** The {@code GET} HTTP method. */
-	public static final String METHOD_GET = "GET";
-
 	/** The {@code POST} HTTP method. */
 	public static final String METHOD_POST = "POST";
 
@@ -124,12 +121,6 @@ public class HttpSupport {
 
 	/** The standard {@code text/plain} MIME type. */
 	public static final String TEXT_PLAIN = "text/plain";
-
-	/** The {@code Authorization} header. */
-	public static final String HDR_AUTHORIZATION = "Authorization";
-
-	/** The {@code WWW-Authenticate} header. */
-	public static final String HDR_WWW_AUTHENTICATE = "WWW-Authenticate";
 
 	/**
 	 * URL encode a value string into an output buffer.

@@ -56,15 +56,13 @@ import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A single file (or stage of a file) in a {@link DirCache}.
@@ -87,7 +85,7 @@ public class DirCacheEntry {
 	/** The second tree revision (usually called "theirs"). */
 	public static final int STAGE_3 = 3;
 
-	private static final int P_CTIME = 0;
+	// private static final int P_CTIME = 0;
 
 	// private static final int P_CTIME_NSEC = 4;
 
@@ -110,23 +108,15 @@ public class DirCacheEntry {
 	private static final int P_OBJECTID = 40;
 
 	private static final int P_FLAGS = 60;
-	private static final int P_FLAGS2 = 62;
 
 	/** Mask applied to data in {@link #P_FLAGS} to get the name length. */
 	private static final int NAME_MASK = 0xfff;
 
-	private static final int INTENT_TO_ADD = 0x20000000;
-	private static final int SKIP_WORKTREE = 0x40000000;
-	private static final int EXTENDED_FLAGS = (INTENT_TO_ADD | SKIP_WORKTREE);
+	static final int INFO_LEN = 62;
 
-	private static final int INFO_LEN = 62;
-	private static final int INFO_LEN_EXTENDED = 64;
-
-	private static final int EXTENDED = 0x40;
 	private static final int ASSUME_VALID = 0x80;
 
-	/** In-core flag signaling that the entry should be considered as modified. */
-	private static final int UPDATE_NEEDED = 0x1;
+	private static final int UPDATE_NEEDED = 0x40;
 
 	/** (Possibly shared) header information storage. */
 	private final byte[] info;
@@ -137,30 +127,13 @@ public class DirCacheEntry {
 	/** Our encoded path name, from the root of the repository. */
 	final byte[] path;
 
-	/** Flags which are never stored to disk. */
-	private byte inCoreFlags;
-
-	DirCacheEntry(final byte[] sharedInfo, final MutableInteger infoAt,
-			final InputStream in, final MessageDigest md, final int smudge_s,
-			final int smudge_ns) throws IOException {
+	DirCacheEntry(final byte[] sharedInfo, final int infoAt,
+			final InputStream in, final MessageDigest md) throws IOException {
 		info = sharedInfo;
-		infoOffset = infoAt.value;
+		infoOffset = infoAt;
 
 		IO.readFully(in, info, infoOffset, INFO_LEN);
-
-		final int len;
-		if (isExtended()) {
-			len = INFO_LEN_EXTENDED;
-			IO.readFully(in, info, infoOffset + INFO_LEN, INFO_LEN_EXTENDED - INFO_LEN);
-
-			if ((getExtendedFlags() & ~EXTENDED_FLAGS) != 0)
-				throw new IOException(MessageFormat.format(JGitText.get()
-						.DIRCUnrecognizedExtendedFlags, String.valueOf(getExtendedFlags())));
-		} else
-			len = INFO_LEN;
-
-		infoAt.value += len;
-		md.update(info, infoOffset, len);
+		md.update(info, infoOffset, INFO_LEN);
 
 		int pathLen = NB.decodeUInt16(info, infoOffset + P_FLAGS) & NAME_MASK;
 		int skipped = 0;
@@ -193,17 +166,13 @@ public class DirCacheEntry {
 		// Index records are padded out to the next 8 byte alignment
 		// for historical reasons related to how C Git read the files.
 		//
-		final int actLen = len + pathLen;
+		final int actLen = INFO_LEN + pathLen;
 		final int expLen = (actLen + 8) & ~7;
 		final int padLen = expLen - actLen - skipped;
 		if (padLen > 0) {
 			IO.skipFully(in, padLen);
 			md.update(nullpad, 0, padLen);
 		}
-
-		if (mightBeRacilyClean(smudge_s, smudge_ns))
-			smudgeRacilyClean();
-
 	}
 
 	/**
@@ -264,10 +233,10 @@ public class DirCacheEntry {
 	 *             or DirCache file.  Or if {@code stage} is outside of the
 	 *             range 0..3, inclusive.
 	 */
-	@SuppressWarnings("boxing")
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new InvalidPathException(toString(newPath));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
+					, toString(newPath)));
 		if (stage < 0 || 3 < stage)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
 					, stage, toString(newPath)));
@@ -285,15 +254,14 @@ public class DirCacheEntry {
 	}
 
 	void write(final OutputStream os) throws IOException {
-		final int len = isExtended() ? INFO_LEN_EXTENDED : INFO_LEN;
 		final int pathLen = path.length;
-		os.write(info, infoOffset, len);
+		os.write(info, infoOffset, INFO_LEN);
 		os.write(path, 0, pathLen);
 
 		// Index records are padded out to the next 8 byte alignment
 		// for historical reasons related to how C Git read the files.
 		//
-		final int actLen = len + pathLen;
+		final int actLen = INFO_LEN + pathLen;
 		final int expLen = (actLen + 8) & ~7;
 		if (actLen != expLen)
 			os.write(nullpad, 0, expLen - actLen);
@@ -402,7 +370,7 @@ public class DirCacheEntry {
 	 * @return true if this entry should be checked for changes
 	 */
 	public boolean isUpdateNeeded() {
-		return (inCoreFlags & UPDATE_NEEDED) != 0;
+		return (info[infoOffset + P_FLAGS] & UPDATE_NEEDED) != 0;
 	}
 
 	/**
@@ -412,9 +380,9 @@ public class DirCacheEntry {
 	 */
 	public void setUpdateNeeded(boolean updateNeeded) {
 		if (updateNeeded)
-			inCoreFlags |= UPDATE_NEEDED;
+			info[infoOffset + P_FLAGS] |= UPDATE_NEEDED;
 		else
-			inCoreFlags &= ~UPDATE_NEEDED;
+			info[infoOffset + P_FLAGS] &= ~UPDATE_NEEDED;
 	}
 
 	/**
@@ -426,34 +394,6 @@ public class DirCacheEntry {
 	 */
 	public int getStage() {
 		return (info[infoOffset + P_FLAGS] >>> 4) & 0x3;
-	}
-
-	/**
-	 * Returns whether this entry should be skipped from the working tree.
-	 *
-	 * @return true if this entry should be skipepd.
-	 */
-	public boolean isSkipWorkTree() {
-		return (getExtendedFlags() & SKIP_WORKTREE) != 0;
-	}
-
-	/**
-	 * Returns whether this entry is intent to be added to the Index.
-	 *
-	 * @return true if this entry is intent to add.
-	 */
-	public boolean isIntentToAdd() {
-		return (getExtendedFlags() & INTENT_TO_ADD) != 0;
-	}
-
-	/**
-	 * Returns whether this entry is in the fully-merged stage (0).
-	 *
-	 * @return true if this entry is merged
-	 * @since 2.2
-	 */
-	public boolean isMerged() {
-		return getStage() == STAGE_0;
 	}
 
 	/**
@@ -496,26 +436,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get the cached creation time of this file, in milliseconds.
-	 *
-	 * @return cached creation time of this file, in milliseconds since the
-	 *         Java epoch (midnight Jan 1, 1970 UTC).
-	 */
-	public long getCreationTime() {
-		return decodeTS(P_CTIME);
-	}
-
-	/**
-	 * Set the cached creation time of this file, using milliseconds.
-	 *
-	 * @param when
-	 *            new cached creation time of the file, in milliseconds.
-	 */
-	public void setCreationTime(final long when) {
-		encodeTS(P_CTIME, when);
-	}
-
-	/**
 	 * Get the cached last modification date of this file, in milliseconds.
 	 * <p>
 	 * One of the indicators that the file has been modified by an application
@@ -540,7 +460,7 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get the cached size (mod 4 GB) (in bytes) of this file.
+	 * Get the cached size (in bytes) of this file.
 	 * <p>
 	 * One of the indicators that the file has been modified by an application
 	 * changing the working tree is if the size of the file (in bytes) differs
@@ -549,10 +469,6 @@ public class DirCacheEntry {
 	 * Note that this is the length of the file in the working directory, which
 	 * may differ from the size of the decompressed blob if work tree filters
 	 * are being used, such as LF<->CRLF conversion.
-	 * <p>
-	 * Note also that for very large files, this is the size of the on-disk file
-	 * truncated to 32 bits, i.e. modulo 4294967296. If that value is larger
-	 * than 2GB, it will appear negative.
 	 *
 	 * @return cached size of the working directory file, in bytes.
 	 */
@@ -564,21 +480,10 @@ public class DirCacheEntry {
 	 * Set the cached size (in bytes) of this file.
 	 *
 	 * @param sz
-	 *            new cached size of the file, as bytes. If the file is larger
-	 *            than 2G, cast it to (int) before calling this method.
+	 *            new cached size of the file, as bytes.
 	 */
 	public void setLength(final int sz) {
 		NB.encodeInt32(info, infoOffset + P_SIZE, sz);
-	}
-
-	/**
-	 * Set the cached size (in bytes) of this file.
-	 *
-	 * @param sz
-	 *            new cached size of the file, as bytes.
-	 */
-	public void setLength(final long sz) {
-		setLength((int) sz);
 	}
 
 	/**
@@ -635,16 +540,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Use for debugging only !
-	 */
-	@Override
-	public String toString() {
-		return getFileMode() + " " + getLength() + " " + getLastModified()
-				+ " " + getObjectId() + " " + getStage() + " "
-				+ getPathString() + "\n";
-	}
-
-	/**
 	 * Copy the ObjectId and other meta fields from an existing entry.
 	 * <p>
 	 * This method copies everything except the path from one entry to another,
@@ -654,40 +549,10 @@ public class DirCacheEntry {
 	 *            the entry to copy ObjectId and meta fields from.
 	 */
 	public void copyMetaData(final DirCacheEntry src) {
-		copyMetaData(src, false);
-	}
-
-	/**
-	 * Copy the ObjectId and other meta fields from an existing entry.
-	 * <p>
-	 * This method copies everything except the path and possibly stage from one
-	 * entry to another, supporting renaming.
-	 *
-	 * @param src
-	 *            the entry to copy ObjectId and meta fields from.
-	 * @param keepStage
-	 *            if true, the stage attribute will not be copied
-	 */
-	void copyMetaData(final DirCacheEntry src, boolean keepStage) {
-		int origflags = NB.decodeUInt16(info, infoOffset + P_FLAGS);
-		int newflags = NB.decodeUInt16(src.info, src.infoOffset + P_FLAGS);
+		final int pLen = NB.decodeUInt16(info, infoOffset + P_FLAGS) & NAME_MASK;
 		System.arraycopy(src.info, src.infoOffset, info, infoOffset, INFO_LEN);
-		final int pLen = origflags & NAME_MASK;
-		final int SHIFTED_STAGE_MASK = 0x3 << 12;
-		final int pStageShifted;
-		if (keepStage)
-			pStageShifted = origflags & SHIFTED_STAGE_MASK;
-		else
-			pStageShifted = newflags & SHIFTED_STAGE_MASK;
-		NB.encodeInt16(info, infoOffset + P_FLAGS, pStageShifted | pLen
-				| (newflags & ~NAME_MASK & ~SHIFTED_STAGE_MASK));
-	}
-
-	/**
-	 * @return true if the entry contains extended flags.
-	 */
-	boolean isExtended() {
-		return (info[infoOffset + P_FLAGS] & EXTENDED) != 0;
+		NB.encodeInt16(info, infoOffset + P_FLAGS, pLen
+				| NB.decodeUInt16(info, infoOffset + P_FLAGS) & ~NAME_MASK);
 	}
 
 	private long decodeTS(final int pIdx) {
@@ -701,13 +566,6 @@ public class DirCacheEntry {
 		final int base = infoOffset + pIdx;
 		NB.encodeInt32(info, base, (int) (when / 1000));
 		NB.encodeInt32(info, base + 4, ((int) (when % 1000)) * 1000000);
-	}
-
-	private int getExtendedFlags() {
-		if (isExtended())
-			return NB.decodeUInt16(info, infoOffset + P_FLAGS2) << 16;
-		else
-			return 0;
 	}
 
 	private static String toString(final byte[] path) {
@@ -730,21 +588,11 @@ public class DirCacheEntry {
 				else
 					return false;
 				break;
-			case '\\':
-			case ':':
-				// Tree's never have a backslash in them, not even on Windows
-				// but even there we regard it as an invalid path
-				if (SystemReader.getInstance().isWindows())
-					return false;
-				//$FALL-THROUGH$
+
 			default:
 				componentHasChars = true;
 			}
 		}
 		return componentHasChars;
-	}
-
-	static int getMaximumInfoLength(boolean extended) {
-		return extended ? INFO_LEN_EXTENDED : INFO_LEN;
 	}
 }

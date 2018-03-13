@@ -51,9 +51,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.util.MutableInteger;
 
@@ -300,14 +300,12 @@ public class HunkHeader {
 		if (nContext + old.nDeleted < old.lineCount) {
 			final int missingCount = old.lineCount - (nContext + old.nDeleted);
 			script.error(buf, startOffset, MessageFormat.format(
-					JGitText.get().truncatedHunkOldLinesMissing,
-					Integer.valueOf(missingCount)));
+					JGitText.get().truncatedHunkOldLinesMissing, missingCount));
 
 		} else if (nContext + old.nAdded < newLineCount) {
 			final int missingCount = newLineCount - (nContext + old.nAdded);
 			script.error(buf, startOffset, MessageFormat.format(
-					JGitText.get().truncatedHunkNewLinesMissing,
-					Integer.valueOf(missingCount)));
+					JGitText.get().truncatedHunkNewLinesMissing, missingCount));
 
 		} else if (nContext + old.nDeleted > old.lineCount
 				|| nContext + old.nAdded > newLineCount) {
@@ -402,18 +400,5 @@ public class HunkHeader {
 		final String s = text[fileIdx];
 		final int end = s.indexOf('\n', offsets[fileIdx]);
 		offsets[fileIdx] = end < 0 ? s.length() : end + 1;
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder buf = new StringBuilder();
-		buf.append("HunkHeader[");
-		buf.append(getOldImage().getStartLine());
-		buf.append(',');
-		buf.append(getOldImage().getLineCount());
-		buf.append("->");
-		buf.append(getNewStartLine()).append(',').append(getNewLineCount());
-		buf.append(']');
-		return buf.toString();
 	}
 }

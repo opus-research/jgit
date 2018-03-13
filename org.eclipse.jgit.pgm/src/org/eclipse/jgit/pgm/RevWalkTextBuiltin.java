@@ -50,10 +50,8 @@ import java.util.List;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.revwalk.FollowFilter;
 import org.eclipse.jgit.revwalk.ObjectWalk;
@@ -81,9 +79,6 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 
 	@Option(name = "--total-count")
 	boolean count = false;
-
-	@Option(name = "--all")
-	boolean all = false;
 
 	char[] outbuffer = new char[Constants.OBJECT_ID_LENGTH * 2];
 
@@ -161,18 +156,6 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		else if (revLimiter.size() > 1)
 			walk.setRevFilter(AndRevFilter.create(revLimiter));
 
-		if (all)
-			for (Ref a : db.getAllRefs().values()) {
-				ObjectId oid = a.getPeeledObjectId();
-				if (oid == null)
-					oid = a.getObjectId();
-				try {
-					commits.add(walk.parseCommit(oid));
-				} catch (IncorrectObjectTypeException e) {
-					// Ignore all refs which are not commits
-				}
-			}
-
 		if (commits.isEmpty()) {
 			final ObjectId head = db.resolve(Constants.HEAD);
 			if (head == null)
@@ -193,19 +176,17 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 			final long end = System.currentTimeMillis();
 			System.err.print(n);
 			System.err.print(' ');
-			System.err
-					.println(MessageFormat.format(
-							CLIText.get().timeInMilliSeconds,
-							Long.valueOf(end - start)));
+			System.err.println(MessageFormat.format(
+					CLIText.get().timeInMilliSeconds, end - start));
 		}
 	}
 
 	protected RevWalk createWalk() {
 		if (objects)
 			return new ObjectWalk(db);
-		if (argWalk != null)
-			return argWalk;
-		return argWalk = new RevWalk(db);
+		if (argWalk == null)
+			argWalk = new RevWalk(db);
+		return argWalk;
 	}
 
 	protected int walkLoop() throws Exception {
@@ -226,30 +207,8 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		return n;
 	}
 
-	/**
-	 * "Show" the current RevCommit when called from the main processing loop.
-	 * <p>
-	 * Implement this methods to define the behavior for subclasses of
-	 * RevWalkTextBuiltin.
-	 *
-	 * @param c
-	 *            The current {@link RevCommit}
-	 * @throws Exception
-	 */
 	protected abstract void show(final RevCommit c) throws Exception;
 
-	/**
-	 * "Show" the current RevCommit when called from the main processing loop.
-	 * <p>
-	 * The default implementation does nothing because most subclasses only
-	 * process RevCommits.
-	 *
-	 * @param objectWalk
-	 *            the {@link ObjectWalk} used by {@link #walkLoop()}
-	 * @param currentObject
-	 *            The current {@link RevObject}
-	 * @throws Exception
-	 */
 	protected void show(final ObjectWalk objectWalk,
 			final RevObject currentObject) throws Exception {
 		// Do nothing by default. Most applications cannot show an object.

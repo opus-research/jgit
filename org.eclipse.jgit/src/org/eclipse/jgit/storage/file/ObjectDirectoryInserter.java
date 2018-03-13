@@ -52,7 +52,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.channels.Channels;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.util.zip.Deflater;
@@ -61,73 +60,60 @@ import java.util.zip.DeflaterOutputStream;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.transport.PackParser;
-import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.IO;
 
 /** Creates loose objects in a {@link ObjectDirectory}. */
 class ObjectDirectoryInserter extends ObjectInserter {
-	private final FileObjectDatabase db;
+	private final ObjectDirectory db;
 
-	private final WriteConfig config;
+	private final Config config;
 
 	private Deflater deflate;
 
-	ObjectDirectoryInserter(final FileObjectDatabase dest, final Config cfg) {
+	ObjectDirectoryInserter(final ObjectDirectory dest, final Config cfg) {
 		db = dest;
-		config = cfg.get(WriteConfig.KEY);
-	}
-
-	@Override
-	public ObjectId insert(int type, byte[] data, int off, int len)
-			throws IOException {
-		ObjectId id = idFor(type, data, off, len);
-		if (db.has(id)) {
-			return id;
-		} else {
-			File tmp = toTemp(type, data, off, len);
-			return insertOneObject(tmp, id);
-		}
+		config = cfg;
 	}
 
 	@Override
 	public ObjectId insert(final int type, long len, final InputStream is)
 			throws IOException {
-		if (len <= buffer().length) {
-			byte[] buf = buffer();
-			int actLen = IO.readFully(is, buf, 0);
-			return insert(type, buf, 0, actLen);
-
-		} else {
-			MessageDigest md = digest();
-			File tmp = toTemp(md, type, len, is);
-			ObjectId id = ObjectId.fromRaw(md.digest());
-			return insertOneObject(tmp, id);
-		}
-	}
-
-	private ObjectId insertOneObject(final File tmp, final ObjectId id)
-			throws IOException, ObjectWritingException {
-		switch (db.insertUnpackedObject(tmp, id, false /* no duplicate */)) {
-		case INSERTED:
-		case EXISTS_PACKED:
-		case EXISTS_LOOSE:
+		final MessageDigest md = digest();
+		final File tmp = toTemp(md, type, len, is);
+		final ObjectId id = ObjectId.fromRaw(md.digest());
+		if (db.has(id)) {
+			// Object is already in the repository, remove temporary file.
+			//
+			tmp.delete();
 			return id;
-
-		case FAILURE:
-		default:
-			break;
 		}
 
 		final File dst = db.fileFor(id);
-		throw new ObjectWritingException("Unable to create new object: " + dst);
-	}
+		if (tmp.renameTo(dst))
+			return id;
 
-	@Override
-	public PackParser newPackParser(InputStream in) throws IOException {
-		return new ObjectDirectoryPackParser(db, in);
+		// Maybe the directory doesn't exist yet as the object
+		// directories are always lazily created. Note that we
+		// try the rename first as the directory likely does exist.
+		//
+		dst.getParentFile().mkdir();
+		if (tmp.renameTo(dst))
+			return id;
+
+		if (db.has(id)) {
+			tmp.delete();
+			return id;
+		}
+
+		// The object failed to be renamed into its proper
+		// location and it doesn't exist in the repository
+		// either. We really don't know what went wrong, so
+		// fail.
+		//
+		tmp.delete();
+		throw new ObjectWritingException("Unable to create new object: " + dst);
 	}
 
 	@Override
@@ -146,21 +132,19 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
 	private File toTemp(final MessageDigest md, final int type, long len,
 			final InputStream is) throws IOException, FileNotFoundException,
 			Error {
 		boolean delete = true;
-		File tmp = newTempFile();
+		File tmp = File.createTempFile("noz", null, db.getDirectory());
 		try {
-			FileOutputStream fOut = new FileOutputStream(tmp);
+			DigestOutputStream dOut = new DigestOutputStream(
+					compress(new FileOutputStream(tmp)), md);
 			try {
-				OutputStream out = fOut;
-				if (config.getFSyncObjectFiles())
-					out = Channels.newOutputStream(fOut.getChannel());
-				DeflaterOutputStream cOut = compress(out);
-				DigestOutputStream dOut = new DigestOutputStream(cOut, md);
-				writeHeader(dOut, type, len);
+				dOut.write(Constants.encodedTypeString(type));
+				dOut.write((byte) ' ');
+				dOut.write(Constants.encodeASCII(len));
+				dOut.write((byte) 0);
 
 				final byte[] buf = buffer();
 				while (len > 0) {
@@ -170,69 +154,25 @@ class ObjectDirectoryInserter extends ObjectInserter {
 					dOut.write(buf, 0, n);
 					len -= n;
 				}
-				dOut.flush();
-				cOut.finish();
 			} finally {
-				if (config.getFSyncObjectFiles())
-					fOut.getChannel().force(true);
-				fOut.close();
+				dOut.close();
 			}
 
+			tmp.setReadOnly();
 			delete = false;
 			return tmp;
 		} finally {
 			if (delete)
-				FileUtils.delete(tmp);
+				tmp.delete();
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
-	private File toTemp(final int type, final byte[] buf, final int pos,
-			final int len) throws IOException, FileNotFoundException {
-		boolean delete = true;
-		File tmp = newTempFile();
-		try {
-			FileOutputStream fOut = new FileOutputStream(tmp);
-			try {
-				OutputStream out = fOut;
-				if (config.getFSyncObjectFiles())
-					out = Channels.newOutputStream(fOut.getChannel());
-				DeflaterOutputStream cOut = compress(out);
-				writeHeader(cOut, type, len);
-				cOut.write(buf, pos, len);
-				cOut.finish();
-			} finally {
-				if (config.getFSyncObjectFiles())
-					fOut.getChannel().force(true);
-				fOut.close();
-			}
-
-			delete = false;
-			return tmp;
-		} finally {
-			if (delete)
-				FileUtils.delete(tmp);
-		}
-	}
-
-	void writeHeader(OutputStream out, final int type, long len)
-			throws IOException {
-		out.write(Constants.encodedTypeString(type));
-		out.write((byte) ' ');
-		out.write(Constants.encodeASCII(len));
-		out.write((byte) 0);
-	}
-
-	File newTempFile() throws IOException {
-		return File.createTempFile("noz", null, db.getDirectory());
-	}
-
-	DeflaterOutputStream compress(final OutputStream out) {
+	private DeflaterOutputStream compress(final OutputStream out) {
 		if (deflate == null)
-			deflate = new Deflater(config.getCompression());
+			deflate = new Deflater(config.get(CoreConfig.KEY).getCompression());
 		else
 			deflate.reset();
-		return new DeflaterOutputStream(out, deflate, 8192);
+		return new DeflaterOutputStream(out, deflate);
 	}
 
 	private static EOFException shortInput(long missing) {

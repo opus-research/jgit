@@ -43,28 +43,15 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.HunkHeader;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class DiffFormatterTest extends RepositoryTestCase {
 	private static final String DIFF = "diff --git ";
@@ -82,96 +69,13 @@ public class DiffFormatterTest extends RepositoryTestCase {
 	private TestRepository testDb;
 
 	@Override
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		testDb = new TestRepository(db);
 		df = new DiffFormatter(DisabledOutputStream.INSTANCE);
 		df.setRepository(db);
-		df.setAbbreviationLength(8);
 	}
 
-	@Override
-	@After
-	public void tearDown() throws Exception {
-		if (df != null)
-			df.release();
-		super.tearDown();
-	}
-
-	@Test
-	public void testCreateFileHeader_Add() throws Exception {
-		ObjectId adId = blob("a\nd\n");
-		DiffEntry ent = DiffEntry.add("FOO", adId);
-		FileHeader fh = df.toFileHeader(ent);
-
-		String diffHeader = "diff --git a/FOO b/FOO\n" //
-				+ "new file mode " + REGULAR_FILE + "\n"
-				+ "index "
-				+ ObjectId.zeroId().abbreviate(8).name()
-				+ ".."
-				+ adId.abbreviate(8).name() + "\n" //
-				+ "--- /dev/null\n"//
-				+ "+++ b/FOO\n";
-		assertEquals(diffHeader, RawParseUtils.decode(fh.getBuffer()));
-
-		assertEquals(0, fh.getStartOffset());
-		assertEquals(fh.getBuffer().length, fh.getEndOffset());
-		assertEquals(FileHeader.PatchType.UNIFIED, fh.getPatchType());
-
-		assertEquals(1, fh.getHunks().size());
-
-		HunkHeader hh = fh.getHunks().get(0);
-		assertEquals(1, hh.toEditList().size());
-
-		EditList el = hh.toEditList();
-		assertEquals(1, el.size());
-
-		Edit e = el.get(0);
-		assertEquals(0, e.getBeginA());
-		assertEquals(0, e.getEndA());
-		assertEquals(0, e.getBeginB());
-		assertEquals(2, e.getEndB());
-		assertEquals(Edit.Type.INSERT, e.getType());
-	}
-
-	@Test
-	public void testCreateFileHeader_Delete() throws Exception {
-		ObjectId adId = blob("a\nd\n");
-		DiffEntry ent = DiffEntry.delete("FOO", adId);
-		FileHeader fh = df.toFileHeader(ent);
-
-		String diffHeader = "diff --git a/FOO b/FOO\n" //
-				+ "deleted file mode " + REGULAR_FILE + "\n"
-				+ "index "
-				+ adId.abbreviate(8).name()
-				+ ".."
-				+ ObjectId.zeroId().abbreviate(8).name() + "\n" //
-				+ "--- a/FOO\n"//
-				+ "+++ /dev/null\n";
-		assertEquals(diffHeader, RawParseUtils.decode(fh.getBuffer()));
-
-		assertEquals(0, fh.getStartOffset());
-		assertEquals(fh.getBuffer().length, fh.getEndOffset());
-		assertEquals(FileHeader.PatchType.UNIFIED, fh.getPatchType());
-
-		assertEquals(1, fh.getHunks().size());
-
-		HunkHeader hh = fh.getHunks().get(0);
-		assertEquals(1, hh.toEditList().size());
-
-		EditList el = hh.toEditList();
-		assertEquals(1, el.size());
-
-		Edit e = el.get(0);
-		assertEquals(0, e.getBeginA());
-		assertEquals(2, e.getEndA());
-		assertEquals(0, e.getBeginB());
-		assertEquals(0, e.getEndB());
-		assertEquals(Edit.Type.DELETE, e.getType());
-	}
-
-	@Test
 	public void testCreateFileHeader_Modify() throws Exception {
 		ObjectId adId = blob("a\nd\n");
 		ObjectId abcdId = blob("a\nb\nc\nd\n");
@@ -183,7 +87,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 
 		DiffEntry mod = DiffEntry.pair(ChangeType.MODIFY, ad, abcd, 0);
 
-		FileHeader fh = df.toFileHeader(mod);
+		FileHeader fh = df.createFileHeader(mod);
 
 		assertEquals(diffHeader, RawParseUtils.decode(fh.getBuffer()));
 		assertEquals(0, fh.getStartOffset());
@@ -206,7 +110,6 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		assertEquals(Edit.Type.INSERT, e.getType());
 	}
 
-	@Test
 	public void testCreateFileHeader_Binary() throws Exception {
 		ObjectId adId = blob("a\nd\n");
 		ObjectId binId = blob("a\nb\nc\n\0\0\0\0d\n");
@@ -219,7 +122,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 
 		DiffEntry mod = DiffEntry.pair(ChangeType.MODIFY, ad, abcd, 0);
 
-		FileHeader fh = df.toFileHeader(mod);
+		FileHeader fh = df.createFileHeader(mod);
 
 		assertEquals(diffHeader, RawParseUtils.decode(fh.getBuffer()));
 		assertEquals(FileHeader.PatchType.BINARY, fh.getPatchType());
@@ -230,7 +133,6 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		assertEquals(0, hh.toEditList().size());
 	}
 
-	@Test
 	public void testCreateFileHeader_GitLink() throws Exception {
 		ObjectId aId = blob("a\n");
 		ObjectId bId = blob("b\n");
@@ -245,7 +147,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 
 		DiffEntry mod = DiffEntry.pair(ChangeType.MODIFY, ad, abcd, 0);
 
-		FileHeader fh = df.toFileHeader(mod);
+		FileHeader fh = df.createFileHeader(mod);
 
 		assertEquals(diffHeader, RawParseUtils.decode(fh.getBuffer()));
 
@@ -255,42 +157,10 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		assertEquals(0, hh.toEditList().size());
 	}
 
-	@Test
-	public void testDiff() throws Exception {
-		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
-		File folder = new File(db.getDirectory().getParent(), "folder");
-		folder.mkdir();
-		write(new File(folder, "folder.txt"), "folder");
-		Git git = new Git(db);
-		git.add().addFilepattern(".").call();
-		git.commit().setMessage("Initial commit").call();
-		write(new File(folder, "folder.txt"), "folder change");
-
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		DiffFormatter df = new DiffFormatter(new SafeBufferedOutputStream(os));
-		df.setRepository(db);
-		df.setPathFilter(PathFilter.create("folder"));
-		DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
-		FileTreeIterator newTree = new FileTreeIterator(db);
-		df.format(oldTree, newTree);
-		df.flush();
-
-		String actual = os.toString();
-		String expected =
- "diff --git a/folder/folder.txt b/folder/folder.txt\n"
-				+ "index 0119635..95c4c65 100644\n"
-				+ "--- a/folder/folder.txt\n" + "+++ b/folder/folder.txt\n"
-				+ "@@ -1 +1 @@\n" + "-folder\n"
-				+ "\\ No newline at end of file\n" + "+folder change\n"
-				+ "\\ No newline at end of file\n";
-
-		assertEquals(expected.toString(), actual);
-	}
-
 	private String makeDiffHeader(String pathA, String pathB, ObjectId aId,
 			ObjectId bId) {
-		String a = aId.abbreviate(8).name();
-		String b = bId.abbreviate(8).name();
+		String a = aId.abbreviate(db).name();
+		String b = bId.abbreviate(db).name();
 		return DIFF + "a/" + pathA + " " + "b/" + pathB + "\n" + //
 				"index " + a + ".." + b + " " + REGULAR_FILE + "\n" + //
 				"--- a/" + pathA + "\n" + //
@@ -299,8 +169,8 @@ public class DiffFormatterTest extends RepositoryTestCase {
 
 	private String makeDiffHeaderModeChange(String pathA, String pathB,
 			ObjectId aId, ObjectId bId, String modeA, String modeB) {
-		String a = aId.abbreviate(8).name();
-		String b = bId.abbreviate(8).name();
+		String a = aId.abbreviate(db).name();
+		String b = bId.abbreviate(db).name();
 		return DIFF + "a/" + pathA + " " + "b/" + pathB + "\n" + //
 				"old mode " + modeA + "\n" + //
 				"new mode " + modeB + "\n" + //
@@ -312,4 +182,5 @@ public class DiffFormatterTest extends RepositoryTestCase {
 	private ObjectId blob(String content) throws Exception {
 		return testDb.blob(content).copy();
 	}
+
 }

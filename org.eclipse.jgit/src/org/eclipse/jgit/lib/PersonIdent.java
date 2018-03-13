@@ -45,12 +45,13 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.Serializable;
+import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -59,9 +60,7 @@ import org.eclipse.jgit.util.SystemReader;
  * Git combines Name + email + time + time zone to specify who wrote or
  * committed something.
  */
-public class PersonIdent implements Serializable {
-	private static final long serialVersionUID = 1L;
-
+public class PersonIdent {
 	private final String name;
 
 	private final String emailAddress;
@@ -78,7 +77,11 @@ public class PersonIdent implements Serializable {
 	 * @param repo
 	 */
 	public PersonIdent(final Repository repo) {
-		this(repo.getConfig().get(UserConfig.KEY));
+		final UserConfig config = repo.getConfig().get(UserConfig.KEY);
+		name = config.getCommitterName();
+		emailAddress = config.getCommitterEmail();
+		when = SystemReader.getInstance().getCurrentTime();
+		tzOffset = SystemReader.getInstance().getTimezone(when);
 	}
 
 	/**
@@ -98,7 +101,10 @@ public class PersonIdent implements Serializable {
 	 * @param aEmailAddress
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress) {
-		this(aName, aEmailAddress, SystemReader.getInstance().getCurrentTime());
+		name = aName;
+		emailAddress = aEmailAddress;
+		when = SystemReader.getInstance().getCurrentTime();
+		tzOffset = SystemReader.getInstance().getTimezone(when);
 	}
 
 	/**
@@ -124,7 +130,10 @@ public class PersonIdent implements Serializable {
 	 *            local time
 	 */
 	public PersonIdent(final PersonIdent pi, final Date aWhen) {
-		this(pi.getName(), pi.getEmailAddress(), aWhen.getTime(), pi.tzOffset);
+		name = pi.getName();
+		emailAddress = pi.getEmailAddress();
+		when = aWhen.getTime();
+		tzOffset = pi.tzOffset;
 	}
 
 	/**
@@ -139,32 +148,10 @@ public class PersonIdent implements Serializable {
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress,
 			final Date aWhen, final TimeZone aTZ) {
-		this(aName, aEmailAddress, aWhen.getTime(), aTZ.getOffset(aWhen
-				.getTime()) / (60 * 1000));
-	}
-
-	/**
-	 * Copy a PersonIdent, but alter the clone's time stamp
-	 *
-	 * @param pi
-	 *            original {@link PersonIdent}
-	 * @param aWhen
-	 *            local time stamp
-	 * @param aTZ
-	 *            time zone
-	 */
-	public PersonIdent(final PersonIdent pi, final long aWhen, final int aTZ) {
-		this(pi.getName(), pi.getEmailAddress(), aWhen, aTZ);
-	}
-
-	private PersonIdent(final String aName, final String aEmailAddress,
-			long when) {
-		this(aName, aEmailAddress, when, SystemReader.getInstance()
-				.getTimezone(when));
-	}
-
-	private PersonIdent(final UserConfig config) {
-		this(config.getCommitterName(), config.getCommitterEmail());
+		name = aName;
+		emailAddress = aEmailAddress;
+		when = aWhen.getTime();
+		tzOffset = aTZ.getOffset(when) / (60 * 1000);
 	}
 
 	/**
@@ -179,16 +166,66 @@ public class PersonIdent implements Serializable {
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress,
 			final long aWhen, final int aTZ) {
-		if (aName == null)
-			throw new IllegalArgumentException(
-					"Name of PersonIdent must not be null.");
-		if (aEmailAddress == null)
-			throw new IllegalArgumentException(
-					"E-mail address of PersonIdent must not be null.");
 		name = aName;
 		emailAddress = aEmailAddress;
 		when = aWhen;
 		tzOffset = aTZ;
+	}
+
+	/**
+	 * Copy a PersonIdent, but alter the clone's time stamp
+	 *
+	 * @param pi
+	 *            original {@link PersonIdent}
+	 * @param aWhen
+	 *            local time stamp
+	 * @param aTZ
+	 *            time zone
+	 */
+	public PersonIdent(final PersonIdent pi, final long aWhen, final int aTZ) {
+		name = pi.getName();
+		emailAddress = pi.getEmailAddress();
+		when = aWhen;
+		tzOffset = aTZ;
+	}
+
+	/**
+	 * Construct a PersonIdent from a string with full name, email, time time
+	 * zone string. The input string must be valid.
+	 *
+	 * @param in
+	 *            a Git internal format author/committer string.
+	 */
+	public PersonIdent(final String in) {
+		final int lt = in.indexOf('<');
+		if (lt == -1) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().malformedpersonIdentString, in));
+		}
+		final int gt = in.indexOf('>', lt);
+		if (gt == -1) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().malformedpersonIdentString, in));
+		}
+		final int sp = in.indexOf(' ', gt + 2);
+		if (sp == -1) {
+			when = 0;
+			tzOffset = -1;
+		} else {
+			final String tzHoursStr = in.substring(sp + 1, sp + 4).trim();
+			final int tzHours;
+			if (tzHoursStr.charAt(0) == '+') {
+				tzHours = Integer.parseInt(tzHoursStr.substring(1));
+			} else {
+				tzHours = Integer.parseInt(tzHoursStr);
+			}
+			final int tzMins = Integer.parseInt(in.substring(sp + 4).trim());
+			when = Long.parseLong(in.substring(gt + 1, sp).trim()) * 1000;
+			tzOffset = tzHours * 60 + tzMins;
+		}
+
+		name = in.substring(0, lt).trim();
+		emailAddress = in.substring(lt + 1, gt).trim();
 	}
 
 	/**
@@ -231,10 +268,7 @@ public class PersonIdent implements Serializable {
 	}
 
 	public int hashCode() {
-		int hc = getEmailAddress().hashCode();
-		hc *= 31;
-		hc += (int) (when / 1000L);
-		return hc;
+		return getEmailAddress().hashCode() ^ (int) when;
 	}
 
 	public boolean equals(final Object o) {
@@ -242,7 +276,7 @@ public class PersonIdent implements Serializable {
 			final PersonIdent p = (PersonIdent) o;
 			return getName().equals(p.getName())
 					&& getEmailAddress().equals(p.getEmailAddress())
-					&& when / 1000L == p.when / 1000L;
+					&& when == p.when;
 		}
 		return false;
 	}
