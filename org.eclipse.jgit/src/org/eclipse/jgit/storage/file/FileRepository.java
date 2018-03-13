@@ -95,8 +95,6 @@ import org.eclipse.jgit.util.SystemReader;
  *
  */
 public class FileRepository extends Repository {
-	private final FileBasedConfig sysConfig;
-
 	private final FileBasedConfig userConfig;
 
 	private final FileBasedConfig repoConfig;
@@ -154,14 +152,11 @@ public class FileRepository extends Repository {
 	public FileRepository(final BaseRepositoryBuilder options) throws IOException {
 		super(options);
 
-		sysConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
-		userConfig = SystemReader.getInstance().openUserConfig(sysConfig,
-				getFS());
+		userConfig = SystemReader.getInstance().openUserConfig(getFS());
 		repoConfig = new FileBasedConfig(userConfig, //
 				getFS().resolve(getDirectory(), "config"), //
 				getFS());
 
-		loadSysConfig();
 		loadUserConfig();
 		loadRepoConfig();
 
@@ -186,18 +181,6 @@ public class FileRepository extends Repository {
 						JGitText.get().unknownRepositoryFormat2,
 						repositoryFormatVersion));
 			}
-		}
-	}
-
-	private void loadSysConfig() throws IOException {
-		try {
-			sysConfig.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException(MessageFormat.format(JGitText
-					.get().sysConfigFileInvalid, sysConfig.getFile()
-					.getAbsolutePath(), e1));
-			e2.initCause(e1);
-			throw e2;
 		}
 	}
 

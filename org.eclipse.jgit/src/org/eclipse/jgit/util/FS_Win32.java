@@ -45,7 +45,6 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 
@@ -76,15 +75,5 @@ class FS_Win32 extends FS {
 	@Override
 	public boolean retryFailedLockFileCommit() {
 		return true;
-	}
-
-	@Override
-	public File gitPrefix() throws IOException {
-		String path = SystemReader.getInstance().getenv("PATH");
-		String gitExe = scanPath(path, "git.exe", "git.cmd");
-		if (gitExe != null)
-			return new File(gitExe).getAbsoluteFile().getParentFile()
-					.getParentFile();
-		return super.gitPrefix();
 	}
 }
