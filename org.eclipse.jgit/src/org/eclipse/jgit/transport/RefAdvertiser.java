@@ -62,17 +62,10 @@ import org.eclipse.jgit.revwalk.RevWalk;
 
 /** Support for the start of {@link UploadPack} and {@link ReceivePack}. */
 public abstract class RefAdvertiser {
-	/** Advertiser which frames lines in a {@link PacketLineOut} format. */
-	public static class PacketLineOutRefAdvertiser extends RefAdvertiser {
+	static class PacketLineOutRefAdvertiser extends RefAdvertiser {
 		private final PacketLineOut pckOut;
 
-		/**
-		 * Create a new advertiser for the supplied stream.
-		 *
-		 * @param out
-		 *            the output stream.
-		 */
-		public PacketLineOutRefAdvertiser(PacketLineOut out) {
+		PacketLineOutRefAdvertiser(PacketLineOut out) {
 			pckOut = out;
 		}
 
