@@ -78,7 +78,6 @@ import java.util.Collection;
 public interface PreReceiveHook {
 	/** A simple no-op hook. */
 	public static final PreReceiveHook NULL = new PreReceiveHook() {
-		@Override
 		public void onPreReceive(final ReceivePack rp,
 				final Collection<ReceiveCommand> commands) {
 			// Do nothing.

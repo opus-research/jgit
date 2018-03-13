@@ -107,7 +107,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 
 	private RevFilter revFilter;
 
-	private final List<PathFilter> pathFilters = new ArrayList<>();
+	private final List<PathFilter> pathFilters = new ArrayList<PathFilter>();
 
 	private int maxCount = -1;
 
@@ -132,7 +132,6 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 * @throws NoHeadException
 	 *             of the references ref cannot be resolved
 	 */
-	@Override
 	public Iterable<RevCommit> call() throws GitAPIException, NoHeadException {
 		checkCallable();
 		if (pathFilters.size() > 0)

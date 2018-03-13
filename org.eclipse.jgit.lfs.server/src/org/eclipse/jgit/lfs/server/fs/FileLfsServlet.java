@@ -125,20 +125,7 @@ public class FileLfsServlet extends HttpServlet {
 		}
 	}
 
-	/**
-	 * Retrieve object id from request
-	 *
-	 * @param req
-	 *            servlet request
-	 * @param rsp
-	 *            servlet response
-	 * @return object id, or <code>null</code> if the object id could not be
-	 *         retrieved
-	 * @throws IOException
-	 *             if an I/O error occurs
-         * @since 4.6
-	 */
-	protected AnyLongObjectId getObjectToTransfer(HttpServletRequest req,
+	private AnyLongObjectId getObjectToTransfer(HttpServletRequest req,
 			HttpServletResponse rsp) throws IOException {
 		String info = req.getPathInfo();
 		int length = 1 + Constants.LONG_OBJECT_ID_STRING_LENGTH;
@@ -187,20 +174,7 @@ public class FileLfsServlet extends HttpServlet {
 		}
 	}
 
-	/**
-	 * Send an error response.
-	 *
-	 * @param rsp
-	 *            the servlet response
-	 * @param status
-	 *            HTTP status code
-	 * @param message
-	 *            error message
-	 * @throws IOException
-	 *             on failure to send the response
-	 * @since 4.6
-	 */
-	protected static void sendError(HttpServletResponse rsp, int status, String message)
+	static void sendError(HttpServletResponse rsp, int status, String message)
 			throws IOException {
 		rsp.setStatus(status);
 		PrintWriter writer = rsp.getWriter();

@@ -82,7 +82,6 @@ public class DateRevQueue extends AbstractRevQueue {
 		}
 	}
 
-	@Override
 	public void add(final RevCommit c) {
 		sinceLastIndex++;
 		if (++inQueue > REBUILD_INDEX_COUNT
@@ -127,7 +126,6 @@ public class DateRevQueue extends AbstractRevQueue {
 		}
 	}
 
-	@Override
 	public RevCommit next() {
 		final Entry q = head;
 		if (q == null)
@@ -163,7 +161,6 @@ public class DateRevQueue extends AbstractRevQueue {
 		return head != null ? head.commit : null;
 	}
 
-	@Override
 	public void clear() {
 		head = null;
 		free = null;
@@ -173,7 +170,6 @@ public class DateRevQueue extends AbstractRevQueue {
 		last = -1;
 	}
 
-	@Override
 	boolean everbodyHasFlag(final int f) {
 		for (Entry q = head; q != null; q = q.next) {
 			if ((q.commit.flags & f) == 0)
@@ -182,7 +178,6 @@ public class DateRevQueue extends AbstractRevQueue {
 		return true;
 	}
 
-	@Override
 	boolean anybodyHasFlag(final int f) {
 		for (Entry q = head; q != null; q = q.next) {
 			if ((q.commit.flags & f) != 0)
@@ -196,7 +191,6 @@ public class DateRevQueue extends AbstractRevQueue {
 		return outputType | SORT_COMMIT_TIME_DESC;
 	}
 
-	@Override
 	public String toString() {
 		final StringBuilder s = new StringBuilder();
 		for (Entry q = head; q != null; q = q.next)
