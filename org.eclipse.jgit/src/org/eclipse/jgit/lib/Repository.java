@@ -240,8 +240,7 @@ public class Repository {
 		this.fs = fs;
 
 		userConfig = SystemReader.getInstance().openUserConfig(fs);
-		config = new RepositoryConfig(userConfig, fs.resolve(gitDir, "config"),
-				fs);
+		config = new RepositoryConfig(userConfig, fs.resolve(gitDir, "config"));
 
 		loadUserConfig();
 		loadConfig();

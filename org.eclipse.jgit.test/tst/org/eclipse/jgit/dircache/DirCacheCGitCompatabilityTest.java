@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.JGitTestUtil;
 
 public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
@@ -66,7 +65,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 
 	public void testReadIndex_LsFiles() throws Exception {
 		final Map<String, CGitIndexRecord> ls = readLsFiles();
-		final DirCache dc = new DirCache(index, FS.DETECTED);
+		final DirCache dc = new DirCache(index);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(ls.size(), dc.getEntryCount());
@@ -80,7 +79,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	public void testTreeWalk_LsFiles() throws Exception {
 		final Repository db = createBareRepository();
 		final Map<String, CGitIndexRecord> ls = readLsFiles();
-		final DirCache dc = new DirCache(index, db.getFS());
+		final DirCache dc = new DirCache(index);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(ls.size(), dc.getEntryCount());
@@ -103,16 +102,14 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	}
 
 	public void testUnsupportedOptionalExtension() throws Exception {
-		final DirCache dc = new DirCache(pathOf("gitgit.index.ZZZZ"),
-				FS.DETECTED);
+		final DirCache dc = new DirCache(pathOf("gitgit.index.ZZZZ"));
 		dc.read();
 		assertEquals(1, dc.getEntryCount());
 		assertEquals("A", dc.getEntry(0).getPathString());
 	}
 
 	public void testUnsupportedRequiredExtension() throws Exception {
-		final DirCache dc = new DirCache(pathOf("gitgit.index.aaaa"),
-				FS.DETECTED);
+		final DirCache dc = new DirCache(pathOf("gitgit.index.aaaa"));
 		try {
 			dc.read();
 			fail("Cache loaded an unsupported extension");
@@ -123,8 +120,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	}
 
 	public void testCorruptChecksumAtFooter() throws Exception {
-		final DirCache dc = new DirCache(pathOf("gitgit.index.badchecksum"),
-				FS.DETECTED);
+		final DirCache dc = new DirCache(pathOf("gitgit.index.badchecksum"));
 		try {
 			dc.read();
 			fail("Cache loaded despite corrupt checksum");
@@ -147,7 +143,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	public void testReadIndex_DirCacheTree() throws Exception {
 		final Map<String, CGitIndexRecord> cList = readLsFiles();
 		final Map<String, CGitLsTreeRecord> cTree = readLsTree();
-		final DirCache dc = new DirCache(index, FS.DETECTED);
+		final DirCache dc = new DirCache(index);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(cList.size(), dc.getEntryCount());
