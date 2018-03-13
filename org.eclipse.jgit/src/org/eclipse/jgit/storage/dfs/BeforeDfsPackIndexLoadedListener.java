@@ -45,11 +45,7 @@ package org.eclipse.jgit.storage.dfs;
 
 import org.eclipse.jgit.events.RepositoryListener;
 
-/**
- * Receives {@link BeforeDfsPackIndexLoadedEvent}s.
- *
- * @since 2.2
- */
+/** Receives {@link BeforeDfsPackIndexLoadedEvent}s. */
 public interface BeforeDfsPackIndexLoadedListener extends RepositoryListener {
 	/**
 	 * Invoked just before a pack index is loaded from the block cache.
