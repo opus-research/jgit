@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,71 +41,66 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.util.CompareUtils;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-/**
- *
- */
-public final class AttributeValue {
+import javaewah.EWAHCompressedBitmap;
 
-	/**
-	 *
-	 */
-	public static final AttributeValue SET = new AttributeValue(null, "SET"); //$NON-NLS-1$
+import org.junit.Test;
 
-	/**
-	 *
-	 */
-	public static final AttributeValue UNSET = new AttributeValue(null, "UNSET"); //$NON-NLS-1$
+public class InflatingBitSetTest {
 
-	/**
-	 * @param value
-	 * @return ...
-	 */
-	public static AttributeValue createValue(String value) {
-		if (value == null)
-			throw new IllegalArgumentException(
-					JGitText.get().attributeValueCantBeNull);
+	@Test
+	public void testMaybeContains() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(63);
+		ecb.set(64);
+		ecb.set(128);
 
-		return new AttributeValue(value, value);
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertTrue(ibs.maybeContains(0));
+		assertFalse(ibs.contains(0)); // Advance
+		assertFalse(ibs.maybeContains(0));
+		assertTrue(ibs.maybeContains(63));
+		assertTrue(ibs.maybeContains(64));
+		assertTrue(ibs.maybeContains(65));
+		assertFalse(ibs.maybeContains(129));
 	}
 
-	private final String value;
+	@Test
+	public void testContainsMany() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(64);
+		ecb.set(65);
+		ecb.set(1024);
 
-	private final String id;
-
-	private AttributeValue(String value, String id) {
-		this.value = value;
-		this.id = id;
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertFalse(ibs.contains(0));
+		assertTrue(ibs.contains(64));
+		assertTrue(ibs.contains(65));
+		assertFalse(ibs.contains(66));
+		assertTrue(ibs.contains(1024));
+		assertFalse(ibs.contains(1025));
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		if (obj instanceof AttributeValue) {
-			final AttributeValue attributeValue = (AttributeValue) obj;
-			return CompareUtils.areEqual(id, attributeValue.id)
-					&& CompareUtils.areEqual(value, attributeValue.value);
-		}
-		return false;
+	@Test
+	public void testContainsOne() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(64);
+
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertTrue(ibs.contains(64));
+		assertTrue(ibs.contains(64));
+		assertFalse(ibs.contains(65));
+		assertFalse(ibs.contains(63));
 	}
 
-	@Override
-	public int hashCode() {
-		return id.hashCode();
-	}
-
-	@Override
-	public String toString() {
-		return id;
-	}
-
-	/**
-	 * @return ...
-	 */
-	public String getValue() {
-		return value;
+	@Test
+	public void testContainsEmpty() {
+		InflatingBitSet ibs = new InflatingBitSet(new EWAHCompressedBitmap());
+		assertFalse(ibs.maybeContains(0));
+		assertFalse(ibs.contains(0));
 	}
 }

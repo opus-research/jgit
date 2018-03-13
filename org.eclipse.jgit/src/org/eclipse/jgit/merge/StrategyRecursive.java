@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2012, Research In Motion Limited
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,37 +41,27 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.merge;
+
+import org.eclipse.jgit.lib.Repository;
 
 /**
- *
+ * A three-way merge strategy performing a content-merge if necessary
  */
-public class AttributeValueCollector implements AttributesCollector {
+public class StrategyRecursive extends StrategyResolve {
 
-	private final String key;
-
-	private AttributeValue value;
-
-	/**
-	 * @param key
-	 */
-	public AttributeValueCollector(String key) {
-		this.key = key;
+	@Override
+	public ThreeWayMerger newMerger(Repository db) {
+		return new RecursiveMerger(db, false);
 	}
 
-	public boolean collect(Attribute attribute) {
-		if (key.equals(attribute.getKey())) {
-			value = attribute.getValue();
-			return false;
-		}
-
-		return true;
+	@Override
+	public ThreeWayMerger newMerger(Repository db, boolean inCore) {
+		return new RecursiveMerger(db, inCore);
 	}
 
-	/**
-	 * @return ...
-	 */
-	public AttributeValue getValue() {
-		return value;
+	@Override
+	public String getName() {
+		return "recursive";
 	}
 }

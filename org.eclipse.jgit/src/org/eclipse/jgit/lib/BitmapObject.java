@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,29 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.lib;
 
-import java.util.ArrayList;
-import java.util.List;
-
-/**
- *
- */
-public class AttributesAllCollector implements AttributesCollector {
-
-	private final List<Attribute> attributes = new ArrayList<Attribute>();
-
-	public boolean collect(Attribute attribute) {
-		if (attribute.getValue() != null)
-			attributes.add(attribute);
-
-		return true;
-	}
+/** Base object type accessed during bitmap expansion. */
+public abstract class BitmapObject {
+	/**
+	 * Get Git object type. See {@link Constants}.
+	 *
+	 * @return object type
+	 */
+	public abstract int getType();
 
 	/**
-	 * @return ...
+	 * Get the name of this object.
+	 *
+	 * @return unique hash of this object.
 	 */
-	public List<Attribute> getAttributes() {
-		return attributes;
-	}
+	public abstract ObjectId getObjectId();
 }
