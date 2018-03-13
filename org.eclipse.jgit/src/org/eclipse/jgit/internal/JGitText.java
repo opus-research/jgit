@@ -287,6 +287,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String emptyRef;
 	/***/ public String encryptionError;
+	/***/ public String encryptionOnlyPBE;
 	/***/ public String endOfFileInEscape;
 	/***/ public String entryNotFoundByPath;
 	/***/ public String enumValueNotSupported2;
@@ -300,7 +301,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
-	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
@@ -346,7 +346,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String gcFailed;
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
-	/***/ public String hiddenFilesStartWithDot;
 	/***/ public String hoursAgo;
 	/***/ public String hugeIndexesAreNotSupportedByJgitYet;
 	/***/ public String hunkBelongsToAnotherFile;
@@ -404,6 +403,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
+	/***/ public String invalidShallowObject;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
@@ -500,6 +500,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packChecksumMismatch;
 	/***/ public String packCorruptedWhileWritingToFilesystem;
 	/***/ public String packDoesNotMatchIndex;
+	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
 	/***/ public String packfileCorruptionDetected;

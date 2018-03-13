@@ -48,6 +48,7 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.lfs.errors.InvalidLongObjectIdException;
 import org.eclipse.jgit.lfs.internal.LfsText;
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.NB;
@@ -63,6 +64,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  * <p>
  * This class converts the hex string into a binary form, to make it more
  * efficient for matching against an object.
+ *
+ * Ported to SHA-256 from {@link AbbreviatedObjectId}
  *
  * @since 4.1
  */

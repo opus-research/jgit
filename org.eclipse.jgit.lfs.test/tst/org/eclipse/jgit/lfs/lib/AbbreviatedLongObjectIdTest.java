@@ -54,6 +54,9 @@ import static org.junit.Assert.fail;
 import org.eclipse.jgit.lfs.test.LongObjectIdTestUtils;
 import org.junit.Test;
 
+/*
+ * Ported to SHA-256 from org.eclipse.jgit.lib.AbbreviatedObjectIdTest
+ */
 public class AbbreviatedLongObjectIdTest {
 	@Test
 	public void testEmpty_FromByteArray() {
@@ -469,7 +472,7 @@ public class AbbreviatedLongObjectIdTest {
 	public void testFromStringByteWrongLength() {
 		byte[] buf = new byte[65];
 		try {
-		AbbreviatedLongObjectId.fromString(buf, 0, 65);
+			AbbreviatedLongObjectId.fromString(buf, 0, 65);
 			fail("expected IllegalArgumentException for too long AbbreviatedLongObjectId");
 		} catch (IllegalArgumentException e) {
 			// expected
