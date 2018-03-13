@@ -428,7 +428,6 @@ public class FileUtilTest {
 		// show test as ignored if the FS doesn't support symlinks
 		Assume.assumeTrue(fs.supportsSymlinks());
 		fs.createSymLink(new File(trash, "x"), "y");
-		assertTrue(fs.supportsSymlinks());
 		String target = fs.readSymLink(new File(trash, "x"));
 		assertEquals("y", target);
 	}
@@ -440,7 +439,6 @@ public class FileUtilTest {
 		Assume.assumeTrue(fs.supportsSymlinks());
 		File file = new File(trash, "x");
 		fs.createSymLink(file, "y");
-		assertTrue(fs.supportsSymlinks());
 		String target = fs.readSymLink(file);
 		assertEquals("y", target);
 		fs.createSymLink(file, "z");
