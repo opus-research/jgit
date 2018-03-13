@@ -539,7 +539,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 						setGitDir(current);
 						break;
 					}
-					break;
 				} catch (IOException ignored) {
 					// Continue searching if gitdir ref isn't found
 				}
