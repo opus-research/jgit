@@ -66,9 +66,6 @@ class Clone extends AbstractFetchCommand {
 	@Option(name = "--no-checkout", aliases = { "-n" }, usage = "usage_noCheckoutAfterClone")
 	private boolean noCheckout;
 
-	@Option(name = "--bare", usage = "usage_bareClone")
-	private boolean isBare;
-
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
 
@@ -98,15 +95,15 @@ class Clone extends AbstractFetchCommand {
 			branch = Constants.HEAD;
 
 		CloneCommand command = Git.cloneRepository();
-		command.setURI(sourceUri).setRemote(remoteName).setBare(isBare)
+		command.setURI(sourceUri).setRemote(remoteName)
 				.setNoCheckout(noCheckout).setBranch(branch);
 
 		command.setGitDir(gitdir == null ? null : new File(gitdir));
 		command.setDirectory(localName == null ? null : new File(localName));
 		try {
+			db = command.call().getRepository();
 			outw.println(MessageFormat.format(CLIText.get().cloningInto,
 					command.getDirectory().getPath()));
-			db = command.call().getRepository();
 			if (db.resolve(Constants.HEAD) == null)
 				outw.println(CLIText.get().clonedEmptyRepository);
 		} catch (InvalidRemoteException e) {

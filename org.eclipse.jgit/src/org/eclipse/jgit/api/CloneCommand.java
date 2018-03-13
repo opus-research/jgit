@@ -361,9 +361,10 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return the directory associated with the clone operation. If the
 	 *         directory wasn't set, a name associated with the source uri will
 	 *         be used.
+	 * @throws InvalidRemoteException
 	 * @since 3.6
 	 */
-	public File getDirectory() {
+	public File getDirectory() throws InvalidRemoteException {
 		return this.directory;
 	}
 
