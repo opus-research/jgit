@@ -55,9 +55,6 @@ import org.eclipse.jgit.internal.fsck.FsckPackParser;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
 /**
@@ -109,19 +106,6 @@ public class DfsFsck implements Fsck {
 							pack.getPackDescription()
 									.getFileName(PackExt.INDEX),
 							e.getErrorType()));
-				}
-			}
-
-			try (ObjectWalk ow = new ObjectWalk(ctx)) {
-				for (Ref r : repo.getAllRefs().values()) {
-					try {
-						RevObject tip = ow.parseAny(r.getObjectId());
-						ow.markStart(ow.parseAny(r.getObjectId()));
-						ow.checkConnectivity();
-						ow.markUninteresting(tip);
-					} catch (MissingObjectException e) {
-						errors.getMissingObjects().add(e.getObjectId());
-					}
 				}
 			}
 		} finally {
