@@ -109,7 +109,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotCommitWriteTo;
 	/***/ public String cannotConnectPipes;
 	/***/ public String cannotConvertScriptToText;
-	/***/ public String cannotCreateCommitMessageFile;
 	/***/ public String cannotCreateConfig;
 	/***/ public String cannotCreateDirectory;
 	/***/ public String cannotCreateHEAD;
@@ -164,7 +163,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String commitMessageNotSpecified;
 	/***/ public String commitOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String commitAmendOnInitialNotPossible;
-	/***/ public String commitRejectedByHook;
 	/***/ public String compressingObjects;
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
@@ -473,7 +471,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String readTimedOut;
-	/***/ public String rebaseRejectedByHook;
 	/***/ public String receivePackObjectTooLarge1;
 	/***/ public String receivePackObjectTooLarge2;
 	/***/ public String receivePackInvalidLimit;
