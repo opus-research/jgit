@@ -746,9 +746,9 @@ public class RepoCommandTest extends RepositoryTestCase {
 				FileBasedConfig c = new FileBasedConfig(gitmodules,
 						FS.DETECTED);
 				c.load();
-				assertEquals("Recording remote branches should work for short branch descriptions", "master",
+				assertEquals("standard branches work", "master",
 						c.getString("submodule", "with-branch", "branch"));
-				assertEquals("Recording remote branches should work for full ref specs", "refs/heads/master",
+				assertEquals("long branches work", "refs/heads/master",
 						c.getString("submodule", "with-long-branch", "branch"));
 			}
 		}
@@ -785,17 +785,21 @@ public class RepoCommandTest extends RepositoryTestCase {
 					.setDirectory(directory)
 					.setURI(remoteDb.getDirectory().toURI().toString()).call()
 					.getRepository();) {
-				// The .gitattributes file should exist
-				File gitattributes = new File(localDb.getWorkTree(),
-					".gitattributes");
-				assertTrue("The .gitattributes file should exist",
-						gitattributes.exists());
-				try (BufferedReader reader = new BufferedReader(
-						new FileReader(gitattributes));) {
-					String content = reader.readLine();
-					assertEquals(".gitattributes content should be as expected",
-						"/test a1 a2", content);
-				}
+				// The .gitmodules file should exist
+				File gitmodules = new File(localDb.getWorkTree(),
+						".gitmodules");
+				assertTrue("The .gitmodules file should exist",
+						gitmodules.exists());
+				FileBasedConfig c = new FileBasedConfig(gitmodules,
+						FS.DETECTED);
+				c.load();
+
+				Set<String> expect = new HashSet<String>();
+				expect.add("a1");
+				expect.add("a2");
+				Set<String> actual = new HashSet<String>();
+				actual.addAll(Arrays.asList(c.getStringList("submodule", "test", "label")));
+				assertEquals("recording labels works", expect, actual);
 			}
 		}
 	}

@@ -50,8 +50,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -348,12 +348,17 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set whether the labels field should be recorded as a label in
-	 * .gitattributes.
+	 * Set whether the labels field should be recorded in .gitmodules.
+	 * <p>
+	 * Submodule entries in .gitmodules can include a "label" field
+	 * to make operating on subsets of submodules easy.
+	 * <p>
+	 * That field is used by any Git submodule operation to decide
+	 * whether to operate on a given submodule.
 	 * <p>
 	 * Not implemented for non-bare repositories.
 	 *
-	 * @param enable Whether to record the labels in the .gitattributes
+	 * @param enable Whether to record the labels in the .gitmodules
 	 * @return this command
 	 * @since 4.4
 	 */
@@ -491,7 +496,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			ObjectInserter inserter = repo.newObjectInserter();
 			try (RevWalk rw = new RevWalk(repo)) {
 				Config cfg = new Config();
-				StringBuilder attributes = new StringBuilder();
 				for (RepoProject proj : bareProjects) {
 					String name = proj.getPath();
 					String nameUri = proj.getName();
@@ -514,15 +518,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 						}
 					}
 					if (recordSubmoduleLabels) {
-						StringBuilder rec = new StringBuilder();
-						rec.append("/"); //$NON-NLS-1$
-						rec.append(name);
-						for (String group : proj.getGroups()) {
-							rec.append(" "); //$NON-NLS-1$
-							rec.append(group);
-						}
-						rec.append("\n"); //$NON-NLS-1$
-						attributes.append(rec.toString());
+						List<String> l = new ArrayList<>();
+						l.addAll(proj.getGroups());
+						cfg.setStringList("submodule", name, "label", l); //$NON-NLS-1$ //$NON-NLS-2$
 					}
 					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
 					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
@@ -552,16 +550,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				dcEntry.setObjectId(objectId);
 				dcEntry.setFileMode(FileMode.REGULAR_FILE);
 				builder.add(dcEntry);
-
-				if (recordSubmoduleLabels) {
-					// create a new DirCacheEntry for .gitattributes file.
-					final DirCacheEntry dcEntryAttr = new DirCacheEntry(Constants.DOT_GIT_ATTRIBUTES);
-					ObjectId attrId = inserter.insert(Constants.OBJ_BLOB,
-							attributes.toString().getBytes(Constants.CHARACTER_ENCODING));
-					dcEntryAttr.setObjectId(attrId);
-					dcEntryAttr.setFileMode(FileMode.REGULAR_FILE);
-					builder.add(dcEntryAttr);
-				}
 
 				builder.finish();
 				ObjectId treeId = index.writeTree(inserter);

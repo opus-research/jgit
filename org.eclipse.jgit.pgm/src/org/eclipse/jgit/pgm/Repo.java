@@ -58,12 +58,20 @@ class Repo extends TextBuiltin {
 	@Argument(required = true, metaVar = "metaVar_path", usage = "usage_pathToXml")
 	private String path;
 
+	@Option(name = "--record-remote-branch", usage = "usage_branches")
+	private boolean branches;
+
+	@Option(name = "--record-labels", usage = "usage_Submodule_Labels")
+	private boolean record_submodule_labels;
+
 	@Override
 	protected void run() throws Exception {
 		new RepoCommand(db)
 			.setURI(uri)
 			.setPath(path)
 			.setGroups(groups)
+			.setRecordRemoteBranch(branches)
+			.setRecordSubmoduleLabels(record_submodule_labels)
 			.call();
 	}
 }
