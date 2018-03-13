@@ -73,9 +73,10 @@ public class AddUnseenToBitmapFilter extends RevFilter {
 	 * Create a filter that adds visited commits to the given bitmap, but does not walk
 	 * through the objects in {@code seen}.
 	 *
+	 * @param seen objects that are already seen
 	 * @param bitmap bitmap to write visited commits to
 	 */
-	public AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
+	public AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmap) {
 		this.seen = seen;
 		this.bitmap = bitmapResult;
 	}
