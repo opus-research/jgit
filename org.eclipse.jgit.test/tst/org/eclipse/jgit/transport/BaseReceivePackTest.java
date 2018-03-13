@@ -56,7 +56,7 @@ public class BaseReceivePackTest {
 		String o = "0000000000000000000000000000000000000000";
 		String n = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 		String r = "refs/heads/master";
-		ReceiveCommand cmd = ReceivePack.parseCommand(o + " " + n + " " + r);
+		ReceiveCommand cmd = BaseReceivePack.parseCommand(o + " " + n + " " + r);
 		assertEquals(ObjectId.zeroId(), cmd.getOldId());
 		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
 				cmd.getNewId().name());
@@ -76,7 +76,7 @@ public class BaseReceivePackTest {
 
 	private void assertParseCommandFails(String input) {
 		try {
-			ReceivePack.parseCommand(input);
+			BaseReceivePack.parseCommand(input);
 			fail();
 		} catch (PackProtocolException e) {
 			// Expected.
