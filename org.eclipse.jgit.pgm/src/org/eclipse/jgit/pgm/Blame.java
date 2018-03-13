@@ -222,29 +222,19 @@ class Blame extends TextBuiltin {
 			String authorFmt = MessageFormat.format(" (%-{0}s %{1}s", //$NON-NLS-1$
 					valueOf(authorWidth), valueOf(dateWidth));
 
-			for (int line = begin; line < end;) {
-				RevCommit c = blame.getSourceCommit(line);
-				String commit = abbreviate(c);
-				String author = null;
-				String date = null;
-				if (!noAuthor) {
-					author = author(line);
-					date = date(line);
-				}
-				do {
-					outw.print(commit);
-					if (showSourcePath)
-						outw.format(pathFmt, path(line));
-					if (showSourceLine)
-						outw.format(numFmt, valueOf(blame.getSourceLine(line) + 1));
-					if (!noAuthor)
-						outw.format(authorFmt, author, date);
-					outw.format(lineFmt, valueOf(line + 1));
-					outw.flush();
-					blame.getResultContents().writeLine(outs, line);
-					outs.flush();
-					outw.print('\n');
-				} while (++line < end && blame.getSourceCommit(line) == c);
+			for (int line = begin; line < end; line++) {
+				outw.print(abbreviate(blame.getSourceCommit(line)));
+				if (showSourcePath)
+					outw.format(pathFmt, path(line));
+				if (showSourceLine)
+					outw.format(numFmt, valueOf(blame.getSourceLine(line) + 1));
+				if (!noAuthor)
+					outw.format(authorFmt, author(line), date(line));
+				outw.format(lineFmt, valueOf(line + 1));
+				outw.flush();
+				blame.getResultContents().writeLine(outs, line);
+				outs.flush();
+				outw.print('\n');
 			}
 		} finally {
 			generator.release();

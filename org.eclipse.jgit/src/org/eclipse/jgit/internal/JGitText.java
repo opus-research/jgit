@@ -113,7 +113,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotCreateDirectory;
 	/***/ public String cannotCreateHEAD;
 	/***/ public String cannotCreateIndexfile;
-	/***/ public String cannotCreateTempDir;
 	/***/ public String cannotDeleteCheckedOutBranch;
 	/***/ public String cannotDeleteFile;
 	/***/ public String cannotDeleteStaleTrackingRef;
@@ -147,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
 	/***/ public String canOnlyCherryPickCommitsWithOneParent;
 	/***/ public String canOnlyRevertCommitsWithOneParent;
-	/***/ public String commitDoesNotHaveGivenParent;
 	/***/ public String cantFindObjectInReversePackIndexForTheSpecifiedOffset;
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
@@ -538,7 +536,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyWithoutHead;
 	/***/ public String stashApplyOnUnsafeRepository;
-	/***/ public String stashCommitIncorrectNumberOfParents;
+	/***/ public String stashCommitMissingTwoParents;
 	/***/ public String stashDropDeleteRefFailed;
 	/***/ public String stashDropFailed;
 	/***/ public String stashDropMissingReflog;
@@ -570,7 +568,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoLocal;
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
-	/***/ public String transportSSHRetryInterrupt;
 	/***/ public String treeEntryAlreadyExists;
 	/***/ public String treeFilterMarkerTooManyFilters;
 	/***/ public String treeIteratorDoesNotSupportRemove;
