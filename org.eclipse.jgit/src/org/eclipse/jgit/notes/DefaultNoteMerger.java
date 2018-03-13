@@ -82,12 +82,8 @@ public class DefaultNoteMerger implements NoteMerger {
 		ObjectLoader lt = reader.open(theirs.getData());
 		UnionInputStream union = new UnionInputStream(lo.openStream(),
 				lt.openStream());
-		try {
-			ObjectId noteData = inserter.insert(Constants.OBJ_BLOB,
-					lo.getSize() + lt.getSize(), union);
-			return new Note(ours, noteData);
-		} finally {
-			union.close();
-		}
+		ObjectId noteData = inserter.insert(Constants.OBJ_BLOB,
+				lo.getSize() + lt.getSize(), union);
+		return new Note(ours, noteData);
 	}
 }
