@@ -58,7 +58,6 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevBlob;
@@ -148,24 +147,6 @@ public class IndexPackTest extends RepositoryTestCase {
 		final byte[] raw = pack.toByteArray();
 		IndexPack ip = IndexPack.create(db, new ByteArrayInputStream(raw));
 		ip.setFixThin(true);
-		ip.index(NullProgressMonitor.INSTANCE);
-		ip.renameAndOpenPack();
-	}
-
-	public void testPackWithDuplicateBlob() throws Exception {
-		final byte[] data = Constants.encode("0123456789abcdefg");
-		TestRepository<Repository> d = new TestRepository<Repository>(db);
-		assertTrue(db.hasObject(d.blob(data)));
-
-		TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(1024);
-		packHeader(pack, 1);
-		pack.write((Constants.OBJ_BLOB) << 4 | 0x80 | 1);
-		pack.write(1);
-		deflate(pack, data);
-		digest(pack);
-
-		final byte[] raw = pack.toByteArray();
-		IndexPack ip = IndexPack.create(db, new ByteArrayInputStream(raw));
 		ip.index(NullProgressMonitor.INSTANCE);
 		ip.renameAndOpenPack();
 	}

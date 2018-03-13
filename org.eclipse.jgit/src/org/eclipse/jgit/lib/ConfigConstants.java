@@ -57,12 +57,6 @@ public class ConfigConstants {
 	/** The "remote" section */
 	public static final String CONFIG_REMOTE_SECTION = "remote";
 
-	/** The "diff" section */
-	public static final String CONFIG_DIFF_SECTION = "diff";
-
-	/** The "algorithm" key */
-	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
-
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 

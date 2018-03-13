@@ -112,6 +112,7 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 
 		@Override
 		protected boolean mergeImpl() throws IOException {
+			tw.reset();
 			tw.addTree(mergeBase());
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
@@ -131,7 +132,7 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 					add(T_THEIRS, DirCacheEntry.STAGE_0);
 				else if (modeB == modeT && tw.idEqual(T_BASE, T_THEIRS))
 					add(T_OURS, DirCacheEntry.STAGE_0);
-				else {
+				else if (tw.isSubtree()) {
 					if (nonTree(modeB)) {
 						add(T_BASE, DirCacheEntry.STAGE_1);
 						hasConflict = true;
@@ -144,8 +145,12 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 						add(T_THEIRS, DirCacheEntry.STAGE_3);
 						hasConflict = true;
 					}
-					if (tw.isSubtree())
-						tw.enterSubtree();
+					tw.enterSubtree();
+				} else {
+					add(T_BASE, DirCacheEntry.STAGE_1);
+					add(T_OURS, DirCacheEntry.STAGE_2);
+					add(T_THEIRS, DirCacheEntry.STAGE_3);
+					hasConflict = true;
 				}
 			}
 			builder.finish();

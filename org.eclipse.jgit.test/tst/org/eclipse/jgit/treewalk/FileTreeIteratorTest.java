@@ -51,7 +51,6 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 
 public class FileTreeIteratorTest extends RepositoryTestCase {
@@ -80,7 +79,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		final File r = new File(trash, paths[0]);
 		assertTrue(r.isFile());
 		final FileTreeIterator fti = new FileTreeIterator(r, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+				WorkingTreeOptions.createConfigurationInstance(db.getConfig()));
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
 	}
@@ -89,7 +88,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		final File r = new File(trash, "not-existing-file");
 		assertFalse(r.exists());
 		final FileTreeIterator fti = new FileTreeIterator(r, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+				WorkingTreeOptions.createConfigurationInstance(db.getConfig()));
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
 	}
@@ -101,14 +100,14 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		assertTrue(r.isDirectory());
 
 		final FileTreeIterator fti = new FileTreeIterator(r, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+				WorkingTreeOptions.createConfigurationInstance(db.getConfig()));
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
 	}
 
 	public void testSimpleIterate() throws Exception {
 		final FileTreeIterator top = new FileTreeIterator(trash, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+				WorkingTreeOptions.createConfigurationInstance(db.getConfig()));
 
 		assertTrue(top.first());
 		assertFalse(top.eof());
@@ -157,7 +156,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 
 	public void testComputeFileObjectId() throws Exception {
 		final FileTreeIterator top = new FileTreeIterator(trash, db.getFS(),
-				db.getConfig().get(WorkingTreeOptions.KEY));
+				WorkingTreeOptions.createConfigurationInstance(db.getConfig()));
 
 		final MessageDigest md = Constants.newMessageDigest();
 		md.update(Constants.encodeASCII(Constants.TYPE_BLOB));
@@ -171,7 +170,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 
 		// Verify it was cached by removing the file and getting it again.
 		//
-		FileUtils.delete(new File(trash, paths[0]));
+		new File(trash, paths[0]).delete();
 		assertEquals(expect, top.getEntryObjectId());
 	}
 

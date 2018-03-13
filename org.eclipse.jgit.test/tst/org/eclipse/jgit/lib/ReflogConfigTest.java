@@ -59,9 +59,11 @@ public class ReflogConfigTest extends RepositoryTestCase {
 
 		// do one commit and check that reflog size is 0: no reflogs should be
 		// written
-		commit("A Commit\n", new PersonIdent(author, commitTime, tz),
+		final Tree t = new Tree(db);
+		addFileToTree(t, "i-am-a-file", "and this is the data in me\n");
+		commit(t, "A Commit\n", new PersonIdent(author, commitTime, tz),
 				new PersonIdent(committer, commitTime, tz));
-		commitTime += 60 * 1000;
+		commitTime += 100;
 		assertTrue(
 				"Reflog for HEAD still contain no entry",
 				db.getReflogReader(Constants.HEAD).getReverseEntries().size() == 0);
@@ -71,9 +73,10 @@ public class ReflogConfigTest extends RepositoryTestCase {
 		assertTrue(db.getConfig().get(CoreConfig.KEY).isLogAllRefUpdates());
 
 		// do one commit and check that reflog size is increased to 1
-		commit("A Commit\n", new PersonIdent(author, commitTime, tz),
+		addFileToTree(t, "i-am-another-file", "and this is other data in me\n");
+		commit(t, "A Commit\n", new PersonIdent(author, commitTime, tz),
 				new PersonIdent(committer, commitTime, tz));
-		commitTime += 60 * 1000;
+		commitTime += 100;
 		assertTrue(
 				"Reflog for HEAD should contain one entry",
 				db.getReflogReader(Constants.HEAD).getReverseEntries().size() == 1);
@@ -83,24 +86,32 @@ public class ReflogConfigTest extends RepositoryTestCase {
 		assertFalse(db.getConfig().get(CoreConfig.KEY).isLogAllRefUpdates());
 
 		// do one commit and check that reflog size is 2
-		commit("A Commit\n", new PersonIdent(author, commitTime, tz),
+		addFileToTree(t, "i-am-anotheranother-file",
+				"and this is other other data in me\n");
+		commit(t, "A Commit\n", new PersonIdent(author, commitTime, tz),
 				new PersonIdent(committer, commitTime, tz));
 		assertTrue(
 				"Reflog for HEAD should contain two entries",
 				db.getReflogReader(Constants.HEAD).getReverseEntries().size() == 2);
 	}
 
-	private void commit(String commitMsg, PersonIdent author,
+	private void addFileToTree(final Tree t, String filename, String content)
+			throws IOException {
+		FileTreeEntry f = t.addFile(filename);
+		writeTrashFile(f.getName(), content);
+		t.accept(new WriteTree(trash, db), TreeEntry.MODIFIED_ONLY);
+	}
+
+	private void commit(final Tree t, String commitMsg, PersonIdent author,
 			PersonIdent committer) throws IOException {
 		final CommitBuilder commit = new CommitBuilder();
 		commit.setAuthor(author);
 		commit.setCommitter(committer);
 		commit.setMessage(commitMsg);
+		commit.setTreeId(t.getTreeId());
 		ObjectInserter inserter = db.newObjectInserter();
-		ObjectId id;
 		try {
-			commit.setTreeId(inserter.insert(new TreeFormatter()));
-			id = inserter.insert(commit);
+			inserter.insert(commit);
 			inserter.flush();
 		} finally {
 			inserter.release();
@@ -108,7 +119,7 @@ public class ReflogConfigTest extends RepositoryTestCase {
 
 		int nl = commitMsg.indexOf('\n');
 		final RefUpdate ru = db.updateRef(Constants.HEAD);
-		ru.setNewObjectId(id);
+		ru.setNewObjectId(commit.getCommitId());
 		ru.setRefLogMessage("commit : "
 				+ ((nl == -1) ? commitMsg : commitMsg.substring(0, nl)), false);
 		ru.forceUpdate();
