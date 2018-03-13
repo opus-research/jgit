@@ -45,7 +45,6 @@ package org.eclipse.jgit.transport;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -53,6 +52,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.transport.http.JDKHttpConnection;
 import org.junit.Test;
 
 public class HttpAuthTest {
@@ -64,29 +64,43 @@ public class HttpAuthTest {
 
 	private static String bearerHeader = "WWW-Authenticate: Bearer";
 
+	private static String negotiateHeader = "WWW-Authenticate: Negotiate";
+
 	private static String URL_SAMPLE = "http://everyones.loves.git/u/2";
 
 	private static String BASIC = "Basic";
 
 	private static String DIGEST = "Digest";
 
+	private static String NEGOTIATE = "Negotiate";
+
 	@Test
-	public void testHttpAuthScanResponse() throws MalformedURLException {
+	public void testHttpAuthScanResponse() {
 		checkResponse(new String[] { basicHeader }, BASIC);
 		checkResponse(new String[] { digestHeader }, DIGEST);
+		checkResponse(new String[] { negotiateHeader }, NEGOTIATE);
 		checkResponse(new String[] { basicHeader, digestHeader }, DIGEST);
 		checkResponse(new String[] { digestHeader, basicHeader }, DIGEST);
+		checkResponse(new String[] { digestHeader, negotiateHeader }, NEGOTIATE);
+		checkResponse(new String[] { negotiateHeader, digestHeader }, NEGOTIATE);
 		checkResponse(new String[] { ntlmHeader, basicHeader, digestHeader,
 				bearerHeader }, DIGEST);
 		checkResponse(new String[] { ntlmHeader, basicHeader, bearerHeader },
 				BASIC);
+		checkResponse(new String[] { ntlmHeader, basicHeader, digestHeader,
+				negotiateHeader, bearerHeader }, NEGOTIATE);
 	}
 
 	private static void checkResponse(String[] headers,
-			String expectedAuthMethod) throws MalformedURLException {
+			String expectedAuthMethod) {
 
-		AuthHeadersResponse responce = new AuthHeadersResponse(headers);
-		HttpAuthMethod authMethod = HttpAuthMethod.scanResponse(responce);
+		AuthHeadersResponse response = null;
+		try {
+			response = new AuthHeadersResponse(headers);
+		} catch (IOException e) {
+			fail("Couldn't instantiate AuthHeadersResponse: " + e.toString());
+		}
+		HttpAuthMethod authMethod = HttpAuthMethod.scanResponse(response);
 
 		if (!expectedAuthMethod.equals(getAuthMethodName(authMethod))) {
 			fail("Wrong authentication method: expected " + expectedAuthMethod
@@ -98,18 +112,13 @@ public class HttpAuthTest {
 		return authMethod.getClass().getSimpleName();
 	}
 
-	private static class AuthHeadersResponse extends HttpURLConnection {
+	private static class AuthHeadersResponse extends JDKHttpConnection {
 		Map<String, List<String>> headerFields = new HashMap<String, List<String>>();
 
 		public AuthHeadersResponse(String[] authHeaders)
-				throws MalformedURLException {
+				throws MalformedURLException, IOException {
 			super(new URL(URL_SAMPLE));
 			parseHeaders(authHeaders);
-		}
-
-		@Override
-		public void disconnect() {
-			fail("The disconnect method shouldn't be invoked");
 		}
 
 		@Override
