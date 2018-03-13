@@ -89,11 +89,6 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	}
 
 	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -108,9 +103,9 @@ public class FS_Win32_Java7 extends FS_Win32 {
 		return FileUtil.isDirectory(path);
 	}
 
+	@Override
 	public boolean isFile(File path) {
-		Path nioPath = path.toPath();
-		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
+		return FileUtil.isFile(path);
 	}
 
 	@Override
