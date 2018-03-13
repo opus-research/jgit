@@ -99,12 +99,9 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 		} catch (UnsupportedEncodingException e) {
 			throw new IllegalStateException(e);
 		}
-		StringBuilder sentNonceBuilder = new StringBuilder();
-		sentNonceBuilder.append(String.format("%d-", new Long(timestamp))); //$NON-NLS-1$
-		for (byte b : rawHmac) {
-			sentNonceBuilder.append(String.format("%02x", Byte.valueOf(b))); //$NON-NLS-1$
-		}
-		return sentNonceBuilder.toString();
+		String sentNonce = String.format(
+				"%d-%20X", new Long(timestamp), rawHmac); //$NON-NLS-1$
+		return sentNonce;
 	}
 
 	@Override
