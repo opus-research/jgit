@@ -170,38 +170,49 @@ public class RemoteConfig implements Serializable {
 		vlst = rc.getStringList(SECTION, name, KEY_URL);
 		Map<String, String> insteadOf = getReplacements(rc, KEY_INSTEADOF);
 		uris = new ArrayList<>(vlst.length);
-		for (final String s : vlst)
+		for (final String s : vlst) {
 			uris.add(new URIish(replaceUri(s, insteadOf)));
-
-		Map<String, String> pushInsteadOf = getReplacements(rc,
-				KEY_PUSHINSTEADOF);
-		vlst = rc.getStringList(SECTION, name, KEY_PUSHURL);
-		pushURIs = new ArrayList<>(vlst.length);
-		for (final String s : vlst)
-			pushURIs.add(new URIish(replaceUri(s, pushInsteadOf)));
-
-		vlst = rc.getStringList(SECTION, name, KEY_FETCH);
-		fetch = new ArrayList<>(vlst.length);
-		for (final String s : vlst)
-			fetch.add(new RefSpec(s));
-
-		vlst = rc.getStringList(SECTION, name, KEY_PUSH);
-		push = new ArrayList<>(vlst.length);
-		for (final String s : vlst)
-			push.add(new RefSpec(s));
-
+		}
+		String[] plst = rc.getStringList(SECTION, name, KEY_PUSHURL);
+		pushURIs = new ArrayList<>(plst.length);
+		for (final String s : plst) {
+			pushURIs.add(new URIish(s));
+		}
+		if (pushURIs.isEmpty()) {
+			// Would default to the uris. If we have pushinsteadof, we must
+			// supply rewritten push uris.
+			Map<String, String> pushInsteadOf = getReplacements(rc,
+					KEY_PUSHINSTEADOF);
+			if (!pushInsteadOf.isEmpty()) {
+				for (String s : vlst) {
+					String replaced = replaceUri(s, pushInsteadOf);
+					if (!s.equals(replaced)) {
+						pushURIs.add(new URIish(replaced));
+					}
+				}
+			}
+		}
+		fetch = rc.getRefSpecs(SECTION, name, KEY_FETCH);
+		push = rc.getRefSpecs(SECTION, name, KEY_PUSH);
 		val = rc.getString(SECTION, name, KEY_UPLOADPACK);
-		if (val == null)
+		if (val == null) {
 			val = DEFAULT_UPLOAD_PACK;
+		}
 		uploadpack = val;
 
 		val = rc.getString(SECTION, name, KEY_RECEIVEPACK);
-		if (val == null)
+		if (val == null) {
 			val = DEFAULT_RECEIVE_PACK;
+		}
 		receivepack = val;
 
-		val = rc.getString(SECTION, name, KEY_TAGOPT);
-		tagopt = TagOpt.fromOption(val);
+		try {
+			val = rc.getString(SECTION, name, KEY_TAGOPT);
+			tagopt = TagOpt.fromOption(val);
+		} catch (IllegalArgumentException e) {
+			// C git silently ignores invalid tagopt values.
+			tagopt = TagOpt.AUTO_FOLLOW;
+		}
 		mirror = rc.getBoolean(SECTION, name, KEY_MIRROR, DEFAULT_MIRROR);
 		timeout = rc.getInt(SECTION, name, KEY_TIMEOUT, 0);
 	}

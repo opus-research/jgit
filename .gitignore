@@ -1,12 +1,6 @@
-/.buckd
 /.project
-/buck-cache
-/buck-out
 /target
+.DS_Store
 infer-out
-bazel-bin
-bazel-genfiles
-bazel-jgit
-bazel-out
-bazel-testlogs
+bazel-*
 *~

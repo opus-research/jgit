@@ -120,8 +120,7 @@ class DiffAlgorithms extends TextBuiltin {
 	@Option(name = "--text-limit", metaVar = "LIMIT", usage = "Maximum size in KiB to scan per file revision")
 	int textLimit = 15 * 1024; // 15 MiB as later we do * 1024.
 
-	@Option(name = "--repository", aliases = {
-			"-r" }, metaVar = "GIT_DIR", usage = "Repository to scan")
+	@Option(name = "--repository", aliases = { "-r" }, metaVar = "GIT_DIR", usage = "Repository to scan")
 	List<File> gitDirs = new ArrayList<>();
 
 	@Option(name = "--count", metaVar = "LIMIT", usage = "Number of file revisions to be compared")

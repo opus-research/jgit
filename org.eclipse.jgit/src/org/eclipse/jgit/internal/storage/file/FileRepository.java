@@ -216,7 +216,7 @@ public class FileRepository extends Repository {
 				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
 
 		String reftype = repoConfig.getString(
-				"extensions", null, "refsStorage"); //$NON-NLS-1$ //$NON-NLS-2$
+				"extensions", null, "refStorage"); //$NON-NLS-1$ //$NON-NLS-2$
 		if (repositoryFormatVersion >= 1 && reftype != null) {
 			if (StringUtils.equalsIgnoreCase(reftype, "reftree")) { //$NON-NLS-1$
 				refs = new RefTreeDatabase(this, new RefDirectory(this));
@@ -490,10 +490,28 @@ public class FileRepository extends Repository {
 	 */
 	@Override
 	public Set<ObjectId> getAdditionalHaves() {
+		return getAdditionalHaves(null);
+	}
+
+	/**
+	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
+	 * <p>
+	 * When a repository borrows objects from another repository, it can
+	 * advertise that it safely has that other repository's references, without
+	 * exposing any other details about the other repository.  This may help
+	 * a client trying to push changes avoid pushing more than it needs to.
+	 *
+	 * @param skips
+	 *            Set of AlternateHandle Ids already seen
+	 *
+	 * @return unmodifiable collection of other known objects.
+	 */
+	private Set<ObjectId> getAdditionalHaves(Set<AlternateHandle.Id> skips) {
 		HashSet<ObjectId> r = new HashSet<>();
+		skips = objectDatabase.addMe(skips);
 		for (AlternateHandle d : objectDatabase.myAlternates()) {
-			if (d instanceof AlternateRepository) {
-				Repository repo;
+			if (d instanceof AlternateRepository && !skips.contains(d.getId())) {
+				FileRepository repo;
 
 				repo = ((AlternateRepository) d).repository;
 				for (Ref ref : repo.getAllRefs().values()) {
@@ -502,7 +520,7 @@ public class FileRepository extends Repository {
 					if (ref.getPeeledObjectId() != null)
 						r.add(ref.getPeeledObjectId());
 				}
-				r.addAll(repo.getAdditionalHaves());
+				r.addAll(repo.getAdditionalHaves(skips));
 			}
 		}
 		return r;
@@ -619,12 +637,18 @@ public class FileRepository extends Repository {
 
 	}
 
+	private boolean shouldAutoDetach() {
+		return getConfig().getBoolean(ConfigConstants.CONFIG_GC_SECTION,
+				ConfigConstants.CONFIG_KEY_AUTODETACH, true);
+	}
+
 	@Override
 	public void autoGC(ProgressMonitor monitor) {
 		GC gc = new GC(this);
 		gc.setPackConfig(new PackConfig(this));
 		gc.setProgressMonitor(monitor);
 		gc.setAuto(true);
+		gc.setBackground(shouldAutoDetach());
 		try {
 			gc.gc();
 		} catch (ParseException | IOException e) {
