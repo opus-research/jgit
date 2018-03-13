@@ -102,27 +102,26 @@ public abstract class DfsOutputStream extends OutputStream {
 	 * Open a stream to read back a portion of already written data.
 	 * <p>
 	 * The writing position of the output stream is not affected by a read. The
-	 * input stream can be read up to the current writing position.
+	 * input stream can be read up to the current writing position. Closing the
+	 * returned stream has no effect on the underlying {@link DfsOutputStream}.
 	 *
 	 * @param position
 	 *            offset to read from.
 	 * @return new input stream
 	 */
 	public InputStream openInputStream(final long position) {
-		return new ReadBackStream(this, position);
+		return new ReadBackStream(position);
 	}
 
-	private static class ReadBackStream extends InputStream {
-		private final DfsOutputStream os;
+	private class ReadBackStream extends InputStream {
 		private final ByteBuffer buf;
 		private long position;
 
-		private ReadBackStream(DfsOutputStream os, long position) {
-			this.os = os;
-			int bs = os.blockSize();
+		private ReadBackStream(long position) {
+			int bs = blockSize();
 			this.position = position;
 			buf = ByteBuffer.allocate(bs > 0 ? bs : 8192);
-			buf.position(buf.capacity());
+			buf.position(buf.limit());
 		}
 
 		@Override
@@ -131,9 +130,9 @@ public abstract class DfsOutputStream extends OutputStream {
 			while (0 < len) {
 				if (!buf.hasRemaining()) {
 					buf.rewind();
-					int nr = os.read(position, buf);
+					int nr = DfsOutputStream.this.read(position, buf);
 					if (nr < 0) {
-						buf.position(buf.remaining());
+						buf.position(buf.limit());
 						break;
 					}
 					position += nr;
@@ -145,8 +144,7 @@ public abstract class DfsOutputStream extends OutputStream {
 				len -= n;
 				cnt += n;
 			}
-			if (cnt == 0 && len > 0)
-				return -1;
+			if (cnt == 0 && len > 0) return -1;
 			return cnt;
 		}
 
