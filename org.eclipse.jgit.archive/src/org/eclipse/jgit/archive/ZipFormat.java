@@ -72,9 +72,6 @@ public final class ZipFormat extends BaseFormat implements
 				Collections.<String, Object> emptyMap());
 	}
 
-	/**
-	 * @since 4.0
-	 */
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s,
 			Map<String, Object> o) throws IOException {
 		return applyFormatOptions(new ZipArchiveOutputStream(s), o);

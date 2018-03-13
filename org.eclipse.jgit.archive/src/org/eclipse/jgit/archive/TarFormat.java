@@ -73,9 +73,6 @@ public final class TarFormat extends BaseFormat implements
 				Collections.<String, Object> emptyMap());
 	}
 
-	/**
-	 * @since 4.0
-	 */
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s,
 			Map<String, Object> o) throws IOException {
 		TarArchiveOutputStream out = new TarArchiveOutputStream(s, "UTF-8"); //$NON-NLS-1$

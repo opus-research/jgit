@@ -875,7 +875,7 @@ public class TestRepository<R extends Repository> {
 		private PersonIdent author;
 		private PersonIdent committer;
 
-		private String changeId;
+		private boolean insertChangeId;
 
 		private boolean updateCommitterTime;
 
@@ -1002,14 +1002,7 @@ public class TestRepository<R extends Repository> {
 		}
 
 		public CommitBuilder insertChangeId() {
-			changeId = "";
-			return this;
-		}
-
-		public CommitBuilder insertChangeId(String c) {
-			// Validate, but store as a string so we can use "" as a sentinel.
-			ObjectId.fromString(c);
-			changeId = c;
+			insertChangeId = true;
 			return this;
 		}
 
@@ -1036,7 +1029,8 @@ public class TestRepository<R extends Repository> {
 						c.setTreeId(topLevelTree);
 					else
 						c.setTreeId(tree.writeTree(ins));
-					insertChangeId(c);
+					if (insertChangeId)
+						insertChangeId(c);
 					c.setMessage(message);
 					commitId = ins.insert(c);
 					ins.flush();
@@ -1051,27 +1045,16 @@ public class TestRepository<R extends Repository> {
 
 		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
 				throws IOException {
-			if (changeId == null)
-				return;
-			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");
-			if (idx >= 0)
-				return;
-
 			ObjectId firstParentId = null;
 			if (!parents.isEmpty())
 				firstParentId = parents.get(0);
-
-			ObjectId cid;
-			if (changeId.equals(""))
-				cid = ChangeIdUtil.computeChangeId(c.getTreeId(), firstParentId,
-						c.getAuthor(), c.getCommitter(), message);
-			else
-				cid = ObjectId.fromString(changeId);
-			message = ChangeIdUtil.insertId(message, cid);
-			if (cid != null)
+			ObjectId changeId = ChangeIdUtil.computeChangeId(c.getTreeId(),
+					firstParentId, c.getAuthor(), c.getCommitter(), message);
+			message = ChangeIdUtil.insertId(message, changeId);
+			if (changeId != null)
 				message = message.replaceAll("\nChange-Id: I" //$NON-NLS-1$
 						+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I" //$NON-NLS-1$ //$NON-NLS-2$
-						+ cid.getName() + "\n"); //$NON-NLS-1$
+						+ changeId.getName() + "\n"); //$NON-NLS-1$
 		}
 
 		public CommitBuilder child() throws Exception {

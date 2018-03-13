@@ -52,8 +52,6 @@ import org.eclipse.jgit.util.StringUtils;
 
 /**
  * Base format class
- *
- * @since 4.0
  */
 public class BaseFormat {
 
