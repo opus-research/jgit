@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,29 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertTrue;
+package org.eclipse.jgit.annotations;
 
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.junit.Test;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
 
-public class RemoteDeleteCommandTest extends AbstractRemoteCommandTest {
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-	@Test
-	public void testDelete() throws Exception {
-		// setup an initial remote
-		RemoteConfig remoteConfig = setupRemote();
-
-		// execute the command to remove the remote
-		RemoteRemoveCommand cmd = Git.wrap(db).remoteRemove();
-		cmd.setName(REMOTE_NAME);
-		RemoteConfig remote = cmd.call();
-
-		// assert that the removed remote is the initial remote
-		assertRemoteConfigEquals(remoteConfig, remote);
-		// assert that there are no remotes left
-		assertTrue(RemoteConfig.getAllRemoteConfigs(db.getConfig()).isEmpty());
-	}
-
+/**
+ * JGit's replacement for the {@code javax.annotations.Nullable}.
+ * <p>
+ * Denotes that a local variable, parameter, field, method return value can be
+ * {@code null}.
+ *
+ * @since 4.2
+ */
+@Documented
+@Retention(RetentionPolicy.CLASS)
+@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
+public @interface Nullable {
+	// marker annotation with no members
 }

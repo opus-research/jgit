@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,29 +41,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.internal.storage.file;
 
-import static org.junit.Assert.assertEquals;
+import java.io.File;
+import java.io.IOException;
 
-import java.util.List;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.junit.Test;
+/** Attribute node loaded from global system-wide file. */
+public class GlobalAttributesNode extends AttributesNode {
+	final Repository repository;
 
-public class RemoteListCommandTest extends AbstractRemoteCommandTest {
-
-	@Test
-	public void testList() throws Exception {
-		// setup an initial remote
-		RemoteConfig remoteConfig = setupRemote();
-
-		// execute the command to list the remotes
-		List<RemoteConfig> remotes = Git.wrap(db).remoteList().call();
-
-		// assert that there is only one remote
-		assertEquals(1, remotes.size());
-		// assert that the available remote is the initial remote
-		assertRemoteConfigEquals(remoteConfig, remotes.get(0));
+	/**
+	 * @param repository
+	 */
+	public GlobalAttributesNode(Repository repository) {
+		this.repository = repository;
 	}
 
+	/**
+	 * @return the attributes node
+	 * @throws IOException
+	 */
+	public AttributesNode load() throws IOException {
+		AttributesNode r = new AttributesNode();
+
+		FS fs = repository.getFS();
+		String path = repository.getConfig().get(CoreConfig.KEY)
+				.getAttributesFile();
+		if (path != null) {
+			File attributesFile;
+			if (path.startsWith("~/")) { //$NON-NLS-1$
+				attributesFile = fs.resolve(fs.userHome(),
+						path.substring(2));
+			} else {
+				attributesFile = fs.resolve(null, path);
+			}
+			FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributesFile);
+		}
+		return r.getRules().isEmpty() ? null : r;
+	}
 }

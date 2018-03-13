@@ -44,15 +44,13 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -67,7 +65,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -112,7 +110,54 @@ public abstract class FS {
 		}
 	}
 
-	final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	/**
+	 * Result of an executed process. The caller is responsible to close the
+	 * contained {@link TemporaryBuffer}s
+	 *
+	 * @since 4.2
+	 */
+	public static class ExecutionResult {
+		private TemporaryBuffer stdout;
+
+		private TemporaryBuffer stderr;
+
+		private int rc;
+
+		/**
+		 * @param stdout
+		 * @param stderr
+		 * @param rc
+		 */
+		public ExecutionResult(TemporaryBuffer stdout, TemporaryBuffer stderr,
+				int rc) {
+			this.stdout = stdout;
+			this.stderr = stderr;
+			this.rc = rc;
+		}
+
+		/**
+		 * @return buffered standard output stream
+		 */
+		public TemporaryBuffer getStdout() {
+			return stdout;
+		}
+
+		/**
+		 * @return buffered standard error stream
+		 */
+		public TemporaryBuffer getStderr() {
+			return stderr;
+		}
+
+		/**
+		 * @return the return code of the process
+		 */
+		public int getRc() {
+			return rc;
+		}
+	}
+
+	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -406,7 +451,8 @@ public abstract class FS {
 	 *            as component array
 	 * @param encoding
 	 *            to be used to parse the command's output
-	 * @return the one-line output of the command
+	 * @return the one-line output of the command or {@code null} if there is
+	 *         none
 	 */
 	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding) {
@@ -425,7 +471,8 @@ public abstract class FS {
 	 * @param env
 	 *            Map of environment variables to be merged with those of the
 	 *            current process
-	 * @return the one-line output of the command
+	 * @return the one-line output of the command or {@code null} if there is
+	 *         none
 	 * @since 4.0
 	 */
 	@Nullable
@@ -864,52 +911,86 @@ public abstract class FS {
 	 * Runs the given process until termination, clearing its stdout and stderr
 	 * streams on-the-fly.
 	 *
-	 * @param hookProcessBuilder
-	 *            The process builder configured for this hook.
+	 * @param processBuilder
+	 *            The process builder configured for this process.
 	 * @param outRedirect
-	 *            A print stream on which to redirect the hook's stdout. Can be
-	 *            <code>null</code>, in which case the hook's standard output
-	 *            will be lost.
+	 *            A OutputStream on which to redirect the processes stdout. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            output will be lost.
 	 * @param errRedirect
-	 *            A print stream on which to redirect the hook's stderr. Can be
-	 *            <code>null</code>, in which case the hook's standard error
-	 *            will be lost.
+	 *            A OutputStream on which to redirect the processes stderr. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            error will be lost.
 	 * @param stdinArgs
 	 *            A string to pass on to the standard input of the hook. Can be
 	 *            <code>null</code>.
-	 * @return the exit value of this hook.
+	 * @return the exit value of this process.
 	 * @throws IOException
-	 *             if an I/O error occurs while executing this hook.
+	 *             if an I/O error occurs while executing this process.
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 3.7
+	 * @since 4.2
 	 */
-	protected int runProcess(ProcessBuilder hookProcessBuilder,
+	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
 			throws IOException, InterruptedException {
+		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
+				stdinArgs.getBytes(Constants.CHARACTER_ENCODING));
+		return runProcess(processBuilder, outRedirect, errRedirect, in);
+	}
+
+	/**
+	 * Runs the given process until termination, clearing its stdout and stderr
+	 * streams on-the-fly.
+	 *
+	 * @param processBuilder
+	 *            The process builder configured for this process.
+	 * @param outRedirect
+	 *            An OutputStream on which to redirect the processes stdout. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            output will be lost.
+	 * @param errRedirect
+	 *            An OutputStream on which to redirect the processes stderr. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            error will be lost.
+	 * @param inRedirect
+	 *            An InputStream from which to redirect the processes stdin. Can
+	 *            be <code>null</code>, in which case the process doesn't get
+	 *            any data over stdin. It is assumed that the whole InputStream
+	 *            will be consumed by the process. The method will close the
+	 *            inputstream after all bytes are read.
+	 * @return the return code of this process.
+	 * @throws IOException
+	 *             if an I/O error occurs while executing this process.
+	 * @throws InterruptedException
+	 *             if the current thread is interrupted while waiting for the
+	 *             process to end.
+	 * @since 4.2
+	 */
+	public int runProcess(ProcessBuilder processBuilder,
+			OutputStream outRedirect, OutputStream errRedirect,
+			InputStream inRedirect) throws IOException,
+			InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
 		// We'll record the first I/O exception that occurs, but keep on trying
 		// to dispose of our open streams and file handles
 		IOException ioException = null;
 		try {
-			process = hookProcessBuilder.start();
+			process = processBuilder.start();
 			final Callable<Void> errorGobbler = new StreamGobbler(
 					process.getErrorStream(), errRedirect);
 			final Callable<Void> outputGobbler = new StreamGobbler(
 					process.getInputStream(), outRedirect);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
-			if (stdinArgs != null) {
-				final PrintWriter stdinWriter = new PrintWriter(
-						process.getOutputStream());
-				stdinWriter.print(stdinArgs);
-				stdinWriter.flush();
-				// We are done with this hook's input. Explicitly close its
-				// stdin now to kick off any blocking read the hook might have.
-				stdinWriter.close();
+			OutputStream outputStream = process.getOutputStream();
+			if (inRedirect != null) {
+				new StreamGobbler(inRedirect, outputStream)
+						.call();
 			}
+			outputStream.close();
 			return process.waitFor();
 		} catch (IOException e) {
 			ioException = e;
@@ -928,6 +1009,9 @@ public abstract class FS {
 				// A process doesn't clean its own resources even when destroyed
 				// Explicitly try and close all three streams, preserving the
 				// outer I/O exception if any.
+				if (inRedirect != null) {
+					inRedirect.close();
+				}
 				try {
 					process.getErrorStream().close();
 				} catch (IOException e) {
@@ -968,10 +1052,10 @@ public abstract class FS {
 		pool.shutdown(); // Disable new tasks from being submitted
 		try {
 			// Wait a while for existing tasks to terminate
-			if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+			if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
 				pool.shutdownNow(); // Cancel currently executing tasks
 				// Wait a while for tasks to respond to being canceled
-				if (!pool.awaitTermination(5, TimeUnit.SECONDS))
+				if (!pool.awaitTermination(60, TimeUnit.SECONDS))
 					hasShutdown = false;
 			}
 		} catch (InterruptedException ie) {
@@ -997,6 +1081,31 @@ public abstract class FS {
 	 *         populating directory, environment, and then start the process.
 	 */
 	public abstract ProcessBuilder runInShell(String cmd, String[] args);
+
+	/**
+	 * Execute a command defined by a {@link ProcessBuilder}.
+	 *
+	 * @param pb
+	 *            The command to be executed
+	 * @param in
+	 *            The standard input stream passed to the process
+	 * @return The result of the executed command
+	 * @throws InterruptedException
+	 * @throws IOException
+	 * @since 4.2
+	 */
+	public ExecutionResult execute(ProcessBuilder pb, InputStream in)
+			throws IOException, InterruptedException {
+		TemporaryBuffer stdout = new TemporaryBuffer.LocalFile(null);
+		TemporaryBuffer stderr = new TemporaryBuffer.Heap(1024, 1024 * 1024);
+		try {
+			int rc = runProcess(pb, stdout, stderr, in);
+			return new ExecutionResult(stdout, stderr, rc);
+		} finally {
+			stdout.close();
+			stderr.close();
+		}
+	}
 
 	private static class Holder<V> {
 		final V value;
@@ -1187,30 +1296,27 @@ public abstract class FS {
 	 * </p>
 	 */
 	private static class StreamGobbler implements Callable<Void> {
-		private final BufferedReader reader;
+		private InputStream in;
 
-		private final BufferedWriter writer;
+		private OutputStream out;
 
 		public StreamGobbler(InputStream stream, OutputStream output) {
-			this.reader = new BufferedReader(new InputStreamReader(stream));
-			if (output == null)
-				this.writer = null;
-			else
-				this.writer = new BufferedWriter(new OutputStreamWriter(output));
+			this.in = stream;
+			this.out = output;
 		}
 
 		public Void call() throws IOException {
 			boolean writeFailure = false;
-
-			String line = null;
-			while ((line = reader.readLine()) != null) {
-				// Do not try to write again after a failure, but keep reading
-				// as long as possible to prevent the input stream from choking.
-				if (!writeFailure && writer != null) {
+			byte buffer[] = new byte[4096];
+			int readBytes;
+			while ((readBytes = in.read(buffer)) != -1) {
+				// Do not try to write again after a failure, but keep
+				// reading as long as possible to prevent the input stream
+				// from choking.
+				if (!writeFailure && out != null) {
 					try {
-						writer.write(line);
-						writer.newLine();
-						writer.flush();
+						out.write(buffer, 0, readBytes);
+						out.flush();
 					} catch (IOException e) {
 						writeFailure = true;
 					}

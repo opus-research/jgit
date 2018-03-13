@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
-
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.attributes;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.lib.CoreConfig;
 
-public class AbstractRemoteCommandTest extends RepositoryTestCase {
+/**
+ * An interface used to retrieve the global and info {@link AttributesNode}s.
+ *
+ * @since 4.2
+ *
+ */
+public interface AttributesNodeProvider {
 
-	protected static final String REMOTE_NAME = "test";
+	/**
+	 * Retrieve the {@link AttributesNode} that holds the information located
+	 * in $GIT_DIR/info/attributes file.
+	 *
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         $GIT_DIR/info/attributes file.
+	 * @throws IOException
+	 *             if an error is raised while parsing the attributes file
+	 */
+	public AttributesNode getInfoAttributesNode() throws IOException;
 
-	protected RemoteConfig setupRemote()
-			throws IOException, URISyntaxException {
-		// create another repository
-		Repository remoteRepository = createWorkRepository();
-
-		// set it up as a remote to this repository
-		final StoredConfig config = db.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, REMOTE_NAME);
-
-		RefSpec refSpec = new RefSpec();
-		refSpec = refSpec.setForceUpdate(true);
-		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*",
-				Constants.R_REMOTES + REMOTE_NAME + "/*");
-		remoteConfig.addFetchRefSpec(refSpec);
-
-		URIish uri = new URIish(
-				remoteRepository.getDirectory().toURI().toURL());
-		remoteConfig.addURI(uri);
-
-		remoteConfig.update(config);
-		config.save();
-
-		return remoteConfig;
-	}
-
-	protected void assertRemoteConfigEquals(RemoteConfig expected,
-			RemoteConfig actual) {
-		assertEquals(expected.getName(), actual.getName());
-		assertEquals(expected.getURIs(), actual.getURIs());
-		assertEquals(expected.getPushURIs(), actual.getPushURIs());
-		assertEquals(expected.getFetchRefSpecs(), actual.getFetchRefSpecs());
-		assertEquals(expected.getPushRefSpecs(), actual.getPushRefSpecs());
-	}
+	/**
+	 * Retrieve the {@link AttributesNode} that holds the information located
+	 * in the global gitattributes file.
+	 *
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         the global gitattributes file.
+	 * @throws IOException
+	 *             IOException if an error is raised while parsing the
+	 *             attributes file
+	 * @see CoreConfig#getAttributesFile()
+	 */
+	public AttributesNode getGlobalAttributesNode() throws IOException;
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * Copyright (C) 2015, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,71 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
+package org.eclipse.jgit.annotations;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.transport.RemoteConfig;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Used to remove an existing remote.
- *
- * This class has setters for all supported options and arguments of this
- * command and a {@link #call()} method to finally execute the command.
- *
- * @see <a href=
- *      "http://www.kernel.org/pub/software/scm/git/docs/git-remote.html" > Git
- *      documentation about Remote</a>
+ * JGit's replacement for the {@code javax.annotation.Nonnull}.
+ * <p>
+ * Denotes that a local variable, parameter, field, method return value expected
+ * to be non {@code null}.
  *
  * @since 4.2
  */
-public class RemoteRemoveCommand extends GitCommand<RemoteConfig> {
-
-	private String name;
-
-	/**
-	 * @param repo
-	 */
-	protected RemoteRemoveCommand(Repository repo) {
-		super(repo);
-	}
-
-	/**
-	 * The name of the remote to remove.
-	 *
-	 * @param name
-	 *            a remote name
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	/**
-	 * Executes the {@code remote} command with all the options and parameters
-	 * collected by the setter methods of this class.
-	 *
-	 * @return the {@link RemoteConfig} object of the removed remote
-	 */
-	@Override
-	public RemoteConfig call() throws GitAPIException {
-		checkCallable();
-
-		try {
-			StoredConfig config = repo.getConfig();
-			RemoteConfig remote = new RemoteConfig(config, name);
-			config.unsetSection(ConfigConstants.CONFIG_KEY_REMOTE, name);
-			config.save();
-			return remote;
-		} catch (IOException | URISyntaxException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
-
-	}
-
+@Documented
+@Retention(RetentionPolicy.CLASS)
+@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
+public @interface NonNull {
+	// marker annotation with no members
 }

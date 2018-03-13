@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.attributes;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
-import org.junit.Test;
-
-public class RemoteSetUrlCommandTest extends AbstractRemoteCommandTest {
-
-	@Test
-	public void testSetUrl() throws Exception {
-		// setup an initial remote
-		setupRemote();
-
-		// execute the command to change the fetch url
-		RemoteSetUrlCommand cmd = Git.wrap(db).remoteSetUrl();
-		cmd.setName(REMOTE_NAME);
-		URIish newUri = new URIish("git://test.com/test");
-		cmd.setUri(newUri);
-		RemoteConfig remote = cmd.call();
-
-		// assert that the changed remote has the new fetch url
-		assertEquals(REMOTE_NAME, remote.getName());
-		assertArrayEquals(new URIish[] { newUri }, remote.getURIs().toArray());
-
-		// assert that the changed remote is available in the git configuration
-		assertRemoteConfigEquals(remote,
-				new RemoteConfig(db.getConfig(), REMOTE_NAME));
-	}
-
-	@Test
-	public void testSetPushUrl() throws Exception {
-		// setup an initial remote
-		RemoteConfig remoteConfig = setupRemote();
-
-		// execute the command to change the push url
-		RemoteSetUrlCommand cmd = Git.wrap(db).remoteSetUrl();
-		cmd.setName(REMOTE_NAME);
-		URIish newUri = new URIish("git://test.com/test");
-		cmd.setUri(newUri);
-		cmd.setPush(true);
-		RemoteConfig remote = cmd.call();
-
-		// assert that the changed remote has the old fetch url and the new push
-		// url
-		assertEquals(REMOTE_NAME, remote.getName());
-		assertEquals(remoteConfig.getURIs(), remote.getURIs());
-		assertArrayEquals(new URIish[] { newUri },
-				remote.getPushURIs().toArray());
-
-		// assert that the changed remote is available in the git configuration
-		assertRemoteConfigEquals(remote,
-				new RemoteConfig(db.getConfig(), REMOTE_NAME));
-	}
-
+/**
+ * Interface for classes which provide git attributes
+ *
+ * @since 4.2
+ */
+public interface AttributesProvider {
+	/**
+	 * @return the currently active attributes
+	 */
+	public Attributes getAttributes();
 }

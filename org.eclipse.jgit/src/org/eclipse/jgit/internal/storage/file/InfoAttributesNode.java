@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,42 +41,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.internal.storage.file;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import java.io.File;
+import java.io.IOException;
 
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
-import org.junit.Test;
+import org.eclipse.jgit.util.FS;
 
-public class RemoteAddCommandTest extends AbstractRemoteCommandTest {
+/** Attribute node loaded from the $GIT_DIR/info/attributes file. */
+public class InfoAttributesNode extends AttributesNode {
+	final Repository repository;
 
-	@Test
-	public void testAdd() throws Exception {
-		// create another repository
-		Repository remoteRepository = createWorkRepository();
-		URIish uri = new URIish(
-				remoteRepository.getDirectory().toURI().toURL());
+	/**
+	 * @param repository
+	 */
+	public InfoAttributesNode(Repository repository) {
+		this.repository = repository;
+	}
 
-		// execute the command to add a new remote
-		RemoteAddCommand cmd = Git.wrap(db).remoteAdd();
-		cmd.setName(REMOTE_NAME);
-		cmd.setUri(uri);
-		RemoteConfig remote = cmd.call();
+	/**
+	 * @return the attributes node
+	 * @throws IOException
+	 */
+	public AttributesNode load() throws IOException {
+		AttributesNode r = new AttributesNode();
 
-		// assert that the added remote represents the remote repository
-		assertEquals(REMOTE_NAME, remote.getName());
-		assertArrayEquals(new URIish[] { uri }, remote.getURIs().toArray());
-		assertEquals(1, remote.getFetchRefSpecs().size());
-		assertEquals(
-				String.format("+refs/heads/*:refs/remotes/%s/*", REMOTE_NAME),
-				remote.getFetchRefSpecs().get(0).toString());
+		FS fs = repository.getFS();
 
-		// assert that the added remote is available in the git configuration
-		assertRemoteConfigEquals(remote,
-				new RemoteConfig(db.getConfig(), REMOTE_NAME));
+		File attributes = fs.resolve(repository.getDirectory(),
+				Constants.INFO_ATTRIBUTES);
+		FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributes);
+
+		return r.getRules().isEmpty() ? null : r;
 	}
 
 }
