@@ -180,9 +180,6 @@ public abstract class PackParser {
 	/** Message to protect the pack data from garbage collection. */
 	private String lockMessage;
 
-	/** Git object size limit */
-	private long maxObjectSizeLimit;
-
 	/**
 	 * Initialize a pack parser.
 	 *
@@ -366,19 +363,6 @@ public abstract class PackParser {
 	 */
 	public void setLockMessage(String msg) {
 		lockMessage = msg;
-	}
-
-	/**
-	 * Set the maximum allowed Git object size.
-	 * <p>
-	 * If an object is larger than the given size the pack-parsing will throw an
-	 * exception aborting the parsing.
-	 *
-	 * @param limit
-	 *            the Git object size limit. If zero then there is not limit.
-	 */
-	public void setMaxObjectSizeLimit(long limit) {
-		maxObjectSizeLimit = limit;
 	}
 
 	/**
@@ -615,7 +599,7 @@ public abstract class PackParser {
 			objectDigest.update(visit.data);
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
 
-			verifySafeObject(tempObjectId, type, visit.data, visit.data.length);
+			verifySafeObject(tempObjectId, type, visit.data);
 
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
@@ -961,9 +945,8 @@ public abstract class PackParser {
 			data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
+			verifySafeObject(tempObjectId, type, data);
 		}
-
-		verifySafeObject(tempObjectId, type, data, sz);
 
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
 		obj.setOffset(pos);
@@ -976,15 +959,7 @@ public abstract class PackParser {
 	}
 
 	private void verifySafeObject(final AnyObjectId id, final int type,
-			final byte[] data, long size) throws IOException {
-		if (0 < maxObjectSizeLimit && maxObjectSizeLimit < size) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().receivePackObjectTooLarge, id.name()));
-		}
-
-		if (data == null)
-			return;
-
+			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
 				objCheck.check(type, data);
