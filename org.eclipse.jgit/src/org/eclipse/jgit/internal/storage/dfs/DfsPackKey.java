@@ -48,13 +48,9 @@ import java.util.concurrent.atomic.AtomicLong;
 final class DfsPackKey {
 	final int hash;
 
-	private final AtomicLong cachedSize;
+	final AtomicLong cachedSize;
 
-	public AtomicLong cachedSize() {
-		return cachedSize;
-	}
-
-	public DfsPackKey() {
+	DfsPackKey() {
 		// Multiply by 31 here so we can more directly combine with another
 		// value without doing the multiply there.
 		//
