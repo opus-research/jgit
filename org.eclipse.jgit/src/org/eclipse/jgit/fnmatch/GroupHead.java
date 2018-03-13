@@ -114,9 +114,9 @@ final class GroupHead extends AbstractHead {
 				characterClasses.add(LetterPattern.INSTANCE);
 				characterClasses.add(DigitPattern.INSTANCE);
 			} else {
-				final String message = MessageFormat.format(
+				final String message = String.format(MessageFormat.format(
 						JGitText.get().characterClassIsNotSupported,
-						characterClass);
+						characterClass));
 				throw new InvalidPatternException(message, wholePattern);
 			}
 
