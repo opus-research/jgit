@@ -99,6 +99,7 @@ public class ObjectChecker {
 	private final MutableInteger ptrout = new MutableInteger();
 
 	private boolean allowZeroMode;
+	private boolean ignoreCase;
 	private boolean windows;
 
 	/**
@@ -119,9 +120,21 @@ public class ObjectChecker {
 	}
 
 	/**
+	 * Assume working directory filesystems are not case sensitive.
+	 *
+	 * @param ignore true if JGit should reject problems with case.
+	 * @return {@code this}.
+	 * @since 3.4
+	 */
+	public ObjectChecker setIgnoreCase(boolean ignore) {
+		ignoreCase = ignore;
+		return this;
+	}
+
+	/**
 	 * Restrict trees to only names legal on Windows platforms.
 	 * <p>
-	 * Also rejects any mixed case forms of reserved names ({@code .git}).
+	 * Also sets {@link #setIgnoreCase(boolean)} to true.
 	 *
 	 * @param win true if Windows name checking should be performed.
 	 * @return {@code this}.
@@ -129,7 +142,7 @@ public class ObjectChecker {
 	 */
 	public ObjectChecker setSafeForWindows(boolean win) {
 		windows = win;
-		return this;
+		return setIgnoreCase(true);
 	}
 
 	/**
@@ -395,18 +408,15 @@ public class ObjectChecker {
 		if (ptr == end)
 			throw new CorruptObjectException("zero length name");
 		if (raw[ptr] == '.') {
-			switch (end - ptr) {
-			case 1:
+			int nameLen = end - ptr;
+			if (nameLen == 1)
 				throw new CorruptObjectException("invalid name '.'");
-			case 2:
-				if (raw[ptr + 1] == '.')
-					throw new CorruptObjectException("invalid name '..'");
-				break;
-			case 4:
-				if (isDotGit(raw, ptr + 1))
-					throw new CorruptObjectException(String.format(
-							"invalid name '%s'",
-							RawParseUtils.decode(raw, ptr, end)));
+			else if (nameLen == 2 && raw[ptr + 1] == '.')
+				throw new CorruptObjectException("invalid name '..'");
+			else if (nameLen == 4 && isDotGit(raw, ptr + 1)) {
+				throw new CorruptObjectException(String.format(
+						"invalid name '%s'",
+						RawParseUtils.decode(raw, ptr, end)));
 			}
 		}
 
@@ -415,7 +425,7 @@ public class ObjectChecker {
 			if (raw[end - 1] == ' ' || raw[end - 1] == '.')
 				throw new CorruptObjectException("invalid name ends with '"
 						+ ((char) raw[end - 1]) + "'");
-			if (end - ptr >= 3)
+			if (end - ptr > 2)
 				checkNotWindowsDevice(raw, ptr, end);
 		}
 	}
@@ -433,14 +443,14 @@ public class ObjectChecker {
 
 		case 'c': // CON, COM[1-9]
 			if (end - ptr >= 3
-					&& toLower(raw[ptr + 2]) == 'n'
 					&& toLower(raw[ptr + 1]) == 'o'
+					&& toLower(raw[ptr + 2]) == 'n'
 					&& (end - ptr == 3 || raw[ptr + 3] == '.'))
 				throw new CorruptObjectException("invalid name 'CON'");
 			if (end - ptr >= 4
-					&& toLower(raw[ptr + 2]) == 'm'
 					&& toLower(raw[ptr + 1]) == 'o'
-					&& isPositiveDigit(raw[ptr + 3])
+					&& toLower(raw[ptr + 2]) == 'm'
+					&& isDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
 				throw new CorruptObjectException("invalid name 'COM"
 						+ ((char) raw[ptr + 3]) + "'");
@@ -450,7 +460,7 @@ public class ObjectChecker {
 			if (end - ptr >= 4
 					&& toLower(raw[ptr + 1]) == 'p'
 					&& toLower(raw[ptr + 2]) == 't'
-					&& isPositiveDigit(raw[ptr + 3])
+					&& isDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
 				throw new CorruptObjectException("invalid name 'LPT"
 						+ ((char) raw[ptr + 3]) + "'");
@@ -491,20 +501,20 @@ public class ObjectChecker {
 	}
 
 	private boolean isDotGit(byte[] buf, int p) {
-		if (windows)
+		if (ignoreCase || windows)
 			return toLower(buf[p]) == 'g'
 					&& toLower(buf[p + 1]) == 'i'
 					&& toLower(buf[p + 2]) == 't';
 		return buf[p] == 'g' && buf[p + 1] == 'i' && buf[p + 2] == 't';
 	}
 
-	private static char toLower(byte b) {
+	private static byte toLower(byte b) {
 		if ('A' <= b && b <= 'Z')
-			return (char) (b + ('a' - 'A'));
-		return (char) b;
+			return (byte) (b + ('a' - 'A'));
+		return b;
 	}
 
-	private static boolean isPositiveDigit(byte b) {
+	private static boolean isDigit(byte b) {
 		return '1' <= b && b <= '9';
 	}
 
