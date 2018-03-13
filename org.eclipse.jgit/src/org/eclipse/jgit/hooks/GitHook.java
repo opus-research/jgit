@@ -159,7 +159,9 @@ abstract class GitHook<T> implements Callable<T> {
 				getHookName(), getParameters(), getOutputStream(),
 				hookErrRedirect, getStdinArgs());
 		if (result.isExecutedWithError()) {
-			throw new AbortedByHookException(new String(errorByteArray.toByteArray(), StandardCharsets.UTF_8),
+			throw new AbortedByHookException(
+					new String(errorByteArray.toByteArray(),
+							StandardCharsets.UTF_8),
 					getHookName(), result.getExitCode());
 		}
 	}
