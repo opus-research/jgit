@@ -1870,7 +1870,6 @@ public class PackWriter {
 			otp.clearReuseAsIs();
 		}
 
-		otp.setDeltaAttempted(next.wasDeltaAttempted());
 		otp.select(next);
 	}
 

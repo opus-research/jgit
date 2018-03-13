@@ -962,7 +962,6 @@ public class DirCacheCheckout {
 			DirCacheEntry entry, ObjectReader or) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File parentDir = f.getParentFile();
-		parentDir.mkdirs();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
 		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		FileOutputStream rawChannel = new FileOutputStream(tmpFile);
@@ -1022,8 +1021,9 @@ public class DirCacheCheckout {
 	}
 
 	private static boolean isValidPathSegment(CanonicalTreeParser t) {
-		boolean isWindows = SystemReader.getInstance().isWindows();
-		boolean isOSX = SystemReader.getInstance().isMacOS();
+		String osName = SystemReader.getInstance().getProperty("os.name");
+		boolean isWindows = "Windows".equals(osName);
+		boolean isOSX = "Darwin".equals(osName) || "Mac OS X".equals(osName);
 		boolean ignCase = isOSX || isWindows;
 
 		int ptr = t.getNameOffset();

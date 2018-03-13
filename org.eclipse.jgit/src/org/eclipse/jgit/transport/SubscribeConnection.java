@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,18 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.debug;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.GC;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+import java.util.Map;
 
-class Gc extends TextBuiltin {
-	@Override
-	protected void run() throws Exception {
-		GC gc = new GC((FileRepository) db);
-		gc.setProgressMonitor(new TextProgressMonitor());
-		gc.gc();
-	}
+import org.eclipse.jgit.errors.TransportException;
+
+/**
+ * SubscribeConnection sends a list of repository names with a list of
+ * SubscribeCommands and ref states for each repository to a Publisher instance.
+ * The connection is left open, and the Publisher responds by sending any
+ * matching ref updates in packs.
+ */
+public interface SubscribeConnection extends Connection {
+	/**
+	 * Do the initial advertisement with only repository names to determine if
+	 * authentication is needed for this request.
+	 *
+	 * @param subscriber
+	 * @throws IOException
+	 * @throws TransportException
+	 *             thrown if the client is unauthorized to view the remote
+	 *             repository, the remote repository does not exist, or a
+	 *             protocol level error occurred.
+	 */
+	void sendSubscribeAdvertisement(SubscribeState subscriber)
+			throws IOException, TransportException;
+
+	/**
+	 * Subscribe to a remote Publisher instance by sending the server a list of
+	 * repositories and refspecs it wants to receive updates for. It also sends
+	 * the client's state for all locally-matching refs, and optionally a
+	 * restart token to reconnect a dropped connection.
+	 *
+	 * @param subscriber
+	 * @param subscribeCommands
+	 *            map from repository name to a list of SubscribeCommands to
+	 *            execute for that repository
+	 * @param output
+	 * @throws InterruptedException
+	 * @throws IOException
+	 * @throws TransportException
+	 */
+	void subscribe(SubscribeState subscriber,
+			Map<String, List<SubscribeCommand>> subscribeCommands,
+			PrintWriter output)
+			throws InterruptedException, TransportException, IOException;
 }

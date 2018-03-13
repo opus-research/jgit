@@ -1,7 +1,6 @@
             == Java GIT ==
 
-This package is licensed under the EDL (Eclipse Distribution
-License).
+This package is licensed under the BSD.
 
   org.eclipse.jgit/
 
@@ -10,7 +9,7 @@ License).
     to exercise the library.  The library provides functions to
     read and write a GIT formatted repository.
 
-    All portions of jgit are covered by the EDL. Absolutely no GPL,
+    All portions of jgit are covered by the BSD.  Absolutely no GPL,
     LGPL or EPL contributions are accepted within this package.
 
   org.eclipse.jgit.test/

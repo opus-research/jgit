@@ -41,45 +41,58 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.hasPushStatusBug;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.invalidVersion;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
+import java.util.Arrays;
 
-import org.junit.Assert;
-import org.junit.Test;
-
-public class ClientVersionUtilTest {
-	@Test
-	public void testParse() {
-		assertEquals("1.6.5", parseVersion("git/1.6.6-rc0"));
-		assertEquals("1.6.6", parseVersion("git/1.6.6"));
-		assertEquals("1.7.5", parseVersion("git/1.7.5.GIT"));
-		assertEquals("1.7.6.1", parseVersion("git/1.7.6.1.45.gbe0cc"));
-
-		assertEquals("1.5.4.3", parseVersion("git/1.5.4.3,gzip(proxy)"));
-		assertEquals("1.7.0.2", parseVersion("git/1.7.0.2.msysgit.0.14.g956d7,gzip"));
-		assertEquals("1.7.10.2", parseVersion("git/1.7.10.2 (Apple Git-33)"));
-
-		assertEquals(ClientVersionUtil.toString(invalidVersion()), parseVersion("foo"));
+/** A command to subscribe or unsubscribe from a spec. */
+public class SubscribeCommand {
+	/** Subscribe or unsubscribe from the spec */
+	public enum Command {
+		/** Subscribe */
+		SUBSCRIBE,
+		/** Unsubscribe */
+		UNSUBSCRIBE
 	}
 
-	@Test
-	public void testPushStatusBug() {
-		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6")));
-		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6.1")));
-		assertTrue(hasPushStatusBug(parseVersion("git/1.7.9")));
+	private final Command command;
 
-		assertFalse(hasPushStatusBug(parseVersion("git/1.7.8.6")));
-		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.1")));
-		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.2")));
-		assertFalse(hasPushStatusBug(parseVersion("git/1.7.10")));
+	private final String spec;
+
+	/**
+	 * @param c
+	 * @param s
+	 */
+	public SubscribeCommand(Command c, String s) {
+		command = c;
+		spec = s;
 	}
 
-	private static void assertEquals(String exp, int[] act) {
-		Assert.assertEquals(exp, ClientVersionUtil.toString(act));
+	/** @return the spec */
+	public String getSpec() {
+		return spec;
+	}
+
+	/** @return the command */
+	public Command getCommand() {
+		return command;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (!(other instanceof SubscribeCommand))
+			return false;
+		SubscribeCommand o = (SubscribeCommand) other;
+		return o.command == command && o.spec.equals(spec);
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(new Object[] { command, spec });
+	}
+
+	@Override
+	public String toString() {
+		return "SubscribeCommand[" + command + " " + spec + "]";
 	}
 }
