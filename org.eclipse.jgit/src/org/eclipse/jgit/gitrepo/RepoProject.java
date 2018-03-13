@@ -252,10 +252,19 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Add a bunch of copyfile configurations.
 	 *
-	 * @param copyfiles
+	 * @param copyFiles
 	 */
-	public void addCopyFiles(Collection<CopyFile> copyfiles) {
-		this.copyfiles.addAll(copyfiles);
+	public void addCopyFiles(Collection<CopyFile> copyFiles) {
+		this.copyfiles.addAll(copyFiles);
+	}
+
+	/**
+	 * Clear all the copyfiles.
+	 *
+	 * @since 4.2
+	 */
+	public void clearCopyFiles() {
+		this.copyfiles.clear();
 	}
 
 	private String getPathWithSlash() {
@@ -273,7 +282,19 @@ public class RepoProject implements Comparable<RepoProject> {
 	 * @return true if this sub repo is the ancestor of given sub repo.
 	 */
 	public boolean isAncestorOf(RepoProject that) {
-		return that.getPathWithSlash().startsWith(this.getPathWithSlash());
+		return isAncestorOf(that.getPathWithSlash());
+	}
+
+	/**
+	 * Check if this sub repo is an ancestor of the given path.
+	 *
+	 * @param thatPath
+	 *            path to be checked to see if it is within this repository
+	 * @return true if this sub repo is an ancestor of the given path.
+	 * @since 4.2
+	 */
+	public boolean isAncestorOf(String thatPath) {
+		return thatPath.startsWith(getPathWithSlash());
 	}
 
 	@Override
