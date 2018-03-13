@@ -44,7 +44,9 @@
 
 package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.JGitText;
+import java.io.Serializable;
+
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -53,7 +55,9 @@ import org.eclipse.jgit.util.RawParseUtils;
 /**
  * Parsed reflog entry
  */
-public class ReflogEntry {
+public class ReflogEntry implements Serializable {
+	private static final long serialVersionUID = 1L;
+
 	private ObjectId oldId;
 
 	private ObjectId newId;
