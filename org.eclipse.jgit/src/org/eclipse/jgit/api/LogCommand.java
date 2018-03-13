@@ -42,13 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -255,8 +252,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             the references could not be accessed
 	 */
 	public LogCommand all() throws IOException {
-		Map<String, Ref> refs = getRepository().getRefDatabase().getRefs(ALL);
-		for (Ref ref : refs.values()) {
+		for (Ref ref : getRepository().getAllRefs().values()) {
 			if(!ref.isPeeled())
 				ref = getRepository().peel(ref);
 
