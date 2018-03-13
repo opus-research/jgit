@@ -46,11 +46,12 @@ package org.eclipse.jgit.storage.dfs;
 import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.GC;
 import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.storage.pack.PackExt.PACK;
+import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -68,7 +69,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
@@ -89,8 +89,6 @@ public class DfsGarbageCollector {
 	private DfsReader ctx;
 
 	private PackConfig packConfig;
-
-	private long coalesceGarbageLimit = 50 << 20;
 
 	private Map<String, Ref> refsBefore;
 
@@ -141,38 +139,6 @@ public class DfsGarbageCollector {
 		return this;
 	}
 
-	/** @return garbage packs smaller than this size will be repacked. */
-	public long getCoalesceGarbageLimit() {
-		return coalesceGarbageLimit;
-	}
-
-	/**
-	 * Set the byte size limit for garbage packs to be repacked.
-	 * <p>
-	 * Any UNREACHABLE_GARBAGE pack smaller than this limit will be repacked at
-	 * the end of the run. This allows the garbage collector to coalesce
-	 * unreachable objects into a single file.
-	 * <p>
-	 * If an UNREACHABLE_GARBAGE pack is already larger than this limit it will
-	 * be left alone by the garbage collector. This avoids unnecessary disk IO
-	 * reading and copying the objects.
-	 * <p>
-	 * If limit is set to 0 the UNREACHABLE_GARBAGE coalesce is disabled.<br>
-	 * If limit is set to {@link Long#MAX_VALUE}, everything is coalesced.
-	 * <p>
-	 * Keeping unreachable garbage prevents race conditions with repository
-	 * changes that may suddenly need an object whose only copy was stored in
-	 * the UNREACHABLE_GARBAGE pack.
-	 *
-	 * @param limit
-	 *            size in bytes.
-	 * @return {@code this}
-	 */
-	public DfsGarbageCollector setCoalesceGarbageLimit(long limit) {
-		coalesceGarbageLimit = limit;
-		return this;
-	}
-
 	/**
 	 * Create a single new pack file containing all of the live objects.
 	 * <p>
@@ -201,7 +167,7 @@ public class DfsGarbageCollector {
 			objdb.clearCache();
 
 			refsBefore = repo.getAllRefs();
-			packsBefore = packsToRebuild();
+			packsBefore = Arrays.asList(objdb.getPacks());
 			if (packsBefore.isEmpty())
 				return true;
 
@@ -235,19 +201,6 @@ public class DfsGarbageCollector {
 		} finally {
 			ctx.release();
 		}
-	}
-
-	private List<DfsPackFile> packsToRebuild() throws IOException {
-		DfsPackFile[] packs = objdb.getPacks();
-		List<DfsPackFile> out = new ArrayList<DfsPackFile>(packs.length);
-		for (DfsPackFile p : packs) {
-			DfsPackDescription d = p.getPackDescription();
-			if (d.getPackSource() != UNREACHABLE_GARBAGE)
-				out.add(p);
-			else if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit)
-				out.add(p);
-		}
-		return out;
 	}
 
 	/** @return all of the source packs that fed into this compaction. */
@@ -311,9 +264,9 @@ public class DfsGarbageCollector {
 		PackWriter pw = newPackWriter();
 		try {
 			RevWalk pool = new RevWalk(ctx);
-			pm.beginTask("Finding garbage", (int) getObjectsBefore());
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
+				pm.beginTask("Finding garbage", (int) oldIdx.getObjectCount());
 				for (PackIndex.MutableEntry ent : oldIdx) {
 					pm.update(1);
 					ObjectId id = ent.toObjectId();
@@ -323,8 +276,8 @@ public class DfsGarbageCollector {
 					int type = oldPack.getObjectType(ctx, ent.getOffset());
 					pw.addObject(pool.lookupAny(id, type));
 				}
+				pm.endTask();
 			}
-			pm.endTask();
 			if (0 < pw.getObjectCount())
 				writePack(UNREACHABLE_GARBAGE, pw, pm);
 		} finally {
