@@ -353,7 +353,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 			dfConflict = null;
 	}
 
-	@Override
 	void stopWalk() throws IOException {
 		if (!needsStopWalk()) {
 			return;

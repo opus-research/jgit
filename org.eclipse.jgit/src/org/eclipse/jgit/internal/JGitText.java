@@ -623,7 +623,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
-	/***/ public String sha1CollisionDetected1;
 	/***/ public String shallowCommitsAlreadyInitialized;
 	/***/ public String shallowPacksRequireDepthWalk;
 	/***/ public String shortCompressedStreamAt;
@@ -670,7 +669,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timeIsUncertain;
 	/***/ public String timerAlreadyTerminated;
-	/***/ public String tooManyCommands;
 	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
 	/***/ public String transportExceptionBadRef;

@@ -127,7 +127,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Git call() throws GitAPIException, InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
 		Repository repository = null;
@@ -220,7 +219,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		RefSpec wcrs = new RefSpec();
 		wcrs = wcrs.setForceUpdate(true);
 		wcrs = wcrs.setSourceDestination(Constants.R_HEADS + "*", dst); //$NON-NLS-1$
-		List<RefSpec> specs = new ArrayList<>();
+		List<RefSpec> specs = new ArrayList<RefSpec>();
 		if (cloneAllBranches)
 			specs.add(wcrs);
 		else if (branchesToClone != null
