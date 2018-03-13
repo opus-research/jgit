@@ -232,7 +232,7 @@ public class IndexDiff {
 		@Override
 		public TreeFilter clone() {
 			throw new IllegalStateException(
-					"Do not clone this kind of filter: " //$NON-NLS-1$
+					"Do not clone this kind of filter: "
 							+ getClass().getName());
 		}
 	}
@@ -525,36 +525,32 @@ public class IndexDiff {
 							.equals(localIgnoreSubmoduleMode))
 						continue;
 				} catch (ConfigInvalidException e) {
-					IOException e1 = new IOException(
+					throw new IOException(
 							"Found invalid ignore param for submodule "
 									+ smw.getPath());
-					e1.initCause(e);
-					throw e1;
 				}
 				Repository subRepo = smw.getRepository();
-				if (subRepo != null) {
-					ObjectId subHead = subRepo.resolve("HEAD"); //$NON-NLS-1$
-					if (subHead != null && !subHead.equals(smw.getObjectId()))
+				ObjectId subHead = subRepo.resolve("HEAD");
+				if (subHead != null && !subHead.equals(smw.getObjectId()))
+					modified.add(smw.getPath());
+				else if (ignoreSubmoduleMode != IgnoreSubmoduleMode.DIRTY) {
+					IndexDiff smid = submoduleIndexDiffs.get(smw.getPath());
+					if (smid == null) {
+						smid = new IndexDiff(subRepo, smw.getObjectId(),
+								wTreeIt.getWorkingTreeIterator(subRepo));
+						submoduleIndexDiffs.put(smw.getPath(), smid);
+					}
+					if (smid.diff()) {
+						if (ignoreSubmoduleMode == IgnoreSubmoduleMode.UNTRACKED
+								&& smid.getAdded().isEmpty()
+								&& smid.getChanged().isEmpty()
+								&& smid.getConflicting().isEmpty()
+								&& smid.getMissing().isEmpty()
+								&& smid.getModified().isEmpty()
+								&& smid.getRemoved().isEmpty()) {
+							continue;
+						}
 						modified.add(smw.getPath());
-					else if (ignoreSubmoduleMode != IgnoreSubmoduleMode.DIRTY) {
-						IndexDiff smid = submoduleIndexDiffs.get(smw.getPath());
-						if (smid == null) {
-							smid = new IndexDiff(subRepo, smw.getObjectId(),
-									wTreeIt.getWorkingTreeIterator(subRepo));
-							submoduleIndexDiffs.put(smw.getPath(), smid);
-						}
-						if (smid.diff()) {
-							if (ignoreSubmoduleMode == IgnoreSubmoduleMode.UNTRACKED
-									&& smid.getAdded().isEmpty()
-									&& smid.getChanged().isEmpty()
-									&& smid.getConflicting().isEmpty()
-									&& smid.getMissing().isEmpty()
-									&& smid.getModified().isEmpty()
-									&& smid.getRemoved().isEmpty()) {
-								continue;
-							}
-							modified.add(smw.getPath());
-						}
 					}
 				}
 			}
