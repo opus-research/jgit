@@ -133,6 +133,7 @@ public class IndexDiffFilter extends TreeFilter {
 			IncorrectObjectTypeException, IOException {
 		final int cnt = tw.getTreeCount();
 		final int wm = tw.getRawMode(workingTree);
+		WorkingTreeIterator wi = workingTree(tw);
 		String path = tw.getPathString();
 
 		DirCacheIterator di = tw.getTree(dirCache, DirCacheIterator.class);
@@ -149,7 +150,8 @@ public class IndexDiffFilter extends TreeFilter {
 			// contain only untracked files and add it to
 			// untrackedParentFolders. If we later find tracked files we will
 			// remove it from this list
-			if (FileMode.TREE.equals(wm)) {
+			if (FileMode.TREE.equals(wm)
+					&& !(honorIgnores && wi.isEntryIgnored())) {
 				// Clean untrackedParentFolders. This potentially moves entries
 				// from untrackedParentFolders to untrackedFolders
 				copyUntrackedFolders(path);
@@ -180,7 +182,6 @@ public class IndexDiffFilter extends TreeFilter {
 		// we can avoid returning a result here, but only if its not in any
 		// other tree.
 		final int dm = tw.getRawMode(dirCache);
-		WorkingTreeIterator wi = workingTree(tw);
 		if (dm == FileMode.TYPE_MISSING) {
 			if (honorIgnores && wi.isEntryIgnored()) {
 				ignoredPaths.add(wi.getEntryPathString());

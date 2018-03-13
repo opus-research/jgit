@@ -797,10 +797,30 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @param forceContentCheck
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
-	 * @param reader
-	 *            access to repository objects if necessary.
 	 * @return true if content is most likely different.
-	 * @since 3.2
+	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
+	 */
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
+		return isModified(entry, false, null);
+	}
+
+	/**
+	 * Checks whether this entry differs from a given entry from the
+	 * {@link DirCache}.
+	 *
+	 * File status information is used and if status is same we consider the
+	 * file identical to the state in the working directory. Native git uses
+	 * more stat fields than we have accessible in Java.
+	 *
+	 * @param entry
+	 *            the entry from the dircache we want to compare against
+	 * @param forceContentCheck
+	 *            True if the actual file content should be checked if
+	 *            modification time differs.
+	 * @param reader
+	 *            access to repository objects if necessary. Should not be null.
+	 * @return true if content is most likely different.
+	 * @since 3.3
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
 			ObjectReader reader) {
@@ -826,26 +846,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().unexpectedCompareResult, diff.name()));
 		}
-	}
-
-	/**
-	 * Checks whether this entry differs from a given entry from the
-	 * {@link DirCache}.
-	 *
-	 * File status information is used and if status is same we consider the
-	 * file identical to the state in the working directory. Native git uses
-	 * more stat fields than we have accessible in Java.
-	 *
-	 * @param entry
-	 *            the entry from the dircache we want to compare against
-	 * @param forceContentCheck
-	 *            True if the actual file content should be checked if
-	 *            modification time differs.
-	 * @return true if content is most likely different.
-	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
-	 */
-	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
-		return isModified(entry, false, null);
 	}
 
 	/**
