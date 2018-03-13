@@ -234,6 +234,11 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	}
 
 	@Override
+	public boolean hasId() {
+		return true;
+	}
+
+	@Override
 	public byte[] idBuffer() {
 		return raw;
 	}
@@ -241,6 +246,12 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	@Override
 	public int idOffset() {
 		return nextPtr - Constants.OBJECT_ID_LENGTH;
+	}
+
+	@Override
+	public void reset() {
+		if (!first())
+			reset(raw);
 	}
 
 	@Override

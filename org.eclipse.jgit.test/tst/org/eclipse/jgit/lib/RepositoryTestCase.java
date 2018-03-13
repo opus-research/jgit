@@ -46,8 +46,11 @@
 
 package org.eclipse.jgit.lib;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -56,10 +59,13 @@ import java.util.Map;
 import java.util.TreeSet;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.util.FileUtils;
+import org.junit.Before;
 
 /**
  * Base class for most JGit unit tests.
@@ -94,6 +100,11 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		return path;
 	}
 
+	protected void deleteTrashFile(final String name) throws IOException {
+		File path = new File(db.getWorkTree(), name);
+		FileUtils.delete(path);
+	}
+
 	protected static void checkFile(File f, final String checkData)
 			throws IOException {
 		Reader r = new InputStreamReader(new FileInputStream(f), "ISO-8859-1");
@@ -114,7 +125,8 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	protected File trash;
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
 		trash = db.getWorkTree();
@@ -128,6 +140,10 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 
 	public static final int CONTENT_ID = 8;
 
+	public static final int CONTENT = 16;
+
+	public static final int ASSUME_UNCHANGED = 32;
+
 	/**
 	 * Represent the state of the index in one String. This representation is
 	 * useful when writing tests which do assertions on the state of the index.
@@ -138,13 +154,15 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * The format of the returned string is described with this BNF:
 	 *
 	 * <pre>
-	 * result = ( "[" path mode stage? time? smudge? length? sha1? "]" )* .
+	 * result = ( "[" path mode stage? time? smudge? length? sha1? content? "]" )* .
 	 * mode = ", mode:" number .
 	 * stage = ", stage:" number .
 	 * time = ", time:t" timestamp-index .
 	 * smudge = "" | ", smudged" .
 	 * length = ", length:" number .
 	 * sha1 = ", sha1:" hex-sha1 .
+	 * content = ", content:" blob-data .
+	 * </pre>
 	 *
 	 * 'stage' is only presented when the stage is different from 0. All
 	 * reported time stamps are mapped to strings like "t0", "t1", ... "tn". The
@@ -154,7 +172,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 *
 	 * @param includedOptions
 	 *            a bitmask constructed out of the constants {@link #MOD_TIME},
-	 *            {@link #SMUDGE}, {@link #LENGTH} and {@link #CONTENT_ID}
+	 *            {@link #SMUDGE}, {@link #LENGTH}, {@link #CONTENT_ID} and {@link #CONTENT}
 	 *            controlling which info is present in the resulting string.
 	 * @return a string encoding the index state
 	 * @throws IllegalStateException
@@ -174,32 +192,75 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		}
 
 		// iterate again, now produce the result string
-		NameConflictTreeWalk tw = new NameConflictTreeWalk(db);
-		tw.setRecursive(true);
-		tw.reset();
-		tw.addTree(new DirCacheIterator(dc));
-		while (tw.next()) {
-			DirCacheIterator dcIt = tw.getTree(0, DirCacheIterator.class);
-			sb.append("["+tw.getPathString()+", mode:" + dcIt.getEntryFileMode());
-			int stage = dcIt.getDirCacheEntry().getStage();
+		for (int i=0; i<dc.getEntryCount(); ++i) {
+			DirCacheEntry entry = dc.getEntry(i);
+			sb.append("["+entry.getPathString()+", mode:" + entry.getFileMode());
+			int stage = entry.getStage();
 			if (stage != 0)
 				sb.append(", stage:" + stage);
 			if (0 != (includedOptions & MOD_TIME)) {
 				sb.append(", time:t"+
-					timeStamps.headSet(Long.valueOf(dcIt.getDirCacheEntry().getLastModified())).size());
+					timeStamps.headSet(Long.valueOf(entry.getLastModified())).size());
 			}
 			if (0 != (includedOptions & SMUDGE))
-				if (dcIt.getDirCacheEntry().isSmudged())
+				if (entry.isSmudged())
 					sb.append(", smudged");
 			if (0 != (includedOptions & LENGTH))
 				sb.append(", length:"
-						+ Integer.toString(dcIt.getDirCacheEntry().getLength()));
+						+ Integer.toString(entry.getLength()));
 			if (0 != (includedOptions & CONTENT_ID))
-				sb.append(", sha1:" + ObjectId.toString(dcIt
-								.getEntryObjectId()));
+				sb.append(", sha1:" + ObjectId.toString(entry.getObjectId()));
+			if (0 != (includedOptions & CONTENT)) {
+				sb.append(", content:"
+						+ new String(db.open(entry.getObjectId(),
+								Constants.OBJ_BLOB).getCachedBytes(), "UTF-8"));
+			}
+			if (0 != (includedOptions & ASSUME_UNCHANGED))
+				sb.append(", assume-unchanged:"
+						+ Boolean.toString(entry.isAssumeValid()));
 			sb.append("]");
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * Resets the index to represent exactly some filesystem content. E.g. the
+	 * following call will replace the index with the working tree content:
+	 * <p>
+	 * <code>resetIndex(new FileSystemIterator(db))</code>
+	 * <p>
+	 * This method can be used by testcases which first prepare a new commit
+	 * somewhere in the filesystem (e.g. in the working-tree) and then want to
+	 * have an index which matches their prepared content.
+	 *
+	 * @param treeItr
+	 *            a {@link FileTreeIterator} which determines which files should
+	 *            go into the new index
+	 * @throws FileNotFoundException
+	 * @throws IOException
+	 */
+	protected void resetIndex(FileTreeIterator treeItr)
+			throws FileNotFoundException, IOException {
+		ObjectInserter inserter = db.newObjectInserter();
+		DirCacheBuilder builder = db.lockDirCache().builder();
+		DirCacheEntry dce;
+
+		while (!treeItr.eof()) {
+			long len = treeItr.getEntryLength();
+
+			dce = new DirCacheEntry(treeItr.getEntryPathString());
+			dce.setFileMode(treeItr.getEntryFileMode());
+			dce.setLastModified(treeItr.getEntryLastModified());
+			dce.setLength((int) len);
+			FileInputStream in = new FileInputStream(treeItr.getEntryFile());
+			dce.setObjectId(inserter.insert(Constants.OBJ_BLOB, len, in));
+			in.close();
+			builder.add(dce);
+			treeItr.next(1);
+		}
+		builder.commit();
+		inserter.flush();
+		inserter.release();
 	}
 
 	/**
@@ -266,7 +327,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 			}
 			return actTime;
 		} finally {
-			tmp.delete();
+			FileUtils.delete(tmp);
 		}
 	}
 }

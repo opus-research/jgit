@@ -43,6 +43,14 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -52,6 +60,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.Deflater;
 
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
@@ -64,8 +74,12 @@ import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.ObjectDirectory;
+import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 	private static final NullProgressMonitor PM = NullProgressMonitor.INSTANCE;
@@ -83,7 +97,8 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 	private RevBlob a, b;
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 
 		src = createBareRepository();
@@ -102,7 +117,7 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		Transport t = Transport.open(src, uriOf(dst));
 		try {
 			t.fetch(PM, Collections.singleton(new RefSpec("+refs/*:refs/*")));
-			assertEquals(B.copy(), src.resolve(R_MASTER));
+			assertEquals(B, src.resolve(R_MASTER));
 		} finally {
 			t.close();
 		}
@@ -115,7 +130,8 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Override
-	protected void tearDown() throws Exception {
+	@After
+	public void tearDown() throws Exception {
 		if (src != null)
 			src.close();
 		if (dst != null)
@@ -123,6 +139,7 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		super.tearDown();
 	}
 
+	@Test
 	public void testFilterHidesPrivate() throws Exception {
 		Map<String, Ref> refs;
 		TransportLocal t = new TransportLocal(src, uriOf(dst)) {
@@ -154,9 +171,10 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 
 		Ref master = refs.get(R_MASTER);
 		assertNotNull("has master", master);
-		assertEquals(B.copy(), master.getObjectId());
+		assertEquals(B, master.getObjectId());
 	}
 
+	@Test
 	public void testSuccess() throws Exception {
 		// Manually force a delta of an object so we reuse it later.
 		//
@@ -219,9 +237,10 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		assertNotNull("have result", r);
 		assertNull("private not advertised", r.getAdvertisedRef(R_PRIVATE));
 		assertSame("master updated", RemoteRefUpdate.Status.OK, u.getStatus());
-		assertEquals(N.copy(), dst.resolve(R_MASTER));
+		assertEquals(N, dst.resolve(R_MASTER));
 	}
 
+	@Test
 	public void testCreateBranchAtHiddenCommitFails() throws Exception {
 		final TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(64);
 		packHeader(pack, 0);
@@ -240,7 +259,15 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
 		rp.setRefFilter(new HidePrivateFilter());
-		rp.receive(new ByteArrayInputStream(inBuf.toByteArray()), outBuf, null);
+		try {
+			receive(rp, inBuf, outBuf);
+			fail("Expected UnpackException");
+		} catch (UnpackException failed) {
+			Throwable err = failed.getCause();
+			assertTrue(err instanceof MissingObjectException);
+			MissingObjectException moe = (MissingObjectException) err;
+			assertEquals(P, moe.getObjectId());
+		}
 
 		final PacketLineIn r = asPacketLineIn(outBuf);
 		String master = r.readString();
@@ -254,17 +281,32 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		assertSame(PacketLineIn.END, r.readString());
 	}
 
+	private void receive(final ReceivePack rp,
+			final TemporaryBuffer.Heap inBuf, final TemporaryBuffer.Heap outBuf)
+			throws IOException {
+		rp.receive(new ByteArrayInputStream(inBuf.toByteArray()), outBuf, null);
+	}
+
+	@Test
 	public void testUsingHiddenDeltaBaseFails() throws Exception {
+		byte[] delta = { 0x1, 0x1, 0x1, 'c' };
+		TestRepository<Repository> s = new TestRepository<Repository>(src);
+		RevCommit N = s.commit().parent(B).add("q",
+				s.blob(BinaryDelta.apply(dst.open(b).getCachedBytes(), delta)))
+				.create();
+
 		final TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(1024);
-		packHeader(pack, 1);
+		packHeader(pack, 3);
+		copy(pack, src.open(N));
+		copy(pack, src.open(s.parseBody(N).getTree()));
 		pack.write((Constants.OBJ_REF_DELTA) << 4 | 4);
 		b.copyRawTo(pack);
-		deflate(pack, new byte[] { 0x1, 0x1, 0x1, 'b' });
+		deflate(pack, delta);
 		digest(pack);
 
-		final TemporaryBuffer.Heap inBuf = new TemporaryBuffer.Heap(256);
+		final TemporaryBuffer.Heap inBuf = new TemporaryBuffer.Heap(1024);
 		final PacketLineOut inPckLine = new PacketLineOut(inBuf);
-		inPckLine.writeString(ObjectId.zeroId().name() + ' ' + P.name() + ' '
+		inPckLine.writeString(ObjectId.zeroId().name() + ' ' + N.name() + ' '
 				+ "refs/heads/s" + '\0'
 				+ BasePackPushConnection.CAPABILITY_REPORT_STATUS);
 		inPckLine.end();
@@ -275,7 +317,15 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
 		rp.setRefFilter(new HidePrivateFilter());
-		rp.receive(new ByteArrayInputStream(inBuf.toByteArray()), outBuf, null);
+		try {
+			receive(rp, inBuf, outBuf);
+			fail("Expected UnpackException");
+		} catch (UnpackException failed) {
+			Throwable err = failed.getCause();
+			assertTrue(err instanceof MissingObjectException);
+			MissingObjectException moe = (MissingObjectException) err;
+			assertEquals(b, moe.getObjectId());
+		}
 
 		final PacketLineIn r = asPacketLineIn(outBuf);
 		String master = r.readString();
@@ -289,6 +339,7 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		assertSame(PacketLineIn.END, r.readString());
 	}
 
+	@Test
 	public void testUsingHiddenCommonBlobFails() throws Exception {
 		// Try to use the 'b' blob that is hidden.
 		//
@@ -316,7 +367,15 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
 		rp.setRefFilter(new HidePrivateFilter());
-		rp.receive(new ByteArrayInputStream(inBuf.toByteArray()), outBuf, null);
+		try {
+			receive(rp, inBuf, outBuf);
+			fail("Expected UnpackException");
+		} catch (UnpackException failed) {
+			Throwable err = failed.getCause();
+			assertTrue(err instanceof MissingObjectException);
+			MissingObjectException moe = (MissingObjectException) err;
+			assertEquals(b, moe.getObjectId());
+		}
 
 		final PacketLineIn r = asPacketLineIn(outBuf);
 		String master = r.readString();
@@ -330,6 +389,7 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		assertSame(PacketLineIn.END, r.readString());
 	}
 
+	@Test
 	public void testUsingUnknownBlobFails() throws Exception {
 		// Try to use the 'n' blob that is not on the server.
 		//
@@ -358,7 +418,15 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
 		rp.setRefFilter(new HidePrivateFilter());
-		rp.receive(new ByteArrayInputStream(inBuf.toByteArray()), outBuf, null);
+		try {
+			receive(rp, inBuf, outBuf);
+			fail("Expected UnpackException");
+		} catch (UnpackException failed) {
+			Throwable err = failed.getCause();
+			assertTrue(err instanceof MissingObjectException);
+			MissingObjectException moe = (MissingObjectException) err;
+			assertEquals(n, moe.getObjectId());
+		}
 
 		final PacketLineIn r = asPacketLineIn(outBuf);
 		String master = r.readString();
@@ -372,6 +440,7 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		assertSame(PacketLineIn.END, r.readString());
 	}
 
+	@Test
 	public void testUsingUnknownTreeFails() throws Exception {
 		TestRepository<Repository> s = new TestRepository<Repository>(src);
 		RevCommit N = s.commit().parent(B).add("q", s.blob("a")).create();
@@ -397,7 +466,15 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		rp.setCheckReceivedObjects(true);
 		rp.setCheckReferencedObjectsAreReachable(true);
 		rp.setRefFilter(new HidePrivateFilter());
-		rp.receive(new ByteArrayInputStream(inBuf.toByteArray()), outBuf, null);
+		try {
+			receive(rp, inBuf, outBuf);
+			fail("Expected UnpackException");
+		} catch (UnpackException failed) {
+			Throwable err = failed.getCause();
+			assertTrue(err instanceof MissingObjectException);
+			MissingObjectException moe = (MissingObjectException) err;
+			assertEquals(t, moe.getObjectId());
+		}
 
 		final PacketLineIn r = asPacketLineIn(outBuf);
 		String master = r.readString();

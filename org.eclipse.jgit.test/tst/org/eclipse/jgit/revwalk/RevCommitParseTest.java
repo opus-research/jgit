@@ -43,23 +43,36 @@
 
 package org.eclipse.jgit.revwalk;
 
-import java.io.ByteArrayOutputStream;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 
+import java.io.ByteArrayOutputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.TimeZone;
+
+import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.Test;
 
 public class RevCommitParseTest extends RepositoryTestCase {
+	@Test
 	public void testParse_NoParents() throws Exception {
 		final ObjectId treeId = id("9788669ad918b6fcce64af8882fc9a81cb6aba67");
 		final String authorName = "A U. Thor";
 		final String authorEmail = "a_u_thor@example.com";
 		final int authorTime = 1218123387;
+		final String authorTimeZone = "+0700";
 
 		final String committerName = "C O. Miter";
 		final String committerEmail = "comiter@example.com";
 		final int committerTime = 1218123390;
+		final String committerTimeZone = "-0500";
 		final StringBuilder body = new StringBuilder();
 
 		body.append("tree ");
@@ -72,7 +85,9 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		body.append(authorEmail);
 		body.append("> ");
 		body.append(authorTime);
-		body.append(" +0700\n");
+		body.append(" ");
+		body.append(authorTimeZone);
+		body.append(" \n");
 
 		body.append("committer ");
 		body.append(committerName);
@@ -80,7 +95,9 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		body.append(committerEmail);
 		body.append("> ");
 		body.append(committerTime);
-		body.append(" -0500\n");
+		body.append(" ");
+		body.append(committerTimeZone);
+		body.append("\n");
 
 		body.append("\n");
 
@@ -104,11 +121,15 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertNotNull(cAuthor);
 		assertEquals(authorName, cAuthor.getName());
 		assertEquals(authorEmail, cAuthor.getEmailAddress());
+		assertEquals((long)authorTime * 1000, cAuthor.getWhen().getTime());
+		assertEquals(TimeZone.getTimeZone("GMT" + authorTimeZone), cAuthor.getTimeZone());
 
 		final PersonIdent cCommitter = c.getCommitterIdent();
 		assertNotNull(cCommitter);
 		assertEquals(committerName, cCommitter.getName());
 		assertEquals(committerEmail, cCommitter.getEmailAddress());
+		assertEquals((long)committerTime * 1000, cCommitter.getWhen().getTime());
+		assertEquals(TimeZone.getTimeZone("GMT" + committerTimeZone), cCommitter.getTimeZone());
 	}
 
 	private RevCommit create(final String msg) throws Exception {
@@ -125,6 +146,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		return c;
 	}
 
+	@Test
 	public void testParse_WeirdHeaderOnlyCommit() throws Exception {
 		final StringBuilder b = new StringBuilder();
 		b.append("tree 9788669ad918b6fcce64af8882fc9a81cb6aba67\n");
@@ -139,6 +161,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals("", c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_implicit_UTF8_encoded() throws Exception {
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		b.write("tree 9788669ad918b6fcce64af8882fc9a81cb6aba67\n".getBytes("UTF-8"));
@@ -158,6 +181,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals("Sm\u00f6rg\u00e5sbord\n\n\u304d\u308c\u3044\n", c.getFullMessage());
 	}
 
+	@Test
 	public void testParse_implicit_mixed_encoded() throws Exception {
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		b.write("tree 9788669ad918b6fcce64af8882fc9a81cb6aba67\n".getBytes("UTF-8"));
@@ -182,6 +206,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
+	@Test
 	public void testParse_explicit_encoded() throws Exception {
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		b.write("tree 9788669ad918b6fcce64af8882fc9a81cb6aba67\n".getBytes("EUC-JP"));
@@ -211,6 +236,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
+	@Test
 	public void testParse_explicit_bad_encoded() throws Exception {
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		b.write("tree 9788669ad918b6fcce64af8882fc9a81cb6aba67\n".getBytes("UTF-8"));
@@ -241,6 +267,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
+	@Test
 	public void testParse_explicit_bad_encoded2() throws Exception {
 		final ByteArrayOutputStream b = new ByteArrayOutputStream();
 		b.write("tree 9788669ad918b6fcce64af8882fc9a81cb6aba67\n".getBytes("UTF-8"));
@@ -261,6 +288,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals("\u304d\u308c\u3044\n\nHi\n", c.getFullMessage());
 	}
 
+	@Test
 	public void testParse_NoMessage() throws Exception {
 		final String msg = "";
 		final RevCommit c = create(msg);
@@ -268,12 +296,14 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals(msg, c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_OnlyLFMessage() throws Exception {
 		final RevCommit c = create("\n");
 		assertEquals("\n", c.getFullMessage());
 		assertEquals("", c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_ShortLineOnlyNoLF() throws Exception {
 		final String shortMsg = "This is a short message.";
 		final RevCommit c = create(shortMsg);
@@ -281,6 +311,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals(shortMsg, c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_ShortLineOnlyEndLF() throws Exception {
 		final String shortMsg = "This is a short message.";
 		final String fullMsg = shortMsg + "\n";
@@ -289,6 +320,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals(shortMsg, c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_ShortLineOnlyEmbeddedLF() throws Exception {
 		final String fullMsg = "This is a\nshort message.";
 		final String shortMsg = fullMsg.replace('\n', ' ');
@@ -297,6 +329,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals(shortMsg, c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_ShortLineOnlyEmbeddedAndEndingLF() throws Exception {
 		final String fullMsg = "This is a\nshort message.\n";
 		final String shortMsg = "This is a short message.";
@@ -305,6 +338,7 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		assertEquals(shortMsg, c.getShortMessage());
 	}
 
+	@Test
 	public void testParse_GitStyleMessage() throws Exception {
 		final String shortMsg = "This fixes a bug.";
 		final String body = "We do it with magic and pixie dust and stuff.\n"
@@ -313,6 +347,25 @@ public class RevCommitParseTest extends RepositoryTestCase {
 		final RevCommit c = create(fullMsg);
 		assertEquals(fullMsg, c.getFullMessage());
 		assertEquals(shortMsg, c.getShortMessage());
+	}
+
+	@Test
+	public void testParse_PublicParseMethod()
+			throws UnsupportedEncodingException {
+		ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
+		CommitBuilder src = new CommitBuilder();
+		src.setTreeId(fmt.idFor(Constants.OBJ_TREE, new byte[] {}));
+		src.setAuthor(author);
+		src.setCommitter(committer);
+		src.setMessage("Test commit\n\nThis is a test.\n");
+
+		RevCommit p = RevCommit.parse(src.build());
+		assertEquals(src.getTreeId(), p.getTree());
+		assertEquals(0, p.getParentCount());
+		assertEquals(author, p.getAuthorIdent());
+		assertEquals(committer, p.getCommitterIdent());
+		assertEquals("Test commit", p.getShortMessage());
+		assertEquals(src.getMessage(), p.getFullMessage());
 	}
 
 	private static ObjectId id(final String str) {
