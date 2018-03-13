@@ -86,7 +86,7 @@ import org.slf4j.LoggerFactory;
  * leader is discarded.
  * <p>
  * In Ketch all push requests are issued through the leader. The steps are as
- * follows (see {@link KetchPreReceive} for an example):
+ * follows:
  * <ul>
  * <li>Create a {@link Proposal} with the
  * {@link org.eclipse.jgit.transport.ReceiveCommand}s that represent the push.
@@ -115,8 +115,19 @@ import org.slf4j.LoggerFactory;
 public abstract class KetchLeader {
 	private static final Logger log = LoggerFactory.getLogger(KetchLeader.class);
 
-	static enum State {
-		CANDIDATE, LEADER, DEPOSED, SHUTDOWN;
+	/** Current state of the leader instance. */
+	public static enum State {
+		/** Newly created instance trying to elect itself leader. */
+		CANDIDATE,
+
+		/** Leader instance elected by a majority. */
+		LEADER,
+
+		/** Instance has been deposed by another with a more recent term. */
+		DEPOSED,
+
+		/** Leader has been gracefully shutdown, e.g. due to inactivity. */
+		SHUTDOWN;
 	}
 
 	private final KetchSystem system;
@@ -178,16 +189,20 @@ public abstract class KetchLeader {
 	volatile boolean roundHoldsReferenceToRefTree;
 
 	/** End of the leader's log. */
-	private LogIndex head;
+	private LogIndex headIndex;
 
 	/** Leader knows this (and all prior) states are committed. */
-	private LogIndex committed;
+	private LogIndex committedIndex;
 
 	/**
-	 * A {@link Round} is in progress, attempting to push one or more
-	 * {@link Proposal}s to other replicas.
+	 * Is the leader idle with no work pending? If {@code true} there is no work
+	 * for the leader (normal state). This field is {@code false} when the
+	 * leader thread is scheduled for execution, or while {@link #runningRound}
+	 * defines a round in progress.
 	 */
-	private boolean running;
+	private boolean idle;
+
+	/** Current round the leader is preparing and waiting for a vote on. */
 	private Round runningRound;
 
 	/**
@@ -200,6 +215,7 @@ public abstract class KetchLeader {
 		this.system = system;
 		this.lock = new ReentrantLock(true /* fair */);
 		this.queued = new ArrayList<>(4);
+		this.idle = true;
 	}
 
 	/** @return system configuration. */
@@ -240,10 +256,10 @@ public abstract class KetchLeader {
 					validVoters));
 		}
 
-		LocalReplica me = findLeader(v);
+		LocalReplica me = findLocal(v);
 		if (me == null) {
 			throw new IllegalArgumentException(
-					KetchText.get().leaderReplicaRequired);
+					KetchText.get().localReplicaRequired);
 		}
 
 		lock.lock();
@@ -264,7 +280,7 @@ public abstract class KetchLeader {
 		return Arrays.asList(valid);
 	}
 
-	private static LocalReplica findLeader(Collection<KetchReplica> voters) {
+	private static LocalReplica findLocal(Collection<KetchReplica> voters) {
 		for (KetchReplica r : voters) {
 			if (r instanceof LocalReplica) {
 				return (LocalReplica) r;
@@ -332,7 +348,7 @@ public abstract class KetchLeader {
 			queued.add(proposal);
 			proposal.notifyState(QUEUED);
 
-			if (!running) {
+			if (idle) {
 				scheduleLeader();
 			}
 		} finally {
@@ -347,17 +363,17 @@ public abstract class KetchLeader {
 			ObjectId accepted = self.getTxnAccepted();
 			if (!ObjectId.zeroId().equals(accepted)) {
 				RevCommit c = rw.parseCommit(accepted);
-				head = LogIndex.unknown(accepted);
+				headIndex = LogIndex.unknown(accepted);
 				refTree = RefTree.read(rw.getObjectReader(), c.getTree());
 			} else {
-				head = LogIndex.unknown(ObjectId.zeroId());
+				headIndex = LogIndex.unknown(ObjectId.zeroId());
 				refTree = RefTree.newEmptyTree();
 			}
 		}
 	}
 
 	private void scheduleLeader() {
-		running = true;
+		idle = false;
 		system.getExecutor().execute(new Runnable() {
 			@Override
 			public void run() {
@@ -367,16 +383,16 @@ public abstract class KetchLeader {
 	}
 
 	private void runLeader() {
-		Round r;
+		Round round;
 		lock.lock();
 		try {
 			switch (state) {
 			case CANDIDATE:
-				r = new ElectionRound(this, head);
+				round = new ElectionRound(this, headIndex);
 				break;
 
 			case LEADER:
-				r = newProposalRound();
+				round = newProposalRound();
 				break;
 
 			case DEPOSED:
@@ -391,7 +407,7 @@ public abstract class KetchLeader {
 		}
 
 		try {
-			r.start();
+			round.start();
 		} catch (IOException e) {
 			// TODO(sop) Depose leader if it cannot use its repository.
 			log.error(KetchText.get().leaderFailedStore, e);
@@ -407,14 +423,8 @@ public abstract class KetchLeader {
 	private ProposalRound newProposalRound() {
 		List<Proposal> todo = new ArrayList<>(queued);
 		queued.clear();
-
-		if (todo.size() == 1) {
-			roundHoldsReferenceToRefTree = true;
-			return new ProposalRound(this, head, todo, refTree);
-		} else {
-			roundHoldsReferenceToRefTree = false;
-			return new ProposalRound(this, head, todo, null);
-		}
+		roundHoldsReferenceToRefTree = true;
+		return new ProposalRound(this, headIndex, todo, refTree);
 	}
 
 	/** @return term of this leader's reign. */
@@ -422,36 +432,36 @@ public abstract class KetchLeader {
 		return term;
 	}
 
-	/** @return top of the leader's log. */
+	/** @return end of the leader's log. */
 	LogIndex getHead() {
-		return head;
+		return headIndex;
 	}
 
 	/**
 	 * @return state leader knows it has committed across a quorum of replicas.
 	 */
 	LogIndex getCommitted() {
-		return committed;
+		return committedIndex;
 	}
 
 	boolean isIdle() {
-		return !running;
+		return idle;
 	}
 
-	void acceptAsync(Round round) {
+	void runAsync(Round round) {
 		lock.lock();
 		try {
-			// Top of the log is this round. Once transport begins it is
+			// End of the log is this round. Once transport begins it is
 			// reasonable to assume at least one replica will eventually get
 			// this, and there is reasonable probability it commits.
-			head = round.acceptedNewIndex;
+			headIndex = round.acceptedNewIndex;
 			runningRound = round;
 
-			for (KetchReplica r : voters) {
-				r.pushTxnAcceptedAsync(round);
+			for (KetchReplica replica : voters) {
+				replica.pushTxnAcceptedAsync(round);
 			}
-			for (KetchReplica r : followers) {
-				r.pushTxnAcceptedAsync(round);
+			for (KetchReplica replica : followers) {
+				replica.pushTxnAcceptedAsync(round);
 			}
 		} finally {
 			lock.unlock();
@@ -476,14 +486,14 @@ public abstract class KetchLeader {
 			// Followers cannot vote, so votes haven't changed.
 			return;
 		} else if (runningRound == null) {
-			// No round running, no need to build a tally of votes.
+			// No round running, no need to tally votes.
 			return;
 		}
 
-		assert head.equals(runningRound.acceptedNewIndex);
+		assert headIndex.equals(runningRound.acceptedNewIndex);
 		int matching = 0;
 		for (KetchReplica r : voters) {
-			if (r.hasAccepted(head)) {
+			if (r.hasAccepted(headIndex)) {
 				matching++;
 			}
 		}
@@ -504,10 +514,10 @@ public abstract class KetchLeader {
 
 			//$FALL-THROUGH$
 		case LEADER:
-			committed = head;
+			committedIndex = headIndex;
 			if (log.isDebugEnabled()) {
 				log.debug("Committed {} in term {}", //$NON-NLS-1$
-						committed.describeForLog(),
+						committedIndex.describeForLog(),
 						Long.valueOf(term));
 			}
 			runningRound.success();
@@ -517,20 +527,22 @@ public abstract class KetchLeader {
 				log.debug("Leader state:\n{}", snapshot()); //$NON-NLS-1$
 			}
 			break;
+
+		default:
+			log.debug("Leader ignoring replica while in {}", state); //$NON-NLS-1$
+			break;
 		}
 	}
 
 	private void commitAsync(KetchReplica caller) {
-		LogIndex c = committed;
-		boolean idle = isIdle();
 		for (KetchReplica r : voters) {
-			if (r != caller && r.hasAccepted(c)) {
-				r.pushCommitAsync(c, idle);
+			if (r != caller && r.hasAccepted(committedIndex)) {
+				r.pushCommitAsync(committedIndex, isIdle());
 			}
 		}
 		for (KetchReplica r : followers) {
-			if (r != caller && r.hasAccepted(c)) {
-				r.pushCommitAsync(c, idle);
+			if (r != caller && r.hasAccepted(committedIndex)) {
+				r.pushCommitAsync(committedIndex, isIdle());
 			}
 		}
 	}
@@ -540,7 +552,7 @@ public abstract class KetchLeader {
 		runningRound = null;
 
 		if (queued.isEmpty()) {
-			running = false;
+			idle = true;
 		} else {
 			// Caller holds lock. Reschedule leader on a new thread so
 			// the call stack can unwind and lock is not held unexpectedly
@@ -556,9 +568,9 @@ public abstract class KetchLeader {
 			LeaderSnapshot s = new LeaderSnapshot();
 			s.state = state;
 			s.term = term;
-			s.head = head;
-			s.committed = committed;
-			s.running = running;
+			s.headIndex = headIndex;
+			s.committedIndex = committedIndex;
+			s.idle = isIdle();
 			for (KetchReplica r : voters) {
 				s.replicas.add(r.snapshot());
 			}
@@ -575,12 +587,14 @@ public abstract class KetchLeader {
 	public void shutdown() {
 		lock.lock();
 		try {
-			state = SHUTDOWN;
-			for (KetchReplica r : voters) {
-				r.shutdown();
-			}
-			for (KetchReplica r : followers) {
-				r.shutdown();
+			if (state != SHUTDOWN) {
+				state = SHUTDOWN;
+				for (KetchReplica r : voters) {
+					r.shutdown();
+				}
+				for (KetchReplica r : followers) {
+					r.shutdown();
+				}
 			}
 		} finally {
 			lock.unlock();

@@ -66,7 +66,7 @@ import org.eclipse.jgit.lib.ObjectId;
  * {@link Round#runAsync(AnyObjectId)} bumps the index as each new round is
  * constructed.
  */
-class LogIndex extends ObjectId {
+public class LogIndex extends ObjectId {
 	static LogIndex unknown(AnyObjectId id) {
 		return new LogIndex(id, 0);
 	}
@@ -80,6 +80,11 @@ class LogIndex extends ObjectId {
 
 	LogIndex nextIndex(AnyObjectId id) {
 		return new LogIndex(id, index + 1);
+	}
+
+	/** @return index provided by the current leader instance. */
+	public long getIndex() {
+		return index;
 	}
 
 	/**
@@ -97,14 +102,18 @@ class LogIndex extends ObjectId {
 		return index <= c.index;
 	}
 
+	/**
+	 * @return string suitable for debug logging containing the log index and
+	 *         abbreviated ObjectId.
+	 */
 	@SuppressWarnings("boxing")
-	String describeForLog() {
+	public String describeForLog() {
 		return String.format("%5d/%s", index, abbreviate(6).name()); //$NON-NLS-1$
 	}
 
 	@SuppressWarnings("boxing")
 	@Override
 	public String toString() {
-		return String.format("LogId[%d %s]", index, name()); //$NON-NLS-1$
+		return String.format("LogId[%5d/%s]", index, name()); //$NON-NLS-1$
 	}
 }

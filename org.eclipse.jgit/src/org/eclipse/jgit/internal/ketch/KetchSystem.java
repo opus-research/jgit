@@ -105,14 +105,15 @@ public class KetchSystem {
 	 *            thread pool to run background operations.
 	 * @param txnNamespace
 	 *            reference namespace for the RefTree graph and associated
-	 *            transaction state.
+	 *            transaction state. Must begin with {@code "refs/"} and end
+	 *            with {@code '/'}, for example {@code "refs/txn/"}.
 	 */
 	public KetchSystem(ScheduledExecutorService executor, String txnNamespace) {
 		this.executor = executor;
 		this.txnNamespace = txnNamespace;
-		this.txnAccepted = getTxnNamespace() + ACCEPTED;
-		this.txnCommitted = getTxnNamespace() + COMMITTED;
-		this.txnStage = getTxnNamespace() + STAGE;
+		this.txnAccepted = txnNamespace + ACCEPTED;
+		this.txnCommitted = txnNamespace + COMMITTED;
+		this.txnStage = txnNamespace + STAGE;
 	}
 
 	/** @return executor to perform background operations. */

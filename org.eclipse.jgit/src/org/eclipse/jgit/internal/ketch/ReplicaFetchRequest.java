@@ -43,22 +43,54 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.util.Map;
+import java.util.Set;
 
-/** Translation bundle for the Ketch implementation. */
-public class KetchText extends TranslationBundle {
-	/** @return instance of this translation bundle. */
-	public static KetchText get() {
-		return NLS.getBundleFor(KetchText.class);
+import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+
+/** A fetch request to obtain objects from a replica, and its result. */
+public class ReplicaFetchRequest {
+	private final Set<String> wantRefs;
+	private final Set<ObjectId> wantObjects;
+	private Map<String, Ref> refs;
+
+	/**
+	 * Construct a new fetch request for a replica.
+	 *
+	 * @param wantRefs
+	 *            named references to be fetched.
+	 * @param wantObjects
+	 *            specific objects to be fetched.
+	 */
+	public ReplicaFetchRequest(Set<String> wantRefs,
+			Set<ObjectId> wantObjects) {
+		this.wantRefs = wantRefs;
+		this.wantObjects = wantObjects;
 	}
 
-	// @formatter:off
-	/***/ public String cannotFetchFromLocalReplica;
-	/***/ public String leaderFailedStore;
-	/***/ public String localReplicaRequired;
-	/***/ public String mismatchedTxnNamespace;
-	/***/ public String outsideTxnNamespace;
-	/***/ public String queuedProposalFailedToApply;
-	/***/ public String unsupportedVoterCount;
+	/** @return references to be fetched. */
+	public Set<String> getWantRefs() {
+		return wantRefs;
+	}
+
+	/** @return objects to be fetched. */
+	public Set<ObjectId> getWantObjects() {
+		return wantObjects;
+	}
+
+	/** @return remote references, usually from the advertisement. */
+	@Nullable
+	public Map<String, Ref> getRefs() {
+		return refs;
+	}
+
+	/**
+	 * @param refs
+	 *            references observed from the replica.
+	 */
+	public void setRefs(Map<String, Ref> refs) {
+		this.refs = refs;
+	}
 }

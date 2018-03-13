@@ -52,7 +52,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
 /**
- * A request made to a replica, and its result.
+ * A push request sending objects to a replica, and its result.
  * <p>
  * Implementors of {@link KetchReplica} must populate the command result fields,
  * {@link #setRefs(Map)}, and call one of
@@ -64,6 +64,7 @@ public class ReplicaPushRequest {
 	private final Collection<ReceiveCommand> commands;
 	private Map<String, Ref> refs;
 	private Throwable exception;
+	private boolean notified;
 
 	/**
 	 * Construct a new push request for a replica.
@@ -117,24 +118,13 @@ public class ReplicaPushRequest {
 	 */
 	public void setException(@Nullable Repository repo, Throwable err) {
 		if (KetchReplica.log.isErrorEnabled()) {
-			StringBuilder m = new StringBuilder();
-			m.append("pushAsync to "); //$NON-NLS-1$
-			m.append(replica.describeForLog());
-			m.append(" failed for:\n"); //$NON-NLS-1$
-			for (ReceiveCommand cmd : commands) {
-				m.append("  "); //$NON-NLS-1$
-				m.append(cmd.getOldId().abbreviate(8).name());
-				m.append(' ');
-				m.append(cmd.getNewId().abbreviate(8).name());
-				m.append(' ');
-				m.append(cmd.getRefName());
-				m.append('\n');
-			}
-			KetchReplica.log.error(m.toString(), err);
+			KetchReplica.log.error(describe("failed"), err); //$NON-NLS-1$
 		}
-
-		exception = err;
-		replica.afterPush(repo, this);
+		if (!notified) {
+			notified = true;
+			exception = err;
+			replica.afterPush(repo, this);
+		}
 	}
 
 	/**
@@ -148,27 +138,31 @@ public class ReplicaPushRequest {
 	 */
 	public void done(Repository repo) {
 		if (KetchReplica.log.isDebugEnabled()) {
-			StringBuilder m = new StringBuilder();
-			m.append("pushAsync to "); //$NON-NLS-1$
-			m.append(replica.describeForLog());
-			m.append(":\n"); //$NON-NLS-1$
-			for (ReceiveCommand cmd : commands) {
-				m.append("  "); //$NON-NLS-1$
-				m.append(cmd.getOldId().abbreviate(8).name());
-				m.append(' ');
-				m.append(cmd.getNewId().abbreviate(8).name());
-				m.append(' ');
-				m.append(cmd.getRefName());
-				m.append(' ');
-				m.append(cmd.getResult());
-				if (cmd.getMessage() != null) {
-					m.append(' ').append(cmd.getMessage());
-				}
-				m.append('\n');
-			}
-			KetchReplica.log.debug(m.toString());
+			KetchReplica.log.debug(describe("completed")); //$NON-NLS-1$
 		}
+		if (!notified) {
+			notified = true;
+			replica.afterPush(repo, this);
+		}
+	}
 
-		replica.afterPush(repo, this);
+	private String describe(String heading) {
+		StringBuilder b = new StringBuilder();
+		b.append("push to "); //$NON-NLS-1$
+		b.append(replica.describeForLog());
+		b.append(' ').append(heading).append(":\n"); //$NON-NLS-1$
+		for (ReceiveCommand cmd : commands) {
+			b.append(String.format(
+					"  %-12s %-12s %s %s", //$NON-NLS-1$
+					LeaderSnapshot.str(cmd.getOldId()),
+					LeaderSnapshot.str(cmd.getNewId()),
+					cmd.getRefName(),
+					cmd.getResult()));
+			if (cmd.getMessage() != null) {
+				b.append(' ').append(cmd.getMessage());
+			}
+			b.append('\n');
+		}
+		return b.toString();
 	}
 }
