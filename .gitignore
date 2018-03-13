@@ -1,2 +1,6 @@
-/.project
-/.settings/org.maven.ide.eclipse.prefs
+/jgit
+/jgit.jar
+/jgit_src.zip
+/jgit_docs.zip
+/org.eclipse.jgit/lib/jsch-*.jar
+/org.eclipse.jgit.pgm/lib/args4j-*.jar
