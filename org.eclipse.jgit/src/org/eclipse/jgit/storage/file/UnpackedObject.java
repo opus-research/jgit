@@ -296,8 +296,8 @@ public class UnpackedObject {
 				try {
 					if (remaining <= 0)
 						checkValidEndOfStream(in, inf, id, new byte[64]);
-				} finally {
 					super.close();
+				} finally {
 					InflaterCache.release(inf);
 				}
 			}
