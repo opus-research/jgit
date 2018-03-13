@@ -396,7 +396,7 @@ public class ReceiveCommand {
 	 *            name of the reference to make symbolic.
 	 * @since 4.9
 	 */
-	protected ReceiveCommand(ObjectId oldId, String newSymref, String name) {
+	private ReceiveCommand(ObjectId oldId, String newSymref, String name) {
 		if (oldId == null) {
 			throw new IllegalArgumentException(
 					JGitText.get().oldIdMustNotBeNull);
@@ -433,7 +433,7 @@ public class ReceiveCommand {
 	 *            name of the reference to convert from symbolic.
 	 * @since 4.9
 	 */
-	protected ReceiveCommand(String oldSymref, ObjectId newId, String name) {
+	private ReceiveCommand(String oldSymref, ObjectId newId, String name) {
 		if (newId == null) {
 			throw new IllegalArgumentException(
 					JGitText.get().newIdMustNotBeNull);
@@ -469,7 +469,7 @@ public class ReceiveCommand {
 	 *            name of the reference to make symbolic.
 	 * @since 4.9
 	 */
-	protected ReceiveCommand(@Nullable String oldTarget, String newTarget, String name) {
+	private ReceiveCommand(@Nullable String oldTarget, String newTarget, String name) {
 		if (name == null || name.isEmpty()) {
 			throw new IllegalArgumentException(
 					JGitText.get().nameMustNotBeNullOrEmpty);
