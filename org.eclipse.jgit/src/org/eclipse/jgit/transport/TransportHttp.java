@@ -154,64 +154,77 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		private final String[] schemeNames = { "http", "https" }; //$NON-NLS-1$ //$NON-NLS-2$
 
 		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<String>(Arrays
+				.unmodifiableSet(new LinkedHashSet<>(Arrays
 						.asList(schemeNames)));
 
+		@Override
 		public String getName() {
 			return JGitText.get().transportProtoHTTP;
 		}
 
+		@Override
 		public Set<String> getSchemes() {
 			return schemeSet;
 		}
 
+		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
+		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
+		@Override
 		public int getDefaultPort() {
 			return 80;
 		}
 
+		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
 		}
 
+		@Override
 		public Transport open(URIish uri) throws NotSupportedException {
 			return new TransportHttp(uri);
 		}
 	};
 
 	static final TransportProtocol PROTO_FTP = new TransportProtocol() {
+		@Override
 		public String getName() {
 			return JGitText.get().transportProtoFTP;
 		}
 
+		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("ftp"); //$NON-NLS-1$
 		}
 
+		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
+		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
+		@Override
 		public int getDefaultPort() {
 			return 21;
 		}
 
+		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
@@ -219,6 +232,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	};
 
 	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
+		@Override
 		public HttpConfig parse(final Config cfg) {
 			return new HttpConfig(cfg);
 		}
@@ -537,7 +551,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			} catch (IOException e) {
 				if (authMethod.getType() != HttpAuthMethod.Type.NONE) {
 					if (ignoreTypes == null) {
-						ignoreTypes = new HashSet<Type>();
+						ignoreTypes = new HashSet<>();
 					}
 
 					ignoreTypes.add(authMethod.getType());
@@ -712,7 +726,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		Collection<String> getPackNames() throws IOException {
-			final Collection<String> packs = new ArrayList<String>();
+			final Collection<String> packs = new ArrayList<>();
 			try {
 				final BufferedReader br = openReader(INFO_PACKS);
 				try {
@@ -765,7 +779,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		Map<String, Ref> readAdvertisedImpl(final BufferedReader br)
 				throws IOException, PackProtocolException {
-			final TreeMap<String, Ref> avail = new TreeMap<String, Ref>();
+			final TreeMap<String, Ref> avail = new TreeMap<>();
 			for (;;) {
 				String line = br.readLine();
 				if (line == null)
@@ -863,6 +877,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			readAdvertisedRefs();
 		}
 
+		@Override
 		protected void doPush(final ProgressMonitor monitor,
 				final Map<String, RemoteRefUpdate> refUpdates,
 				OutputStream outputStream) throws TransportException {
@@ -975,16 +990,19 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		abstract void execute() throws IOException;
 
 		class HttpExecuteStream extends InputStream {
+			@Override
 			public int read() throws IOException {
 				execute();
 				return -1;
 			}
 
+			@Override
 			public int read(byte[] b, int off, int len) throws IOException {
 				execute();
 				return -1;
 			}
 
+			@Override
 			public long skip(long n) throws IOException {
 				execute();
 				return 0;

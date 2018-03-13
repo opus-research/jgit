@@ -79,6 +79,7 @@ public class ArchiveCommandTest extends RepositoryTestCase {
 		ArchiveCommand.registerFormat(format.SUFFIXES.get(0), format);
 	}
 
+	@Override
 	@After
 	public void tearDown() {
 		ArchiveCommand.unregisterFormat(format.SUFFIXES.get(0));
@@ -191,7 +192,7 @@ public class ArchiveCommandTest extends RepositoryTestCase {
 
 	private class MockFormat implements ArchiveCommand.Format<MockOutputStream> {
 
-		private Map<String, String> entries = new HashMap<String, String>();
+		private Map<String, String> entries = new HashMap<>();
 
 		private int size() {
 			return entries.size();

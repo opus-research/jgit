@@ -149,6 +149,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		return null;
 	}
 
+	@Override
 	public Collection<CachedPack> getCachedPacksAndUpdate(
 		BitmapBuilder needBitmap) throws IOException {
 		for (DfsPackFile pack : db.getPacks()) {
@@ -165,7 +166,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			throws IOException {
 		if (id.isComplete())
 			return Collections.singleton(id.toObjectId());
-		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
+		HashSet<ObjectId> matches = new HashSet<>(4);
 		PackList packList = db.getPackList();
 		resolveImpl(packList, id, matches);
 		if (matches.size() < MAX_RESOLVE_MATCHES && packList.dirty()) {
@@ -274,6 +275,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	private static final Comparator<FoundObject<?>> FOUND_OBJECT_SORT = new Comparator<FoundObject<?>>() {
+		@Override
 		public int compare(FoundObject<?> a, FoundObject<?> b) {
 			int cmp = a.packIndex - b.packIndex;
 			if (cmp == 0)
@@ -317,7 +319,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			findAllImpl(db.scanPacks(packList), pending, r);
 		}
 		for (T t : pending) {
-			r.add(new FoundObject<T>(t));
+			r.add(new FoundObject<>(t));
 		}
 		Collections.sort(r, FOUND_OBJECT_SORT);
 		return r;
@@ -338,7 +340,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				try {
 					long p = lastPack.findOffset(this, t);
 					if (0 < p) {
-						r.add(new FoundObject<T>(t, lastIdx, lastPack, p));
+						r.add(new FoundObject<>(t, lastIdx, lastPack, p));
 						it.remove();
 						continue;
 					}
@@ -356,7 +358,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				try {
 					long p = pack.findOffset(this, t);
 					if (0 < p) {
-						r.add(new FoundObject<T>(t, i, pack, p));
+						r.add(new FoundObject<>(t, i, pack, p));
 						it.remove();
 						lastIdx = i;
 						lastPack = pack;
@@ -392,6 +394,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		return new AsyncObjectLoaderQueue<T>() {
 			private FoundObject<T> cur;
 
+			@Override
 			public boolean next() throws MissingObjectException, IOException {
 				if (idItr.hasNext()) {
 					cur = idItr.next();
@@ -403,14 +406,17 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				}
 			}
 
+			@Override
 			public T getCurrent() {
 				return cur.id;
 			}
 
+			@Override
 			public ObjectId getObjectId() {
 				return cur.id;
 			}
 
+			@Override
 			public ObjectLoader open() throws IOException {
 				if (cur.pack == null)
 					throw new MissingObjectException(cur.id,
@@ -418,10 +424,12 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				return cur.pack.load(DfsReader.this, cur.offset);
 			}
 
+			@Override
 			public boolean cancel(boolean mayInterruptIfRunning) {
 				return true;
 			}
 
+			@Override
 			public void release() {
 				// Nothing to clean up.
 			}
@@ -447,6 +455,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 			private long sz;
 
+			@Override
 			public boolean next() throws MissingObjectException, IOException {
 				if (idItr.hasNext()) {
 					cur = idItr.next();
@@ -462,22 +471,27 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				}
 			}
 
+			@Override
 			public T getCurrent() {
 				return cur.id;
 			}
 
+			@Override
 			public ObjectId getObjectId() {
 				return cur.id;
 			}
 
+			@Override
 			public long getSize() {
 				return sz;
 			}
 
+			@Override
 			public boolean cancel(boolean mayInterruptIfRunning) {
 				return true;
 			}
 
+			@Override
 			public void release() {
 				// Nothing to clean up.
 			}
@@ -529,16 +543,19 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		return -1;
 	}
 
+	@Override
 	public DfsObjectToPack newObjectToPack(AnyObjectId objectId, int type) {
 		return new DfsObjectToPack(objectId, type);
 	}
 
 	private static final Comparator<DfsObjectToPack> OFFSET_SORT = new Comparator<DfsObjectToPack>() {
+		@Override
 		public int compare(DfsObjectToPack a, DfsObjectToPack b) {
 			return Long.signum(a.getOffset() - b.getOffset());
 		}
 	};
 
+	@Override
 	public void selectObjectRepresentation(PackWriter packer,
 			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
@@ -564,6 +581,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	private static final Comparator<DfsPackFile> PACK_SORT_FOR_REUSE = new Comparator<DfsPackFile>() {
+		@Override
 		public int compare(DfsPackFile af, DfsPackFile bf) {
 			DfsPackDescription ad = af.getPackDescription();
 			DfsPackDescription bd = bf.getPackDescription();
@@ -594,7 +612,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private List<DfsObjectToPack> findAllFromPack(DfsPackFile pack,
 			Iterable<ObjectToPack> objects) throws IOException {
-		List<DfsObjectToPack> tmp = new BlockList<DfsObjectToPack>();
+		List<DfsObjectToPack> tmp = new BlockList<>();
 		PackIndex idx = pack.getPackIndex(this);
 		for (ObjectToPack otp : objects) {
 			long p = idx.findOffset(otp);
@@ -606,6 +624,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		return tmp;
 	}
 
+	@Override
 	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp,
 			boolean validate) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
@@ -613,12 +632,14 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		src.pack.copyAsIs(out, src, validate, this);
 	}
 
+	@Override
 	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
 			throws IOException {
 		for (ObjectToPack otp : list)
 			out.writeObject(otp);
 	}
 
+	@Override
 	public void copyPackAsIs(PackOutputStream out, CachedPack pack)
 			throws IOException {
 		((DfsCachedPack) pack).copyAsIs(out, this);
