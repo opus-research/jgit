@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +41,54 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
+import static org.junit.Assert.*;
 
-/** {@link ObjectToPack} for {@link DfsObjDatabase}. */
-class DfsObjectToPack extends ObjectToPack {
-	/** Pack to reuse compressed data from, otherwise null. */
-	DfsPackFile pack;
+import javaewah.EWAHCompressedBitmap;
 
-	/** Position of the pack in the reader's pack list. */
-	int packIndex;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;
+import org.junit.Test;
 
-	/** Offset of the object's header in {@link #pack}. */
-	long offset;
+public class StoredBitmapTest {
 
-	/** Length of the data section of the object. */
-	long length;
-
-	DfsObjectToPack(AnyObjectId src, final int type) {
-		super(src, type);
+	@Test
+	public void testGetBitmapWithoutXor() {
+		EWAHCompressedBitmap b = bitmapOf(100);
+		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
+		assertEquals(b, sb.getBitmap());
 	}
 
-	@Override
-	protected void clearReuseAsIs() {
-		super.clearReuseAsIs();
-		pack = null;
+	@Test
+	public void testGetBitmapWithOneXor() {
+		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
+		assertEquals(bitmapOf(101), sb.getBitmap());
 	}
 
-	@Override
-	public void select(StoredObjectRepresentation ref) {
-		DfsObjectRepresentation ptr = (DfsObjectRepresentation) ref;
-		this.pack = ptr.pack;
-		this.packIndex = ptr.packIndex;
-		this.offset = ptr.offset;
-		this.length = ptr.length;
+	@Test
+	public void testGetBitmapWithThreeXor() {
+		StoredBitmap sb = newStoredBitmap(
+				bitmapOf(100),
+				bitmapOf(90, 101),
+				bitmapOf(100, 101),
+				bitmapOf(50));
+		assertEquals(bitmapOf(50, 90), sb.getBitmap());
+		assertEquals(bitmapOf(50, 90), sb.getBitmap());
+	}
+
+	private static final StoredBitmap newStoredBitmap(
+			EWAHCompressedBitmap... bitmaps) {
+		StoredBitmap sb = null;
+		for (EWAHCompressedBitmap bitmap : bitmaps)
+			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb, 0);
+		return sb;
+	}
+
+	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
+		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
+		for (int bit : bits)
+			b.set(bit);
+		return b;
 	}
 }

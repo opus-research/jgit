@@ -87,10 +87,13 @@ public class JGitText extends TranslationBundle {
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
+	/***/ public String bitmapMissingObject;
+	/***/ public String bitmapsMustBePrepared;
 	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
+	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cachedPacksPreventsListingObjects;
 	/***/ public String cannotBeCombined;
@@ -258,6 +261,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String expectedCharacterEncodingGuesses;
 	/***/ public String expectedEOFReceived;
 	/***/ public String expectedGot;
+	/***/ public String expectedLessThanGot;
 	/***/ public String expectedPktLineWithService;
 	/***/ public String expectedReceivedContentType;
 	/***/ public String expectedReportForRefNotReceived;
@@ -398,6 +402,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String objectAtPathDoesNotHaveId;
 	/***/ public String objectIsCorrupt;
 	/***/ public String objectIsNotA;
+	/***/ public String objectNotFound;
 	/***/ public String objectNotFoundIn;
 	/***/ public String obtainingCommitsForCherryPick;
 	/***/ public String offsetWrittenDeltaBaseForObjectNotFoundInAPack;
@@ -486,6 +491,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String searchForReuse;
 	/***/ public String searchForSizes;
 	/***/ public String secondsAgo;
+	/***/ public String selectingCommits;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
