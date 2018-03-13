@@ -74,12 +74,12 @@ public class PlotCommitList<L extends PlotLane> extends
 
 	private int positionsAllocated;
 
-	private final TreeSet<Integer> freePositions = new TreeSet<>();
+	private final TreeSet<Integer> freePositions = new TreeSet<Integer>();
 
-	private final HashSet<PlotLane> activeLanes = new HashSet<>(32);
+	private final HashSet<PlotLane> activeLanes = new HashSet<PlotLane>(32);
 
 	/** number of (child) commits on a lane */
-	private final HashMap<PlotLane, Integer> laneLength = new HashMap<>(
+	private final HashMap<PlotLane, Integer> laneLength = new HashMap<PlotLane, Integer>(
 			32);
 
 	@Override

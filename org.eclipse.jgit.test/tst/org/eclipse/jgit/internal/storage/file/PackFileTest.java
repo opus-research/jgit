@@ -107,7 +107,6 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		return rng;
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -117,11 +116,10 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		cfg.install();
 
 		repo = createBareRepository();
-		tr = new TestRepository<>(repo);
+		tr = new TestRepository<Repository>(repo);
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
@@ -291,7 +289,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 
 			f = new FileOutputStream(idxName);
 			try {
-				List<PackedObjectInfo> list = new ArrayList<>();
+				List<PackedObjectInfo> list = new ArrayList<PackedObjectInfo>();
 				list.add(a);
 				list.add(b);
 				Collections.sort(list);
@@ -310,27 +308,6 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 				packFile.close();
 			}
 		}
-	}
-
-	@Test
-	public void testConfigurableStreamFileThreshold() throws Exception {
-		byte[] data = getRng().nextBytes(300);
-		RevBlob id = tr.blob(data);
-		tr.branch("master").commit().add("A", id).create();
-		tr.packAndPrune();
-		assertTrue("has blob", wc.has(id));
-
-		ObjectLoader ol = wc.open(id);
-		ObjectStream in = ol.openStream();
-		assertTrue(in instanceof ObjectStream.SmallStream);
-		assertEquals(300, in.available());
-		in.close();
-
-		wc.setStreamFileThreshold(299);
-		ol = wc.open(id);
-		in = ol.openStream();
-		assertTrue(in instanceof ObjectStream.Filter);
-		assertEquals(1, in.available());
 	}
 
 	private static byte[] clone(int first, byte[] base) {

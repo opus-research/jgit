@@ -43,13 +43,20 @@
 package org.eclipse.jgit.util.io;
 
 import java.io.BufferedOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * @deprecated use BufferedOutputStream in Java 8 and later.
+ * A BufferedOutputStream that throws an error if the final flush fails on
+ * close.
+ * <p>
+ * Java's BufferedOutputStream swallows errors that occur when the output stream
+ * tries to write the final bytes to the output during close. This may result in
+ * corrupted files without notice.
+ * </p>
  */
-@Deprecated
 public class SafeBufferedOutputStream extends BufferedOutputStream {
+
 	/**
 	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
 	 * @param out
@@ -68,5 +75,14 @@ public class SafeBufferedOutputStream extends BufferedOutputStream {
 	 */
 	public SafeBufferedOutputStream(OutputStream out, int size) {
 		super(out, size);
+	}
+
+	@Override
+	public void close() throws IOException {
+		try {
+			flush();
+		} finally {
+			super.close();
+		}
 	}
 }
