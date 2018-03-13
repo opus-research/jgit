@@ -131,9 +131,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** Cached canonical length, initialized from {@link #idBuffer()} */
 	private long canonLen = -1;
 
-	/** The offset of the content id in {@link #idBuffer()} */
-	private int contentIdOffset;
-
 	/**
 	 * Create a new iterator with no parent.
 	 *
@@ -237,14 +234,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
-					contentIdOffset = i.idOffset();
-					contentIdFromPtr = ptr;
-					return contentId = i.idBuffer();
-				}
-				contentIdOffset = 0;
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL)
+					return i.idBuffer();
 			}
 		}
+
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -341,36 +335,39 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private InputStream possiblyFilteredInputStream(final Entry e,
 			final InputStream is, final long len) throws IOException {
+		InputStream filteredIs;
 		if (!mightNeedCleaning()) {
+			filteredIs = is;
 			canonLen = len;
-			return is;
-		}
-
-		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
-			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			byte[] raw = rawbuf.array();
-			int n = rawbuf.limit();
-			if (!isBinary(raw, n)) {
-				rawbuf = filterClean(raw, n);
-				raw = rawbuf.array();
-				n = rawbuf.limit();
+		} else {
+			if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
+				ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
+				byte[] raw = rawbuf.array();
+				int n = rawbuf.limit();
+				if (!isBinary(raw, n)) {
+					rawbuf = filterClean(raw, n);
+					raw = rawbuf.array();
+					n = rawbuf.limit();
+				}
+				filteredIs = new ByteArrayInputStream(raw, 0, n);
+				canonLen = n;
+			} else {
+				if (isBinary(e)) {
+					filteredIs = is;
+					canonLen = len;
+				} else {
+					final InputStream lenIs = filterClean(e
+							.openInputStream());
+					try {
+						canonLen = computeLength(lenIs);
+					} finally {
+						safeClose(lenIs);
+					}
+					filteredIs = filterClean(is);
+				}
 			}
-			canonLen = n;
-			return new ByteArrayInputStream(raw, 0, n);
 		}
-
-		if (isBinary(e)) {
-			canonLen = len;
-			return is;
-		}
-
-		final InputStream lenIs = filterClean(e.openInputStream());
-		try {
-			canonLen = computeLength(lenIs);
-		} finally {
-			safeClose(lenIs);
-		}
-		return filterClean(is);
+		return filteredIs;
 	}
 
 	private static void safeClose(final InputStream in) {
@@ -418,7 +415,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) {
+	private InputStream filterClean(InputStream in) throws IOException {
 		return new EolCanonicalizingInputStream(in, true);
 	}
 
@@ -433,7 +430,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	@Override
 	public int idOffset() {
-		return contentIdOffset;
+		return 0;
 	}
 
 	@Override
@@ -702,33 +699,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * Is the file mode of the current entry different than the given raw mode?
-	 *
-	 * @param rawMode
-	 * @return true if different, false otherwise
-	 */
-	public boolean isModeDifferent(final int rawMode) {
-		// Determine difference in mode-bits of file and index-entry. In the
-		// bitwise presentation of modeDiff we'll have a '1' when the two modes
-		// differ at this position.
-		int modeDiff = getEntryRawMode() ^ rawMode;
-
-		if (modeDiff == 0)
-			return false;
-
-		// Do not rely on filemode differences in case of symbolic links
-		if (FileMode.SYMLINK.equals(rawMode))
-			return false;
-
-		// Ignore the executable file bits if WorkingTreeOptions tell me to
-		// do so. Ignoring is done by setting the bits representing a
-		// EXECUTABLE_FILE to '0' in modeDiff
-		if (!state.options.isFileMode())
-			modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
-		return modeDiff != 0;
-	}
-
-	/**
 	 * Compare the metadata (mode, length, modification-timestamp) of the
 	 * current entry and a {@link DirCacheEntry}
 	 *
@@ -744,11 +714,26 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isUpdateNeeded())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
+		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (isModeDifferent(entry.getRawMode()))
-			return MetadataDiff.DIFFER_BY_METADATA;
+		// Determine difference in mode-bits of file and index-entry. In the
+		// bitwise presentation of modeDiff we'll have a '1' when the two modes
+		// differ at this position.
+		int modeDiff = getEntryRawMode() ^ entry.getRawMode();
+
+		// Do not rely on filemode differences in case of symbolic links
+		if (modeDiff != 0 && !FileMode.SYMLINK.equals(entry.getRawMode())) {
+			// Ignore the executable file bits if WorkingTreeOptions tell me to
+			// do so. Ignoring is done by setting the bits representing a
+			// EXECUTABLE_FILE to '0' in modeDiff
+			if (!state.options.isFileMode())
+				modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
+			if (modeDiff != 0)
+				// Report a modification if the modes still (after potentially
+				// ignoring EXECUTABLE_FILE bits) differ
+				return MetadataDiff.DIFFER_BY_METADATA;
+		}
 
 		// Git under windows only stores seconds so we round the timestamp
 		// Java gives us if it looks like the timestamp in index is seconds

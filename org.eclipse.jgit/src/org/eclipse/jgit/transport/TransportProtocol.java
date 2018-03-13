@@ -49,7 +49,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -254,19 +253,4 @@ public abstract class TransportProtocol {
 	public abstract Transport open(URIish uri, Repository local,
 			String remoteName)
 			throws NotSupportedException, TransportException;
-
-	/**
-	 * Open a new transport instance to the remote repository. Use default
-	 * configuration instead of reading from configuration files.
-	 *
-	 * @param uri
-	 * @return new Transport
-	 * @throws NotSupportedException
-	 * @throws TransportException
-	 */
-	public Transport open(URIish uri)
-			throws NotSupportedException, TransportException {
-		throw new NotSupportedException(JGitText
-				.get().transportNeedsRepository);
-	}
 }

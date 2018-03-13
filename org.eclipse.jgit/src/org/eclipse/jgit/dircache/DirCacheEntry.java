@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A single file (or stage of a file) in a {@link DirCache}.
@@ -141,8 +140,7 @@ public class DirCacheEntry {
 	private byte inCoreFlags;
 
 	DirCacheEntry(final byte[] sharedInfo, final MutableInteger infoAt,
-			final InputStream in, final MessageDigest md, final int smudge_s,
-			final int smudge_ns) throws IOException {
+			final InputStream in, final MessageDigest md) throws IOException {
 		info = sharedInfo;
 		infoOffset = infoAt.value;
 
@@ -200,10 +198,6 @@ public class DirCacheEntry {
 			IO.skipFully(in, padLen);
 			md.update(nullpad, 0, padLen);
 		}
-
-		if (mightBeRacilyClean(smudge_s, smudge_ns))
-			smudgeRacilyClean();
-
 	}
 
 	/**
@@ -267,7 +261,8 @@ public class DirCacheEntry {
 	@SuppressWarnings("boxing")
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new InvalidPathException(toString(newPath));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
+					, toString(newPath)));
 		if (stage < 0 || 3 < stage)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
 					, stage, toString(newPath)));
@@ -530,7 +525,7 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get the cached size (mod 4 GB) (in bytes) of this file.
+	 * Get the cached size (in bytes) of this file.
 	 * <p>
 	 * One of the indicators that the file has been modified by an application
 	 * changing the working tree is if the size of the file (in bytes) differs
@@ -539,10 +534,6 @@ public class DirCacheEntry {
 	 * Note that this is the length of the file in the working directory, which
 	 * may differ from the size of the decompressed blob if work tree filters
 	 * are being used, such as LF<->CRLF conversion.
-	 * <p>
-	 * Note also that for very large files, this is the size of the on-disk file
-	 * truncated to 32 bits, i.e. modulo 4294967296. If that value is larger
-	 * than 2GB, it will appear negative.
 	 *
 	 * @return cached size of the working directory file, in bytes.
 	 */
@@ -554,8 +545,7 @@ public class DirCacheEntry {
 	 * Set the cached size (in bytes) of this file.
 	 *
 	 * @param sz
-	 *            new cached size of the file, as bytes. If the file is larger
-	 *            than 2G, cast it to (int) before calling this method.
+	 *            new cached size of the file, as bytes.
 	 */
 	public void setLength(final int sz) {
 		NB.encodeInt32(info, infoOffset + P_SIZE, sz);
@@ -566,8 +556,15 @@ public class DirCacheEntry {
 	 *
 	 * @param sz
 	 *            new cached size of the file, as bytes.
+	 * @throws IllegalArgumentException
+	 *             if the size exceeds the 2 GiB barrier imposed by current file
+	 *             format limitations.
 	 */
+	@SuppressWarnings("boxing")
 	public void setLength(final long sz) {
+		if (Integer.MAX_VALUE <= sz)
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().sizeExceeds2GB, getPathString(), sz));
 		setLength((int) sz);
 	}
 
@@ -637,38 +634,19 @@ public class DirCacheEntry {
 	/**
 	 * Copy the ObjectId and other meta fields from an existing entry.
 	 * <p>
-	 * This method copies everything except the path from one entry to another,
-	 * supporting renaming.
+	 * This method copies everything except the path and stage from one entry to
+	 * another, supporting renaming.
 	 *
 	 * @param src
 	 *            the entry to copy ObjectId and meta fields from.
 	 */
 	public void copyMetaData(final DirCacheEntry src) {
-		copyMetaData(src, false);
-	}
-
-	/**
-	 * Copy the ObjectId and other meta fields from an existing entry.
-	 * <p>
-	 * This method copies everything except the path and possibly stage from one
-	 * entry to another, supporting renaming.
-	 *
-	 * @param src
-	 *            the entry to copy ObjectId and meta fields from.
-	 * @param keepStage
-	 *            if true, the stage attribute will not be copied
-	 */
-	void copyMetaData(final DirCacheEntry src, boolean keepStage) {
 		int origflags = NB.decodeUInt16(info, infoOffset + P_FLAGS);
 		int newflags = NB.decodeUInt16(src.info, src.infoOffset + P_FLAGS);
 		System.arraycopy(src.info, src.infoOffset, info, infoOffset, INFO_LEN);
 		final int pLen = origflags & NAME_MASK;
 		final int SHIFTED_STAGE_MASK = 0x3 << 12;
-		final int pStageShifted;
-		if (keepStage)
-			pStageShifted = origflags & SHIFTED_STAGE_MASK;
-		else
-			pStageShifted = newflags & SHIFTED_STAGE_MASK;
+		final int pStageShifted = origflags & SHIFTED_STAGE_MASK;
 		NB.encodeInt16(info, infoOffset + P_FLAGS, pStageShifted | pLen
 				| (newflags & ~NAME_MASK & ~SHIFTED_STAGE_MASK));
 	}
@@ -720,13 +698,7 @@ public class DirCacheEntry {
 				else
 					return false;
 				break;
-			case '\\':
-			case ':':
-				// Tree's never have a backslash in them, not even on Windows
-				// but even there we regard it as an invalid path
-				if (SystemReader.getInstance().isWindows())
-					return false;
-				//$FALL-THROUGH$
+
 			default:
 				componentHasChars = true;
 			}

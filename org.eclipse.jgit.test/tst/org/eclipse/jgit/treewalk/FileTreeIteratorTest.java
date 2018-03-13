@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator.MetadataDiff;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -198,31 +197,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testDirCacheMatchingId() throws Exception {
-		File f = writeTrashFile("file", "content");
-		Git git = new Git(db);
-		writeTrashFile("file", "content");
-		fsTick(f);
-		git.add().addFilepattern("file").call();
-		DirCacheEntry dce = db.readDirCache().getEntry("file");
-		TreeWalk tw = new TreeWalk(db);
-		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
-				.getConfig().get(WorkingTreeOptions.KEY));
-		tw.addTree(fti);
-		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
-		tw.addTree(dci);
-		fti.setDirCacheIterator(tw, 1);
-		while (tw.next() && !tw.getPathString().equals("file")) {
-			//
-		}
-		assertEquals(MetadataDiff.EQUAL, fti.compareMetadata(dce));
-		ObjectId fromRaw = ObjectId.fromRaw(fti.idBuffer(), fti.idOffset());
-		assertEquals("6b584e8ece562ebffc15d38808cd6b98fc3d97ea",
-				fromRaw.getName());
-		assertFalse(fti.isModified(dce, false));
-	}
-
-	@Test
 	public void testIsModifiedSymlink() throws Exception {
 		File f = writeTrashFile("symlink", "content");
 		Git git = new Git(db);
@@ -239,27 +213,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		while (!fti.getEntryPathString().equals("symlink"))
 			fti.next(1);
 		assertFalse(fti.isModified(dce, false));
-	}
-
-	@Test
-	public void testIsModifiedFileSmudged() throws Exception {
-		File f = writeTrashFile("file", "content");
-		Git git = new Git(db);
-		// The idea of this test is to check the smudged handling
-		// Hopefully fsTick will make sure our entry gets smudged
-		fsTick(f);
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		writeTrashFile("file", "conten2");
-		DirCacheEntry dce = db.readDirCache().getEntry("file");
-		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
-				.getConfig().get(WorkingTreeOptions.KEY));
-		while (!fti.getEntryPathString().equals("file"))
-			fti.next(1);
-		// If the fsTick trick does not work we could skip the compareMetaData
-		// test and hope that we are usually testing the intended code path.
-		assertEquals(MetadataDiff.SMUDGED, fti.compareMetadata(dce));
-		assertTrue(fti.isModified(dce, false));
 	}
 
 	@Test
@@ -281,8 +234,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		editor.commit();
 
 		Git.cloneRepository().setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository().close();
+				.setDirectory(new File(db.getWorkTree(), path)).call();
 
 		TreeWalk walk = new TreeWalk(db);
 		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
@@ -381,8 +333,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		editor.commit();
 
 		Git.cloneRepository().setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository().close();
+				.setDirectory(new File(db.getWorkTree(), path)).call();
 
 		TreeWalk walk = new TreeWalk(db);
 		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
@@ -415,8 +366,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		editor.commit();
 
 		Git.cloneRepository().setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository().close();
+				.setDirectory(new File(db.getWorkTree(), path)).call();
 
 		TreeWalk walk = new TreeWalk(db);
 		DirCacheIterator indexIter = new DirCacheIterator(db.readDirCache());
