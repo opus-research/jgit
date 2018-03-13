@@ -130,10 +130,8 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;
-	/***/ public String noteObjectTooLargeToPrint;
 	/***/ public String onlyOneMetaVarExpectedIn;
 	/***/ public String pushTo;
-	/***/ public String pathsRequired;
 	/***/ public String remoteMessage;
 	/***/ public String remoteRefObjectChangedIsNotExpectedOne;
 	/***/ public String remoteSideDoesNotSupportDeletingRefs;

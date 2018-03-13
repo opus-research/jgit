@@ -83,7 +83,7 @@ import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -99,7 +99,6 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
-import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -142,16 +141,16 @@ public class PackWriter {
 	private final List<ObjectToPack> objectsLists[] = new List[Constants.OBJ_TAG + 1];
 	{
 		objectsLists[0] = Collections.<ObjectToPack> emptyList();
-		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TREE] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_BLOB] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TAG] = new ArrayList<ObjectToPack>();
 	}
 
-	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
+	private final ObjectIdSubclassMap<ObjectToPack> objectsMap = new ObjectIdSubclassMap<ObjectToPack>();
 
 	// edge objects for thin packs
-	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
+	private List<ObjectToPack> edgeObjects = new ArrayList<ObjectToPack>();
 
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
 
@@ -168,8 +167,6 @@ public class PackWriter {
 
 	private final Statistics stats;
 
-	private Statistics.ObjectType typeStats;
-
 	private List<ObjectToPack> sortedByName;
 
 	private byte packcsum[];
@@ -177,10 +174,6 @@ public class PackWriter {
 	private boolean deltaBaseAsOffset;
 
 	private boolean reuseDeltas;
-
-	private boolean reuseDeltaCommits;
-
-	private boolean reuseValidate;
 
 	private boolean thin;
 
@@ -250,7 +243,6 @@ public class PackWriter {
 
 		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
 		reuseDeltas = config.isReuseDeltas();
-		reuseValidate = true; // be paranoid by default
 		stats = new Statistics();
 	}
 
@@ -281,50 +273,6 @@ public class PackWriter {
 	 */
 	public void setDeltaBaseAsOffset(boolean deltaBaseAsOffset) {
 		this.deltaBaseAsOffset = deltaBaseAsOffset;
-	}
-
-	/**
-	 * Check if the writer will reuse commits that are already stored as deltas.
-	 *
-	 * @return true if the writer would reuse commits stored as deltas, assuming
-	 *         delta reuse is already enabled.
-	 */
-	public boolean isReuseDeltaCommits() {
-		return reuseDeltaCommits;
-	}
-
-	/**
-	 * Set the writer to reuse existing delta versions of commits.
-	 *
-	 * @param reuse
-	 *            if true, the writer will reuse any commits stored as deltas.
-	 *            By default the writer does not reuse delta commits.
-	 */
-	public void setReuseDeltaCommits(boolean reuse) {
-		reuseDeltaCommits = reuse;
-	}
-
-	/**
-	 * Check if the writer validates objects before copying them.
-	 *
-	 * @return true if validation is enabled; false if the reader will handle
-	 *         object validation as a side-effect of it consuming the output.
-	 */
-	public boolean isReuseValidatingObjects() {
-		return reuseValidate;
-	}
-
-	/**
-	 * Enable (or disable) object validation during packing.
-	 *
-	 * @param validate
-	 *            if true the pack writer will validate an object before it is
-	 *            put into the output. This additional validation work may be
-	 *            necessary to avoid propagating corruption from one local pack
-	 *            file to another local pack file.
-	 */
-	public void setReuseValidatingObjects(boolean validate) {
-		reuseValidate = validate;
 	}
 
 	/** @return true if this writer is producing a thin pack. */
@@ -404,18 +352,8 @@ public class PackWriter {
 	 * Returns objects number in a pack file that was created by this writer.
 	 *
 	 * @return number of objects in pack.
-	 * @throws IOException
-	 *             a cached pack cannot supply its object count.
 	 */
-	public long getObjectCount() throws IOException {
-		if (stats.totalObjects == 0) {
-			long objCnt = 0;
-			for (List<ObjectToPack> list : objectsLists)
-				objCnt += list.size();
-			for (CachedPack pack : cachedPacks)
-				objCnt += pack.getObjectCount();
-			return objCnt;
-		}
+	public long getObjectsNumber() {
 		return stats.totalObjects;
 	}
 
@@ -599,9 +537,11 @@ public class PackWriter {
 			int cnt = 0;
 			for (List<ObjectToPack> list : objectsLists)
 				cnt += list.size();
-			sortedByName = new BlockList<ObjectToPack>(cnt);
-			for (List<ObjectToPack> list : objectsLists)
-				sortedByName.addAll(list);
+			sortedByName = new ArrayList<ObjectToPack>(cnt);
+			for (List<ObjectToPack> list : objectsLists) {
+				for (ObjectToPack otp : list)
+					sortedByName.add(otp);
+			}
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -647,45 +587,37 @@ public class PackWriter {
 		final PackOutputStream out = new PackOutputStream(writeMonitor,
 				packStream, this);
 
-		long objCnt = getObjectCount();
+		long objCnt = 0;
+		for (List<ObjectToPack> list : objectsLists)
+			objCnt += list.size();
+		for (CachedPack pack : cachedPacks)
+			objCnt += pack.getObjectCount();
 		stats.totalObjects = objCnt;
+
 		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
+		long headerStart = out.length();
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
 		out.flush();
+		long headerEnd = out.length();
 
 		writeObjects(out);
-		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
-			for (Statistics.ObjectType typeStat : stats.objectTypes) {
-				if (typeStat == null)
-					continue;
-				stats.thinPackBytes += typeStat.bytes;
-			}
-		}
+		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty())
+			stats.thinPackBytes = out.length() - (headerEnd - headerStart);
 
 		for (CachedPack pack : cachedPacks) {
 			long deltaCnt = pack.getDeltaCount();
 			stats.reusedObjects += pack.getObjectCount();
 			stats.reusedDeltas += deltaCnt;
 			stats.totalDeltas += deltaCnt;
-			reuseSupport.copyPackAsIs(out, pack, reuseValidate);
+			reuseSupport.copyPackAsIs(out, pack);
 		}
 		writeChecksum(out);
 		out.flush();
 		stats.timeWriting = System.currentTimeMillis() - writeStart;
 		stats.totalBytes = out.length();
 		stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
-
-		for (Statistics.ObjectType typeStat : stats.objectTypes) {
-			if (typeStat == null)
-				continue;
-			typeStat.cntDeltas += typeStat.reusedDeltas;
-
-			stats.reusedObjects += typeStat.reusedObjects;
-			stats.reusedDeltas += typeStat.reusedDeltas;
-			stats.totalDeltas += typeStat.cntDeltas;
-		}
 
 		reader.release();
 		writeMonitor.endTask();
@@ -713,12 +645,10 @@ public class PackWriter {
 		int cnt = 0;
 		for (List<ObjectToPack> list : objectsLists)
 			cnt += list.size();
-		long start = System.currentTimeMillis();
 		monitor.beginTask(JGitText.get().searchForReuse, cnt);
 		for (List<ObjectToPack> list : objectsLists)
 			reuseSupport.selectObjectRepresentation(this, monitor, list);
 		monitor.endTask();
-		stats.timeSearchingForReuse = System.currentTimeMillis() - start;
 	}
 
 	private void searchForDeltas(ProgressMonitor monitor)
@@ -755,7 +685,6 @@ public class PackWriter {
 		// search code to discover the missing object and skip over it, or
 		// abort with an exception if we actually had to have it.
 		//
-		final long sizingStart = System.currentTimeMillis();
 		monitor.beginTask(JGitText.get().searchForSizes, cnt);
 		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
 				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
@@ -802,7 +731,6 @@ public class PackWriter {
 			sizeQueue.release();
 		}
 		monitor.endTask();
-		stats.timeSearchingForSizes = System.currentTimeMillis() - sizingStart;
 
 		// Sort the objects by path hash so like files are near each other,
 		// and then by size descending so that bigger files are first. This
@@ -860,9 +788,9 @@ public class PackWriter {
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isReuseAsIs()) // already reusing a representation
-				continue;
 			if (otp.isDoNotDelta()) // delta is disabled for this path
+				continue;
+			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -1022,29 +950,15 @@ public class PackWriter {
 	}
 
 	private void writeObjects(PackOutputStream out) throws IOException {
-		writeObjects(out, objectsLists[Constants.OBJ_COMMIT]);
-		writeObjects(out, objectsLists[Constants.OBJ_TAG]);
-		writeObjects(out, objectsLists[Constants.OBJ_TREE]);
-		writeObjects(out, objectsLists[Constants.OBJ_BLOB]);
-	}
-
-	private void writeObjects(PackOutputStream out, List<ObjectToPack> list)
-			throws IOException {
-		if (list.isEmpty())
-			return;
-
-		typeStats = stats.objectTypes[list.get(0).getType()];
-		long beginOffset = out.length();
-
 		if (reuseSupport != null) {
-			reuseSupport.writeObjects(out, list);
+			for (List<ObjectToPack> list : objectsLists)
+				reuseSupport.writeObjects(out, list);
 		} else {
-			for (ObjectToPack otp : list)
-				out.writeObject(otp);
+			for (List<ObjectToPack> list : objectsLists) {
+				for (ObjectToPack otp : list)
+					out.writeObject(otp);
+			}
 		}
-
-		typeStats.bytes += out.length() - beginOffset;
-		typeStats.cntObjects = list.size();
 	}
 
 	void writeObject(PackOutputStream out, ObjectToPack otp) throws IOException {
@@ -1060,14 +974,12 @@ public class PackWriter {
 
 		while (otp.isReuseAsIs()) {
 			try {
-				reuseSupport.copyObjectAsIs(out, otp, reuseValidate);
+				reuseSupport.copyObjectAsIs(out, otp);
 				out.endObject();
 				otp.setCRC(out.getCRC32());
-				typeStats.reusedObjects++;
-				if (otp.isDeltaRepresentation()) {
-					typeStats.reusedDeltas++;
-					typeStats.deltaBytes += out.length() - otp.getOffset();
-				}
+				stats.reusedObjects++;
+				if (otp.isDeltaRepresentation())
+					stats.reusedDeltas++;
 				return;
 			} catch (StoredObjectRepresentationNotAvailableException gone) {
 				if (otp.getOffset() == out.length()) {
@@ -1162,8 +1074,7 @@ public class PackWriter {
 		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
 		delta.writeTo(dst, null);
 		dst.finish();
-		typeStats.cntDeltas++;
-		typeStats.deltaBytes += out.length() - otp.getOffset();
+		stats.totalDeltas++;
 	}
 
 	private TemporaryBuffer.Heap delta(final ObjectToPack otp)
@@ -1327,7 +1238,7 @@ public class PackWriter {
 		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		BlockList<RevCommit> commits = new BlockList<RevCommit>();
+		List<RevCommit> commits = new ArrayList<RevCommit>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
 			if (c.has(inCachedPack)) {
@@ -1335,7 +1246,7 @@ public class PackWriter {
 				if (includesAllTips(pack, include, walker)) {
 					useCachedPack(walker, keepOnRestart, //
 							wantObjs, haveObjs, pack);
-					commits = new BlockList<RevCommit>();
+					commits = new ArrayList<RevCommit>();
 
 					countingMonitor.endTask();
 					countingMonitor.beginTask(JGitText.get().countingObjects,
@@ -1352,6 +1263,11 @@ public class PackWriter {
 
 			commits.add(c);
 			countingMonitor.update(1);
+		}
+
+		if (objectsLists[Constants.OBJ_COMMIT] instanceof ArrayList) {
+			ArrayList<ObjectToPack> list = (ArrayList<ObjectToPack>) objectsLists[Constants.OBJ_COMMIT];
+			list.ensureCapacity(list.size() + commits.size());
 		}
 
 		int commitCnt = 0;
@@ -1460,7 +1376,7 @@ public class PackWriter {
 		}
 
 		while (dst < list.size())
-			list.remove(list.size() - 1);
+			list.remove(dst);
 	}
 
 	private void useCachedPack(ObjectWalk walker, RevFlagSet keepOnRestart,
@@ -1560,7 +1476,7 @@ public class PackWriter {
 		} else
 			nWeight = next.getWeight();
 
-		if (nFmt == PACK_DELTA && reuseDeltas && reuseDeltaFor(otp)) {
+		if (nFmt == PACK_DELTA && reuseDeltas) {
 			ObjectId baseId = next.getDeltaBase();
 			ObjectToPack ptr = objectsMap.get(baseId);
 			if (ptr != null && !ptr.isEdge()) {
@@ -1587,91 +1503,8 @@ public class PackWriter {
 		otp.select(next);
 	}
 
-	private boolean reuseDeltaFor(ObjectToPack otp) {
-		switch (otp.getType()) {
-		case Constants.OBJ_COMMIT:
-			return reuseDeltaCommits;
-		case Constants.OBJ_TREE:
-			return true;
-		case Constants.OBJ_BLOB:
-			return true;
-		case Constants.OBJ_TAG:
-			return false;
-		default:
-			return true;
-		}
-	}
-
 	/** Summary of how PackWriter created the pack. */
 	public static class Statistics {
-		/** Statistics about a single class of object. */
-		public static class ObjectType {
-			long cntObjects;
-
-			long cntDeltas;
-
-			long reusedObjects;
-
-			long reusedDeltas;
-
-			long bytes;
-
-			long deltaBytes;
-
-			/**
-			 * @return total number of objects output. This total includes the
-			 *         value of {@link #getDeltas()}.
-			 */
-			public long getObjects() {
-				return cntObjects;
-			}
-
-			/**
-			 * @return total number of deltas output. This may be lower than the
-			 *         actual number of deltas if a cached pack was reused.
-			 */
-			public long getDeltas() {
-				return cntDeltas;
-			}
-
-			/**
-			 * @return number of objects whose existing representation was
-			 *         reused in the output. This count includes
-			 *         {@link #getReusedDeltas()}.
-			 */
-			public long getReusedObjects() {
-				return reusedObjects;
-			}
-
-			/**
-			 * @return number of deltas whose existing representation was reused
-			 *         in the output, as their base object was also output or
-			 *         was assumed present for a thin pack. This may be lower
-			 *         than the actual number of reused deltas if a cached pack
-			 *         was reused.
-			 */
-			public long getReusedDeltas() {
-				return reusedDeltas;
-			}
-
-			/**
-			 * @return total number of bytes written. This size includes the
-			 *         object headers as well as the compressed data. This size
-			 *         also includes all of {@link #getDeltaBytes()}.
-			 */
-			public long getBytes() {
-				return bytes;
-			}
-
-			/**
-			 * @return number of delta bytes written. This size includes the
-			 *         object headers for the delta objects.
-			 */
-			public long getDeltaBytes() {
-				return deltaBytes;
-			}
-		}
-
 		Set<ObjectId> interestingObjects;
 
 		Set<ObjectId> uninterestingObjects;
@@ -1696,23 +1529,9 @@ public class PackWriter {
 
 		long timeCounting;
 
-		long timeSearchingForReuse;
-
-		long timeSearchingForSizes;
-
 		long timeCompressing;
 
 		long timeWriting;
-
-		ObjectType[] objectTypes;
-
-		{
-			objectTypes = new ObjectType[5];
-			objectTypes[Constants.OBJ_COMMIT] = new ObjectType();
-			objectTypes[Constants.OBJ_TREE] = new ObjectType();
-			objectTypes[Constants.OBJ_BLOB] = new ObjectType();
-			objectTypes[Constants.OBJ_TAG] = new ObjectType();
-		}
 
 		/**
 		 * @return unmodifiable collection of objects to be included in the
@@ -1812,40 +1631,12 @@ public class PackWriter {
 		}
 
 		/**
-		 * @param typeCode
-		 *            object type code, e.g. OBJ_COMMIT or OBJ_TREE.
-		 * @return information about this type of object in the pack.
-		 */
-		public ObjectType byObjectType(int typeCode) {
-			return objectTypes[typeCode];
-		}
-
-		/**
 		 * @return time in milliseconds spent enumerating the objects that need
 		 *         to be included in the output. This time includes any restarts
 		 *         that occur when a cached pack is selected for reuse.
 		 */
 		public long getTimeCounting() {
 			return timeCounting;
-		}
-
-		/**
-		 * @return time in milliseconds spent matching existing representations
-		 *         against objects that will be transmitted, or that the client
-		 *         can be assumed to already have.
-		 */
-		public long getTimeSearchingForReuse() {
-			return timeSearchingForReuse;
-		}
-
-		/**
-		 * @return time in milliseconds spent finding the sizes of all objects
-		 *         that will enter the delta compression search window. The
-		 *         sizes need to be known to better match similar objects
-		 *         together and improve delta compression ratios.
-		 */
-		public long getTimeSearchingForSizes() {
-			return timeSearchingForSizes;
 		}
 
 		/**
