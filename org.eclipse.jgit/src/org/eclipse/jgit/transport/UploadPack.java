@@ -100,6 +100,8 @@ public class UploadPack {
 
 	static final String OPTION_NO_PROGRESS = BasePackFetchConnection.OPTION_NO_PROGRESS;
 
+	static final String OPTION_NO_DONE = BasePackFetchConnection.OPTION_NO_DONE;
+
 	/** Database we read the objects from. */
 	private final Repository db;
 
@@ -142,6 +144,9 @@ public class UploadPack {
 	/** Filter used while advertising the refs to the client. */
 	private RefFilter refFilter;
 
+	/** Hook handling the various upload phases. */
+	private PreUploadHook preUploadHook = PreUploadHook.NULL;
+
 	/** Capabilities requested by the client. */
 	private final Set<String> options = new HashSet<String>();
 
@@ -159,6 +164,8 @@ public class UploadPack {
 
 	/** null if {@link #commonBase} should be examined again. */
 	private Boolean okToGiveUp;
+
+	private boolean sentReady;
 
 	/** Objects we sent in our advertisement list, clients can ask for these. */
 	private Set<ObjectId> advertised;
@@ -178,6 +185,8 @@ public class UploadPack {
 	private final RevFlagSet SAVE;
 
 	private MultiAck multiAck = MultiAck.OFF;
+
+	private boolean noDone;
 
 	private PackWriter.Statistics statistics;
 
@@ -220,6 +229,9 @@ public class UploadPack {
 
 	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
+		if (refs == null) {
+			refs = refFilter.filter(db.getAllRefs());
+		}
 		return refs;
 	}
 
@@ -279,6 +291,21 @@ public class UploadPack {
 	 */
 	public void setRefFilter(final RefFilter refFilter) {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
+	}
+
+	/** @return the configured upload hook. */
+	public PreUploadHook getPreUploadHook() {
+		return preUploadHook;
+	}
+
+	/**
+	 * Set the hook that controls how this instance will behave.
+	 *
+	 * @param hook
+	 *            the hook; if null no special actions are taken.
+	 */
+	public void setPreUploadHook(PreUploadHook hook) {
+		preUploadHook = hook != null ? hook : PreUploadHook.NULL;
 	}
 
 	/**
@@ -367,20 +394,23 @@ public class UploadPack {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else {
 			advertised = new HashSet<ObjectId>();
-			refs = refFilter.filter(db.getAllRefs());
-			for (Ref ref : refs.values()) {
+			for (Ref ref : getAdvertisedRefs().values()) {
 				if (ref.getObjectId() != null)
 					advertised.add(ref.getObjectId());
 			}
 		}
 
 		recvWants();
-		if (wantIds.isEmpty())
+		if (wantIds.isEmpty()) {
+			preUploadHook.onBeginNegotiateRound(this, wantIds, 0);
+			preUploadHook.onEndNegotiateRound(this, wantIds, 0, 0, false);
 			return;
+		}
 
-		if (options.contains(OPTION_MULTI_ACK_DETAILED))
+		if (options.contains(OPTION_MULTI_ACK_DETAILED)) {
 			multiAck = MultiAck.DETAILED;
-		else if (options.contains(OPTION_MULTI_ACK))
+			noDone = options.contains(OPTION_NO_DONE);
+		} else if (options.contains(OPTION_MULTI_ACK))
 			multiAck = MultiAck.CONTINUE;
 		else
 			multiAck = MultiAck.OFF;
@@ -396,11 +426,25 @@ public class UploadPack {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
+	 * @throws UploadPackMayNotContinueException
+	 *             the hook denied advertisement.
 	 */
-	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
+			UploadPackMayNotContinueException {
+		try {
+			preUploadHook.onPreAdvertiseRefs(this);
+		} catch (UploadPackMayNotContinueException fail) {
+			if (fail.getMessage() != null) {
+				adv.writeOne("ERR " + fail.getMessage());
+				fail.setOutput();
+			}
+			throw fail;
+		}
+
 		adv.init(db);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK_DETAILED);
+		adv.advertiseCapability(OPTION_NO_DONE);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
 		adv.advertiseCapability(OPTION_OFS_DELTA);
 		adv.advertiseCapability(OPTION_SIDE_BAND);
@@ -408,8 +452,7 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_THIN_PACK);
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
 		adv.setDerefTags(true);
-		refs = refFilter.filter(db.getAllRefs());
-		advertised = adv.send(refs);
+		advertised = adv.send(getAdvertisedRefs());
 		adv.end();
 	}
 
@@ -461,6 +504,10 @@ public class UploadPack {
 				last = processHaveLines(peerHas, last);
 				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
 					pckOut.writeString("NAK\n");
+				if (noDone && sentReady) {
+					pckOut.writeString("ACK " + last.name() + "\n");
+					return true;
+				}
 				if (!biDirectionalPipe)
 					return false;
 				pckOut.flush();
@@ -487,12 +534,23 @@ public class UploadPack {
 
 	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
 			throws IOException {
+		try {
+			preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
+		} catch (UploadPackMayNotContinueException fail) {
+			if (fail.getMessage() != null) {
+				pckOut.writeString("ERR " + fail.getMessage() + "\n");
+				fail.setOutput();
+			}
+			throw fail;
+		}
+
 		if (peerHas.isEmpty())
 			return last;
 
 		List<ObjectId> toParse = peerHas;
 		HashSet<ObjectId> peerHasSet = null;
 		boolean needMissing = false;
+		sentReady = false;
 
 		if (wantAll.isEmpty() && !wantIds.isEmpty()) {
 			// We have not yet parsed the want list. Parse it now.
@@ -504,6 +562,7 @@ public class UploadPack {
 			needMissing = true;
 		}
 
+		int haveCnt = 0;
 		AsyncRevObjectQueue q = walk.parseAny(toParse, needMissing);
 		try {
 			for (;;) {
@@ -553,6 +612,7 @@ public class UploadPack {
 				}
 
 				last = obj;
+				haveCnt++;
 
 				if (obj instanceof RevCommit) {
 					RevCommit c = (RevCommit) obj;
@@ -586,35 +646,51 @@ public class UploadPack {
 		} finally {
 			q.release();
 		}
+		int missCnt = peerHas.size() - haveCnt;
 
 		// If we don't have one of the objects but we're also willing to
 		// create a pack at this point, let the client know so it stops
 		// telling us about its history.
 		//
 		boolean didOkToGiveUp = false;
-		for (int i = peerHas.size() - 1; i >= 0; i--) {
-			ObjectId id = peerHas.get(i);
-			if (walk.lookupOrNull(id) == null) {
-				didOkToGiveUp = true;
-				if (okToGiveUp()) {
-					switch (multiAck) {
-					case OFF:
-						break;
-					case CONTINUE:
-						pckOut.writeString("ACK " + id.name() + " continue\n");
-						break;
-					case DETAILED:
-						pckOut.writeString("ACK " + id.name() + " ready\n");
-						break;
+		if (0 < missCnt) {
+			for (int i = peerHas.size() - 1; i >= 0; i--) {
+				ObjectId id = peerHas.get(i);
+				if (walk.lookupOrNull(id) == null) {
+					didOkToGiveUp = true;
+					if (okToGiveUp()) {
+						switch (multiAck) {
+						case OFF:
+							break;
+						case CONTINUE:
+							pckOut.writeString("ACK " + id.name() + " continue\n");
+							break;
+						case DETAILED:
+							sentReady = true;
+							pckOut.writeString("ACK " + id.name() + " ready\n");
+							break;
+						}
 					}
+					break;
 				}
-				break;
 			}
 		}
 
 		if (multiAck == MultiAck.DETAILED && !didOkToGiveUp && okToGiveUp()) {
 			ObjectId id = peerHas.get(peerHas.size() - 1);
+			sentReady = true;
 			pckOut.writeString("ACK " + id.name() + " ready\n");
+		}
+
+		try {
+			preUploadHook.onEndNegotiateRound(this, wantAll, //
+					haveCnt, missCnt, sentReady);
+		} catch (UploadPackMayNotContinueException fail) {
+			if (fail.getMessage() != null) {
+				pckOut.writeString("ERR " + fail.getMessage() + "\n");
+				fail.setOutput();
+			}
+			throw fail;
 		}
 
 		peerHas.clear();
@@ -691,6 +767,24 @@ public class UploadPack {
 						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut);
 				pm = new SideBandProgressMonitor(msgOut);
 			}
+		}
+
+		try {
+			if (wantAll.isEmpty()) {
+				preUploadHook.onSendPack(this, wantIds, commonBase);
+			} else {
+				preUploadHook.onSendPack(this, wantAll, commonBase);
+			}
+		} catch (UploadPackMayNotContinueException noPack) {
+			if (sideband && noPack.getMessage() != null) {
+				noPack.setOutput();
+				SideBandOutputStream err = new SideBandOutputStream(
+						SideBandOutputStream.CH_ERROR,
+						SideBandOutputStream.SMALL_BUF, rawOut);
+				err.write(Constants.encode(noPack.getMessage()));
+				err.flush();
+			}
+			throw noPack;
 		}
 
 		PackConfig cfg = packConfig;
