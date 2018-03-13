@@ -84,9 +84,6 @@ public class ConfigConstants {
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
-	/** The "safecrlf" key */
-	public static final String CONFIG_KEY_SAFECRLF = "safecrlf";
-
 	/** The "bare" key */
 	public static final String CONFIG_KEY_BARE = "bare";
 
@@ -181,4 +178,7 @@ public class ConfigConstants {
 
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
+
+	/** The "precomposeunicode" key */
+	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
 }

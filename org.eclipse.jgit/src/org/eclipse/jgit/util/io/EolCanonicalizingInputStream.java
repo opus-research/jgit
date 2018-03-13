@@ -47,13 +47,13 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.errors.UnsafeCRLFConversionException;
 
 /**
- * An input stream which canonicalizes EOLs bytes on the fly to '\n', unless the
- * first 8000 bytes indicate the stream is binary.
+ * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
  *
- * Note: Make sure to apply this InputStream only to text files!
+ * Optionally, a binary check on the first 8000 bytes is performed
+ * and in case of binary files, canonicalization is turned off
+ * (for the complete file).
  */
 public class EolCanonicalizingInputStream extends InputStream {
 	private final byte[] single = new byte[1];
@@ -68,42 +68,24 @@ public class EolCanonicalizingInputStream extends InputStream {
 
 	private boolean isBinary;
 
-	private boolean modeDetected;
+	private boolean detectBinary;
 
 	private long srcBytes = 0;
 
 	private long dstBytes = 0;
 
-	private final boolean safe;
-
-	private boolean lfOnlyFound;
-
-	private boolean crlfFound;
-
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
 	 *
 	 * @param in
 	 *            raw input stream
-	 * @param safe
-	 *            if true, reading will fail in lone LF's appear in input,
-	 *            indicating that checkout would not produce the original
-	 *            stream.
+	 * @param detectBinary
+	 *            whether binaries should be detected
+	 * @since 2.0
 	 */
-	public EolCanonicalizingInputStream(InputStream in, boolean safe) {
+	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary) {
 		this.in = in;
-		this.safe = safe;
-	}
-
-	/**
-	 * Creates a new InputStream, wrapping the specified stream
-	 *
-	 * @param in
-	 *            raw input stream
-	 */
-	public EolCanonicalizingInputStream(InputStream in) {
-		this.in = in;
-		this.safe = false;
+		this.detectBinary = detectBinary;
 	}
 
 	@Override
@@ -132,8 +114,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 			if (isBinary || b != '\r') {
 				// Logic for binary files ends here
 				bs[off++] = b;
-				if (b == '\n')
-					lfOnlyFound = true;
 				continue;
 			}
 
@@ -143,15 +123,11 @@ public class EolCanonicalizingInputStream extends InputStream {
 			}
 
 			if (buf[ptr] == '\n') {
-				crlfFound = true;
 				bs[off++] = '\n';
 				ptr++;
 			} else
 				bs[off++] = '\r';
 		}
-
-		if (crlfFound && lfOnlyFound && safe)
-			throw new UnsafeCRLFConversionException();
 
 		if (startOff == off)
 			return -1;
@@ -186,12 +162,11 @@ public class EolCanonicalizingInputStream extends InputStream {
 		cnt = in.read(buf, 0, buf.length);
 		if (cnt < 1)
 			return false;
-		if (!modeDetected) {
+		if (detectBinary) {
 			isBinary = RawText.isBinary(buf, cnt);
-			modeDetected = true;
+			detectBinary = false;
 		}
 		srcBytes += cnt;
-
 		ptr = 0;
 		return true;
 	}

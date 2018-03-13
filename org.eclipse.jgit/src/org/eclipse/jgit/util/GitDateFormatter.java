@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, 2012 Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,7 +52,9 @@ import org.eclipse.jgit.lib.PersonIdent;
 
 /**
  * A utility for formatting dates according to the Git log.date formats plus
- * extensions. <p< The enum {@link Format} defines the available types
+ * extensions.
+ * <p>
+ * The enum {@link Format} defines the available types.
  */
 public class GitDateFormatter {
 
@@ -144,10 +146,10 @@ public class GitDateFormatter {
 			break;
 		case LOCALE:
 		case LOCALELOCAL:
-			Locale locale = SystemReader.getInstance().getLocale();
-			dateTimeInstance = DateFormat.getDateTimeInstance(
-					DateFormat.DEFAULT, DateFormat.DEFAULT, locale);
-			dateTimeInstance2 = new SimpleDateFormat("Z", locale);
+			SystemReader systemReader = SystemReader.getInstance();
+			dateTimeInstance = systemReader.getDateTimeInstance(
+					DateFormat.DEFAULT, DateFormat.DEFAULT);
+			dateTimeInstance2 = systemReader.getSimpleDateFormat("Z");
 			break;
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
@@ -50,13 +49,13 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.UnsafeCRLFException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -66,7 +65,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.errors.UnsafeCRLFConversionException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -137,24 +136,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             when called on a git repo without a HEAD reference
 	 * @throws NoMessageException
 	 *             when called without specifying a commit message
-	 * @throws UnmergedPathException
+	 * @throws UnmergedPathsException
 	 *             when the current index contained unmerged paths (conflicts)
+	 * @throws ConcurrentRefUpdateException
+	 *             when HEAD or branch ref is updated concurrently by someone
+	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
-	 * @throws UnsafeCRLFException
-	 *             when CRLF conversion would be irreversible
-	 * @throws JGitInternalException
-	 *             a low-level exception of JGit has occurred. The original
-	 *             exception can be retrieved by calling
-	 *             {@link Exception#getCause()}. Expect only
-	 *             {@code IOException's} to be wrapped. Subclasses of
-	 *             {@link IOException} (e.g. {@link UnmergedPathException}) are
-	 *             typically not wrapped here but thrown as original exception
 	 */
-	public RevCommit call() throws NoHeadException, NoMessageException,
-			UnmergedPathException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException,
-			UnsafeCRLFException {
+	public RevCommit call() throws GitAPIException, NoHeadException,
+			NoMessageException, UnmergedPathsException,
+			ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		checkCallable();
 
 		RepositoryState state = repo.getRepositoryState();
@@ -275,10 +268,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				index.unlock();
 			}
 		} catch (UnmergedPathException e) {
-			// since UnmergedPathException is a subclass of IOException
-			// which should not be wrapped by a JGitInternalException we
-			// have to catch and re-throw it here
-			throw e;
+			throw new UnmergedPathsException(e);
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
@@ -357,27 +347,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					if (objectExists) {
 						dcEntry.setObjectId(fTree.getEntryObjectId());
 					} else {
-						if (FileMode.GITLINK.equals(dcEntry.getFileMode())) {
-							// Do not check the content of submodule entries
-							// Use the old entry information instead.
-							dcEntry.copyMetaData(index.getEntry(dcEntry
-									.getPathString()));
-						} else {
+						if (FileMode.GITLINK.equals(dcEntry.getFileMode()))
+							dcEntry.setObjectId(fTree.getEntryObjectId());
+						else {
 							// insert object
 							if (inserter == null)
 								inserter = repo.newObjectInserter();
-
+							long contentLength = fTree.getEntryContentLength();
 							InputStream inputStream = fTree.openEntryStream();
 							try {
 								dcEntry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, entryLength,
+										Constants.OBJ_BLOB, contentLength,
 										inputStream));
-							} catch (UnsafeCRLFConversionException e) {
-								throw new UnsafeCRLFConversionException(
-										MessageFormat.format(
-												JGitText.get().unsafeCrlfConversionIn,
-												new File(repo.getWorkTree(),
-														path).getPath()));
 							} finally {
 								inputStream.close();
 							}
@@ -394,7 +375,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					// add to temporary in-core index
 					dcBuilder.add(dcEntry);
 
-					if (emptyCommit && (hTree == null || !hTree.idEqual(fTree)))
+					if (emptyCommit
+							&& (hTree == null || !hTree.idEqual(fTree) || hTree
+									.getEntryRawMode() != fTree
+									.getEntryRawMode()))
 						// this is a change
 						emptyCommit = false;
 				} else {
@@ -504,9 +488,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							Constants.MERGE_MSG, e), e);
 				}
 			}
+		} else if (state == RepositoryState.SAFE && message == null) {
+			try {
+				message = repo.readSquashCommitMsg();
+				if (message != null)
+					repo.writeSquashCommitMsg(null /* delete */);
+			} catch (IOException e) {
+				throw new JGitInternalException(MessageFormat.format(
+						JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
+						Constants.MERGE_MSG, e), e);
+			}
+
 		}
 		if (message == null)
-			// as long as we don't suppport -C option we have to have
+			// as long as we don't support -C option we have to have
 			// an explicit message
 			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
 	}

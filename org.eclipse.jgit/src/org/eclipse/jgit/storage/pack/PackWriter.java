@@ -75,12 +75,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
@@ -1660,7 +1660,8 @@ public class PackWriter {
 
 				for (int i = 0; i < cmit.getParentCount(); i++) {
 					RevCommit p = cmit.getParent(i);
-					if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)) {
+					if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)
+							&& !exclude(p)) {
 						p.add(added);
 						addObject(p, 0);
 						commitCnt++;
@@ -1869,6 +1870,7 @@ public class PackWriter {
 			otp.clearReuseAsIs();
 		}
 
+		otp.setDeltaAttempted(next.wasDeltaAttempted());
 		otp.select(next);
 	}
 
@@ -2185,8 +2187,8 @@ public class PackWriter {
 		/** @return formatted message string for display to clients. */
 		public String getMessage() {
 			return MessageFormat.format(JGitText.get().packWriterStatistics, //
-					totalObjects, totalDeltas, //
-					reusedObjects, reusedDeltas);
+					Long.valueOf(totalObjects), Long.valueOf(totalDeltas), //
+					Long.valueOf(reusedObjects), Long.valueOf(reusedDeltas));
 		}
 	}
 

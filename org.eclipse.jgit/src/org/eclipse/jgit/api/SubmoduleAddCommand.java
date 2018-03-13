@@ -46,10 +46,11 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.api.errors.UnsafeCRLFException;
+import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -134,7 +135,7 @@ public class SubmoduleAddCommand extends
 		return SubmoduleWalk.forIndex(repo).setFilter(filter).next();
 	}
 
-	public Repository call() throws JGitInternalException {
+	public Repository call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().pathNotConfigured);
@@ -149,12 +150,18 @@ public class SubmoduleAddCommand extends
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
+		final String resolvedUri;
+		try {
+			resolvedUri = SubmoduleWalk.getSubmoduleRemoteUrl(repo, uri);
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
 		// Clone submodule repository
 		File moduleDirectory = SubmoduleWalk.getSubmoduleDirectory(repo, path);
 		CloneCommand clone = Git.cloneRepository();
 		configure(clone);
 		clone.setDirectory(moduleDirectory);
-		clone.setURI(uri);
+		clone.setURI(resolvedUri);
 		if (monitor != null)
 			clone.setProgressMonitor(monitor);
 		Repository subRepo = clone.call().getRepository();
@@ -162,7 +169,7 @@ public class SubmoduleAddCommand extends
 		// Save submodule URL to parent repository's config
 		StoredConfig config = repo.getConfig();
 		config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, uri);
+				ConfigConstants.CONFIG_KEY_URL, resolvedUri);
 		try {
 			config.save();
 		} catch (IOException e) {
@@ -172,13 +179,16 @@ public class SubmoduleAddCommand extends
 		// Save path and URL to parent repository's .gitmodules file
 		FileBasedConfig modulesConfig = new FileBasedConfig(new File(
 				repo.getWorkTree(), Constants.DOT_GIT_MODULES), repo.getFS());
-		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_PATH, path);
-		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, uri);
 		try {
+			modulesConfig.load();
+			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
+					path, ConfigConstants.CONFIG_KEY_PATH, path);
+			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
+					path, ConfigConstants.CONFIG_KEY_URL, uri);
 			modulesConfig.save();
 		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		} catch (ConfigInvalidException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
@@ -190,9 +200,6 @@ public class SubmoduleAddCommand extends
 		try {
 			add.call();
 		} catch (NoFilepatternException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (UnsafeCRLFException e) {
-			// Should not happen
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
