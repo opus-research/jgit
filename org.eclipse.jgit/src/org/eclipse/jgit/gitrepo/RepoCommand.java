@@ -182,6 +182,15 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					.setURI(uri)
 					.call()
 					.getRepository();
+			try {
+				return readFileFromRepo(repo, ref, path);
+			} finally {
+				FileUtils.delete(dir, FileUtils.RECURSIVE);
+			}
+		}
+
+		protected byte[] readFileFromRepo(Repository repo,
+				String ref, String path) throws GitAPIException, IOException {
 			ObjectReader reader = repo.newObjectReader();
 			byte[] result;
 			try {
@@ -189,7 +198,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				result = reader.open(oid).getBytes(Integer.MAX_VALUE);
 			} finally {
 				reader.release();
-				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
 			return result;
 		}
@@ -267,8 +275,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			this.command = command;
 			this.inputStream = inputStream;
 			this.filename = filename;
-			// Strip trailing /s to match repo behavior.
-			this.baseUrl = baseUrl.replaceAll("/+$", ""); //$NON-NLS-1$ //$NON-NLS-2$
+			this.baseUrl = baseUrl;
 			remotes = new HashMap<String, String>();
 			projects = new ArrayList<Project>();
 			plusGroups = new HashSet<String>();
@@ -428,11 +435,12 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/**
 	 * Set the input stream to the manifest XML.
 	 *
-	 * Setting inputStream will ignore the path set.
-	 * It will be closed in {@link #call}.
+	 * Setting inputStream will ignore the path set. It will be closed in
+	 * {@link #call}.
 	 *
 	 * @param inputStream
 	 * @return this command
+	 * @since 3.5
 	 */
 	public RepoCommand setInputStream(final InputStream inputStream) {
 		this.inputStream = inputStream;
