@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <zx@redhat.com>
- * Copyright (C) 2011, Abhishek Bhatnagar <abhatnag@redhat.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,83 +42,72 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.List;
 
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.ReflogEntry;
 
 /**
- * Remove untracked files from the working tree
+ * Command class to list the stashed commits in a repository.
  *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
- *      >Git documentation about Clean</a>
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
+ *      >Git documentation about Stash</a>
  */
-public class CleanCommand extends GitCommand<Set<String>> {
-
-	private Set<String> paths = Collections.emptySet();
-
-	private boolean dryRun;
+public class StashListCommand extends GitCommand<Collection<RevCommit>> {
 
 	/**
+	 * Create a new stash list command
+	 *
 	 * @param repo
 	 */
-	protected CleanCommand(Repository repo) {
+	public StashListCommand(final Repository repo) {
 		super(repo);
 	}
 
-	/**
-	 * Executes the {@code clean} command with all the options and parameters
-	 * collected by the setter methods of this class. Each instance of this
-	 * class should only be used for one invocation of the command (means: one
-	 * call to {@link #call()})
-	 *
-	 * @return a set of strings representing each file cleaned.
-	 */
-	public Set<String> call() {
-		Set<String> files = new TreeSet<String>();
+	public Collection<RevCommit> call() throws Exception {
+		checkCallable();
+
 		try {
-			StatusCommand command = new StatusCommand(repo);
-			Status status = command.call();
-			for (String file : status.getUntracked()) {
-				if (paths.isEmpty() || paths.contains(file)) {
-					if (!dryRun)
-						FileUtils.delete(new File(repo.getWorkTree(), file));
-					files.add(file);
-				}
-			}
+			if (repo.getRef(Constants.R_STASH) == null)
+				return Collections.emptyList();
 		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
+			throw new InvalidRefNameException(MessageFormat.format(
+					JGitText.get().cannotRead, Constants.R_STASH), e);
 		}
-		return files;
-	}
 
-	/**
-	 * If paths are set, only these paths are affected by the cleaning.
-	 *
-	 * @param paths
-	 *            the paths to set
-	 * @return {@code this}
-	 */
-	public CleanCommand setPaths(Set<String> paths) {
-		this.paths = paths;
-		return this;
-	}
+		final ReflogCommand refLog = new ReflogCommand(repo);
+		refLog.setRef(Constants.R_STASH);
+		final Collection<ReflogEntry> stashEntries = refLog.call();
+		if (stashEntries.isEmpty())
+			return Collections.emptyList();
 
-	/**
-	 * If dryRun is set, the paths in question will not actually be deleted.
-	 * 
-	 * @param dryRun
-	 *            whether to do a dry run or not
-	 * @return {@code this}
-	 */
-	public CleanCommand setDryRun(boolean dryRun) {
-		this.dryRun = dryRun;
-		return this;
+		final List<RevCommit> stashCommits = new ArrayList<RevCommit>(
+				stashEntries.size());
+		final RevWalk walk = new RevWalk(repo);
+		walk.setRetainBody(true);
+		try {
+			for (ReflogEntry entry : stashEntries)
+				try {
+					stashCommits.add(walk.parseCommit(entry.getNewId()));
+				} catch (IOException e) {
+					throw new JGitInternalException(MessageFormat.format(
+							JGitText.get().cannotReadCommit, entry.getNewId()),
+							e);
+				}
+		} finally {
+			walk.dispose();
+		}
+		return stashCommits;
 	}
 }
