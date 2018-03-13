@@ -80,7 +80,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
-import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -641,21 +640,10 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		boolean needSearchForReuse = reuseSupport != null && (
+		if (reuseSupport != null && (
 				   reuseDeltas
 				|| config.isReuseObjects()
-				|| !cachedPacks.isEmpty());
-
-		if (compressMonitor instanceof BatchingProgressMonitor) {
-			long delay = 1000;
-			if (needSearchForReuse && config.isDeltaCompress())
-				delay = 500;
-			((BatchingProgressMonitor) compressMonitor).setDelayStart(
-					delay,
-					TimeUnit.MILLISECONDS);
-		}
-
-		if (needSearchForReuse)
+				|| !cachedPacks.isEmpty()))
 			searchForReuse(compressMonitor);
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
