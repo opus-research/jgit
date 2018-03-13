@@ -50,7 +50,6 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 
 import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.MacroExpander;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -60,6 +59,7 @@ import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.eclipse.jgit.util.Paths;
 
 /**
  * Walks a Git tree (directory) in Git sort order.
@@ -88,14 +88,8 @@ public abstract class AbstractTreeIterator {
 	/** A dummy object id buffer that matches the zero ObjectId. */
 	protected static final byte[] zeroid = new byte[Constants.OBJECT_ID_LENGTH];
 
-	/**
-	 * Iterator for the parent tree; null if we are the root iterator.
-	 * <p>
-	 * Used by {@link TreeWalk} and {@link MacroExpander}
-	 *
-	 * @since 4.2
-	 */
-	public final AbstractTreeIterator parent;
+	/** Iterator for the parent tree; null if we are the root iterator. */
+	final AbstractTreeIterator parent;
 
 	/** The iterator this current entry is path equal to. */
 	AbstractTreeIterator matches;
@@ -389,20 +383,9 @@ public abstract class AbstractTreeIterator {
 	}
 
 	private int pathCompare(byte[] b, int bPos, int bEnd, int bMode, int aPos) {
-		final byte[] a = path;
-		final int aEnd = pathLen;
-
-		for (; aPos < aEnd && bPos < bEnd; aPos++, bPos++) {
-			final int cmp = (a[aPos] & 0xff) - (b[bPos] & 0xff);
-			if (cmp != 0)
-				return cmp;
-		}
-
-		if (aPos < aEnd)
-			return (a[aPos] & 0xff) - lastPathChar(bMode);
-		if (bPos < bEnd)
-			return lastPathChar(mode) - (b[bPos] & 0xff);
-		return lastPathChar(mode) - lastPathChar(bMode);
+		return Paths.compare(
+				path, aPos, pathLen, mode,
+				b, bPos, bEnd, bMode);
 	}
 
 	private static int alreadyMatch(AbstractTreeIterator a,
@@ -417,10 +400,6 @@ public abstract class AbstractTreeIterator {
 			a = ap;
 			b = bp;
 		}
-	}
-
-	private static int lastPathChar(final int mode) {
-		return FileMode.TREE.equals(mode) ? '/' : '\0';
 	}
 
 	/**
@@ -696,6 +675,14 @@ public abstract class AbstractTreeIterator {
 	 */
 	public void stopWalk() {
 		// Do nothing by default.  Most iterators do not care.
+	}
+
+	/**
+	 * @return true if the iterator implements {@link #stopWalk()}.
+	 * @since 4.2
+	 */
+	protected boolean needsStopWalk() {
+		return false;
 	}
 
 	/**
