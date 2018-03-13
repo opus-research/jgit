@@ -36,9 +36,3 @@ java_library(
   ],
   visibility = ['PUBLIC'],
 )
-
-genrule(
-  name = 'jgit_bin',
-  cmd = 'ln -s $(location //org.eclipse.jgit.pgm:jgit) $OUT',
-  out = 'jgit_bin',
-)
