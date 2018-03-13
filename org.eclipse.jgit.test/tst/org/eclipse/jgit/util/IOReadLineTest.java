@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,56 +43,74 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Collection;
 
-import org.junit.After;
-import org.junit.Before;
+import org.eclipse.jgit.lib.Constants;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-public class FileUtils7Test {
+@RunWith(Parameterized.class)
+public class IOReadLineTest {
+	@Parameter(0)
+	public boolean buffered;
 
-	private final File trash = new File(new File("target"), "trash");
+	@Parameter(1)
+	public int sizeHint;
 
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
-	}
-
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
-	}
-
-	@Test
-	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
-			throws IOException {
-		FS fs = FS.DETECTED;
-		File dir = new File(trash, "dir");
-		File file = new File(dir, "file");
-		File link = new File(trash, "link");
-		FileUtils.mkdirs(dir);
-		FileUtils.createNewFile(file);
-		fs.createSymLink(link, "dir");
-		FileUtils.delete(link, FileUtils.RECURSIVE);
-		assertFalse(link.exists());
-		assertTrue(dir.exists());
-		assertTrue(file.exists());
+	@SuppressWarnings("boxing")
+	@Parameters(name="buffered={0}, sizeHint={1}")
+	public static Collection<Object[]> getParameters() {
+		Boolean[] bv = {false, true};
+		Integer[] sv = {-1, 0, 1, 2, 3, 4, 64};
+		Collection<Object[]> params = new ArrayList<>(bv.length * sv.length);
+		for (boolean b : bv) {
+			for (Integer s : sv) {
+				params.add(new Object[]{b, s});
+			}
+		}
+		return params;
 	}
 
 	@Test
-	public void testAtomicMove() throws IOException {
-		File src = new File(trash, "src");
-		Files.createFile(src.toPath());
-		File dst = new File(trash, "dst");
-		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
-		assertFalse(Files.exists(src.toPath()));
-		assertTrue(Files.exists(dst.toPath()));
+	public void testReadLine() throws Exception {
+		Reader r = newReader("foo\nbar\nbaz\n");
+		assertEquals("foo\n", readLine(r));
+		assertEquals("bar\n", readLine(r));
+		assertEquals("baz\n", readLine(r));
+		assertEquals("", readLine(r));
+	}
+
+	@Test
+	public void testReadLineNoTrailingNewline() throws Exception {
+		Reader r = newReader("foo\nbar\nbaz");
+		assertEquals("foo\n", readLine(r));
+		assertEquals("bar\n", readLine(r));
+		assertEquals("baz", readLine(r));
+		assertEquals("", readLine(r));
+	}
+
+	private String readLine(Reader r) throws Exception {
+		return IO.readLine(r, sizeHint);
+	}
+
+	private Reader newReader(String in) {
+		Reader r = new InputStreamReader(
+				new ByteArrayInputStream(Constants.encode(in)));
+		if (buffered) {
+			r = new BufferedReader(r);
+		}
+		assertEquals(Boolean.valueOf(buffered),
+				Boolean.valueOf(r.markSupported()));
+		return r;
 	}
 }
