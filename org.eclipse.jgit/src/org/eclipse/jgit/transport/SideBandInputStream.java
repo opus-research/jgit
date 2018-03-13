@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.SideBandOutputStream.HDR_SIZE;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.regex.Matcher;
@@ -71,7 +69,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * Channel 3 results in an exception being thrown, as the remote side has issued
  * an unrecoverable error.
  *
- * @see SideBandOutputStream
+ * @see PacketLineIn#sideband(ProgressMonitor)
  */
 class SideBandInputStream extends InputStream {
 	static final int CH_DATA = 1;
@@ -86,9 +84,9 @@ class SideBandInputStream extends InputStream {
 	private static Pattern P_BOUNDED = Pattern.compile(
 			"^([\\w ]+):.*\\((\\d+)/(\\d+)\\).*", Pattern.DOTALL);
 
-	private final InputStream rawIn;
-
 	private final PacketLineIn pckIn;
+
+	private final InputStream in;
 
 	private final ProgressMonitor monitor;
 
@@ -104,10 +102,11 @@ class SideBandInputStream extends InputStream {
 
 	private int available;
 
-	SideBandInputStream(final InputStream in, final ProgressMonitor progress) {
-		rawIn = in;
-		pckIn = new PacketLineIn(rawIn);
-		monitor = progress;
+	SideBandInputStream(final PacketLineIn aPckIn, final InputStream aIn,
+			final ProgressMonitor aProgress) {
+		pckIn = aPckIn;
+		in = aIn;
+		monitor = aProgress;
 		currentTask = "";
 	}
 
@@ -117,7 +116,7 @@ class SideBandInputStream extends InputStream {
 		if (eof)
 			return -1;
 		available--;
-		return rawIn.read();
+		return in.read();
 	}
 
 	@Override
@@ -127,7 +126,7 @@ class SideBandInputStream extends InputStream {
 			needDataPacket();
 			if (eof)
 				break;
-			final int n = rawIn.read(b, off, Math.min(len, available));
+			final int n = in.read(b, off, Math.min(len, available));
 			if (n < 0)
 				break;
 			r += n;
@@ -148,8 +147,8 @@ class SideBandInputStream extends InputStream {
 				return;
 			}
 
-			channel = rawIn.read();
-			available -= HDR_SIZE; // length header plus channel indicator
+			channel = in.read();
+			available -= 5; // length header plus channel indicator
 			if (available == 0)
 				continue;
 
@@ -158,6 +157,7 @@ class SideBandInputStream extends InputStream {
 				return;
 			case CH_PROGRESS:
 				progress(readString(available));
+
 				continue;
 			case CH_ERROR:
 				eof = true;
@@ -229,7 +229,7 @@ class SideBandInputStream extends InputStream {
 
 	private String readString(final int len) throws IOException {
 		final byte[] raw = new byte[len];
-		IO.readFully(rawIn, raw, 0, len);
+		IO.readFully(in, raw, 0, len);
 		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 }
