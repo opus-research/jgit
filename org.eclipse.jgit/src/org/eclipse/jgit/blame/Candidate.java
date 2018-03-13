@@ -45,6 +45,7 @@ package org.eclipse.jgit.blame;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.RawText;
@@ -135,8 +136,12 @@ class Candidate {
 		return sourceCommit.getAuthorIdent();
 	}
 
+	Candidate create(RevCommit commit, PathFilter path) {
+		return new Candidate(commit, path);
+	}
+
 	Candidate copy(RevCommit commit) {
-		Candidate r = new Candidate(commit, sourcePath);
+		Candidate r = create(commit, sourcePath);
 		r.sourceBlob = sourceBlob;
 		r.sourceText = sourceText;
 		r.regionList = regionList;
@@ -282,10 +287,65 @@ class Candidate {
 		return r.toString();
 	}
 
-	static class BlobCandidate extends Candidate {
-		String description;
+	/**
+	 * Special candidate type used for reverse blame.
+	 * <p>
+	 * Reverse blame inverts the commit history graph to follow from a commit to
+	 * its descendant children, rather than the normal history direction of
+	 * child to parent. These types require a {@link ReverseCommit} which keeps
+	 * children pointers, allowing reverse navigation of history.
+	 */
+	static final class ReverseCandidate extends Candidate {
+		ReverseCandidate(ReverseCommit commit, PathFilter path) {
+			super(commit, path);
+		}
 
+		@Override
+		int getParentCount() {
+			return ((ReverseCommit) sourceCommit).getChildCount();
+		}
+
+		@Override
+		RevCommit getParent(int idx) {
+			return ((ReverseCommit) sourceCommit).getChild(idx);
+		}
+
+		@Override
+		int getTime() {
+			// Invert the timestamp so newer dates sort older.
+			return -sourceCommit.getCommitTime();
+		}
+
+		@Override
+		Candidate create(RevCommit commit, PathFilter path) {
+			return new ReverseCandidate((ReverseCommit) commit, path);
+		}
+
+		@Override
+		public String toString() {
+			return "Reverse" + super.toString();
+		}
+	}
+
+	/**
+	 * Candidate loaded from a file source, and not a commit.
+	 * <p>
+	 * The {@link Candidate#sourceCommit} field is always null on this type of
+	 * candidate. Instead history traversal follows the single {@link #parent}
+	 * field to discover the next Candidate. Often this is a normal Candidate
+	 * type that has a valid sourceCommit.
+	 */
+	static final class BlobCandidate extends Candidate {
+		/**
+		 * Next candidate to pass blame onto.
+		 * <p>
+		 * When computing the differences that this candidate introduced to the
+		 * file content, the parent's sourceText is used as the base.
+		 */
 		Candidate parent;
+
+		/** Author name to refer to this blob with. */
+		String description;
 
 		BlobCandidate(String name, PathFilter path) {
 			super(null, path);

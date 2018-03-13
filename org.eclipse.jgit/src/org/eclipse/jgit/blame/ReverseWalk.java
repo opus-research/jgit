@@ -41,53 +41,73 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht.spi.memory;
+package org.eclipse.jgit.blame;
 
-import java.text.MessageFormat;
-import java.util.concurrent.TimeoutException;
+import java.io.IOException;
 
-import org.eclipse.jgit.storage.dht.DhtException;
-import org.eclipse.jgit.storage.dht.DhtText;
-import org.eclipse.jgit.storage.dht.RepositoryKey;
-import org.eclipse.jgit.storage.dht.RepositoryName;
-import org.eclipse.jgit.storage.dht.spi.RepositoryIndexTable;
-import org.eclipse.jgit.storage.dht.spi.memory.MemTable.Cell;
-import org.eclipse.jgit.storage.dht.spi.util.ColumnMatcher;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 
-final class MemRepositoryIndexTable implements RepositoryIndexTable {
-	private final MemTable table = new MemTable();
+final class ReverseWalk extends RevWalk {
+	ReverseWalk(Repository repo) {
+		super(repo);
+	}
 
-	private final ColumnMatcher colId = new ColumnMatcher("id");
-
-	public RepositoryKey get(RepositoryName name) throws DhtException,
-			TimeoutException {
-		Cell cell = table.get(name.asBytes(), colId.name());
-		if (cell == null)
+	@Override
+	public ReverseCommit next() throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		ReverseCommit c = (ReverseCommit) super.next();
+		if (c == null)
 			return null;
-		return RepositoryKey.fromBytes(cell.getValue());
+		for (int pIdx = 0; pIdx < c.getParentCount(); pIdx++)
+			((ReverseCommit) c.getParent(pIdx)).addChild(c);
+		return c;
 	}
 
-	public void putUnique(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet( //
-				name.asBytes(), //
-				colId.name(), //
-				null, //
-				key.asBytes());
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
+	@Override
+	protected RevCommit createCommit(AnyObjectId id) {
+		return new ReverseCommit(id);
 	}
 
-	public void remove(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet(
-				name.asBytes(),
-				colId.name(),
-				key.asBytes(),
-				null);
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
+	static final class ReverseCommit extends RevCommit {
+		private static final ReverseCommit[] NO_CHILDREN = {};
+
+		private ReverseCommit[] children = NO_CHILDREN;
+
+		ReverseCommit(AnyObjectId id) {
+			super(id);
+		}
+
+		void addChild(ReverseCommit c) {
+			// Always put the most recent child onto the front of the list.
+			// This works correctly because our ReverseWalk parent (above)
+			// runs in COMMIT_TIME_DESC order. Older commits will be popped
+			// later and should go in front of the children list so they are
+			// visited first by BlameGenerator when considering candidates.
+
+			int cnt = children.length;
+			if (cnt == 0)
+				children = new ReverseCommit[] { c };
+			else if (cnt == 1)
+				children = new ReverseCommit[] { c, children[0] };
+			else {
+				ReverseCommit[] n = new ReverseCommit[1 + cnt];
+				n[0] = c;
+				System.arraycopy(children, 0, n, 1, cnt);
+				children = n;
+			}
+		}
+
+		int getChildCount() {
+			return children.length;
+		}
+
+		ReverseCommit getChild(final int nth) {
+			return children[nth];
+		}
 	}
 }
