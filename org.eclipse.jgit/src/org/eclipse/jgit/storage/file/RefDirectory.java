@@ -130,8 +130,7 @@ public class RefDirectory extends RefDatabase {
 
 	/** The names of the additional refs supported by this class */
 	private static final String[] additionalRefsNames = new String[] {
-			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD,
-			Constants.CHERRY_PICK_HEAD };
+			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD };
 
 	private final FileRepository parent;
 
