@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -57,71 +57,39 @@ import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 public class FileResolver implements RepositoryResolver {
 	private final File basePath;
 
-	private final boolean exportAll;
-
 	/**
 	 * Create a new resolver for the given path.
-	 *
+	 * 
 	 * @param basePath
 	 *            the base path all repositories are rooted under.
-	 * @param exportAll
-	 *            if true, exports all repositories, ignoring the check for the
-	 *            {@code git-daemon-export-ok} files.
 	 */
-	public FileResolver(final File basePath, final boolean exportAll) {
+	public FileResolver(final File basePath) {
 		this.basePath = basePath;
-		this.exportAll = exportAll;
 	}
 
 	public Repository open(final HttpServletRequest req,
-			final String repositoryName) throws RepositoryNotFoundException,
-			ServiceNotEnabledException {
+			final String repositoryName) throws RepositoryNotFoundException {
 		if (isUnreasonableName(repositoryName))
 			throw new RepositoryNotFoundException(repositoryName);
 
-		final Repository db;
 		try {
-			final File gitdir = new File(basePath, repositoryName);
-			db = RepositoryCache.open(FileKey.lenient(gitdir), true);
-		} catch (IOException e) {
-			throw new RepositoryNotFoundException(repositoryName, e);
-		}
-
-		try {
-			if (isExportOk(req, repositoryName, db)) {
-				// We have to leak the open count to the caller, they
-				// are responsible for closing the repository if we
-				// complete successfully.
+			File gitdir = new File(basePath, repositoryName);
+			Repository db = RepositoryCache.open(FileKey.lenient(gitdir), true);
+			if (isExportOk(req, repositoryName, db))
 				return db;
-			} else
-				throw new ServiceNotEnabledException();
-
-		} catch (RuntimeException e) {
 			db.close();
-			throw new RepositoryNotFoundException(repositoryName, e);
-
+			throw new IOException("Repository not available for export");
 		} catch (IOException e) {
-			db.close();
-			throw new RepositoryNotFoundException(repositoryName, e);
-
-		} catch (ServiceNotEnabledException e) {
-			db.close();
-			throw e;
+			final RepositoryNotFoundException notFound;
+			notFound = new RepositoryNotFoundException(repositoryName);
+			notFound.initCause(e);
+			throw notFound;
 		}
-	}
-
-	/** @return {@code true} if all repositories are to be exported. */
-	protected boolean isExportAll() {
-		return exportAll;
 	}
 
 	/**
 	 * Check if this repository can be served over HTTP.
-	 * <p>
-	 * The default implementation of this method returns true only if either
-	 * {@link #isExportAll()} is true, or the {@code git-daemon-export-ok} file
-	 * is present in the repository's directory.
-	 *
+	 * 
 	 * @param req
 	 *            the current HTTP request.
 	 * @param repositoryName
@@ -129,16 +97,10 @@ public class FileResolver implements RepositoryResolver {
 	 * @param db
 	 *            the opened repository instance.
 	 * @return true if the repository is accessible; false if not.
-	 * @throws IOException
-	 *             the repository could not be accessed, the caller will claim
-	 *             the repository does not exist.
 	 */
 	protected boolean isExportOk(HttpServletRequest req, String repositoryName,
-			Repository db) throws IOException {
-		if (isExportAll())
-			return true;
-		else
-			return new File(db.getDirectory(), "git-daemon-export-ok").exists();
+			Repository db) {
+		return new File(db.getDirectory(), "git-daemon-export-ok").exists();
 	}
 
 	private static boolean isUnreasonableName(final String name) {
@@ -146,7 +108,9 @@ public class FileResolver implements RepositoryResolver {
 			return true; // no empty paths
 
 		if (name.indexOf('\\') >= 0)
-			return true; // no windows/dos style paths
+			return true; // no windows/dos stlye paths
+		if (name.charAt(0) == '/')
+			return true; // no absolute paths
 		if (new File(name).isAbsolute())
 			return true; // no absolute paths
 
@@ -157,7 +121,7 @@ public class FileResolver implements RepositoryResolver {
 		if (name.contains("/./"))
 			return true; // "foo/./foo" is insane to ask
 		if (name.contains("//"))
-			return true; // double slashes is sloppy, don't use it
+			return true; // windows UNC path can be "//..."
 
 		return false; // is a reasonable name
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,50 +43,96 @@
 
 package org.eclipse.jgit.http.server;
 
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.send;
-
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
-import javax.servlet.http.HttpServlet;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.PacketLineOut;
+import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser;
-import org.eclipse.jgit.util.HttpSupport;
+import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 
 /** Send a complete list of current refs, including peeled values for tags. */
-class InfoRefsServlet extends HttpServlet {
+class InfoRefsServlet extends RepositoryServlet {
 	private static final long serialVersionUID = 1L;
 
-	public void doGet(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws IOException {
-		// Assume a dumb client and send back the dumb client
-		// version of the info/refs file.
-		final byte[] raw = dumbHttp(req);
-		rsp.setContentType(HttpSupport.TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
-		send(raw, req, rsp);
+	private final ReceivePackFactory receivePackFactory;
+
+	InfoRefsServlet(final ReceivePackFactory receivePackFactory) {
+		this.receivePackFactory = receivePackFactory;
 	}
 
-	private byte[] dumbHttp(final HttpServletRequest req) throws IOException {
-		final Repository db = getRepository(req);
+	@Override
+	public void doGet(final HttpServletRequest req,
+			final HttpServletResponse rsp) throws IOException {
+		serve(req, rsp, true);
+	}
+
+	@Override
+	protected void doHead(final HttpServletRequest req,
+			final HttpServletResponse rsp) throws ServletException, IOException {
+		serve(req, rsp, false);
+	}
+
+	private void serve(final HttpServletRequest req,
+			final HttpServletResponse rsp, final boolean sendBody)
+			throws IOException {
+		final byte[] raw;
+		try {
+			final Repository db = getRepository(req);
+			final String name = req.getParameter("service");
+
+			if (name != null && name.startsWith("git-")) {
+				final ByteArrayOutputStream buf = new ByteArrayOutputStream();
+				final PacketLineOut out = new PacketLineOut(buf);
+				out.writeString("# service=" + name + "\n");
+
+				if ("git-receive-pack".equals(name)) {
+					final ReceivePack rp = receivePackFactory.create(req, db);
+					rp.sendAdvertisedRefs(new PacketLineOutRefAdvertiser(out));
+
+				} else {
+					throw new ServiceNotEnabledException();
+				}
+
+				raw = buf.toByteArray();
+				rsp.setContentType("application/x-" + name + "-advertisement");
+
+			} else {
+				// We don't recognize the service request, or none was made.
+				// Assume a dumb client and send back the dumb version of the
+				// info/refs file.
+				//
+				raw = dumbHttp(db);
+				rsp.setContentType("text/plain");
+				rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
+			}
+
+		} catch (ServiceNotEnabledException e) {
+			rsp.reset();
+			rsp.sendError(HttpServletResponse.SC_FORBIDDEN);
+			return;
+		}
+
+		send(raw, req, rsp, sendBody);
+	}
+
+	private byte[] dumbHttp(final Repository db) throws IOException {
+		final StringBuilder out = new StringBuilder();
 		final RevWalk walk = new RevWalk(db);
 		final RevFlag ADVERTISED = walk.newFlag("ADVERTISED");
-		final StringBuilder out = new StringBuilder();
 		final RefAdvertiser adv = new RefAdvertiser() {
 			@Override
 			protected void writeOne(final CharSequence line) {
-				// Whoever decided that info/refs should use a different
-				// delimiter than the native git:// protocol shouldn't
-				// be allowed to design this sort of stuff. :-(
 				out.append(line.toString().replace(' ', '\t'));
 			}
 
@@ -97,10 +143,7 @@ class InfoRefsServlet extends HttpServlet {
 		};
 		adv.init(walk, ADVERTISED);
 		adv.setDerefTags(true);
-
-		Map<String, Ref> refs = new HashMap<String, Ref>(db.getAllRefs());
-		refs.remove(Constants.HEAD);
-		adv.send(refs.values());
-		return out.toString().getBytes(Constants.CHARACTER_ENCODING);
+		adv.send(db.getAllRefs().values());
+		return Constants.encode(out.toString());
 	}
 }

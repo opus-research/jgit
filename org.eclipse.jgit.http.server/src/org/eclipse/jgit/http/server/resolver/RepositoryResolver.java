@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -54,7 +54,7 @@ public interface RepositoryResolver {
 	 * Locate and open a reference to a {@link Repository}.
 	 * <p>
 	 * The caller is responsible for closing the returned Repository.
-	 *
+	 * 
 	 * @param req
 	 *            the current HTTP request, may be used to inspect session state
 	 *            including cookies or user authentication.
@@ -62,16 +62,9 @@ public interface RepositoryResolver {
 	 *            name of the repository, as parsed out of the URL.
 	 * @return the opened repository instance, never null.
 	 * @throws RepositoryNotFoundException
-	 *             the repository does not exist or the name is incorrectly
-	 *             formatted as a repository name.
-	 * @throws ServiceNotAuthorizedException
-	 *             the repository exists, but HTTP access is not allowed for the
-	 *             current user.
-	 * @throws ServiceNotEnabledException
-	 *             the repository exists, but HTTP access is not allowed on the
-	 *             target repository, by any user.
+	 *             the repository does not exist or is not accessible over HTTP
+	 *             for the current request.
 	 */
 	Repository open(HttpServletRequest req, String name)
-			throws RepositoryNotFoundException, ServiceNotAuthorizedException,
-			ServiceNotEnabledException;
+			throws RepositoryNotFoundException;
 }
