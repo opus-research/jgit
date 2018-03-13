@@ -43,39 +43,57 @@
 
 package org.eclipse.jgit.transport;
 
-/** Ref name with matching functions. */
+/**
+ * Subscribe spec with matching functions. Can either contain a constant ref
+ * ("refs/heads/master") or a wildcard pattern ("refs/heads/*").
+ */
 public class SubscribeSpec {
+	/**
+	 * Strip the wildcard character from the end of a wildcard ref.
+	 *
+	 * @param ref
+	 *            the wildcard ref string, e.g "refs/heads/*"
+	 * @return the ref without the trailing "*", e.g "refs/heads/"
+	 */
+	public static String stripWildcard(String ref) {
+		return ref.substring(0, ref.length() - 1);
+	}
+
 	private final String refName;
 
 	private final boolean isWildcard;
 
 	/**
 	 * @param name
+	 *            the ref name or wildcard spec, e.g "refs/heads/master" or
+	 *            "refs/heads/*"
 	 */
 	public SubscribeSpec(String name) {
 		refName = name;
-		isWildcard = name.endsWith("/*");
+		isWildcard = RefSpec.isWildcard(name);
 	}
 
-	/** @return ref name */
+	/** @return ref name or wildcard ref pattern */
 	public String getRefName() {
 		return refName;
 	}
 
-	/** @return true if this spec contains a wildcard */
+	/** @return true if this spec contains a wildcard (ends with "*") */
 	public boolean isWildcard() {
 		return isWildcard;
 	}
 
 	/**
 	 * @param ref
-	 * @return true if ref is a match
+	 *            to match against
+	 * @return true if ref is an exact match if this spec is not a wildcard
+	 *         pattern, or a wildcard match.
 	 */
 	public boolean isMatch(String ref) {
 		if (ref == null)
 			return false;
 		if (isWildcard)
-			return ref.startsWith(refName.substring(0, refName.length() - 1));
+			return ref.startsWith(stripWildcard(refName));
 		return refName.equals(ref);
 	}
 

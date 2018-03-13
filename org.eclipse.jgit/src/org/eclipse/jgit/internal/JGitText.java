@@ -473,7 +473,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String searchForSizes;
 	/***/ public String secondsAgo;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
-	/***/ public String serviceNotEnabled;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
 	/***/ public String serviceNotPermittedNoName;
@@ -502,12 +501,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
+	/***/ public String stopCommandNotSupported;
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String subscribeNewUpdate;
 	/***/ public String subscribeNotSupported;
-	/***/ public String subscribeStart;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
 	/***/ public String tagNameInvalid;

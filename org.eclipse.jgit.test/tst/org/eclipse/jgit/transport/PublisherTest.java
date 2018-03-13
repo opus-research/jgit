@@ -44,12 +44,12 @@
 package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
@@ -57,7 +57,6 @@ import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -66,7 +65,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.transport.PublisherSession.SessionGenerator;
-import org.eclipse.jgit.transport.SubscribeCommand.Command;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Test;
@@ -85,7 +83,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 	String refName = "refs/heads/foobar";
 
-	PublisherBuffer buffer;
+	PublisherMemoryPool buffer;
 
 	PublisherPackFactory packFactory;
 
@@ -94,13 +92,11 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 	CountDownLatch connectLatch;
 
 	private void setUpPublisher(int expectedClients) {
-		// Every PublisherTestClient that is created makes 2 calls to
-		// connectClient.
-		connectLatch = new CountDownLatch(2 * expectedClients);
-		buffer = new PublisherBuffer(64 * 1024);
+		connectLatch = new CountDownLatch(expectedClients);
+		buffer = new PublisherMemoryPool(64 * 1024);
 		packFactory = new PublisherPackFactory(buffer);
 		packFactory.setSliceSize(1024);
-		packFactory.setSliceMemoryThreshold(3);
+		packFactory.setSliceInMemoryLimit(3);
 		publisher = new Publisher(new PublisherReverseResolver(),
 			packFactory, new SessionGenerator() {
 			private AtomicInteger sid = new AtomicInteger();
@@ -110,69 +106,12 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			}
 		}) {
 			@Override
-			public synchronized PublisherSession connectClient(
-					PublisherClient c) throws ServiceNotAuthorizedException,
-					ServiceNotEnabledException {
-				PublisherSession s = super.connectClient(c);
+			public synchronized PublisherSession newSession() {
+				PublisherSession s = super.newSession();
 				connectLatch.countDown();
 				return s;
 			}
 		};
-		buffer.startGC();
-	}
-
-	/**
-	 * Test reading the packet-line encoded subscribe commands from a client.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testSubscribe() throws Exception {
-		setUpPublisher(1);
-		PublisherClientTest pc = new PublisherClientTest(0, 100) {
-			@Override
-			protected void writeSubscribePacket(PacketLineOut pckLineOut)
-					throws IOException {
-				pckLineOut.writeString("subscribe");
-				pckLineOut.writeString("restart " + state.getKey());
-				pckLineOut.end();
-				pckLineOut.writeString("repository testrepository");
-				pckLineOut.writeString("want " + refName);
-				pckLineOut.writeString(
-						"have " + OBJECT_ID1.getName() + " " + refName);
-				pckLineOut.end();
-				pckLineOut.writeString("done");
-			}
-
-			@Override
-			public Repository openRepository(String name)
-					throws RepositoryNotFoundException,
-					ServiceMayNotContinueException,
-					ServiceNotAuthorizedException, ServiceNotEnabledException {
-				if (!name.equals("testrepository"))
-					fail("Invalid open database request");
-				return db;
-			}
-		};
-
-		connectLatch.await();
-
-		assertEquals(pc.getPublisherState().getKey(), pc.getRestartToken());
-
-		Map<String, List<SubscribeCommand>> cmds = pc.getCommands();
-		assertTrue(cmds.containsKey("testrepository"));
-		List<SubscribeCommand> subCmds = cmds.get("testrepository");
-		assertEquals(1, subCmds.size());
-		SubscribeCommand subCmd = subCmds.get(0);
-		assertEquals(Command.SUBSCRIBE, subCmd.getCommand());
-		assertEquals(refName, subCmd.getSpec());
-
-		Map<String, Map<String, ObjectId>> s = pc.getRefState();
-		assertTrue(s.containsKey("testrepository"));
-		Map<String, ObjectId> specs = s.get("testrepository");
-		assertEquals(1, specs.size());
-		assertTrue(specs.containsKey(refName));
-		assertEquals(OBJECT_ID1, specs.get(refName));
 	}
 
 	@Test
@@ -213,7 +152,6 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
 				pckLineOut.writeString("subscribe");
-				pckLineOut.writeString("restart " + state.getKey());
 				pckLineOut.end();
 				pckLineOut.writeString("repository testrepository");
 				pckLineOut.writeString("want refs/heads/a");
@@ -246,7 +184,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		line = in.readString();
 		parts = line.split(" ", 2);
 		assertEquals("restart-token", parts[0]);
-		assertEquals(c.getPublisherState().getKey(), parts[1]);
+		assertEquals(c.getSession().getKey(), parts[1]);
 		line = in.readString();
 		parts = line.split(" ", 2);
 		assertEquals("heartbeat-interval", parts[0]);
@@ -290,7 +228,6 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				protected void writeSubscribePacket(PacketLineOut pckLineOut)
 						throws IOException {
 					pckLineOut.writeString("subscribe");
-					pckLineOut.writeString("restart " + state.getKey());
 					pckLineOut.end();
 					pckLineOut.writeString("repository testrepository");
 					pckLineOut.writeString("want " + refName);
@@ -312,7 +249,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				}
 			};
 			testClients.add(t);
-			states.add(t.getPublisherState());
+			states.add(t.getSession());
 		}
 
 		connectLatch.await();
@@ -334,7 +271,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				line = in.readString();
 				parts = line.split(" ", 2);
 				assertEquals("restart-token", parts[0]);
-				assertEquals(c.getPublisherState().getKey(), parts[1]);
+				assertEquals(c.getSession().getKey(), parts[1]);
 				line = in.readString();
 				parts = line.split(" ", 2);
 				assertEquals("heartbeat-interval", parts[0]);
@@ -356,13 +293,13 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 					line = in.readString();
 					parts = line.split(" ", 2);
-					assertEquals("pack-number", parts[0]);
+					assertEquals("pack-id", parts[0]);
 					updatesLeft--;
 				}
 			} catch (Exception e) {
-				throw new Exception(c.getPublisherState().getKey(), e);
+				throw new Exception(c.getSession().getKey(), e);
 			} finally {
-				c.close();
+				c.checkExceptions();
 			}
 		}
 	}
@@ -370,17 +307,13 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 	abstract class PublisherClientTest extends PublisherClient {
 		Thread subscribeThread;
 
-		PublisherSession state;
-
 		PipedOutputStream output;
 
 		PipedInputStream input;
 
+		List<Exception> exceptions;
+
 		/**
-		 * Connect first so we can get a fast-restart key, then disconnect and
-		 * let subscribe() reconnect us with the same PublisherClientState
-		 * instance.
-		 *
 		 * @param delayWrite
 		 * @param space
 		 * @throws ServiceNotAuthorizedException
@@ -390,8 +323,6 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				throws ServiceNotAuthorizedException,
 				ServiceNotEnabledException {
 			super(publisher);
-			state = publisher.connectClient(this);
-			state.disconnect();
 
 			ByteArrayOutputStream fillIn = new ByteArrayOutputStream();
 			PacketLineOut pckLineOut = new PacketLineOut(fillIn);
@@ -423,14 +354,17 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				// Never happens
 			}
 
+			exceptions = new ArrayList<Exception>();
 			final PublisherClient me = this;
 			subscribeThread = new Thread() {
 				@Override
 				public void run() {
 					try {
-						me.subscribe(myIn, output, null);
+						me.subscribeLoop(myIn, output, null);
+					} catch (EOFException e) {
+						// Nothing, normal close
 					} catch (Exception e) {
-						fail(e.toString());
+						exceptions.add(e);
 					}
 				}
 			};
@@ -438,16 +372,9 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			subscribeThread.start();
 		}
 
-		@Override
-		public synchronized void close() {
-			try {
-				if (output != null) {
-					output.close();
-					input.close();
-				}
-			} catch (IOException e) {
-				fail(e.getMessage());
-			}
+		public void checkExceptions() throws Exception {
+			for (Exception e : exceptions)
+				throw e;
 		}
 
 		protected abstract void writeSubscribePacket(PacketLineOut pckLineOut)
@@ -455,10 +382,6 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 		public Thread getSubscribeThread() {
 			return subscribeThread;
-		}
-
-		public PublisherSession getPublisherState() {
-			return state;
 		}
 
 		public PipedInputStream getPipedInputStream() {

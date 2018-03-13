@@ -51,13 +51,12 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.transport.SubscribeCommand.Command;
+import org.eclipse.jgit.util.RefTranslator;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -106,53 +105,6 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		assertEquals(publisherConfig, s1.getPublisher());
 		assertEquals(db.getDirectory().getAbsolutePath(), s1.getDirectory());
 		assertEquals("testrepository", s1.getName());
-	}
-
-	@Test
-	public void testSync() throws Exception {
-		Subscriber s = new Subscriber(publisherConfig.getUri());
-		Map<String, List<SubscribeCommand>> cmds = s.sync(publisherConfig);
-		assertTrue(cmds.containsKey("testrepository"));
-		assertEquals(2, cmds.get("testrepository").size());
-
-		List<SubscribeCommand> expected = new ArrayList<SubscribeCommand>();
-		expected.add(
-				new SubscribeCommand(Command.SUBSCRIBE, "refs/heads/master"));
-		expected.add(new SubscribeCommand(Command.SUBSCRIBE, "refs/tags/*"));
-		expected.removeAll(cmds.get("testrepository"));
-		assertEquals(0, expected.size());
-	}
-
-	@Test
-	public void testResync() throws Exception {
-		Subscriber s = new Subscriber(publisherConfig.getUri());
-
-		s.sync(publisherConfig);
-
-		String directory = db.getDirectory().getAbsolutePath();
-		FileBasedConfig fc = db.getConfig();
-		fc.load();
-		RemoteConfig rc = new RemoteConfig(fc, "origin");
-		rc.removeFetchRefSpec(new RefSpec("refs/tags/*:refs/tags/*"));
-		rc.addFetchRefSpec(
-				new RefSpec("refs/heads/branch:refs/remotes/origin/branch"));
-		rc.update(fc);
-		fc.save();
-		publisherConfig = new PubSubConfig.Publisher("http://example.com/");
-		PubSubConfig.Subscriber subscribeConfig = new PubSubConfig.Subscriber(
-				publisherConfig, "origin", directory);
-		publisherConfig.addSubscriber(subscribeConfig);
-
-		Map<String, List<SubscribeCommand>> after = s.sync(publisherConfig);
-
-		assertTrue(after.containsKey("testrepository"));
-		assertEquals(2, after.get("testrepository").size());
-		List<SubscribeCommand> expected = new ArrayList<SubscribeCommand>();
-		expected.add(new SubscribeCommand(Command.UNSUBSCRIBE, "refs/tags/*"));
-		expected.add(
-				new SubscribeCommand(Command.SUBSCRIBE, "refs/heads/branch"));
-		expected.removeAll(after.get("testrepository"));
-		assertEquals(0, expected.size());
 	}
 
 	@Test
@@ -216,25 +168,25 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		RemoteConfig rc = new RemoteConfig(fc, "self");
 
 		assertEquals("refs/pubsub/self/heads/master",
-				SubscribedRepository.getPubSubRefFromTracking(
+				RefTranslator.getPubSubRefFromTracking(
 						rc, "refs/remotes/origin/master"));
 		assertEquals("refs/pubsub/self/heads/master",
-				SubscribedRepository.getPubSubRefFromRemote(
+				RefTranslator.getPubSubRefFromRemote(
 						"self", "refs/heads/master"));
 		assertEquals("refs/remotes/origin/master",
-				SubscribedRepository.getTrackingRefFromPubSub(
+				RefTranslator.getTrackingRefFromPubSub(
 						rc, "refs/pubsub/self/heads/master"));
 		assertEquals("refs/heads/master",
-				SubscribedRepository.getRemoteRefFromTracking(
+				RefTranslator.getRemoteRefFromTracking(
 						rc, "refs/remotes/origin/master"));
 		assertEquals("refs/remotes/origin/master",
-				SubscribedRepository.getTrackingRefFromRemote(
+				RefTranslator.getTrackingRefFromRemote(
 						rc, "refs/heads/master"));
 		assertEquals("refs/heads/master",
-				SubscribedRepository.getRemoteRefFromTracking(
+				RefTranslator.getRemoteRefFromTracking(
 						rc, "refs/remotes/origin/master"));
 		assertEquals("refs/heads/master",
-				SubscribedRepository.getRemoteRefFromPubSub(
+				RefTranslator.getRemoteRefFromPubSub(
 						"self", "refs/pubsub/self/heads/master"));
 	}
 }

@@ -43,124 +43,52 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.errors.NotSupportedException;
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PublisherSession.SessionGenerator;
+import org.eclipse.jgit.transport.PublisherStream.Window;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.util.ConcurrentLinkedList;
-import org.eclipse.jgit.util.ConcurrentLinkedList.ConcurrentIterator;
 
 /**
  * Publishes pack data to multiple Subscribers with matching subscription
  * requests. This publisher handles multiple repositories.
  */
-public class Publisher {
+public class Publisher implements PostReceiveHook {
 	/** Session lifetime after a client disconnects, in seconds. */
-	private static final int DEFAULT_SESSION_LIFETIME = 60 * 60;
+	private static final int DEFAULT_SESSION_GRACE_PERIOD = 60 * 60;
 
-	/**
-	 * Contains acceleration structures to speed up calculation of which clients
-	 * the PublisherUpdate needs to be sent to.
-	 */
-	class PublisherEventProcessor {
-		LinkedHashSet<PublisherSession> clients = new LinkedHashSet<PublisherSession>();
-
-		public synchronized void addClient(PublisherSession c) {
-			clients.add(c);
-		}
-
-		public synchronized void removeClient(PublisherSession c) {
-			clients.remove(c);
-		}
-
-		/**
-		 * Find all matches between client SubscribeSpecs and the update.
-		 *
-		 * @param name
-		 * @param updates
-		 * @return a list of all client states that have overlapping refs
-		 */
-		public synchronized Map<Set<ReceiveCommand>, List<PublisherSession>> getAffectedClients(
-				String name, Collection<ReceiveCommand> updates) {
-			Map<Set<ReceiveCommand>, List<PublisherSession>> groups = new LinkedHashMap<Set<ReceiveCommand>, List<PublisherSession>>();
-
-			for (PublisherSession c : clients) {
-				Collection<SubscribeSpec> clientSpecs = c.getSubscriptions(
-						name);
-				if (!clientSpecs.isEmpty()) {
-					Set<ReceiveCommand> matchedUpdates = new LinkedHashSet<
-							ReceiveCommand>();
-					for (ReceiveCommand r : updates) {
-						for (SubscribeSpec f : clientSpecs) {
-							if (f.isMatch(r.getRefName())) {
-								matchedUpdates.add(r);
-								break;
-							}
-						}
-					}
-					// Search for match
-					if (matchedUpdates.size() > 0) {
-						if (!groups.containsKey(matchedUpdates))
-							groups.put(matchedUpdates,
-									new ArrayList<PublisherSession>());
-						groups.get(matchedUpdates).add(c);
-					}
-				}
-			}
-			return groups;
-		}
-	}
-
-	private final PostReceiveHook postReceiveHook = new PostReceiveHook() {
-		public void onPostReceive(
-				ReceivePack rp, Collection<ReceiveCommand> commands) {
-			List<ReceiveCommand> updates = new ArrayList<ReceiveCommand>();
-			for (ReceiveCommand c : commands) {
-				if (c.getResult() != ReceiveCommand.Result.OK)
-					continue;
-				updates.add(c);
-			}
-			try {
-				onPush(rp.db, updates);
-			} catch (NotSupportedException e) {
-				e.printStackTrace();
-			}
-		}
-	};
+	private static final int DEFAULT_SESSION_ROLLBACK_COUNT = 2;
 
 	private final PublisherPackFactory packFactory;
 
-	private final PublisherEventProcessor processor;
-
-	private final Map<String, PublisherSession> clientStates;
+	private final Map<String, PublisherSession> sessions;
 
 	private final PublisherReverseResolver repositoryNameLookup;
 
-	private final ConcurrentLinkedList<PublisherPack> packStream;
+	private final PublisherStream pushStream;
 
 	private final ScheduledThreadPoolExecutor sessionDeleter;
 
 	private final SessionGenerator generator;
 
 	private int sessionLifetime;
+
+	private int sessionRollbackCount;
+
+	private long pushCount;
+
+	private volatile boolean closed;
 
 	/**
 	 * Create a new Publisher to serve multiple repositories.
@@ -171,11 +99,19 @@ public class Publisher {
 	 */
 	public Publisher(PublisherReverseResolver repositoryNameLookup,
 			PublisherPackFactory packFactory, SessionGenerator generator) {
-		processor = new PublisherEventProcessor();
-		clientStates = new HashMap<String, PublisherSession>();
-		packStream = new ConcurrentLinkedList<PublisherPack>();
-		sessionDeleter = new ScheduledThreadPoolExecutor(1);
-		sessionLifetime = DEFAULT_SESSION_LIFETIME;
+		sessions = new HashMap<String, PublisherSession>();
+		pushStream = new PublisherStream();
+		sessionDeleter = new ScheduledThreadPoolExecutor(
+				1, new ThreadFactory() {
+					public Thread newThread(Runnable r) {
+						Thread t = new Thread(r);
+						t.setName("SessionDeleter");
+						t.setDaemon(true);
+						return t;
+					}
+				});
+		sessionLifetime = DEFAULT_SESSION_GRACE_PERIOD;
+		sessionRollbackCount = DEFAULT_SESSION_ROLLBACK_COUNT;
 		this.repositoryNameLookup = repositoryNameLookup;
 		this.packFactory = packFactory;
 		this.generator = generator;
@@ -186,52 +122,44 @@ public class Publisher {
 	 *            the number of seconds before deleting this session after its
 	 *            client disconnects
 	 */
-	public void setSessionLifetime(int lifetime) {
+	public synchronized void setSessionLifetime(int lifetime) {
 		sessionLifetime = lifetime;
 	}
 
 	/**
-	 * @param c
+	 * @param count
+	 *            the number of updates each session should keep after sending,
+	 *            to allow the client to rollback the stream
+	 */
+	public synchronized void setSessionRollbackCount(int count) {
+		sessionRollbackCount = count;
+	}
+
+	/**
+	 * @return a new session, initialized with commands
+	 */
+	public synchronized PublisherSession newSession() {
+		Window window = pushStream.newWindow(sessionRollbackCount);
+		PublisherSession session = new PublisherSession(
+				window, generator
+				.generate());
+		sessions.put(session.getKey(), session);
+		return session;
+	}
+
+	/**
+	 * @param sessionId
 	 * @return the persistent state for this connection, or null if a restart
 	 *         token was given but could not be recovered
 	 * @throws ServiceNotAuthorizedException
 	 * @throws ServiceNotEnabledException
 	 */
-	public synchronized PublisherSession connectClient(PublisherClient c)
+	public synchronized PublisherSession reconnectSession(String sessionId)
 			throws ServiceNotAuthorizedException, ServiceNotEnabledException {
-		PublisherSession state;
-		if (c.getRestartToken() != null) {
-			if (!clientStates.containsKey(c.getRestartToken()))
-				return null;
-			state = clientStates.get(c.getRestartToken());
-			if (!state.stopDeleteTimer())
-				return null;
-		} else {
-			state = new PublisherSession(this, generator);
-			clientStates.put(state.getKey(), state);
-		}
-
-		boolean failedSyncing = false;
-		try {
-			state.sync(c);
-			processor.addClient(state);
-			return state;
-		} catch (IOException e) {
-			failedSyncing = true;
-			e.printStackTrace();
-		} catch (ServiceNotAuthorizedException e) {
-			failedSyncing = true;
-			throw e;
-		} catch (ServiceNotEnabledException e) {
-			failedSyncing = true;
-			throw e;
-		} finally {
-			if (failedSyncing) {
-				state.disconnect();
-				processor.removeClient(state);
-			}
-		}
-		return null;
+		PublisherSession state = sessions.get(sessionId);
+		if (state == null || !state.cancelDeleteTimer())
+			return null;
+		return state;
 	}
 
 	/**
@@ -241,13 +169,36 @@ public class Publisher {
 	 * @param session
 	 */
 	public synchronized void removeSession(PublisherSession session) {
-		clientStates.remove(session.getKey());
-		session.close();
+		sessions.remove(session.getKey());
+		try {
+			session.close();
+		} catch (PublisherException e) {
+			close();
+			e.printStackTrace();
+		}
 	}
 
-	/** @return post-receive hook implementation to install in ReceivePack */
-	public PostReceiveHook getHook() {
-		return postReceiveHook;
+	/** Post-receive hook implementation to install in ReceivePack */
+	public void onPostReceive(
+			ReceivePack rp, Collection<ReceiveCommand> commands) {
+		if (isClosed())
+			return;
+		List<ReceiveCommand> updates = new ArrayList<ReceiveCommand>(
+				commands.size());
+		for (ReceiveCommand c : commands) {
+			if (c.getResult() != ReceiveCommand.Result.OK)
+				continue;
+			updates.add(c);
+		}
+		try {
+			onPush(rp.db, updates);
+		} catch (NotSupportedException e) {
+			e.printStackTrace();
+		} catch (PublisherException e) {
+			// Fatal error
+			close();
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -264,12 +215,9 @@ public class Publisher {
 	 *            to resolve a repository.
 	 * @throws NotSupportedException
 	 */
-	public void hookRepository(Repository r, String name) throws NotSupportedException {
+	public void hookRepository(Repository r, String name)
+			throws NotSupportedException {
 		repositoryNameLookup.register(r, name);
-	}
-
-	private String getName(Repository r) throws NotSupportedException {
-		return repositoryNameLookup.find(r);
 	}
 
 	/**
@@ -281,101 +229,54 @@ public class Publisher {
 	 * @param db
 	 * @param updates
 	 * @throws NotSupportedException
+	 * @throws PublisherException
 	 */
 	public synchronized void onPush(
-			Repository db, Collection<ReceiveCommand> updates) throws NotSupportedException {
-		// Split pack apart into the smallest number of packs needed to cover
-		// the different sessions. Not all sessions will be subscribed to all of
-		// the updated refs.
-		String dbName = getName(db);
-		Map<Set<ReceiveCommand>, List<PublisherSession>> updateGroups = processor
-				.getAffectedClients(dbName, updates);
-		for (Map.Entry<Set<ReceiveCommand>, List<PublisherSession>> e :
-				updateGroups.entrySet()) {
-			// Need to split up the session list further to include all possible
-			// existing ObjectIds of all covered objects. This reduces the pack
-			// size as much as possible without asking each client for their
-			// ref state by assuming the client's state matches the server for
-			// all refs that match the subscription specs.
-			List<PublisherSession> updateGroup = e.getValue();
-			Map<Set<SubscribeSpec>, List<PublisherSession>> existingObjectGroups
-					= new HashMap<Set<SubscribeSpec>, List<PublisherSession>>();
-
-			if (updateGroup.size() == 0)
-				break;
-			for (PublisherSession s : updateGroup) {
-				Set<SubscribeSpec> specSet = new HashSet<SubscribeSpec>();
-				specSet.addAll(s.getSubscriptions(dbName));
-				List<PublisherSession> sessionGroup = existingObjectGroups.get(
-						specSet);
-				if (sessionGroup == null) {
-					sessionGroup = new ArrayList<PublisherSession>();
-					sessionGroup.add(s);
-					existingObjectGroups.put(specSet, sessionGroup);
-				} else
-					sessionGroup.add(s);
-			}
-
-			for (Map.Entry<Set<SubscribeSpec>, List<PublisherSession>> e2 :
-					existingObjectGroups.entrySet()) {
-				List<PublisherSession> sessionList = e2.getValue();
-				Set<SubscribeSpec> sessionSpecs = e2.getKey();
-				try {
-					PublisherPack pk = packFactory.buildPack(sessionList.size(),
-							dbName, updates, db, sessionSpecs);
-					packStream.put(pk);
-				} catch (IOException ex) {
-					// Nothing, pack already released
-				}
-			}
-		}
+			Repository db, final Collection<ReceiveCommand> updates)
+			throws NotSupportedException, PublisherException {
+		String dbName = repositoryNameLookup.find(db);
+		if (dbName == null)
+			return;
+		pushStream.add(new PublisherPush(
+				dbName, updates, "push-" + pushCount++, packFactory));
 	}
 
 	/**
-	 * @param c
-	 * @param name
-	 * @return the Repository with this name
-	 * @throws ServiceNotEnabledException
-	 * @throws ServiceNotAuthorizedException
-	 * @throws ServiceMayNotContinueException
-	 * @throws RepositoryNotFoundException
+	 * @return the factory used for creating new pack files to stream to
+	 *         clients.
 	 */
-	public Repository getRepository(PublisherClient c, String name)
-			throws RepositoryNotFoundException, ServiceMayNotContinueException,
-			ServiceNotAuthorizedException, ServiceNotEnabledException {
-		return c.openRepository(name);
-	}
-
-	/** @return a new iterator starting at the tail of the stream */
-	public ConcurrentIterator<PublisherPack> getPackStreamIterator() {
-		return packStream.getTailIterator();
-	}
-
-	/**
-	 * @param refUpdates
-	 * @param serverRepository
-	 * @param repoName
-	 * @return a new publisher pack initialized for 1 consumer
-	 * @throws IOException
-	 */
-	public PublisherPack createInitialPack(List<ReceiveCommand> refUpdates,
-			Repository serverRepository, String repoName) throws IOException {
-		List<SubscribeSpec> emptySpecs = Collections.emptyList();
-		return packFactory.buildPack(
-				1, repoName, refUpdates, serverRepository, emptySpecs);
+	public PublisherPackFactory getPackFactory() {
+		return packFactory;
 	}
 
 	/**
 	 * @param session
-	 * @return the task to delete this session
+	 *            the session to be deleted after {@link #sessionLifetime}
+	 *            seconds.
 	 */
-	public ScheduledFuture<?> startDeleteTimer(
+	public void startDeleteTimer(
 			final PublisherSession session) {
-		return sessionDeleter.schedule(new Callable<Void>() {
+		session.setDeleteTimer(sessionDeleter.schedule(new Callable<Void>() {
 			public Void call() throws Exception {
 				removeSession(session);
 				return null;
 			}
-		}, sessionLifetime, TimeUnit.SECONDS);
+		}, sessionLifetime, TimeUnit.SECONDS));
+	}
+
+	/**
+	 * Close this publisher. This will cause all clients to disconnect and
+	 * the publisher to stop receiving updates.
+	 */
+	public void close() {
+		closed = true;
+		sessionDeleter.shutdown();
+	}
+
+	/**
+	 * @return true if the publisher is closed
+	 */
+	public boolean isClosed() {
+		return closed;
 	}
 }

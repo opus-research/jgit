@@ -57,14 +57,13 @@ public class PublisherPackSliceFile extends PublisherPackSlice {
 
 	/**
 	 * @param policy
-	 * @param callback
-	 * @param consumers
+	 * @param allocator
 	 * @param buf
 	 * @param fileName
 	 */
-	public PublisherPackSliceFile(LoadPolicy policy, LoadCallback callback,
-			int consumers, byte[] buf, String fileName) {
-		super(policy, callback, consumers, buf);
+	public PublisherPackSliceFile(LoadPolicy policy, Allocator allocator,
+			byte[] buf, String fileName) {
+		super(policy, allocator, buf);
 		this.fileName = fileName;
 	}
 
@@ -105,7 +104,7 @@ public class PublisherPackSliceFile extends PublisherPackSlice {
 	}
 
 	@Override
-	public void close() {
+	public void close() throws PublisherException {
 		super.close();
 		File f = new File(fileName);
 		f.delete();

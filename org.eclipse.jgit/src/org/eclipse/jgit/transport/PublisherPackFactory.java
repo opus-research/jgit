@@ -55,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -63,7 +62,8 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.transport.PublisherPackSlice.LoadCallback;
+import org.eclipse.jgit.transport.PublisherPackSlice.Allocator;
+import org.eclipse.jgit.transport.PublisherPackSlice.Deallocator;
 import org.eclipse.jgit.transport.PublisherPackSlice.LoadPolicy;
 import org.eclipse.jgit.transport.ReceiveCommand.Type;
 
@@ -75,16 +75,14 @@ public class PublisherPackFactory {
 	private int sliceSize = 256 * 1024;
 
 	/** Store all slices after this threshold value. */
-	private int sliceMemoryThreshold = 2;
+	private int sliceMemoryInMemoryLimit = 2;
 
-	private AtomicLong packNumber = new AtomicLong();
-
-	private final PublisherBuffer buffer;
+	private final PublisherMemoryPool buffer;
 
 	/**
 	 * @param buffer
 	 */
-	public PublisherPackFactory(PublisherBuffer buffer) {
+	public PublisherPackFactory(PublisherMemoryPool buffer) {
 		this.buffer = buffer;
 	}
 
@@ -103,23 +101,21 @@ public class PublisherPackFactory {
 	 *
 	 * @param threshold
 	 */
-	public void setSliceMemoryThreshold(int threshold) {
-		sliceMemoryThreshold = threshold;
+	public void setSliceInMemoryLimit(int threshold) {
+		sliceMemoryInMemoryLimit = threshold;
 	}
 
 	/**
-	 * @param consumers
-	 *            the number of consumers expected to use this pack
-	 * @param repositoryName
 	 * @param refUpdates
 	 * @param repository
 	 * @param existingSpecs
+	 * @param packId
 	 * @return new publisher pack with created slices
 	 * @throws IOException
 	 */
-	public PublisherPack buildPack(int consumers, String repositoryName,
-			Collection<ReceiveCommand> refUpdates, Repository repository,
-			Collection<SubscribeSpec> existingSpecs)
+	public PublisherPack buildPack(Repository repository,
+			Collection<ReceiveCommand> refUpdates,
+			Collection<SubscribeSpec> existingSpecs, String packId)
 			throws IOException {
 		// Generate a list of ObjectIds that we expect clients to have because
 		// they are subscribed to existingSpecs. Don't include ObjectIds that
@@ -128,14 +124,14 @@ public class PublisherPackFactory {
 		Set<String> updatedRefs = new LinkedHashSet<String>();
 		for (ReceiveCommand rc : refUpdates)
 			updatedRefs.add(rc.getRefName());
-		Set<ObjectId> existingObjects = new LinkedHashSet<ObjectId>();
+		Set<ObjectId> existingObjects = new HashSet<ObjectId>();
 		RefDatabase refdb = repository.getRefDatabase();
 		Collection<Ref> matchingRefs = Collections.emptyList();
+		// Generate a list of supporting ObjectIds that the client must have
 		for (SubscribeSpec spec : existingSpecs) {
 			String refName = spec.getRefName();
 			if (spec.isWildcard()) {
-				String refNamePrefix = refName.substring(
-						0, refName.length() - 1);
+				String refNamePrefix = SubscribeSpec.stripWildcard(refName);
 				Map<String, Ref> refMap = refdb.getRefs(refNamePrefix);
 				for (String updatedRef : updatedRefs) {
 					if (updatedRef.startsWith(refNamePrefix))
@@ -145,17 +141,20 @@ public class PublisherPackFactory {
 				matchingRefs = refMap.values();
 			} else if (updatedRefs.contains(refName))
 				continue;
-			else
-				matchingRefs = Collections.singleton(refdb.getRef(refName));
+			else {
+				Ref ref = refdb.getRef(refName);
+				if (ref == null)
+					continue;
+				matchingRefs = Collections.singleton(ref);
+			}
+
 			for (Ref r : matchingRefs)
 				existingObjects.add(r.getLeaf().getObjectId());
 		}
-		long packNum = packNumber.incrementAndGet();
 		List<PublisherPackSlice> slices = new ArrayList<PublisherPackSlice>();
-		OutputStream packOut = createSliceStream(consumers, slices, packNum);
+		OutputStream packOut = createSliceStream(slices, packId);
 		PacketLineOut packDataLine = new PacketLineOut(packOut);
 
-		existingObjects.addAll(existingObjects);
 		Set<ObjectId> newObjects = new HashSet<ObjectId>();
 		PackWriter writer = new PackWriter(repository);
 		boolean writePack = false;
@@ -199,21 +198,19 @@ public class PublisherPackFactory {
 		} finally {
 			writer.release();
 		}
-		return new PublisherPack(
-				repositoryName, refUpdates, slices, packNum, existingSpecs);
+		return new PublisherPack(slices);
 	}
 
 	/**
 	 * Create a new slice that loads into memory on the first access.
 	 *
-	 * @param packNum
+	 * @param packId
 	 * @param sliceNumber
-	 * @param consumers
 	 * @param buf
 	 * @return a new slice using this data. Defaults to file-backed slice.
 	 */
 	protected PublisherPackSlice createSlice(
-			long packNum, int sliceNumber, int consumers, byte[] buf) {
+			String packId, int sliceNumber, byte[] buf) {
 		LoadPolicy policy = new LoadPolicy() {
 			private AtomicBoolean called = new AtomicBoolean();
 
@@ -222,22 +219,19 @@ public class PublisherPackFactory {
 			}
 		};
 
-		LoadCallback callback = new LoadCallback() {
-			public void loaded(PublisherPackSlice slice) {
-				buffer.allocate(slice);
-			}
-
-			public void unloaded(PublisherPackSlice slice) {
-				buffer.deallocate(slice);
+		Allocator allocator = new Allocator() {
+			public Deallocator allocate(final PublisherPackSlice slice)
+					throws PublisherException {
+				return buffer.allocate(slice);
 			}
 		};
 
-		return new PublisherPackSliceFile(policy, callback, consumers, buf,
-				"pack-" + packNum + "-" + sliceNumber + ".slice");
+		return new PublisherPackSliceFile(policy, allocator, buf, packId + "-"
+				+ sliceNumber + ".slice");
 	}
 
-	private OutputStream createSliceStream(final int consumers,
-			final List<PublisherPackSlice> slices, final long packNum) {
+	private OutputStream createSliceStream(
+			final List<PublisherPackSlice> slices, final String packId) {
 		return new OutputStream() {
 			int bufLen;
 
@@ -271,12 +265,12 @@ public class PublisherPackFactory {
 					return;
 				if (bufLen < buf.length)
 					buf = Arrays.copyOf(buf, bufLen);
-				PublisherPackSlice s = createSlice(
-						packNum, slices.size(), consumers, buf);
-				if (slices.size() >= sliceMemoryThreshold)
-					s.store(false);
-				else
-					buffer.allocate(s);
+				PublisherPackSlice s = createSlice(packId, slices.size(), buf);
+				if (slices.size() >= sliceMemoryInMemoryLimit) {
+					s.setDeallocator(Deallocator.INSTANCE);
+					s.store();
+				} else
+					s.setDeallocator(buffer.allocate(s));
 				slices.add(s);
 				bufLen = 0;
 				buf = new byte[sliceSize];
