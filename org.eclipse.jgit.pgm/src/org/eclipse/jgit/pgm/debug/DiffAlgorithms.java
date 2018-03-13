@@ -260,11 +260,11 @@ class DiffAlgorithms extends TextBuiltin {
 				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
 		outw.format("%-25s %12s ( %12s  %12s )\n", //
 				"", "", "N=" + minN, "N=" + maxN);
-		outw.println("-----------------------------------------------------" //$NON-NLS-1$
-				+ "----------------"); //$NON-NLS-1$
+		outw.println("-----------------------------------------------------"
+				+ "----------------");
 
 		for (Test test : all) {
-			outw.format("%-25s %12d ( %12d  %12d )", // //$NON-NLS-1$
+			outw.format("%-25s %12d ( %12d  %12d )", //
 					test.algorithm.name, //
 					valueOf(test.runningTimeNanos), //
 					valueOf(test.minN.runningTimeNanos), //
