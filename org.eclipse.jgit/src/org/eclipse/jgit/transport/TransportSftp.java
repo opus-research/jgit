@@ -227,7 +227,6 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 		Collection<String> getPackNames() throws IOException {
 			final List<String> packs = new ArrayList<String>();
 			try {
-				@SuppressWarnings("unchecked")
 				final Collection<ChannelSftp.LsEntry> list = ftp.ls("pack"); //$NON-NLS-1$
 				final HashMap<String, ChannelSftp.LsEntry> files;
 				final HashMap<String, Integer> mtimes;
@@ -456,7 +455,7 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 			}
 
 			throw new TransportException(
-					MessageFormat.format(JGitText.get().badRef, name, line)); // $NON-NLS-2$
+					MessageFormat.format(JGitText.get().badRef, name, line));
 		}
 
 		private Storage loose(final Ref r) {
