@@ -44,8 +44,10 @@
 
 package org.eclipse.jgit.merge;
 
+import java.text.MessageFormat;
 import java.util.HashMap;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -64,12 +66,16 @@ public abstract class MergeStrategy {
 	/** Simple strategy to merge paths, without simultaneous edits. */
 	public static final ThreeWayMergeStrategy SIMPLE_TWO_WAY_IN_CORE = new StrategySimpleTwoWayInCore();
 
+	/** Simple strategy to merge paths. It tries to merge also contents. Multiple merge bases are not supported */
+	public static final ThreeWayMergeStrategy RESOLVE = new StrategyResolve();
+
 	private static final HashMap<String, MergeStrategy> STRATEGIES = new HashMap<String, MergeStrategy>();
 
 	static {
 		register(OURS);
 		register(THEIRS);
 		register(SIMPLE_TWO_WAY_IN_CORE);
+		register(RESOLVE);
 	}
 
 	/**
@@ -97,8 +103,7 @@ public abstract class MergeStrategy {
 	public static synchronized void register(final String name,
 			final MergeStrategy imp) {
 		if (STRATEGIES.containsKey(name))
-			throw new IllegalArgumentException("Merge strategy \"" + name
-					+ "\" already exists as a default strategy");
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().mergeStrategyAlreadyExistsAsDefault, name));
 		STRATEGIES.put(name, imp);
 	}
 
@@ -138,4 +143,18 @@ public abstract class MergeStrategy {
 	 * @return the new merge instance which implements this strategy.
 	 */
 	public abstract Merger newMerger(Repository db);
+
+	/**
+	 * Create a new merge instance.
+	 * 
+	 * @param db
+	 *            repository database the merger will read from, and eventually
+	 *            write results back to.
+	 * @param inCore
+	 *            the merge will happen in memory, working folder will not be
+	 *            modified, in case of a non-trivial merge that requires manual
+	 *            resolution, the merger will fail.
+	 * @return the new merge instance which implements this strategy.
+	 */
+	public abstract Merger newMerger(Repository db, boolean inCore);
 }

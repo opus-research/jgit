@@ -83,7 +83,12 @@ class UploadPackServlet extends HttpServlet {
 		protected void advertise(HttpServletRequest req, Repository db,
 				PacketLineOutRefAdvertiser pck) throws IOException,
 				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			uploadPackFactory.create(req, db).sendAdvertisedRefs(pck);
+			UploadPack up = uploadPackFactory.create(req, db);
+			try {
+				up.sendAdvertisedRefs(pck);
+			} finally {
+				up.getRevWalk().release();
+			}
 		}
 	}
 
@@ -106,7 +111,15 @@ class UploadPackServlet extends HttpServlet {
 			final UploadPack up = uploadPackFactory.create(req, db);
 			up.setBiDirectionalPipe(false);
 			rsp.setContentType(RSP_TYPE);
-			up.upload(getInputStream(req), rsp.getOutputStream(), null);
+
+			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
+				@Override
+				public void flush() throws IOException {
+					doFlush();
+				}
+			};
+			up.upload(getInputStream(req), out, null);
+			out.close();
 
 		} catch (ServiceNotAuthorizedException e) {
 			rsp.reset();
@@ -119,7 +132,7 @@ class UploadPackServlet extends HttpServlet {
 			return;
 
 		} catch (IOException e) {
-			getServletContext().log("Internal error during upload-pack", e);
+			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
 			rsp.reset();
 			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;

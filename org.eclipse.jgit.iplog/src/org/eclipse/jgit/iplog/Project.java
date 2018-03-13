@@ -43,10 +43,15 @@
 
 package org.eclipse.jgit.iplog;
 
+import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
+
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 
 /** Description of a project. */
 class Project {
@@ -64,6 +69,8 @@ class Project {
 	private String comments;
 
 	private final Set<String> licenses = new TreeSet<String>();
+
+	private final ObjectIdSubclassMap<ObjectId> skipCommits = new ObjectIdSubclassMap<ObjectId>();
 
 	private String version;
 
@@ -104,6 +111,14 @@ class Project {
 		licenses.add(licenseName);
 	}
 
+	void addSkipCommit(AnyObjectId commit) {
+		skipCommits.add(commit.copy());
+	}
+
+	boolean isSkippedCommit(AnyObjectId commit) {
+		return skipCommits.contains(commit);
+	}
+
 	String getVersion() {
 		return version;
 	}
@@ -114,6 +129,6 @@ class Project {
 
 	@Override
 	public String toString() {
-		return "Project " + getID() + " (" + getName() + ")";
+		return MessageFormat.format(IpLogText.get().projectString, getID(), getName());
 	}
 }

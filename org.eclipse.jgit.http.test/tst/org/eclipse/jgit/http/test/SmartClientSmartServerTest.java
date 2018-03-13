@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -66,24 +66,26 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.http.test.util.AccessEvent;
-import org.eclipse.jgit.http.test.util.HttpTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRng;
+import org.eclipse.jgit.junit.http.AccessEvent;
+import org.eclipse.jgit.junit.http.HttpTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryConfig;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
@@ -94,7 +96,7 @@ import org.eclipse.jgit.transport.URIish;
 public class SmartClientSmartServerTest extends HttpTestCase {
 	private static final String HDR_TRANSFER_ENCODING = "Transfer-Encoding";
 
-	private Repository remoteRepository;
+	private FileRepository remoteRepository;
 
 	private URIish remoteURI;
 
@@ -107,7 +109,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	protected void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository src = createTestRepository();
+		final TestRepository<FileRepository> src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
 
 		ServletContextHandler app = server.addContext("/git");
@@ -253,8 +255,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(200, service.getStatus());
 		assertEquals("application/x-git-upload-pack-result", service
 				.getResponseHeader(HDR_CONTENT_TYPE));
-		assertNull("no compression (never compressed)", service
-				.getResponseHeader(HDR_CONTENT_ENCODING));
 	}
 
 	public void testFetchUpdateExisting() throws Exception {
@@ -399,8 +399,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				t.push(NullProgressMonitor.INSTANCE, Collections.singleton(u));
 				fail("anonymous push incorrectly accepted without error");
 			} catch (TransportException e) {
-				final String status = "401 Unauthorized";
-				final String exp = remoteURI.toString() + ": " + status;
+				final String exp = remoteURI + ": "
+						+ JGitText.get().authenticationNotSupported;
 				assertEquals(exp, e.getMessage());
 			}
 		} finally {
@@ -491,18 +491,19 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	}
 
 	public void testPush_ChunkedEncoding() throws Exception {
-		final TestRepository src = createTestRepository();
+		final TestRepository<FileRepository> src = createTestRepository();
 		final RevBlob Q_bin = src.blob(new TestRng("Q").nextBytes(128 * 1024));
 		final RevCommit Q = src.commit().add("Q", Q_bin).create();
-		final Repository db = src.getRepository();
+		final FileRepository db = src.getRepository();
 		final String dstName = Constants.R_HEADS + "new.branch";
 		Transport t;
 
 		enableReceivePack();
 
-		db.getConfig().setInt("core", null, "compression", 0);
-		db.getConfig().setInt("http", null, "postbuffer", 8 * 1024);
-		db.getConfig().save();
+		final FileBasedConfig cfg = db.getConfig();
+		cfg.setInt("core", null, "compression", 0);
+		cfg.setInt("http", null, "postbuffer", 8 * 1024);
+		cfg.save();
 
 		t = Transport.open(db, remoteURI);
 		try {
@@ -549,7 +550,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	}
 
 	private void enableReceivePack() throws IOException {
-		final RepositoryConfig cfg = remoteRepository.getConfig();
+		final FileBasedConfig cfg = remoteRepository.getConfig();
 		cfg.setBoolean("http", null, "receivepack", true);
 		cfg.save();
 	}

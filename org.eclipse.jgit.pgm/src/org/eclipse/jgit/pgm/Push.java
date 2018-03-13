@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,31 +44,36 @@
 
 package org.eclipse.jgit.pgm;
 
+import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.PushCommand;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
+import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-@Command(common = true, usage = "Update remote repository from local refs")
+@Command(common = true, usage = "usage_UpdateRemoteRepositoryFromLocalRefs")
 class Push extends TextBuiltin {
-	@Option(name = "--timeout", metaVar = "SECONDS", usage = "abort connection if no activity")
+	@Option(name = "--timeout", metaVar = "metaVar_seconds", usage = "usage_abortConnectionIfNoActivity")
 	int timeout = -1;
 
-	@Argument(index = 0, metaVar = "uri-ish")
+	@Argument(index = 0, metaVar = "metaVar_uriish")
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
-	@Argument(index = 1, metaVar = "refspec")
+	@Argument(index = 1, metaVar = "metaVar_refspec")
 	private final List<RefSpec> refSpecs = new ArrayList<RefSpec>();
 
 	@Option(name = "--all")
@@ -94,7 +100,7 @@ class Push extends TextBuiltin {
 	@Option(name = "--force", aliases = { "-f" })
 	private boolean force;
 
-	@Option(name = "--receive-pack", metaVar = "path")
+	@Option(name = "--receive-pack", metaVar = "metaVar_path")
 	private String receivePack;
 
 	@Option(name = "--dry-run")
@@ -104,38 +110,28 @@ class Push extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		if (force) {
-			final List<RefSpec> orig = new ArrayList<RefSpec>(refSpecs);
-			refSpecs.clear();
-			for (final RefSpec spec : orig)
-				refSpecs.add(spec.setForceUpdate(true));
-		}
-
-		final List<Transport> transports;
-		transports = Transport.openAll(db, remote, Transport.Operation.PUSH);
-		for (final Transport transport : transports) {
-			if (0 <= timeout)
-				transport.setTimeout(timeout);
-			transport.setPushThin(thin);
-			if (receivePack != null)
-				transport.setOptionReceivePack(receivePack);
-			transport.setDryRun(dryRun);
-
-			final Collection<RemoteRefUpdate> toPush = transport
-					.findRemoteRefUpdatesFor(refSpecs);
-
-			final URIish uri = transport.getURI();
-			final PushResult result;
+		Git git = new Git(db);
+		PushCommand push = git.push();
+		push.setDryRun(dryRun);
+		push.setForce(force);
+		push.setProgressMonitor(new TextProgressMonitor());
+		push.setReceivePack(receivePack);
+		push.setRefSpecs(refSpecs);
+		push.setRemote(remote);
+		push.setThin(thin);
+		push.setTimeout(timeout);
+		Iterable<PushResult> results = push.call();
+		for (PushResult result : results) {
+			ObjectReader reader = db.newObjectReader();
 			try {
-				result = transport.push(new TextProgressMonitor(), toPush);
+				printPushResult(reader, result.getURI(), result);
 			} finally {
-				transport.close();
+				reader.release();
 			}
-			printPushResult(uri, result);
 		}
 	}
 
-	private void printPushResult(final URIish uri,
+	private void printPushResult(final ObjectReader reader, final URIish uri,
 			final PushResult result) {
 		shownURI = false;
 		boolean everythingUpToDate = true;
@@ -144,7 +140,7 @@ class Push extends TextBuiltin {
 		for (final RemoteRefUpdate rru : result.getRemoteUpdates()) {
 			if (rru.getStatus() == Status.UP_TO_DATE) {
 				if (verbose)
-					printRefUpdateResult(uri, result, rru);
+					printRefUpdateResult(reader, uri, result, rru);
 			} else
 				everythingUpToDate = false;
 		}
@@ -152,25 +148,26 @@ class Push extends TextBuiltin {
 		for (final RemoteRefUpdate rru : result.getRemoteUpdates()) {
 			// ...then successful updates...
 			if (rru.getStatus() == Status.OK)
-				printRefUpdateResult(uri, result, rru);
+				printRefUpdateResult(reader, uri, result, rru);
 		}
 
 		for (final RemoteRefUpdate rru : result.getRemoteUpdates()) {
 			// ...finally, others (problematic)
 			if (rru.getStatus() != Status.OK
 					&& rru.getStatus() != Status.UP_TO_DATE)
-				printRefUpdateResult(uri, result, rru);
+				printRefUpdateResult(reader, uri, result, rru);
 		}
 
+		AbstractFetchCommand.showRemoteMessages(result.getMessages());
 		if (everythingUpToDate)
-			out.println("Everything up-to-date");
+			out.println(CLIText.get().everythingUpToDate);
 	}
 
-	private void printRefUpdateResult(final URIish uri,
-			final PushResult result, final RemoteRefUpdate rru) {
+	private void printRefUpdateResult(final ObjectReader reader,
+			final URIish uri, final PushResult result, final RemoteRefUpdate rru) {
 		if (!shownURI) {
 			shownURI = true;
-			out.format("To %s\n", uri);
+			out.println(MessageFormat.format(CLIText.get().pushTo, uri));
 		}
 
 		final String remoteName = rru.getRemoteName();
@@ -192,11 +189,11 @@ class Push extends TextBuiltin {
 				} else {
 					boolean fastForward = rru.isFastForward();
 					final char flag = fastForward ? ' ' : '+';
-					final String summary = oldRef.getObjectId().abbreviate(db)
-							.name()
+					final String summary = safeAbbreviate(reader, oldRef
+							.getObjectId())
 							+ (fastForward ? ".." : "...")
-							+ rru.getNewObjectId().abbreviate(db).name();
-					final String message = fastForward ? null : "forced update";
+							+ safeAbbreviate(reader, rru.getNewObjectId());
+					final String message = fastForward ? null : CLIText.get().forcedUpdate;
 					printUpdateLine(flag, summary, srcRef, remoteName, message);
 				}
 			}
@@ -208,17 +205,18 @@ class Push extends TextBuiltin {
 
 		case REJECTED_NODELETE:
 			printUpdateLine('!', "[rejected]", null, remoteName,
-					"remote side does not support deleting refs");
+					CLIText.get().remoteSideDoesNotSupportDeletingRefs);
 			break;
 
 		case REJECTED_NONFASTFORWARD:
 			printUpdateLine('!', "[rejected]", srcRef, remoteName,
-					"non-fast forward");
+					CLIText.get().nonFastForward);
 			break;
 
 		case REJECTED_REMOTE_CHANGED:
-			final String message = "remote ref object changed - is not expected one "
-					+ rru.getExpectedOldObjectId().abbreviate(db).name();
+			final String message = MessageFormat.format(
+					CLIText.get().remoteRefObjectChangedIsNotExpectedOne,
+					safeAbbreviate(reader, rru.getExpectedOldObjectId()));
 			printUpdateLine('!', "[rejected]", srcRef, remoteName, message);
 			break;
 
@@ -237,6 +235,14 @@ class Push extends TextBuiltin {
 			printUpdateLine('?', "[unexpected push-process behavior]", srcRef,
 					remoteName, rru.getMessage());
 			break;
+		}
+	}
+
+	private String safeAbbreviate(ObjectReader reader, ObjectId id) {
+		try {
+			return reader.abbreviate(id).name();
+		} catch (IOException cannotAbbreviate) {
+			return id.name();
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,24 +43,26 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PackWriter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.storage.pack.PackWriter;
 
 /**
  * Creates a Git bundle file, for sneaker-net transport to another system.
@@ -80,24 +82,35 @@ import org.eclipse.jgit.revwalk.RevCommit;
  * overall bundle size.
  */
 public class BundleWriter {
-	private final PackWriter packWriter;
+	private final Repository db;
 
 	private final Map<String, ObjectId> include;
 
 	private final Set<RevCommit> assume;
+
+	private PackConfig packConfig;
 
 	/**
 	 * Create a writer for a bundle.
 	 *
 	 * @param repo
 	 *            repository where objects are stored.
-	 * @param monitor
-	 *            operations progress monitor.
 	 */
-	public BundleWriter(final Repository repo, final ProgressMonitor monitor) {
-		packWriter = new PackWriter(repo, monitor);
+	public BundleWriter(final Repository repo) {
+		db = repo;
 		include = new TreeMap<String, ObjectId>();
 		assume = new HashSet<RevCommit>();
+	}
+
+	/**
+	 * Set the configuration used by the pack generator.
+	 *
+	 * @param pc
+	 *            configuration controlling packing parameters. If null the
+	 *            source repository's settings will be used.
+	 */
+	public void setPackConfig(PackConfig pc) {
+		this.packConfig = pc;
 	}
 
 	/**
@@ -113,9 +126,9 @@ public class BundleWriter {
 	 */
 	public void include(final String name, final AnyObjectId id) {
 		if (!Repository.isValidRefName(name))
-			throw new IllegalArgumentException("Invalid ref name: " + name);
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidRefName, name));
 		if (include.containsKey(name))
-			throw new IllegalStateException("Duplicate ref: " + name);
+			throw new IllegalStateException(JGitText.get().duplicateRef + name);
 		include.put(name, id.toObjectId());
 	}
 
@@ -154,50 +167,58 @@ public class BundleWriter {
 	 * <p>
 	 * This method can only be called once per BundleWriter instance.
 	 *
+	 * @param monitor
+	 *            progress monitor to report bundle writing status to.
 	 * @param os
-	 *            the stream the bundle is written to. If the stream is not
-	 *            buffered it will be buffered by the writer. Caller is
-	 *            responsible for closing the stream.
+	 *            the stream the bundle is written to. The stream should be
+	 *            buffered by the caller. The caller is responsible for closing
+	 *            the stream.
 	 * @throws IOException
 	 *             an error occurred reading a local object's data to include in
 	 *             the bundle, or writing compressed object data to the output
 	 *             stream.
 	 */
-	public void writeBundle(OutputStream os) throws IOException {
-		if (!(os instanceof BufferedOutputStream))
-			os = new BufferedOutputStream(os);
+	public void writeBundle(ProgressMonitor monitor, OutputStream os)
+			throws IOException {
+		PackConfig pc = packConfig;
+		if (pc == null)
+			pc = new PackConfig(db);
+		PackWriter packWriter = new PackWriter(pc, db.newObjectReader());
+		try {
+			final HashSet<ObjectId> inc = new HashSet<ObjectId>();
+			final HashSet<ObjectId> exc = new HashSet<ObjectId>();
+			inc.addAll(include.values());
+			for (final RevCommit r : assume)
+				exc.add(r.getId());
+			packWriter.setThin(exc.size() > 0);
+			packWriter.preparePack(monitor, inc, exc);
 
-		final HashSet<ObjectId> inc = new HashSet<ObjectId>();
-		final HashSet<ObjectId> exc = new HashSet<ObjectId>();
-		inc.addAll(include.values());
-		for (final RevCommit r : assume)
-			exc.add(r.getId());
-		packWriter.setThin(exc.size() > 0);
-		packWriter.preparePack(inc, exc);
+			final Writer w = new OutputStreamWriter(os, Constants.CHARSET);
+			w.write(TransportBundle.V2_BUNDLE_SIGNATURE);
+			w.write('\n');
 
-		final Writer w = new OutputStreamWriter(os, Constants.CHARSET);
-		w.write(TransportBundle.V2_BUNDLE_SIGNATURE);
-		w.write('\n');
-
-		final char[] tmp = new char[Constants.OBJECT_ID_STRING_LENGTH];
-		for (final RevCommit a : assume) {
-			w.write('-');
-			a.copyTo(tmp, w);
-			if (a.getRawBuffer() != null) {
-				w.write(' ');
-				w.write(a.getShortMessage());
+			final char[] tmp = new char[Constants.OBJECT_ID_STRING_LENGTH];
+			for (final RevCommit a : assume) {
+				w.write('-');
+				a.copyTo(tmp, w);
+				if (a.getRawBuffer() != null) {
+					w.write(' ');
+					w.write(a.getShortMessage());
+				}
+				w.write('\n');
 			}
-			w.write('\n');
-		}
-		for (final Map.Entry<String, ObjectId> e : include.entrySet()) {
-			e.getValue().copyTo(tmp, w);
-			w.write(' ');
-			w.write(e.getKey());
-			w.write('\n');
-		}
+			for (final Map.Entry<String, ObjectId> e : include.entrySet()) {
+				e.getValue().copyTo(tmp, w);
+				w.write(' ');
+				w.write(e.getKey());
+				w.write('\n');
+			}
 
-		w.write('\n');
-		w.flush();
-		packWriter.writePack(os);
+			w.write('\n');
+			w.flush();
+			packWriter.writePack(monitor, monitor, os);
+		} finally {
+			packWriter.release();
+		}
 	}
 }
