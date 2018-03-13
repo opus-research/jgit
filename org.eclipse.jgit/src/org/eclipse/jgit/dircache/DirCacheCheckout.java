@@ -130,7 +130,7 @@ public class DirCacheCheckout {
 	 *         {@link DirCacheCheckout}.
 	 */
 	public List<String> getToBeDeleted() {
-		return conflicts;
+		return toBeDeleted;
 	}
 
 	/**
@@ -386,9 +386,7 @@ public class DirCacheCheckout {
 			if (!file.getParentFile().mkdirs()) {
 				// ignore
 			}
-			if (!file.createNewFile()) {
-				// ignore
-			}
+			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
 			checkoutEntry(repo, file, entry);
 		}
