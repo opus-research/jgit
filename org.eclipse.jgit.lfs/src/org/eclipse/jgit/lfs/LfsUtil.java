@@ -89,11 +89,11 @@ public class LfsUtil {
 
 	/**
 	 * @return the path to the object directory used by LFS. Most of the times
-	 *         this will be "<repo>/.git/lfs/objectsDir"
+	 *         this will be "<repo>/.git/lfs/objects"
 	 */
 	public Path getLfsObjDir() {
 		if (objDir == null) {
-			objDir = root.resolve("objectsDir");
+			objDir = root.resolve("objects");
 		}
 		return objDir;
 	}
@@ -103,7 +103,7 @@ public class LfsUtil {
 	 *            the id of the mediafile
 	 * @return the file which stores the original content. This will be files
 	 *         underneath
-	 *         "<repo>/.git/lfs/objectsDir/<firstTwoLettersOfID>/<remainingLettersOfID>"
+	 *         "<repo>/.git/lfs/objects/<firstTwoLettersOfID>/<remainingLettersOfID>"
 	 */
 	public Path getMediaFile(LongObjectId id) {
 		String idStr = LongObjectId.toString(id);

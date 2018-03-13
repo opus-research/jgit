@@ -65,7 +65,7 @@ import org.eclipse.jgit.util.FileUtils;
  * is configured for that content, then this filter will replace the original
  * content with content of a so called pointer file. The pointer file content
  * will then be added to the git repository. Additionally this filter writes the
- * original content in a so called 'media file' at '.git/lfs/objectsDir/
+ * original content in a so called 'media file' at '.git/lfs/objects/
  * <first-two-characters-of-contentid>/ <rest-of-contentid>'
  *
  * @since 4.5
