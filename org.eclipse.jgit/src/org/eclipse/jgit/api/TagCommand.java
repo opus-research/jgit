@@ -50,7 +50,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -152,11 +151,6 @@ public class TagCommand extends GitCommand<Ref> {
 						throw new ConcurrentRefUpdateException(
 								JGitText.get().couldNotLockHEAD,
 								tagRef.getRef(), updateResult);
-					case REJECTED:
-						throw new RefAlreadyExistsException(
-								MessageFormat.format(
-										JGitText.get().tagAlreadyExists,
-										newTag.toString()));
 					default:
 						throw new JGitInternalException(MessageFormat.format(
 								JGitText.get().updatingRefFailed, refName,

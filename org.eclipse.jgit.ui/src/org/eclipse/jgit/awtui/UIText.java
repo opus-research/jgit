@@ -58,7 +58,6 @@ public class UIText extends TranslationBundle {
 		return NLS.getBundleFor(UIText.class);
 	}
 
-	// @formatter:off
 	/***/ public String authenticationRequired;
 	/***/ public String author;
 	/***/ public String date;
