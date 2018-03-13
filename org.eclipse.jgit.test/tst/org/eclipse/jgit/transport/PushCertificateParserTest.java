@@ -360,7 +360,6 @@ public class PushCertificateParserTest {
 		PushCertificate cert = parser.build();
 		assertEquals("0.1", cert.getVersion());
 		assertNull(cert.getPushee());
-		assertFalse(cert.toText().contains(PushCertificateParser.PUSHEE));
 	}
 
 	private static String concatPacketLines(String input, int begin, int end)
