@@ -206,7 +206,7 @@ public class DfsGarbageCollector {
 	 *            Defaults to {@code 1}. Must be {@code u >= 0}.
 	 * @return {@code this}
 	 */
-	public DfsGarbageCollector setReftableBootstrapMaxUpdateIndex(long u) {
+	public DfsGarbageCollector setReftableInitialMaxUpdateIndex(long u) {
 		reftableInitialMaxUpdateIndex = Math.max(0, u);
 		return this;
 	}
@@ -288,11 +288,13 @@ public class DfsGarbageCollector {
 	 *             a new pack cannot be created.
 	 */
 	public boolean pack(ProgressMonitor pm) throws IOException {
-		if (pm == null)
+		if (pm == null) {
 			pm = NullProgressMonitor.INSTANCE;
-		if (packConfig.getIndexVersion() != 2)
+		}
+		if (packConfig.getIndexVersion() != 2) {
 			throw new IllegalStateException(
 					JGitText.get().supportOnlyPackIndexVersion2);
+		}
 
 		startTimeMillis = SystemReader.getInstance().getCurrentTime();
 		ctx = objdb.newReader();
@@ -354,8 +356,9 @@ public class DfsGarbageCollector {
 				rollback = false;
 				return true;
 			} finally {
-				if (rollback)
+				if (rollback) {
 					objdb.rollbackPack(newPackDesc);
+				}
 			}
 		} finally {
 			ctx.close();
@@ -525,29 +528,35 @@ public class DfsGarbageCollector {
 	}
 
 	private void packRest(ProgressMonitor pm) throws IOException {
-		if (nonHeads.isEmpty())
+		if (nonHeads.isEmpty()) {
 			return;
+		}
 
 		try (PackWriter pw = newPackWriter()) {
-			for (ObjectIdSet packedObjs : newPackObj)
+			for (ObjectIdSet packedObjs : newPackObj) {
 				pw.excludeObjects(packedObjs);
+			}
 			pw.preparePack(pm, nonHeads, allHeadsAndTags);
-			if (0 < pw.getObjectCount())
+			if (0 < pw.getObjectCount()) {
 				writePack(GC_REST, pw, pm,
 						estimateGcPackSize(INSERT, RECEIVE, COMPACT, GC_REST));
+			}
 		}
 	}
 
 	private void packRefTreeGraph(ProgressMonitor pm) throws IOException {
-		if (txnHeads.isEmpty())
+		if (txnHeads.isEmpty()) {
 			return;
+		}
 
 		try (PackWriter pw = newPackWriter()) {
-			for (ObjectIdSet packedObjs : newPackObj)
+			for (ObjectIdSet packedObjs : newPackObj) {
 				pw.excludeObjects(packedObjs);
+			}
 			pw.preparePack(pm, txnHeads, NONE);
-			if (0 < pw.getObjectCount())
+			if (0 < pw.getObjectCount()) {
 				writePack(GC_TXN, pw, pm, 0 /* unknown pack size */);
+			}
 		}
 	}
 
@@ -572,8 +581,9 @@ public class DfsGarbageCollector {
 				for (PackIndex.MutableEntry ent : oldIdx) {
 					pm.update(1);
 					ObjectId id = ent.toObjectId();
-					if (pool.lookupOrNull(id) != null || anyPackHas(id))
+					if (pool.lookupOrNull(id) != null || anyPackHas(id)) {
 						continue;
+					}
 
 					long offset = ent.getOffset();
 					int type = oldPack.getObjectType(ctx, offset);
@@ -584,15 +594,18 @@ public class DfsGarbageCollector {
 				}
 			}
 			pm.endTask();
-			if (0 < pw.getObjectCount())
+			if (0 < pw.getObjectCount()) {
 				writePack(UNREACHABLE_GARBAGE, pw, pm, estimatedPackSize);
+			}
 		}
 	}
 
 	private boolean anyPackHas(AnyObjectId id) {
-		for (ObjectIdSet packedObjs : newPackObj)
-			if (packedObjs.contains(id))
+		for (ObjectIdSet packedObjs : newPackObj) {
+			if (packedObjs.contains(id)) {
 				return true;
+			}
+		}
 		return false;
 	}
 
@@ -606,8 +619,9 @@ public class DfsGarbageCollector {
 
 	private int objectsBefore() {
 		int cnt = 0;
-		for (DfsPackFile p : packsBefore)
+		for (DfsPackFile p : packsBefore) {
 			cnt += p.getPackDescription().getObjectCount();
+		}
 		return cnt;
 	}
 
