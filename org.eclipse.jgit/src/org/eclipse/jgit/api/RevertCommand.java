@@ -85,11 +85,11 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about revert</a>
  */
 public class RevertCommand extends GitCommand<RevCommit> {
-	private List<Ref> commits = new LinkedList<>();
+	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
 
-	private List<Ref> revertedRefs = new LinkedList<>();
+	private List<Ref> revertedRefs = new LinkedList<Ref>();
 
 	private MergeResult failingResult;
 
@@ -120,7 +120,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 * @throws UnmergedPathsException
 	 * @throws NoMessageException
 	 */
-	@Override
 	public RevCommit call() throws NoMessageException, UnmergedPathsException,
 			ConcurrentRefUpdateException, WrongRepositoryStateException,
 			GitAPIException {
@@ -130,7 +129,7 @@ public class RevertCommand extends GitCommand<RevCommit> {
 		try (RevWalk revWalk = new RevWalk(repo)) {
 
 			// get the head commit
-			Ref headRef = repo.exactRef(Constants.HEAD);
+			Ref headRef = repo.getRef(Constants.HEAD);
 			if (headRef == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);

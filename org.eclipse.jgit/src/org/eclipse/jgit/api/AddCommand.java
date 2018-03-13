@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.FileMode.GITLINK;
-import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_TREE;
 
 import java.io.IOException;
@@ -96,7 +95,7 @@ public class AddCommand extends GitCommand<DirCache> {
 	 */
 	public AddCommand(Repository repo) {
 		super(repo);
-		filepatterns = new LinkedList<>();
+		filepatterns = new LinkedList<String>();
 	}
 
 	/**
@@ -134,7 +133,6 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
-	@Override
 	public DirCache call() throws GitAPIException, NoFilepatternException {
 
 		if (filepatterns.isEmpty())
@@ -203,10 +201,7 @@ public class AddCommand extends GitCommand<DirCache> {
 					continue;
 				}
 
-				if ((f.getEntryRawMode() == TYPE_TREE
-						&& f.getIndexFileMode(c) != FileMode.GITLINK) ||
-						(f.getEntryRawMode() == TYPE_GITLINK
-								&& f.getIndexFileMode(c) == FileMode.TREE)) {
+				if (f.getEntryRawMode() == TYPE_TREE) {
 					// Index entry exists and is symlink, gitlink or file,
 					// otherwise the tree would have been entered above.
 					// Replace the index entry by diving into tree of files.
@@ -225,11 +220,6 @@ public class AddCommand extends GitCommand<DirCache> {
 					entry.setLength(f.getEntryLength());
 					entry.setLastModified(f.getEntryLastModified());
 					long len = f.getEntryContentLength();
-					// We read and filter the content multiple times.
-					// f.getEntryContentLength() reads and filters the input and
-					// inserter.insert(...) does it again. That's because an
-					// ObjectInserter needs to know the length before it starts
-					// inserting. TODO: Fix this by using Buffers.
 					try (InputStream in = f.openEntryStream()) {
 						ObjectId id = inserter.insert(OBJ_BLOB, len, in);
 						entry.setObjectId(id);

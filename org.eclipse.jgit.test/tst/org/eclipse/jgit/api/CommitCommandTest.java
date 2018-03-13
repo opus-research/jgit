@@ -43,10 +43,10 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
-import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -92,37 +91,30 @@ public class CommitCommandTest extends RepositoryTestCase {
 
 		FS executableFs = new FS() {
 
-			@Override
 			public boolean supportsExecute() {
 				return true;
 			}
 
-			@Override
 			public boolean setExecute(File f, boolean canExec) {
 				return true;
 			}
 
-			@Override
 			public ProcessBuilder runInShell(String cmd, String[] args) {
 				return null;
 			}
 
-			@Override
 			public boolean retryFailedLockFileCommit() {
 				return false;
 			}
 
-			@Override
 			public FS newInstance() {
 				return this;
 			}
 
-			@Override
 			protected File discoverGitExe() {
 				return null;
 			}
 
-			@Override
 			public boolean canExecute(File f) {
 				return true;
 			}
@@ -144,37 +136,30 @@ public class CommitCommandTest extends RepositoryTestCase {
 
 		FS nonExecutableFs = new FS() {
 
-			@Override
 			public boolean supportsExecute() {
 				return false;
 			}
 
-			@Override
 			public boolean setExecute(File f, boolean canExec) {
 				return false;
 			}
 
-			@Override
 			public ProcessBuilder runInShell(String cmd, String[] args) {
 				return null;
 			}
 
-			@Override
 			public boolean retryFailedLockFileCommit() {
 				return false;
 			}
 
-			@Override
 			public FS newInstance() {
 				return this;
 			}
 
-			@Override
 			protected File discoverGitExe() {
 				return null;
 			}
 
-			@Override
 			public boolean canExecute(File f) {
 				return false;
 			}
@@ -449,36 +434,6 @@ public class CommitCommandTest extends RepositoryTestCase {
 			assertEquals("commit: Squashed commit of the following:", db
 					.getReflogReader(db.getBranch()).getLastEntry().getComment());
 		}
-	}
-
-	@Test
-	public void testReflogs() throws Exception {
-		try (Git git = new Git(db)) {
-			writeTrashFile("f", "1");
-			git.add().addFilepattern("f").call();
-			git.commit().setMessage("c1").call();
-			writeTrashFile("f", "2");
-			git.commit().setMessage("c2").setAll(true).setReflogComment(null)
-					.call();
-			writeTrashFile("f", "3");
-			git.commit().setMessage("c3").setAll(true)
-					.setReflogComment("testRl").call();
-
-			db.getReflogReader(Constants.HEAD).getReverseEntries();
-
-			assertEquals("testRl;commit (initial): c1;", reflogComments(
-					db.getReflogReader(Constants.HEAD).getReverseEntries()));
-			assertEquals("testRl;commit (initial): c1;", reflogComments(
-					db.getReflogReader(db.getBranch()).getReverseEntries()));
-		}
-	}
-
-	private static String reflogComments(List<ReflogEntry> entries) {
-		StringBuffer b = new StringBuffer();
-		for (ReflogEntry e : entries) {
-			b.append(e.getComment()).append(";");
-		}
-		return b.toString();
 	}
 
 	@Test(expected = WrongRepositoryStateException.class)

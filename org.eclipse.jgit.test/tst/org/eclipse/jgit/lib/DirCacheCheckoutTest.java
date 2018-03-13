@@ -65,7 +65,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheCheckout.CheckoutMetadata;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -114,7 +113,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		return dco.getRemoved();
 	}
 
-	private Map<String, CheckoutMetadata> getUpdated() {
+	private Map<String, String> getUpdated() {
 		return dco.getUpdated();
 	}
 
@@ -130,7 +129,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		if ((args.length % 2) > 0)
 			throw new IllegalArgumentException("needs to be pairs");
 
-		HashMap<String, String> map = new HashMap<>();
+		HashMap<String, String> map = new HashMap<String, String>();
 		for (int i = 0; i < args.length; i += 2) {
 			map.put(args[i], args[i + 1]);
 		}
@@ -228,7 +227,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testInitialCheckout() throws Exception {
 		try (Git git = new Git(db)) {
-			TestRepository<Repository> db_t = new TestRepository<>(db);
+			TestRepository<Repository> db_t = new TestRepository<Repository>(db);
 			BranchBuilder master = db_t.branch("master");
 			master.commit().add("f", "1").message("m0").create();
 			assertFalse(new File(db.getWorkTree(), "f").exists());
@@ -377,7 +376,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		// rules 4 and 5
 		HashMap<String, String> idxMap;
 
-		idxMap = new HashMap<>();
+		idxMap = new HashMap<String, String>();
 		idxMap.put("foo", "foo");
 		setupCase(null, null, idxMap);
 		go();
@@ -387,7 +386,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue(getConflicts().isEmpty());
 
 		// rules 6 and 7
-		idxMap = new HashMap<>();
+		idxMap = new HashMap<String, String>();
 		idxMap.put("foo", "foo");
 		setupCase(null, idxMap, idxMap);
 		go();
@@ -396,7 +395,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// rules 8 and 9
 		HashMap<String, String> mergeMap;
-		mergeMap = new HashMap<>();
+		mergeMap = new HashMap<String, String>();
 
 		mergeMap.put("foo", "merge");
 		setupCase(null, mergeMap, idxMap);
@@ -408,7 +407,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// rule 10
 
-		HashMap<String, String> headMap = new HashMap<>();
+		HashMap<String, String> headMap = new HashMap<String, String>();
 		headMap.put("foo", "foo");
 		setupCase(headMap, null, idxMap);
 		go();
@@ -798,7 +797,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			fail("didn't get the expected exception");
 		} catch (CheckoutConflictException e) {
 			assertConflict("foo");
-			assertEquals("foo", e.getConflictingFiles()[0]);
 			assertWorkDir(mkmap("foo", "bar", "other", "other"));
 			assertIndex(mk("other"));
 		}
@@ -886,7 +884,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			assertWorkDir(mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f",
 					"e/f", "e/g", "e/g3"));
 			assertConflict("e/g");
-			assertEquals("e/g", e.getConflictingFiles()[0]);
 		}
 	}
 
@@ -1614,78 +1611,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertNotNull(git.checkout().setName(Constants.MASTER).call());
 	}
 
-	@Test(expected = CheckoutConflictException.class)
-	public void testFolderFileConflict() throws Exception {
-		RevCommit headCommit = commitFile("f/a", "initial content", "master");
-		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
-		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
-		writeTrashFile("f", "file instead of folder");
-		new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-				checkoutCommit.getTree()).checkout();
-	}
-
-	@Test
-	public void testMultipleContentConflicts() throws Exception {
-		commitFile("a", "initial content", "master");
-		RevCommit headCommit = commitFile("b", "initial content", "master");
-		commitFile("a", "side content", "side");
-		RevCommit checkoutCommit = commitFile("b", "side content", "side");
-		writeTrashFile("a", "changed content");
-		writeTrashFile("b", "changed content");
-
-		try {
-			new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-					checkoutCommit.getTree()).checkout();
-			fail();
-		} catch (CheckoutConflictException expected) {
-			assertEquals(2, expected.getConflictingFiles().length);
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("a"));
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("b"));
-			assertEquals("changed content", read("a"));
-			assertEquals("changed content", read("b"));
-		}
-	}
-
-	@Test
-	public void testFolderFileAndContentConflicts() throws Exception {
-		RevCommit headCommit = commitFile("f/a", "initial content", "master");
-		commitFile("b", "side content", "side");
-		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
-		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
-		writeTrashFile("f", "file instead of a folder");
-		writeTrashFile("b", "changed content");
-
-		try {
-			new DirCacheCheckout(db, headCommit.getTree(), db.lockDirCache(),
-					checkoutCommit.getTree()).checkout();
-			fail();
-		} catch (CheckoutConflictException expected) {
-			assertEquals(2, expected.getConflictingFiles().length);
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("b"));
-			assertTrue(Arrays.asList(expected.getConflictingFiles())
-					.contains("f"));
-			assertEquals("file instead of a folder", read("f"));
-			assertEquals("changed content", read("b"));
-		}
-	}
-
-	@Test
-	public void testLongFilename() throws Exception {
-		char[] bytes = new char[253];
-		Arrays.fill(bytes, 'f');
-		String longFileName = new String(bytes);
-		// 1
-		doit(mkmap(longFileName, "a"), mkmap(longFileName, "b"),
-				mkmap(longFileName, "a"));
-		writeTrashFile(longFileName, "a");
-		checkout();
-		assertNoConflicts();
-		assertUpdated(longFileName);
-	}
-
 	public void assertWorkDir(Map<String, String> i)
 			throws CorruptObjectException,
 			IOException {
@@ -1719,8 +1644,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 							+ " in workDir. ", buffer, i.get(path).getBytes());
 					nrFiles++;
 				} else if (file.isDirectory()) {
-					String[] files = file.list();
-					if (files != null && files.length == 0) {
+					if (file.list().length == 0) {
 						assertEquals("found unexpected empty folder for path "
 								+ path + " in workDir. ", "/", i.get(path));
 						nrFiles++;

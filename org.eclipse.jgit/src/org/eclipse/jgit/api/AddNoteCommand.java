@@ -81,14 +81,13 @@ public class AddNoteCommand extends GitCommand<Note> {
 		super(repo);
 	}
 
-	@Override
 	public Note call() throws GitAPIException {
 		checkCallable();
 		NoteMap map = NoteMap.newEmptyMap();
 		RevCommit notesCommit = null;
 		try (RevWalk walk = new RevWalk(repo);
 				ObjectInserter inserter = repo.newObjectInserter()) {
-			Ref ref = repo.findRef(notesRef);
+			Ref ref = repo.getRef(notesRef);
 			// if we have a notes ref, use it
 			if (ref != null) {
 				notesCommit = walk.parseCommit(ref.getObjectId());

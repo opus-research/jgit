@@ -118,7 +118,7 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 
 	private Ref getRef() throws GitAPIException {
 		try {
-			return repo.exactRef(R_STASH);
+			return repo.getRef(R_STASH);
 		} catch (IOException e) {
 			throw new InvalidRefNameException(MessageFormat.format(
 					JGitText.get().cannotRead, R_STASH), e);
@@ -171,7 +171,6 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 	 * @return commit id of stash reference or null if no more stashed changes
 	 * @throws GitAPIException
 	 */
-	@Override
 	public ObjectId call() throws GitAPIException {
 		checkCallable();
 
@@ -237,7 +236,7 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 		updateRef(stashRef, entryId);
 
 		try {
-			Ref newStashRef = repo.exactRef(R_STASH);
+			Ref newStashRef = repo.getRef(R_STASH);
 			return newStashRef != null ? newStashRef.getObjectId() : null;
 		} catch (IOException e) {
 			throw new InvalidRefNameException(MessageFormat.format(

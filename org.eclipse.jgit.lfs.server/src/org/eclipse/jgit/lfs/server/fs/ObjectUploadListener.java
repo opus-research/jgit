@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2015, Matthias Sohn <matthias.sohnk@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -59,16 +59,13 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
 import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
-import org.eclipse.jgit.lfs.internal.AtomicObjectOutputStream;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 import org.eclipse.jgit.lfs.lib.Constants;
 
 /**
- * Handle asynchronous object upload.
- *
- * @since 4.6
+ * Handle asynchronous object upload
  */
-public class ObjectUploadListener implements ReadListener {
+class ObjectUploadListener implements ReadListener {
 
 	private static Logger LOG = Logger
 			.getLogger(ObjectUploadListener.class.getName());
@@ -77,13 +74,13 @@ public class ObjectUploadListener implements ReadListener {
 
 	private final HttpServletResponse response;
 
+	private FileLfsRepository repository;
+
 	private final ServletInputStream in;
 
 	private final ReadableByteChannel inChannel;
 
-	private final AtomicObjectOutputStream out;
-
-	private WritableByteChannel channel;
+	private WritableByteChannel out;
 
 	private final ByteBuffer buffer = ByteBuffer.allocateDirect(8192);
 
@@ -101,12 +98,12 @@ public class ObjectUploadListener implements ReadListener {
 			AsyncContext context, HttpServletRequest request,
 			HttpServletResponse response, AnyLongObjectId id)
 					throws FileNotFoundException, IOException {
+		this.repository = repository;
 		this.context = context;
 		this.response = response;
 		this.in = request.getInputStream();
 		this.inChannel = Channels.newChannel(in);
-		this.out = repository.getOutputStream(id);
-		this.channel = Channels.newChannel(out);
+		this.out = repository.getWriteChannel(id);
 		response.setContentType(Constants.CONTENT_TYPE_GIT_LFS_JSON);
 	}
 
@@ -120,12 +117,12 @@ public class ObjectUploadListener implements ReadListener {
 		while (in.isReady()) {
 			if (inChannel.read(buffer) > 0) {
 				buffer.flip();
-				channel.write(buffer);
+				out.write(buffer);
 				buffer.compact();
 			} else {
 				buffer.flip();
 				while (buffer.hasRemaining()) {
-					channel.write(buffer);
+					out.write(buffer);
 				}
 				close();
 				return;
@@ -141,13 +138,10 @@ public class ObjectUploadListener implements ReadListener {
 		close();
 	}
 
-	/**
-	 * @throws IOException
-	 */
 	protected void close() throws IOException {
 		try {
 			inChannel.close();
-			channel.close();
+			out.close();
 			// TODO check if status 200 is ok for PUT request, HTTP foresees 204
 			// for successful PUT without response body
 			response.setStatus(HttpServletResponse.SC_OK);
@@ -163,9 +157,9 @@ public class ObjectUploadListener implements ReadListener {
 	@Override
 	public void onError(Throwable e) {
 		try {
-			out.abort();
+			repository.abortWrite();
 			inChannel.close();
-			channel.close();
+			out.close();
 			int status;
 			if (e instanceof CorruptLongObjectException) {
 				status = HttpStatus.SC_BAD_REQUEST;

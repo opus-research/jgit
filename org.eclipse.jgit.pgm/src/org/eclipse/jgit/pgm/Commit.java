@@ -75,7 +75,7 @@ class Commit extends TextBuiltin {
 	private boolean amend;
 
 	@Argument(metaVar = "metaVar_commitPaths", usage = "usage_CommitPaths")
-	private List<String> paths = new ArrayList<>();
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws NoHeadException, NoMessageException,
@@ -95,7 +95,7 @@ class Commit extends TextBuiltin {
 					commitCmd.setOnly(p);
 			commitCmd.setAmend(amend);
 			commitCmd.setAll(all);
-			Ref head = db.exactRef(Constants.HEAD);
+			Ref head = db.getRef(Constants.HEAD);
 			if (head == null) {
 				throw die(CLIText.get().onBranchToBeBorn);
 			}

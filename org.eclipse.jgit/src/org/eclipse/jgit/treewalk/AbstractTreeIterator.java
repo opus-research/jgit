@@ -49,8 +49,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 
-import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -728,14 +728,5 @@ public abstract class AbstractTreeIterator {
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + "[" + getEntryPathString() + "]"; //$NON-NLS-1$
-	}
-
-	/**
-	 * @return whether or not this Iterator is iterating through the Work Tree
-	 *
-	 * @since 4.3
-	 */
-	public boolean isWorkTree() {
-		return false;
 	}
 }

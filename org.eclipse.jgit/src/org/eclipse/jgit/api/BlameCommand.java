@@ -61,12 +61,12 @@ import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.io.AutoLFInputStream;
+import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
  * Blame command for building a {@link BlameResult} for a file path.
@@ -188,7 +188,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	public BlameCommand reverse(AnyObjectId start, Collection<ObjectId> end)
 			throws IOException {
 		startCommit = start.toObjectId();
-		reverseEndCommits = new ArrayList<>(end);
+		reverseEndCommits = new ArrayList<ObjectId>(end);
 		return this;
 	}
 
@@ -198,7 +198,6 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 *
 	 * @return list of lines
 	 */
-	@Override
 	public BlameResult call() throws GitAPIException {
 		checkCallable();
 		try (BlameGenerator gen = new BlameGenerator(repo, path)) {
@@ -249,12 +248,11 @@ public class BlameCommand extends GitCommand<BlameResult> {
 			rawText = new RawText(inTree);
 			break;
 		case TRUE:
-			try (AutoLFInputStream in = new AutoLFInputStream(
-					new FileInputStream(inTree), true)) {
-				// Canonicalization should lead to same or shorter length
-				// (CRLF to LF), so the file size on disk is an upper size bound
-				rawText = new RawText(toByteArray(in, (int) inTree.length()));
-			}
+			EolCanonicalizingInputStream in = new EolCanonicalizingInputStream(
+					new FileInputStream(inTree), true);
+			// Canonicalization should lead to same or shorter length
+			// (CRLF to LF), so the file size on disk is an upper size bound
+			rawText = new RawText(toByteArray(in, (int) inTree.length()));
 			break;
 		default:
 			throw new IllegalArgumentException(

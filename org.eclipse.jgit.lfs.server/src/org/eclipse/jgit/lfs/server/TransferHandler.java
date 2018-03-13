@@ -44,9 +44,6 @@
 package org.eclipse.jgit.lfs.server;
 
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static org.eclipse.jgit.lfs.lib.Constants.DOWNLOAD;
-import static org.eclipse.jgit.lfs.lib.Constants.UPLOAD;
-import static org.eclipse.jgit.lfs.lib.Constants.VERIFY;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -61,14 +58,18 @@ import org.eclipse.jgit.lfs.server.internal.LfsServerText;
 
 abstract class TransferHandler {
 
+	private static final String DOWNLOAD = "download"; //$NON-NLS-1$
+	private static final String UPLOAD = "upload"; //$NON-NLS-1$
+	private static final String VERIFY = "verify"; //$NON-NLS-1$
+
 	static TransferHandler forOperation(String operation,
 			LargeFileRepository repository, List<LfsObject> objects) {
 		switch (operation) {
-		case UPLOAD:
+		case TransferHandler.UPLOAD:
 			return new Upload(repository, objects);
-		case DOWNLOAD:
+		case TransferHandler.DOWNLOAD:
 			return new Download(repository, objects);
-		case VERIFY:
+		case TransferHandler.VERIFY:
 		default:
 			throw new UnsupportedOperationException(MessageFormat.format(
 					LfsServerText.get().unsupportedOperation, operation));

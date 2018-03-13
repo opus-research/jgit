@@ -141,20 +141,8 @@ public class HttpSupport {
 	/** The {@code Accept-Encoding} header. */
 	public static final String HDR_ACCEPT_ENCODING = "Accept-Encoding"; //$NON-NLS-1$
 
-	/**
-	 * The {@code Location} header.
-	 * @since 4.7
-	 */
-	public static final String HDR_LOCATION = "Location"; //$NON-NLS-1$
-
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_GZIP = "gzip"; //$NON-NLS-1$
-
-	/**
-	 * The {@code x-gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}.
-	 * @since 4.6
-	 */
-	public static final String ENCODING_X_GZIP = "x-gzip"; //$NON-NLS-1$
 
 	/** The standard {@code text/plain} MIME type. */
 	public static final String TEXT_PLAIN = "text/plain"; //$NON-NLS-1$
@@ -201,8 +189,7 @@ public class HttpSupport {
 		try {
 			return c.getResponseCode();
 		} catch (ConnectException ce) {
-			final URL url = c.getURL();
-			final String host = (url == null) ? "<null>" : url.getHost(); //$NON-NLS-1$
+			final String host = c.getURL().getHost();
 			// The standard J2SE error message is not very useful.
 			//
 			if ("Connection timed out: connect".equals(ce.getMessage())) //$NON-NLS-1$
@@ -229,8 +216,7 @@ public class HttpSupport {
 		try {
 			return c.getResponseCode();
 		} catch (ConnectException ce) {
-			final URL url = c.getURL();
-			final String host = (url == null) ? "<null>" : url.getHost(); //$NON-NLS-1$
+			final String host = c.getURL().getHost();
 			// The standard J2SE error message is not very useful.
 			//
 			if ("Connection timed out: connect".equals(ce.getMessage())) //$NON-NLS-1$
@@ -238,23 +224,6 @@ public class HttpSupport {
 						JGitText.get().connectionTimeOut, host));
 			throw new ConnectException(ce.getMessage() + " " + host); //$NON-NLS-1$
 		}
-	}
-
-	/**
-	 * Extract a HTTP header from the response.
-	 *
-	 * @param c
-	 *            connection the header should be obtained from.
-	 * @param headerName
-	 *            the header name
-	 * @return the header value
-	 * @throws IOException
-	 *             communications error prevented obtaining the header.
-	 * @since 4.7
-	 */
-	public static String responseHeader(final HttpConnection c,
-			final String headerName) throws IOException {
-		return c.getHeaderField(headerName);
 	}
 
 	/**
@@ -303,18 +272,15 @@ public class HttpSupport {
 	}
 
 	private static class DummyX509TrustManager implements X509TrustManager {
-		@Override
 		public X509Certificate[] getAcceptedIssuers() {
 			return null;
 		}
 
-		@Override
 		public void checkClientTrusted(X509Certificate[] certs,
 				String authType) {
 			// no check
 		}
 
-		@Override
 		public void checkServerTrusted(X509Certificate[] certs,
 				String authType) {
 			// no check
@@ -322,7 +288,6 @@ public class HttpSupport {
 	}
 
 	private static class DummyHostnameVerifier implements HostnameVerifier {
-		@Override
 		public boolean verify(String hostname, SSLSession session) {
 			// always accept
 			return true;

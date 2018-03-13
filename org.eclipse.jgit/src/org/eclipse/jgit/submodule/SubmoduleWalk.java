@@ -45,7 +45,6 @@ package org.eclipse.jgit.submodule;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Locale;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -265,7 +264,7 @@ public class SubmoduleWalk implements AutoCloseable {
 
 		String remoteName = null;
 		// Look up remote URL associated wit HEAD ref
-		Ref ref = parent.exactRef(Constants.HEAD);
+		Ref ref = parent.getRef(Constants.HEAD);
 		if (ref != null) {
 			if (ref.isSymbolic())
 				ref = ref.getLeaf();
@@ -664,8 +663,7 @@ public class SubmoduleWalk implements AutoCloseable {
 				ConfigConstants.CONFIG_KEY_IGNORE);
 		if (name == null)
 			return null;
-		return IgnoreSubmoduleMode
-				.valueOf(name.trim().toUpperCase(Locale.ROOT));
+		return IgnoreSubmoduleMode.valueOf(name.trim().toUpperCase());
 	}
 
 	/**
@@ -706,7 +704,7 @@ public class SubmoduleWalk implements AutoCloseable {
 		if (subRepo == null)
 			return null;
 		try {
-			Ref head = subRepo.exactRef(Constants.HEAD);
+			Ref head = subRepo.getRef(Constants.HEAD);
 			return head != null ? head.getLeaf().getName() : null;
 		} finally {
 			subRepo.close();
