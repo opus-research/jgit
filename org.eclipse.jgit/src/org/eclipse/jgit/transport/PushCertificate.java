@@ -85,11 +85,12 @@ public class PushCertificate {
 	private final String nonce;
 	private final NonceStatus nonceStatus;
 	private final List<ReceiveCommand> commands;
+	private final String rawCommands;
 	private final String signature;
 
 	PushCertificate(String version, PushCertificateIdent pusher, String pushee,
 			String nonce, NonceStatus nonceStatus, List<ReceiveCommand> commands,
-			String signature) {
+			String rawCommands, String signature) {
 		if (version == null || version.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, VERSION));
@@ -106,12 +107,8 @@ public class PushCertificate {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, NONCE));
 		}
-		if (nonceStatus == null) {
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidField,
-					"nonce status")); //$NON-NLS-1$
-		}
-		if (commands == null || commands.isEmpty()) {
+		if (commands == null || commands.isEmpty()
+				|| rawCommands == null || rawCommands.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField,
 					"command")); //$NON-NLS-1$
@@ -121,7 +118,7 @@ public class PushCertificate {
 					JGitText.get().pushCertificateInvalidSignature);
 		}
 		if (!signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE)
-				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE + '\n')) {
+				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE)) {
 			throw new IllegalArgumentException(
 					JGitText.get().pushCertificateInvalidSignature);
 		}
@@ -131,6 +128,7 @@ public class PushCertificate {
 		this.nonce = nonce;
 		this.nonceStatus = nonceStatus;
 		this.commands = commands;
+		this.rawCommands = rawCommands;
 		this.signature = signature;
 	}
 
@@ -206,18 +204,14 @@ public class PushCertificate {
 	 * @since 4.1
 	 */
 	public String toText() {
-		StringBuilder sb = new StringBuilder()
+		return new StringBuilder()
 				.append(VERSION).append(' ').append(version).append('\n')
 				.append(PUSHER).append(' ').append(getPusher())
 				.append('\n')
 				.append(PUSHEE).append(' ').append(pushee).append('\n')
 				.append(NONCE).append(' ').append(nonce).append('\n')
-				.append('\n');
-		for (ReceiveCommand cmd : commands) {
-			sb.append(cmd.getOldId().name())
-				.append(' ').append(cmd.getNewId().name())
-				.append(' ').append(cmd.getRefName()).append('\n');
-		}
-		return sb.toString();
+				.append('\n')
+				.append(rawCommands)
+				.toString();
 	}
 }
