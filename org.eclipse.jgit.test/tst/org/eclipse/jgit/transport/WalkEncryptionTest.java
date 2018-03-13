@@ -91,6 +91,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
+import javax.crypto.Cipher;
 import javax.crypto.SecretKeyFactory;
 
 import org.eclipse.jgit.api.Git;
@@ -771,16 +772,16 @@ public class WalkEncryptionTest {
 			String profile = props.getProperty(AmazonS3.Keys.CRYPTO_ALG);
 			String version = props.getProperty(AmazonS3.Keys.CRYPTO_VER,
 					WalkEncryption.Vals.DEFAULT_VERS);
-			String cryptoAlgo;
+			String crytoAlgo;
 			String keyAlgo;
 			switch (version) {
 			case WalkEncryption.Vals.DEFAULT_VERS:
 			case WalkEncryption.JGitV1.VERSION:
-				cryptoAlgo = profile;
+				crytoAlgo = profile;
 				keyAlgo = profile;
 				break;
 			case WalkEncryption.JGitV2.VERSION:
-				cryptoAlgo = props
+				crytoAlgo = props
 						.getProperty(profile + WalkEncryption.Keys.X_ALGO);
 				keyAlgo = props
 						.getProperty(profile + WalkEncryption.Keys.X_KEY_ALGO);
@@ -789,7 +790,7 @@ public class WalkEncryptionTest {
 				return false;
 			}
 			try {
-				InsecureCipherFactory.create(cryptoAlgo);
+				Cipher.getInstance(crytoAlgo);
 				SecretKeyFactory.getInstance(keyAlgo);
 				return true;
 			} catch (Throwable e) {
