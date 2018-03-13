@@ -147,7 +147,8 @@ public class FileBasedConfig extends StoredConfig {
 					snapshot = newSnapshot;
 			} else {
 				final String decoded;
-				if (isUtf8(in)) {
+				if (in.length >= 3 && in[0] == (byte) 0xEF
+						&& in[1] == (byte) 0xBB && in[2] == (byte) 0xBF) {
 					decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
 							in, 3, in.length);
 					utf8Bom = true;

@@ -62,7 +62,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.lib.BranchConfig.BranchRebaseMode;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -606,10 +605,11 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
-		assertNull(git2.getRepository().getConfig().getEnum(
-				BranchRebaseMode.values(),
-				ConfigConstants.CONFIG_BRANCH_SECTION, "test",
-				ConfigConstants.CONFIG_KEY_REBASE, null));
+		assertFalse(git2
+				.getRepository()
+				.getConfig()
+				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
+						ConfigConstants.CONFIG_KEY_REBASE, false));
 
 		FileBasedConfig userConfig = SystemReader.getInstance().openUserConfig(
 				null, git.getRepository().getFS());
@@ -623,12 +623,11 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setURI(fileUri());
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
-		assertEquals(BranchRebaseMode.REBASE,
-				git2.getRepository().getConfig().getEnum(
-						BranchRebaseMode.values(),
-						ConfigConstants.CONFIG_BRANCH_SECTION, "test",
-						ConfigConstants.CONFIG_KEY_REBASE,
-						BranchRebaseMode.NONE));
+		assertTrue(git2
+				.getRepository()
+				.getConfig()
+				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
+						ConfigConstants.CONFIG_KEY_REBASE, false));
 
 		userConfig.setString(ConfigConstants.CONFIG_BRANCH_SECTION, null,
 				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE,
@@ -640,12 +639,11 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setURI(fileUri());
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
-		assertEquals(BranchRebaseMode.REBASE,
-				git2.getRepository().getConfig().getEnum(
-						BranchRebaseMode.values(),
-						ConfigConstants.CONFIG_BRANCH_SECTION, "test",
-						ConfigConstants.CONFIG_KEY_REBASE,
-						BranchRebaseMode.NONE));
+		assertTrue(git2
+				.getRepository()
+				.getConfig()
+				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
+						ConfigConstants.CONFIG_KEY_REBASE, false));
 
 	}
 

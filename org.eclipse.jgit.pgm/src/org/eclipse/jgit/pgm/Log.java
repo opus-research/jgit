@@ -228,7 +228,7 @@ class Log extends RevWalkTextBuiltin {
 	}
 
 	private void addNoteMap(String notesRef) throws IOException {
-		Ref notes = db.exactRef(notesRef);
+		Ref notes = db.getRef(notesRef);
 		if (notes == null)
 			return;
 		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());

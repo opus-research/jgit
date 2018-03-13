@@ -53,7 +53,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 
 import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.lfs.internal.AtomicObjectOutputStream;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.server.LargeFileRepository;
@@ -148,10 +147,7 @@ public class FileLfsRepository implements LargeFileRepository {
 	AtomicObjectOutputStream getOutputStream(AnyLongObjectId id)
 			throws IOException {
 		Path path = getPath(id);
-		Path parent = path.getParent();
-		if (parent != null) {
-			Files.createDirectories(parent);
-		}
+		Files.createDirectories(path.getParent());
 		return new AtomicObjectOutputStream(path, id);
 	}
 
