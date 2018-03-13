@@ -331,13 +331,10 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param uri
-	 *            the uri to clone from.  Must be non-{@code null}.
+	 *            the uri to clone from
 	 * @return this instance
 	 */
 	public CloneCommand setURI(String uri) {
-		if (uri == null) {
-			throw new NullPointerException();
-		}
 		this.uri = uri;
 		return this;
 	}
@@ -349,8 +346,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @see URIish#getHumanishName()
 	 *
 	 * @param directory
-	 *            the directory to clone to, or {@code null} if the directory
-	 *            name should be taken from the source uri
+	 *            the directory to clone to
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
@@ -366,8 +362,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param gitDir
-	 *            the repository meta directory, or {@code null} to choose one
-	 *            automatically at clone time
+	 *            the repository meta directory
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
@@ -409,9 +404,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {
-		if (remote == null) {
-			throw new NullPointerException();
-		}
 		this.remote = remote;
 		return this;
 	}
@@ -424,9 +416,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return this instance
 	 */
 	public CloneCommand setBranch(String branch) {
-		if (branch == null) {
-			throw new NullPointerException();
-		}
 		this.branch = branch;
 		return this;
 	}
@@ -441,9 +430,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return {@code this}
 	 */
 	public CloneCommand setProgressMonitor(ProgressMonitor monitor) {
-		if (monitor == null) {
-			monitor = NullProgressMonitor.INSTANCE;
-		}
 		this.monitor = monitor;
 		return this;
 	}

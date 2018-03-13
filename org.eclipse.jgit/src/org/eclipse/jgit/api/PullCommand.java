@@ -130,9 +130,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @return this instance
 	 */
 	public PullCommand setProgressMonitor(ProgressMonitor monitor) {
-		if (monitor == null) {
-			monitor = NullProgressMonitor.INSTANCE;
-		}
 		this.monitor = monitor;
 		return this;
 	}
