@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Constantine Plotnikov <constantine.plotnikov@gmail.com>
  * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
@@ -130,10 +129,5 @@ public final class AlternateRepositoryDatabase extends ObjectDatabase {
 	@Override
 	protected void closeAlternates(final ObjectDatabase[] alt) {
 		// Do nothing; these belong to odb to close, not us.
-	}
-
-	@Override
-	public ObjectDatabase newCachedDatabase() {
-		return odb.newCachedDatabase();
 	}
 }
