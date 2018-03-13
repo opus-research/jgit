@@ -112,16 +112,22 @@
   </dependencies>
 
   <profiles>
-    <!-- Profile provides a property which enables long running tests. -->
+    <!-- Set profile s3.test or -Djgit.s3.test=true to enable S3 encryption tests.
+        Set -Djgit.test.long=true to also enable long running tests -->
     <profile>
-      <id>test.long</id>
+      <id>s3.test</id>
+      <activation>
+        <property>
+          <name>jgit.s3.test</name>
+        </property>
+      </activation>
       <build>
         <plugins>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <argLine>-Djgit.test.long=true</argLine>
+              <argLine>-Djgit.s3.test=true -Djgit.test.long=${jgit.test.long}</argLine>
             </configuration>
           </plugin>
         </plugins>
