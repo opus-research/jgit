@@ -68,13 +68,20 @@ class SimilarityIndex {
 	/** The {@link #idHash} table stops growing at {@code 1 << MAX_HASH_BITS}. */
 	private static final int MAX_HASH_BITS = 17;
 
+	/** The {@link #idHash} table will not grow bigger than this, ever. */
+	private static final int MAX_HASH_SIZE = 1 << MAX_HASH_BITS;
+
+	/** Prime just before {@link #MAX_HASH_SIZE}. */
+	private static final int P = 131071;
+
 	/**
 	 * Shift to apply before storing a key.
 	 * <p>
 	 * Within the 64 bit table record space, we leave the highest bit unset so
-	 * all values are positive. The lower 32 bits to count bytes.
+	 * all values are positive, and we need {@link #MAX_HASH_BITS} bits for the
+	 * keys. The lower 32 bits are used to count bytes impacted.
 	 */
-	private static final int KEY_SHIFT = 32;
+	private static final int KEY_SHIFT = 64 - 1 - MAX_HASH_BITS;
 
 	/** Total size of the file we hashed into the structure. */
 	private long fileSize;
@@ -93,12 +100,8 @@ class SimilarityIndex {
 	 */
 	private long[] idHash;
 
-	/** {@code idHash.length == 1 << idHashBits}. */
-	private int idHashBits;
-
 	SimilarityIndex() {
-		idHashBits = 8;
-		idHash = new long[1 << idHashBits];
+		idHash = new long[256];
 	}
 
 	long getFileSize() {
@@ -135,7 +138,7 @@ class SimilarityIndex {
 				int c = raw[ptr++] & 0xff;
 				if (c == '\n')
 					break;
-				hash = (hash << 5) + hash + c;
+				hash = (hash << 5) ^ c;
 			} while (ptr < end && ptr - start < 64);
 			add(hash, ptr - start);
 		}
@@ -163,7 +166,7 @@ class SimilarityIndex {
 				int c = buf[ptr++] & 0xff;
 				if (c == '\n')
 					break;
-				hash = (hash << 5) + hash + c;
+				hash = (hash << 5) ^ c;
 			} while (n < 64 && n < remaining);
 			add(hash, n);
 			remaining -= n;
@@ -269,8 +272,7 @@ class SimilarityIndex {
 	}
 
 	void add(int key, int cnt) {
-		key = (key * 0x9e370001) >>> 1; // Mix bits and ensure not negative.
-
+		key = hash(key);
 		int j = slot(key);
 		for (;;) {
 			long v = idHash[j];
@@ -296,24 +298,28 @@ class SimilarityIndex {
 		}
 	}
 
-	private int slot(int key) {
-		// We use 31 - idHashBits because the upper bit was already forced
-		// to be 0 and we want the remaining high bits to be used as the
-		// table slot.
+	private static int hash(int key) {
+		// Make the key fit into our table. Since we have a maximum size
+		// that we cap the table at, all keys get squashed before going
+		// into the table. This prevents overflow.
 		//
-		return key >>> (31 - idHashBits);
+		return (key >>> 1) % P;
+	}
+
+	private int slot(int key) {
+		return key % idHash.length;
 	}
 
 	private boolean shouldGrow() {
-		return idHashBits < MAX_HASH_BITS && idHash.length <= idSize * 2;
+		int n = idHash.length;
+		return n < MAX_HASH_SIZE && n <= idSize * 2;
 	}
 
 	private void grow() {
 		long[] oldHash = idHash;
 		int oldSize = idHash.length;
 
-		idHashBits++;
-		idHash = new long[1 << idHashBits];
+		idHash = new long[2 * oldSize];
 		for (int i = 0; i < oldSize; i++) {
 			long v = oldHash[i];
 			if (v != 0) {

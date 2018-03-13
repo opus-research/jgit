@@ -101,7 +101,7 @@ package org.eclipse.jgit.diff;
  */
 public class PatienceDiff extends DiffAlgorithm {
 	/** Algorithm we use when there are no common unique lines in a region. */
-	private DiffAlgorithm fallback;
+	private DiffAlgorithm fallback = HistogramDiff.INSTANCE;
 
 	/**
 	 * Set the algorithm used when there are no common unique lines remaining.
@@ -154,6 +154,11 @@ public class PatienceDiff extends DiffAlgorithm {
 				diff(r.before(lcs), pCommon, 0, pIdx);
 				diff(r.after(lcs), pCommon, pIdx + 1, pEnd);
 
+			} else if (fallback instanceof HistogramDiff) {
+				pCommon = null;
+				p = null;
+				((HistogramDiff) fallback).diffNonCommon(edits, cmp, a, b, r);
+
 			} else if (fallback != null) {
 				pCommon = null;
 				p = null;
@@ -182,8 +187,6 @@ public class PatienceDiff extends DiffAlgorithm {
 				break;
 
 			case EMPTY:
-				break;
-
 			default:
 				throw new IllegalStateException();
 			}

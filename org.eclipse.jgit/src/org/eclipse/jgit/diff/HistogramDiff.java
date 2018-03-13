@@ -44,93 +44,45 @@
 package org.eclipse.jgit.diff;
 
 /**
- * An extended form of Bram Cohen's patience diff algorithm.
+ * An extended form of Bram Cohen's {@link PatienceDiff}.
  *
- * This implementation was derived by using the 4 rules that are outlined in
- * Bram Cohen's <a href="http://bramcohen.livejournal.com/73318.html">blog</a>,
- * and then was further extended to support low-occurrence common elements.
+ * This algorithm exists primarily as a fallback for {@code PatienceDiff},
+ * providing a stable method of computing a difference when there are no more
+ * common unique elements in a region.
  *
- * The basic idea of the algorithm is to create a histogram of occurrences for
- * each element of sequence A. Each element of sequence B is then considered in
- * turn. If the element also exists in sequence A, and has a lower occurrence
- * count, the positions are considered as a candidate for the longest common
- * subsequence (LCS). After scanning of B is complete the LCS that has the
- * lowest number of occurrences is chosen as a split point. The region is split
- * around the LCS, and the algorithm is recursively applied to the sections
- * before and after the LCS.
+ * Unlike {@code PatienceDiff}, this implementation builds a histogram of
+ * element occurrences in sequence A and finds the longest common subsequence
+ * between A and B that has the fewest occurrences in A. At each LCS point the
+ * sequence is split and the algorithm is recursively applied to the before and
+ * after regions until no more common elements exist.
  *
- * By always selecting a LCS position with the lowest occurrence count, this
- * algorithm behaves exactly like Bram Cohen's patience diff whenever there is a
- * unique common element available between the two sequences. When no unique
- * elements exist, the lowest occurrence element is chosen instead. This offers
- * more readable diffs than simply falling back on the standard Myers' O(ND)
- * algorithm would produce.
+ * Because construction of the histogram is more expensive than the simpler
+ * common unique list used by {@code PatienceDiff} this algorithm will run
+ * slower than {@code PatienceDiff}, but should produce the same results
+ * whenever there is a common unique element.
  *
- * To prevent the algorithm from having an O(N^2) running time, an upper limit
- * on the number of unique elements in a histogram bucket is configured by
- * {@link #setMaxChainLength(int)}. If sequence A has more than this many
- * elements that hash into the same hash bucket, the algorithm passes the region
- * to {@link #setFallbackAlgorithm(DiffAlgorithm)}. If no fallback algorithm is
- * configured, the region is emitted as a replace edit.
- *
- * During scanning of sequence B, any element of A that occurs more than
- * {@link #setMaxChainLength(int)} times is never considered for an LCS match
- * position, even if it is common between the two sequences. This limits the
- * number of locations in sequence A that must be considered to find the LCS,
- * and helps maintain a lower running time bound.
- *
- * So long as {@link #setMaxChainLength(int)} is a small constant (such as 64),
- * the algorithm runs in O(N * D) time, where N is the sum of the input lengths
- * and D is the number of edits in the resulting EditList. If the supplied
- * {@link SequenceComparator} has a good hash function, this implementation
- * typically out-performs {@link MyersDiff}, even though its theoretical running
- * time is the same.
- *
- * This implementation has an internal limitation that prevents it from handling
- * sequences with more than 268,435,456 (2^28) elements.
+ * @see PatienceDiff
  */
-public class HistogramDiff extends LowLevelDiffAlgorithm {
-	/** Algorithm to use when there are too many element occurrences. */
-	private DiffAlgorithm fallback = MyersDiff.INSTANCE;
+public class HistogramDiff extends DiffAlgorithm {
+	/** Singleton instance of HistogramDiff. */
+	public static final HistogramDiff INSTANCE = new HistogramDiff();
 
-	/**
-	 * Maximum number of positions to consider for a given element hash.
-	 *
-	 * All elements with the same hash are stored into a single chain. The chain
-	 * size is capped to ensure search is linear time at O(len_A + len_B) rather
-	 * than quadratic at O(len_A * len_B).
-	 */
-	private int maxChainLength = 64;
-
-	/**
-	 * Set the algorithm used when there are too many element occurrences.
-	 *
-	 * @param alg
-	 *            the secondary algorithm. If null the region will be denoted as
-	 *            a single REPLACE block.
-	 */
-	public void setFallbackAlgorithm(DiffAlgorithm alg) {
-		fallback = alg;
+	private HistogramDiff() {
+		// Singleton algorithm.
 	}
 
-	/**
-	 * Maximum number of positions to consider for a given element hash.
-	 *
-	 * All elements with the same hash are stored into a single chain. The chain
-	 * size is capped to ensure search is linear time at O(len_A + len_B) rather
-	 * than quadratic at O(len_A * len_B).
-	 *
-	 * @param maxLen
-	 *            new maximum length.
-	 */
-	public void setMaxChainLength(int maxLen) {
-		maxChainLength = maxLen;
+	public <S extends Sequence> EditList diffNonCommon(
+			SequenceComparator<? super S> cmp, S a, S b) {
+		State<S> s = new State<S>(new HashedSequencePair<S>(cmp, a, b));
+		s.diffReplace(new Edit(0, s.a.size(), 0, s.b.size()));
+		return s.edits;
 	}
 
-	public <S extends Sequence> void diffNonCommon(EditList edits,
+	<S extends Sequence> void diffNonCommon(EditList edits,
 			HashedSequenceComparator<S> cmp, HashedSequence<S> a,
 			HashedSequence<S> b, Edit region) {
-		new State<S>(edits, cmp, a, b).diffReplace(region);
+		State<S> s = new State<S>(edits, cmp, a, b);
+		s.diffReplace(region);
 	}
 
 	private class State<S extends Sequence> {
@@ -143,6 +95,13 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		/** Result edits we have determined that must be made to convert a to b. */
 		final EditList edits;
 
+		State(HashedSequencePair<S> p) {
+			this.cmp = p.getComparator();
+			this.a = p.getA();
+			this.b = p.getB();
+			this.edits = new EditList();
+		}
+
 		State(EditList edits, HashedSequenceComparator<S> cmp,
 				HashedSequence<S> a, HashedSequence<S> b) {
 			this.cmp = cmp;
@@ -152,33 +111,11 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		}
 
 		void diffReplace(Edit r) {
-			Edit lcs = new HistogramDiffIndex<S>(maxChainLength, cmp, a, b, r)
+			Edit lcs = new HistogramDiffIndex<S>(cmp, a, b, r)
 					.findLongestCommonSequence();
 			if (lcs != null) {
-				// If we were given an edit, we can prove a result here.
-				//
-				if (lcs.isEmpty()) {
-					// An empty edit indicates there is nothing in common.
-					// Replace the entire region.
-					//
-					edits.add(r);
-				} else {
-					diff(r.before(lcs));
-					diff(r.after(lcs));
-				}
-
-			} else if (fallback instanceof LowLevelDiffAlgorithm) {
-				LowLevelDiffAlgorithm fb = (LowLevelDiffAlgorithm) fallback;
-				fb.diffNonCommon(edits, cmp, a, b, r);
-
-			} else if (fallback != null) {
-				SubsequenceComparator<HashedSequence<S>> cs = subcmp();
-				Subsequence<HashedSequence<S>> as = Subsequence.a(a, r);
-				Subsequence<HashedSequence<S>> bs = Subsequence.b(b, r);
-
-				EditList res = fallback.diffNonCommon(cs, as, bs);
-				edits.addAll(Subsequence.toBase(res, as, bs));
-
+				diff(r.before(lcs));
+				diff(r.after(lcs));
 			} else {
 				edits.add(r);
 			}
@@ -199,10 +136,6 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 			default:
 				throw new IllegalStateException();
 			}
-		}
-
-		private SubsequenceComparator<HashedSequence<S>> subcmp() {
-			return new SubsequenceComparator<HashedSequence<S>>(cmp);
 		}
 	}
 }

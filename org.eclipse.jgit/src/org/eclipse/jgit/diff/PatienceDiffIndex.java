@@ -91,11 +91,10 @@ final class PatienceDiffIndex<S extends Sequence> {
 	/** 1 past the last valid entry in {@link #pCommon}. */
 	private final int pEnd;
 
-	/** Keyed by {@link #hash(HashedSequence, int)} to get an entry offset. */
+	/** Keyed by {@code cmp.hash() & tableMask} to yield an entry offset. */
 	private final int[] table;
 
-	/** Number of low bits to discard from a key to index {@link #table}. */
-	private final int keyShift;
+	private final int tableMask;
 
 	// To save memory the buckets for hash chains are stored in correlated
 	// arrays. This permits us to get 3 values per entry, without paying
@@ -159,9 +158,8 @@ final class PatienceDiffIndex<S extends Sequence> {
 		this.pEnd = pCnt;
 
 		final int sz = region.getLengthB();
-		final int tableBits = tableBits(sz);
-		table = new int[1 << tableBits];
-		keyShift = 32 - tableBits;
+		table = new int[tableSize(sz)];
+		tableMask = table.length - 1;
 
 		// As we insert elements we preincrement so that 0 is never a
 		// valid entry. Therefore we have to allocate one extra space.
@@ -189,7 +187,7 @@ final class PatienceDiffIndex<S extends Sequence> {
 		final int end = region.endB;
 		int pIdx = pBegin;
 		SCAN: while (ptr < end) {
-			final int tIdx = hash(b, ptr);
+			final int tIdx = cmp.hash(b, ptr) & tableMask;
 
 			if (pIdx < pEnd) {
 				final long priorRec = pCommon[pIdx];
@@ -244,9 +242,9 @@ final class PatienceDiffIndex<S extends Sequence> {
 	private void scanA() {
 		int ptr = region.beginA;
 		final int end = region.endA;
-		int pLast = pBegin;
+		int pLast = pBegin - 1;
 		SCAN: while (ptr < end) {
-			final int tIdx = hash(a, ptr);
+			final int tIdx = cmp.hash(a, ptr) & tableMask;
 
 			for (int eIdx = table[tIdx]; eIdx != 0; eIdx = next[eIdx]) {
 				final long rec = ptrs[eIdx];
@@ -276,7 +274,12 @@ final class PatienceDiffIndex<S extends Sequence> {
 					// fact that pCommon is sorted by B, and its likely that
 					// matches in A appear in the same order as they do in B.
 					//
-					for (int pIdx = pLast;;) {
+					for (int pIdx = pLast + 1;; pIdx++) {
+						if (pIdx == pEnd)
+							pIdx = pBegin;
+						else if (pIdx == pLast)
+							break;
+
 						final long priorRec = pCommon[pIdx];
 						final int priorB = bOf(priorRec);
 						if (bs < priorB)
@@ -286,12 +289,6 @@ final class PatienceDiffIndex<S extends Sequence> {
 							pLast = pIdx;
 							continue SCAN;
 						}
-
-						pIdx++;
-						if (pIdx == pEnd)
-							pIdx = pBegin;
-						if (pIdx == pLast)
-							break;
 					}
 				}
 
@@ -394,10 +391,6 @@ final class PatienceDiffIndex<S extends Sequence> {
 		return lcs;
 	}
 
-	private int hash(HashedSequence<S> s, int idx) {
-		return (cmp.hash(s, idx) * 0x9e370001 /* mix bits */) >>> keyShift;
-	}
-
 	private static boolean isDuplicate(long rec) {
 		return (((int) rec) & DUPLICATE_MASK) != 0;
 	}
@@ -414,12 +407,11 @@ final class PatienceDiffIndex<S extends Sequence> {
 		return (int) (rec >>> B_SHIFT);
 	}
 
-	private static int tableBits(final int sz) {
-		int bits = 31 - Integer.numberOfLeadingZeros(sz);
-		if (bits == 0)
-			bits = 1;
-		if (1 << bits < sz)
-			bits++;
-		return bits;
+	private static int tableSize(final int worstCaseBlockCnt) {
+		int shift = 32 - Integer.numberOfLeadingZeros(worstCaseBlockCnt);
+		int sz = 1 << (shift - 1);
+		if (sz < worstCaseBlockCnt)
+			sz <<= 1;
+		return sz;
 	}
 }
