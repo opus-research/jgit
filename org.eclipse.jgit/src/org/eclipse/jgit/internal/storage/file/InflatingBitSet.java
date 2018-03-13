@@ -43,8 +43,8 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-import com.googlecode.javaewah.IntIterator;
+import javaewah.EWAHCompressedBitmap;
+import javaewah.IntIterator;
 
 /**
  * A wrapper around the EWAHCompressedBitmap optimized for the contains
