@@ -67,6 +67,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -90,6 +91,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogEntry;
+import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -482,9 +484,10 @@ public class GC {
 				return false;
 			return r1.getTarget().getName().equals(r2.getTarget().getName());
 		} else {
-			if (r2.isSymbolic())
+			if (r2.isSymbolic()) {
 				return false;
-			return r1.getObjectId().equals(r2.getObjectId());
+			}
+			return Objects.equals(r1.getObjectId(), r2.getObjectId());
 		}
 	}
 
@@ -592,7 +595,11 @@ public class GC {
 	 * @throws IOException
 	 */
 	private Set<ObjectId> listRefLogObjects(Ref ref, long minTime) throws IOException {
-		List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
+		ReflogReader reflogReader = repo.getReflogReader(ref.getName());
+		if (reflogReader == null) {
+			return Collections.emptySet();
+		}
+		List<ReflogEntry> rlEntries = reflogReader
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
@@ -635,10 +642,7 @@ public class GC {
 	 */
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
-		try {
-			if (repo.getIndexFile() == null)
-				return Collections.emptySet();
-		} catch (NoWorkTreeException e) {
+		if (repo.isBare()) {
 			return Collections.emptySet();
 		}
 		try (TreeWalk treeWalk = new TreeWalk(repo)) {
