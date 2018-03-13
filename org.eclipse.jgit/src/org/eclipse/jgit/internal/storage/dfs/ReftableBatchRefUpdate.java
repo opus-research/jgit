@@ -78,6 +78,7 @@ import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
 import org.eclipse.jgit.internal.storage.reftable.ReftableWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -113,7 +114,10 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 		this.refdb = refdb;
 		this.odb = odb;
 		lock = refdb.getLock();
-		reftableConfig = refdb.getReftableConfig();
+
+		Config cfg = refdb.getRepository().getConfig();
+		reftableConfig = new ReftableConfig();
+		reftableConfig.fromConfig(cfg);
 	}
 
 	@Override
