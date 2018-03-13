@@ -100,6 +100,9 @@ final class PatienceDiffIndex<S extends Sequence> {
 	// arrays. This permits us to get 3 values per entry, without paying
 	// the penalty for an object header on each entry.
 
+	/** Cached hash value for an element as returned by {@link #cmp}. */
+	private final int[] hash;
+
 	/**
 	 * A matched (or partially examined) element from the two sequences.
 	 *
@@ -157,15 +160,26 @@ final class PatienceDiffIndex<S extends Sequence> {
 		this.pBegin = pIdx;
 		this.pEnd = pCnt;
 
-		final int sz = region.getLengthB();
-		table = new int[tableSize(sz)];
-		tableMask = table.length - 1;
+		final int blockCnt = region.getLengthB();
+		if (blockCnt < 1) {
+			table = new int[] {};
+			tableMask = 0;
 
-		// As we insert elements we preincrement so that 0 is never a
-		// valid entry. Therefore we have to allocate one extra space.
-		//
-		ptrs = new long[1 + sz];
-		next = new int[ptrs.length];
+			hash = new int[] {};
+			ptrs = new long[] {};
+			next = new int[] {};
+
+		} else {
+			table = new int[tableSize(blockCnt)];
+			tableMask = table.length - 1;
+
+			// As we insert elements we preincrement so that 0 is never a
+			// valid entry. Therefore we have to allocate one extra space.
+			//
+			hash = new int[1 + blockCnt];
+			ptrs = new long[hash.length];
+			next = new int[hash.length];
+		}
 	}
 
 	/**
@@ -187,7 +201,8 @@ final class PatienceDiffIndex<S extends Sequence> {
 		final int end = region.endB;
 		int pIdx = pBegin;
 		SCAN: while (ptr < end) {
-			final int tIdx = cmp.hash(b, ptr) & tableMask;
+			final int key = cmp.hash(b, ptr);
+			final int tIdx = key & tableMask;
 
 			if (pIdx < pEnd) {
 				final long priorRec = pCommon[pIdx];
@@ -195,7 +210,7 @@ final class PatienceDiffIndex<S extends Sequence> {
 					// We know this region is unique from a prior pass.
 					// Insert the start point, and skip right to the end.
 					//
-					insertB(tIdx, ptr);
+					insertB(key, tIdx, ptr);
 					pIdx++;
 					ptr = aOfRaw(priorRec);
 					continue SCAN;
@@ -207,6 +222,9 @@ final class PatienceDiffIndex<S extends Sequence> {
 			// was already a different entry present.
 			//
 			for (int eIdx = table[tIdx]; eIdx != 0; eIdx = next[eIdx]) {
+				if (hash[eIdx] != key)
+					continue;
+
 				final long rec = ptrs[eIdx];
 				if (cmp.equals(b, ptr, b, bOf(rec))) {
 					ptrs[eIdx] = rec | B_DUPLICATE;
@@ -215,13 +233,14 @@ final class PatienceDiffIndex<S extends Sequence> {
 				}
 			}
 
-			insertB(tIdx, ptr);
+			insertB(key, tIdx, ptr);
 			ptr++;
 		}
 	}
 
-	private void insertB(final int tIdx, int ptr) {
+	private void insertB(final int key, final int tIdx, int ptr) {
 		final int eIdx = ++entryCnt;
+		hash[eIdx] = key;
 		ptrs[eIdx] = ((long) ptr) << B_SHIFT;
 		next[eIdx] = table[tIdx];
 		table[tIdx] = eIdx;
@@ -244,19 +263,25 @@ final class PatienceDiffIndex<S extends Sequence> {
 		final int end = region.endA;
 		int pLast = pBegin - 1;
 		SCAN: while (ptr < end) {
-			final int tIdx = cmp.hash(a, ptr) & tableMask;
+			final int key = cmp.hash(a, ptr);
+			final int tIdx = key & tableMask;
 
 			for (int eIdx = table[tIdx]; eIdx != 0; eIdx = next[eIdx]) {
 				final long rec = ptrs[eIdx];
-				final int bs = bOf(rec);
 
-				if (isDuplicate(rec) || !cmp.equals(a, ptr, b, bs))
+				if (isDuplicate(rec) || hash[eIdx] != key)
 					continue;
 
 				final int aPtr = aOfRaw(rec);
 				if (aPtr != 0 && cmp.equals(a, ptr, a, aPtr - 1)) {
 					ptrs[eIdx] = rec | A_DUPLICATE;
 					uniqueCommonCnt--;
+					ptr++;
+					continue SCAN;
+				}
+
+				final int bs = bOf(rec);
+				if (!cmp.equals(a, ptr, b, bs)) {
 					ptr++;
 					continue SCAN;
 				}
