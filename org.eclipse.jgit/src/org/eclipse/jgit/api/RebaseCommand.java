@@ -392,8 +392,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				throw new JGitInternalException("Updating HEAD failed");
 			}
 			rup = repo.updateRef(Constants.HEAD);
-			rup.setRefLogMessage(MessageFormat.format(
-					JGitText.get().rebaseFinishedReturningTo, headName), false);
 			res = rup.link(headName);
 			switch (res) {
 			case FAST_FORWARD:
