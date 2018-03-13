@@ -111,7 +111,6 @@ public class NoteMapTest extends RepositoryTestCase {
 
 		NoteMap map = NoteMap.read(reader, r);
 		assertNotNull("have map", map);
-		assertFalse("is not empty", map.isEmpty());
 
 		assertTrue("has note for a", map.contains(a));
 		assertTrue("has note for b", map.contains(b));
@@ -137,7 +136,6 @@ public class NoteMapTest extends RepositoryTestCase {
 
 		NoteMap map = NoteMap.read(reader, r);
 		assertNotNull("have map", map);
-		assertFalse("is not empty", map.isEmpty());
 
 		assertTrue("has note for a", map.contains(a));
 		assertTrue("has note for b", map.contains(b));
@@ -163,7 +161,6 @@ public class NoteMapTest extends RepositoryTestCase {
 
 		NoteMap map = NoteMap.read(reader, r);
 		assertNotNull("have map", map);
-		assertFalse("is not empty", map.isEmpty());
 
 		assertTrue("has note for a", map.contains(a));
 		assertTrue("has note for b", map.contains(b));
@@ -189,7 +186,6 @@ public class NoteMapTest extends RepositoryTestCase {
 
 		NoteMap map = NoteMap.read(reader, r);
 		assertNotNull("have map", map);
-		assertFalse("is not empty", map.isEmpty());
 
 		assertTrue("has note for a", map.contains(a));
 		assertTrue("has note for b", map.contains(b));
@@ -233,7 +229,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		tr.parseBody(r);
 
 		NoteMap map = NoteMap.read(reader, r);
-		assertFalse("is not empty", map.isEmpty());
 		assertTrue("has note for a", map.contains(a));
 		assertTrue("has note for b", map.contains(b));
 
@@ -258,7 +253,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		tr.parseBody(r);
 
 		NoteMap map = NoteMap.read(reader, r);
-		assertFalse("is not empty", map.isEmpty());
 		assertTrue("has note for a", map.contains(a));
 		assertTrue("has note for b", map.contains(b));
 
@@ -282,13 +276,11 @@ public class NoteMapTest extends RepositoryTestCase {
 		RevBlob data2 = tr.blob("data2");
 
 		NoteMap map = NoteMap.newEmptyMap();
-		assertTrue("is empty", map.isEmpty());
 		assertFalse("no a", map.contains(a));
 		assertFalse("no b", map.contains(b));
 
 		map.set(a, data1);
 		map.set(b, data2);
-		assertFalse("is not empty", map.isEmpty());
 
 		assertEquals(data1, map.get(a));
 		assertEquals(data2, map.get(b));
@@ -296,16 +288,13 @@ public class NoteMapTest extends RepositoryTestCase {
 		map.remove(a);
 		map.remove(b);
 
-		assertTrue("is empty", map.isEmpty());
 		assertFalse("no a", map.contains(a));
 		assertFalse("no b", map.contains(b));
 
 		map.set(a, "data1", inserter);
-		assertFalse("is not empty", map.isEmpty());
 		assertEquals(data1, map.get(a));
 
 		map.set(a, null, inserter);
-		assertTrue("is empty", map.isEmpty());
 		assertFalse("no a", map.contains(a));
 	}
 
@@ -325,7 +314,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		tr.parseBody(r);
 
 		NoteMap map = NoteMap.read(reader, r);
-		assertFalse("is not empty", map.isEmpty());
 		map.set(a, data2);
 		map.set(b, null);
 		map.set(data1, b);
@@ -373,7 +361,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		tr.parseBody(r);
 
 		NoteMap map = NoteMap.read(reader, r);
-		assertFalse("is not empty", map.isEmpty());
 		map.set(a, data2);
 		map.set(b, null);
 		map.set(data1, b);
@@ -410,7 +397,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		tr.parseBody(r);
 
 		NoteMap map = NoteMap.read(reader, r);
-		assertFalse("is not empty", map.isEmpty());
 		for (int i = 0; i < 254; i++) {
 			idBuf.setByte(Constants.OBJECT_ID_LENGTH - 1, i);
 			map.set(idBuf, data1);
@@ -457,12 +443,9 @@ public class NoteMapTest extends RepositoryTestCase {
 		tr.parseBody(r);
 
 		NoteMap map = NoteMap.read(reader, r);
-		assertFalse("is not empty", map.isEmpty());
 		map.set(a, null);
-		assertTrue("is empty", map.isEmpty());
 
 		RevCommit n = commitNoteMap(map);
-		assertTrue("is empty", map.isEmpty());
 		assertEquals("empty tree", empty, n.getTree());
 	}
 
