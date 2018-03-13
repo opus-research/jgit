@@ -186,19 +186,19 @@ public abstract class Merger {
 	/**
 	 * Create an iterator to walk the merge base of two commits.
 	 *
-	 * @param a
-	 *            the first commit in {@link #sourceObjects}.
-	 * @param b
-	 *            the second commit in {@link #sourceObjects}.
+	 * @param aIdx
+	 *            index of the first commit in {@link #sourceObjects}.
+	 * @param bIdx
+	 *            index of the second commit in {@link #sourceObjects}.
 	 * @return the new iterator
 	 * @throws IncorrectObjectTypeException
 	 *             one of the input objects is not a commit.
 	 * @throws IOException
 	 *             objects are missing or multiple merge bases were found.
 	 */
-	protected AbstractTreeIterator mergeBase(RevCommit a, RevCommit b)
+	protected AbstractTreeIterator mergeBase(final int aIdx, final int bIdx)
 			throws IOException {
-		RevCommit base = getBaseCommit(a, b);
+		RevCommit base = getBaseCommit(aIdx, bIdx);
 		return (base == null) ? new EmptyTreeIterator() : openTree(base.getTree());
 	}
 
@@ -224,36 +224,18 @@ public abstract class Merger {
 		if (sourceCommits[bIdx] == null)
 			throw new IncorrectObjectTypeException(sourceObjects[bIdx],
 					Constants.TYPE_COMMIT);
-		return getBaseCommit(sourceCommits[aIdx], sourceCommits[bIdx]);
-	}
-
-	/**
-	 * Return the merge base of two commits.
-	 *
-	 * @param a
-	 *            the first commit in {@link #sourceObjects}.
-	 * @param b
-	 *            the second commit in {@link #sourceObjects}.
-	 * @return the merge base of two commits
-	 * @throws IncorrectObjectTypeException
-	 *             one of the input objects is not a commit.
-	 * @throws IOException
-	 *             objects are missing or multiple merge bases were found.
-	 */
-	protected RevCommit getBaseCommit(RevCommit a, RevCommit b)
-			throws IncorrectObjectTypeException, IOException {
 		walk.reset();
 		walk.setRevFilter(RevFilter.MERGE_BASE);
-		walk.markStart(a);
-		walk.markStart(b);
+		walk.markStart(sourceCommits[aIdx]);
+		walk.markStart(sourceCommits[bIdx]);
 		final RevCommit base = walk.next();
 		if (base == null)
 			return null;
 		final RevCommit base2 = walk.next();
 		if (base2 != null) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().multipleMergeBasesFor, a.name(), b.name(),
-					base.name(), base2.name()));
+			throw new IOException(MessageFormat.format(JGitText.get().multipleMergeBasesFor
+					, sourceCommits[aIdx].name(), sourceCommits[bIdx].name()
+					, base.name(), base2.name()));
 		}
 		return base;
 	}
