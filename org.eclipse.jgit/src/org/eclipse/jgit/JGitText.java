@@ -196,7 +196,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String credentialPassword;
 	/***/ public String credentialUsername;
 	/***/ public String daemonAlreadyRunning;
-	/***/ public String daysAgo;
 	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deleteFileFailed;
 	/***/ public String deletingNotSupported;
@@ -234,7 +233,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfCherryPickCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfFetchCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfLsRemoteCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfPushCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfPullCommand;
@@ -265,7 +263,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String flagNotFromThis;
 	/***/ public String flagsAlreadyCreated;
 	/***/ public String funnyRefname;
-	/***/ public String hoursAgo;
 	/***/ public String hugeIndexesAreNotSupportedByJgitYet;
 	/***/ public String hunkBelongsToAnotherFile;
 	/***/ public String hunkDisconnectedFromFile;
@@ -284,7 +281,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
 	/***/ public String interruptedWriting;
-	/***/ public String inTheFuture;
 	/***/ public String invalidAdvertisementOf;
 	/***/ public String invalidAncestryLength;
 	/***/ public String invalidBooleanValue;
@@ -332,7 +328,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
-	/***/ public String minutesAgo;
 	/***/ public String missingAccesskey;
 	/***/ public String missingConfigurationForKey;
 	/***/ public String missingDeltaBase;
@@ -344,9 +339,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mixedStagesNotAllowed;
 	/***/ public String mkDirFailed;
 	/***/ public String mkDirsFailed;
-	/***/ public String month;
-	/***/ public String months;
-	/***/ public String monthsAgo;
 	/***/ public String multipleMergeBasesFor;
 	/***/ public String need2Arguments;
 	/***/ public String needPackOut;
@@ -452,7 +444,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String rewinding;
 	/***/ public String searchForReuse;
 	/***/ public String searchForSizes;
-	/***/ public String secondsAgo;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
@@ -534,7 +525,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String userConfigFileInvalid;
 	/***/ public String walkFailure;
 	/***/ public String wantNotValid;
-	/***/ public String weeksAgo;
 	/***/ public String windowSizeMustBeLesserThanLimit;
 	/***/ public String windowSizeMustBePowerOf2;
 	/***/ public String writeTimedOut;
@@ -544,8 +534,4 @@ public class JGitText extends TranslationBundle {
 	/***/ public String writingObjects;
 	/***/ public String wrongDecompressedLength;
 	/***/ public String wrongRepositoryState;
-	/***/ public String year;
-	/***/ public String years;
-	/***/ public String yearsAgo;
-	/***/ public String yearsMonthsAgo;
 }

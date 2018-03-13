@@ -842,22 +842,19 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	@SuppressWarnings("null")
 	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
-		FileSnapshot currentSnapshot = null;
+		final long modified = path.lastModified();
 
 		if (ref != null) {
-			currentSnapshot = ref.getSnapShot();
-			if (!currentSnapshot.isModified(path))
+			if (ref.getLastModified() == modified)
 				return ref;
 			name = ref.getName();
-		} else if (!path.exists())
+		} else if (modified == 0)
 			return null;
 
 		final int limit = 4096;
 		final byte[] buf;
-		FileSnapshot otherSnapshot = FileSnapshot.save(path);
 		try {
 			buf = IO.readSome(path, limit);
 		} catch (FileNotFoundException noFile) {
@@ -880,12 +877,7 @@ public class RefDirectory extends RefDatabase {
 				throw new IOException(MessageFormat.format(JGitText.get().notARef, name, content));
 			}
 			final String target = RawParseUtils.decode(buf, 5, n);
-			if (ref != null && ref.isSymbolic()
-					&& ref.getTarget().getName().equals(target)) {
-				currentSnapshot.setClean(otherSnapshot);
-				return ref;
-			}
-			return newSymbolicRef(path.lastModified(), name, target);
+			return newSymbolicRef(modified, name, target);
 		}
 
 		if (n < OBJECT_ID_STRING_LENGTH)
@@ -894,19 +886,13 @@ public class RefDirectory extends RefDatabase {
 		final ObjectId id;
 		try {
 			id = ObjectId.fromString(buf, 0);
-			if (ref != null && !ref.isSymbolic()
-					&& ref.getTarget().getObjectId().equals(id)) {
-				currentSnapshot.setClean(otherSnapshot);
-				return ref;
-			}
-
 		} catch (IllegalArgumentException notRef) {
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
 			String content = RawParseUtils.decode(buf, 0, n);
 			throw new IOException(MessageFormat.format(JGitText.get().notARef, name, content));
 		}
-		return new LooseUnpeeled(path.lastModified(), name, id);
+		return new LooseUnpeeled(modified, name, id);
 	}
 
 	private static boolean isSymRef(final byte[] buf, int n) {
@@ -1011,22 +997,22 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private static interface LooseRef extends Ref {
-		FileSnapshot getSnapShot();
+		long getLastModified();
 
 		LooseRef peel(ObjectIdRef newLeaf);
 	}
 
 	private final static class LoosePeeledTag extends ObjectIdRef.PeeledTag
 			implements LooseRef {
-		private final FileSnapshot snapShot;
+		private final long lastModified;
 
 		LoosePeeledTag(long mtime, String refName, ObjectId id, ObjectId p) {
 			super(LOOSE, refName, id, p);
-			snapShot = FileSnapshot.save(mtime);
+			this.lastModified = mtime;
 		}
 
-		public FileSnapshot getSnapShot() {
-			return snapShot;
+		public long getLastModified() {
+			return lastModified;
 		}
 
 		public LooseRef peel(ObjectIdRef newLeaf) {
@@ -1036,15 +1022,15 @@ public class RefDirectory extends RefDatabase {
 
 	private final static class LooseNonTag extends ObjectIdRef.PeeledNonTag
 			implements LooseRef {
-		private final FileSnapshot snapShot;
+		private final long lastModified;
 
 		LooseNonTag(long mtime, String refName, ObjectId id) {
 			super(LOOSE, refName, id);
-			snapShot = FileSnapshot.save(mtime);
+			this.lastModified = mtime;
 		}
 
-		public FileSnapshot getSnapShot() {
-			return snapShot;
+		public long getLastModified() {
+			return lastModified;
 		}
 
 		public LooseRef peel(ObjectIdRef newLeaf) {
@@ -1054,38 +1040,37 @@ public class RefDirectory extends RefDatabase {
 
 	private final static class LooseUnpeeled extends ObjectIdRef.Unpeeled
 			implements LooseRef {
-		private final FileSnapshot snapShot;
+		private final long lastModified;
 
 		LooseUnpeeled(long mtime, String refName, ObjectId id) {
 			super(LOOSE, refName, id);
-			snapShot = FileSnapshot.save(mtime);
+			this.lastModified = mtime;
 		}
 
-		public FileSnapshot getSnapShot() {
-			return snapShot;
+		public long getLastModified() {
+			return lastModified;
 		}
 
 		public LooseRef peel(ObjectIdRef newLeaf) {
 			if (newLeaf.getPeeledObjectId() != null)
-				return new LoosePeeledTag(snapShot.lastModified(), getName(),
+				return new LoosePeeledTag(lastModified, getName(),
 						getObjectId(), newLeaf.getPeeledObjectId());
 			else
-				return new LooseNonTag(snapShot.lastModified(), getName(),
-						getObjectId());
+				return new LooseNonTag(lastModified, getName(), getObjectId());
 		}
 	}
 
 	private final static class LooseSymbolicRef extends SymbolicRef implements
 			LooseRef {
-		private final FileSnapshot snapShot;
+		private final long lastModified;
 
 		LooseSymbolicRef(long mtime, String refName, Ref target) {
 			super(refName, target);
-			snapShot = FileSnapshot.save(mtime);
+			this.lastModified = mtime;
 		}
 
-		public FileSnapshot getSnapShot() {
-			return snapShot;
+		public long getLastModified() {
+			return lastModified;
 		}
 
 		public LooseRef peel(ObjectIdRef newLeaf) {
