@@ -67,12 +67,12 @@ import org.eclipse.jgit.transport.ReceiveCommand.Result;
 /**
  * Command with peeled reference information and symref support.
  * <p>
- * Command instances should be supplied to {@code RefTree} to make updates.
+ * Commands should be passed to {@link RefTree#apply(java.util.Collection)}.
  */
 public class Command {
 	private final Ref oldRef;
 	private final Ref newRef;
-	private ReceiveCommand cmd;
+	private final ReceiveCommand cmd;
 	private Result result;
 
 	/**
@@ -89,6 +89,7 @@ public class Command {
 	public Command(@Nullable Ref oldRef, @Nullable Ref newRef) {
 		this.oldRef = oldRef;
 		this.newRef = newRef;
+		this.cmd = null;
 		this.result = Result.NOT_ATTEMPTED;
 
 		if (oldRef == null && newRef == null) {
@@ -119,9 +120,9 @@ public class Command {
 	 */
 	public Command(RevWalk rw, ReceiveCommand cmd)
 			throws MissingObjectException, IOException {
-		this.cmd = cmd;
 		this.oldRef = toRef(rw, cmd.getOldId(), cmd.getRefName());
 		this.newRef = toRef(rw, cmd.getNewId(), cmd.getRefName());
+		this.cmd = cmd;
 	}
 
 	private static Ref toRef(RevWalk rw, ObjectId id, String name)
@@ -222,23 +223,27 @@ public class Command {
 		if (cur != null && cur.getRawMode() == 0) {
 			cur = null;
 		}
+		return check(cur, oldRef) || check(cur, newRef);
+	}
 
+	private static boolean check(@Nullable DirCacheEntry cur,
+			@Nullable Ref exp) {
 		if (cur == null) {
 			// Does not exist, ok if oldRef does not exist.
-			return oldRef == null;
-		} else if (oldRef == null) {
+			return exp == null;
+		} else if (exp == null) {
 			// Expected to not exist, but currently exists, fail.
 			return false;
 		}
 
-		if (oldRef.isSymbolic()) {
-			String dst = oldRef.getTarget().getName();
+		if (exp.isSymbolic()) {
+			String dst = exp.getTarget().getName();
 			return cur.getRawMode() == TYPE_SYMLINK
 					&& cur.getObjectId().equals(symref(dst));
 		}
 
 		return cur.getRawMode() == TYPE_GITLINK
-				&& cur.getObjectId().equals(oldRef.getObjectId());
+				&& cur.getObjectId().equals(exp.getObjectId());
 	}
 
 	static ObjectId symref(String s) {

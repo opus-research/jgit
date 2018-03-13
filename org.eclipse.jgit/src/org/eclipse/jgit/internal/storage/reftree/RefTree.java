@@ -229,13 +229,11 @@ public class RefTree {
 	}
 
 	private Ref readRef(String name) throws IOException {
-		String path = refPath(name);
-		DirCacheEntry e = contents.getEntry(path);
-		return e != null ? toRef(e, path) : null;
+		DirCacheEntry e = contents.getEntry(refPath(name));
+		return e != null ? toRef(e, name) : null;
 	}
 
-	private Ref toRef(DirCacheEntry e, String path) throws IOException {
-		String name = refName(path);
+	private Ref toRef(DirCacheEntry e, String name) throws IOException {
 		int mode = e.getRawMode();
 		if (mode == TYPE_GITLINK) {
 			ObjectId id = e.getObjectId();
@@ -269,9 +267,16 @@ public class RefTree {
 
 	/**
 	 * Attempt a batch of commands against this RefTree.
+	 * <p>
+	 * The batch is applied atomically. Either all commands apply at once, or
+	 * they all reject and the RefTree is left unmodified.
+	 * <p>
+	 * On {@code true} return value the command results are left as-is (probably
+	 * {@code NOT_ATTEMPTED}). Results are set only when this method returns
+	 * {@code false} to indicate failure.
 	 *
 	 * @param cmdList
-	 *            to apply. All commands should be state NOT_ATTEMPTED.
+	 *            to apply. All commands should still have result NOT_ATTEMPTED.
 	 * @return true if the commands applied; false if they were rejected.
 	 */
 	public boolean apply(Collection<Command> cmdList) {
