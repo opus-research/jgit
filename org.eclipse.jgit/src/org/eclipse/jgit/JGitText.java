@@ -62,6 +62,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String DIRCExtensionIsTooLargeAt;
 	/***/ public String DIRCExtensionNotSupportedByThisVersion;
 	/***/ public String DIRCHasTooManyEntries;
+	/***/ public String DIRCUnrecognizedExtendedFlags;
 	/***/ public String JRELacksMD5Implementation;
 	/***/ public String URINotSupported;
 	/***/ public String URLNotFound;
@@ -443,7 +444,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownRepositoryFormat;
 	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
-	/***/ public String unpackException;
 	/***/ public String unreadablePackIndex;
 	/***/ public String unrecognizedRef;
 	/***/ public String unsupportedCommand0;

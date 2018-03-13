@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,25 +41,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.merge;
 
-package org.eclipse.jgit.errors;
+import org.eclipse.jgit.lib.Repository;
 
-import java.io.IOException;
+/**
+ * A three-way merge strategy performing a content-merge if necessary
+ */
+public class StrategyResolve extends ThreeWayMergeStrategy {
+	@Override
+	public ThreeWayMerger newMerger(Repository db) {
+		return new ResolveMerger(db);
+	}
 
-import org.eclipse.jgit.JGitText;
-
-/** Indicates a ReceivePack failure while scanning the pack stream. */
-public class UnpackException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * Creates an exception with a root cause.
-	 *
-	 * @param why
-	 *            the root cause of the unpacking failure.
-	 */
-	public UnpackException(Throwable why) {
-		super(JGitText.get().unpackException);
-		initCause(why);
+	@Override
+	public String getName() {
+		return "resolve";
 	}
 }
