@@ -147,13 +147,13 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * sha1 = ", sha1:" hex-sha1 .
 	 *
 	 * 'stage' is only presented when the stage is different from 0. All
-	 * reported timestamps are mapped to strings like "t0", "t1", ... "tn". The
+	 * reported time stamps are mapped to strings like "t0", "t1", ... "tn". The
 	 * smallest reported time-stamp will be called "t0". This allows to write
 	 * assertions against the string although the concrete value of the
-	 * timestamps is unknown.
+	 * time stamps is unknown.
 	 *
 	 * @param includedOptions
-	 *            a bitmask constructed out of the contants {@link #MOD_TIME},
+	 *            a bitmask constructed out of the constants {@link #MOD_TIME},
 	 *            {@link #SMUDGE}, {@link #LENGTH} and {@link #CONTENT_ID}
 	 *            controlling which info is present in the resulting string.
 	 * @return a string encoding the index state
@@ -166,7 +166,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		StringBuilder sb = new StringBuilder();
 		TreeSet<Long> timeStamps = null;
 
-		// iterate once of the dircache just to collect all timestamps
+		// iterate once over the dircache just to collect all time stamps
 		if (0 != (includedOptions & MOD_TIME)) {
 			timeStamps = new TreeSet<Long>();
 			for (int i=0; i<dc.getEntryCount(); ++i)
@@ -220,7 +220,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * @param lookupTable
 	 *            a table storing object-name mappings.
 	 * @return a name of that object. Is not guaranteed to be unique. Use
-	 *         nameTemplates containing "%n" to always have uniqe names
+	 *         nameTemplates containing "%n" to always have unique names
 	 */
 	public static String lookup(Object l, String nameTemplate,
 			Map<Object, String> lookupTable) {
@@ -231,41 +231,5 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 			lookupTable.put(l, name);
 		}
 		return name;
-	}
-
-	/**
-	 * Waits until it is guaranteed that a subsequent file modification has a
-	 * younger modification timestamp than the modification timestamp of the
-	 * given file. This is done by touching a temporary file, reading the
-	 * lastmodified attribute and, if needed, sleeping. After sleeping this loop
-	 * starts again until the filesystem timer has advanced enough.
-	 *
-	 * @param lastFile
-	 *            the file on which we want to wait until the filesystem timer
-	 *            has advanced more than the lastmodification timestamp of this
-	 *            file
-	 * @return return the last measured value of the filesystem timer which is
-	 *         greater than then the lastmodification time of lastfile.
-	 * @throws InterruptedException
-	 * @throws IOException
-	 */
-	public static long fsTick(File lastFile) throws InterruptedException,
-			IOException {
-		long sleepTime = 1;
-		File tmp = File.createTempFile("FileTreeIteratorWithTimeControl", null);
-		try {
-			long startTime = (lastFile == null) ? tmp.lastModified() : lastFile
-					.lastModified();
-			long actTime = tmp.lastModified();
-			while (actTime <= startTime) {
-				Thread.sleep(sleepTime);
-				sleepTime *= 5;
-				tmp.setLastModified(System.currentTimeMillis());
-				actTime = tmp.lastModified();
-			}
-			return actTime;
-		} finally {
-			tmp.delete();
-		}
 	}
 }
