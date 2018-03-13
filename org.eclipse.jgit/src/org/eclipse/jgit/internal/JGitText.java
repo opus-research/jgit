@@ -62,7 +62,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String abbreviationLengthMustBeNonNegative;
 	/***/ public String abortingRebase;
 	/***/ public String abortingRebaseFailed;
-	/***/ public String abortingRebaseFailedNoOrigHead;
 	/***/ public String advertisementCameBefore;
 	/***/ public String advertisementOfCameBefore;
 	/***/ public String amazonS3ActionFailed;

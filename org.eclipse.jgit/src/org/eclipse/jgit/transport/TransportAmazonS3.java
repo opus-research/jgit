@@ -98,11 +98,11 @@ import org.eclipse.jgit.lib.SymbolicRef;
  * @see WalkPushConnection
  */
 public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
-	static final String S3_SCHEME = "amazon-s3"; //$NON-NLS-1$
+	static final String S3_SCHEME = "amazon-s3";
 
 	static final TransportProtocol PROTO_S3 = new TransportProtocol() {
 		public String getName() {
-			return "Amazon S3"; //$NON-NLS-1$
+			return "Amazon S3";
 		}
 
 		public Set<String> getSchemes() {
@@ -151,9 +151,9 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 		bucket = uri.getHost();
 
 		String p = uri.getPath();
-		if (p.startsWith("/")) //$NON-NLS-1$
+		if (p.startsWith("/"))
 			p = p.substring(1);
-		if (p.endsWith("/")) //$NON-NLS-1$
+		if (p.endsWith("/"))
 			p = p.substring(0, p.length() - 1);
 		keyPrefix = p;
 	}
@@ -170,8 +170,8 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			return loadPropertiesFile(propsFile);
 
 		Properties props = new Properties();
-		props.setProperty("accesskey", uri.getUser()); //$NON-NLS-1$
-		props.setProperty("secretkey", uri.getPass()); //$NON-NLS-1$
+		props.setProperty("accesskey", uri.getUser());
+		props.setProperty("secretkey", uri.getPass());
 		return props;
 	}
 
@@ -187,7 +187,7 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 
 	@Override
 	public FetchConnection openFetch() throws TransportException {
-		final DatabaseS3 c = new DatabaseS3(bucket, keyPrefix + "/objects"); //$NON-NLS-1$
+		final DatabaseS3 c = new DatabaseS3(bucket, keyPrefix + "/objects");
 		final WalkFetchConnection r = new WalkFetchConnection(this, c);
 		r.available(c.readAdvertisedRefs());
 		return r;
@@ -195,7 +195,7 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 
 	@Override
 	public PushConnection openPush() throws TransportException {
-		final DatabaseS3 c = new DatabaseS3(bucket, keyPrefix + "/objects"); //$NON-NLS-1$
+		final DatabaseS3 c = new DatabaseS3(bucket, keyPrefix + "/objects");
 		final WalkPushConnection r = new WalkPushConnection(this, c);
 		r.available(c.readAdvertisedRefs());
 		return r;
@@ -217,14 +217,14 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 		}
 
 		private String resolveKey(String subpath) {
-			if (subpath.endsWith("/")) //$NON-NLS-1$
+			if (subpath.endsWith("/"))
 				subpath = subpath.substring(0, subpath.length() - 1);
 			String k = objectsKey;
 			while (subpath.startsWith(ROOT_DIR)) {
 				k = k.substring(0, k.lastIndexOf('/'));
 				subpath = subpath.substring(3);
 			}
-			return k + "/" + subpath; //$NON-NLS-1$
+			return k + "/" + subpath;
 		}
 
 		@Override
@@ -232,7 +232,7 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			URIish u = new URIish();
 			u = u.setScheme(S3_SCHEME);
 			u = u.setHost(bucketName);
-			u = u.setPath("/" + objectsKey); //$NON-NLS-1$
+			u = u.setPath("/" + objectsKey);
 			return u;
 		}
 
@@ -255,14 +255,14 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 		@Override
 		Collection<String> getPackNames() throws IOException {
 			final HashSet<String> have = new HashSet<String>();
-			have.addAll(s3.list(bucket, resolveKey("pack"))); //$NON-NLS-1$
+			have.addAll(s3.list(bucket, resolveKey("pack")));
 
 			final Collection<String> packs = new ArrayList<String>();
 			for (final String n : have) {
-				if (!n.startsWith("pack-") || !n.endsWith(".pack")) //$NON-NLS-1$ //$NON-NLS-2$
+				if (!n.startsWith("pack-") || !n.endsWith(".pack"))
 					continue;
 
-				final String in = n.substring(0, n.length() - 5) + ".idx"; //$NON-NLS-1$
+				final String in = n.substring(0, n.length() - 5) + ".idx";
 				if (have.contains(in))
 					packs.add(n);
 			}
@@ -307,8 +307,8 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 				throws TransportException {
 			try {
 				for (final String n : s3.list(bucket, resolveKey(ROOT_DIR
-						+ "refs"))) //$NON-NLS-1$
-					readRef(avail, "refs/" + n); //$NON-NLS-1$
+						+ "refs")))
+					readRef(avail, "refs/" + n);
 			} catch (IOException e) {
 				throw new TransportException(getURI(), JGitText.get().cannotListRefs, e);
 			}
@@ -335,8 +335,8 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			if (s == null)
 				throw new TransportException(getURI(), MessageFormat.format(JGitText.get().transportExceptionEmptyRef, rn));
 
-			if (s.startsWith("ref: ")) { //$NON-NLS-1$
-				final String target = s.substring("ref: ".length()); //$NON-NLS-1$
+			if (s.startsWith("ref: ")) {
+				final String target = s.substring("ref: ".length());
 				Ref r = avail.get(target);
 				if (r == null)
 					r = readRef(avail, target);

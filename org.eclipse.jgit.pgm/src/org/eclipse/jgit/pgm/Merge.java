@@ -103,7 +103,7 @@ class Merge extends TextBuiltin {
 
 		// determine the other revision we want to merge with HEAD
 		final Ref srcRef = db.getRef(ref);
-		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
+		final ObjectId src = db.resolve(ref + "^{commit}");
 		if (src == null)
 			throw die(MessageFormat.format(
 					CLIText.get().refDoesNotExistOrNoCommit, ref));
@@ -144,11 +144,11 @@ class Merge extends TextBuiltin {
 				case DIRTY_WORKTREE:
 				case DIRTY_INDEX:
 					outw.println(CLIText.get().dontOverwriteLocalChanges);
-					outw.println("        " + entry.getKey()); //$NON-NLS-1$
+					outw.println("        " + entry.getKey());
 					break;
 				case COULD_NOT_DELETE:
 					outw.println(CLIText.get().cannotDeleteFile);
-					outw.println("        " + entry.getKey()); //$NON-NLS-1$
+					outw.println("        " + entry.getKey());
 					break;
 				}
 			break;
@@ -157,11 +157,10 @@ class Merge extends TextBuiltin {
 			if (!isMergedInto(oldHead, src))
 				name = mergeStrategy.getName();
 			else
-				name = "recursive"; //$NON-NLS-1$
+				name = "recursive";
 			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy, name));
 			break;
 		case MERGED_SQUASHED:
-		case FAST_FORWARD_SQUASHED:
 			outw.println(CLIText.get().mergedSquashed);
 			break;
 		case ABORTED:

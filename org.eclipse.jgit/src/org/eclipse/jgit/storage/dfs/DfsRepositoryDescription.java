@@ -84,7 +84,6 @@ public class DfsRepositoryDescription {
 		return false;
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return "DfsRepositoryDescription[" + getRepositoryName() + "]";
