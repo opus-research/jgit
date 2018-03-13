@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
+package org.eclipse.jgit.pgm;
 
-public class CheckoutCommandTest extends RepositoryTestCase {
-	private Git git;
+import java.util.ArrayList;
+import java.util.List;
 
-	RevCommit initialCommit;
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-	RevCommit secondCommit;
+@Command(common = true, usage = "usage_addFileContentsToTheIndex")
+class Add extends TextBuiltin {
+
+	@Option(name = "--update", aliases = { "-u" }, usage = "usage_onlyMatchAgainstAlreadyTrackedFiles")
+	private boolean update = false;
+
+	@Argument(required = true, metaVar = "metavar_filepattern", usage = "usage_filesToAddContentFrom")
+	private List<String> filepatterns = new ArrayList<String>();
 
 	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		// checkout master
-		git.commit().setMessage("initial commit").call();
-		// commit something
-		writeTrashFile("Test.txt", "Hello world");
-		git.add().addFilepattern("Test.txt").call();
-		initialCommit = git.commit().setMessage("Initial commit").call();
-		writeTrashFile("Test.txt", "Some change");
-		git.add().addFilepattern("Test.txt").call();
-		secondCommit = git.commit().setMessage("Second commit").call();
-		// create a master branch
-		git.branchCreate().setForce(true).setName("master").call();
-		RefUpdate rup = db.updateRef("refs/heads/master");
-		rup.setNewObjectId(initialCommit.getId());
-		rup.setForceUpdate(true);
-		rup.update();
+	protected void run() throws Exception {
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
 	}
-
 }
