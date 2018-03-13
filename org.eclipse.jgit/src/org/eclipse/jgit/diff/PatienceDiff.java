@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.diff;
 
-import java.util.Arrays;
-
-import org.eclipse.jgit.util.LongList;
-
 /**
  * An implementation of the patience difference algorithm.
  *
@@ -79,12 +75,12 @@ import org.eclipse.jgit.util.LongList;
  * skip over any elements that are common between {@code a} and {@code b}.
  * Likewise shift the ending points earlier in the sequence to skip any trailing
  * elements that are common. The first and last element of the edit are now not
- * common, however there may be common content within interior of the Edit that
- * hasn't been discovered yet.</li>
+ * common, however there may be common content within the interior of the Edit
+ * that hasn't been discovered yet.</li>
  *
  * <li>Find unique elements within the Edit region that are in both sequences.
- * This is currently accomplished by hashing the elements, sorting the hash
- * codes, and performing a merge-join on the sorted lists.</li>
+ * This is currently accomplished by hashing the elements and merging them
+ * through a custom hash table in {@link PatienceDiffIndex}.</li>
  *
  * <li>Order the common unique elements by their position within {@code b}.</li>
  *
@@ -107,8 +103,6 @@ import org.eclipse.jgit.util.LongList;
  *            type of sequence.
  */
 public class PatienceDiff<S extends Sequence> {
-	private static final int HASH_SHIFT = 32;
-
 	/**
 	 * Compute the difference between two sequences.
 	 *
@@ -128,9 +122,26 @@ public class PatienceDiff<S extends Sequence> {
 		Edit e = new Edit(0, a.size(), 0, b.size());
 		e = cmp.reduceCommonStartEnd(a, b, e);
 
-		PatienceDiff<S> d = new PatienceDiff<S>(cmp, a, b);
-		d.diff(e);
-		return d.edits;
+		switch (e.getType()) {
+		case INSERT:
+		case DELETE: {
+			EditList r = new EditList();
+			r.add(e);
+			return r;
+		}
+
+		case REPLACE: {
+			PatienceDiff<S> d = new PatienceDiff<S>(cmp, a, b);
+			d.diff(e, null, 0, 0);
+			return d.edits;
+		}
+
+		case EMPTY:
+			return new EditList();
+
+		default:
+			throw new IllegalStateException();
+		}
 	}
 
 	private final SequenceComparator<S> cmp;
@@ -139,6 +150,7 @@ public class PatienceDiff<S extends Sequence> {
 
 	private final S b;
 
+	/** Result edits we have determined that must be made to convert a to b. */
 	private final EditList edits;
 
 	private PatienceDiff(SequenceComparator<S> cmp, S a, S b) {
@@ -148,11 +160,11 @@ public class PatienceDiff<S extends Sequence> {
 		this.edits = new EditList();
 	}
 
-	private void diff(Edit e) {
-		switch (e.getType()) {
+	private void diff(Edit region, long[] pCommon, int pIdx, int pCnt) {
+		switch (region.getType()) {
 		case INSERT:
 		case DELETE:
-			edits.add(e);
+			edits.add(region);
 			return;
 
 		case REPLACE:
@@ -162,153 +174,28 @@ public class PatienceDiff<S extends Sequence> {
 			return;
 		}
 
-		LongList matchPoints = match(index(a, e.beginA, e.endA), index(b,
-				e.beginB, e.endB));
-		if (matchPoints.size() == 0) {
+		PatienceDiffIndex<S> idx = new PatienceDiffIndex<S>(cmp, region);
+		idx.scanB(b, region.beginB, region.endB);
+		idx.scanA(a, region.beginA, region.endA, b);
+		Edit lcs = idx.match(region, a, b, pCommon, pIdx, pCnt);
+
+		if (lcs != null) {
+			pCommon = idx.nCommon;
+			pIdx = idx.cIdx;
+			pCnt = idx.nCnt;
+			idx = null;
+
+			diff(region.before(lcs), pCommon, 0, pIdx);
+			diff(region.after(lcs), pCommon, pIdx + 1, pCnt);
+
+		} else {
 			// If we have no unique common lines, replace the entire region
-			// on the one side with the region from the other. But can this
-			// be less than optimal? This implies we had no unique lines.
+			// on the one side with the region from the other.
 			//
-			edits.add(e);
-			return;
+			// Some implementations fall back to Myers O(ND) implementation
+			// at this point.
+			//
+			edits.add(region);
 		}
-
-		// Find the longest common sequence we can of the matches. We'll
-		// use that to split this region into three parts:
-		// - edit before
-		// - the common sequence
-		// - edit after
-		//
-		Edit lcs = longestCommonSubsequence(e, matchPoints);
-
-		diff(e.before(lcs));
-		diff(e.after(lcs));
-	}
-
-	private Edit longestCommonSubsequence(Edit e, LongList matchPoints) {
-		Edit lcs = new Edit(0, 0);
-		for (int i = 0; i < matchPoints.size(); i++) {
-			long rec = matchPoints.get(i);
-
-			int bs = hashOf(rec);
-			if (bs < lcs.endB)
-				continue;
-
-			int as = lineOf(rec);
-			int ae = as + 1;
-			int be = bs + 1;
-
-			while (e.beginA < as && e.beginB < bs
-					&& cmp.equals(a, as - 1, b, bs - 1)) {
-				as--;
-				bs--;
-			}
-			while (ae < e.endA && be < e.endB && cmp.equals(a, ae, b, be)) {
-				ae++;
-				be++;
-			}
-
-			if (lcs.getLengthB() < be - bs) {
-				lcs.beginA = as;
-				lcs.beginB = bs;
-				lcs.endA = ae;
-				lcs.endB = be;
-			}
-		}
-		return lcs;
-	}
-
-	private LongList match(long[] ah, long[] bh) {
-		final LongList matches = new LongList();
-
-		int aIdx = 0;
-		int bIdx = 0;
-		int aKey = hashOf(ah[aIdx]);
-		int bKey = hashOf(bh[bIdx]);
-
-		for (;;) {
-			if (aKey < bKey) {
-				if (++aIdx == ah.length)
-					break;
-				aKey = hashOf(ah[aIdx]);
-
-			} else if (aKey > bKey) {
-				if (++bIdx == bh.length)
-					break;
-				bKey = hashOf(bh[bIdx]);
-
-			} else if (!isUnique(a, ah, aIdx)) {
-				if (++aIdx == ah.length)
-					break;
-				aKey = hashOf(ah[aIdx]);
-
-			} else if (!isUnique(b, bh, bIdx)) {
-				if (++bIdx == bh.length)
-					break;
-				bKey = hashOf(bh[bIdx]);
-
-			} else {
-				final int aLine = lineOf(ah[aIdx]);
-				final int bLine = lineOf(bh[bIdx]);
-
-				if (cmp.equals(a, aLine, b, bLine))
-					matches.add(pair(bLine, aLine));
-
-				if (++aIdx == ah.length || ++bIdx == bh.length)
-					break;
-				aKey = hashOf(ah[aIdx]);
-				bKey = hashOf(bh[bIdx]);
-			}
-		}
-
-		matches.sort();
-		return matches;
-	}
-
-	private long[] index(S content, int as, int ae) {
-		long[] index = new long[ae - as];
-		for (int i = 0; as < ae; as++, i++)
-			index[i] = pair(cmp.hash(content, as), as);
-		Arrays.sort(index);
-		return index;
-	}
-
-	private boolean isUnique(S raw, long[] hashes, int ptr) {
-		long rec = hashes[ptr];
-		final int hash = hashOf(rec);
-		final int line = lineOf(rec);
-
-		// We might be in the middle of the range of values that match
-		// our hash. If a prior record matches us, we aren't unique.
-		//
-		for (int i = ptr - 1; 0 <= i; i--) {
-			rec = hashes[i];
-			if (hashOf(rec) != hash)
-				break;
-			if (cmp.equals(raw, line, raw, lineOf(rec)))
-				return false;
-		}
-
-		while (++ptr < hashes.length) {
-			rec = hashes[ptr];
-			if (hashOf(rec) != hash)
-				return true;
-			if (cmp.equals(raw, line, raw, lineOf(rec)))
-				return false;
-		}
-
-		return true;
-	}
-
-	private static long pair(int hash, int line) {
-		return (((long) hash) << HASH_SHIFT) | line;
-	}
-
-	private static int hashOf(long v) {
-		return (int) (v >>> HASH_SHIFT);
-	}
-
-	private static int lineOf(long v) {
-		return (int) v;
 	}
 }
