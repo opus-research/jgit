@@ -642,26 +642,14 @@ public class MergeCommandTest extends RepositoryTestCase {
 	public void testSuccessfulMergeFailsDueToDirtyIndex() throws Exception {
 		Git git = new Git(db);
 
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
+		RevCommit firstMasterCommit = createAddAndCommitFileA(git);
+		RevCommit sideCommit = createAndCheckoutSideBranchAndAddFileB(
+				firstMasterCommit, git, true);
+		checkoutMasterBranchAndAddFileC(git, false);
 
 		// modify and add file a
-		write(fileA, "a(modified)");
+		writeTrashFile("a", "a(modified)");
 		git.add().addFilepattern("a").call();
-		// do not commit
 
 		// get current index state
 		String indexState = indexState(CONTENT);
@@ -670,35 +658,21 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(sideCommit.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
 
-		checkMergeFailedResult(result, indexState, fileA);
+		checkMergeFailedResult(result, indexState);
 	}
 
 	@Test
 	public void testConflictingMergeFailsDueToDirtyIndex() throws Exception {
 		Git git = new Git(db);
 
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		// modify file a - this will cause a conflict during merge
-		write(fileA, "a(master)");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
+		RevCommit firstMasterCommit = createAddAndCommitFileA(git);
+		RevCommit sideCommit = createAndCheckoutSideBranchAndAddFileB(
+				firstMasterCommit, git, true);
+		checkoutMasterBranchAndAddFileC(git, true);
 
 		// modify and add file a
-		write(fileA, "a(modified)");
+		writeTrashFile("a", "a(modified)");
 		git.add().addFilepattern("a").call();
-		// do not commit
 
 		// get current index state
 		String indexState = indexState(CONTENT);
@@ -707,32 +681,20 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(sideCommit.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
 
-		checkMergeFailedResult(result, indexState, fileA);
+		checkMergeFailedResult(result, indexState);
 	}
 
 	@Test
 	public void testSuccessfulMergeFailsDueToDirtyWorktree() throws Exception {
 		Git git = new Git(db);
 
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
+		RevCommit firstMasterCommit = createAddAndCommitFileA(git);
+		RevCommit sideCommit = createAndCheckoutSideBranchAndAddFileB(
+				firstMasterCommit, git, true);
+		checkoutMasterBranchAndAddFileC(git, false);
 
 		// modify file a
-		write(fileA, "a(modified)");
-		// do not add and commit
+		writeTrashFile("a", "a(modified)");
 
 		// get current index state
 		String indexState = indexState(CONTENT);
@@ -741,34 +703,20 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(sideCommit.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
 
-		checkMergeFailedResult(result, indexState, fileA);
+		checkMergeFailedResult(result, indexState);
 	}
 
 	@Test
 	public void testConflictingMergeFailsDueToDirtyWorktree() throws Exception {
 		Git git = new Git(db);
 
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		// modify file a - this will cause a conflict during merge
-		write(fileA, "a(master)");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
+		RevCommit firstMasterCommit = createAddAndCommitFileA(git);
+		RevCommit sideCommit = createAndCheckoutSideBranchAndAddFileB(
+				firstMasterCommit, git, true);
+		checkoutMasterBranchAndAddFileC(git, true);
 
 		// modify file a
-		write(fileA, "a(modified)");
-		// do not add and commit
+		writeTrashFile("a", "a(modified)");
 
 		// get current index state
 		String indexState = indexState(CONTENT);
@@ -777,18 +725,43 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(sideCommit.getId())
 				.setStrategy(MergeStrategy.RESOLVE).call();
 
-		checkMergeFailedResult(result, indexState, fileA);
+		checkMergeFailedResult(result, indexState);
 	}
 
-	private RevCommit addAllAndCommit(final Git git) throws Exception {
-		git.add().addFilepattern(".").call();
+	private RevCommit createAddAndCommitFileA(final Git git) throws Exception {
+		writeTrashFile("a", "a");
+		git.add().addFilepattern("a").call();
+		return git.commit().setMessage("message").call();
+	}
+
+	private RevCommit createAndCheckoutSideBranchAndAddFileB(
+			final RevCommit commit, final Git git, final boolean modifyFileA)
+			throws Exception {
+		createBranch(commit, "refs/heads/side");
+		checkoutBranch("refs/heads/side");
+
+		if (modifyFileA)
+			writeTrashFile("a", "a(side)");
+		writeTrashFile("b", "b");
+		git.add().addFilepattern("a").addFilepattern("b").call();
+		return git.commit().setMessage("message").call();
+	}
+
+	private RevCommit checkoutMasterBranchAndAddFileC(final Git git,
+			final boolean modifyFileA) throws Exception {
+		checkoutBranch("refs/heads/master");
+
+		if (modifyFileA)
+			writeTrashFile("a", "a(master)");
+		writeTrashFile("c", "c");
+		git.add().addFilepattern("a").addFilepattern("c").call();
 		return git.commit().setMessage("message").call();
 	}
 
 	private void checkMergeFailedResult(final MergeResult result,
-			final String indexState, final File fileA) throws Exception {
+			final String indexState) throws Exception {
 		assertEquals(MergeStatus.FAILED, result.getMergeStatus());
-		assertEquals("a(modified)", read(fileA));
+		assertEquals("a(modified)", read(new File(db.getWorkTree(), "a")));
 		assertFalse(new File(db.getWorkTree(), "b").exists());
 		assertEquals("c", read(new File(db.getWorkTree(), "c")));
 		assertEquals(indexState, indexState(CONTENT));
