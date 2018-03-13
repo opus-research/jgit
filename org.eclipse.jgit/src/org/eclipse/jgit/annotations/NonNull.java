@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2015, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -54,16 +54,16 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * JGit's replacement for the {@code javax.annotations.Nullable}.
+ * JGit's replacement for the {@code javax.annotation.Nonnull}.
  * <p>
- * Denotes that a local variable, parameter, field, method return value can be
- * {@code null}.
+ * Denotes that a local variable, parameter, field, method return value expected
+ * to be non {@code null}.
  *
  * @since 4.2
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface Nullable {
+public @interface NonNull {
 	// marker annotation with no members
 }
