@@ -47,18 +47,15 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_CHAINED;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_DATA;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_IDENT;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_MESSAGE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_RESTARTS;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseUpdateIndex;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableOutputStream.computeVarintSize;
@@ -75,8 +72,10 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.util.IntList;
+import org.eclipse.jgit.util.LongList;
 import org.eclipse.jgit.util.NB;
 
+/** Formats and writes blocks for {@link ReftableWriter}. */
 class BlockWriter {
 	private final byte blockType;
 	private final byte keyType;
@@ -136,7 +135,7 @@ class BlockWriter {
 
 	boolean padBetweenBlocks() {
 		return padBetweenBlocks(blockType)
-				|| (blockType == OBJ_BLOCK_TYPE && padBetweenBlocks(keyType));
+				|| (blockType == INDEX_BLOCK_TYPE && padBetweenBlocks(keyType));
 	}
 
 	static boolean padBetweenBlocks(byte type) {
@@ -196,13 +195,6 @@ class BlockWriter {
 				prefixLen = 0;
 			} else if (prefixLen == 0) {
 				restart = true;
-			}
-
-			if (!restart
-					&& entry instanceof LogEntry
-					&& priorEntry instanceof LogEntry
-					&& prefixLen >= key.length - 8) {
-				((LogEntry) entry).moreRecent = (LogEntry) priorEntry;
 			}
 		}
 
@@ -376,7 +368,7 @@ class BlockWriter {
 		@Override
 		int valueType() {
 			if (ref.isSymbolic()) {
-				return VALUE_TEXT;
+				return VALUE_SYMREF;
 			} else if (ref.getStorage() == NEW && ref.getObjectId() == null) {
 				return VALUE_NONE;
 			} else if (ref.getPeeledObjectId() != null) {
@@ -395,9 +387,9 @@ class BlockWriter {
 				return OBJECT_ID_LENGTH;
 			case VALUE_2ID:
 				return 2 * OBJECT_ID_LENGTH;
-			case VALUE_TEXT:
+			case VALUE_SYMREF:
 				if (ref.isSymbolic()) {
-					int nameLen = 5 + nameUtf8(ref.getTarget()).length;
+					int nameLen = nameUtf8(ref.getTarget()).length;
 					return computeVarintSize(nameLen) + nameLen;
 				}
 			}
@@ -434,10 +426,9 @@ class BlockWriter {
 				return;
 			}
 
-			case VALUE_TEXT:
+			case VALUE_SYMREF:
 				if (ref.isSymbolic()) {
-					String target = ref.getTarget().getName();
-					os.writeVarintString("ref: " + target); //$NON-NLS-1$
+					os.writeVarintString(ref.getTarget().getName());
 					return;
 				}
 			}
@@ -449,42 +440,12 @@ class BlockWriter {
 		}
 	}
 
-	static class TextEntry extends Entry {
-		final byte[] value;
-
-		TextEntry(String name, String value) {
-			super(name.getBytes(UTF_8));
-			this.value = value.getBytes(UTF_8);
-		}
-
-		@Override
-		byte blockType() {
-			return REF_BLOCK_TYPE;
-		}
-
-		@Override
-		int valueType() {
-			return VALUE_TEXT;
-		}
-
-		@Override
-		int valueSize() {
-			return computeVarintSize(value.length) + value.length;
-		}
-
-		@Override
-		void writeValue(ReftableOutputStream os) throws IOException {
-			os.writeVarint(value.length);
-			os.write(value);
-		}
-	}
-
 	static class ObjEntry extends Entry {
-		final IntList blockIds;
+		final LongList blockPos;
 
-		ObjEntry(int idLen, ObjectId id, IntList blockIds) {
+		ObjEntry(int idLen, ObjectId id, LongList blockPos) {
 			super(key(idLen, id));
-			this.blockIds = blockIds;
+			this.blockPos = blockPos;
 		}
 
 		private static byte[] key(int idLen, ObjectId id) {
@@ -497,7 +458,7 @@ class BlockWriter {
 		}
 
 		void markScanRequired() {
-			blockIds.clear();
+			blockPos.clear();
 		}
 
 		@Override
@@ -507,13 +468,13 @@ class BlockWriter {
 
 		@Override
 		int valueType() {
-			int cnt = blockIds.size();
+			int cnt = blockPos.size();
 			return cnt != 0 && cnt <= VALUE_TYPE_MASK ? cnt : 0;
 		}
 
 		@Override
 		int valueSize() {
-			int cnt = blockIds.size();
+			int cnt = blockPos.size();
 			if (cnt == 0) {
 				return computeVarintSize(0);
 			}
@@ -522,10 +483,10 @@ class BlockWriter {
 			if (cnt > VALUE_TYPE_MASK) {
 				n += computeVarintSize(cnt);
 			}
-			n += computeVarintSize(blockIds.get(0));
+			n += computeVarintSize(blockPos.get(0));
 			for (int j = 1; j < cnt; j++) {
-				int prior = blockIds.get(j - 1);
-				int b = blockIds.get(j);
+				long prior = blockPos.get(j - 1);
+				long b = blockPos.get(j);
 				n += computeVarintSize(b - prior);
 			}
 			return n;
@@ -533,7 +494,7 @@ class BlockWriter {
 
 		@Override
 		void writeValue(ReftableOutputStream os) throws IOException {
-			int cnt = blockIds.size();
+			int cnt = blockPos.size();
 			if (cnt == 0) {
 				os.writeVarint(0);
 				return;
@@ -542,10 +503,10 @@ class BlockWriter {
 			if (cnt > VALUE_TYPE_MASK) {
 				os.writeVarint(cnt);
 			}
-			os.writeVarint(blockIds.get(0));
+			os.writeVarint(blockPos.get(0));
 			for (int j = 1; j < cnt; j++) {
-				int prior = blockIds.get(j - 1);
-				int b = blockIds.get(j);
+				long prior = blockPos.get(j - 1);
+				long b = blockPos.get(j);
 				os.writeVarint(b - prior);
 			}
 		}
@@ -585,7 +546,6 @@ class BlockWriter {
 		final byte[] name;
 		final byte[] email;
 		final byte[] msg;
-		LogEntry moreRecent;
 
 		LogEntry(String refName, long updateIndex, PersonIdent who,
 				ObjectId oldId, ObjectId newId, String message) {
@@ -614,72 +574,28 @@ class BlockWriter {
 
 		@Override
 		int valueType() {
-			if (moreRecent == null || !moreRecent.oldId.equals(newId)) {
-				return LOG_DATA;
-			}
-
-			int type = LOG_CHAINED; // chained, moreRecent old is this new
-			if (tz == moreRecent.tz
-					&& Arrays.equals(name, moreRecent.name)
-					&& Arrays.equals(email, moreRecent.email)) {
-				type |= LOG_SAME_IDENT; // same identity
-			}
-			if (Arrays.equals(msg, moreRecent.msg)) {
-				type |= LOG_SAME_MESSAGE; // same message;
-			}
-			return type;
+			return LOG_DATA;
 		}
 
 		@Override
 		int valueSize() {
-			int type = valueType();
-			if (type == LOG_DATA) {
-				return 2 * OBJECT_ID_LENGTH
-						+ computeVarintSize(timeSecs)
-						+ 2 // tz
-						+ computeVarintSize(name.length) + name.length
-						+ computeVarintSize(email.length) + email.length
-						+ computeVarintSize(msg.length) + msg.length;
-			}
-
-			int n = OBJECT_ID_LENGTH;
-			n += computeVarintSize(timeSecs);
-			if ((type & LOG_SAME_IDENT) == 0) { // not same identity
-				n += 2; // tz
-				n += computeVarintSize(name.length) + name.length;
-				n += computeVarintSize(email.length) + email.length;
-			}
-			if ((type & LOG_SAME_MESSAGE) == 0) { // not same message
-				n += computeVarintSize(msg.length) + msg.length;
-			}
-			return n;
+			return 2 * OBJECT_ID_LENGTH
+					+ computeVarintSize(name.length) + name.length
+					+ computeVarintSize(email.length) + email.length
+					+ computeVarintSize(timeSecs)
+					+ 2 // tz
+					+ computeVarintSize(msg.length) + msg.length;
 		}
 
 		@Override
 		void writeValue(ReftableOutputStream os) {
-			int type = valueType();
-			if (type == LOG_DATA) {
-				os.writeId(oldId);
-				os.writeId(newId);
-				os.writeVarint(timeSecs);
-				os.writeInt16(tz);
-				os.writeVarintString(name);
-				os.writeVarintString(email);
-				os.writeVarintString(msg);
-				return;
-			}
-
-			// chained, moreRecent oldId is this newId; record this oldId.
 			os.writeId(oldId);
+			os.writeId(newId);
+			os.writeVarintString(name);
+			os.writeVarintString(email);
 			os.writeVarint(timeSecs);
-			if ((type & LOG_SAME_IDENT) == 0) { // not same identity
-				os.writeInt16(tz);
-				os.writeVarintString(name);
-				os.writeVarintString(email);
-			}
-			if ((type & LOG_SAME_MESSAGE) == 0) { // not same message
-				os.writeVarintString(msg);
-			}
+			os.writeInt16(tz);
+			os.writeVarintString(msg);
 		}
 	}
 }
