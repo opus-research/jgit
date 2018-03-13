@@ -55,9 +55,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.eclipse.jgit.blame.BlameGenerator;
@@ -123,8 +121,6 @@ class Blame extends TextBuiltin {
 	private String file;
 
 	private ObjectReader reader;
-
-	private final Map<RevCommit, String> abbreviatedCommits = new HashMap<RevCommit, String>();
 
 	private SimpleDateFormat dateFmt;
 
@@ -347,33 +343,20 @@ class Blame extends TextBuiltin {
 	}
 
 	private String abbreviate(RevCommit commit) throws IOException {
-		String r = abbreviatedCommits.get(commit);
-		if (r != null)
-			return r;
-
 		if (showBlankBoundary && commit.getParentCount() == 0)
 			commit = null;
-
 		if (commit == null) {
 			int len = showLongRevision ? OBJECT_ID_STRING_LENGTH : (abbrev + 1);
 			StringBuilder b = new StringBuilder(len);
 			for (int i = 0; i < len; i++)
 				b.append(' ');
-			r = b.toString();
-
+			return b.toString();
 		} else if (!root && commit.getParentCount() == 0) {
 			if (showLongRevision)
-				r = "^" + commit.name().substring(0, OBJECT_ID_STRING_LENGTH - 1); //$NON-NLS-1$
-			else
-				r = "^" + reader.abbreviate(commit, abbrev).name(); //$NON-NLS-1$
-		} else {
-			if (showLongRevision)
-				r = commit.name();
-			else
-				r = reader.abbreviate(commit, abbrev + 1).name();
-		}
-
-		abbreviatedCommits.put(commit, r);
-		return r;
+				return "^" + commit.name().substring(0, OBJECT_ID_STRING_LENGTH - 1); //$NON-NLS-1$
+			return "^" + reader.abbreviate(commit, abbrev).name(); //$NON-NLS-1$
+		} else if (showLongRevision)
+			return commit.name();
+		return reader.abbreviate(commit, abbrev + 1).name();
 	}
 }
