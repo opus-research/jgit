@@ -195,6 +195,20 @@ public class RefTreeTest {
 	}
 
 	@Test
+	public void testApplyWrongOldIdButAlreadyCurrentIsNoOp() throws Exception {
+		RefTree tree = RefTree.newEmptyTree();
+		RevBlob a = git.blob("A");
+		Command cmd = new Command(null, ref(R_MASTER, a));
+		assertTrue(tree.apply(Collections.singletonList(cmd)));
+		ObjectId treeId = write(tree);
+
+		RevBlob b = git.blob("B");
+		cmd = update(R_MASTER, b, a);
+		assertTrue(tree.apply(Collections.singletonList(cmd)));
+		assertEquals(treeId, write(tree));
+	}
+
+	@Test
 	public void testApplyCannotCreateSubdirectory() throws Exception {
 		RefTree tree = RefTree.newEmptyTree();
 		RevBlob a = git.blob("A");
