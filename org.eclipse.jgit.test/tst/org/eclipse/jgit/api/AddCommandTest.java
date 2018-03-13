@@ -119,7 +119,9 @@ public class AddCommandTest extends RepositoryTestCase {
 			GitAPIException {
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 		writeTrashFile("src/a.tmp", "foo");
-		writeTrashFile("src/a.txt", "foo");
+		// Caution: we need a trailing '\n' since sed on mac always appends
+		// linefeeds if missing
+		writeTrashFile("src/a.txt", "foo\n");
 		File script = writeTempFile("sed s/o/e/g");
 
 		Git git = new Git(db);
@@ -132,7 +134,7 @@ public class AddCommandTest extends RepositoryTestCase {
 				.call();
 
 		assertEquals(
-				"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:fee]",
+				"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:fee\n]",
 				indexState(CONTENT));
 	}
 
@@ -160,8 +162,10 @@ public class AddCommandTest extends RepositoryTestCase {
 	public void testMultipleCleanFilter() throws IOException, GitAPIException {
 		writeTrashFile(".gitattributes",
 				"*.txt filter=tstFilter\n*.tmp filter=tstFilter2");
-		writeTrashFile("src/a.tmp", "foo");
-		writeTrashFile("src/a.txt", "foo");
+		// Caution: we need a trailing '\n' since sed on mac always appends
+		// linefeeds if missing
+		writeTrashFile("src/a.tmp", "foo\n");
+		writeTrashFile("src/a.txt", "foo\n");
 		File script = writeTempFile("sed s/o/e/g");
 		File script2 = writeTempFile("sed s/f/x/g");
 
@@ -177,7 +181,7 @@ public class AddCommandTest extends RepositoryTestCase {
 				.call();
 
 		assertEquals(
-				"[src/a.tmp, mode:100644, content:xoo][src/a.txt, mode:100644, content:fee]",
+				"[src/a.tmp, mode:100644, content:xoo\n][src/a.txt, mode:100644, content:fee\n]",
 				indexState(CONTENT));
 
 		// TODO: multiple clean filters for one file???
@@ -193,7 +197,9 @@ public class AddCommandTest extends RepositoryTestCase {
 	 */
 	@Test
 	public void testCommandInjection() throws IOException, GitAPIException {
-		writeTrashFile("; echo virus", "foo");
+		// Caution: we need a trailing '\n' since sed on mac always appends
+		// linefeeds if missing
+		writeTrashFile("; echo virus", "foo\n");
 		File script = writeTempFile("sed s/o/e/g");
 
 		Git git = new Git(db);
@@ -205,7 +211,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("; echo virus").call();
 		// Without proper escaping the content would be "feovirus". The sed
 		// command and the "echo virus" would contribute to the content
-		assertEquals("[; echo virus, mode:100644, content:fee]",
+		assertEquals("[; echo virus, mode:100644, content:fee\n]",
 				indexState(CONTENT));
 	}
 

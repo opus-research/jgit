@@ -45,15 +45,15 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
+import org.eclipse.jgit.attributes.Attribute.State;
+import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
@@ -267,7 +267,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	AbstractTreeIterator currentHead;
 
 	/** Cached attribute for the current entry */
-	private Map<String, Attribute> attrs = null;
+	private Attributes attrs = null;
 
 	private Config config;
 
@@ -1131,7 +1131,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
 	 * @since 4.2
 	 */
-	public Map<String, Attribute> getAttributes() {
+	public Attributes getAttributes() {
 		if (attrs != null)
 			return attrs;
 
@@ -1150,34 +1150,41 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				&& other == null) {
 			// Can not retrieve the attributes without at least one of the above
 			// iterators.
-			return Collections.<String, Attribute> emptyMap();
+			return new Attributes();
 		}
 
 		String path = currentHead.getEntryPathString();
 		final boolean isDir = FileMode.TREE.equals(currentHead.mode);
-		Map<String, Attribute> attributes = new LinkedHashMap<String, Attribute>();
+		Attributes attributes = new Attributes();
 		try {
-			// Gets the info attributes
+			// Gets the global attributes node
+			AttributesNode globalNodeAttr = attributesNodeProvider
+					.getGlobalAttributesNode();
+			// Gets the info attributes node
 			AttributesNode infoNodeAttr = attributesNodeProvider
 					.getInfoAttributesNode();
+
+			// Gets the info attributes
 			if (infoNodeAttr != null) {
 				infoNodeAttr.getAttributes(path, isDir, attributes);
 			}
 
-
 			// Gets the attributes located on the current entry path
 			getPerDirectoryEntryAttributes(path, isDir, operationType,
-					workingTreeIterator, dirCacheIterator, other,
-					attributes);
+					workingTreeIterator, dirCacheIterator, other, attributes);
 
 			// Gets the attributes located in the global attribute file
-			AttributesNode globalNodeAttr = attributesNodeProvider
-					.getGlobalAttributesNode();
 			if (globalNodeAttr != null) {
 				globalNodeAttr.getAttributes(path, isDir, attributes);
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
+		}
+		// now after all attributes are collected - in the correct hierarchy
+		// order - remove all unspecified entries (the ! marker)
+		for (Attribute a : attributes.getAttributes()) {
+			if (a.getState() == State.UNSPECIFIED)
+				attributes.removeAttribute(a.getKey());
 		}
 		return attributes;
 	}
@@ -1207,7 +1214,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private void getPerDirectoryEntryAttributes(String path, boolean isDir,
 			OperationType opType, WorkingTreeIterator workingTreeIterator,
 			DirCacheIterator dirCacheIterator, CanonicalTreeParser other,
-			Map<String, Attribute> attributes)
+			Attributes attributes)
 			throws IOException {
 		// Prevents infinite recurrence
 		if (workingTreeIterator != null || dirCacheIterator != null
@@ -1220,12 +1227,11 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
 					getParent(dirCacheIterator, DirCacheIterator.class),
-					getParent(other, CanonicalTreeParser.class),
-					attributes);
+					getParent(other, CanonicalTreeParser.class), attributes);
 		}
 	}
 
-	private <T extends AbstractTreeIterator> T getParent(T current,
+	private static <T extends AbstractTreeIterator> T getParent(T current,
 			Class<T> type) {
 		if (current != null) {
 			AbstractTreeIterator parent = current.parent;
@@ -1236,7 +1242,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		return null;
 	}
 
-	private <T> T getTree(Class<T> type) {
+	private <T extends AbstractTreeIterator> T getTree(Class<T> type) {
 		for (int i = 0; i < trees.length; i++) {
 			AbstractTreeIterator tree = trees[i];
 			if (type.isInstance(tree)) {
@@ -1329,9 +1335,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	public String getFilterCommand(String filterCommandType)
 			throws IOException {
-		Map<String, Attribute> attributes = getAttributes();
+		Attributes attributes = getAttributes();
 
-		Attribute f = attributes.get(Constants.ATTR_FILTER);
+		Attribute f = attributes.getAttribute(Constants.ATTR_FILTER);
 		if (f == null) {
 			return null;
 		}
