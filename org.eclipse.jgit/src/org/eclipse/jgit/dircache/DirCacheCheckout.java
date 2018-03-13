@@ -273,11 +273,8 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) {
 		if (m != null) {
-			if (f == null || !m.idEqual(f) || i == null || !m.idEqual(i)) {
-				update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode());
-			} else
-				keep(i.getDirCacheEntry());
+			update(m.getEntryPathString(), m.getEntryObjectId(),
+					m.getEntryFileMode());
 		} else {
 			if (f != null) {
 				if (walk.isDirectoryFileConflict()) {
