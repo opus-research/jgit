@@ -133,9 +133,7 @@ public class SubmoduleAddCommand extends
 	 */
 	protected boolean submoduleExists() throws IOException {
 		TreeFilter filter = PathFilter.create(path);
-		try (SubmoduleWalk w = SubmoduleWalk.forIndex(repo)) {
-			return w.setFilter(filter).next();
-		}
+		return SubmoduleWalk.forIndex(repo).setFilter(filter).next();
 	}
 
 	/**
@@ -180,10 +178,8 @@ public class SubmoduleAddCommand extends
 		clone.setURI(resolvedUri);
 		if (monitor != null)
 			clone.setProgressMonitor(monitor);
-		Repository subRepo = null;
-		try (Git git = clone.call()) {
-			subRepo = git.getRepository();
-		}
+		Repository subRepo = clone.call().getRepository();
+
 		// Save submodule URL to parent repository's config
 		StoredConfig config = repo.getConfig();
 		config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
