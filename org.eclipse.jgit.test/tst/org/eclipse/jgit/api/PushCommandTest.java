@@ -84,7 +84,6 @@ public class PushCommandTest extends RepositoryTestCase {
 
 		// setup the first repository
 		final StoredConfig config = db.getConfig();
-		System.out.println(db.toString());
 		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
 		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
 		remoteConfig.addURI(uri);
