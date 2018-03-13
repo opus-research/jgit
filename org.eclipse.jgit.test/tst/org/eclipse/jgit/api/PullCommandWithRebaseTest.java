@@ -149,7 +149,7 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 		PullResult res = target.pull().call();
 		// nothing to update since we don't have different data yet
 		assertTrue(res.getFetchResult().getTrackingRefUpdates().isEmpty());
-		assertEquals(Status.UP_TO_DATE, res.getRebaseResult().getStatus());
+		assertTrue(res.getRebaseResult().getStatus().equals(Status.UP_TO_DATE));
 
 		assertFileContentsEqual(targetFile, "Hello world");
 
@@ -172,7 +172,7 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 						ConfigConstants.CONFIG_KEY_URL);
 
 		assertFalse(res.getFetchResult().getTrackingRefUpdates().isEmpty());
-		assertEquals(Status.STOPPED, res.getRebaseResult().getStatus());
+		assertTrue(res.getRebaseResult().getStatus().equals(Status.STOPPED));
 		String result = "<<<<<<< Upstream, based on branch 'master' of "
 				+ remoteUri
 				+ "\nSource change\n=======\nTarget change\n>>>>>>> 42453fd Target change in local\n";
