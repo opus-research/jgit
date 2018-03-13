@@ -85,9 +85,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FileUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * A class used to execute a repo command.
  *
@@ -106,8 +103,6 @@ import org.slf4j.LoggerFactory;
  * @since 3.4
  */
 public class RepoCommand extends GitCommand<RevCommit> {
-	private final static Logger LOG =
-			LoggerFactory.getLogger(RepoCommand.class);
 
 	private String path;
 	private String uri;
@@ -119,7 +114,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private RemoteReader callback;
 	private InputStream inputStream;
 	private IncludedFileReader includedReader;
-	private boolean ignoreRemoteFailures = false;
 
 	private List<RepoProject> bareProjects;
 	private Git git;
@@ -143,8 +137,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		 *            The URI of the remote repository
 		 * @param ref
 		 *            The ref (branch/tag/etc.) to read
-		 * @return the sha1 of the remote repository, or null if the ref does
-		 *		   not exist.
+		 * @return the sha1 of the remote repository
 		 * @throws GitAPIException
 		 */
 		public ObjectId sha1(String uri, String ref) throws GitAPIException;
@@ -325,7 +318,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set whether the branch name should be recorded in .gitmodules.
+	 * Set whether the branch name should be recorded in .gitmodules
 	 * <p>
 	 * Submodule entries in .gitmodules can include a "branch" field
 	 * to indicate what remote branch each submodule tracks.
@@ -358,26 +351,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 */
 	public RepoCommand setProgressMonitor(final ProgressMonitor monitor) {
 		this.monitor = monitor;
-		return this;
-	}
-
-	/**
-	 * Set whether to skip projects whose commits don't exist remotely.
-	 * <p>
-	 * When set to true, we'll just skip the manifest entry and continue
-	 * on to the next one.
-	 * <p>
-	 * When set to false (default), we'll throw an error when remote
-	 * failures occur.
-	 * <p>
-	 * Not implemented for non-bare repositories.
-	 *
-	 * @param ignore Whether to ignore the remote failures.
-	 * @return this command
-	 * @since 4.3
-	 */
-	public RepoCommand setIgnoreRemoteFailures(boolean ignore) {
-		this.ignoreRemoteFailures = ignore;
 		return this;
 	}
 
@@ -479,48 +452,34 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				for (RepoProject proj : bareProjects) {
 					String name = proj.getPath();
 					String nameUri = proj.getName();
-					ObjectId objectId = null;
+					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
+					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
+					// create gitlink
+					DirCacheEntry dcEntry = new DirCacheEntry(name);
+					ObjectId objectId;
 					if (ObjectId.isId(proj.getRevision())) {
 						objectId = ObjectId.fromString(proj.getRevision());
 					} else {
-						try {
-							objectId = callback.sha1(
-									nameUri, proj.getRevision());
-						} catch (GitAPIException e) {
-							if (ignoreRemoteFailures) {
-								LOG.warn("Failed to resolve SHA1.", e);
-								continue;
-							} else {
-								throw e;
-							}
-						}
-						if (recordRemoteBranch && objectId != null) {
+						objectId = callback.sha1(nameUri, proj.getRevision());
+						if (recordRemoteBranch)
 							// can be branch or tag
 							cfg.setString("submodule", name, "branch", //$NON-NLS-1$ //$NON-NLS-2$
 									proj.getRevision());
-						}
 					}
-					if (objectId != null) {
-						cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
-						cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
-
-						// create gitlink
-						DirCacheEntry dcEntry = new DirCacheEntry(name);
-						dcEntry.setObjectId(objectId);
-						dcEntry.setFileMode(FileMode.GITLINK);
-						builder.add(dcEntry);
-
-						for (CopyFile copyfile : proj.getCopyFiles()) {
-							byte[] src = callback.readFile(
-									nameUri, proj.getRevision(), copyfile.src);
-							objectId = inserter.insert(Constants.OBJ_BLOB, src);
-							dcEntry = new DirCacheEntry(copyfile.dest);
-							dcEntry.setObjectId(objectId);
-							dcEntry.setFileMode(FileMode.REGULAR_FILE);
-							builder.add(dcEntry);
-						}
-					} else if (!ignoreRemoteFailures) {
+					if (objectId == null)
 						throw new RemoteUnavailableException(nameUri);
+					dcEntry.setObjectId(objectId);
+					dcEntry.setFileMode(FileMode.GITLINK);
+					builder.add(dcEntry);
+
+					for (CopyFile copyfile : proj.getCopyFiles()) {
+						byte[] src = callback.readFile(
+								nameUri, proj.getRevision(), copyfile.src);
+						objectId = inserter.insert(Constants.OBJ_BLOB, src);
+						dcEntry = new DirCacheEntry(copyfile.dest);
+						dcEntry.setObjectId(objectId);
+						dcEntry.setFileMode(FileMode.REGULAR_FILE);
+						builder.add(dcEntry);
 					}
 				}
 				String content = cfg.toText();
