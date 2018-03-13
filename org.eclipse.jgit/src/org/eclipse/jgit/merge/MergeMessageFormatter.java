@@ -115,31 +115,11 @@ public class MergeMessageFormatter {
 
 		String targetName = target.getLeaf().getName();
 		if (!targetName.equals(Constants.R_HEADS + Constants.MASTER)) {
-			String targetShortName = Repository.shortenRefName(targetName);
+			String targetShortName = Repository
+					.shortenRefName(target.getName());
 			sb.append(" into " + targetShortName);
 		}
 
-		return sb.toString();
-	}
-
-	/**
-	 * Add section with conflicting paths to merge message.
-	 *
-	 * @param message
-	 *            the original merge message
-	 * @param conflictingPaths
-	 *            the paths with conflicts
-	 * @return merge message with conflicting paths added
-	 */
-	public String formatWithConflicts(String message,
-			List<String> conflictingPaths) {
-		StringBuilder sb = new StringBuilder(message);
-		if (!message.endsWith("\n"))
-			sb.append("\n");
-		sb.append("\n");
-		sb.append("Conflicts:\n");
-		for (String conflictingPath : conflictingPaths)
-			sb.append('\t').append(conflictingPath).append('\n');
 		return sb.toString();
 	}
 

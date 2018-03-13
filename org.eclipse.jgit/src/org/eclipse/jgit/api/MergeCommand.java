@@ -189,16 +189,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						mergeStrategy, null, null);
 			} else {
 
-				String mergeMessage = new MergeMessageFormatter().format(
-						commits, head);
-				repo.writeMergeCommitMsg(mergeMessage);
+				repo.writeMergeCommitMsg(new MergeMessageFormatter().format(
+						commits, head));
 				repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
 				ThreeWayMerger merger = (ThreeWayMerger) mergeStrategy
 						.newMerger(repo);
 				boolean noProblems;
 				Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults = null;
 				Map<String, MergeFailureReason> failingPaths = null;
-				List<String> unmergedPaths = null;
 				if (merger instanceof ResolveMerger) {
 					ResolveMerger resolveMerger = (ResolveMerger) merger;
 					resolveMerger.setCommitNames(new String[] {
@@ -208,7 +206,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					lowLevelResults = resolveMerger
 							.getMergeResults();
 					failingPaths = resolveMerger.getFailingPaths();
-					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
 
@@ -232,19 +229,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 								new ObjectId[] {
 										headCommit.getId(), srcCommit.getId() },
 								MergeStatus.FAILED, mergeStrategy,
-								lowLevelResults, failingPaths, null);
-					} else {
-						String mergeMessageWithConflicts = new MergeMessageFormatter()
-								.formatWithConflicts(mergeMessage,
-										unmergedPaths);
-						repo.writeMergeCommitMsg(mergeMessageWithConflicts);
+								lowLevelResults, null);
+					} else
 						return new MergeResult(null,
 								merger.getBaseCommit(0, 1),
 								new ObjectId[] { headCommit.getId(),
 										srcCommit.getId() },
 								MergeStatus.CONFLICTING, mergeStrategy,
 								lowLevelResults, null);
-					}
 				}
 			}
 		} catch (IOException e) {

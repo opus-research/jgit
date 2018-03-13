@@ -96,8 +96,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final File packFile;
 
-	private volatile String packName;
-
 	final int hash;
 
 	private RandomAccessFile fd;
@@ -179,15 +177,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	/** @return name extracted from {@code pack-*.pack} pattern. */
 	public String getPackName() {
-		String name = packName;
-		if (name == null) {
-			name = getPackFile().getName();
-			if (name.startsWith("pack-"))
-				name = name.substring("pack-".length());
-			if (name.endsWith(".pack"))
-				name = name.substring(0, name.length() - ".pack".length());
-			packName = name;
-		}
+		String name = getPackFile().getName();
+		if (name.startsWith("pack-"))
+			name = name.substring("pack-".length());
+		if (name.endsWith(".pack"))
+			name = name.substring(0, name.length() - ".pack".length());
 		return name;
 	}
 
@@ -236,6 +230,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 * Close the resources utilized by this repository
 	 */
 	public void close() {
+		DeltaBaseCache.purge(this);
 		WindowCache.purge(this);
 		synchronized (this) {
 			loadedIdx = null;
@@ -722,7 +717,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					if (sz != delta.deltaSize)
 						break SEARCH;
 
-					DeltaBaseCache.Entry e = curs.getDeltaBaseCache().get(this, base);
+					DeltaBaseCache.Entry e = DeltaBaseCache.get(this, base);
 					if (e != null) {
 						type = e.type;
 						data = e.data;
@@ -740,7 +735,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					if (sz != delta.deltaSize)
 						break SEARCH;
 
-					DeltaBaseCache.Entry e = curs.getDeltaBaseCache().get(this, base);
+					DeltaBaseCache.Entry e = DeltaBaseCache.get(this, base);
 					if (e != null) {
 						type = e.type;
 						data = e.data;
@@ -768,7 +763,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				if (cached)
 					cached = false;
 				else if (delta.next == null)
-					curs.getDeltaBaseCache().store(this, delta.basePos, data, type);
+					DeltaBaseCache.store(this, delta.basePos, data, type);
 
 				pos = delta.deltaPos;
 

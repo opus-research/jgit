@@ -81,8 +81,6 @@ import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.junit.Before;
-import org.junit.Test;
 
 public class HttpClientTests extends HttpTestCase {
 	private TestRepository<FileRepository> remoteRepository;
@@ -95,7 +93,6 @@ public class HttpClientTests extends HttpTestCase {
 
 	private URIish smartAuthBasicURI;
 
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
@@ -152,7 +149,6 @@ public class HttpClientTests extends HttpTestCase {
 		return db.getDirectory().getName();
 	}
 
-	@Test
 	public void testRepositoryNotFound_Dumb() throws Exception {
 		URIish uri = toURIish("/dumb.none/not-found");
 		Repository dst = createBareRepository();
@@ -171,7 +167,6 @@ public class HttpClientTests extends HttpTestCase {
 		}
 	}
 
-	@Test
 	public void testRepositoryNotFound_Smart() throws Exception {
 		URIish uri = toURIish("/smart.none/not-found");
 		Repository dst = createBareRepository();
@@ -190,7 +185,6 @@ public class HttpClientTests extends HttpTestCase {
 		}
 	}
 
-	@Test
 	public void testListRemote_Dumb_DetachedHEAD() throws Exception {
 		Repository src = remoteRepository.getRepository();
 		RefUpdate u = src.updateRef(Constants.HEAD, true);
@@ -215,7 +209,6 @@ public class HttpClientTests extends HttpTestCase {
 		assertEquals(Q, head.getObjectId());
 	}
 
-	@Test
 	public void testListRemote_Dumb_NoHEAD() throws Exception {
 		FileRepository src = remoteRepository.getRepository();
 		File headref = new File(src.getDirectory(), Constants.HEAD);
@@ -238,7 +231,6 @@ public class HttpClientTests extends HttpTestCase {
 		assertNull("has no " + Constants.HEAD, head);
 	}
 
-	@Test
 	public void testListRemote_Smart_DetachedHEAD() throws Exception {
 		Repository src = remoteRepository.getRepository();
 		RefUpdate u = src.updateRef(Constants.HEAD, true);
@@ -263,7 +255,6 @@ public class HttpClientTests extends HttpTestCase {
 		assertEquals(Q, head.getObjectId());
 	}
 
-	@Test
 	public void testListRemote_Smart_WithQueryParameters() throws Exception {
 		URIish myURI = toURIish("/snone/do?r=1&p=test.git");
 		Repository dst = createBareRepository();
@@ -292,7 +283,6 @@ public class HttpClientTests extends HttpTestCase {
 		assertEquals(404, info.getStatus());
 	}
 
-	@Test
 	public void testListRemote_Dumb_NeedsAuth() throws Exception {
 		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, dumbAuthBasicURI);
@@ -310,7 +300,6 @@ public class HttpClientTests extends HttpTestCase {
 		}
 	}
 
-	@Test
 	public void testListRemote_Dumb_Auth() throws Exception {
 		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, dumbAuthBasicURI);
@@ -336,7 +325,6 @@ public class HttpClientTests extends HttpTestCase {
 		}
 	}
 
-	@Test
 	public void testListRemote_Smart_UploadPackNeedsAuth() throws Exception {
 		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, smartAuthBasicURI);
@@ -354,7 +342,6 @@ public class HttpClientTests extends HttpTestCase {
 		}
 	}
 
-	@Test
 	public void testListRemote_Smart_UploadPackDisabled() throws Exception {
 		FileRepository src = remoteRepository.getRepository();
 		final FileBasedConfig cfg = src.getConfig();

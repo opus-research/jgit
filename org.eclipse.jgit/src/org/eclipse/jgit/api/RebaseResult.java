@@ -42,10 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.util.Map;
-
-import org.eclipse.jgit.merge.ResolveMerger;
-import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
@@ -69,10 +65,6 @@ public class RebaseResult {
 		 */
 		STOPPED,
 		/**
-		 * Failed; the original HEAD was restored
-		 */
-		FAILED,
-		/**
 		 * Already up-to-date
 		 */
 		UP_TO_DATE,
@@ -82,48 +74,21 @@ public class RebaseResult {
 		FAST_FORWARD;
 	}
 
-	static final RebaseResult OK_RESULT = new RebaseResult(Status.OK);
-
-	static final RebaseResult ABORTED_RESULT = new RebaseResult(Status.ABORTED);
-
 	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
 			Status.UP_TO_DATE);
-
-	static final RebaseResult FAST_FORWARD_RESULT = new RebaseResult(
-			Status.FAST_FORWARD);
 
 	private final Status mySatus;
 
 	private final RevCommit currentCommit;
 
-	private Map<String, MergeFailureReason> failingPaths;
-
-	private RebaseResult(Status status) {
+	RebaseResult(Status status) {
 		this.mySatus = status;
 		currentCommit = null;
 	}
 
-	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#STOPPED}
-	 *
-	 * @param commit
-	 *            current commit
-	 */
 	RebaseResult(RevCommit commit) {
-		mySatus = Status.STOPPED;
+		this.mySatus = Status.STOPPED;
 		currentCommit = commit;
-	}
-
-	/**
-	 * Create <code>RebaseResult</code> with status {@link Status#FAILED}
-	 *
-	 * @param failingPaths
-	 *            list of paths causing this rebase to fail
-	 */
-	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
-		mySatus = Status.FAILED;
-		currentCommit = null;
-		this.failingPaths = failingPaths;
 	}
 
 	/**
@@ -139,14 +104,5 @@ public class RebaseResult {
 	 */
 	public RevCommit getCurrentCommit() {
 		return currentCommit;
-	}
-
-	/**
-	 * @return the list of paths causing this rebase to fail (see
-	 *         {@link ResolveMerger#getFailingPaths()} for details) if status is
-	 *         {@link Status#FAILED}, otherwise <code>null</code>
-	 */
-	public Map<String, MergeFailureReason> getFailingPaths() {
-		return failingPaths;
 	}
 }
