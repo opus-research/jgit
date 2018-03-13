@@ -50,13 +50,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -270,14 +270,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
 		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
-		String autosetupRebase = clonedRepo.getConfig().getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
-		if (ConfigConstants.CONFIG_KEY_ALWAYS.equals(autosetupRebase)
-				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autosetupRebase))
-			clonedRepo.getConfig().setBoolean(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REBASE, true);
 		clonedRepo.getConfig().save();
 	}
 
