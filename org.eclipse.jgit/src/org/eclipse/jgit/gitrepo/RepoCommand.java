@@ -160,10 +160,16 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/** A default implementation of {@link RemoteReader} callback. */
 	public static class DefaultRemoteReader implements RemoteReader {
 		public ObjectId sha1(String uri, String ref) throws GitAPIException {
-			Map<String, Ref> map = Git
+			Collection<Ref> refs = Git
 					.lsRemoteRepository()
 					.setRemote(uri)
-					.callAsMap();
+					.call();
+			// Since LsRemoteCommand.call() only returned Map.values() to us, we
+			// have to rebuild the map here.
+			Map<String, Ref> map = new HashMap<String, Ref>(refs.size());
+			for (Ref r : refs)
+				map.put(r.getName(), r);
+
 			Ref r = RefDatabase.findRef(map, ref);
 			return r != null ? r.getObjectId() : null;
 		}
