@@ -422,7 +422,7 @@ public class ReceivePack implements ReceiveSession {
 			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 	}
 
- 	/** @return get the hook invoked before updates occur. */
+	/** @return the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
