@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Constantine Plotnikov <constantine.plotnikov@gmail.com>
+ * Copyright (C) 2010, JetBrains s.r.o.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,58 +42,71 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.eclipse;
+package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.net.Authenticator;
-import java.net.CookieHandler;
-import java.net.PasswordAuthentication;
-import java.net.URL;
+import java.io.IOException;
 
-import org.eclipse.jgit.iplog.IpLogMeta;
-import org.eclipse.jgit.iplog.SimpleCookieManager;
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.kohsuke.args4j.Option;
+/**
+ * The cached instance of an {@link ObjectDirectory}.
+ * <p>
+ * This class caches the list of loose objects in memory, so the file system is
+ * not queried with stat calls.
+ */
+public class CachedObjectDirectory extends CachedObjectDatabase {
+	/**
+	 * The set that contains unpacked objects identifiers, it is created when
+	 * the cached instance is created.
+	 */
+	private final ObjectIdSubclassMap<ObjectId> unpackedObjects = new ObjectIdSubclassMap<ObjectId>();
 
-@Command(name = "eclipse-ipzilla", common = false, usage = "Synchronize IPZilla data")
-class Ipzilla extends TextBuiltin {
-	@Option(name = "--url", metaVar = "URL", usage = "IPZilla URL")
-	private String url = "https://dev.eclipse.org/ipzilla/";
-
-	@Option(name = "--username", metaVar = "USER", usage = "IPZilla Username")
-	private String username;
-
-	@Option(name = "--password", metaVar = "PASS", usage = "IPZilla Password")
-	private String password;
-
-	@Option(name = "--file", aliases = { "-f" }, metaVar = "FILE", usage = "Input/output file")
-	private File output;
+	/**
+	 * The constructor
+	 *
+	 * @param wrapped
+	 *            the wrapped database
+	 */
+	public CachedObjectDirectory(ObjectDirectory wrapped) {
+		super(wrapped);
+		File objects = wrapped.getDirectory();
+		String[] fanout = objects.list();
+		if (fanout == null)
+			fanout = new String[0];
+		for (String d : fanout) {
+			if (d.length() != 2)
+				continue;
+			String[] entries = new File(objects, d).list();
+			if (entries == null)
+				continue;
+			for (String e : entries) {
+				if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+					continue;
+				try {
+					unpackedObjects.add(ObjectId.fromString(d + e));
+				} catch (IllegalArgumentException notAnObject) {
+					// ignoring the file that does not represent loose object
+				}
+			}
+		}
+	}
 
 	@Override
-	protected void run() throws Exception {
-		if (CookieHandler.getDefault() == null)
-			CookieHandler.setDefault(new SimpleCookieManager());
+	protected ObjectLoader openObject2(WindowCursor curs, String objectName,
+			AnyObjectId objectId) throws IOException {
+		if (unpackedObjects.get(objectId) == null)
+			return null;
+		return super.openObject2(curs, objectName, objectId);
+	}
 
-		final URL ipzilla = new URL(url);
-		if (username == null) {
-			final PasswordAuthentication auth = Authenticator
-					.requestPasswordAuthentication(ipzilla.getHost(), //
-							null, //
-							ipzilla.getPort(), //
-							ipzilla.getProtocol(), //
-							"IPZilla Password", //
-							ipzilla.getProtocol(), //
-							ipzilla, //
-							Authenticator.RequestorType.SERVER);
-			username = auth.getUserName();
-			password = new String(auth.getPassword());
-		}
+	@Override
+	protected boolean hasObject1(AnyObjectId objectId) {
+		if (unpackedObjects.get(objectId) != null)
+			return true; // known to be loose
+		return super.hasObject1(objectId);
+	}
 
-		if (output == null)
-			output = new File(db.getWorkDir(), IpLogMeta.IPLOG_CONFIG_FILE);
-
-		IpLogMeta meta = new IpLogMeta();
-		meta.syncCQs(output, ipzilla, username, password);
+	@Override
+	protected boolean hasObject2(String name) {
+		return false; // loose objects were tested by hasObject1
 	}
 }
