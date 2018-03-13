@@ -614,7 +614,7 @@ public class URIish implements Serializable {
 		}
 
 		if (getHost() != null) {
-			if (getUser() != null && getUser().length() > 0)
+			if (getUser() != null)
 				r.append('@');
 			r.append(escape(getHost(), false, escapeNonAscii));
 			if (getScheme() != null && getPort() > 0) {
