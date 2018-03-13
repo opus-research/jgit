@@ -459,14 +459,9 @@ public class GC {
 			return;
 
 		// delete all candidates which have survived: these are unreferenced
-		// loose objects. Make a last check, though, to avoid deleting objects
-		// that could have been referenced while the candidates list was being
-		// built (by an incoming push, for example).
-		for (File f : deletionCandidates.values()) {
-			if (f.lastModified() < expireDate) {
-				f.delete();
-			}
-		}
+		// loose objects
+		for (File f : deletionCandidates.values())
+			f.delete();
 
 		repo.getObjectDatabase().close();
 	}
@@ -607,7 +602,7 @@ public class GC {
 			nonHeads.addAll(listRefLogObjects(ref, 0));
 			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
-			if (isHead(ref) || isTag(ref))
+			if (ref.getName().startsWith(Constants.R_HEADS))
 				allHeads.add(ref.getObjectId());
 			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
 				txnHeads.add(ref.getObjectId());
@@ -658,14 +653,6 @@ public class GC {
 		lastPackedRefs = refsBefore;
 		lastRepackTime = time;
 		return ret;
-	}
-
-	private static boolean isHead(Ref ref) {
-		return ref.getName().startsWith(Constants.R_HEADS);
-	}
-
-	private static boolean isTag(Ref ref) {
-		return ref.getName().startsWith(Constants.R_TAGS);
 	}
 
 	/**
@@ -1177,7 +1164,7 @@ public class GC {
 	/**
 	 * @return {@code true} if number of packs > gc.autopacklimit (default 50)
 	 */
-	boolean tooManyPacks() {
+	private boolean tooManyPacks() {
 		int autopacklimit = repo.getConfig().getInt(
 				ConfigConstants.CONFIG_GC_SECTION,
 				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT,
@@ -1196,7 +1183,7 @@ public class GC {
 	 *
 	 * @return {@code true} if number of loose objects > gc.auto (default 6700)
 	 */
-	boolean tooManyLooseObjects() {
+	private boolean tooManyLooseObjects() {
 		int auto = repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
 				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
 		if (auto <= 0) {
@@ -1212,15 +1199,14 @@ public class GC {
 				new DirectoryStream.Filter<Path>() {
 
 					public boolean accept(Path file) throws IOException {
-						Path fileName = file.getFileName();
-						return Files.isRegularFile(file) && fileName != null
-								&& PATTERN_LOOSE_OBJECT
-										.matcher(fileName.toString()).matches();
+						return Files.isRegularFile(file) && PATTERN_LOOSE_OBJECT
+								.matcher(file.getFileName().toString())
+								.matches();
 					}
 				})) {
-			for (Iterator<Path> iter = stream.iterator(); iter.hasNext();
-					iter.next()) {
-				if (++n > threshold) {
+			Iterator<Path> iter = stream.iterator();
+			while (iter.hasNext()) {
+				if (n++ > threshold) {
 					return true;
 				}
 			}
