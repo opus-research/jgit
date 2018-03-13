@@ -146,12 +146,20 @@ public class StreamCopyThread extends Thread {
 
 					synchronized (writeLock) {
 						boolean writeInterrupted = Thread.interrupted();
-						dst.write(buf, 0, n);
+						for (;;) {
+							try {
+								dst.write(buf, 0, n);
+							} catch (InterruptedIOException wakey) {
+								writeInterrupted = true;
+								continue;
+							}
 
-						// set interrupt status, which will be checked
-						// when we block in src.read
-						if (writeInterrupted)
-							interrupt();
+							// set interrupt status, which will be checked
+							// when we block in src.read
+							if (writeInterrupted)
+								interrupt();
+							break;
+						}
 					}
 				} catch (IOException e) {
 					break;
