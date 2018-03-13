@@ -44,10 +44,6 @@
 
 package org.eclipse.jgit.treewalk;
 
-import static org.eclipse.jgit.lib.Constants.DOT_GIT_ATTRIBUTES;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.encode;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -62,12 +58,16 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.util.RawParseUtils;
 
 /** Parses raw Git trees from the canonical semi-text/semi-binary format. */
 public class CanonicalTreeParser extends AbstractTreeIterator {
 	private static final byte[] EMPTY = {};
-	private static final byte[] ATTRS = encode(DOT_GIT_ATTRIBUTES);
+
+	private static final byte[] ATTRS = Constants
+			.encode(Constants.DOT_GIT_ATTRIBUTES);
 
 	private byte[] raw;
 
@@ -133,9 +133,13 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 *            the raw tree content.
 	 */
 	public void reset(final byte[] treeData) {
-		attributesNode = null;
 		raw = treeData;
-		initAndParse(-1, 0);
+		prevPtr = -1;
+		currPtr = 0;
+		if (eof())
+			nextPtr = 0;
+		else
+			parseEntry();
 	}
 
 	/**
@@ -342,16 +346,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		parseEntry();
 	}
 
-	private void initAndParse(int prev, int curr) {
-		prevPtr = prev;
-		currPtr = curr;
-		if (eof()) {
-			nextPtr = 0;
-		} else {
-			parseEntry();
-		}
-	}
-
 	private void parseEntry() {
 		int ptr = currPtr;
 		byte c = raw[ptr++];
@@ -379,6 +373,11 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		}
 		pathLen = tmp;
 		nextPtr = ptr + Constants.OBJECT_ID_LENGTH;
+
+		// Check if this entry is a .gitattributes file
+		if (path[pathOffset] == '.'
+				&& RawParseUtils.match(path, pathOffset, ATTRS) > 0)
+			attributesNode = new LazyLoadingAttributesNode(idOffset());
 	}
 
 	/**
@@ -392,46 +391,36 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	 */
 	public AttributesNode getEntryAttributesNode(ObjectReader reader)
 			throws IOException {
-		if (attributesNode == null) {
-			attributesNode = findGitAttributes(reader);
-		}
-		return attributesNode.getRules().isEmpty() ? null : attributesNode;
+		if (attributesNode instanceof LazyLoadingAttributesNode)
+			attributesNode = ((LazyLoadingAttributesNode) attributesNode)
+					.load(reader);
+		return attributesNode;
 	}
 
-	private AttributesNode findGitAttributes(ObjectReader reader)
-			throws IOException {
-		final int oldPrev = prevPtr;
-		final int oldCurr = currPtr;
-		try {
-			if (!first()) {
-				initAndParse(-1, 0);
-			}
-			int m = FileMode.REGULAR_FILE.getBits();
-			while (!eof()) {
-				int cmp = pathCompare(ATTRS, 0, ATTRS.length, m, pathOffset);
-				if (cmp == 0) {
-					return load(reader);
-				} else if (cmp > 0) {
-					return noAttributes();
+	/**
+	 * {@link AttributesNode} implementation that provides lazy loading
+	 */
+	private class LazyLoadingAttributesNode extends AttributesNode {
+		private final int idOffset;
+
+		LazyLoadingAttributesNode(int idOffset) {
+			super(Collections.<AttributesRule> emptyList());
+			this.idOffset = idOffset;
+		}
+
+		AttributesNode load(ObjectReader reader) throws IOException {
+			AttributesNode r = new AttributesNode();
+			ObjectId id = ObjectId.fromRaw(raw, idOffset);
+			ObjectLoader loader = reader.open(id);
+			if (loader != null) {
+				InputStream in = loader.openStream();
+				try {
+					r.parse(in);
+				} finally {
+					in.close();
 				}
-				next(1);
 			}
-			return noAttributes();
-		} finally {
-			initAndParse(oldPrev, oldCurr);
+			return r.getRules().isEmpty() ? null : r;
 		}
-	}
-
-	private AttributesNode load(ObjectReader reader) throws IOException {
-		AttributesNode r = new AttributesNode();
-		ObjectId id = ObjectId.fromRaw(idBuffer(), idOffset());
-		try (InputStream in = reader.open(id, OBJ_BLOB).openStream()) {
-			r.parse(in);
-		}
-		return r.getRules().isEmpty() ? noAttributes() : r;
-	}
-
-	private static AttributesNode noAttributes() {
-		return new AttributesNode(Collections.<AttributesRule> emptyList());
 	}
 }
