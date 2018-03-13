@@ -127,16 +127,23 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 */
 	public Git call() throws GitAPIException, InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
+		Repository repository = null;
 		try {
 			URIish u = new URIish(uri);
-			Repository repository = init(u);
+			repository = init(u);
 			FetchResult result = fetch(repository, u);
 			if (!noCheckout)
 				checkout(repository, result);
-			return new Git(repository);
+			return new Git(repository, true);
 		} catch (IOException ioe) {
+			if (repository != null) {
+				repository.close();
+			}
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		} catch (URISyntaxException e) {
+			if (repository != null) {
+				repository.close();
+			}
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
 		}
@@ -331,7 +338,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param uri
-	 *            the uri to clone from
+	 *            the URI to clone from, or {@code null} to unset the URI.
+	 *            The URI must be set before {@link #call} is called.
 	 * @return this instance
 	 */
 	public CloneCommand setURI(String uri) {
@@ -346,7 +354,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @see URIish#getHumanishName()
 	 *
 	 * @param directory
-	 *            the directory to clone to
+	 *            the directory to clone to, or {@code null} if the directory
+	 *            name should be taken from the source uri
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
@@ -362,7 +371,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param gitDir
-	 *            the repository meta directory
+	 *            the repository meta directory, or {@code null} to choose one
+	 *            automatically at clone time
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
@@ -400,10 +410,14 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 *
 	 * @see Constants#DEFAULT_REMOTE_NAME
 	 * @param remote
-	 *            name that keeps track of the upstream repository
+	 *            name that keeps track of the upstream repository.
+	 *            {@code null} means to use DEFAULT_REMOTE_NAME.
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {
+		if (remote == null) {
+			remote = Constants.DEFAULT_REMOTE_NAME;
+		}
 		this.remote = remote;
 		return this;
 	}
@@ -413,9 +427,15 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 *            the initial branch to check out when cloning the repository.
 	 *            Can be specified as ref name (<code>refs/heads/master</code>),
 	 *            branch name (<code>master</code>) or tag name (<code>v1.2.3</code>).
+	 *            The default is to use the branch pointed to by the cloned
+	 *            repository's HEAD and can be requested by passing {@code null}
+	 *            or <code>HEAD</code>.
 	 * @return this instance
 	 */
 	public CloneCommand setBranch(String branch) {
+		if (branch == null) {
+			branch = Constants.HEAD;
+		}
 		this.branch = branch;
 		return this;
 	}
@@ -430,6 +450,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return {@code this}
 	 */
 	public CloneCommand setProgressMonitor(ProgressMonitor monitor) {
+		if (monitor == null) {
+			monitor = NullProgressMonitor.INSTANCE;
+		}
 		this.monitor = monitor;
 		return this;
 	}
