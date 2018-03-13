@@ -258,12 +258,12 @@ public class PushCertificateParser {
 	 */
 	public void receiveSignature(PacketLineIn pckIn) throws IOException {
 		try {
-			StringBuilder sig = new StringBuilder(BEGIN_SIGNATURE);
+			StringBuilder sig = new StringBuilder();
 			String line;
 			while (!(line = pckIn.readStringRaw()).equals(END_SIGNATURE)) {
 				sig.append(line);
 			}
-			signature = sig.append(END_SIGNATURE).toString();
+			signature = sig.toString();
 			if (!pckIn.readStringRaw().equals(END_CERT)) {
 				throw new PackProtocolException(
 						JGitText.get().pushCertificateInvalidSignature);

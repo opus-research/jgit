@@ -123,11 +123,6 @@ public class PushCertificate {
 			throw new IllegalArgumentException(
 					JGitText.get().pushCertificateInvalidSignature);
 		}
-		if (!signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE)
-				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE)) {
-			throw new IllegalArgumentException(
-					JGitText.get().pushCertificateInvalidSignature);
-		}
 		this.version = version;
 		this.pusher = pusher;
 		this.pushee = pushee;
@@ -198,7 +193,7 @@ public class PushCertificate {
 	/**
 	 * @return the raw signature, consisting of the lines received between the
 	 *     lines {@code "----BEGIN GPG SIGNATURE-----\n"} and
-	 *     {@code "----END GPG SIGNATURE-----\n}", inclusive.
+	 *     {@code "----END GPG SIGNATURE-----\n}", exclusive
 	 * @since 4.0
 	 */
 	public String getSignature() {
