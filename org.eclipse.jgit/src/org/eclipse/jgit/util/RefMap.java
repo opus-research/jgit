@@ -111,7 +111,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 
 	/** Construct an empty map with a small initial capacity. */
 	public RefMap() {
-		prefix = ""; //$NON-NLS-1$
+		prefix = "";
 		packed = RefList.emptyList();
 		loose = RefList.emptyList();
 		resolved = RefList.emptyList();
@@ -136,13 +136,12 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 *            list {@code loose}, if an item appears in both. Items in this
 	 *            list <b>must</b> also appear in {@code loose}.
 	 */
-	@SuppressWarnings("unchecked")
-	public RefMap(String prefix, RefList<? extends Ref> packed,
-			RefList<? extends Ref> loose, RefList<? extends Ref> resolved) {
+	public RefMap(String prefix, RefList<Ref> packed, RefList<Ref> loose,
+			RefList<Ref> resolved) {
 		this.prefix = prefix;
-		this.packed = (RefList<Ref>) packed;
-		this.loose = (RefList<Ref>) loose;
-		this.resolved = (RefList<Ref>) resolved;
+		this.packed = packed;
+		this.loose = loose;
+		this.resolved = resolved;
 	}
 
 	@Override
@@ -267,7 +266,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 			if (first)
 				first = false;
 			else
-				r.append(", "); //$NON-NLS-1$
+				r.append(", ");
 			r.append(ref);
 		}
 		r.append(']');

@@ -46,6 +46,7 @@ package org.eclipse.jgit.lib;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.lib.GitIndex.Entry;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -59,6 +60,21 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 @Deprecated
 public abstract class TreeEntry implements Comparable {
+	/**
+	 * a flag for {@link TreeEntry#accept(TreeVisitor, int)} to visit only modified entries
+	 */
+	public static final int MODIFIED_ONLY = 1 << 0;
+
+	/**
+	 * a flag for {@link TreeEntry#accept(TreeVisitor, int)} to visit only loaded entries
+	 */
+	public static final int LOADED_ONLY = 1 << 1;
+
+	/**
+	 * a flag for {@link TreeEntry#accept(TreeVisitor, int)} obsolete?
+	 */
+	public static final int CONCURRENT_MODIFICATION = 1 << 2;
+
 	private byte[] nameUTF8;
 
 	private Tree parent;
@@ -234,6 +250,42 @@ public abstract class TreeEntry implements Comparable {
 		else
 			return '/';
 	}
+
+	/**
+	 * Helper for accessing tree/blob/index methods.
+	 *
+	 * @param i
+	 * @return '/' for Tree entries and NUL for non-treeish objects
+	 */
+	final public static int lastChar(Entry i) {
+		// FIXME, gitlink etc. Currently Trees cannot appear in the
+		// index so '\0' is always returned, except maybe for submodules
+		// which we do not support yet.
+		return FileMode.TREE.equals(i.getModeBits()) ? '/' : '\0';
+	}
+
+	/**
+	 * See @{link {@link #accept(TreeVisitor, int)}.
+	 *
+	 * @param tv
+	 * @throws IOException
+	 */
+	public void accept(final TreeVisitor tv) throws IOException {
+		accept(tv, 0);
+	}
+
+	/**
+	 * Visit the members of this TreeEntry.
+	 *
+	 * @param tv
+	 *            A visitor object doing the work
+	 * @param flags
+	 *            Specification for what members to visit. See
+	 *            {@link #MODIFIED_ONLY}, {@link #LOADED_ONLY},
+	 *            {@link #CONCURRENT_MODIFICATION}.
+	 * @throws IOException
+	 */
+	public abstract void accept(TreeVisitor tv, int flags) throws IOException;
 
 	/**
 	 * @return mode (type of object)

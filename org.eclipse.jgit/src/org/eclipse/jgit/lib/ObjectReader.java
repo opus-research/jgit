@@ -48,7 +48,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -252,14 +251,6 @@ public abstract class ObjectReader {
 			IOException;
 
 	/**
-	 * Returns IDs for those commits which should be considered as shallow.
-	 *
-	 * @return IDs of shallow commits
-	 * @throws IOException
-	 */
-	public abstract Set<ObjectId> getShallowCommits() throws IOException;
-
-	/**
 	 * Asynchronous object opening.
 	 *
 	 * @param <T>
@@ -434,30 +425,6 @@ public abstract class ObjectReader {
 	/** Advice from that a walk is over. */
 	public void walkAdviceEnd() {
 		// Do nothing by default, most readers don't want or need advice.
-	}
-
-	/**
-	 * Advise the reader to avoid unreachable objects.
-	 * <p>
-	 * While enabled the reader will skip over anything previously proven to be
-	 * unreachable. This may be dangerous in the face of concurrent writes.
-	 *
-	 * @param avoid
-	 *            true to avoid unreachable objects.
-	 */
-	public void setAvoidUnreachableObjects(boolean avoid) {
-		// Do nothing by default.
-	}
-
-	/**
-	 * An index that can be used to speed up ObjectWalks.
-	 *
-	 * @return the index or null if one does not exist.
-	 * @throws IOException
-	 *             when the index fails to load
-	 */
-	public BitmapIndex getBitmapIndex() throws IOException {
-		return null;
 	}
 
 	/**

@@ -45,7 +45,6 @@ package org.eclipse.jgit.storage.file;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Set;
 
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -55,10 +54,8 @@ import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.util.FS;
 
 abstract class FileObjectDatabase extends ObjectDatabase {
 	static enum InsertLooseObjectResult {
@@ -134,10 +131,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			throws IOException;
 
 	abstract Config getConfig();
-
-	abstract FS getFS();
-
-	abstract Set<ObjectId> getShallowCommits() throws IOException;
 
 	/**
 	 * Open an object from this database.
@@ -262,9 +255,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	abstract File getDirectory();
 
-	abstract Collection<? extends CachedPack> getCachedPacks()
-			throws IOException;
-
 	abstract AlternateHandle[] myAlternates();
 
 	abstract boolean tryAgain1();
@@ -286,24 +276,15 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 			AnyObjectId objectId) throws IOException;
 
 	abstract InsertLooseObjectResult insertUnpackedObject(File tmp,
-			ObjectId id, boolean createDuplicate) throws IOException;
-
-	abstract PackFile openPack(File pack) throws IOException;
+			ObjectId id, boolean createDuplicate);
 
 	abstract FileObjectDatabase newCachedFileObjectDatabase();
-
-	abstract Collection<PackFile> getPacks();
 
 	static class AlternateHandle {
 		final FileObjectDatabase db;
 
 		AlternateHandle(FileObjectDatabase db) {
 			this.db = db;
-		}
-
-		@SuppressWarnings("unchecked")
-		Collection<CachedPack> getCachedPacks() throws IOException {
-			return (Collection<CachedPack>) db.getCachedPacks();
 		}
 
 		void close() {

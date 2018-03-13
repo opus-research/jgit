@@ -45,11 +45,9 @@ package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
  * Selects interesting tree entries during walking.
@@ -106,7 +104,7 @@ public abstract class TreeFilter {
 
 		@Override
 		public String toString() {
-			return "ALL"; //$NON-NLS-1$
+			return "ALL";
 		}
 	}
 
@@ -122,9 +120,6 @@ public abstract class TreeFilter {
 	 * {@link #ALL}, or as though the walker was matching a virtual empty tree
 	 * against the single tree it was actually given. Applications may wish to
 	 * treat such a difference as "all names added".
-	 * <p>
-	 * When comparing {@link WorkingTreeIterator} and {@link DirCacheIterator}
-	 * applications should use {@link IndexDiffFilter}.
 	 */
 	public static final TreeFilter ANY_DIFF = new AnyDiffFilter();
 
@@ -156,7 +151,7 @@ public abstract class TreeFilter {
 
 		@Override
 		public String toString() {
-			return "ANY_DIFF"; //$NON-NLS-1$
+			return "ANY_DIFF";
 		}
 	}
 

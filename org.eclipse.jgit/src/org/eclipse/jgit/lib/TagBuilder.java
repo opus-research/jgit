@@ -62,6 +62,8 @@ import org.eclipse.jgit.revwalk.RevObject;
  * {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
  */
 public class TagBuilder {
+	private ObjectId tagId;
+
 	private ObjectId object;
 
 	private int type = Constants.OBJ_BAD;
@@ -71,6 +73,21 @@ public class TagBuilder {
 	private PersonIdent tagger;
 
 	private String message;
+
+	/** @return this tag's object id. */
+	public ObjectId getTagId() {
+		return tagId;
+	}
+
+	/**
+	 * Set the id of this tag object.
+	 *
+	 * @param id
+	 *            the id that we calculated for this object.
+	 */
+	public void setTagId(ObjectId id) {
+		tagId = id;
+	}
 
 	/** @return the type of object this tag refers to. */
 	public int getObjectType() {
@@ -93,6 +110,7 @@ public class TagBuilder {
 	public void setObjectId(AnyObjectId obj, int objType) {
 		object = obj.copy();
 		type = objType;
+		tagId = null;
 	}
 
 	/**
@@ -120,6 +138,7 @@ public class TagBuilder {
 	 */
 	public void setTag(String shortName) {
 		this.tag = shortName;
+		tagId = null;
 	}
 
 	/** @return creator of this tag. May be null. */
@@ -135,6 +154,7 @@ public class TagBuilder {
 	 */
 	public void setTagger(PersonIdent taggerIdent) {
 		tagger = taggerIdent;
+		tagId = null;
 	}
 
 	/** @return the complete commit message. */
@@ -150,32 +170,53 @@ public class TagBuilder {
 	 */
 	public void setMessage(final String newMessage) {
 		message = newMessage;
+		tagId = null;
 	}
 
 	/**
 	 * Format this builder's state as an annotated tag object.
 	 *
+	 * As a side effect, {@link #getTagId()} will be populated with the proper
+	 * ObjectId for the formatted content.
+	 *
 	 * @return this object in the canonical annotated tag format, suitable for
 	 *         storage in a repository.
 	 */
-	public byte[] build() {
+	public byte[] format() {
+		return format(new ObjectInserter.Formatter());
+	}
+
+	/**
+	 * Format this builder's state as an annotated tag object.
+	 *
+	 * As a side effect, {@link #getTagId()} will be populated with the proper
+	 * ObjectId for the formatted content.
+	 *
+	 * @param oi
+	 *            the inserter whose formatting support will be reused. The
+	 *            inserter itself is not affected, and the annotated tag is not
+	 *            actually inserted into the repository.
+	 * @return this object in the canonical annotated tag format, suitable for
+	 *         storage in a repository.
+	 */
+	public byte[] format(ObjectInserter oi) {
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
 		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
 		try {
-			w.write("object "); //$NON-NLS-1$
+			w.write("object ");
 			getObjectId().copyTo(w);
 			w.write('\n');
 
-			w.write("type "); //$NON-NLS-1$
+			w.write("type ");
 			w.write(Constants.typeString(getObjectType()));
-			w.write("\n"); //$NON-NLS-1$
+			w.write("\n");
 
-			w.write("tag "); //$NON-NLS-1$
+			w.write("tag ");
 			w.write(getTag());
-			w.write("\n"); //$NON-NLS-1$
+			w.write("\n");
 
 			if (getTagger() != null) {
-				w.write("tagger "); //$NON-NLS-1$
+				w.write("tagger ");
 				w.write(getTagger().toExternalString());
 				w.write('\n');
 			}
@@ -190,24 +231,18 @@ public class TagBuilder {
 			//
 			throw new RuntimeException(err);
 		}
-		return os.toByteArray();
+
+		byte[] content = os.toByteArray();
+		setTagId(oi.idFor(Constants.OBJ_TAG, content));
+		return content;
 	}
 
-	/**
-	 * Format this builder's state as an annotated tag object.
-	 *
-	 * @return this object in the canonical annotated tag format, suitable for
-	 *         storage in a repository.
-	 */
-	public byte[] toByteArray() {
-		return build();
-	}
-
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();
 		r.append("Tag");
+		if (tagId != null)
+			r.append("[" + tagId.name() + "]");
 		r.append("={\n");
 
 		r.append("object ");

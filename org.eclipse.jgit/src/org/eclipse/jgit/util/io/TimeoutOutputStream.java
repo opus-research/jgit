@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2013 Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,7 +48,7 @@ import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /** OutputStream with a configurable timeout. */
 public class TimeoutOutputStream extends OutputStream {
@@ -84,8 +84,7 @@ public class TimeoutOutputStream extends OutputStream {
 	 */
 	public void setTimeout(final int millis) {
 		if (millis < 0)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidTimeout, Integer.valueOf(millis)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidTimeout, millis));
 		timeout = millis;
 	}
 
@@ -150,8 +149,7 @@ public class TimeoutOutputStream extends OutputStream {
 		myTimer.end();
 	}
 
-	private InterruptedIOException writeTimedOut() {
-		return new InterruptedIOException(MessageFormat.format(
-				JGitText.get().writeTimedOut, Integer.valueOf(timeout)));
+	private static InterruptedIOException writeTimedOut() {
+		return new InterruptedIOException(JGitText.get().writeTimedOut);
 	}
 }

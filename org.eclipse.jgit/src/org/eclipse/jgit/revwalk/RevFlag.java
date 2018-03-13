@@ -45,7 +45,7 @@ package org.eclipse.jgit.revwalk;
 
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Application level mark bit for {@link RevObject}s.
@@ -64,17 +64,7 @@ public class RevFlag {
 	 * This is a static flag. Its RevWalk is not available.
 	 */
 	public static final RevFlag UNINTERESTING = new StaticRevFlag(
-			"UNINTERESTING", RevWalk.UNINTERESTING); //$NON-NLS-1$
-
-	/**
-	 * Set on RevCommit instances added to {@link RevWalk#pending} queue.
-	 * <p>
-	 * We use this flag to avoid adding the same commit instance twice to our
-	 * queue, especially if we reached it by more than one path.
-	 * <p>
-	 * This is a static flag. Its RevWalk is not available.
-	 */
-	public static final RevFlag SEEN = new StaticRevFlag("SEEN", RevWalk.SEEN);
+			"UNINTERESTING", RevWalk.UNINTERESTING);
 
 	final RevWalk walker;
 

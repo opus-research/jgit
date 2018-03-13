@@ -128,7 +128,7 @@ public abstract class RefWriter {
 				r.getPeeledObjectId().copyTo(tmp, w);
 				w.write('\t');
 				w.write(r.getName());
-				w.write("^{}\n"); //$NON-NLS-1$
+				w.write("^{}\n");
 			}
 		}
 		writeFile(Constants.INFO_REFS, Constants.encode(w.toString()));

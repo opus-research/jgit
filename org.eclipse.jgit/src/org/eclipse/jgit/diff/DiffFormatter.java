@@ -62,17 +62,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -92,9 +89,7 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.IndexDiffFilter;
 import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
@@ -105,7 +100,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 public class DiffFormatter {
 	private static final int DEFAULT_BINARY_FILE_THRESHOLD = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 
-	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
+	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n");
 
 	/** Magic return content indicating it is empty or no content present. */
 	private static final byte[] EMPTY = new byte[] {};
@@ -123,15 +118,15 @@ public class DiffFormatter {
 
 	private int abbreviationLength = 7;
 
-	private DiffAlgorithm diffAlgorithm;
+	private DiffAlgorithm diffAlgorithm = new HistogramDiff();
 
 	private RawTextComparator comparator = RawTextComparator.DEFAULT;
 
 	private int binaryFileThreshold = DEFAULT_BINARY_FILE_THRESHOLD;
 
-	private String oldPrefix = "a/"; //$NON-NLS-1$
+	private String oldPrefix = "a/";
 
-	private String newPrefix = "b/"; //$NON-NLS-1$
+	private String newPrefix = "b/";
 
 	private TreeFilter pathFilter = TreeFilter.ALL;
 
@@ -179,16 +174,10 @@ public class DiffFormatter {
 
 		DiffConfig dc = db.getConfig().get(DiffConfig.KEY);
 		if (dc.isNoPrefix()) {
-			setOldPrefix(""); //$NON-NLS-1$
-			setNewPrefix(""); //$NON-NLS-1$
+			setOldPrefix("");
+			setNewPrefix("");
 		}
 		setDetectRenames(dc.isRenameDetectionEnabled());
-
-		diffAlgorithm = DiffAlgorithm.getAlgorithm(db.getConfig().getEnum(
-				ConfigConstants.CONFIG_DIFF_SECTION, null,
-				ConfigConstants.CONFIG_KEY_ALGORITHM,
-				SupportedAlgorithm.HISTOGRAM));
-
 	}
 
 	/**
@@ -275,16 +264,6 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Get the prefix applied in front of old file paths.
-	 *
-	 * @return the prefix
-	 * @since 2.0
-	 */
-	public String getOldPrefix() {
-		return this.oldPrefix;
-	}
-
-	/**
 	 * Set the prefix applied in front of new file paths.
 	 *
 	 * @param prefix
@@ -295,16 +274,6 @@ public class DiffFormatter {
 	 */
 	public void setNewPrefix(String prefix) {
 		newPrefix = prefix;
-	}
-
-	/**
-	 * Get the prefix applied in front of new file paths.
-	 *
-	 * @return the prefix
-	 * @since 2.0
-	 */
-	public String getNewPrefix() {
-		return this.newPrefix;
 	}
 
 	/** @return true if rename detection is enabled. */
@@ -454,18 +423,20 @@ public class DiffFormatter {
 		assertHaveRepository();
 
 		TreeWalk walk = new TreeWalk(reader);
+		walk.reset();
 		walk.addTree(a);
 		walk.addTree(b);
 		walk.setRecursive(true);
 
-		TreeFilter filter = getDiffTreeFilterFor(a, b);
-		if (pathFilter instanceof FollowFilter) {
-			walk.setFilter(AndTreeFilter.create(
-					PathFilter.create(((FollowFilter) pathFilter).getPath()),
-					filter));
-		} else {
-			walk.setFilter(AndTreeFilter.create(pathFilter, filter));
-		}
+		TreeFilter filter = pathFilter;
+
+		if (a instanceof WorkingTreeIterator)
+			filter = AndTreeFilter.create(filter, new NotIgnoredFilter(0));
+		if (b instanceof WorkingTreeIterator)
+			filter = AndTreeFilter.create(filter, new NotIgnoredFilter(1));
+		if (!(pathFilter instanceof FollowFilter))
+			filter = AndTreeFilter.create(filter, TreeFilter.ANY_DIFF);
+		walk.setFilter(filter);
 
 		source = new ContentSource.Pair(source(a), source(b));
 
@@ -480,6 +451,12 @@ public class DiffFormatter {
 			walk.reset();
 			walk.addTree(a);
 			walk.addTree(b);
+
+			filter = TreeFilter.ANY_DIFF;
+			if (a instanceof WorkingTreeIterator)
+				filter = AndTreeFilter.create(new NotIgnoredFilter(0), filter);
+			if (b instanceof WorkingTreeIterator)
+				filter = AndTreeFilter.create(new NotIgnoredFilter(1), filter);
 			walk.setFilter(filter);
 
 			if (renameDetector == null)
@@ -490,22 +467,6 @@ public class DiffFormatter {
 			files = detectRenames(files);
 
 		return files;
-	}
-
-	private static TreeFilter getDiffTreeFilterFor(AbstractTreeIterator a,
-			AbstractTreeIterator b) {
-		if (a instanceof DirCacheIterator && b instanceof WorkingTreeIterator)
-			return new IndexDiffFilter(0, 1);
-
-		if (a instanceof WorkingTreeIterator && b instanceof DirCacheIterator)
-			return new IndexDiffFilter(1, 0);
-
-		TreeFilter filter = TreeFilter.ANY_DIFF;
-		if (a instanceof WorkingTreeIterator)
-			filter = AndTreeFilter.create(new NotIgnoredFilter(0), filter);
-		if (b instanceof WorkingTreeIterator)
-			filter = AndTreeFilter.create(new NotIgnoredFilter(1), filter);
-		return filter;
 	}
 
 	private ContentSource source(AbstractTreeIterator iterator) {
@@ -601,9 +562,7 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Format a patch script from a list of difference entries. Requires
-	 * {@link #scan(AbstractTreeIterator, AbstractTreeIterator)} to have been
-	 * called first.
+	 * Format a patch script from a list of difference entries.
 	 *
 	 * @param entries
 	 *            entries describing the affected files.
@@ -633,12 +592,12 @@ public class DiffFormatter {
 	private void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
 			throws IOException {
 		if (ent.getOldMode() == GITLINK) {
-			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name() //$NON-NLS-1$
-					+ "\n")); //$NON-NLS-1$
+			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name()
+					+ "\n"));
 		}
 		if (ent.getNewMode() == GITLINK) {
-			o.write(encodeASCII("+Subproject commit " + ent.getNewId().name() //$NON-NLS-1$
-					+ "\n")); //$NON-NLS-1$
+			o.write(encodeASCII("+Subproject commit " + ent.getNewId().name()
+					+ "\n"));
 		}
 	}
 
@@ -918,7 +877,7 @@ public class DiffFormatter {
 			if (aRaw == BINARY || bRaw == BINARY //
 					|| RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
 				formatOldNewPaths(buf, ent);
-				buf.write(encodeASCII("Binary files differ\n")); //$NON-NLS-1$
+				buf.write(encodeASCII("Binary files differ\n"));
 				editList = new EditList();
 				type = PatchType.BINARY;
 
@@ -963,7 +922,7 @@ public class DiffFormatter {
 		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
 
-		if (isBinary())
+		if (isBinary(entry.getPath(side)))
 			return BINARY;
 
 		AbbreviatedObjectId id = entry.getId(side);
@@ -1004,33 +963,8 @@ public class DiffFormatter {
 		}
 	}
 
-	private boolean isBinary() {
+	private boolean isBinary(String path) {
 		return false;
-	}
-
-	/**
-	 * Output the first header line
-	 *
-	 * @param o
-	 *            The stream the formatter will write the first header line to
-	 * @param type
-	 *            The {@link ChangeType}
-	 * @param oldPath
-	 *            old path to the file
-	 * @param newPath
-	 *            new path to the file
-	 * @throws IOException
-	 *             the stream threw an exception while writing to it.
-	 */
-	protected void formatGitDiffFirstHeaderLine(ByteArrayOutputStream o,
-			final ChangeType type, final String oldPath, final String newPath)
-			throws IOException {
-		o.write(encodeASCII("diff --git ")); //$NON-NLS-1$
-		o.write(encode(quotePath(oldPrefix + (type == ADD ? newPath : oldPath))));
-		o.write(' ');
-		o.write(encode(quotePath(newPrefix
-				+ (type == DELETE ? oldPath : newPath))));
-		o.write('\n');
 	}
 
 	private void formatHeader(ByteArrayOutputStream o, DiffEntry ent)
@@ -1041,44 +975,48 @@ public class DiffFormatter {
 		final FileMode oldMode = ent.getOldMode();
 		final FileMode newMode = ent.getNewMode();
 
-		formatGitDiffFirstHeaderLine(o, type, oldp, newp);
+		o.write(encodeASCII("diff --git "));
+		o.write(encode(quotePath(oldPrefix + (type == ADD ? newp : oldp))));
+		o.write(' ');
+		o.write(encode(quotePath(newPrefix + (type == DELETE ? oldp : newp))));
+		o.write('\n');
 
 		switch (type) {
 		case ADD:
-			o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
+			o.write(encodeASCII("new file mode "));
 			newMode.copyTo(o);
 			o.write('\n');
 			break;
 
 		case DELETE:
-			o.write(encodeASCII("deleted file mode ")); //$NON-NLS-1$
+			o.write(encodeASCII("deleted file mode "));
 			oldMode.copyTo(o);
 			o.write('\n');
 			break;
 
 		case RENAME:
-			o.write(encodeASCII("similarity index " + ent.getScore() + "%")); //$NON-NLS-1$ //$NON-NLS-2$
+			o.write(encodeASCII("similarity index " + ent.getScore() + "%"));
 			o.write('\n');
 
-			o.write(encode("rename from " + quotePath(oldp))); //$NON-NLS-1$
+			o.write(encode("rename from " + quotePath(oldp)));
 			o.write('\n');
 
-			o.write(encode("rename to " + quotePath(newp))); //$NON-NLS-1$
+			o.write(encode("rename to " + quotePath(newp)));
 			o.write('\n');
 			break;
 
 		case COPY:
-			o.write(encodeASCII("similarity index " + ent.getScore() + "%")); //$NON-NLS-1$ //$NON-NLS-2$
+			o.write(encodeASCII("similarity index " + ent.getScore() + "%"));
 			o.write('\n');
 
-			o.write(encode("copy from " + quotePath(oldp))); //$NON-NLS-1$
+			o.write(encode("copy from " + quotePath(oldp)));
 			o.write('\n');
 
-			o.write(encode("copy to " + quotePath(newp))); //$NON-NLS-1$
+			o.write(encode("copy to " + quotePath(newp)));
 			o.write('\n');
 
 			if (!oldMode.equals(newMode)) {
-				o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
+				o.write(encodeASCII("new file mode "));
 				newMode.copyTo(o);
 				o.write('\n');
 			}
@@ -1086,54 +1024,38 @@ public class DiffFormatter {
 
 		case MODIFY:
 			if (0 < ent.getScore()) {
-				o.write(encodeASCII("dissimilarity index " //$NON-NLS-1$
-						+ (100 - ent.getScore()) + "%")); //$NON-NLS-1$
+				o.write(encodeASCII("dissimilarity index "
+						+ (100 - ent.getScore()) + "%"));
 				o.write('\n');
 			}
 			break;
 		}
 
 		if ((type == MODIFY || type == RENAME) && !oldMode.equals(newMode)) {
-			o.write(encodeASCII("old mode ")); //$NON-NLS-1$
+			o.write(encodeASCII("old mode "));
 			oldMode.copyTo(o);
 			o.write('\n');
 
-			o.write(encodeASCII("new mode ")); //$NON-NLS-1$
+			o.write(encodeASCII("new mode "));
 			newMode.copyTo(o);
 			o.write('\n');
 		}
 
 		if (!ent.getOldId().equals(ent.getNewId())) {
-			formatIndexLine(o, ent);
+			o.write(encodeASCII("index " //
+					+ format(ent.getOldId()) //
+					+ ".." //
+					+ format(ent.getNewId())));
+			if (oldMode.equals(newMode)) {
+				o.write(' ');
+				newMode.copyTo(o);
+			}
+			o.write('\n');
 		}
-	}
-
-	/**
-	 * @param o
-	 *            the stream the formatter will write line data to
-	 * @param ent
-	 *            the DiffEntry to create the FileHeader for
-	 * @throws IOException
-	 *             writing to the supplied stream failed.
-	 */
-	protected void formatIndexLine(OutputStream o, DiffEntry ent)
-			throws IOException {
-		o.write(encodeASCII("index " // //$NON-NLS-1$
-				+ format(ent.getOldId()) //
-				+ ".." // //$NON-NLS-1$
-				+ format(ent.getNewId())));
-		if (ent.getOldMode().equals(ent.getNewMode())) {
-			o.write(' ');
-			ent.getNewMode().copyTo(o);
-		}
-		o.write('\n');
 	}
 
 	private void formatOldNewPaths(ByteArrayOutputStream o, DiffEntry ent)
 			throws IOException {
-		if (ent.oldId.equals(ent.newId))
-			return;
-
 		final String oldp;
 		final String newp;
 
@@ -1154,8 +1076,8 @@ public class DiffFormatter {
 			break;
 		}
 
-		o.write(encode("--- " + oldp + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
-		o.write(encode("+++ " + newp + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
+		o.write(encode("--- " + oldp + "\n"));
+		o.write(encode("+++ " + newp + "\n"));
 	}
 
 	private int findCombinedEnd(final List<Edit> edits, final int i) {

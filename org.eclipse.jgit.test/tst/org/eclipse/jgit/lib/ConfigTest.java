@@ -48,51 +48,38 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
-import org.junit.Test;
 
 /**
  * Test reading of git config
  */
-public class ConfigTest {
-	@Test
+public class ConfigTest extends TestCase {
 	public void test001_ReadBareKey() throws ConfigInvalidException {
 		final Config c = parse("[foo]\nbar\n");
-		assertTrue(c.getBoolean("foo", null, "bar", false));
+		assertEquals(true, c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
-	@Test
 	public void test002_ReadWithSubsection() throws ConfigInvalidException {
 		final Config c = parse("[foo \"zip\"]\nbar\n[foo \"zap\"]\nbar=false\nn=3\n");
-		assertTrue(c.getBoolean("foo", "zip", "bar", false));
+		assertEquals(true, c.getBoolean("foo", "zip", "bar", false));
 		assertEquals("", c.getString("foo","zip", "bar"));
-		assertFalse(c.getBoolean("foo", "zap", "bar", true));
+		assertEquals(false, c.getBoolean("foo", "zap", "bar", true));
 		assertEquals("false", c.getString("foo", "zap", "bar"));
 		assertEquals(3, c.getInt("foo", "zap", "n", 4));
 		assertEquals(4, c.getInt("foo", "zap","m", 4));
 	}
 
-	@Test
 	public void test003_PutRemote() {
 		final Config c = new Config();
 		c.setString("sec", "ext", "name", "value");
@@ -101,7 +88,6 @@ public class ConfigTest {
 		assertEquals(expText, c.toText());
 	}
 
-	@Test
 	public void test004_PutGetSimple() {
 		Config c = new Config();
 		c.setString("my", null, "somename", "false");
@@ -109,7 +95,6 @@ public class ConfigTest {
 		assertEquals("[my]\n\tsomename = false\n", c.toText());
 	}
 
-	@Test
 	public void test005_PutGetStringList() {
 		Config c = new Config();
 		final LinkedList<String> values = new LinkedList<String>();
@@ -119,26 +104,23 @@ public class ConfigTest {
 
 		final Object[] expArr = values.toArray();
 		final String[] actArr = c.getStringList("my", null, "somename");
-		assertArrayEquals(expArr, actArr);
+		assertTrue(Arrays.equals(expArr, actArr));
 
 		final String expText = "[my]\n\tsomename = value1\n\tsomename = value2\n";
 		assertEquals(expText, c.toText());
 	}
 
-	@Test
 	public void test006_readCaseInsensitive() throws ConfigInvalidException {
 		final Config c = parse("[Foo]\nBar\n");
-		assertTrue(c.getBoolean("foo", null, "bar", false));
+		assertEquals(true, c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
-	@Test
 	public void test007_readUserConfig() {
 		final MockSystemReader mockSystemReader = new MockSystemReader();
 		SystemReader.setInstance(mockSystemReader);
 		final String hostname = mockSystemReader.getHostname();
-		final Config userGitConfig = mockSystemReader.openUserConfig(null,
-				FS.DETECTED);
+		final Config userGitConfig = mockSystemReader.openUserConfig(FS.DETECTED);
 		final Config localConfig = new Config(userGitConfig);
 		mockSystemReader.clearProperties();
 
@@ -150,21 +132,17 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals(Constants.UNKNOWN_USER_DEFAULT, authorName);
 		assertEquals(Constants.UNKNOWN_USER_DEFAULT + "@" + hostname, authorEmail);
-		assertTrue(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
-		assertTrue(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the system user name is defined
 		mockSystemReader.setProperty(Constants.OS_USER_NAME_KEY, "os user name");
 		localConfig.uncache(UserConfig.KEY);
 		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
 		assertEquals("os user name", authorName);
-		assertTrue(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
 
 		if (hostname != null && hostname.length() != 0) {
 			authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 			assertEquals("os user name@" + hostname, authorEmail);
 		}
-		assertTrue(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the git environment variables are defined
 		mockSystemReader.setProperty(Constants.GIT_AUTHOR_NAME_KEY, "git author name");
@@ -174,8 +152,6 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("git author name", authorName);
 		assertEquals("author@email", authorEmail);
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the values are defined in the global configuration
 		userGitConfig.setString("user", null, "name", "global username");
@@ -184,8 +160,6 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("global username", authorName);
 		assertEquals("author@globalemail", authorEmail);
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the values are defined in the local configuration
 		localConfig.setString("user", null, "name", "local username");
@@ -194,18 +168,13 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("local username", authorName);
 		assertEquals("author@localemail", authorEmail);
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		authorName = localConfig.get(UserConfig.KEY).getCommitterName();
 		authorEmail = localConfig.get(UserConfig.KEY).getCommitterEmail();
 		assertEquals("local username", authorName);
 		assertEquals("author@localemail", authorEmail);
-		assertFalse(localConfig.get(UserConfig.KEY).isCommitterNameImplicit());
-		assertFalse(localConfig.get(UserConfig.KEY).isCommitterEmailImplicit());
 	}
 
-	@Test
 	public void testReadBoolean_TrueFalse1() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = true\nb = false\n");
 		assertEquals("true", c.getString("s", null, "a"));
@@ -215,7 +184,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_TrueFalse2() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = TrUe\nb = fAlSe\n");
 		assertEquals("TrUe", c.getString("s", null, "a"));
@@ -225,7 +193,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_YesNo1() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = yes\nb = no\n");
 		assertEquals("yes", c.getString("s", null, "a"));
@@ -235,7 +202,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_YesNo2() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = yEs\nb = NO\n");
 		assertEquals("yEs", c.getString("s", null, "a"));
@@ -245,7 +211,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_OnOff1() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = on\nb = off\n");
 		assertEquals("on", c.getString("s", null, "a"));
@@ -255,7 +220,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_OnOff2() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = ON\nb = OFF\n");
 		assertEquals("ON", c.getString("s", null, "a"));
@@ -269,7 +233,6 @@ public class ConfigTest {
 		ONE_TWO;
 	}
 
-	@Test
 	public void testGetEnum() throws ConfigInvalidException {
 		Config c = parse("[s]\na = ON\nb = input\nc = true\nd = off\n");
 		assertSame(CoreConfig.AutoCRLF.TRUE, c.getEnum("s", null, "a",
@@ -290,106 +253,14 @@ public class ConfigTest {
 
 		c = parse("[s \"b\"]\n\tc = one two\n");
 		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
-
-		c = parse("[s \"b\"]\n\tc = one-two\n");
-		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
 	}
 
-	@Test
-	public void testGetInvalidEnum() throws ConfigInvalidException {
-		Config c = parse("[a]\n\tb = invalid\n");
-		try {
-			c.getEnum("a", null, "b", TestEnum.ONE_TWO);
-			fail();
-		} catch (IllegalArgumentException e) {
-			assertEquals("Invalid value: a.b=invalid", e.getMessage());
-		}
-
-		c = parse("[a \"b\"]\n\tc = invalid\n");
-		try {
-			c.getEnum("a", "b", "c", TestEnum.ONE_TWO);
-			fail();
-		} catch (IllegalArgumentException e) {
-			assertEquals("Invalid value: a.b.c=invalid", e.getMessage());
-		}
-	}
-
-	@Test
 	public void testSetEnum() {
 		final Config c = new Config();
 		c.setEnum("s", "b", "c", TestEnum.ONE_TWO);
 		assertEquals("[s \"b\"]\n\tc = one two\n", c.toText());
 	}
 
-	@Test
-	public void testGetFastForwardMergeoptions() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		assertSame(FastForwardMode.FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS, FastForwardMode.FF));
-		c = parse("[branch \"side\"]\n\tmergeoptions = --ff-only\n");
-		assertSame(FastForwardMode.FF_ONLY, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS,
-				FastForwardMode.FF_ONLY));
-		c = parse("[branch \"side\"]\n\tmergeoptions = --ff\n");
-		assertSame(FastForwardMode.FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS, FastForwardMode.FF));
-		c = parse("[branch \"side\"]\n\tmergeoptions = --no-ff\n");
-		assertSame(FastForwardMode.NO_FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS, FastForwardMode.NO_FF));
-	}
-
-	@Test
-	public void testSetFastForwardMergeoptions() {
-		final Config c = new Config();
-		c.setEnum("branch", "side", "mergeoptions", FastForwardMode.FF);
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --ff\n", c.toText());
-		c.setEnum("branch", "side", "mergeoptions", FastForwardMode.FF_ONLY);
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --ff-only\n",
-				c.toText());
-		c.setEnum("branch", "side", "mergeoptions", FastForwardMode.NO_FF);
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --no-ff\n",
-				c.toText());
-	}
-
-	@Test
-	public void testGetFastForwardMerge() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		assertSame(FastForwardMode.Merge.TRUE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.TRUE));
-		c = parse("[merge]\n\tff = only\n");
-		assertSame(FastForwardMode.Merge.ONLY, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.ONLY));
-		c = parse("[merge]\n\tff = true\n");
-		assertSame(FastForwardMode.Merge.TRUE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.TRUE));
-		c = parse("[merge]\n\tff = false\n");
-		assertSame(FastForwardMode.Merge.FALSE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.FALSE));
-	}
-
-	@Test
-	public void testSetFastForwardMerge() {
-		final Config c = new Config();
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.FF));
-		assertEquals("[merge]\n\tff = true\n", c.toText());
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.FF_ONLY));
-		assertEquals("[merge]\n\tff = only\n", c.toText());
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.NO_FF));
-		assertEquals("[merge]\n\tff = false\n", c.toText());
-	}
-
-	@Test
 	public void testReadLong() throws ConfigInvalidException {
 		assertReadLong(1L);
 		assertReadLong(-1L);
@@ -407,7 +278,6 @@ public class ConfigTest {
 		}
 	}
 
-	@Test
 	public void testBooleanWithNoValue() throws ConfigInvalidException {
 		Config c = parse("[my]\n\tempty\n");
 		assertEquals("", c.getString("my", null, "empty"));
@@ -417,7 +287,6 @@ public class ConfigTest {
 		assertEquals("[my]\n\tempty\n", c.toText());
 	}
 
-	@Test
 	public void testEmptyString() throws ConfigInvalidException {
 		Config c = parse("[my]\n\tempty =\n");
 		assertNull(c.getString("my", null, "empty"));
@@ -438,7 +307,6 @@ public class ConfigTest {
 		assertEquals("[my]\n\tempty =\n", c.toText());
 	}
 
-	@Test
 	public void testUnsetBranchSection() throws ConfigInvalidException {
 		Config c = parse("" //
 				+ "[branch \"keep\"]\n"
@@ -460,7 +328,6 @@ public class ConfigTest {
 				+ "  packedGitLimit = 14\n", c.toText());
 	}
 
-	@Test
 	public void testUnsetSingleSection() throws ConfigInvalidException {
 		Config c = parse("" //
 				+ "[branch \"keep\"]\n"
@@ -481,7 +348,6 @@ public class ConfigTest {
 				+ "  packedGitLimit = 14\n", c.toText());
 	}
 
-	@Test
 	public void test008_readSectionNames() throws ConfigInvalidException {
 		final Config c = parse("[a]\n [B]\n");
 		Set<String> sections = c.getSections();
@@ -489,30 +355,16 @@ public class ConfigTest {
 		assertTrue("Sections should contain \"b\"", sections.contains("b"));
 	}
 
-	@Test
 	public void test009_readNamesInSection() throws ConfigInvalidException {
-		String configString = "[core]\n" + "repositoryFormatVersion = 0\n"
-				+ "filemode = false\n" + "logAllRefUpdates = true\n";
+		String configString = "[core]\n" + "repositoryformatversion = 0\n"
+				+ "filemode = false\n" + "logallrefupdates = true\n";
 		final Config c = parse(configString);
 		Set<String> names = c.getNames("core");
 		assertEquals("Core section size", 3, names.size());
 		assertTrue("Core section should contain \"filemode\"", names
 				.contains("filemode"));
-
-		assertTrue("Core section should contain \"repositoryFormatVersion\"",
-				names.contains("repositoryFormatVersion"));
-
-		assertTrue("Core section should contain \"repositoryformatversion\"",
-				names.contains("repositoryformatversion"));
-
-		Iterator<String> itr = names.iterator();
-		assertEquals("filemode", itr.next());
-		assertEquals("logAllRefUpdates", itr.next());
-		assertEquals("repositoryFormatVersion", itr.next());
-		assertFalse(itr.hasNext());
 	}
 
-	@Test
 	public void test010_readNamesInSubSection() throws ConfigInvalidException {
 		String configString = "[a \"sub1\"]\n"//
 				+ "x = 0\n" //
@@ -533,7 +385,6 @@ public class ConfigTest {
 		assertTrue("Subsection should contain \"b\"", names.contains("b"));
 	}
 
-	@Test
 	public void testQuotingForSubSectionNames() {
 		String resultPattern = "[testsection \"{0}\"]\n\ttestname = testvalue\n";
 		String result;
@@ -556,27 +407,17 @@ public class ConfigTest {
 		assertEquals(result, config.toText());
 	}
 
-	@Test
-	public void testNoFinalNewline() throws ConfigInvalidException {
-		Config c = parse("[a]\n"
-				+ "x = 0\n"
-				+ "y = 1");
-		assertEquals("0", c.getString("a", null, "x"));
-		assertEquals("1", c.getString("a", null, "y"));
-	}
-
-	private static void assertReadLong(long exp) throws ConfigInvalidException {
+	private void assertReadLong(long exp) throws ConfigInvalidException {
 		assertReadLong(exp, String.valueOf(exp));
 	}
 
-	private static void assertReadLong(long exp, String act)
+	private void assertReadLong(long exp, String act)
 			throws ConfigInvalidException {
 		final Config c = parse("[s]\na = " + act + "\n");
 		assertEquals(exp, c.getLong("s", null, "a", 0L));
 	}
 
-	private static Config parse(final String content)
-			throws ConfigInvalidException {
+	private Config parse(final String content) throws ConfigInvalidException {
 		final Config c = new Config(null);
 		c.fromText(content);
 		return c;

@@ -62,6 +62,6 @@ public class StrategyResolve extends ThreeWayMergeStrategy {
 
 	@Override
 	public String getName() {
-		return "resolve"; //$NON-NLS-1$
+		return "resolve";
 	}
 }

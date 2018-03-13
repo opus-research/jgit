@@ -43,36 +43,27 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.fail;
-
-import java.io.IOException;
-
 import javax.servlet.http.HttpServletRequestWrapper;
 
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.junit.Before;
-import org.junit.Test;
 
 public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
 	private Repository db;
 
 	private AsIsFileService service;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		db = createBareRepository();
 		service = new AsIsFileService();
 	}
 
-	@Test
 	public void testDisabledSingleton() throws ServiceNotAuthorizedException {
 		service = AsIsFileService.DISABLED;
 		try {
@@ -90,19 +81,14 @@ public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCreate_Default() throws ServiceNotEnabledException,
 			ServiceNotAuthorizedException {
 		service.access(new R(null, "1.2.3.4"), db);
 		service.access(new R("bob", "1.2.3.4"), db);
 	}
 
-	@Test
-	public void testCreate_Disabled() throws ServiceNotAuthorizedException,
-			IOException {
-		final StoredConfig cfg = db.getConfig();
-		cfg.setBoolean("http", null, "getanyfile", false);
-		cfg.save();
+	public void testCreate_Disabled() throws ServiceNotAuthorizedException {
+		db.getConfig().setBoolean("http", null, "getanyfile", false);
 
 		try {
 			service.access(new R(null, "1.2.3.4"), db);
@@ -119,7 +105,6 @@ public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCreate_Enabled() throws ServiceNotEnabledException,
 			ServiceNotAuthorizedException {
 		db.getConfig().setBoolean("http", null, "getanyfile", true);

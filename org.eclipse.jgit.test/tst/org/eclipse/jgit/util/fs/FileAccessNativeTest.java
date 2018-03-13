@@ -44,10 +44,6 @@
 
 package org.eclipse.jgit.util.fs;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 
@@ -55,8 +51,6 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.NativeLibrary;
-import org.junit.Before;
-import org.junit.Test;
 
 public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 	private static boolean skipTest() {
@@ -70,8 +64,7 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 	private FileAccessNative access;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		if (!skipTest()) {
@@ -81,7 +74,6 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStatRegularFile() throws IOException {
 		if (skipTest())
 			return;
@@ -112,7 +104,6 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStatDirectory() throws IOException {
 		if (skipTest())
 			return;
@@ -132,7 +123,6 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testMissingFile() throws IOException {
 		if (skipTest())
 			return;
@@ -146,7 +136,6 @@ public class FileAccessNativeTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testNotDirectory() throws IOException {
 		if (skipTest())
 			return;

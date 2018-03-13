@@ -45,7 +45,7 @@
 package org.eclipse.jgit.transport;
 
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectId;
 
 /**
  * Description of an object stored in a pack file, including offset.
@@ -54,7 +54,7 @@ import org.eclipse.jgit.lib.ObjectIdOwnerMap;
  * (starting position of the object data) to perform random-access reads of
  * objects from the pack. This extension of ObjectId includes the offset.
  */
-public class PackedObjectInfo extends ObjectIdOwnerMap.Entry {
+public class PackedObjectInfo extends ObjectId {
 	private long offset;
 
 	private int crc;
