@@ -56,10 +56,6 @@ import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.diff.RawTextIgnoreAllWhitespace;
-import org.eclipse.jgit.diff.RawTextIgnoreLeadingWhitespace;
-import org.eclipse.jgit.diff.RawTextIgnoreTrailingWhitespace;
-import org.eclipse.jgit.diff.RawTextIgnoreWhitespaceChange;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
@@ -68,30 +64,18 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
-@Command(common = true, usage = "usage_ShowDiffs")
+@Command(common = true, usage = "Show diffs")
 class Diff extends TextBuiltin {
-	@Argument(index = 0, metaVar = "metaVar_treeish", required = true)
+	@Argument(index = 0, metaVar = "tree-ish", required = true)
 	void tree_0(final AbstractTreeIterator c) {
 		trees.add(c);
 	}
 
-	@Argument(index = 1, metaVar = "metaVar_treeish", required = true)
+	@Argument(index = 1, metaVar = "tree-ish", required = true)
 	private final List<AbstractTreeIterator> trees = new ArrayList<AbstractTreeIterator>();
 
-	@Option(name = "--", metaVar = "metaVar_port", multiValued = true, handler = PathTreeFilterHandler.class)
+	@Option(name = "--", metaVar = "path", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;
-
-	@Option(name = "--ignore-space-at-eol")
-	private boolean ignoreWsTrailing;
-
-	@Option(name = "--ignore-leading-space")
-	private boolean ignoreWsLeading;
-
-	@Option(name = "-b", aliases = { "--ignore-space-change" })
-	private boolean ignoreWsChange;
-
-	@Option(name = "-w", aliases = { "--ignore-all-space" })
-	private boolean ignoreWsAll;
 
 	private DiffFormatter fmt = new DiffFormatter();
 
@@ -132,37 +116,16 @@ class Diff extends TextBuiltin {
 			+ (mode1.equals(mode2) ? " " + mode1 : ""));
 		out.println("--- " + (isNew ?  "/dev/null" : name1));
 		out.println("+++ " + (isDelete ?  "/dev/null" : name2));
-
-		byte[] aRaw = getRawBytes(id1);
-		byte[] bRaw = getRawBytes(id2);
-
-		if (RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
-			out.println("Binary files differ");
-			return;
-		}
-
-		RawText a = getRawText(aRaw);
-		RawText b = getRawText(bRaw);
+		RawText a = getRawText(id1);
+		RawText b = getRawText(id2);
 		MyersDiff diff = new MyersDiff(a, b);
 		fmt.formatEdits(out, a, b, diff.getEdits());
 	}
 
-	private byte[] getRawBytes(ObjectId id) throws IOException {
+	private RawText getRawText(ObjectId id) throws IOException {
 		if (id.equals(ObjectId.zeroId()))
-			return new byte[] {};
-		return db.openBlob(id).getCachedBytes();
-	}
-
-	private RawText getRawText(byte[] raw) {
-		if (ignoreWsAll)
-			return new RawTextIgnoreAllWhitespace(raw);
-		else if (ignoreWsTrailing)
-			return new RawTextIgnoreTrailingWhitespace(raw);
-		else if (ignoreWsChange)
-			return new RawTextIgnoreWhitespaceChange(raw);
-		else if (ignoreWsLeading)
-			return new RawTextIgnoreLeadingWhitespace(raw);
-		else
-			return new RawText(raw);
+			return new RawText(new byte[] { });
+		return new RawText(db.openBlob(id).getCachedBytes());
 	}
 }
+

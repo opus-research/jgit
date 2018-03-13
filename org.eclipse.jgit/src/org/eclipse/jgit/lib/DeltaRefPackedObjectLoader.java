@@ -54,9 +54,10 @@ import org.eclipse.jgit.errors.MissingObjectException;
 class DeltaRefPackedObjectLoader extends DeltaPackedObjectLoader {
 	private final ObjectId deltaBase;
 
-	DeltaRefPackedObjectLoader(final PackFile pr, final long objectOffset,
-			final int headerSz, final int deltaSz, final ObjectId base) {
-		super(pr, objectOffset, headerSz, deltaSz);
+	DeltaRefPackedObjectLoader(final PackFile pr,
+			final long dataOffset, final long objectOffset, final int deltaSz,
+			final ObjectId base) {
+		super(pr, dataOffset, objectOffset, deltaSz);
 		deltaBase = base;
 	}
 

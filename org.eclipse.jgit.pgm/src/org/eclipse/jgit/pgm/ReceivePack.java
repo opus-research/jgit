@@ -45,15 +45,14 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.File;
-import java.text.MessageFormat;
 
 import org.kohsuke.args4j.Argument;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 
-@Command(common = false, usage = "usage_ServerSideBackendForJgitPush")
+@Command(common = false, usage = "Server side backend for 'jgit push'")
 class ReceivePack extends TextBuiltin {
-	@Argument(index = 0, required = true, metaVar = "metaVar_directory", usage = "usage_RepositoryToReceiveInto")
+	@Argument(index = 0, required = true, metaVar = "DIRECTORY", usage = "Repository to receive into")
 	File dstGitdir;
 
 	@Override
@@ -69,7 +68,7 @@ class ReceivePack extends TextBuiltin {
 			dstGitdir = new File(dstGitdir, Constants.DOT_GIT);
 		db = new Repository(dstGitdir);
 		if (!db.getObjectsDirectory().isDirectory())
-			throw die(MessageFormat.format(CLIText.get().notAGitRepository, dstGitdir.getPath()));
+			throw die("'" + dstGitdir.getPath() + "' not a git repository");
 		rp = new org.eclipse.jgit.transport.ReceivePack(db);
 		rp.receive(System.in, System.out, System.err);
 	}

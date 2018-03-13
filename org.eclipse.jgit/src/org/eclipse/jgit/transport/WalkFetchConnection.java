@@ -49,7 +49,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,7 +58,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CompoundException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -263,7 +261,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 				if (inWorkQueue.add(id))
 					workQueue.add(id);
 			} catch (IOException e) {
-				throw new TransportException(MessageFormat.format(JGitText.get().cannotRead, id.name()), e);
+				throw new TransportException("Cannot read " + id.name(), e);
 			}
 		}
 	}
@@ -282,7 +280,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					return;
 			}
 		} catch (IOException e) {
-			throw new TransportException(MessageFormat.format(JGitText.get().cannotRead, id.name()), e);
+			throw new TransportException("Cannot read " + id.name(), e);
 		}
 
 		switch (obj.getType()) {
@@ -299,7 +297,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			processTag(obj);
 			break;
 		default:
-			throw new TransportException(MessageFormat.format(JGitText.get().unknownObjectType, id.name()));
+			throw new TransportException("Unknown object type " + id.name());
 		}
 
 		// If we had any prior errors fetching this object they are
@@ -310,7 +308,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 	private void processBlob(final RevObject obj) throws TransportException {
 		if (!local.hasObject(obj))
-			throw new TransportException(MessageFormat.format(JGitText.get().cannotReadBlob, obj.name()),
+			throw new TransportException("Cannot read blob " + obj.name(),
 					new MissingObjectException(obj, Constants.TYPE_BLOB));
 		obj.add(COMPLETE);
 	}
@@ -333,12 +331,14 @@ class WalkFetchConnection extends BaseFetchConnection {
 					if (FileMode.GITLINK.equals(mode))
 						continue;
 					treeWalk.getObjectId(idBuffer, 0);
-					throw new CorruptObjectException(MessageFormat.format(JGitText.get().invalidModeFor
-							, mode, idBuffer.name(), treeWalk.getPathString(), obj.getId().name()));
+					throw new CorruptObjectException("Invalid mode " + mode
+							+ " for " + idBuffer.name() + " "
+							+ treeWalk.getPathString() + " in "
+							+ obj.getId().name() + ".");
 				}
 			}
 		} catch (IOException ioe) {
-			throw new TransportException(MessageFormat.format(JGitText.get().cannotReadTree, obj.name()), ioe);
+			throw new TransportException("Cannot read tree " + obj.name(), ioe);
 		}
 		obj.add(COMPLETE);
 	}
@@ -445,7 +445,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			List<Throwable> failures = fetchErrors.get(id.copy());
 			final TransportException te;
 
-			te = new TransportException(MessageFormat.format(JGitText.get().cannotGet, id.name()));
+			te = new TransportException("Cannot get " + id.name() + ".");
 			if (failures != null && !failures.isEmpty()) {
 				if (failures.size() == 1)
 					te.initCause(failures.get(0));
@@ -521,8 +521,8 @@ class WalkFetchConnection extends BaseFetchConnection {
 				// the object, but after indexing we didn't
 				// actually find it in the pack.
 				//
-				recordError(id, new FileNotFoundException(MessageFormat.format(
-						JGitText.get().objectNotFoundIn, id.name(), pack.packName)));
+				recordError(id, new FileNotFoundException("Object " + id.name()
+						+ " not found in " + pack.packName + "."));
 				continue;
 			}
 
@@ -565,7 +565,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 			recordError(id, e);
 			return false;
 		} catch (IOException e) {
-			throw new TransportException(MessageFormat.format(JGitText.get().cannotDownload, id.name()), e);
+			throw new TransportException("Cannot download " + id.name(), e);
 		}
 	}
 
@@ -601,15 +601,18 @@ class WalkFetchConnection extends BaseFetchConnection {
 		idBuffer.fromRaw(objectDigest.digest(), 0);
 
 		if (!AnyObjectId.equals(id, idBuffer)) {
-			throw new TransportException(MessageFormat.format(JGitText.get().incorrectHashFor
-					, id.name(), idBuffer.name(), Constants.typeString(uol.getType()), compressed.length));
+			throw new TransportException("Incorrect hash for " + id.name()
+					+ "; computed " + idBuffer.name() + " as a "
+					+ Constants.typeString(uol.getType()) + " from "
+					+ compressed.length + " bytes.");
 		}
 		if (objCheck != null) {
 			try {
 				objCheck.check(uol.getType(), uol.getCachedBytes());
 			} catch (CorruptObjectException e) {
-				throw new TransportException(MessageFormat.format(JGitText.get().transportExceptionInvalid
-						, Constants.typeString(uol.getType()), id.name(), e.getMessage()));
+				throw new TransportException("Invalid "
+						+ Constants.typeString(uol.getType()) + " "
+						+ id.name() + ":" + e.getMessage());
 			}
 		}
 	}
@@ -647,7 +650,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		tmp.delete();
 		if (local.hasObject(id))
 			return;
-		throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToStore, id.name()));
+		throw new ObjectWritingException("Unable to store " + id.name() + ".");
 	}
 
 	private Collection<WalkRemoteObjectDatabase> expandOneAlternate(
@@ -655,7 +658,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		while (!noAlternatesYet.isEmpty()) {
 			final WalkRemoteObjectDatabase wrr = noAlternatesYet.removeFirst();
 			try {
-				pm.beginTask(JGitText.get().listingAlternates, ProgressMonitor.UNKNOWN);
+				pm.beginTask("Listing alternates", ProgressMonitor.UNKNOWN);
 				Collection<WalkRemoteObjectDatabase> altList = wrr
 						.getAlternates();
 				if (altList != null && !altList.isEmpty())
@@ -676,14 +679,15 @@ class WalkFetchConnection extends BaseFetchConnection {
 			try {
 				markLocalObjComplete(revWalk.parseAny(r.getObjectId()));
 			} catch (IOException readError) {
-				throw new TransportException(MessageFormat.format(JGitText.get().localRefIsMissingObjects, r.getName()), readError);
+				throw new TransportException("Local ref " + r.getName()
+						+ " is missing object(s).", readError);
 			}
 		}
 		for (final ObjectId id : have) {
 			try {
 				markLocalObjComplete(revWalk.parseAny(id));
 			} catch (IOException readError) {
-				throw new TransportException(MessageFormat.format(JGitText.get().transportExceptionMissingAssumed, id.name()), readError);
+				throw new TransportException("Missing assumed "+id.name(), readError);
 			}
 		}
 	}
@@ -722,7 +726,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					pushLocalCommit(p);
 			}
 		} catch (IOException err) {
-			throw new TransportException(JGitText.get().localObjectsIncomplete, err);
+			throw new TransportException("Local objects incomplete.", err);
 		}
 	}
 
@@ -765,8 +769,9 @@ class WalkFetchConnection extends BaseFetchConnection {
 				if (FileMode.GITLINK.equals(mode))
 					continue;
 				treeWalk.getObjectId(idBuffer, 0);
-				throw new CorruptObjectException(MessageFormat.format(JGitText.get().corruptObjectInvalidMode3
-						, mode, idBuffer.name(), treeWalk.getPathString(), tree.name()));
+				throw new CorruptObjectException("Invalid mode " + mode
+						+ " for " + idBuffer.name() + " "
+						+ treeWalk.getPathString() + " in " + tree.name() + ".");
 			}
 		}
 	}

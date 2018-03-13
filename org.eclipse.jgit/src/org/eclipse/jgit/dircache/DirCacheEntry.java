@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,10 +51,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -115,8 +112,6 @@ public class DirCacheEntry {
 
 	private static final int ASSUME_VALID = 0x80;
 
-	private static final int UPDATE_NEEDED = 0x40;
-
 	/** (Possibly shared) header information storage. */
 	private final byte[] info;
 
@@ -150,7 +145,7 @@ public class DirCacheEntry {
 			for (;;) {
 				final int c = in.read();
 				if (c < 0)
-					throw new EOFException(JGitText.get().shortReadOfBlock);
+					throw new EOFException("Short read of block.");
 				if (c == 0)
 					break;
 				tmp.write(c);
@@ -234,11 +229,11 @@ public class DirCacheEntry {
 	 */
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
-					, toString(newPath)));
+			throw new IllegalArgumentException("Invalid path: "
+					+ toString(newPath));
 		if (stage < 0 || 3 < stage)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
-					, stage, toString(newPath)));
+			throw new IllegalArgumentException("Invalid stage " + stage
+					+ " for path " + toString(newPath));
 
 		info = new byte[INFO_LEN];
 		infoOffset = 0;
@@ -295,7 +290,7 @@ public class DirCacheEntry {
 		if (smudge_s < mtime)
 			return true;
 		if (smudge_s == mtime)
-			return smudge_ns <= NB.decodeInt32(info, base + 4);
+			return smudge_ns <= NB.decodeInt32(info, base + 4) / 1000000;
 		return false;
 	}
 
@@ -359,25 +354,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * @return true if this entry should be checked for changes
-	 */
-	public boolean isUpdateNeeded() {
-		return (info[infoOffset + P_FLAGS] & UPDATE_NEEDED) != 0;
-	}
-
-	/**
-	 * Set whether this entry must be checked for changes
-	 *
-	 * @param updateNeeded
-	 */
-	public void setUpdateNeeded(boolean updateNeeded) {
-		if (updateNeeded)
-			info[infoOffset + P_FLAGS] |= UPDATE_NEEDED;
-		else
-			info[infoOffset + P_FLAGS] &= ~UPDATE_NEEDED;
-	}
-
-	/**
 	 * Get the stage of this entry.
 	 * <p>
 	 * Entries have one of 4 possible stages: 0-3.
@@ -421,8 +397,8 @@ public class DirCacheEntry {
 		switch (mode.getBits() & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_MISSING:
 		case FileMode.TYPE_TREE:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidModeForPath
-					, mode, getPathString()));
+			throw new IllegalArgumentException("Invalid mode " + mode
+					+ " for path " + getPathString());
 		}
 		NB.encodeInt32(info, infoOffset + P_MODE, mode.getBits());
 	}

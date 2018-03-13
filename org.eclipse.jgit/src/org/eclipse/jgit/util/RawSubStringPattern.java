@@ -44,7 +44,6 @@
 
 package org.eclipse.jgit.util;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 
 /**
@@ -68,7 +67,7 @@ public class RawSubStringPattern {
 	 */
 	public RawSubStringPattern(final String patternText) {
 		if (patternText.length() == 0)
-			throw new IllegalArgumentException(JGitText.get().cannotMatchOnEmptyString);
+			throw new IllegalArgumentException("Cannot match on empty string.");
 		needleString = patternText;
 
 		final byte[] b = Constants.encode(patternText);

@@ -43,16 +43,16 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
-
-@Command(common = true, usage = "usage_DisplayTheVersionOfJgit")
+@Command(common = true, usage = "Display the version of jgit")
 class Version extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		final Package pkg = getClass().getPackage();
 		if (pkg == null || pkg.getImplementationVersion() == null)
-			throw die(CLIText.get().cannotReadPackageInformation);
+			throw die("Cannot read package information.");
 
-		out.println(MessageFormat.format(CLIText.get().jgitVersion, pkg.getImplementationVersion()));
+		out.print("jgit version ");
+		out.print(pkg.getImplementationVersion());
+		out.println();
 	}
 }

@@ -52,7 +52,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -61,7 +60,6 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -84,10 +82,10 @@ import org.eclipse.jgit.util.NB;
 /** Indexes Git pack files for local use. */
 public class IndexPack {
 	/** Progress message when reading raw data from the pack. */
-	public static final String PROGRESS_DOWNLOAD = JGitText.get().receivingObjects;
+	public static final String PROGRESS_DOWNLOAD = "Receiving objects";
 
 	/** Progress message when computing names of delta compressed objects. */
-	public static final String PROGRESS_RESOLVE_DELTA = JGitText.get().resolvingDeltas;
+	public static final String PROGRESS_RESOLVE_DELTA = "Resolving deltas";
 
 	/**
 	 * Size of the internal stream buffer.
@@ -394,19 +392,20 @@ public class IndexPack {
 					indexOneObject();
 					progress.update(1);
 					if (progress.isCancelled())
-						throw new IOException(JGitText.get().downloadCancelled);
+						throw new IOException("Download cancelled");
 				}
 				readPackFooter();
 				endInput();
 				progress.endTask();
 				if (deltaCount > 0) {
 					if (packOut == null)
-						throw new IOException(JGitText.get().needPackOut);
+						throw new IOException("need packOut");
 					resolveDeltas(progress);
 					if (entryCount < objectCount) {
 						if (!fixThin) {
-							throw new IOException(MessageFormat.format(
-									JGitText.get().packHasUnresolvedDeltas, (objectCount - entryCount)));
+							throw new IOException("pack has "
+									+ (objectCount - entryCount)
+									+ " unresolved deltas");
 						}
 						fixThinPack(progress);
 					}
@@ -459,7 +458,7 @@ public class IndexPack {
 			resolveDeltas(entries[i]);
 			progress.update(entryCount - before);
 			if (progress.isCancelled())
-				throw new IOException(JGitText.get().downloadCancelledDuringIndexing);
+				throw new IOException("Download cancelled during indexing");
 		}
 		progress.endTask();
 	}
@@ -506,12 +505,12 @@ public class IndexPack {
 			break;
 		}
 		default:
-			throw new IOException(MessageFormat.format(JGitText.get().unknownObjectType, typeCode));
+			throw new IOException("Unknown object type " + typeCode + ".");
 		}
 
 		final int crc32 = (int) crc.getValue();
 		if (oldCRC != crc32)
-			throw new IOException(MessageFormat.format(JGitText.get().corruptionDetectedReReadingAt, pos));
+			throw new IOException("Corruption detected re-reading at " + pos);
 		if (oe == null) {
 			objectDigest.update(Constants.encodedTypeString(type));
 			objectDigest.update((byte) ' ');
@@ -603,7 +602,7 @@ public class IndexPack {
 
 			resolveChildDeltas(oe.getOffset(), typeCode, data, oe);
 			if (progress.isCancelled())
-				throw new IOException(JGitText.get().downloadCancelledDuringIndexing);
+				throw new IOException("Download cancelled during indexing");
 		}
 		def.end();
 
@@ -692,7 +691,7 @@ public class IndexPack {
 
 		if (!Arrays.equals(origDigest.digest(), origcsum)
 				|| !Arrays.equals(tailDigest.digest(), tailcsum))
-			throw new IOException(JGitText.get().packCorruptedWhileWritingToFilesystem);
+			throw new IOException("Pack corrupted while writing to filesystem");
 
 		packcsum = packDigest.digest();
 		packOut.write(packcsum);
@@ -731,11 +730,11 @@ public class IndexPack {
 		final int p = fillFromInput(hdrln);
 		for (int k = 0; k < Constants.PACK_SIGNATURE.length; k++)
 			if (buf[p + k] != Constants.PACK_SIGNATURE[k])
-				throw new IOException(JGitText.get().notAPACKFile);
+				throw new IOException("Not a PACK file.");
 
 		final long vers = NB.decodeUInt32(buf, p + 4);
 		if (vers != 2 && vers != 3)
-			throw new IOException(MessageFormat.format(JGitText.get().unsupportedPackVersion, vers));
+			throw new IOException("Unsupported pack version " + vers + ".");
 		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
 	}
@@ -751,7 +750,7 @@ public class IndexPack {
 			packOut.write(packcsum);
 
 		if (!Arrays.equals(cmpcsum, packcsum))
-			throw new CorruptObjectException(JGitText.get().corruptObjectPackfileChecksumIncorrect);
+			throw new CorruptObjectException("Packfile checksum incorrect.");
 	}
 
 	// Cleanup all resources associated with our input parsing.
@@ -815,7 +814,7 @@ public class IndexPack {
 			break;
 		}
 		default:
-			throw new IOException(MessageFormat.format(JGitText.get().unknownObjectType, typeCode));
+			throw new IOException("Unknown object type " + typeCode + ".");
 		}
 	}
 
@@ -840,8 +839,9 @@ public class IndexPack {
 			try {
 				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				throw new IOException(MessageFormat.format(JGitText.get().invalidObject
-						, Constants.typeString(type) , id.name() , e.getMessage()));
+				throw new IOException("Invalid "
+						+ Constants.typeString(type) + " " + id.name()
+						+ ":" + e.getMessage());
 			}
 		}
 
@@ -849,7 +849,7 @@ public class IndexPack {
 		if (ldr != null) {
 			final byte[] existingData = ldr.getCachedBytes();
 			if (ldr.getType() != type || !Arrays.equals(data, existingData)) {
-				throw new IOException(MessageFormat.format(JGitText.get().collisionOn, id.name()));
+				throw new IOException("Collision on " + id.name());
 			}
 		}
 	}
@@ -904,7 +904,7 @@ public class IndexPack {
 			}
 			next = in.read(buf, next, free);
 			if (next <= 0)
-				throw new EOFException(JGitText.get().packfileIsTruncated);
+				throw new EOFException("Packfile is truncated.");
 			bAvail += next;
 		}
 		return bOffset;
@@ -924,7 +924,7 @@ public class IndexPack {
 			}
 			next = packOut.read(buf, next, free);
 			if (next <= 0)
-				throw new EOFException(JGitText.get().packfileIsTruncated);
+				throw new EOFException("Packfile is truncated.");
 			bAvail += next;
 		}
 		return bOffset;
@@ -966,7 +966,7 @@ public class IndexPack {
 				n += inf.inflate(dst, n, free);
 			}
 			if (n != sz)
-				throw new DataFormatException(JGitText.get().wrongDecompressedLength);
+				throw new DataFormatException("wrong decompressed length");
 			n = bAvail - inf.getRemaining();
 			if (n > 0) {
 				crc.update(buf, p, n);
@@ -998,7 +998,7 @@ public class IndexPack {
 				n += inf.inflate(dst, n, dst.length - n);
 			}
 			if (n != sz)
-				throw new DataFormatException(JGitText.get().wrongDecompressedLength);
+				throw new DataFormatException("wrong decompressed length");
 			n = bAvail - inf.getRemaining();
 			if (n > 0) {
 				crc.update(buf, p, n);
@@ -1043,8 +1043,8 @@ public class IndexPack {
 	}
 
 	private static CorruptObjectException corrupt(final DataFormatException dfe) {
-		return new CorruptObjectException(MessageFormat.format(
-				JGitText.get().packfileCorruptionDetected, dfe.getMessage()));
+		return new CorruptObjectException("Packfile corruption detected: "
+				+ dfe.getMessage());
 	}
 
 	private static class DeltaChain extends ObjectId {
@@ -1138,7 +1138,7 @@ public class IndexPack {
 			// to create it. There is no way to move this pack in.
 			//
 			cleanupTemporaryFiles();
-			throw new IOException(MessageFormat.format(JGitText.get().cannotCreateDirectory, packDir.getAbsolutePath()));
+			throw new IOException("Cannot create " + packDir.getAbsolutePath());
 		}
 
 		if (finalPack.exists()) {
@@ -1154,7 +1154,7 @@ public class IndexPack {
 			//
 			try {
 				if (!keep.lock(lockMessage))
-					throw new IOException(MessageFormat.format(JGitText.get().cannotLockPackIn, finalPack));
+					throw new IOException("Cannot lock pack in " + finalPack);
 			} catch (IOException e) {
 				cleanupTemporaryFiles();
 				throw e;
@@ -1164,7 +1164,7 @@ public class IndexPack {
 		if (!dstPack.renameTo(finalPack)) {
 			cleanupTemporaryFiles();
 			keep.unlock();
-			throw new IOException(MessageFormat.format(JGitText.get().cannotMovePackTo, finalPack));
+			throw new IOException("Cannot move pack to " + finalPack);
 		}
 
 		if (!dstIdx.renameTo(finalIdx)) {
@@ -1172,7 +1172,7 @@ public class IndexPack {
 			keep.unlock();
 			if (!finalPack.delete())
 				finalPack.deleteOnExit();
-			throw new IOException(MessageFormat.format(JGitText.get().cannotMoveIndexTo, finalIdx));
+			throw new IOException("Cannot move index to " + finalIdx);
 		}
 
 		try {

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
- * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,63 +42,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.diff;
+package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
+import java.io.File;
+import java.io.IOException;
 
-/**
- * A version of {@link RawText} that ignores leading whitespace.
- */
-public class RawTextIgnoreLeadingWhitespace extends RawText {
+import junit.textui.TestRunner;
 
-	/**
-	 * Create a new sequence from an existing content byte array.
-	 * <p>
-	 * The entire array (indexes 0 through length-1) is used as the content.
-	 *
-	 * @param input
-	 *            the content array. The array is never modified, so passing
-	 *            through cached arrays is safe.
-	 */
-	public RawTextIgnoreLeadingWhitespace(byte[] input) {
-		super(input);
+public class T0006_DeepSpeedTest extends SpeedTestBase {
+
+	protected void setUp() throws Exception {
+		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d","--","net/netfilter/nf_queue.c" });
 	}
 
-	@Override
-	public boolean equals(final int i, final Sequence other, final int j) {
-		return equals(this, i + 1, (RawText) other, j + 1);
-	}
-
-	private static boolean equals(final RawText a, final int ai,
-			final RawText b, final int bi) {
-		if (a.hashes.get(ai) != b.hashes.get(bi))
-			return false;
-
-		int as = a.lines.get(ai);
-		int bs = b.lines.get(bi);
-		int ae = a.lines.get(ai + 1);
-		int be = b.lines.get(bi + 1);
-
-		as = trimLeadingWhitespace(a.content, as, ae);
-		bs = trimLeadingWhitespace(b.content, bs, be);
-
-		if (ae - as != be - bs)
-			return false;
-
-		while (as < ae) {
-			if (a.content[as++] != b.content[bs++])
-				return false;
+	public void testDeepHistoryScan() throws IOException {
+		long start = System.currentTimeMillis();
+		Repository db = new Repository(new File(kernelrepo));
+		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
+		int n = 1;
+		for (;;) {
+			ObjectId[] parents = commit.getParentIds();
+			if (parents.length == 0)
+				break;
+			ObjectId parentId = parents[0];
+			commit = db.mapCommit(parentId);
+			TreeEntry m = commit.getTree().findBlobMember("net/netfilter/nf_queue.c");
+			if (m != null)
+				commit.getCommitId().name();
+			++n;
 		}
-		return true;
+
+		assertEquals(12275, n);
+		long stop = System.currentTimeMillis();
+		long time = stop - start;
+		System.out.println("native="+nativeTime);
+		System.out.println("jgit="+time);
+		/*
+		native=1355
+		jgit=5449
+		 */
+		// This is not an exact factor, but we'd expect native git to perform this
+		// about 4 times quicker. If for some reason we find jgit to be faster than
+		// this the cause should be found and secured.
+		long factor = (time*110/nativeTime+50)/100;
+		assertEquals(4, factor);
 	}
 
-	@Override
-	protected int hashLine(final byte[] raw, int ptr, int end) {
-		int hash = 5381;
-		ptr = trimLeadingWhitespace(raw, ptr, end);
-		for (; ptr < end; ptr++) {
-			hash = (hash << 5) ^ (raw[ptr] & 0xff);
-		}
-		return hash;
+	public static void main(String[] args) {
+		TestRunner.run(T0006_DeepSpeedTest.class);
 	}
 }

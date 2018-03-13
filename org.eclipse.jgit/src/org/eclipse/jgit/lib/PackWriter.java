@@ -54,7 +54,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.revwalk.ObjectWalk;
@@ -104,7 +103,7 @@ public class PackWriter {
 	 *
 	 * @see #preparePack(Collection, Collection)
 	 */
-	public static final String COUNTING_OBJECTS_PROGRESS = JGitText.get().countingObjects;
+	public static final String COUNTING_OBJECTS_PROGRESS = "Counting objects";
 
 	/**
 	 * Title of {@link ProgressMonitor} task used during searching for objects
@@ -112,7 +111,7 @@ public class PackWriter {
 	 *
 	 * @see #writePack(OutputStream)
 	 */
-	public static final String SEARCHING_REUSE_PROGRESS = JGitText.get().compressingObjects;
+	public static final String SEARCHING_REUSE_PROGRESS = "Compressing objects";
 
 	/**
 	 * Title of {@link ProgressMonitor} task used during writing out pack
@@ -120,7 +119,7 @@ public class PackWriter {
 	 *
 	 * @see #writePack(OutputStream)
 	 */
-	public static final String WRITING_OBJECTS_PROGRESS = JGitText.get().writingObjects;
+	public static final String WRITING_OBJECTS_PROGRESS = "Writing objects";
 
 	/**
 	 * Default value of deltas reuse option.
@@ -606,7 +605,7 @@ public class PackWriter {
 			for (ObjectToPack otp : list) {
 				if (initMonitor.isCancelled())
 					throw new IOException(
-							JGitText.get().packingCancelledDuringObjectsWriting);
+							"Packing cancelled during objects writing");
 				reuseLoaders.clear();
 				searchForReuse(reuseLoaders, otp);
 				initMonitor.update(1);
@@ -624,7 +623,7 @@ public class PackWriter {
 			selectDeltaReuseForObject(otp, reuseLoaders);
 		}
 		// delta reuse is preferred over object reuse
-		if (reuseObjects && !otp.isCopyable()) {
+		if (reuseObjects && !otp.hasReuseLoader()) {
 			selectObjectReuseForObject(otp, reuseLoaders);
 		}
 	}
@@ -650,7 +649,7 @@ public class PackWriter {
 		}
 
 		if (bestLoader != null) {
-			otp.setCopyFromPack(bestLoader);
+			otp.setReuseLoader(bestLoader);
 			otp.setDeltaBase(bestBase);
 		}
 	}
@@ -671,7 +670,7 @@ public class PackWriter {
 			final Collection<PackedObjectLoader> loaders) {
 		for (final PackedObjectLoader loader : loaders) {
 			if (loader instanceof WholePackedObjectLoader) {
-				otp.setCopyFromPack(loader);
+				otp.setReuseLoader(loader);
 				return;
 			}
 		}
@@ -689,7 +688,7 @@ public class PackWriter {
 			for (ObjectToPack otp : list) {
 				if (writeMonitor.isCancelled())
 					throw new IOException(
-							JGitText.get().packingCancelledDuringObjectsWriting);
+							"Packing cancelled during objects writing");
 				if (!otp.isWritten())
 					writeObject(otp);
 			}
@@ -704,7 +703,7 @@ public class PackWriter {
 			if (deltaBase != null && !deltaBase.isWritten()) {
 				if (deltaBase.wantWrite()) {
 					otp.clearDeltaBase(); // cycle detected
-					otp.clearSourcePack();
+					otp.disposeLoader();
 				} else {
 					writeObject(deltaBase);
 				}
@@ -728,7 +727,7 @@ public class PackWriter {
 				reuse.endCopyRawData();
 			}
 		} else if (otp.isDeltaRepresentation()) {
-			throw new IOException(JGitText.get().creatingDeltasIsNotImplemented);
+			throw new IOException("creating deltas is not implemented");
 		} else {
 			writeWholeObjectDeflate(otp);
 		}
@@ -738,9 +737,13 @@ public class PackWriter {
 	}
 
 	private PackedObjectLoader open(final ObjectToPack otp) throws IOException {
-		while (otp.isCopyable()) {
+		for (;;) {
+			PackedObjectLoader reuse = otp.useLoader();
+			if (reuse == null) {
+				return null;
+			}
+
 			try {
-				PackedObjectLoader reuse = otp.getCopyLoader(windowCursor);
 				reuse.beginCopyRawData();
 				return reuse;
 			} catch (IOException err) {
@@ -748,12 +751,10 @@ public class PackWriter {
 				// it has been overwritten with a different layout.
 				//
 				otp.clearDeltaBase();
-				otp.clearSourcePack();
 				searchForReuse(new ArrayList<PackedObjectLoader>(), otp);
 				continue;
 			}
 		}
-		return null;
 	}
 
 	private void writeWholeObjectDeflate(final ObjectToPack otp)
@@ -887,11 +888,11 @@ public class PackWriter {
 			objectsLists[object.getType()].add(otp);
 		} catch (ArrayIndexOutOfBoundsException x) {
 			throw new IncorrectObjectTypeException(object,
-					JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+					"COMMIT nor TREE nor BLOB nor TAG");
 		} catch (UnsupportedOperationException x) {
 			// index pointing to "dummy" empty list
 			throw new IncorrectObjectTypeException(object,
-					JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+					"COMMIT nor TREE nor BLOB nor TAG");
 		}
 		objectsMap.add(otp);
 	}
@@ -903,14 +904,9 @@ public class PackWriter {
 	 *
 	 */
 	static class ObjectToPack extends PackedObjectInfo {
-		/** Other object being packed that this will delta against. */
 		private ObjectId deltaBase;
 
-		/** Pack to reuse compressed data from, otherwise null. */
-		private PackFile copyFromPack;
-
-		/** Offset of the object's header in {@link #copyFromPack}. */
-		private long copyOffset;
+		private PackedObjectLoader reuseLoader;
 
 		/**
 		 * Bit field, from bit 0 to bit 31:
@@ -993,21 +989,22 @@ public class PackWriter {
 			return getOffset() != 0;
 		}
 
-		boolean isCopyable() {
-			return copyFromPack != null;
+		PackedObjectLoader useLoader() {
+			final PackedObjectLoader r = reuseLoader;
+			reuseLoader = null;
+			return r;
 		}
 
-		PackedObjectLoader getCopyLoader(WindowCursor curs) throws IOException {
-			return copyFromPack.resolveBase(curs, copyOffset);
+		boolean hasReuseLoader() {
+			return reuseLoader != null;
 		}
 
-		void setCopyFromPack(PackedObjectLoader loader) {
-			this.copyFromPack = loader.pack;
-			this.copyOffset = loader.objectOffset;
+		void setReuseLoader(PackedObjectLoader reuseLoader) {
+			this.reuseLoader = reuseLoader;
 		}
 
-		void clearSourcePack() {
-			copyFromPack = null;
+		void disposeLoader() {
+			this.reuseLoader = null;
 		}
 
 		int getType() {

@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.iplog;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -173,7 +172,7 @@ class Committer {
 
 	@Override
 	public String toString() {
-		return MessageFormat.format(IpLogText.get().committerString, getFirstName(), getLastName());
+		return "Committer " + getFirstName() + " " + getLastName();
 	}
 
 	/** Date period during which the committer was active. */

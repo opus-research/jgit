@@ -75,17 +75,14 @@ public final class AlternateRepositoryDatabase extends ObjectDatabase {
 		return repository;
 	}
 
-	@Override
 	public void closeSelf() {
 		repository.close();
 	}
 
-	@Override
 	public void create() throws IOException {
 		repository.create();
 	}
 
-	@Override
 	public boolean exists() {
 		return odb.exists();
 	}

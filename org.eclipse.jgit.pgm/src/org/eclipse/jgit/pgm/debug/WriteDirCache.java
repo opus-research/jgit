@@ -45,7 +45,6 @@
 package org.eclipse.jgit.pgm.debug;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
 
 class WriteDirCache extends TextBuiltin {
@@ -53,10 +52,10 @@ class WriteDirCache extends TextBuiltin {
 	protected void run() throws Exception {
 		final DirCache cache = DirCache.read(db);
 		if (!cache.lock())
-			throw die(CLIText.get().failedToLockIndex);
+			throw die("failed to lock index");
 		cache.read();
 		cache.write();
 		if (!cache.commit())
-			throw die(CLIText.get().failedToCommitIndex);
+			throw die("failed to commit index");
 	}
 }

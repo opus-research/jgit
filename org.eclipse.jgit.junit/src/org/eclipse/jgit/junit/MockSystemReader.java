@@ -53,7 +53,6 @@ import java.util.TimeZone;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileBasedConfig;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 
 public class MockSystemReader extends SystemReader {
@@ -103,7 +102,7 @@ public class MockSystemReader extends SystemReader {
 	}
 
 	@Override
-	public FileBasedConfig openUserConfig(FS fs) {
+	public FileBasedConfig openUserConfig() {
 		return userGitConfig;
 	}
 

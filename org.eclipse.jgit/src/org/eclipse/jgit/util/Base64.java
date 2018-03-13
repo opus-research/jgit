@@ -9,9 +9,6 @@ package org.eclipse.jgit.util;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 
 /**
@@ -705,7 +702,7 @@ public class Base64
             }   // end if: white space, equals sign or better
             else
             {
-                System.err.println(MessageFormat.format(JGitText.get().badBase64InputCharacterAt, i+ source[i]));
+                System.err.println( "Bad Base64 input character at " + i + ": " + source[i] + "(decimal)" );
                 return null;
             }   // end else:
         }   // each input character
@@ -928,7 +925,7 @@ public class Base64
             // Check for size of file
             if( file.length() > Integer.MAX_VALUE )
             {
-                System.err.println(MessageFormat.format(JGitText.get().fileIsTooBigForThisConvenienceMethod, file.length()));
+                System.err.println( "File is too big for this convenience method (" + file.length() + " bytes)." );
                 return null;
             }   // end if: file too big for int index
             buffer = new byte[ (int)file.length() ];
@@ -949,7 +946,7 @@ public class Base64
         }   // end try
         catch( java.io.IOException e )
         {
-            System.err.println(MessageFormat.format(JGitText.get().errorDecodingFromFile, filename));
+            System.err.println( "Error decoding from file " + filename );
         }   // end catch: IOException
         finally
         {
@@ -997,7 +994,7 @@ public class Base64
         }   // end try
         catch( java.io.IOException e )
         {
-            System.err.println(MessageFormat.format(JGitText.get().errorEncodingFromFile, filename));
+            System.err.println( "Error encoding from file " + filename );
         }   // end catch: IOException
         finally
         {
@@ -1157,7 +1154,7 @@ public class Base64
                     else
                     {
                         // Must have broken out from above.
-                        throw new java.io.IOException(JGitText.get().improperlyPaddedBase64Input);
+                        throw new java.io.IOException( "Improperly padded Base64 input." );
                     }   // end
 
                 }   // end else: decode
@@ -1195,7 +1192,7 @@ public class Base64
             else
             {
                 // When JDK1.4 is more accepted, use an assertion here.
-                throw new java.io.IOException(JGitText.get().errorInBase64CodeReadingStream);
+                throw new java.io.IOException( "Error in Base64 code reading stream." );
             }   // end else
         }   // end read
 
@@ -1366,7 +1363,7 @@ public class Base64
                 }   // end if: meaningful base64 character
                 else if( DECODABET[ theByte & 0x7f ] != WHITE_SPACE_ENC )
                 {
-                    throw new java.io.IOException(JGitText.get().invalidCharacterInBase64Data);
+                    throw new java.io.IOException( "Invalid character in Base64 data." );
                 }   // end else: not white space either
             }   // end else: decoding
         }   // end write
@@ -1416,7 +1413,7 @@ public class Base64
                 }   // end if: encoding
                 else
                 {
-                    throw new java.io.IOException(JGitText.get().base64InputNotProperlyPadded);
+                    throw new java.io.IOException( "Base64 input not properly padded." );
                 }   // end else: decoding
             }   // end if: buffer partially full
 
