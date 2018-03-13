@@ -86,8 +86,6 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 
 	private RevWalk walk;
 
-	private boolean seenHelp;
-
 	/**
 	 * Creates a new command line owner that parses arguments/options and set
 	 * them into the given object.
@@ -145,31 +143,9 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 			}
 
 			tmp.add(str);
-
-			if (containsHelp(args)) {
-				// suppress exceptions on required parameters if help is present
-				seenHelp = true;
-				// stop argument parsing here
-				break;
-			}
 		}
 
-		try {
-			super.parseArgument(tmp.toArray(new String[tmp.size()]));
-		} finally {
-			// reset "required" options to defaults for correct command printout
-			seenHelp = false;
-		}
-	}
-
-	/**
-	 * @param args
-	 *            non null
-	 * @return true if the given array contains help option
-	 * @since 4.2
-	 */
-	protected boolean containsHelp(final String... args) {
-		return TextBuiltin.containsHelp(args);
+		super.parseArgument(tmp.toArray(new String[tmp.size()]));
 	}
 
 	/**
@@ -205,7 +181,7 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 		return walk;
 	}
 
-	class MyOptionDef extends OptionDef {
+	static class MyOptionDef extends OptionDef {
 
 		public MyOptionDef(OptionDef o) {
 			super(o.usage(), o.metaVar(), o.required(), o.handler(), o
@@ -224,11 +200,6 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 				e.printStackTrace(System.err);
 				return metaVar();
 			}
-		}
-
-		@Override
-		public boolean required() {
-			return seenHelp ? false : super.required();
 		}
 	}
 
