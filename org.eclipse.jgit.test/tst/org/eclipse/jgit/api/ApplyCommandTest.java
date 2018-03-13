@@ -150,8 +150,8 @@ public class ApplyCommandTest extends RepositoryTestCase {
 	public void testModifyW() throws Exception {
 		ApplyResult result = init("W");
 		assertEquals(1, result.getUpdatedFiles().size());
-		assertEquals(new File(db.getWorkTree(), "W"),
-				result.getUpdatedFiles().get(0));
+		assertEquals(new File(db.getWorkTree(), "W"), result.getUpdatedFiles()
+				.get(0));
 		checkFile(new File(db.getWorkTree(), "W"),
 				b.getString(0, b.size(), false));
 	}
