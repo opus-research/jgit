@@ -123,7 +123,9 @@ public class HttpClientTests extends HttpTestCase {
 
 		ServletContextHandler ctx = server.addContext(path);
 		ctx.setResourceBase(base.toString());
-		ctx.addServlet(DefaultServlet.class, "/");
+		ServletHolder holder = ctx.addServlet(DefaultServlet.class, "/");
+		// The tmp directory is symlinked on OS X
+		holder.setInitParameter("aliases", "true");
 		return ctx;
 	}
 
@@ -369,6 +371,22 @@ public class HttpClientTests extends HttpTestCase {
 			} catch (TransportException err) {
 				String exp = smartAuthNoneURI + ": Git access forbidden";
 				assertEquals(exp, err.getMessage());
+			}
+		} finally {
+			t.close();
+		}
+	}
+
+	@Test
+	public void testListRemoteWithoutLocalRepository() throws Exception {
+		Transport t = Transport.open(smartAuthNoneURI);
+		try {
+			FetchConnection c = t.openFetch();
+			try {
+				Ref head = c.getRef(Constants.HEAD);
+				assertNotNull(head);
+			} finally {
+				c.close();
 			}
 		} finally {
 			t.close();
