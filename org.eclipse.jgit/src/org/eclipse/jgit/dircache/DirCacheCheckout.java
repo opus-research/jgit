@@ -352,7 +352,7 @@ public class DirCacheCheckout {
 			throw new IndexWriteException();
 		}
 
-		return toBeDeleted.size() == 0;
+		return toBeDeleted == null;
 	}
 
 	private static boolean isSamePrefix(String a, String b) {
