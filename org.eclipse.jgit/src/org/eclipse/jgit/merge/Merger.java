@@ -47,7 +47,6 @@ package org.eclipse.jgit.merge;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.errors.NoMergeBaseException.MergeBaseFailureReason;
@@ -71,15 +70,7 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
  * Instance of a specific {@link MergeStrategy} for a single {@link Repository}.
  */
 public abstract class Merger {
-	/**
-	 * The repository this merger operates on.
-	 * <p>
-	 * Null if and only if the merger was constructed with {@link
-	 * #Merger(ObjectInserter)}. Callers that want to assume the repo is not null
-	 * (e.g. because of a previous check that the merger is not in-core) may use
-	 * {@link #nonNullRepo()}.
-	 */
-	@Nullable
+	/** The repository this merger operates on. */
 	protected final Repository db;
 
 	/** Reader to support {@link #walk} and other object loading. */
@@ -113,47 +104,16 @@ public abstract class Merger {
 	 *            the repository this merger will read and write data on.
 	 */
 	protected Merger(final Repository local) {
-		if (local == null) {
-			throw new IllegalArgumentException(JGitText.get().repositoryIsRequired);
-		}
 		db = local;
-		inserter = local.newObjectInserter();
+		inserter = db.newObjectInserter();
 		reader = inserter.newReader();
-		walk = new RevWalk(reader);
-	}
-
-	/**
-	 * Create a new in-core merge instance from an inserter.
-	 *
-	 * @param oi
-	 *            the inserter to write objects to.
-	 * @since 4.7
-	 */
-	protected Merger(ObjectInserter oi) {
-		db = null;
-		inserter = oi;
-		reader = oi.newReader();
 		walk = new RevWalk(reader);
 	}
 
 	/**
 	 * @return the repository this merger operates on.
 	 */
-	@Nullable
 	public Repository getRepository() {
-		return db;
-	}
-
-	/**
-	 * @return non-null repository instance
-	 * @throws IllegalArgumentException
-	 *             if the merger was constructed without a repository.
-	 * @since 4.7
-	 */
-	protected Repository nonNullRepo() {
-		if (db == null) {
-			throw new IllegalArgumentException(JGitText.get().repositoryIsRequired);
-		}
 		return db;
 	}
 
