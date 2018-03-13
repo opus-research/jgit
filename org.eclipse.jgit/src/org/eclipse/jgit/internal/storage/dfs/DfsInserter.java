@@ -104,7 +104,7 @@ public class DfsInserter extends ObjectInserter {
 	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
 	DfsBlockCache cache;
-	DfsPackKey packKey;
+	DfsStreamKey packKey;
 	DfsPackDescription packDsc;
 	PackStream packOut;
 	private boolean rollback;
@@ -221,7 +221,7 @@ public class DfsInserter extends ObjectInserter {
 		db.commitPack(Collections.singletonList(packDsc), null);
 		rollback = false;
 
-		DfsPackFile p = cache.getOrCreate(packDsc, packKey);
+		DfsPackFile p = new DfsPackFile(cache, packDsc);
 		if (index != null)
 			p.setPackIndex(index);
 		db.addPack(p);
@@ -281,8 +281,10 @@ public class DfsInserter extends ObjectInserter {
 
 		rollback = true;
 		packDsc = db.newPack(DfsObjDatabase.PackSource.INSERT);
-		packOut = new PackStream(db.writeFile(packDsc, PACK));
-		packKey = new DfsPackKey();
+		DfsOutputStream dfsOut = db.writeFile(packDsc, PACK);
+		packDsc.setBlockSize(PACK, dfsOut.blockSize());
+		packOut = new PackStream(dfsOut);
+		packKey = packDsc.getStreamKey(PACK);
 
 		// Write the header as though it were a single object pack.
 		byte[] buf = packOut.hdrBuf;
@@ -312,13 +314,14 @@ public class DfsInserter extends ObjectInserter {
 			packIndex = PackIndex.read(buf.openInputStream());
 		}
 
-		DfsOutputStream os = db.writeFile(pack, INDEX);
-		try (CountingOutputStream cnt = new CountingOutputStream(os)) {
+		try (DfsOutputStream os = db.writeFile(pack, INDEX)) {
+			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
 				index(cnt, packHash, list);
 			pack.addFileExt(INDEX);
+			pack.setBlockSize(INDEX, os.blockSize());
 			pack.setFileSize(INDEX, cnt.getCount());
 		} finally {
 			if (buf != null) {
@@ -633,11 +636,11 @@ public class DfsInserter extends ObjectInserter {
 		private final int type;
 		private final long size;
 
-		private final DfsPackKey srcPack;
+		private final DfsStreamKey srcPack;
 		private final long pos;
 
 		StreamLoader(ObjectId id, int type, long sz,
-				DfsPackKey key, long pos) {
+				DfsStreamKey key, long pos) {
 			this.id = id;
 			this.type = type;
 			this.size = sz;
