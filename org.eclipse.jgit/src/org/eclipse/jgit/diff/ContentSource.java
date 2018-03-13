@@ -44,8 +44,6 @@
 package org.eclipse.jgit.diff;
 
 import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,7 +59,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Supplies the content of a file for {@link DiffFormatter}.
@@ -94,11 +91,6 @@ public abstract class ContentSource {
 	 * @return a content source wrapping the iterator.
 	 */
 	public static ContentSource create(WorkingTreeIterator iterator) {
-		if (iterator instanceof FileTreeIterator) {
-			FileTreeIterator i = (FileTreeIterator) iterator;
-			return new FileSource(i.getDirectory(), iterator.getRepository()
-					.getFS());
-		}
 		return new WorkingTreeSource(iterator);
 	}
 
@@ -160,6 +152,7 @@ public abstract class ContentSource {
 
 		WorkingTreeSource(WorkingTreeIterator iterator) {
 			this.tw = new TreeWalk((ObjectReader) null);
+			this.tw.setRecursive(true);
 			this.iterator = iterator;
 		}
 
@@ -217,68 +210,6 @@ public abstract class ContentSource {
 				if (ptr == null)
 					throw new FileNotFoundException(path);
 			}
-		}
-	}
-
-	private static class FileSource extends ContentSource {
-		private final File root;
-
-		private FS fs;
-
-		FileSource(File root, FS fs) {
-			this.root = root;
-			this.fs = fs;
-		}
-
-		@Override
-		public long size(String path, ObjectId id) throws IOException {
-			return new File(root, path).length();
-		}
-
-		@Override
-		public ObjectLoader open(String path, ObjectId id) throws IOException {
-			final File p = new File(root, path);
-			if (!fs.isFile(p) && !fs.isSymLink(p))
-				throw new FileNotFoundException(path);
-			return new ObjectLoader() {
-				@Override
-				public long getSize() {
-					try {
-						return fs.length(p);
-					} catch (IOException e) {
-						return 0;
-					}
-				}
-
-				@Override
-				public int getType() {
-					return Constants.OBJ_BLOB;
-				}
-
-				@Override
-				public ObjectStream openStream() throws MissingObjectException,
-						IOException {
-					if (fs.isSymLink(p))
-						return new ObjectStream.SmallStream(Constants.OBJ_BLOB,
-								fs.readSymLink(p).getBytes(
-										Constants.CHARACTER_ENCODING));
-					final FileInputStream in = new FileInputStream(p);
-					final long sz = in.getChannel().size();
-					final int type = getType();
-					final BufferedInputStream b = new BufferedInputStream(in);
-					return new ObjectStream.Filter(type, sz, b);
-				}
-
-				@Override
-				public boolean isLarge() {
-					return true;
-				}
-
-				@Override
-				public byte[] getCachedBytes() throws LargeObjectException {
-					throw new LargeObjectException();
-				}
-			};
 		}
 	}
 

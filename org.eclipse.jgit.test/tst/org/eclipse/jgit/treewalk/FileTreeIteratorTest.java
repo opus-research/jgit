@@ -465,7 +465,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		assertFalse(tw.next());
 	}
 
-	private void assertEntry(String sha1string, String path, TreeWalk tw)
+	private static void assertEntry(String sha1string, String path, TreeWalk tw)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			CorruptObjectException, IOException {
 		assertTrue(tw.next());
