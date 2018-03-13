@@ -44,8 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -58,8 +56,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
  * A class used to execute a {@code Log} command. It has setters for all
@@ -79,8 +75,6 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	private RevWalk walk;
 
 	private boolean startSpecified = false;
-
-	private final List<PathFilter> pathFilters = new ArrayList<PathFilter>();
 
 	/**
 	 * @param repo
@@ -102,8 +96,6 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	public Iterable<RevCommit> call() throws NoHeadException,
 			JGitInternalException {
 		checkCallable();
-		if (pathFilters.size() > 0)
-			walk.setTreeFilter(PathFilterGroup.create(pathFilters));
 		if (!startSpecified) {
 			try {
 				ObjectId headId = repo.resolve(Constants.HEAD);
@@ -208,21 +200,6 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			JGitInternalException {
 		return not(since).add(until);
-	}
-
-	/**
-	 * Show only commits that affect any of the specified paths. The path must
-	 * either name a file or a directory exactly. Note that regex expressions or
-	 * wildcards are not supported.
-	 *
-	 * @param path
-	 *            a path is relative to the top level of the repository
-	 * @return {@code this}
-	 */
-	public LogCommand addPath(String path) {
-		checkCallable();
-		pathFilters.add(PathFilter.create(path));
-		return this;
 	}
 
 	private LogCommand add(boolean include, AnyObjectId start)
