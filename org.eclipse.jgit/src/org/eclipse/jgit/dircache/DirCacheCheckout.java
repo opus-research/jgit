@@ -280,9 +280,8 @@ public class DirCacheCheckout {
 
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
-		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
+		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
-		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -321,9 +320,8 @@ public class DirCacheCheckout {
 
 		walk = new NameConflictTreeWalk(repo);
 		addTree(walk, mergeCommitTree);
-		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
+		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
-		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -354,16 +352,8 @@ public class DirCacheCheckout {
 				// The index entry is missing
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
-					if (failOnConflict) {
-						// don't overwrite an untracked and not ignored file
-						conflicts.add(walk.getPathString());
-					} else {
-						// failOnConflict is false. Putting something to conflicts
-						// would mean we delete it. Instead we want the mergeCommit
-						// content to be checked out.
-						update(m.getEntryPathString(), m.getEntryObjectId(),
-								m.getEntryFileMode());
-					}
+					// don't overwrite an untracked and not ignored file
+					conflicts.add(walk.getPathString());
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
@@ -398,9 +388,6 @@ public class DirCacheCheckout {
 			if (f != null) {
 				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
-					// We put it in conflicts. Even if failOnConflict is false
-					// this would cause the path to be deleted. Thats exactly what
-					// we want in this situation
 					conflicts.add(walk.getPathString());
 				} else {
 					// No file/folder conflict exists. All entries are files or
@@ -718,23 +705,10 @@ public class DirCacheCheckout {
 			return;
 		}
 
-		if ((ffMask & 0x222) == 0) {
-			// HEAD, MERGE and index don't contain a file (e.g. all contain a
-			// folder)
-			if (f == null || FileMode.TREE.equals(f.getEntryFileMode())) {
-				// the workingtree entry doesn't exist or also contains a folder
-				// -> no problem
-				return;
-			} else {
-				// the workingtree entry exists and is not a folder
-				if (!idEqual(h, m)) {
-					// Because HEAD and MERGE differ we will try to update the
-					// workingtree with a folder -> return a conflict
-					conflict(name, null, null, null);
-				}
-				return;
-			}
-		}
+		// if we have no file at all then there is nothing to do
+		if ((ffMask & 0x222) == 0
+				&& (f == null || FileMode.TREE.equals(f.getEntryFileMode())))
+			return;
 
 		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
 			// File/Directory conflict case #20
@@ -1017,17 +991,6 @@ public class DirCacheCheckout {
 		}
 	}
 
-	private static boolean idEqual(AbstractTreeIterator a,
-			AbstractTreeIterator b) {
-		if (a == b) {
-			return true;
-		}
-		if (a == null || b == null) {
-			return false;
-		}
-		return a.getEntryObjectId().equals(b.getEntryObjectId());
-	}
-
 	/**
 	 * A conflict is detected - add the three different stages to the index
 	 * @param path the path of the conflicting entry
@@ -1130,10 +1093,8 @@ public class DirCacheCheckout {
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
 		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
-			int dciPos = tw.addTree(new DirCacheIterator(dc));
-			FileTreeIterator fti = new FileTreeIterator(repo);
-			tw.addTree(fti);
-			fti.setDirCacheIterator(tw, dciPos);
+			tw.addTree(new DirCacheIterator(dc));
+			tw.addTree(new FileTreeIterator(repo));
 			tw.setRecursive(true);
 			tw.setFilter(PathFilter.create(path));
 			DirCacheIterator dcIt;
@@ -1379,7 +1340,7 @@ public class DirCacheCheckout {
 				FileUtils.delete(tmpFile);
 			}
 		}
-		entry.setLastModified(fs.lastModified(f));
+		entry.setLastModified(f.lastModified());
 	}
 
 	@SuppressWarnings("deprecation")
