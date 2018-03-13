@@ -233,7 +233,7 @@ public class PackWriter {
 	 * reducing pack size) or should store it as an object id (legacy style,
 	 * compatible with old readers).
 	 *
-	 * Default setting: {@value PackConfig#DEFAULT_DELTA_BASE_AS_OFFSET}
+	 * Default setting: {@link PackConfig#DEFAULT_DELTA_BASE_AS_OFFSET}
 	 *
 	 * @return true if delta base is stored as an offset; false if it is stored
 	 *         as an object id.
@@ -247,7 +247,7 @@ public class PackWriter {
 	 * pack file (new approach reducing file size) or as an object id (legacy
 	 * approach, compatible with old readers).
 	 *
-	 * Default setting: {@value PackConfig#DEFAULT_DELTA_BASE_AS_OFFSET}
+	 * Default setting: {@link PackConfig#DEFAULT_DELTA_BASE_AS_OFFSET}
 	 *
 	 * @param deltaBaseAsOffset
 	 *            boolean indicating whether delta base can be stored as an
