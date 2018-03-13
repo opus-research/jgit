@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,54 +41,49 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.pgm;
 
-import java.io.File;
-import java.io.IOException;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ResetCommand;
+import org.eclipse.jgit.api.ResetCommand.ResetType;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.lib.BaseRepositoryBuilder;
+@Command(common = true, usage = "usage_reset")
+class Reset extends TextBuiltin {
 
-/**
- * Constructs a {@link FileRepository}.
- * <p>
- * Applications must set one of {@link #setGitDir(File)} or
- * {@link #setWorkTree(File)}, or use {@link #readEnvironment()} or
- * {@link #findGitDir()} in order to configure the minimum property set
- * necessary to open a repository.
- * <p>
- * Single repository applications trying to be compatible with other Git
- * implementations are encouraged to use a model such as:
- *
- * <pre>
- * new FileRepositoryBuilder() //
- * 		.setGitDir(gitDirArgument) // --git-dir if supplied, no-op if null
- * 		.readEnviroment() // scan environment GIT_* variables
- * 		.findGitDir() // scan up the file system tree
- * 		.build()
- * </pre>
- */
-public class FileRepositoryBuilder extends
-		BaseRepositoryBuilder<FileRepositoryBuilder, FileRepository> {
-	/**
-	 * Create a repository matching the configuration in this builder.
-	 * <p>
-	 * If an option was not set, the build method will try to default the option
-	 * based on other options. If insufficient information is available, an
-	 * exception is thrown to the caller.
-	 *
-	 * @return a repository matching this configuration.
-	 * @throws IllegalArgumentException
-	 *             insufficient parameters were set.
-	 * @throws IOException
-	 *             the repository could not be accessed to configure the rest of
-	 *             the builder's parameters.
-	 */
+	@Option(name = "--soft", usage = "usage_resetSoft")
+	private boolean soft = false;
+
+	@Option(name = "--mixed", usage = "usage_resetMixed")
+	private boolean mixed = false;
+
+	@Option(name = "--hard", usage = "usage_resetHard")
+	private boolean hard = false;
+
+	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_reset")
+	private String commit;
+
 	@Override
-	public FileRepository build() throws IOException {
-		FileRepository repo = new FileRepository(setup());
-		if (isMustExist() && !repo.getObjectDatabase().exists())
-			throw new RepositoryNotFoundException(getGitDir());
-		return repo;
+	protected void run() throws Exception {
+		ResetCommand command = new Git(db).reset();
+		command.setRef(commit);
+		ResetType mode = null;
+		if (soft)
+			mode = selectMode(mode, ResetType.SOFT);
+		if (mixed)
+			mode = selectMode(mode, ResetType.MIXED);
+		if (hard)
+			mode = selectMode(mode, ResetType.HARD);
+		if (mode == null)
+			throw die("no reset mode set");
+		command.setMode(mode);
+		command.call();
+	}
+
+	private static ResetType selectMode(ResetType mode, ResetType want) {
+		if (mode != null)
+			throw die("reset modes are mutually exclusive, select one");
+		return want;
 	}
 }
