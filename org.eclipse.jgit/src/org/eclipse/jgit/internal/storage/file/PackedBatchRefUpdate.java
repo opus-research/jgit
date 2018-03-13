@@ -202,7 +202,8 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				return;
 			}
 			// commitPackedRefs removes lock file (by renaming over real file).
-			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList);
+			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList,
+					true);
 		} finally {
 			try {
 				unlockAll(locks);
@@ -422,7 +423,6 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		if (ident == null) {
 			ident = new PersonIdent(refdb.getRepository());
 		}
-		ReflogWriter w = refdb.getLogWriter();
 		for (ReceiveCommand cmd : commands) {
 			// Assume any pending commands have already been executed atomically.
 			if (cmd.getResult() != ReceiveCommand.Result.OK) {
@@ -432,7 +432,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 
 			if (cmd.getType() == ReceiveCommand.Type.DELETE) {
 				try {
-					RefDirectory.delete(w.logFor(name), RefDirectory.levelsIn(name));
+					RefDirectory.delete(refdb.logFor(name), RefDirectory.levelsIn(name));
 				} catch (IOException e) {
 					// Ignore failures, see below.
 				}
@@ -452,7 +452,8 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				}
 			}
 			try {
-				w.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
+				new ReflogWriter(refdb, isForceRefLog(cmd))
+						.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
 			} catch (IOException e) {
 				// Ignore failures, but continue attempting to write more reflogs.
 				//

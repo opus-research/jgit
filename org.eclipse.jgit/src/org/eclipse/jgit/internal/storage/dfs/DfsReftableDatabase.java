@@ -53,7 +53,6 @@ import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.reftable.MergedReftable;
 import org.eclipse.jgit.internal.storage.reftable.RefCursor;
 import org.eclipse.jgit.internal.storage.reftable.Reftable;
-import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -75,8 +74,11 @@ import org.eclipse.jgit.util.RefMap;
  */
 public class DfsReftableDatabase extends DfsRefDatabase {
 	private final ReentrantLock lock = new ReentrantLock(true);
+
 	private DfsReader ctx;
+
 	private ReftableStack tableStack;
+
 	private MergedReftable mergedTables;
 
 	/**
@@ -98,13 +100,6 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	public BatchRefUpdate newBatchUpdate() {
 		DfsObjDatabase odb = getRepository().getObjectDatabase();
 		return new ReftableBatchRefUpdate(this, odb);
-	}
-
-	/** @return configuration to write new reftables with. */
-	public ReftableConfig getReftableConfig() {
-		ReftableConfig cfg = new ReftableConfig();
-		cfg.fromConfig(getRepository().getConfig());
-		return cfg;
 	}
 
 	/** @return the lock protecting this instance's state. */
@@ -220,8 +215,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		lock.lock();
 		try {
 			Reftable table = read();
-			try (RefCursor rc = ALL.equals(prefix)
-					? table.allRefs()
+			try (RefCursor rc = ALL.equals(prefix) ? table.allRefs()
 					: table.seekRef(prefix)) {
 				while (rc.next()) {
 					Ref ref = table.resolve(rc.getRef());
@@ -281,10 +275,8 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 			throws IOException {
 		ReceiveCommand cmd = toCommand(oldRef, newRef);
 		try (RevWalk rw = new RevWalk(getRepository())) {
-			newBatchUpdate()
-				.setAllowNonFastForwards(true)
-				.addCommand(cmd)
-				.execute(rw, NullProgressMonitor.INSTANCE);
+			newBatchUpdate().setAllowNonFastForwards(true).addCommand(cmd)
+					.execute(rw, NullProgressMonitor.INSTANCE);
 		}
 		switch (cmd.getResult()) {
 		case OK:
@@ -305,17 +297,14 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		if (oldRef != null && oldRef.isSymbolic()) {
 			if (newRef != null) {
 				if (newRef.isSymbolic()) {
-					return ReceiveCommand.link(
-							oldRef.getTarget().getName(),
+					return ReceiveCommand.link(oldRef.getTarget().getName(),
 							newRef.getTarget().getName(), name);
 				} else {
-					return ReceiveCommand.unlink(
-							oldRef.getTarget().getName(),
+					return ReceiveCommand.unlink(oldRef.getTarget().getName(),
 							newId, name);
 				}
 			} else {
-				return ReceiveCommand.unlink(
-						oldRef.getTarget().getName(),
+				return ReceiveCommand.unlink(oldRef.getTarget().getName(),
 						ObjectId.zeroId(), name);
 			}
 		}
@@ -323,17 +312,14 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 		if (newRef != null && newRef.isSymbolic()) {
 			if (oldRef != null) {
 				if (oldRef.isSymbolic()) {
-					return ReceiveCommand.link(
-							oldRef.getTarget().getName(),
+					return ReceiveCommand.link(oldRef.getTarget().getName(),
 							newRef.getTarget().getName(), name);
 				} else {
-					return ReceiveCommand.link(
-							oldId,
+					return ReceiveCommand.link(oldId,
 							newRef.getTarget().getName(), name);
 				}
 			} else {
-				return ReceiveCommand.link(
-						ObjectId.zeroId(),
+				return ReceiveCommand.link(ObjectId.zeroId(),
 						newRef.getTarget().getName(), name);
 			}
 		}
@@ -352,12 +338,7 @@ public class DfsReftableDatabase extends DfsRefDatabase {
 	}
 
 	private static String toName(Ref oldRef, Ref newRef) {
-		if (oldRef != null) {
-			return oldRef.getName();
-		} else if (newRef != null) {
-			return newRef.getName();
-		}
-		return null;
+		return oldRef != null ? oldRef.getName() : newRef.getName();
 	}
 
 	@Override
