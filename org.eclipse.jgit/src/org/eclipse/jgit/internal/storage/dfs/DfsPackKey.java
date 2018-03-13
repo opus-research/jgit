@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +41,20 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.junit.Assert.assertEquals;
+import java.util.concurrent.atomic.AtomicLong;
 
-import org.eclipse.jgit.lib.ProgressMonitor;
+final class DfsPackKey {
+	final int hash;
 
-public final class StrictWorkMonitor implements ProgressMonitor {
-	private int lastWork, totalWork;
+	final AtomicLong cachedSize;
 
-	@Override
-	public void start(int totalTasks) {
-		// empty
-	}
-
-	@Override
-	public void beginTask(String title, int total) {
-		this.totalWork = total;
-		lastWork = 0;
-	}
-
-	@Override
-	public void update(int completed) {
-		lastWork += completed;
-	}
-
-	@Override
-	public void endTask() {
-		assertEquals("Units of work recorded", totalWork, lastWork);
-	}
-
-	@Override
-	public boolean isCancelled() {
-		return false;
+	DfsPackKey() {
+		// Multiply by 31 here so we can more directly combine with another
+		// value without doing the multiply there.
+		//
+		hash = System.identityHashCode(this) * 31;
+		cachedSize = new AtomicLong();
 	}
 }
