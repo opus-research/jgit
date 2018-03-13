@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,84 +40,27 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+package org.eclipse.jgit.lfs.errors;
 
-import org.eclipse.jgit.lfs.lib.LongObjectId;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.lfs.internal.LfsText;
 
 /**
- * Helper class for dealing with LFS issues
+ * Thrown when the user has read, but not write access. Only applicable when the
+ * operation in the request is "upload".
  *
  * @since 4.5
  */
-public class LfsUtil {
-	private Path root;
-
-	private Path objDir;
-
-	private Path tmpDir;
+public class LfsRepositoryReadOnly extends LfsException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param root
-	 *            the path to the LFS media directory. Will be "<repo>/.git/lfs"
+	 * @param name
+	 *            the repository name.
 	 */
-	public LfsUtil(Path root) {
-		this.root = root;
+	public LfsRepositoryReadOnly(String name) {
+		super(MessageFormat.format(LfsText.get().repositoryReadOnly, name));
 	}
-
-	/**
-	 * @return the path to the LFS directory
-	 */
-	public Path getLfsRoot() {
-		return root;
-	}
-
-	/**
-	 * @return the path to the temp directory used by LFS. Will be
-	 *         "<repo>/.git/lfs/tmp"
-	 */
-	public Path getLfsTmpDir() {
-		if (tmpDir == null) {
-			tmpDir = root.resolve("tmp");
-		}
-		return tmpDir;
-	}
-
-	/**
-	 * @return the path to the object directory used by LFS. Will be
-	 *         "<repo>/.git/lfs/objects"
-	 */
-	public Path getLfsObjDir() {
-		if (objDir == null) {
-			objDir = root.resolve("objects");
-		}
-		return objDir;
-	}
-
-	/**
-	 * @param id
-	 *            the id of the mediafile
-	 * @return the file which stores the original content. This will be files
-	 *         underneath
-	 *         "<repo>/.git/lfs/objects/<firstTwoLettersOfID>/<remainingLettersOfID>"
-	 */
-	public Path getMediaFile(LongObjectId id) {
-		String idStr = LongObjectId.toString(id);
-		return getLfsObjDir().resolve(idStr.substring(0, 2))
-				.resolve(idStr.substring(2));
-	}
-
-	/**
-	 * Create a new temp file in the LFS directory
-	 *
-	 * @return a new temporary file in the lfs directory
-	 * @throws IOException
-	 */
-	public Path createTmpFile() throws IOException {
-		return Files.createTempFile(getLfsTmpDir(), null, null);
-	}
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.lfs.errors;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.lfs.internal.LfsText;
-
 /**
- * Thrown when a lfs mediafile is found which doesn't have the expected size
+ * Thrown when the bandwidth limit for the user or repository has been exceeded.
  *
  * @since 4.5
+ *
  */
-public class CorruptMediaFile extends IOException {
+public class LfsBandwidthLimitExceeded extends LfsException {
 	private static final long serialVersionUID = 1L;
 
-	private Path mediaFile;
-
-	private long expectedSize;
-
-	private long observedSize;
-
 	/**
-	 * @param mediaFile
-	 * @param expectedSize
-	 * @param observedSize
+	 * @param message
+	 *            error message, which may be shown to an end-user.
 	 */
-	@SuppressWarnings("boxing")
-	public CorruptMediaFile(Path mediaFile, long expectedSize,
-			long observedSize) {
-		super(MessageFormat.format(LfsText.get().inconsistentMediafileLength,
-				mediaFile, expectedSize, observedSize));
-		this.mediaFile = mediaFile;
-		this.expectedSize = expectedSize;
-		this.observedSize = observedSize;
-	}
-
-	/**
-	 * @return the media file which seems to be corrupt
-	 */
-	public Path getMediaFile() {
-		return mediaFile;
-	}
-
-	/**
-	 * @return the expected size of the media file
-	 */
-	public long getExpectedSize() {
-		return expectedSize;
-	}
-
-	/**
-	 * @return the actual size of the media file in the file system
-	 */
-	public long getObservedSize() {
-		return observedSize;
+	public LfsBandwidthLimitExceeded(String message) {
+		super(message);
 	}
 }
