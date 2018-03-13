@@ -138,13 +138,11 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		 *            archive object from createArchiveOutputStream
 		 * @param path
 		 *            full filename relative to the root of the archive
-		 *            (with trailing '/' for directories)
 		 * @param mode
 		 *            mode (for example FileMode.REGULAR_FILE or
 		 *            FileMode.SYMLINK)
 		 * @param loader
-		 *            blob object with data for this entry (null for
-		 *            directories)
+		 *            blob object with data for this entry
 		 * @throws IOException
 		 *            thrown by the underlying output stream for I/O errors
 		 */
@@ -267,7 +265,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	}
 
 	private <T extends Closeable> OutputStream writeArchive(Format<T> fmt) {
-		final String pfx = prefix == null ? "" : prefix; //$NON-NLS-1$
+		final String pfx = prefix == null ? "" : prefix;
 		final TreeWalk walk = new TreeWalk(repo);
 		try {
 			final T outa = fmt.createArchiveOutputStream(out);
@@ -277,22 +275,16 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 				final RevWalk rw = new RevWalk(walk.getObjectReader());
 
 				walk.reset(rw.parseTree(tree));
+				walk.setRecursive(true);
 				while (walk.next()) {
 					final String name = pfx + walk.getPathString();
-					FileMode mode = walk.getFileMode(0);
+					final FileMode mode = walk.getFileMode(0);
 
-					if (walk.isSubtree())
-						walk.enterSubtree();
-
-					if (mode == FileMode.GITLINK)
-						// TODO(jrn): Take a callback to recurse
-						// into submodules.
-						mode = FileMode.TREE;
-
-					if (mode == FileMode.TREE) {
-						fmt.putEntry(outa, name + "/", mode, null);
+					if (mode == FileMode.TREE)
+						// ZIP entries for directories are optional.
+						// Leave them out, mimicking "git archive".
 						continue;
-					}
+
 					walk.getObjectId(idBuf, 0);
 					fmt.putEntry(outa, name, mode, reader.open(idBuf));
 				}
