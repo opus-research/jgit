@@ -61,8 +61,8 @@ import org.eclipse.jgit.lib.ReflogEntry;
  * <p>
  * By default all log entries are copied, even if no references in the output
  * file match the log records. Callers may truncate the log to a more recent
- * time horizon with {@link #setOldestReflogTime(long)}, or disable the log
- * altogether with {@code setOldestReflogTime(Long.MAX_VALUE)}.
+ * time horizon with {@link #setOldestReflogTimeUsec(long)}, or disable the log
+ * altogether with {@code setOldestReflogTimeUsec(Long.MAX_VALUE)}.
  */
 public class ReftableCompactor {
 	private final ReftableWriter writer = new ReftableWriter();
@@ -71,7 +71,7 @@ public class ReftableCompactor {
 	private long compactBytesLimit;
 	private long bytesToCompact;
 	private boolean includeDeletes;
-	private long oldestReflogTime;
+	private long oldestReflogTimeUsec;
 
 	/**
 	 * @param bytes
@@ -127,15 +127,15 @@ public class ReftableCompactor {
 	}
 
 	/**
-	 * @param timeMillis
+	 * @param timeUsec
 	 *            oldest log time to preserve. Entries whose timestamps are
-	 *            {@code >= timeMillis} will be copied into the output file. Log
-	 *            entries that predate {@code timeMillis} will be discarded.
-	 *            Specified in the usual Java way, milliseconds since the epoch.
+	 *            {@code >= timeUsec} will be copied into the output file. Log
+	 *            entries that predate {@code timeUsec} will be discarded.
+	 *            Specified in microseconds since the epoch.
 	 * @return {@code this}
 	 */
-	public ReftableCompactor setOldestReflogTime(long timeMillis) {
-		oldestReflogTime = timeMillis;
+	public ReftableCompactor setOldestReflogTimeUsec(long timeUsec) {
+		oldestReflogTimeUsec = timeUsec;
 		return this;
 	}
 
@@ -209,11 +209,13 @@ public class ReftableCompactor {
 	private void mergeLogs(MergedReftable mr) throws IOException {
 		mr.seekToFirstLog();
 		while (mr.next()) {
+			long timeUsec = mr.getReflogTimeUsec();
 			ReflogEntry log = mr.getReflogEntry();
 			PersonIdent who = log.getWho();
-			if (who.getWhen().getTime() >= oldestReflogTime) {
+			if (timeUsec >= oldestReflogTimeUsec) {
 				writer.writeLog(
 						mr.getRefName(),
+						timeUsec,
 						who,
 						log.getOldId(),
 						log.getNewId(),

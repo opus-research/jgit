@@ -52,9 +52,12 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSI
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.zip.CRC32;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.internal.storage.reftable.BlockWriter.Entry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.RefEntry;
 import org.eclipse.jgit.lib.ObjectId;
@@ -70,7 +73,6 @@ import org.eclipse.jgit.util.NB;
  */
 public class ReftableWriter {
 	private int refBlockSize = 4 << 10;
-
 	private int logBlockSize;
 	private int restartInterval;
 
@@ -80,6 +82,9 @@ public class ReftableWriter {
 	private BlockWriter logIndex;
 	private BlockWriter cur;
 
+	private String logLastRef = ""; //$NON-NLS-1$
+	private long logLastTimeUsec;
+
 	private long logOffset;
 	private long refIndexOffset;
 	private long logIndexOffset;
@@ -88,7 +93,6 @@ public class ReftableWriter {
 	private long logBytes;
 	private int refBlocks;
 	private int refIndexSize;
-	private ObjectId hash;
 	private Stats stats;
 
 	/**
@@ -159,7 +163,30 @@ public class ReftableWriter {
 		int ri = restartInterval;
 		refIndex = new BlockWriter(INDEX_BLOCK_TYPE, refBlockSize, ri);
 		out = new ReftableOutputStream(os, refBlockSize);
+		logLastRef = ""; //$NON-NLS-1$
+		logLastTimeUsec = 0;
 		writeFileHeader();
+		return this;
+	}
+
+	/**
+	 * Sort a collection of references and write them to the reftable.
+	 *
+	 * @param refs
+	 *            references to sort and write.
+	 * @return {@code this}
+	 * @throws IOException
+	 *             reftable cannot be written.
+	 */
+	public ReftableWriter sortAndWriteRefs(Collection<Ref> refs)
+			throws IOException {
+		Iterator<RefEntry> itr = refs.stream()
+				.map(RefEntry::new)
+				.sorted(Entry::compare)
+				.iterator();
+		while (itr.hasNext()) {
+			writeEntry(refIndex, itr.next());
+		}
 		return this;
 	}
 
@@ -182,7 +209,9 @@ public class ReftableWriter {
 	 * Write one reflog entry to the reftable.
 	 * <p>
 	 * Reflog entries must be written in reference name and descending time
-	 * (most recent first) order.
+	 * (most recent first) order. If duplicate times are detected by this
+	 * method, the time of older records will be adjusted backwards by a few
+	 * microseconds to maintain uniqueness.
 	 *
 	 * @param name
 	 *            name of the reference.
@@ -200,9 +229,45 @@ public class ReftableWriter {
 	 */
 	public ReftableWriter writeLog(String name, PersonIdent who, ObjectId oldId,
 			ObjectId newId, @Nullable String message) throws IOException {
+		long timeUsec = who.getWhen().getTime() * 1000L + 999L;
+		if (logLastRef.equals(name) && timeUsec >= logLastTimeUsec) {
+			timeUsec = logLastTimeUsec - 1;
+		}
+		return writeLog(name, timeUsec, who, oldId, newId, message);
+	}
+
+	/**
+	 * Write one reflog entry to the reftable.
+	 * <p>
+	 * Reflog entries must be written in reference name and descending time
+	 * (most recent first) order.
+	 *
+	 * @param name
+	 *            name of the reference.
+	 * @param timeUsec
+	 *            time in microseconds since the epoch of the log event. This
+	 *            timestamp must be unique within the scope of {@code name}.
+	 * @param who
+	 *            committer of the reflog entry.
+	 * @param oldId
+	 *            prior id; pass {@link ObjectId#zeroId()} for creations.
+	 * @param newId
+	 *            new id; pass {@link ObjectId#zeroId()} for deletions.
+	 * @param message
+	 *            optional message (may be null).
+	 * @return {@code this}
+	 * @throws IOException
+	 *             reftable cannot be written.
+	 */
+	public ReftableWriter writeLog(String name, long timeUsec, PersonIdent who,
+			ObjectId oldId, ObjectId newId, @Nullable String message)
+					throws IOException {
 		String msg = message != null ? message : ""; //$NON-NLS-1$
 		beginLog();
-		return writeEntry(logIndex, new LogEntry(name, who, oldId, newId, msg));
+		logLastRef = name;
+		logLastTimeUsec = timeUsec;
+		return writeEntry(logIndex,
+				new LogEntry(name, timeUsec, who, oldId, newId, msg));
 	}
 
 	private void beginLog() throws IOException {
@@ -323,7 +388,7 @@ public class ReftableWriter {
 		NB.encodeInt32(ftr, ftrLen - 4, (int) crc.getValue());
 
 		out.write(ftr);
-		hash = out.finishFile();
+		out.finishFile();
 	}
 
 	/** @return statistics of the last written reftable. */
@@ -333,7 +398,6 @@ public class ReftableWriter {
 
 	/** Statistics about a written reftable. */
 	public static class Stats {
-		private final ObjectId hash;
 		private final int refBlockSize;
 		private final int logBlockSize;
 		private final int restartInterval;
@@ -348,7 +412,6 @@ public class ReftableWriter {
 		private final int refIndexSize;
 
 		Stats(ReftableWriter w, ReftableOutputStream o, BlockWriter refIdx) {
-			hash = w.hash;
 			refBlockSize = w.refBlockSize;
 			logBlockSize = w.logBlockSize;
 			restartInterval = w.restartInterval;
@@ -419,11 +482,6 @@ public class ReftableWriter {
 				return 1;
 			}
 			return log(refBlockCount()) / log(2);
-		}
-
-		/** @return content hash of the reftable. */
-		public ObjectId hash() {
-			return hash;
 		}
 	}
 }

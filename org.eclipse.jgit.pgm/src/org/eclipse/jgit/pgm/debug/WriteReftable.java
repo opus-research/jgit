@@ -121,7 +121,6 @@ class WriteReftable extends TextBuiltin {
 
 		int fileMiB = (int) Math.round(((double) stats.totalBytes()) / MIB);
 		printf("Summary:");
-		printf("  hash    : %s", stats.hash().name());
 		printf("  file sz : %d MiB (%d bytes)", fileMiB, stats.totalBytes());
 		printf("  padding : %d KiB", stats.paddingBytes() / KIB);
 		errw.println();
