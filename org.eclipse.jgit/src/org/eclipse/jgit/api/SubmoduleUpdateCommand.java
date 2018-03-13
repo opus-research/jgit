@@ -60,6 +60,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
@@ -69,10 +70,11 @@ import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-submodule.html"
  *      >Git documentation about submodules</a>
  */
-public class SubmoduleUpdateCommand extends
-		TransportCommand<SubmoduleUpdateCommand, Collection<String>> {
+public class SubmoduleUpdateCommand extends GitCommand<Collection<String>> {
 
 	private ProgressMonitor monitor;
+
+	private CredentialsProvider credentialsProvider;
 
 	private final Collection<String> paths;
 
@@ -95,6 +97,17 @@ public class SubmoduleUpdateCommand extends
 	public SubmoduleUpdateCommand setProgressMonitor(
 			final ProgressMonitor monitor) {
 		this.monitor = monitor;
+		return this;
+	}
+
+	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return this command
+	 */
+	public SubmoduleUpdateCommand setCredentialsProvider(
+			final CredentialsProvider credentialsProvider) {
+		this.credentialsProvider = credentialsProvider;
 		return this;
 	}
 
