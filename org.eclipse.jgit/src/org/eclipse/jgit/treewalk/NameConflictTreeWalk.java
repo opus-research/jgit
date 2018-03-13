@@ -86,7 +86,7 @@ public class NameConflictTreeWalk extends TreeWalk {
 
 	private boolean fastMinHasMatch;
 
-	private AbstractTreeIterator dfConflict;
+	private String dfConflictPath;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -173,6 +173,10 @@ public class NameConflictTreeWalk extends TreeWalk {
 				}
 				t.matches = t;
 				minRef = t;
+				// remember where D/F conflicts started
+				if (dfConflictPath == null)
+					dfConflictPath = t.getEntryPathString()+"/";
+
 			} else
 				fastMinHasMatch = false;
 		}
@@ -274,8 +278,8 @@ public class NameConflictTreeWalk extends TreeWalk {
 					t.matches = treeMatch;
 
 			// remember where D/F conflicts started
-			if (dfConflict == null)
-				dfConflict = treeMatch;
+			if (dfConflictPath == null)
+				dfConflictPath = treeMatch.getEntryPathString()+"/";
 
 			return treeMatch;
 		}
@@ -285,26 +289,19 @@ public class NameConflictTreeWalk extends TreeWalk {
 
 	@Override
 	void popEntriesEqual() throws CorruptObjectException {
-		boolean popped = false;
-		boolean foundDfConflict = false;
 		final AbstractTreeIterator ch = currentHead;
 		for (int i = 0; i < trees.length; i++) {
 			final AbstractTreeIterator t = trees[i];
-			if (dfConflict == t)
-				foundDfConflict = true;
 			if (t.matches == ch) {
 				if (t.matchShift == 0)
 					t.next(1);
 				else {
-					popped = true;
 					t.back(t.matchShift);
 					t.matchShift = 0;
 				}
 				t.matches = null;
 			}
 		}
-		if (popped && foundDfConflict)
-			dfConflict = null;
 	}
 
 	@Override
@@ -338,6 +335,11 @@ public class NameConflictTreeWalk extends TreeWalk {
 	 *
 	 */
 	public boolean isDirectoryFileConflict() {
-		return dfConflict != null;
+		if (dfConflictPath != null) {
+			if ((currentHead.getEntryPathString()+"/").startsWith(dfConflictPath))
+				return true;
+			dfConflictPath = null;
+		}
+		return false;
 	}
 }

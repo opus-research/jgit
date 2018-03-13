@@ -220,6 +220,7 @@ public abstract class AbstractTreeIterator {
 		parent = p;
 		path = p.path;
 		pathOffset = p.pathLen + 1;
+
 		try {
 			path[pathOffset - 1] = '/';
 		} catch (ArrayIndexOutOfBoundsException e) {

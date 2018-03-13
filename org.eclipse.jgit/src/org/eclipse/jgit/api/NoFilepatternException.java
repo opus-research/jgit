@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Chrisian Halstrick <christian.halstrick@sap.com> and
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -35,43 +36,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.errors;
 
-import java.io.IOException;
-
-import org.eclipse.jgit.JGitText;
+package org.eclipse.jgit.api;
 
 /**
- * Cannot write a modified index. This is a serious error that users need to be
- * made aware of.
+ * Exception thrown when the options given to a command don't include a
+ * file pattern which is mandatory for processing.
  */
-public class IndexWriteException extends IOException {
+public class NoFilepatternException extends GitAPIException {
+
 	private static final long serialVersionUID = 1L;
 
-	/**
-	 * Constructs an IndexWriteException with the default message.
-	 */
-	public IndexWriteException() {
-		super(JGitText.get().indexWriteException);
+	NoFilepatternException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
-	/**
-	 * Constructs an IndexWriteException with the specified detail message.
-	 *
-	 * @param s message
-	 */
-	public IndexWriteException(final String s) {
-		super(s);
+	NoFilepatternException(String message) {
+		super(message);
 	}
 
-	/**
-	 * Constructs an IndexWriteException with the specified detail message.
-	 *
-	 * @param s message
-	 * @param cause root cause exception
-	 */
-	public IndexWriteException(final String s, final Throwable cause) {
-		super(s);
-		initCause(cause);
-	}
 }

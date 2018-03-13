@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <me@lathund.dewire.com>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,70 +41,28 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.diff;
 
-import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
 
-class FS_POSIX_Java6 extends FS {
-	private static final Method canExecute;
-
-	private static final Method setExecute;
-
-	static {
-		canExecute = needMethod(File.class, "canExecute");
-		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE);
-	}
-
-	static boolean detect() {
-		return canExecute != null && setExecute != null;
-	}
-
-	private static Method needMethod(final Class<?> on, final String name,
-			final Class<?>... args) {
-		try {
-			return on.getMethod(name, args);
-		} catch (SecurityException e) {
-			return null;
-		} catch (NoSuchMethodException e) {
-			return null;
+/** Keeps track of diff related configuration options. */
+public class DiffConfig {
+	/** Key for {@link Config#get(SectionParser)}. */
+	public static final Config.SectionParser<DiffConfig> KEY = new SectionParser<DiffConfig>() {
+		public DiffConfig parse(final Config cfg) {
+			return new DiffConfig(cfg);
 		}
+	};
+
+	private final int renameLimit;
+
+	private DiffConfig(final Config rc) {
+		renameLimit = rc.getInt("diff", "renamelimit", 200);
 	}
 
-	public boolean supportsExecute() {
-		return true;
-	}
-
-	public boolean canExecute(final File f) {
-		try {
-			final Object r = canExecute.invoke(f, (Object[]) null);
-			return ((Boolean) r).booleanValue();
-		} catch (IllegalArgumentException e) {
-			throw new Error(e);
-		} catch (IllegalAccessException e) {
-			throw new Error(e);
-		} catch (InvocationTargetException e) {
-			throw new Error(e);
-		}
-	}
-
-	public boolean setExecute(final File f, final boolean canExec) {
-		try {
-			final Object r;
-			r = setExecute.invoke(f, new Object[] { Boolean.valueOf(canExec) });
-			return ((Boolean) r).booleanValue();
-		} catch (IllegalArgumentException e) {
-			throw new Error(e);
-		} catch (IllegalAccessException e) {
-			throw new Error(e);
-		} catch (InvocationTargetException e) {
-			throw new Error(e);
-		}
-	}
-
-	@Override
-	public boolean retryFailedLockFileCommit() {
-		return false;
+	/** @return limit on number of paths to perform inexact rename detection. */
+	public int getRenameLimit() {
+		return renameLimit;
 	}
 }

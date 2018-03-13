@@ -120,11 +120,15 @@ public class NameConflictTreeWalkTest extends RepositoryTestCase {
 		tw.addTree(new DirCacheIterator(tree1));
 
 		assertModes("a", REGULAR_FILE, TREE, tw);
+		assertTrue(tw.isDirectoryFileConflict());
 		assertTrue(tw.isSubtree());
 		tw.enterSubtree();
 		assertModes("a/b", MISSING, REGULAR_FILE, tw);
+		assertTrue(tw.isDirectoryFileConflict());
 		assertModes("a.b", EXECUTABLE_FILE, MISSING, tw);
+		assertFalse(tw.isDirectoryFileConflict());
 		assertModes("a0b", SYMLINK, MISSING, tw);
+		assertFalse(tw.isDirectoryFileConflict());
 	}
 
 	public void testDF_GapByOne() throws Exception {
@@ -153,10 +157,14 @@ public class NameConflictTreeWalkTest extends RepositoryTestCase {
 
 		assertModes("a", REGULAR_FILE, TREE, tw);
 		assertTrue(tw.isSubtree());
+		assertTrue(tw.isDirectoryFileConflict());
 		tw.enterSubtree();
 		assertModes("a/b", MISSING, REGULAR_FILE, tw);
+		assertTrue(tw.isDirectoryFileConflict());
 		assertModes("a.b", EXECUTABLE_FILE, EXECUTABLE_FILE, tw);
+		assertFalse(tw.isDirectoryFileConflict());
 		assertModes("a0b", SYMLINK, MISSING, tw);
+		assertFalse(tw.isDirectoryFileConflict());
 	}
 
 	public void testDF_SkipsSeenSubtree() throws Exception {
@@ -185,10 +193,14 @@ public class NameConflictTreeWalkTest extends RepositoryTestCase {
 
 		assertModes("a", REGULAR_FILE, TREE, tw);
 		assertTrue(tw.isSubtree());
+		assertTrue(tw.isDirectoryFileConflict());
 		tw.enterSubtree();
 		assertModes("a/b", MISSING, REGULAR_FILE, tw);
+		assertTrue(tw.isDirectoryFileConflict());
 		assertModes("a.b", MISSING, EXECUTABLE_FILE, tw);
+		assertFalse(tw.isDirectoryFileConflict());
 		assertModes("a0b", SYMLINK, SYMLINK, tw);
+		assertFalse(tw.isDirectoryFileConflict());
 	}
 
 	public void testDF_DetectConflict() throws Exception {

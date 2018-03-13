@@ -66,6 +66,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String URINotSupported;
 	/***/ public String URLNotFound;
 	/***/ public String aNewObjectIdIsRequired;
+	/***/ public String abbreviationLengthMustBeNonNegative;
 	/***/ public String advertisementCameBefore;
 	/***/ public String advertisementOfCameBefore;
 	/***/ public String amazonS3ActionFailed;
@@ -73,6 +74,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String anExceptionOccurredWhileTryingToAddTheIdOfHEAD;
 	/***/ public String anSSHSessionHasBeenAlreadyCreated;
 	/***/ public String atLeastOnePathIsRequired;
+	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;
@@ -167,7 +169,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
 	/***/ public String couldNotRenameDeleteOldIndex;
-	/***/ public String couldNotRenameTemporaryFile;
 	/***/ public String couldNotRenameTemporaryIndexFileToIndex;
 	/***/ public String couldNotURLEncodeToUTF8;
 	/***/ public String couldNotWriteFile;
@@ -179,7 +180,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String dirCacheDoesNotHaveABackingFile;
 	/***/ public String dirCacheFileIsNotLocked;
 	/***/ public String dirCacheIsNotLocked;
-	/***/ public String dirtyFilesExist;
 	/***/ public String doesNotHandleMode;
 	/***/ public String downloadCancelled;
 	/***/ public String downloadCancelledDuringIndexing;
@@ -200,6 +200,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
@@ -239,7 +240,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexFileIsInUse;
 	/***/ public String indexFileIsTooLargeForJgit;
 	/***/ public String indexSignatureIsInvalid;
-	/***/ public String indexWriteException;
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
 	/***/ public String interruptedWriting;
@@ -359,8 +359,21 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
+	/***/ public String renamesAlreadyFound;
+	/***/ public String renamesFindingByContent;
+	/***/ public String renamesFindingExact;
 	/***/ public String repositoryAlreadyExists;
+	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
+	/***/ public String repositoryState_applyMailbox;
+	/***/ public String repositoryState_bisecting;
+	/***/ public String repositoryState_conflicts;
+	/***/ public String repositoryState_merged;
+	/***/ public String repositoryState_normal;
+	/***/ public String repositoryState_rebase;
+	/***/ public String repositoryState_rebaseInteractive;
+	/***/ public String repositoryState_rebaseOrApplyMailbox;
+	/***/ public String repositoryState_rebaseWithMerge;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
 	/***/ public String serviceNotPermitted;
@@ -368,6 +381,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
 	/***/ public String shortSkipOfBlock;
+	/***/ public String similarityScoreMustBeWithinBounds;
 	/***/ public String smartHTTPPushDisabled;
 	/***/ public String sourceDestinationMustMatch;
 	/***/ public String sourceIsNotAWildcard;
@@ -408,6 +422,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownObjectType;
 	/***/ public String unknownRepositoryFormat2;
 	/***/ public String unknownRepositoryFormat;
+	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
 	/***/ public String unpackError;
 	/***/ public String unreadablePackIndex;
