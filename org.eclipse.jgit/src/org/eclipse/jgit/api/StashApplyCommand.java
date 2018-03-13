@@ -189,8 +189,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 		return false;
 	}
 
-	private ObjectId getHeadTree() throws JGitInternalException,
-			GitAPIException {
+	private ObjectId getHeadTree() throws GitAPIException {
 		final ObjectId headTree;
 		try {
 			headTree = repo.resolve(Constants.HEAD + "^{tree}");
@@ -202,7 +201,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 		return headTree;
 	}
 
-	private ObjectId getStashId() throws JGitInternalException, GitAPIException {
+	private ObjectId getStashId() throws GitAPIException {
 		final String revision = stashRef != null ? stashRef : DEFAULT_REF;
 		final ObjectId stashId;
 		try {
