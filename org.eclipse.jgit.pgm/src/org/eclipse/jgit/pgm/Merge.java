@@ -87,7 +87,7 @@ class Merge extends TextBuiltin {
 
 		switch (result.getMergeStatus()) {
 		case ALREADY_UP_TO_DATE:
-			outw.println(CLIText.get().alreadyUpToDate);
+			out.println(CLIText.get().alreadyUpToDate);
 			break;
 		case FAST_FORWARD:
 			outw.println(result.getMergeStatus().toString());
