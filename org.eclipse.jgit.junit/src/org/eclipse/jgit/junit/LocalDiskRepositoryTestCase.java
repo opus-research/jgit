@@ -70,7 +70,6 @@ import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -391,7 +390,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 *             the file could not be written.
 	 */
 	protected void write(final File f, final String body) throws IOException {
-		FileUtils.mkdirs(f.getParentFile(), true);
+		f.getParentFile().mkdirs();
 		Writer w = new OutputStreamWriter(new FileOutputStream(f), "UTF-8");
 		try {
 			w.write(body);
