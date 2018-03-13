@@ -42,6 +42,10 @@
  */
 package org.eclipse.jgit.archive;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.eclipse.jgit.api.ArchiveCommand;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 
@@ -54,26 +58,51 @@ import org.osgi.framework.BundleContext;
  * when the package is loaded as an OSGi bundle (and the corresponding
  * deregistration happens when the bundle is unloaded, to avoid
  * leaks).
+ *
+ * The static start() and stop() methods allow registering the same
+ * list of formats manually in cases where OSGi bundle activation
+ * cannot be used.
  */
 public class FormatActivator implements BundleActivator {
-	/**
-	 * Registers all included archive formats by calling
-	 * {@link #start()}.  This method is called by the OSGi framework
-	 * when the bundle is started.
-	 *
-	 * @param context unused
-	 */
-	public void start(BundleContext context) {
-		ArchiveFormats.registerAll();
+	private static final List<String> myFormats = new ArrayList<String>();
+
+	private static final void register(String name, ArchiveCommand.Format<?> fmt) {
+		myFormats.add(name);
+		ArchiveCommand.registerFormat(name, fmt);
 	}
 
 	/**
-	 * Cleans up after {@link #start(BundleContext)} by calling
-	 * {@link #stop()}.
+	 * Register all included archive formats so they can be used
+	 * as arguments to the ArchiveCommand.setFormat() method.
 	 *
-	 * @param context unused
+	 * Should not be called twice without a call to stop() in between.
+	 * Not thread-safe.
 	 */
-	public void stop(BundleContext context) {
-		ArchiveFormats.unregisterAll();
+	public static void start() {
+		register("tar", new TarFormat());
+		register("tgz", new TgzFormat());
+		register("txz", new TxzFormat());
+		register("zip", new ZipFormat());
+	}
+
+	/**
+	 * Clean up by deregistering all formats that were registered
+	 * by start().
+	 *
+	 * Not thread-safe.
+	 */
+	public static void stop() {
+		for (String name : myFormats) {
+			ArchiveCommand.unregisterFormat(name);
+		}
+		myFormats.clear();
+	}
+
+	public void start(BundleContext context) throws Exception {
+		start();
+	}
+
+	public void stop(BundleContext context) throws Exception {
+		stop();
 	}
 }

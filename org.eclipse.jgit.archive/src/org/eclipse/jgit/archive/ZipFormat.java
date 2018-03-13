@@ -52,9 +52,6 @@ import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
-/**
- * PKWARE's ZIP format.
- */
 public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		return new ZipArchiveOutputStream(s);

@@ -48,11 +48,6 @@ public abstract class GitAPIException extends Exception {
 	/**
 	 * Constructs a new exception with the specified detail
 	 * message and cause.
-	 *
-	 * @param message
-	 *            detail message
-	 * @param cause
-	 *            cause
 	 */
 	protected GitAPIException(String message, Throwable cause) {
 		super(message, cause);
@@ -61,9 +56,6 @@ public abstract class GitAPIException extends Exception {
 	/**
 	 * Constructs a new exception with the specified detail
 	 * message and no cause.
-	 *
-	 * @param message
-	 *            detail message
 	 */
 	protected GitAPIException(String message) {
 		super(message);
