@@ -90,6 +90,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		{
 			final Iterator<CGitIndexRecord> rItr = ls.values().iterator();
 			final TreeWalk tw = new TreeWalk(db);
+			tw.reset();
 			tw.setRecursive(true);
 			tw.addTree(new DirCacheIterator(dc));
 			while (rItr.hasNext()) {
