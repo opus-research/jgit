@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, 2013 Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2016, Laurent Delaigue <laurent.delaigue@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -560,6 +561,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		lastStepWasForward = newHead != null;
 		if (!lastStepWasForward) {
 			ObjectId headId = getHead().getObjectId();
+			// getHead() checks for null
+			assert headId != null;
 			if (!AnyObjectId.equals(headId, newParents.get(0)))
 				checkoutCommit(headId.getName(), newParents.get(0));
 
@@ -609,6 +612,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					// their non-first parents rewritten
 					MergeCommand merge = git.merge()
 							.setFastForward(MergeCommand.FastForwardMode.NO_FF)
+							.setProgressMonitor(monitor)
 							.setCommit(false);
 					for (int i = 1; i < commitToPick.getParentCount(); i++)
 						merge.include(newParents.get(i));
@@ -668,12 +672,15 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private void writeRewrittenHashes() throws RevisionSyntaxException,
-			IOException {
+			IOException, RefNotFoundException {
 		File currentCommitFile = rebaseState.getFile(CURRENT_COMMIT);
 		if (!currentCommitFile.exists())
 			return;
 
-		String head = repo.resolve(Constants.HEAD).getName();
+		ObjectId headId = getHead().getObjectId();
+		// getHead() checks for null
+		assert headId != null;
+		String head = headId.getName();
 		String currentCommits = rebaseState.readFile(CURRENT_COMMIT);
 		for (String current : currentCommits.split("\n")) //$NON-NLS-1$
 			RebaseState
@@ -743,8 +750,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void resetSoftToParent() throws IOException,
 			GitAPIException, CheckoutConflictException {
-		Ref orig_head = repo.getRef(Constants.ORIG_HEAD);
-		ObjectId orig_headId = orig_head.getObjectId();
+		Ref ref = repo.getRef(Constants.ORIG_HEAD);
+		ObjectId orig_head = ref == null ? null : ref.getObjectId();
 		try {
 			// we have already commited the cherry-picked commit.
 			// what we need is to have changes introduced by this
@@ -755,7 +762,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} finally {
 			// set ORIG_HEAD back to where we started because soft
 			// reset moved it
-			repo.writeOrigHead(orig_headId);
+			repo.writeOrigHead(orig_head);
 		}
 	}
 
@@ -980,6 +987,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		try {
 			raw = IO.readFully(authorScriptFile);
 		} catch (FileNotFoundException notFound) {
+			if (authorScriptFile.exists()) {
+				throw notFound;
+			}
 			return null;
 		}
 		return parseAuthor(raw);
@@ -1069,11 +1079,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		Ref head = getHead();
 
-		String headName = getHeadName(head);
 		ObjectId headId = head.getObjectId();
-		if (headId == null)
+		if (headId == null) {
 			throw new RefNotFoundException(MessageFormat.format(
 					JGitText.get().refNotResolved, Constants.HEAD));
+		}
+		String headName = getHeadName(head);
 		RevCommit headCommit = walk.lookupCommit(headId);
 		RevCommit upstream = walk.lookupCommit(upstreamCommit.getId());
 
@@ -1184,10 +1195,14 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private static String getHeadName(Ref head) {
 		String headName;
-		if (head.isSymbolic())
+		if (head.isSymbolic()) {
 			headName = head.getTarget().getName();
-		else
-			headName = head.getObjectId().getName();
+		} else {
+			ObjectId headId = head.getObjectId();
+			// the callers are checking this already
+			assert headId != null;
+			headName = headId.getName();
+		}
 		return headName;
 	}
 
