@@ -66,6 +66,8 @@ public class AddToBitmapFilter extends RevFilter {
 
 	/**
 	 * Create a filter that adds visited commits to the given bitmap.
+	 *
+	 * @param bitmap bitmap to write visited commits to
 	 */
 	public AddToBitmapFilter(BitmapBuilder bitmap) {
 		this.bitmap = bitmap;
