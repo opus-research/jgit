@@ -45,7 +45,6 @@ package org.eclipse.jgit.lfs.server;
 /**
  * LFS object.
  *
- * @since 4.5
  */
 public class LfsObject {
 	String oid;

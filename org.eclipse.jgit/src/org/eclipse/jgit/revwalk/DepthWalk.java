@@ -150,9 +150,6 @@ public interface DepthWalk {
 			return REINTERESTING;
 		}
 
-		/**
-		 * @since 4.5
-		 */
 		@Override
 		public ObjectWalk toObjectWalkWithSameObjects() {
 			ObjectWalk ow = new ObjectWalk(reader, depth);
