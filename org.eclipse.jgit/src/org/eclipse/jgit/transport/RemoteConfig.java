@@ -206,13 +206,8 @@ public class RemoteConfig implements Serializable {
 		}
 		receivepack = val;
 
-		try {
-			val = rc.getString(SECTION, name, KEY_TAGOPT);
-			tagopt = TagOpt.fromOption(val);
-		} catch (IllegalArgumentException e) {
-			// C git silently ignores invalid tagopt values.
-			tagopt = TagOpt.AUTO_FOLLOW;
-		}
+		val = rc.getString(SECTION, name, KEY_TAGOPT);
+		tagopt = TagOpt.fromOption(val);
 		mirror = rc.getBoolean(SECTION, name, KEY_MIRROR, DEFAULT_MIRROR);
 		timeout = rc.getInt(SECTION, name, KEY_TIMEOUT, 0);
 	}
