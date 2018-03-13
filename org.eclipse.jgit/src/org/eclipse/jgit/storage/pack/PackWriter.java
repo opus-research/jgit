@@ -83,7 +83,7 @@ import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -99,6 +99,7 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
+import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -141,16 +142,16 @@ public class PackWriter {
 	private final List<ObjectToPack> objectsLists[] = new List[Constants.OBJ_TAG + 1];
 	{
 		objectsLists[0] = Collections.<ObjectToPack> emptyList();
-		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TREE] = new ArrayList<ObjectToPack>();
-		objectsLists[Constants.OBJ_BLOB] = new ArrayList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TAG] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
 	}
 
-	private final ObjectIdSubclassMap<ObjectToPack> objectsMap = new ObjectIdSubclassMap<ObjectToPack>();
+	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
 
 	// edge objects for thin packs
-	private List<ObjectToPack> edgeObjects = new ArrayList<ObjectToPack>();
+	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
 
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
 
@@ -401,8 +402,18 @@ public class PackWriter {
 	 * Returns objects number in a pack file that was created by this writer.
 	 *
 	 * @return number of objects in pack.
+	 * @throws IOException
+	 *             a cached pack cannot supply its object count.
 	 */
-	public long getObjectsNumber() {
+	public long getObjectCount() throws IOException {
+		if (stats.totalObjects == 0) {
+			long objCnt = 0;
+			for (List<ObjectToPack> list : objectsLists)
+				objCnt += list.size();
+			for (CachedPack pack : cachedPacks)
+				objCnt += pack.getObjectCount();
+			return objCnt;
+		}
 		return stats.totalObjects;
 	}
 
@@ -586,11 +597,9 @@ public class PackWriter {
 			int cnt = 0;
 			for (List<ObjectToPack> list : objectsLists)
 				cnt += list.size();
-			sortedByName = new ArrayList<ObjectToPack>(cnt);
-			for (List<ObjectToPack> list : objectsLists) {
-				for (ObjectToPack otp : list)
-					sortedByName.add(otp);
-			}
+			sortedByName = new BlockList<ObjectToPack>(cnt);
+			for (List<ObjectToPack> list : objectsLists)
+				sortedByName.addAll(list);
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -636,13 +645,8 @@ public class PackWriter {
 		final PackOutputStream out = new PackOutputStream(writeMonitor,
 				packStream, this);
 
-		long objCnt = 0;
-		for (List<ObjectToPack> list : objectsLists)
-			objCnt += list.size();
-		for (CachedPack pack : cachedPacks)
-			objCnt += pack.getObjectCount();
+		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
-
 		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
@@ -1298,7 +1302,7 @@ public class PackWriter {
 		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		List<RevCommit> commits = new ArrayList<RevCommit>();
+		BlockList<RevCommit> commits = new BlockList<RevCommit>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
 			if (c.has(inCachedPack)) {
@@ -1306,7 +1310,7 @@ public class PackWriter {
 				if (includesAllTips(pack, include, walker)) {
 					useCachedPack(walker, keepOnRestart, //
 							wantObjs, haveObjs, pack);
-					commits = new ArrayList<RevCommit>();
+					commits = new BlockList<RevCommit>();
 
 					countingMonitor.endTask();
 					countingMonitor.beginTask(JGitText.get().countingObjects,
@@ -1323,11 +1327,6 @@ public class PackWriter {
 
 			commits.add(c);
 			countingMonitor.update(1);
-		}
-
-		if (objectsLists[Constants.OBJ_COMMIT] instanceof ArrayList) {
-			ArrayList<ObjectToPack> list = (ArrayList<ObjectToPack>) objectsLists[Constants.OBJ_COMMIT];
-			list.ensureCapacity(list.size() + commits.size());
 		}
 
 		int commitCnt = 0;
@@ -1436,7 +1435,7 @@ public class PackWriter {
 		}
 
 		while (dst < list.size())
-			list.remove(dst);
+			list.remove(list.size() - 1);
 	}
 
 	private void useCachedPack(ObjectWalk walker, RevFlagSet keepOnRestart,
