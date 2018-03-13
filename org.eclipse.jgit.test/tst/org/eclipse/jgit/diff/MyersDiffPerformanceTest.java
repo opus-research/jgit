@@ -62,7 +62,7 @@ import org.eclipse.jgit.util.CPUTimeStopWatch;
  * diffs between chunks of different length, measure the needed time and check
  * that time/(N*D) does not differ more than a certain factor.
  */
-public class DiffPerformanceTest extends TestCase {
+public class MyersDiffPerformanceTest extends TestCase {
 	private static final long longTaskBoundary = 5000000000L;
 
 	private static final int minCPUTimerTicks = 10;
@@ -186,7 +186,7 @@ public class DiffPerformanceTest extends TestCase {
 		return ret;
 	}
 
-	static class CharArray extends Sequence {
+	private static class CharArray extends Sequence {
 		final char[] array;
 
 		public CharArray(String s) {
@@ -199,7 +199,7 @@ public class DiffPerformanceTest extends TestCase {
 		}
 	}
 
-	static class CharCmp extends SequenceComparator<CharArray> {
+	private static class CharCmp extends SequenceComparator<CharArray> {
 		@Override
 		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
 			return a.array[ai] == b.array[bi];
