@@ -50,7 +50,6 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -200,30 +199,15 @@ public class ObjectIdSubclassMapTest {
 		} catch (UnsupportedOperationException expected) {
 			// OK
 		}
-
-		m.clear();
-		HashSet<ObjectId> exp = new HashSet<ObjectId>();
-		for (int id = 32; id < 8000; id++) {
-			SubId s = new SubId(id(id));
-			m.add(s);
-			exp.add(s);
-		}
-
-		i = m.iterator();
-		while (i.hasNext()) {
-			SubId s = i.next();
-			assertTrue(exp.remove(s));
-		}
-		assertTrue(exp.isEmpty());
 	}
 
 	private AnyObjectId id(int val) {
-		idBuf.setByte(8, (val & ((1 << 6) - 1)) << 2);
-		val >>>= 6;
+		// Using bytes 2 and 3 positions our value at the low end of idBuf.w1,
+		// which is what ObjectIdSubclassMap uses for hashing. This makes
+		// collisions likely, making collision testing easier.
 
-		val = Integer.reverse(val);
-		idBuf.setByte(0, val >>> 24);
-		idBuf.setByte(1, (val >>> 16) & 0xff);
+		val <<= 1;
+
 		idBuf.setByte(2, (val >>> 8) & 0xff);
 		idBuf.setByte(3, val & 0xff);
 		return idBuf;
