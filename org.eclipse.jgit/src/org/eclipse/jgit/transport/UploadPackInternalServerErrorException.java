@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Robin Rosenberg
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,73 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.transport;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
-
-/**
- * Utility for reading reflog entries
- */
-public class ReflogReader {
-	private File logName;
+/** UploadPack has already reported an error to the client.*/
+public class UploadPackInternalServerErrorException extends IOException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param db
-	 * @param refname
-	 */
-	public ReflogReader(Repository db, String refname) {
-		logName = new File(db.getDirectory(), "logs/" + refname);
-	}
-
-	/**
-	 * Get the last entry in the reflog
+	 * Initialize a new exception.
 	 *
-	 * @return the latest reflog entry, or null if no log
-	 * @throws IOException
+	 * @param why
+	 *            root cause.
 	 */
-	public ReflogEntry getLastEntry() throws IOException {
-		List<ReflogEntry> entries = getReverseEntries(1);
-		return entries.size() > 0 ? entries.get(0) : null;
-	}
-
-	/**
-	 * @return all reflog entries in reverse order
-	 * @throws IOException
-	 */
-	public List<ReflogEntry> getReverseEntries() throws IOException {
-		return getReverseEntries(Integer.MAX_VALUE);
-	}
-
-	/**
-	 * @param max
-	 *            max numer of entries to read
-	 * @return all reflog entries in reverse order
-	 * @throws IOException
-	 */
-	public List<ReflogEntry> getReverseEntries(int max) throws IOException {
-		final byte[] log;
-		try {
-			log = IO.readFully(logName);
-		} catch (FileNotFoundException e) {
-			return Collections.emptyList();
-		}
-
-		int rs = RawParseUtils.prevLF(log, log.length);
-		List<ReflogEntry> ret = new ArrayList<ReflogEntry>();
-		while (rs >= 0 && max-- > 0) {
-			rs = RawParseUtils.prevLF(log, rs);
-			ReflogEntry entry = new ReflogEntry(log, rs < 0 ? 0 : rs + 2);
-			ret.add(entry);
-		}
-		return ret;
+	public UploadPackInternalServerErrorException(Throwable why) {
+		initCause(why);
 	}
 }
