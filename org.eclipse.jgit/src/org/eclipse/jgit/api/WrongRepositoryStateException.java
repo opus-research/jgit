@@ -37,49 +37,19 @@
  */
 package org.eclipse.jgit.api;
 
-import java.util.LinkedList;
-import java.util.List;
-
 /**
- * Exception thrown when a command can't succeed because of unresolved
- * conflicts.
+ * Exception thrown when the state of the repository doesn't allow the execution
+ * of a certain command. E.g. when a CommitCommand should be executed on a
+ * repository with unresolved conflicts this exception will be thrown.
  */
-public class CheckoutConflictException extends GitAPIException {
+public class WrongRepositoryStateException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
-	private List<String> conflictingPaths;
 
-	CheckoutConflictException(String message, Throwable cause) {
+	WrongRepositoryStateException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
-	CheckoutConflictException(String message, List<String> conflictingPaths, Throwable cause) {
-		super(message, cause);
-		this.conflictingPaths = conflictingPaths;
-	}
-
-	CheckoutConflictException(String message) {
+	WrongRepositoryStateException(String message) {
 		super(message);
-	}
-
-	CheckoutConflictException(String message, List<String> conflictingPaths) {
-		super(message);
-		this.conflictingPaths = conflictingPaths;
-	}
-
-	/** @return all the paths where unresolved conflicts have been detected */
-	public List<String> getConflictingPaths() {
-		return conflictingPaths;
-	}
-
-	/**
-	 * Adds a new conflicting path
-	 * @param conflictingPath
-	 * @return {@code this}
-	 */
-	CheckoutConflictException addConflictingPath(String conflictingPath) {
-		if (conflictingPaths == null)
-			conflictingPaths = new LinkedList<String>();
-		conflictingPaths.add(conflictingPath);
-		return this;
 	}
 }
