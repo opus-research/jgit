@@ -54,9 +54,6 @@ public class PackExt {
 	/** A pack index file extension. */
 	public static final PackExt INDEX = newPackExt("idx"); //$NON-NLS-1$
 
-	/** A pack bitmap index file extension. */
-	public static final PackExt BITMAP_INDEX = newPackExt("bitmap"); //$NON-NLS-1$
-
 	/** @return all of the PackExt values. */
 	public static PackExt[] values() {
 		return VALUES;
@@ -106,9 +103,14 @@ public class PackExt {
 		return pos;
 	}
 
+	/** @return the bit mask of the extension e.g {@code 1 << getPosition()}. */
+	public int getBit() {
+		return 1 << getPosition();
+	}
+
 	@Override
 	public String toString() {
 		return String.format("PackExt[%s, bit=0x%s]", getExtension(), //$NON-NLS-1$
-				Integer.toHexString(1 << getPosition()));
+				Integer.toHexString(getBit()));
 	}
 }
