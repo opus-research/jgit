@@ -113,7 +113,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotCreateDirectory;
 	/***/ public String cannotCreateHEAD;
 	/***/ public String cannotCreateIndexfile;
-	/***/ public String cannotCreateTempDir;
 	/***/ public String cannotDeleteCheckedOutBranch;
 	/***/ public String cannotDeleteFile;
 	/***/ public String cannotDeleteStaleTrackingRef;
@@ -147,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
 	/***/ public String canOnlyCherryPickCommitsWithOneParent;
 	/***/ public String canOnlyRevertCommitsWithOneParent;
-	/***/ public String commitDoesNotHaveGivenParent;
 	/***/ public String cantFindObjectInReversePackIndexForTheSpecifiedOffset;
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
@@ -370,7 +368,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
-	/***/ public String mergeRecursiveConflictsWhenMergingCommonAncestors;
 	/***/ public String mergeRecursiveReturnedNoCommit;
 	/***/ public String mergeRecursiveTooManyMergeBasesFor;
 	/***/ public String messageAndTaggerNotAllowedInUnannotatedTags;
@@ -443,7 +440,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
 	/***/ public String packRefs;
-	/***/ public String packSizeNotSetYet;
 	/***/ public String packTooLargeForIndexVersion1;
 	/***/ public String packWriterStatistics;
 	/***/ public String panicCantRenameIndexFile;
@@ -469,8 +465,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String readTimedOut;
 	/***/ public String receivePackObjectTooLarge1;
 	/***/ public String receivePackObjectTooLarge2;
-	/***/ public String receivePackInvalidLimit;
-	/***/ public String receivePackTooLarge;
 	/***/ public String receivingObjects;
 	/***/ public String refAlreadyExists;
 	/***/ public String refAlreadyExists1;
@@ -539,7 +533,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyWithoutHead;
 	/***/ public String stashApplyOnUnsafeRepository;
-	/***/ public String stashCommitIncorrectNumberOfParents;
+	/***/ public String stashCommitMissingTwoParents;
 	/***/ public String stashDropDeleteRefFailed;
 	/***/ public String stashDropFailed;
 	/***/ public String stashDropMissingReflog;
@@ -571,7 +565,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoLocal;
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
-	/***/ public String transportSSHRetryInterrupt;
 	/***/ public String treeEntryAlreadyExists;
 	/***/ public String treeFilterMarkerTooManyFilters;
 	/***/ public String treeIteratorDoesNotSupportRemove;
@@ -591,6 +584,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unexpectedRefReport;
 	/***/ public String unexpectedReportLine;
 	/***/ public String unexpectedReportLine2;
+	/***/ public String unexpectedSSLContextException;
 	/***/ public String unknownOrUnsupportedCommand;
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;

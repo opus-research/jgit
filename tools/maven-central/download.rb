@@ -1,18 +1,10 @@
 #!/usr/bin/env ruby
-version = ARGV[0].freeze
-if version =~ /\A(\d+\.\d+\.\d+)\.(\d{12})-(m\d|rc\d|r)\Z/
-   printf "version %s qualifier %s classifier %s\n", $1, $2, $3
-else
-   printf "invalid version %s\n", version
-   abort
-end
-
+version = '3.1.0.201310021548-r'.freeze
 group = 'org.eclipse.jgit'
 artifacts = [group,
              group + '.ant',
              group + '.archive',
              group + '.console',
-			 group + '.http.apache',
              group + '.http.server',
              group + '.java7',
              group + '.junit',

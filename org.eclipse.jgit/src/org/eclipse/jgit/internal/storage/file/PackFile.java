@@ -65,7 +65,6 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
@@ -702,7 +701,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	ObjectLoader load(final WindowCursor curs, long pos)
-			throws IOException, LargeObjectException {
+			throws IOException {
 		try {
 			final byte[] ib = curs.tempId;
 			Delta delta = null;
@@ -728,7 +727,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				case Constants.OBJ_TREE:
 				case Constants.OBJ_BLOB:
 				case Constants.OBJ_TAG: {
-					if (delta != null || sz < curs.getStreamFileThreshold())
+					if (sz < curs.getStreamFileThreshold())
 						data = decompress(pos + p, (int) sz, curs);
 
 					if (delta != null) {
@@ -797,7 +796,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// (Whole objects with no deltas to apply return early above.)
 
 			if (data == null)
-				throw new IOException(JGitText.get().inMemoryBufferLimitExceeded);
+				return delta.large(this, curs);
 
 			do {
 				// Cache only the base immediately before desired object.
@@ -812,19 +811,19 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 						delta.deltaSize, curs);
 				if (cmds == null) {
 					data = null; // Discard base in case of OutOfMemoryError
-					throw new LargeObjectException.OutOfMemory(new OutOfMemoryError());
+					return delta.large(this, curs);
 				}
 
 				final long sz = BinaryDelta.getResultSize(cmds);
 				if (Integer.MAX_VALUE <= sz)
-					throw new LargeObjectException.ExceedsByteArrayLimit();
+					return delta.large(this, curs);
 
 				final byte[] result;
 				try {
 					result = new byte[(int) sz];
 				} catch (OutOfMemoryError tooBig) {
 					data = null; // Discard base in case of OutOfMemoryError
-					throw new LargeObjectException.OutOfMemory(tooBig);
+					return delta.large(this, curs);
 				}
 
 				BinaryDelta.apply(data, cmds, result);
@@ -875,6 +874,18 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			this.deltaSize = sz;
 			this.hdrLen = hdrLen;
 			this.basePos = baseOffset;
+		}
+
+		ObjectLoader large(PackFile pack, WindowCursor wc) {
+			Delta d = this;
+			while (d.next != null)
+				d = d.next;
+			return d.newLargeLoader(pack, wc);
+		}
+
+		private ObjectLoader newLargeLoader(PackFile pack, WindowCursor wc) {
+			return new LargePackedDeltaObject(deltaPos, basePos, hdrLen,
+					pack, wc.db);
 		}
 	}
 
