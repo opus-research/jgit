@@ -43,13 +43,7 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
-import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Offers a "GitPorcelain"-like API to interact with a git repository.
@@ -86,46 +80,6 @@ public class Git {
 	private final Repository repo;
 
 	/**
-	 * @param dir
-	 *            the repository to open. May be either the GIT_DIR, or the
-	 *            working tree directory that contains {@code .git}.
-	 * @return a {@link Git} object for the existing git repository
-	 * @throws IOException
-	 */
-	public static Git open(File dir) throws IOException {
-		return open(dir, FS.DETECTED);
-	}
-
-	/**
-	 * @param dir
-	 *            the repository to open. May be either the GIT_DIR, or the
-	 *            working tree directory that contains {@code .git}.
-	 * @param fs
-	 *            filesystem abstraction to use when accessing the repository.
-	 * @return a {@link Git} object for the existing git repository
-	 * @throws IOException
-	 */
-	public static Git open(File dir, FS fs) throws IOException {
-		RepositoryCache.FileKey key;
-
-		key = RepositoryCache.FileKey.lenient(dir, fs);
-		return wrap(new RepositoryBuilder()
-				.setFS(fs)
-				.setGitDir(key.getFile())
-				.setMustExist(true).build());
-	}
-
-	/**
-	 * @param repo
-	 *            the git repository this class is interacting with.
-	 *            {@code null} is not allowed
-	 * @return a {@link Git} object for the existing git repository
-	 */
-	public static Git wrap(Repository repo) {
-		return new Git(repo);
-	}
-
-	/**
 	 * Returns a command object to execute a {@code clone} command
 	 *
 	 * @see <a
@@ -134,7 +88,7 @@ public class Git {
 	 * @return a {@link CloneCommand} used to collect all optional parameters
 	 *         and to finally execute the {@code clone} command
 	 */
-	public static CloneCommand cloneRepository() {
+	static public CloneCommand cloneRepository() {
 		return new CloneCommand();
 	}
 
@@ -378,55 +332,6 @@ public class Git {
 	 */
 	public ResetCommand reset() {
 		return new ResetCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code status} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-status.html"
-	 *      >Git documentation about status</a>
-	 * @return a {@link StatusCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code status} command
-	 */
-	public StatusCommand status() {
-		return new StatusCommand(repo);
-	}
-
-	/**
-	 * Returns a command to add notes to an object
-	 *
-	 * @return a {@link AddNoteCommand}
-	 */
-	public AddNoteCommand notesAdd() {
-		return new AddNoteCommand(repo);
-	}
-
-	/**
-	 * Returns a command to remove notes on an object
-	 *
-	 * @return a {@link RemoveNoteCommand}
-	 */
-	public RemoveNoteCommand notesRemove() {
-		return new RemoveNoteCommand(repo);
-	}
-
-	/**
-	 * Returns a command to list all notes
-	 *
-	 * @return a {@link ListNotesCommand}
-	 */
-	public ListNotesCommand notesList() {
-		return new ListNotesCommand(repo);
-	}
-
-	/**
-	 * Returns a command to show notes on an object
-	 *
-	 * @return a {@link ShowNoteCommand}
-	 */
-	public ShowNoteCommand notesShow() {
-		return new ShowNoteCommand(repo);
 	}
 
 	/**

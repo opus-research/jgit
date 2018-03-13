@@ -53,7 +53,7 @@ import java.util.Arrays;
 import java.util.List;
 
 class FS_Win32 extends FS {
-	static boolean isWin32() {
+	static boolean detect() {
 		final String osDotName = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
@@ -64,17 +64,8 @@ class FS_Win32 extends FS {
 				&& StringUtils.toLowerCase(osDotName).indexOf("windows") != -1;
 	}
 
-	FS_Win32() {
-		super();
-	}
-
-	FS_Win32(FS src) {
-		super(src);
-	}
-
-	public FS newInstance() {
-		return new FS_Win32(this);
-	}
+	private File gitPrefix;
+	private boolean gitPrefixEvaluated;
 
 	public boolean supportsExecute() {
 		return false;
@@ -94,25 +85,27 @@ class FS_Win32 extends FS {
 	}
 
 	@Override
-	protected File discoverGitPrefix() {
+	public File gitPrefix() {
+		if (gitPrefixEvaluated)
+			return gitPrefix;
+
 		String path = SystemReader.getInstance().getenv("PATH");
 		File gitExe = searchPath(path, "git.exe", "git.cmd");
 		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
-
-		// This isn't likely to work, if bash is in $PATH, git should
-		// also be in $PATH. But its worth trying.
-		//
-		String w = readPipe(userHome(), //
-				new String[] { "bash", "--login", "-c", "which git" }, //
-				Charset.defaultCharset().name());
-		if (w != null) {
-			// The path may be in cygwin/msys notation so resolve it right away
-			gitExe = resolve(null, w);
-			if (gitExe != null)
-				return gitExe.getParentFile().getParentFile();
+			gitPrefix = gitExe.getParentFile().getParentFile();
+		else {
+			// This isn't likely to work, if bash is in $PATH, git should
+			// also be in $PATH. But its worth trying.
+			//
+			String w = readPipe(userHome(), //
+			                    new String[] { "bash", "--login", "-c", "which git" }, //
+			                    Charset.defaultCharset().name());
+			if (w != null)
+				gitPrefix = new File(w).getParentFile().getParentFile();
 		}
-		return null;
+
+		gitPrefixEvaluated = true;
+		return gitPrefix;
 	}
 
 	@Override

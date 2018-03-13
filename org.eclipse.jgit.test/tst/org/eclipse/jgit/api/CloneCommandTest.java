@@ -48,29 +48,18 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 
-import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevBlob;
 import org.junit.Test;
 
 public class CloneCommandTest extends RepositoryTestCase {
 
 	private Git git;
 
-	private TestRepository<Repository> tr;
-
 	public void setUp() throws Exception {
 		super.setUp();
-		tr = new TestRepository<Repository>(db);
-
 		git = new Git(db);
 		// commit something
 		writeTrashFile("Test.txt", "Hello world");
@@ -86,8 +75,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 		writeTrashFile("Test.txt", "Some change");
 		git.add().addFilepattern("Test.txt").call();
 		git.commit().setMessage("Second commit").call();
-		RevBlob blob = tr.blob("blob-not-in-master-branch");
-		git.tag().setName("tag-for-blob").setObjectId(blob).call();
 	}
 
 	@Test
@@ -100,24 +87,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			Git git2 = command.call();
 			assertNotNull(git2);
-			ObjectId id = git2.getRepository().resolve("tag-for-blob");
-			assertNotNull(id);
-			assertEquals(git2.getRepository().getFullBranch(),
-					"refs/heads/test");
-			assertEquals(
-					"origin",
-					git2.getRepository()
-							.getConfig()
-							.getString(ConfigConstants.CONFIG_BRANCH_SECTION,
-									"test", ConfigConstants.CONFIG_KEY_REMOTE));
-			assertEquals(
-					"refs/heads/test",
-					git2.getRepository()
-							.getConfig()
-							.getString(ConfigConstants.CONFIG_BRANCH_SECTION,
-									"test", ConfigConstants.CONFIG_KEY_MERGE));
-			assertEquals(2, git2.branchList().setListMode(ListMode.REMOTE)
-					.call().size());
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}
@@ -128,36 +97,14 @@ public class CloneCommandTest extends RepositoryTestCase {
 		try {
 			File directory = createTempDirectory("testCloneRepositoryWithBranch");
 			CloneCommand command = Git.cloneRepository();
-			command.setBranch("refs/heads/master");
+			command.setBranch("refs/heads/test");
 			command.setDirectory(directory);
 			command.setURI("file://"
 					+ git.getRepository().getWorkTree().getPath());
 			Git git2 = command.call();
 			assertNotNull(git2);
 			assertEquals(git2.getRepository().getFullBranch(),
-					"refs/heads/master");
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	@Test
-	public void testCloneRepositoryOnlyOneBranch() {
-		try {
-			File directory = createTempDirectory("testCloneRepositoryWithBranch");
-			CloneCommand command = Git.cloneRepository();
-			command.setBranch("refs/heads/master");
-			command.setBranchesToClone(Collections
-					.singletonList("refs/heads/master"));
-			command.setDirectory(directory);
-			command.setURI("file://"
-					+ git.getRepository().getWorkTree().getPath());
-			Git git2 = command.call();
-			assertNotNull(git2);
-			assertEquals(git2.getRepository().getFullBranch(),
-					"refs/heads/master");
-			assertEquals(1, git2.branchList().setListMode(ListMode.REMOTE)
-					.call().size());
+					"refs/heads/test");
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}

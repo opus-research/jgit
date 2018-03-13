@@ -84,8 +84,8 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -199,7 +199,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			switch (operation) {
 			case ABORT:
 				try {
-					return abort(new RebaseResult(Status.ABORTED));
+					return abort();
 				} catch (IOException ioe) {
 					throw new JGitInternalException(ioe.getMessage(), ioe);
 				}
@@ -217,12 +217,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 
 			if (monitor.isCancelled())
-				return abort(new RebaseResult(Status.ABORTED));
+				return abort();
 
-			if (operation == Operation.CONTINUE)
+			if (this.operation == Operation.CONTINUE)
 				newHead = continueRebase();
 
-			if (operation == Operation.SKIP)
+			if (this.operation == Operation.SKIP)
 				newHead = checkoutCurrentHead();
 
 			ObjectReader or = repo.newObjectReader();
@@ -238,37 +238,23 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						.parseCommit(ids.iterator().next());
 				if (monitor.isCancelled())
 					return new RebaseResult(commitToPick);
-				try {
-					monitor.beginTask(MessageFormat.format(
-							JGitText.get().applyingCommit,
-							commitToPick.getShortMessage()),
-							ProgressMonitor.UNKNOWN);
-					// if the first parent of commitToPick is the current HEAD,
-					// we do a fast-forward instead of cherry-pick to avoid
-					// unnecessary object rewriting
-					newHead = tryFastForward(commitToPick);
-					lastStepWasForward = newHead != null;
-					if (!lastStepWasForward) {
-						// TODO if the content of this commit is already merged
-						// here we should skip this step in order to avoid
-						// confusing pseudo-changed
-						CherryPickResult cherryPickResult = new Git(repo)
-								.cherryPick().include(commitToPick).call();
-						switch (cherryPickResult.getStatus()) {
-						case FAILED:
-							if (operation == Operation.BEGIN)
-								return abort(new RebaseResult(
-										cherryPickResult.getFailingPaths()));
-							else
-								return stop(commitToPick);
-						case CONFLICTING:
-							return stop(commitToPick);
-						case OK:
-							newHead = cherryPickResult.getNewHead();
-						}
-					}
-				} finally {
-					monitor.endTask();
+				monitor.beginTask(MessageFormat.format(
+						JGitText.get().applyingCommit, commitToPick
+								.getShortMessage()), ProgressMonitor.UNKNOWN);
+				// if the first parent of commitToPick is the current HEAD,
+				// we do a fast-forward instead of cherry-pick to avoid
+				// unnecessary object rewriting
+				newHead = tryFastForward(commitToPick);
+				lastStepWasForward = newHead != null;
+				if (!lastStepWasForward)
+					// TODO if the content of this commit is already merged here
+					// we should skip this step in order to avoid confusing
+					// pseudo-changed
+					newHead = new Git(repo).cherryPick().include(commitToPick)
+							.call();
+				monitor.endTask();
+				if (newHead == null) {
+					return stop(commitToPick);
 				}
 			}
 			if (newHead != null) {
@@ -399,9 +385,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				Constants.CHARACTER_ENCODING));
 		createFile(rebaseDir, STOPPED_SHA, repo.newObjectReader().abbreviate(
 				commitToPick).name());
-		// Remove cherry pick state file created by CherryPickCommand, it's not
-		// needed for rebase
-		repo.writeCherryPickHead(null);
 		return new RebaseResult(commitToPick);
 	}
 
@@ -702,23 +685,17 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RebaseResult abort(RebaseResult result) throws IOException {
+	private RebaseResult abort() throws IOException {
 		try {
 			String commitId = readFile(repo.getDirectory(), Constants.ORIG_HEAD);
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().abortingRebase, commitId),
 					ProgressMonitor.UNKNOWN);
 
-			DirCacheCheckout dco;
 			RevCommit commit = walk.parseCommit(repo.resolve(commitId));
-			if (result.getStatus().equals(Status.FAILED)) {
-				RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
-				dco = new DirCacheCheckout(repo, head.getTree(),
-						repo.lockDirCache(), commit.getTree());
-			} else {
-				dco = new DirCacheCheckout(repo, repo.lockDirCache(),
-						commit.getTree());
-			}
+			// no head in order to reset --hard
+			DirCacheCheckout dco = new DirCacheCheckout(repo, repo
+					.lockDirCache(), commit.getTree());
 			dco.setFailOnConflict(false);
 			dco.checkout();
 			walk.release();
@@ -747,8 +724,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			// cleanup the files
 			FileUtils.delete(rebaseDir, FileUtils.RECURSIVE);
-			repo.writeCherryPickHead(null);
-			return result;
+			return new RebaseResult(Status.ABORTED);
 
 		} finally {
 			monitor.endTask();

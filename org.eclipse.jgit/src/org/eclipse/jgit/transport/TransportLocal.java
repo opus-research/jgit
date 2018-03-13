@@ -104,7 +104,7 @@ class TransportLocal extends Transport implements PackTransport {
 		}
 
 		@Override
-		public boolean canHandle(URIish uri, Repository local, String remoteName) {
+		public boolean canHandle(Repository local, URIish uri, String remoteName) {
 			if (uri.getPath() == null
 					|| uri.getPort() > 0
 					|| uri.getUser() != null
@@ -116,7 +116,7 @@ class TransportLocal extends Transport implements PackTransport {
 		}
 
 		@Override
-		public Transport open(URIish uri, Repository local, String remoteName)
+		public Transport open(Repository local, URIish uri, String remoteName)
 				throws NoRemoteRepositoryException {
 			// If the reference is to a local file, C Git behavior says
 			// assume this is a bundle, since repositories are directories.
