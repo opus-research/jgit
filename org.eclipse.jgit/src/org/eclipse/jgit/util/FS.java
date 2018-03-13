@@ -50,7 +50,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -218,6 +217,10 @@ public abstract class FS {
 	 * <p>
 	 * Not all platforms and JREs support executable flags on files. If the
 	 * feature is unsupported this method will always return false.
+	 * <p>
+	 * <em>If the platform supports symbolic links and <code>f</code> is a symbolic link
+	 * this method returns false, rather than the state of the executable flags
+	 * on the target file.</em>
 	 *
 	 * @param f
 	 *            abstract path to test.
@@ -275,19 +278,6 @@ public abstract class FS {
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
-	}
-
-	/**
-	 * Delete a file. Throws an exception if delete fails.
-	 * 
-	 * @param f
-	 * @throws IOException
-	 *             , this may be a Java7 subclass with detailed information
-	 */
-	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
