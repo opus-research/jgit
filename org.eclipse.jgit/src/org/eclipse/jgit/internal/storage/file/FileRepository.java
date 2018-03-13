@@ -350,9 +350,9 @@ public class FileRepository extends Repository {
 	 *
 	 * @return unmodifiable collection of other known objects.
 	 */
-	public Set<ObjectId> getAdditionalHaves(final ObjectDirectory primary) {
+	public Set<ObjectId> getAdditionalHaves() {
 		HashSet<ObjectId> r = new HashSet<ObjectId>();
-		for (AlternateHandle d : objectDatabase.myAlternates()) {
+		for (AlternateHandle d : objectDatabase. myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;
 
@@ -363,12 +363,7 @@ public class FileRepository extends Repository {
 					if (ref.getPeeledObjectId() != null)
 						r.add(ref.getPeeledObjectId());
 				}
-				if (primary == null)
-					r.addAll(repo.getAdditionalHaves(objectDatabase));
-				else if (!d.in(primary.myAlternates())) {
-					primary.addAlternate(d);
-					r.addAll(repo.getAdditionalHaves(primary));
-				}
+				r.addAll(repo.getAdditionalHaves());
 			}
 		}
 		return r;

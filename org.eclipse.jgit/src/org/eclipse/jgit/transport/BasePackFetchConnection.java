@@ -410,7 +410,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			parseReachable(id);
 		}
 
-		for (ObjectId id : local.getAdditionalHaves(null))
+		for (ObjectId id : local.getAdditionalHaves())
 			parseReachable(id);
 
 		for (ObjectId id : have)
