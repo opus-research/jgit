@@ -51,7 +51,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -948,10 +947,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// modify file
 		writeTrashFile(fname, "b");
-		assertWorkDir(mkmap(fname, "b"));
+		assertWorkDir(mkmap(fname, "b", linkName, "/"));
 
 		// revert both paths to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
+		git.checkout().setStartPoint(Constants.HEAD)
 				.addPath(fname).addPath(linkName).call();
 
 		assertWorkDir(mkmap(fname, "a", linkName, "a"));
@@ -986,10 +985,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// modify file
 		writeTrashFile(fname, "b");
-		assertWorkDir(mkmap(fname, "b"));
+		assertWorkDir(mkmap(fname, "b", linkName + "/dummyDir", "/"));
 
 		// revert both paths to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
+		git.checkout().setStartPoint(Constants.HEAD)
 				.addPath(fname).addPath(linkName).call();
 
 		assertWorkDir(mkmap(fname, "a", linkName, "a"));
@@ -1032,8 +1031,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 				linkName + "/dir2/file2", "d"));
 
 		// revert path to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
-				.addPath(linkName).call();
+		git.checkout().setStartPoint(Constants.HEAD).addPath(linkName).call();
 
 		// expect only the one added to the index
 		assertWorkDir(mkmap(linkName, "a", fname, "a"));
@@ -1078,8 +1076,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 				linkName + "/dir2/file2", "d"));
 
 		// revert path to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
-				.addPath(linkName).call();
+		git.checkout().setStartPoint(Constants.HEAD).addPath(linkName).call();
 
 		// original file and link
 		assertWorkDir(mkmap(linkName, "a", fname, "a"));
@@ -1103,11 +1100,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		FileUtils.mkdir(file);
 		assertTrue("File must be a directory now", file.isDirectory());
 
-		assertWorkDir(Collections.<String, String> emptyMap());
+		assertWorkDir(mkmap(fname, "/"));
 
 		// revert path to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
-				.addPath(fname).call();
+		git.checkout().setStartPoint(Constants.HEAD).addPath(fname).call();
 
 		assertWorkDir(mkmap(fname, "a"));
 
@@ -1131,11 +1127,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue("File must be a directory now", file.isDirectory());
 		assertFalse("Must not delete non empty directory", file.delete());
 
-		assertWorkDir(Collections.<String, String> emptyMap());
+		assertWorkDir(mkmap(fname + "/dummyDir", "/"));
 
 		// revert path to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
-				.addPath(fname).call();
+		git.checkout().setStartPoint(Constants.HEAD).addPath(fname).call();
 
 		assertWorkDir(mkmap(fname, "a"));
 
@@ -1172,8 +1167,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 				mkmap(fname + "/dir1/file1", "c", fname + "/dir2/file2", "d"));
 
 		// revert path to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
-				.addPath(fname).call();
+		git.checkout().setStartPoint(Constants.HEAD).addPath(fname).call();
 
 		// expect only the one added to the index
 		assertWorkDir(mkmap(fname, "a"));
@@ -1213,8 +1207,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 				mkmap(fname + "/dir/file1", "c", fname + "/dir/file2", "d"));
 
 		// revert path to HEAD state
-		git.checkout().setName("master").setStartPoint(Constants.HEAD)
-				.addPath(fname).call();
+		git.checkout().setStartPoint(Constants.HEAD).addPath(fname).call();
 		assertWorkDir(mkmap(fname, "a"));
 
 		Status st = git.status().call();
@@ -1284,66 +1277,11 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCheckoutPathesDeletesFile()
-			throws IOException, GitAPIException {
-		String fname1 = "file1.txt";
-		String fname2 = "file2.txt";
-		Git git = Git.wrap(db);
-
-		// Create file1
-		writeTrashFile(fname1, "a");
-		git.add().addFilepattern(fname1).call();
-		git.commit().setMessage("create file1").call();
-
-		// Create branch and switch to it
-		git.branchCreate().setName("side").call();
-
-		// Create file2
-		writeTrashFile(fname2, "b");
-		git.add().addFilepattern(fname2).call();
-		git.commit().setMessage("create file2").call();
-		assertWorkDir(mkmap(fname1, "a", fname2, "b"));
-
-		// Checkout paths
-		git.checkout().setName("side").addPath(fname1).call();
-		assertWorkDir(mkmap(fname1, "a", fname2, "b"));
-
-		try {
-			git.checkout().setName("side").addPath(fname2).call();
-			// expecting an exception here. You can checkout and specify a path
-			// unknown to checkout out commit
-			fail("did not throw exception");
-		} catch (IllegalStateException e) {
-			assertWorkDir(mkmap(fname1, "a", fname2, "b"));
-		}
-	}
-
-	@Test
-	public void testCheckoutPathesReplacesFileByFolder()
-			throws IOException, GitAPIException {
-		String fname1 = "file1.txt";
-		Git git = Git.wrap(db);
-
-		// Create folder
-		writeTrashFile(fname1 + "/a.txt", "a");
-		git.add().addFilepattern(fname1).call();
-		git.commit().setMessage("create folder").call();
-		assertWorkDir(mkmap(fname1 + "/a.txt", "a"));
-
-		// Create branch and switch to it
-		git.branchCreate().setName("side").call();
-
-		// Replace with file
-		git.rm().addFilepattern(fname1).call();
-		writeTrashFile(fname1, "b");
-		git.add().addFilepattern(fname1).call();
-		git.commit().setMessage("replace folder with file").call();
-		assertWorkDir(mkmap(fname1, "b"));
-
-		// Checkout paths
-		git.checkout().setName("side").addPath(fname1)
-				.addPath(fname1 + "/a.txt").call();
-		assertWorkDir(mkmap(fname1 + "/a.txt", "a"));
+	public void testDontOverwriteEmptyFolder() throws IOException {
+		setupCase(mk("foo"), mk("foo"), mk("foo"));
+		FileUtils.mkdir(new File(db.getWorkTree(), "d"));
+		checkout();
+		assertWorkDir(mkmap("foo", "foo", "d", "/"));
 	}
 
 	@Test
@@ -1674,7 +1612,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			throws CorruptObjectException,
 			IOException {
 		TreeWalk walk = new TreeWalk(db);
-		walk.setRecursive(true);
+		walk.setRecursive(false);
 		walk.addTree(new FileTreeIterator(db));
 		String expectedValue;
 		String path;
@@ -1684,11 +1622,11 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			ft = walk.getTree(0, FileTreeIterator.class);
 			path = ft.getEntryPathString();
 			expectedValue = i.get(path);
-			assertNotNull("found unexpected file for path " + path
-					+ " in workdir", expectedValue);
 			File file = new File(db.getWorkTree(), path);
 			assertTrue(file.exists());
 			if (file.isFile()) {
+				assertNotNull("found unexpected file for path " + path
+						+ " in workdir", expectedValue);
 				FileInputStream is = new FileInputStream(file);
 				byte[] buffer = new byte[(int) file.length()];
 				int offset = 0;
@@ -1702,6 +1640,15 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 				assertArrayEquals("unexpected content for path " + path
 						+ " in workDir. ", buffer, i.get(path).getBytes());
 				nrFiles++;
+			} else if (file.isDirectory()) {
+				if (file.list().length == 0) {
+					assertEquals("found unexpected empty folder for path "
+							+ path + " in workDir. ", "/", i.get(path));
+					nrFiles++;
+				}
+			}
+			if (walk.isSubtree()) {
+				walk.enterSubtree();
 			}
 		}
 		assertEquals("WorkDir has not the right size.", i.size(), nrFiles);
