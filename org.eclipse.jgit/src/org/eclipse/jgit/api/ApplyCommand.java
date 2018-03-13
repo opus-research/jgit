@@ -58,7 +58,6 @@ import org.eclipse.jgit.api.errors.PatchFormatException;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.HunkHeader;
@@ -224,12 +223,16 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 					pos++;
 					break;
 				case '-':
-					if (!newLines.get(hh.getNewStartLine() - 1 + pos).equals(
-							hunkLine.substring(1))) {
-						throw new PatchApplyException(MessageFormat.format(
-								JGitText.get().patchApplyException, hh));
+					if (hh.getNewStartLine() == 0) {
+						newLines.clear();
+					} else {
+						if (!newLines.get(hh.getNewStartLine() - 1 + pos)
+								.equals(hunkLine.substring(1))) {
+							throw new PatchApplyException(MessageFormat.format(
+									JGitText.get().patchApplyException, hh));
+						}
+						newLines.remove(hh.getNewStartLine() - 1 + pos);
 					}
-					newLines.remove(hh.getNewStartLine() - 1 + pos);
 					break;
 				case '+':
 					newLines.add(hh.getNewStartLine() - 1 + pos,
@@ -251,12 +254,12 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 			// still there!
 			sb.append(l).append('\n');
 		}
-		sb.deleteCharAt(sb.length() - 1);
+		if (sb.length() > 0) {
+			sb.deleteCharAt(sb.length() - 1);
+		}
 		FileWriter fw = new FileWriter(f);
 		fw.write(sb.toString());
 		fw.close();
-
-		getRepository().getFS().setExecute(f, fh.getNewMode() == FileMode.EXECUTABLE_FILE);
 	}
 
 	private static boolean isChanged(List<String> ol, List<String> nl) {
