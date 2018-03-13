@@ -49,7 +49,6 @@ import static org.eclipse.jgit.diff.DiffEntry.Side.OLD;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.List;
 
 import org.eclipse.jgit.JGitText;
@@ -217,7 +216,6 @@ class SimilarityRenameDetector {
 
 		long[] srcSizes = new long[srcs.size()];
 		long[] dstSizes = new long[dsts.size()];
-		BitSet dstTooLarge = null;
 
 		// Init the size arrays to some value that indicates that we haven't
 		// calculated the size yet. Since sizes cannot be negative, -1 will work
@@ -257,11 +255,6 @@ class SimilarityRenameDetector {
 					continue;
 				}
 
-				if (dstTooLarge != null && dstTooLarge.get(dstIdx)) {
-					pm.update(1);
-					continue;
-				}
-
 				long srcSize = srcSizes[srcIdx];
 				if (srcSize < 0) {
 					srcSize = size(OLD, srcEnt);
@@ -286,9 +279,6 @@ class SimilarityRenameDetector {
 				try {
 					d = hash(NEW, dstEnt);
 				} catch (TableFullException tableFull) {
-					if (dstTooLarge == null)
-						dstTooLarge = new BitSet(dsts.size());
-					dstTooLarge.set(dstIdx);
 					tableOverflow = true;
 					pm.update(1);
 					continue;
