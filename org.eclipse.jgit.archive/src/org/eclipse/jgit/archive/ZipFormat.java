@@ -40,40 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm.archive;
+package org.eclipse.jgit.archive;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
+import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
-class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+/**
+ * PKWARE's ZIP format.
+ */
+public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	private static final List<String> SUFFIXES =
+			Collections.unmodifiableList(Arrays.asList(".zip"));
+
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-		return new TarArchiveOutputStream(s);
+		return new ZipArchiveOutputStream(s);
 	}
 
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		if (mode == FileMode.SYMLINK) {
-			final TarArchiveEntry entry = new TarArchiveEntry(
-					path, TarConstants.LF_SYMLINK);
-			entry.setLinkName(new String(
-					loader.getCachedBytes(100), "UTF-8")); //$NON-NLS-1$
-			out.putArchiveEntry(entry);
-			out.closeArchiveEntry();
-			return;
-		}
+		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
 
-		final TarArchiveEntry entry = new TarArchiveEntry(path);
-		if (mode == FileMode.REGULAR_FILE ||
-		    mode == FileMode.EXECUTABLE_FILE) {
-			entry.setMode(mode.getBits());
+		if (mode == FileMode.REGULAR_FILE) {
+			// ok
+		} else if (mode == FileMode.EXECUTABLE_FILE
+				|| mode == FileMode.SYMLINK) {
+			entry.setUnixMode(mode.getBits());
 		} else {
 			// TODO(jrn): Let the caller know the tree contained
 			// an entry with unsupported mode (e.g., a submodule).
@@ -82,5 +84,9 @@ class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 		out.putArchiveEntry(entry);
 		loader.copyTo(out);
 		out.closeArchiveEntry();
+	}
+
+	public Iterable<String> suffixes() {
+		return SUFFIXES;
 	}
 }

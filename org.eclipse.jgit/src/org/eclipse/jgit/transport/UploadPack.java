@@ -707,6 +707,7 @@ public class UploadPack {
 	 * @param what
 	 *            string describing the problem identified by the hook. The
 	 *            string must not end with an LF, and must not contain an LF.
+	 * @since 3.1
 	 */
 	public void sendMessage(String what) {
 		try {
@@ -716,7 +717,10 @@ public class UploadPack {
 		}
 	}
 
-	/** @return an underlying stream for sending messages to the client, or null. */
+	/**
+	 * @return an underlying stream for sending messages to the client, or null.
+	 * @since 3.1
+	 */
 	public OutputStream getMessageOutputStream() {
 		return msgOut;
 	}
@@ -815,10 +819,10 @@ public class UploadPack {
 	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
 			throws IOException {
 		preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
-		if (peerHas.isEmpty())
-			return last;
 		if (wantAll.isEmpty() && !wantIds.isEmpty())
 			parseWants();
+		if (peerHas.isEmpty())
+			return last;
 
 		sentReady = false;
 		int haveCnt = 0;
