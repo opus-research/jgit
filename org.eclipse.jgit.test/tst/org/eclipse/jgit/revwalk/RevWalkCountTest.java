@@ -47,20 +47,20 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-public class RevWalkUtilsCountTest extends RevWalkTestCase {
+public class RevWalkCountTest extends RevWalkTestCase {
 
 	@Test
 	public void shouldWorkForNormalCase() throws Exception {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
 
-		assertEquals(1, count(b, a));
+		assertEquals(1, rw.count(b, a));
 	}
 
 	@Test
 	public void shouldReturnZeroOnSameCommit() throws Exception {
 		final RevCommit c1 = commit(commit(commit()));
-		assertEquals(0, count(c1, c1));
+		assertEquals(0, rw.count(c1, c1));
 	}
 
 	@Test
@@ -68,7 +68,7 @@ public class RevWalkUtilsCountTest extends RevWalkTestCase {
 		final RevCommit a = commit();
 		final RevCommit b = commit(a);
 
-		assertEquals(0, count(a, b));
+		assertEquals(0, rw.count(a, b));
 	}
 
 	@Test
@@ -78,7 +78,7 @@ public class RevWalkUtilsCountTest extends RevWalkTestCase {
 		final RevCommit b2 = commit(a);
 		final RevCommit c = commit(b1, b2);
 
-		assertEquals(3, count(c, a));
+		assertEquals(3, rw.count(c, a));
 	}
 
 	@Test
@@ -87,17 +87,13 @@ public class RevWalkUtilsCountTest extends RevWalkTestCase {
 		final RevCommit a2 = commit();
 		final RevCommit b = commit(a1);
 
-		assertEquals(2, count(b, a2));
+		assertEquals(2, rw.count(b, a2));
 	}
 
 	@Test
 	public void shouldWorkWithZeroAsEnd() throws Exception {
 		final RevCommit c = commit(commit());
 
-		assertEquals(2, count(c, null));
-	}
-
-	private int count(RevCommit start, RevCommit end) throws Exception {
-		return RevWalkUtils.count(rw, start, end);
+		assertEquals(2, rw.count(c, null));
 	}
 }
