@@ -213,10 +213,6 @@ class BlockWriter {
 
 
 	static abstract class Entry {
-		static int compare(Entry a, Entry b) {
-			return BlockReader.compare(a.key, b.key, 0, b.key.length);
-		}
-
 		final byte[] key;
 		boolean restart;
 
