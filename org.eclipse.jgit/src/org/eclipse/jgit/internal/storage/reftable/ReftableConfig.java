@@ -51,7 +51,7 @@ import org.eclipse.jgit.lib.Repository;
 /** Configuration used by a reftable writer when constructing the stream. */
 public class ReftableConfig {
 	private int refBlockSize = 4 << 10;
-	private int logBlockSize;
+	private int logBlockSize = 64 << 10;
 	private int restartInterval;
 	private boolean indexObjects = true;
 

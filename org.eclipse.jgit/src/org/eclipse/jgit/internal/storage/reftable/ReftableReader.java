@@ -79,6 +79,9 @@ public class ReftableReader extends Reftable {
 	private final BlockSource src;
 
 	private int blockSize;
+	private long minUpdateIndex;
+	private long maxUpdateIndex;
+
 	private long refEnd;
 	private long objOffset;
 	private long objEnd;
@@ -115,6 +118,34 @@ public class ReftableReader extends Reftable {
 			readFileHeader();
 		}
 		return blockSize;
+	}
+
+	/**
+	 * @return the minimum update index for log entries that appear in this
+	 *         reftable. This should be 1 higher than the prior reftable's
+	 *         {@code maxUpdateIndex} if this table is used in a stack.
+	 * @throws IOException
+	 *             file cannot be read.
+	 */
+	public long minUpdateIndex() throws IOException {
+		if (blockSize == 0) {
+			readFileHeader();
+		}
+		return minUpdateIndex;
+	}
+
+	/**
+	 * @return the maximum update index for log entries that appear in this
+	 *         reftable. This should be 1 higher than the prior reftable's
+	 *         {@code maxUpdateIndex} if this table is used in a stack.
+	 * @throws IOException
+	 *             file cannot be read.
+	 */
+	public long maxUpdateIndex() throws IOException {
+		if (blockSize == 0) {
+			readFileHeader();
+		}
+		return maxUpdateIndex;
 	}
 
 	@Override
@@ -173,10 +204,11 @@ public class ReftableReader extends Reftable {
 	}
 
 	@Override
-	public LogCursor seekLog(String refName, long timeUsec) throws IOException {
+	public LogCursor seekLog(String refName, long updateIndex)
+			throws IOException {
 		initLogIndex();
 		if (logOffset > 0) {
-			byte[] key = LogEntry.key(refName, timeUsec);
+			byte[] key = LogEntry.key(refName, updateIndex);
 			byte[] match = refName.getBytes(UTF_8);
 			LogCursorImpl i = new LogCursorImpl(logEnd, match);
 			i.block = seek(LOG_BLOCK_TYPE, key, logIndex, logOffset, logEnd);
@@ -235,11 +267,11 @@ public class ReftableReader extends Reftable {
 			throw new IOException(JGitText.get().invalidReftableCRC);
 		}
 
-		refIndexOffset = NB.decodeInt64(ftr, 8);
-		objOffset = NB.decodeInt64(ftr, 16);
-		objIndexOffset = NB.decodeInt64(ftr, 24);
-		logOffset = NB.decodeInt64(ftr, 32);
-		logIndexOffset = NB.decodeInt64(ftr, 40);
+		refIndexOffset = NB.decodeInt64(ftr, 24);
+		objOffset = NB.decodeInt64(ftr, 32);
+		objIndexOffset = NB.decodeInt64(ftr, 40);
+		logOffset = NB.decodeInt64(ftr, 48);
+		logIndexOffset = NB.decodeInt64(ftr, 56);
 
 		if (refIndexOffset > 0) {
 			refEnd = refIndexOffset;
@@ -293,6 +325,8 @@ public class ReftableReader extends Reftable {
 		if (blockSize == 0) {
 			blockSize = v & 0xffffff;
 		}
+		minUpdateIndex = NB.decodeInt64(tmp, 8);
+		maxUpdateIndex = NB.decodeInt64(tmp, 16);
 		return tmp;
 	}
 
@@ -363,17 +397,6 @@ public class ReftableReader extends Reftable {
 		return end % blockSize == 0 ? blocks : (blocks + 1);
 	}
 
-	/**
-	 * Get size of the reftable, in bytes.
-	 *
-	 * @return size of the reftable, in bytes.
-	 * @throws IOException
-	 *             size cannot be obtained.
-	 */
-	public long size() throws IOException {
-		return src.size();
-	}
-
 	@Override
 	public void close() throws IOException {
 		src.close();
@@ -437,7 +460,7 @@ public class ReftableReader extends Reftable {
 		private final byte[] match;
 
 		private String refName;
-		private long timeUsec;
+		private long updateIndex;
 		private ReflogEntry entry;
 		BlockReader block;
 
@@ -467,8 +490,8 @@ public class ReftableReader extends Reftable {
 				}
 
 				refName = block.name();
-				timeUsec = block.readLogTimeUsec();
-				entry = block.readLog(timeUsec);
+				updateIndex = block.readLogUpdateIndex();
+				entry = block.readLog();
 				return true;
 			}
 		}
@@ -479,8 +502,8 @@ public class ReftableReader extends Reftable {
 		}
 
 		@Override
-		public long getReflogTimeUsec() {
-			return timeUsec;
+		public long getUpdateIndex() {
+			return updateIndex;
 		}
 
 		@Override

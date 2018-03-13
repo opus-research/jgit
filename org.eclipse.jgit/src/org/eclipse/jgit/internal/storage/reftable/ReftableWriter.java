@@ -88,11 +88,14 @@ import org.eclipse.jgit.util.NB;
  * all references. A {@link ReftableWriter} is single-use, and not thread-safe.
  */
 public class ReftableWriter {
-	private ReftableConfig config = new ReftableConfig();
+	private ReftableConfig config;
 	private int refBlockSize;
 	private int logBlockSize;
 	private int restartInterval;
 	private boolean indexObjects;
+
+	private long minUpdateIndex;
+	private long maxUpdateIndex;
 
 	private ReftableOutputStream out;
 	private ObjectIdSubclassMap<RefList> obj2ref;
@@ -101,9 +104,6 @@ public class ReftableWriter {
 	private BlockWriter objIndex;
 	private BlockWriter logIndex;
 	private BlockWriter cur;
-
-	private String logLastRef = ""; //$NON-NLS-1$
-	private long logLastTimeUsec;
 
 	private long objOffset;
 	private long logOffset;
@@ -125,6 +125,21 @@ public class ReftableWriter {
 	private int objIdLen;
 	private Stats stats;
 
+	/** Initialize a writer with a default configuration. */
+	public ReftableWriter() {
+		this(new ReftableConfig());
+	}
+
+	/**
+	 * Initialize a writer with a specific configuration.
+	 *
+	 * @param cfg
+	 *            configuration for the writer.
+	 */
+	public ReftableWriter(ReftableConfig cfg) {
+		config = cfg;
+	}
+
 	/**
 	 * @param cfg
 	 *            configuration for the writer.
@@ -136,17 +151,39 @@ public class ReftableWriter {
 	}
 
 	/**
+	 * @param min
+	 *            the minimum update index for log entries that appear in this
+	 *            reftable. This should be 1 higher than the prior reftable's
+	 *            {@code maxUpdateIndex} if this table will be used in a stack.
+	 * @return {@code this}
+	 */
+	public ReftableWriter setMinUpdateIndex(long min) {
+		minUpdateIndex = min;
+		return this;
+	}
+
+	/**
+	 * @param max
+	 *            the maximum update index for log entries that appear in this
+	 *            reftable. This should be at least 1 higher than the prior
+	 *            reftable's {@code maxUpdateIndex} if this table will be used
+	 *            in a stack.
+	 * @return {@code this}
+	 */
+	public ReftableWriter setMaxUpdateIndex(long max) {
+		maxUpdateIndex = max;
+		return this;
+	}
+
+	/**
 	 * Begin writing the reftable.
-	 * <p>
-	 * The provided {@code OutputStream} should be buffered by the caller to
-	 * amortize system calls.
 	 *
 	 * @param os
 	 *            stream to write the table to. Caller is responsible for
 	 *            closing the stream after invoking {@link #finish()}.
 	 * @return {@code this}
 	 * @throws IOException
-	 *             reftable header cannot be written.
+	 *             if reftable header cannot be written.
 	 */
 	public ReftableWriter begin(OutputStream os) throws IOException {
 		refBlockSize = config.getRefBlockSize();
@@ -171,8 +208,6 @@ public class ReftableWriter {
 		if (indexObjects) {
 			obj2ref = new ObjectIdSubclassMap<>();
 		}
-		logLastRef = ""; //$NON-NLS-1$
-		logLastTimeUsec = 0;
 		writeFileHeader();
 		return this;
 	}
@@ -241,13 +276,16 @@ public class ReftableWriter {
 	/**
 	 * Write one reflog entry to the reftable.
 	 * <p>
-	 * Reflog entries must be written in reference name and descending time
-	 * (most recent first) order. If duplicate times are detected by this
-	 * method, the time of older records will be adjusted backwards by a few
-	 * microseconds to maintain uniqueness.
+	 * Reflog entries must be written in reference name and descending
+	 * {@code updateIndex} (highest first) order.
 	 *
-	 * @param name
+	 * @param ref
 	 *            name of the reference.
+	 * @param updateIndex
+	 *            identifier of the transaction that created the log record. The
+	 *            {@code updateIndex} must be unique within the scope of
+	 *            {@code ref}, and must be within the bounds defined by
+	 *            {@code minUpdateIndex <= updateIndex <= maxUpdateIndex}.
 	 * @param who
 	 *            committer of the reflog entry.
 	 * @param oldId
@@ -259,51 +297,19 @@ public class ReftableWriter {
 	 * @throws IOException
 	 *             reftable cannot be written.
 	 */
-	public void writeLog(String name, PersonIdent who, ObjectId oldId,
-			ObjectId newId, @Nullable String message) throws IOException {
-		long timeUsec = who.getWhen().getTime() * 1000L + 999L;
-		if (logLastRef.equals(name) && timeUsec >= logLastTimeUsec) {
-			timeUsec = logLastTimeUsec - 1;
-		}
-		writeLog(name, timeUsec, who, oldId, newId, message);
-	}
-
-	/**
-	 * Write one reflog entry to the reftable.
-	 * <p>
-	 * Reflog entries must be written in reference name and descending time
-	 * (most recent first) order.
-	 *
-	 * @param name
-	 *            name of the reference.
-	 * @param timeUsec
-	 *            time in microseconds since the epoch of the log event. This
-	 *            timestamp must be unique within the scope of {@code name}.
-	 * @param who
-	 *            committer of the reflog entry.
-	 * @param oldId
-	 *            prior id; pass {@link ObjectId#zeroId()} for creations.
-	 * @param newId
-	 *            new id; pass {@link ObjectId#zeroId()} for deletions.
-	 * @param message
-	 *            optional message (may be null).
-	 * @throws IOException
-	 *             reftable cannot be written.
-	 */
-	public void writeLog(String name, long timeUsec, PersonIdent who,
+	public void writeLog(String ref, long updateIndex, PersonIdent who,
 			ObjectId oldId, ObjectId newId, @Nullable String message)
 					throws IOException {
 		String msg = message != null ? message : ""; //$NON-NLS-1$
 		beginLog();
-		logLastRef = name;
-		logLastTimeUsec = timeUsec;
 		logCnt++;
-		write(logIndex, new LogEntry(name, timeUsec, who, oldId, newId, msg));
+		write(logIndex, new LogEntry(ref, updateIndex, who, oldId, newId, msg));
 	}
 
 	private void beginLog() throws IOException {
 		if (logOffset == 0) {
 			finishRef(); // close prior ref blocks and their index, if present.
+			out.flushFileHeader();
 
 			if (logBlockSize == 0) {
 				logBlockSize = refBlockSize * 2;
@@ -464,22 +470,27 @@ public class ReftableWriter {
 
 	private void writeFileHeader() throws IOException {
 		byte[] hdr = new byte[FILE_HEADER_LEN];
+		encodeHeader(hdr);
+		out.write(hdr);
+	}
+
+	private void encodeHeader(byte[] hdr) {
 		System.arraycopy(FILE_HEADER_MAGIC, 0, hdr, 0, 4);
 		NB.encodeInt32(hdr, 4, (VERSION_1 << 24) | refBlockSize);
-		out.write(hdr);
+		NB.encodeInt64(hdr, 8, minUpdateIndex);
+		NB.encodeInt64(hdr, 16, maxUpdateIndex);
 	}
 
 	private void writeFileFooter() throws IOException {
 		int ftrLen = FILE_FOOTER_LEN;
 		byte[] ftr = new byte[ftrLen];
-		System.arraycopy(FILE_HEADER_MAGIC, 0, ftr, 0, 4);
-		NB.encodeInt32(ftr, 4, (VERSION_1 << 24) | refBlockSize);
+		encodeHeader(ftr);
 
-		NB.encodeInt64(ftr, 8, refIndexOffset);
-		NB.encodeInt64(ftr, 16, objOffset);
-		NB.encodeInt64(ftr, 24, objIndexOffset);
-		NB.encodeInt64(ftr, 32, logOffset);
-		NB.encodeInt64(ftr, 40, logIndexOffset);
+		NB.encodeInt64(ftr, 24, refIndexOffset);
+		NB.encodeInt64(ftr, 32, objOffset);
+		NB.encodeInt64(ftr, 40, objIndexOffset);
+		NB.encodeInt64(ftr, 48, logOffset);
+		NB.encodeInt64(ftr, 56, logIndexOffset);
 
 		CRC32 crc = new CRC32();
 		crc.update(ftr, 0, ftrLen - 4);
@@ -499,6 +510,9 @@ public class ReftableWriter {
 		private final int refBlockSize;
 		private final int logBlockSize;
 		private final int restartInterval;
+
+		private final long minUpdateIndex;
+		private final long maxUpdateIndex;
 
 		private final long refCnt;
 		private final int objCnt;
@@ -521,6 +535,9 @@ public class ReftableWriter {
 			refBlockSize = w.refBlockSize;
 			logBlockSize = w.logBlockSize;
 			restartInterval = w.restartInterval;
+
+			minUpdateIndex = w.minUpdateIndex;
+			maxUpdateIndex = w.maxUpdateIndex;
 
 			refCnt = w.refCnt;
 			objCnt = w.objCnt;
@@ -545,7 +562,7 @@ public class ReftableWriter {
 			return refBlockSize;
 		}
 
-		/** @return number of bytes in a ref block. */
+		/** @return number of bytes to compress into a log block. */
 		public int logBlockSize() {
 			return logBlockSize;
 		}
@@ -553,6 +570,16 @@ public class ReftableWriter {
 		/** @return number of references between binary search markers. */
 		public int restartInterval() {
 			return restartInterval;
+		}
+
+		/** @return smallest update index contained in this reftable. */
+		public long minUpdateIndex() {
+			return minUpdateIndex;
+		}
+
+		/** @return largest update index contained in this reftable. */
+		public long maxUpdateIndex() {
+			return maxUpdateIndex;
 		}
 
 		/** @return total number of references in the reftable. */
