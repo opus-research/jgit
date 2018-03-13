@@ -322,9 +322,12 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private RevCommit parseCommit(final Repository clonedRepo, final Ref ref)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
+		final RevWalk rw = new RevWalk(clonedRepo);
 		final RevCommit commit;
-		try (final RevWalk rw = new RevWalk(clonedRepo)) {
+		try {
 			commit = rw.parseCommit(ref.getObjectId());
+		} finally {
+			rw.release();
 		}
 		return commit;
 	}

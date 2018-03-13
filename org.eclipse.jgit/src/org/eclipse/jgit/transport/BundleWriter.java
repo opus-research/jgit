@@ -194,7 +194,8 @@ public class BundleWriter {
 		PackConfig pc = packConfig;
 		if (pc == null)
 			pc = new PackConfig(db);
-		try (PackWriter packWriter = new PackWriter(pc, db.newObjectReader())) {
+		PackWriter packWriter = new PackWriter(pc, db.newObjectReader());
+		try {
 			final HashSet<ObjectId> inc = new HashSet<ObjectId>();
 			final HashSet<ObjectId> exc = new HashSet<ObjectId>();
 			inc.addAll(include.values());
@@ -232,6 +233,8 @@ public class BundleWriter {
 			w.write('\n');
 			w.flush();
 			packWriter.writePack(monitor, monitor, os);
+		} finally {
+			packWriter.release();
 		}
 	}
 }

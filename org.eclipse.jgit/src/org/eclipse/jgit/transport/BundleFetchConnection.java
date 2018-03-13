@@ -183,13 +183,16 @@ class BundleFetchConnection extends BaseFetchConnection {
 			throws TransportException {
 		verifyPrerequisites();
 		try {
-			try (ObjectInserter ins = transport.local.newObjectInserter()) {
+			ObjectInserter ins = transport.local.newObjectInserter();
+			try {
 				PackParser parser = ins.newPackParser(bin);
 				parser.setAllowThin(true);
 				parser.setObjectChecker(transport.getObjectChecker());
 				parser.setLockMessage(lockMessage);
 				packLock = parser.parse(NullProgressMonitor.INSTANCE);
 				ins.flush();
+			} finally {
+				ins.release();
 			}
 		} catch (IOException err) {
 			close();
@@ -214,7 +217,8 @@ class BundleFetchConnection extends BaseFetchConnection {
 		if (prereqs.isEmpty())
 			return;
 
-		try (final RevWalk rw = new RevWalk(transport.local)) {
+		final RevWalk rw = new RevWalk(transport.local);
+		try {
 			final RevFlag PREREQ = rw.newFlag("PREREQ"); //$NON-NLS-1$
 			final RevFlag SEEN = rw.newFlag("SEEN"); //$NON-NLS-1$
 
@@ -277,6 +281,8 @@ class BundleFetchConnection extends BaseFetchConnection {
 				throw new MissingBundlePrerequisiteException(transport.uri,
 						missing);
 			}
+		} finally {
+			rw.release();
 		}
 	}
 

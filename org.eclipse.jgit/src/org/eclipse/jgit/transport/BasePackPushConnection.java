@@ -279,8 +279,9 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		Set<ObjectId> remoteObjects = new HashSet<ObjectId>();
 		Set<ObjectId> newObjects = new HashSet<ObjectId>();
 
-		try (final PackWriter writer = new PackWriter(transport.getPackConfig(),
-				local.newObjectReader())) {
+		final PackWriter writer = new PackWriter(transport.getPackConfig(),
+				local.newObjectReader());
+		try {
 
 			for (final Ref r : getRefs()) {
 				// only add objects that we actually have
@@ -302,9 +303,10 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
 			writer.writePack(monitor, monitor, out);
-
-			packTransferTime = writer.getStatistics().getTimeWriting();
+		} finally {
+			writer.release();
 		}
+		packTransferTime = writer.getStatistics().getTimeWriting();
 	}
 
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)
