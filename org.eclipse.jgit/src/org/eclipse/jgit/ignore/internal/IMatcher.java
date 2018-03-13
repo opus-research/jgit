@@ -50,20 +50,6 @@ package org.eclipse.jgit.ignore.internal;
 public interface IMatcher {
 
 	/**
-	 * Matcher that does not match any pattern.
-	 */
-	public static final IMatcher NO_MATCH = new IMatcher() {
-		public boolean matches(String path, boolean assumeDirectory) {
-			return false;
-		}
-
-		public boolean matches(String segment, int startIncl, int endExcl,
-				boolean assumeDirectory) {
-			return false;
-		}
-	};
-
-	/**
 	 * Matches entire given string
 	 *
 	 * @param path
