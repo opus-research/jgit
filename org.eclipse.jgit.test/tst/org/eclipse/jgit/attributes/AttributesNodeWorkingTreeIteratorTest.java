@@ -231,7 +231,7 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {
-					assertThat(entryAttributes.getAll(),
+					assertThat(entryAttributes.getAttributes(),
 							hasItem(attribute));
 				}
 			} else {

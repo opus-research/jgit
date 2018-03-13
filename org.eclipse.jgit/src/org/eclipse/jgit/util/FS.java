@@ -110,54 +110,7 @@ public abstract class FS {
 		}
 	}
 
-	/**
-	 * Result of an executed process. The caller is responsible to close the
-	 * contained {@link TemporaryBuffer}s
-	 *
-	 * @since 4.2
-	 */
-	public static class ExecutionResult {
-		private TemporaryBuffer stdout;
-
-		private TemporaryBuffer stderr;
-
-		private int rc;
-
-		/**
-		 * @param stdout
-		 * @param stderr
-		 * @param rc
-		 */
-		public ExecutionResult(TemporaryBuffer stdout, TemporaryBuffer stderr,
-				int rc) {
-			this.stdout = stdout;
-			this.stderr = stderr;
-			this.rc = rc;
-		}
-
-		/**
-		 * @return buffered standard output stream
-		 */
-		public TemporaryBuffer getStdout() {
-			return stdout;
-		}
-
-		/**
-		 * @return buffered standard error stream
-		 */
-		public TemporaryBuffer getStderr() {
-			return stderr;
-		}
-
-		/**
-		 * @return the return code of the process
-		 */
-		public int getRc() {
-			return rc;
-		}
-	}
-
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -949,7 +902,9 @@ public abstract class FS {
 	 * @param outRedirect
 	 *            An OutputStream on which to redirect the processes stdout. Can
 	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost.
+	 *            output will be lost. If binary is set to <code>false</code>
+	 *            then it is expected that the process emits text data which
+	 *            should be processed line by line.
 	 * @param errRedirect
 	 *            An OutputStream on which to redirect the processes stderr. Can
 	 *            be <code>null</code>, in which case the processes standard
@@ -957,9 +912,9 @@ public abstract class FS {
 	 * @param inRedirect
 	 *            An InputStream from which to redirect the processes stdin. Can
 	 *            be <code>null</code>, in which case the process doesn't get
-	 *            any data over stdin. It is assumed that the whole InputStream
-	 *            will be consumed by the process. The method will close the
-	 *            inputstream after all bytes are read.
+	 *            any data over stdin. If binary is set to
+	 *            <code>false</code> then it is expected that the process
+	 *            expects text data which should be processed line by line.
 	 * @return the return code of this process.
 	 * @throws IOException
 	 *             if an I/O error occurs while executing this process.
@@ -1009,9 +964,6 @@ public abstract class FS {
 				// A process doesn't clean its own resources even when destroyed
 				// Explicitly try and close all three streams, preserving the
 				// outer I/O exception if any.
-				if (inRedirect != null) {
-					inRedirect.close();
-				}
 				try {
 					process.getErrorStream().close();
 				} catch (IOException e) {
@@ -1052,10 +1004,10 @@ public abstract class FS {
 		pool.shutdown(); // Disable new tasks from being submitted
 		try {
 			// Wait a while for existing tasks to terminate
-			if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+			if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
 				pool.shutdownNow(); // Cancel currently executing tasks
 				// Wait a while for tasks to respond to being canceled
-				if (!pool.awaitTermination(60, TimeUnit.SECONDS))
+				if (!pool.awaitTermination(5, TimeUnit.SECONDS))
 					hasShutdown = false;
 			}
 		} catch (InterruptedException ie) {
@@ -1081,31 +1033,6 @@ public abstract class FS {
 	 *         populating directory, environment, and then start the process.
 	 */
 	public abstract ProcessBuilder runInShell(String cmd, String[] args);
-
-	/**
-	 * Execute a command defined by a {@link ProcessBuilder}.
-	 *
-	 * @param pb
-	 *            The command to be executed
-	 * @param in
-	 *            The standard input stream passed to the process
-	 * @return The result of the executed command
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public ExecutionResult execute(ProcessBuilder pb, InputStream in)
-			throws IOException, InterruptedException {
-		TemporaryBuffer stdout = new TemporaryBuffer.LocalFile(null);
-		TemporaryBuffer stderr = new TemporaryBuffer.Heap(1024, 1024 * 1024);
-		try {
-			int rc = runProcess(pb, stdout, stderr, in);
-			return new ExecutionResult(stdout, stderr, rc);
-		} finally {
-			stdout.close();
-			stderr.close();
-		}
-	}
 
 	private static class Holder<V> {
 		final V value;

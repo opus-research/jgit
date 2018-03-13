@@ -50,10 +50,10 @@ package org.eclipse.jgit.attributes;
  * <li>Set - represented by {@link State#SET}</li>
  * <li>Unset - represented by {@link State#UNSET}</li>
  * <li>Set to a value - represented by {@link State#CUSTOM}</li>
- * <li>Unspecified - used to revert an attribute . This is crucial in order to
- * mark an attribute as unspecified in the attributes map and thus preventing
- * following (with lower priority) nodes from setting the attribute to a value
- * at all</li>
+ * <li>Unspecified - used in the INFO .gitattributes in order to revert a
+ * previously set attribute key. This is crucial in order to mark an attribute
+ * as unspecified in the Map and preventing following nodes from setting the
+ * attribute</li>
  * </ul>
  * </p>
  *
@@ -74,7 +74,7 @@ public final class Attribute {
 
 		/**
 		 * the attribute appears as if it would not be defined at all
-		 *
+		 * 
 		 * @since 4.2
 		 */
 		UNSPECIFIED,

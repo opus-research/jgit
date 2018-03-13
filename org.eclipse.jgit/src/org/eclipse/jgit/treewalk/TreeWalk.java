@@ -1151,27 +1151,41 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			AttributesNode infoNodeAttr = attributesNodeProvider
 					.getInfoAttributesNode();
 
+			// TODO imotsch: this will follow in the next proposal:
+			/*
+			 * // Gets the current tree root node AttributesNode rootNodeAttr =
+			 * getRootAttributesNode(operationType, workingTreeIterator,
+			 * dirCacheIterator, other);
+			 *
+			 * // Update the macro expander using the global node, the info node
+			 * // and the current root node updateMacroExpander(globalNodeAttr,
+			 * infoNodeAttr, rootNodeAttr);
+			 */
+
 			// Gets the info attributes
 			if (infoNodeAttr != null) {
-				infoNodeAttr.getAttributes(path, isDir, attributes);
+				infoNodeAttr.getAttributes(path, isDir,
+						attributes);
 			}
 
 			// Gets the attributes located on the current entry path
-			getPerDirectoryEntryAttributes(path, isDir, operationType,
-					workingTreeIterator, dirCacheIterator, other, attributes);
+			getPerDirectoryEntryAttributes(path, isDir,
+					operationType, workingTreeIterator, dirCacheIterator, other,
+					attributes);
 
 			// Gets the attributes located in the global attribute file
 			if (globalNodeAttr != null) {
-				globalNodeAttr.getAttributes(path, isDir, attributes);
+				globalNodeAttr.getAttributes(path, isDir,
+						attributes);
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
 		}
 		// now after all attributes are collected - in the correct hierarchy
 		// order - remove all unspecified entries (the ! marker)
-		for (Attribute a : attributes.getAll()) {
+		for (Attribute a : attributes.getAttributes()) {
 			if (a.getState() == State.UNSPECIFIED)
-				attributes.remove(a.getKey());
+				attributes.removeAttribute(a.getKey());
 		}
 		return attributes;
 	}
@@ -1209,12 +1223,14 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			AttributesNode currentAttributesNode = getCurrentAttributesNode(
 					opType, workingTreeIterator, dirCacheIterator, other);
 			if (currentAttributesNode != null) {
-				currentAttributesNode.getAttributes(path, isDir, attributes);
+				currentAttributesNode.getAttributes(path, isDir,
+						attributes);
 			}
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
 					getParent(dirCacheIterator, DirCacheIterator.class),
-					getParent(other, CanonicalTreeParser.class), attributes);
+					getParent(other, CanonicalTreeParser.class),
+					attributes);
 		}
 	}
 

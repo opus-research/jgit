@@ -66,7 +66,7 @@ public final class Attributes {
 	public Attributes(Attribute... attributes) {
 		if (attributes != null) {
 			for (Attribute a : attributes) {
-				put(a);
+				putAttribute(a);
 			}
 		}
 	}
@@ -82,28 +82,28 @@ public final class Attributes {
 	 * @param key
 	 * @return the attribute or null
 	 */
-	public Attribute get(String key) {
+	public Attribute getAttribute(String key) {
 		return map.get(key);
 	}
 
 	/**
 	 * @return all attributes
 	 */
-	public Collection<Attribute> getAll() {
+	public Collection<Attribute> getAttributes() {
 		return new ArrayList<>(map.values());
 	}
 
 	/**
 	 * @param a
 	 */
-	public void put(Attribute a) {
+	public void putAttribute(Attribute a) {
 		map.put(a.getKey(), a);
 	}
 
 	/**
 	 * @param key
 	 */
-	public void remove(String key) {
+	public void removeAttribute(String key) {
 		map.remove(key);
 	}
 
@@ -129,7 +129,7 @@ public final class Attributes {
 
 	/**
 	 * @param key
-	 * @return true if the key is {@link State#SET}, false in all other cases
+	 * @return true uf the key is {@link State#SET}, false in all other cases
 	 */
 	public boolean isSet(String key) {
 		return (getState(key) == State.SET);
@@ -137,28 +137,10 @@ public final class Attributes {
 
 	/**
 	 * @param key
-	 * @return true if the key is {@link State#UNSET}, false in all other cases
+	 * @return true uf the key is {@link State#UNSET}, false in all other cases
 	 */
 	public boolean isUnset(String key) {
 		return (getState(key) == State.UNSET);
-	}
-
-	/**
-	 * @param key
-	 * @return true if the key is {@link State#UNSPECIFIED}, false in all other
-	 *         cases
-	 */
-	public boolean isUnspecified(String key) {
-		return (getState(key) == State.UNSPECIFIED);
-	}
-
-	/**
-	 * @param key
-	 * @return true if the key is {@link State#CUSTOM}, false in all other cases
-	 *         see {@link #getValue(String)} for the value of the key
-	 */
-	public boolean isCustom(String key) {
-		return (getState(key) == State.CUSTOM);
 	}
 
 	/**
