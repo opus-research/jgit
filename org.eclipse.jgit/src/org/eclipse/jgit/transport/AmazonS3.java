@@ -56,10 +56,10 @@ import java.net.ProxySelector;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.DigestOutputStream;
-import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -186,19 +186,6 @@ public class AmazonS3 {
 	/** S3 Bucket Domain. */
 	private final String domain;
 
-	/** Property names used in amazon connection configuration file. */
-	interface Keys {
-		String ACCESS_KEY = "accesskey"; //$NON-NLS-1$
-		String SECRET_KEY = "secretkey"; //$NON-NLS-1$
-		String PASSWORD = "password"; //$NON-NLS-1$
-		String CRYPTO_ALG = "crypto.algorithm"; //$NON-NLS-1$
-		String CRYPTO_VER = "crypto.version"; //$NON-NLS-1$
-		String ACL = "acl"; //$NON-NLS-1$
-		String DOMAIN = "domain"; //$NON-NLS-1$
-		String HTTP_RETRY = "httpclient.retry-max"; //$NON-NLS-1$
-		String TMP_DIR = "tmpdir"; //$NON-NLS-1$
-	}
-
 	/**
 	 * Create a new S3 client for the supplied user information.
 	 * <p>
@@ -232,18 +219,17 @@ public class AmazonS3 {
 	 *
 	 */
 	public AmazonS3(final Properties props) {
-		domain = props.getProperty(Keys.DOMAIN, "s3.amazonaws.com"); //$NON-NLS-1$
-
-		publicKey = props.getProperty(Keys.ACCESS_KEY);
+		domain = props.getProperty("domain", "s3.amazonaws.com"); //$NON-NLS-1$ //$NON-NLS-2$
+		publicKey = props.getProperty("accesskey"); //$NON-NLS-1$
 		if (publicKey == null)
 			throw new IllegalArgumentException(JGitText.get().missingAccesskey);
 
-		final String secret = props.getProperty(Keys.SECRET_KEY);
+		final String secret = props.getProperty("secretkey"); //$NON-NLS-1$
 		if (secret == null)
 			throw new IllegalArgumentException(JGitText.get().missingSecretkey);
 		privateKey = new SecretKeySpec(Constants.encodeASCII(secret), HMAC);
 
-		final String pacl = props.getProperty(Keys.ACL, "PRIVATE"); //$NON-NLS-1$
+		final String pacl = props.getProperty("acl", "PRIVATE"); //$NON-NLS-1$ //$NON-NLS-2$
 		if (StringUtils.equalsIgnoreCase("PRIVATE", pacl)) //$NON-NLS-1$
 			acl = "private"; //$NON-NLS-1$
 		else if (StringUtils.equalsIgnoreCase("PUBLIC", pacl)) //$NON-NLS-1$
@@ -256,16 +242,26 @@ public class AmazonS3 {
 			throw new IllegalArgumentException("Invalid acl: " + pacl); //$NON-NLS-1$
 
 		try {
-			encryption = WalkEncryption.instance(props);
-		} catch (GeneralSecurityException e) {
+			final String cPas = props.getProperty("password"); //$NON-NLS-1$
+			if (cPas != null) {
+				String cAlg = props.getProperty("crypto.algorithm"); //$NON-NLS-1$
+				if (cAlg == null)
+					cAlg = "PBEWithMD5AndDES"; //$NON-NLS-1$
+				encryption = new WalkEncryption.ObjectEncryptionV2(cAlg, cPas);
+			} else {
+				encryption = WalkEncryption.NONE;
+			}
+		} catch (InvalidKeySpecException e) {
+			throw new IllegalArgumentException(JGitText.get().invalidEncryption, e);
+		} catch (NoSuchAlgorithmException e) {
 			throw new IllegalArgumentException(JGitText.get().invalidEncryption, e);
 		}
 
-		maxAttempts = Integer
-				.parseInt(props.getProperty(Keys.HTTP_RETRY, "3")); //$NON-NLS-1$
+		maxAttempts = Integer.parseInt(props.getProperty(
+				"httpclient.retry-max", "3")); //$NON-NLS-1$ //$NON-NLS-2$
 		proxySelector = ProxySelector.getDefault();
 
-		String tmp = props.getProperty(Keys.TMP_DIR);
+		String tmp = props.getProperty("tmpdir"); //$NON-NLS-1$
 		tmpDir = tmp != null && tmp.length() > 0 ? new File(tmp) : null;
 	}
 
