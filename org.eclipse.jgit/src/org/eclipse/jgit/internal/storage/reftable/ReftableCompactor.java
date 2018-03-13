@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ReflogEntry;
 
 /**
@@ -60,34 +59,19 @@ import org.eclipse.jgit.lib.ReflogEntry;
  * to {@code true} to ensure the new reftable continues to use a delete marker
  * to shadow any lower reftable that may have the reference present.
  * <p>
- * By default all log entries within the range defined by
- * {@link #setMinUpdateIndex(long)} and {@link #setMaxUpdateIndex(long)} are
- * copied, even if no references in the output file match the log records.
- * Callers may truncate the log to a more recent time horizon with
- * {@link #setOldestReflogTimeMillis(long)}, or disable the log altogether with
- * {@code setOldestReflogTimeMillis(Long.MAX_VALUE)}.
+ * By default all log entries are copied, even if no references in the output
+ * file match the log records. Callers may truncate the log to a more recent
+ * time horizon with {@link #setOldestReflogTime(long)}, or disable the log
+ * altogether with {@code setOldestReflogTime(Long.MAX_VALUE)}.
  */
 public class ReftableCompactor {
 	private final ReftableWriter writer = new ReftableWriter();
-	private final ArrayDeque<Reftable> tables = new ArrayDeque<>();
+	private final ArrayDeque<RefCursor> tables = new ArrayDeque<>();
 
 	private long compactBytesLimit;
 	private long bytesToCompact;
 	private boolean includeDeletes;
-	private long minUpdateIndex;
-	private long maxUpdateIndex;
-	private long oldestReflogTimeMillis;
-	private Stats stats;
-
-	/**
-	 * @param cfg
-	 *            configuration for the reftable.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setConfig(ReftableConfig cfg) {
-		writer.setConfig(cfg);
-		return this;
-	}
+	private long oldestReflogTime;
 
 	/**
 	 * @param bytes
@@ -96,6 +80,38 @@ public class ReftableCompactor {
 	 */
 	public ReftableCompactor setCompactBytesLimit(long bytes) {
 		compactBytesLimit = bytes;
+		return this;
+	}
+
+	/**
+	 * @param szBytes
+	 *            desired output block size for references, in bytes.
+	 * @return {@code this}
+	 */
+	public ReftableCompactor setRefBlockSize(int szBytes) {
+		writer.setRefBlockSize(szBytes);
+		return this;
+	}
+
+	/**
+	 * @param szBytes
+	 *            desired output block size for log entries, in bytes.
+	 * @return {@code this}
+	 */
+	public ReftableCompactor setLogBlockSize(int szBytes) {
+		writer.setLogBlockSize(szBytes);
+		return this;
+	}
+
+	/**
+	 * @param interval
+	 *            number of references between binary search markers. If
+	 *            {@code interval} is 0 (default), the writer will select a
+	 *            default value based on the block size.
+	 * @return {@code this}
+	 */
+	public ReftableCompactor setRestartInterval(int interval) {
+		writer.setRestartInterval(interval);
 		return this;
 	}
 
@@ -111,41 +127,15 @@ public class ReftableCompactor {
 	}
 
 	/**
-	 * @param min
-	 *            the minimum update index for log entries that appear in the
-	 *            compacted reftable. This should be 1 higher than the prior
-	 *            reftable's {@code maxUpdateIndex} if this table will be used
-	 *            in a stack.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setMinUpdateIndex(long min) {
-		minUpdateIndex = min;
-		return this;
-	}
-
-	/**
-	 * @param max
-	 *            the maximum update index for log entries that appear in the
-	 *            compacted reftable. This should be at least 1 higher than the
-	 *            prior reftable's {@code maxUpdateIndex} if this table will be
-	 *            used in a stack.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setMaxUpdateIndex(long max) {
-		maxUpdateIndex = max;
-		return this;
-	}
-
-	/**
 	 * @param timeMillis
 	 *            oldest log time to preserve. Entries whose timestamps are
 	 *            {@code >= timeMillis} will be copied into the output file. Log
 	 *            entries that predate {@code timeMillis} will be discarded.
-	 *            Specified in Java standard milliseconds since the epoch.
+	 *            Specified in the usual Java way, milliseconds since the epoch.
 	 * @return {@code this}
 	 */
-	public ReftableCompactor setOldestReflogTimeMillis(long timeMillis) {
-		oldestReflogTimeMillis = timeMillis;
+	public ReftableCompactor setOldestReflogTime(long timeMillis) {
+		oldestReflogTime = timeMillis;
 		return this;
 	}
 
@@ -160,7 +150,7 @@ public class ReftableCompactor {
 	 *            recent last so that the more recent tables can shadow the
 	 *            older results. Caller is responsible for closing the readers.
 	 */
-	public void addAll(List<? extends Reftable> readers) {
+	public void addAll(List<RefCursor> readers) {
 		tables.addAll(readers);
 	}
 
@@ -178,7 +168,7 @@ public class ReftableCompactor {
 	 * @return {@code true} if the compactor accepted this table; {@code false}
 	 *         if the compactor has reached its limit.
 	 * @throws IOException
-	 *             if size of {@code reader} cannot be read.
+	 *             size of {@code reader} cannot be read.
 	 */
 	public boolean tryAddFirst(ReftableReader reader) throws IOException {
 		long sz = reader.size();
@@ -197,67 +187,37 @@ public class ReftableCompactor {
 	 *            stream to write the compacted tables to. Caller is responsible
 	 *            for closing {@code out}.
 	 * @throws IOException
-	 *             if tables cannot be read, or cannot be written.
+	 *             tables cannot be read, or cannot be written.
 	 */
 	public void compact(OutputStream out) throws IOException {
 		MergedReftable mr = new MergedReftable(new ArrayList<>(tables));
 		mr.setIncludeDeletes(includeDeletes);
 
-		writer.setMinUpdateIndex(minUpdateIndex);
-		writer.setMaxUpdateIndex(maxUpdateIndex);
 		writer.begin(out);
 		mergeRefs(mr);
 		mergeLogs(mr);
 		writer.finish();
-		stats = writer.getStats();
-	}
-
-	/** @return statistics of the last written reftable. */
-	public Stats getStats() {
-		return stats;
 	}
 
 	private void mergeRefs(MergedReftable mr) throws IOException {
-		try (RefCursor rc = mr.allRefs()) {
-			while (rc.next()) {
-				writer.writeRef(rc.getRef());
-			}
+		mr.seekToFirstRef();
+		while (mr.next()) {
+			writer.writeRef(mr.getRef());
 		}
 	}
 
 	private void mergeLogs(MergedReftable mr) throws IOException {
-		if (oldestReflogTimeMillis == Long.MAX_VALUE) {
-			return;
-		}
-
-		try (LogCursor lc = mr.allLogs()) {
-			while (lc.next()) {
-				long updateIndex = lc.getUpdateIndex();
-				if (updateIndex < minUpdateIndex
-						|| updateIndex > maxUpdateIndex) {
-					// Cannot merge log records outside the header's range.
-					continue;
-				}
-
-				String refName = lc.getRefName();
-				ReflogEntry log = lc.getReflogEntry();
-				if (log == null) {
-					if (includeDeletes) {
-						writer.deleteLog(refName, updateIndex);
-					}
-					continue;
-				}
-
-				PersonIdent who = log.getWho();
-				if (who.getWhen().getTime() >= oldestReflogTimeMillis) {
-					writer.writeLog(
-							refName,
-							updateIndex,
-							who,
-							log.getOldId(),
-							log.getNewId(),
-							log.getComment());
-				}
+		mr.seekToFirstLog();
+		while (mr.next()) {
+			ReflogEntry log = mr.getReflogEntry();
+			PersonIdent who = log.getWho();
+			if (who.getWhen().getTime() >= oldestReflogTime) {
+				writer.writeLog(
+						mr.getRefName(),
+						who,
+						log.getOldId(),
+						log.getNewId(),
+						log.getComment());
 			}
 		}
 	}

@@ -170,28 +170,16 @@ public class RemoteConfig implements Serializable {
 		vlst = rc.getStringList(SECTION, name, KEY_URL);
 		Map<String, String> insteadOf = getReplacements(rc, KEY_INSTEADOF);
 		uris = new ArrayList<>(vlst.length);
-		for (final String s : vlst) {
+		for (final String s : vlst)
 			uris.add(new URIish(replaceUri(s, insteadOf)));
-		}
-		String[] plst = rc.getStringList(SECTION, name, KEY_PUSHURL);
-		pushURIs = new ArrayList<>(plst.length);
-		for (final String s : plst) {
-			pushURIs.add(new URIish(s));
-		}
-		if (pushURIs.isEmpty()) {
-			// Would default to the uris. If we have pushinsteadof, we must
-			// supply rewritten push uris.
-			Map<String, String> pushInsteadOf = getReplacements(rc,
-					KEY_PUSHINSTEADOF);
-			if (!pushInsteadOf.isEmpty()) {
-				for (String s : vlst) {
-					String replaced = replaceUri(s, pushInsteadOf);
-					if (!s.equals(replaced)) {
-						pushURIs.add(new URIish(replaced));
-					}
-				}
-			}
-		}
+
+		Map<String, String> pushInsteadOf = getReplacements(rc,
+				KEY_PUSHINSTEADOF);
+		vlst = rc.getStringList(SECTION, name, KEY_PUSHURL);
+		pushURIs = new ArrayList<>(vlst.length);
+		for (final String s : vlst)
+			pushURIs.add(new URIish(replaceUri(s, pushInsteadOf)));
+
 		vlst = rc.getStringList(SECTION, name, KEY_FETCH);
 		fetch = new ArrayList<>(vlst.length);
 		for (final String s : vlst)
