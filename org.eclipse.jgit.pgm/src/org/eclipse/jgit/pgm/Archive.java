@@ -45,14 +45,15 @@ package org.eclipse.jgit.pgm;
 
 import java.lang.String;
 import java.lang.System;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.EnumMap;
 import java.util.Map;
 import java.text.MessageFormat;
 
 import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.ArchiveStreamFactory;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.eclipse.jgit.lib.FileMode;
@@ -98,7 +99,13 @@ class Archive extends TextBuiltin {
 				continue;
 
 			walk.getObjectId(idBuf, 0);
-			fmt.putEntry(name, mode, reader.open(idBuf), out);
+			final ObjectLoader loader = reader.open(idBuf);
+			final ArchiveEntry entry = fmt.createArchiveEntry( //
+					name, mode, loader.getSize());
+
+			out.putArchiveEntry(entry);
+			loader.copyTo(out);
+			out.closeArchiveEntry();
 		}
 
 		out.close();
@@ -113,27 +120,27 @@ class Archive extends TextBuiltin {
 	public enum Format {
 		ZIP
 	};
-
 	private static interface Archiver {
 		ArchiveOutputStream createArchiveOutputStream(OutputStream s);
-		void putEntry(String path, FileMode mode, //
-				ObjectLoader loader, ArchiveOutputStream out) //
-				throws IOException;
+		ArchiveEntry createArchiveEntry(String path, FileMode mode, long size);
 	}
-
 	private static final Map<Format, Archiver> formats;
 	static {
 		Map<Format, Archiver> fmts = new EnumMap<Format, Archiver>(Format.class);
 		fmts.put(Format.ZIP, new Archiver() {
 			@Override
 			public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-				return new ZipArchiveOutputStream(s);
+				ArchiveStreamFactory factory = new ArchiveStreamFactory();
+				try {
+					return factory.createArchiveOutputStream( //
+							ArchiveStreamFactory.ZIP, s);
+				} catch (ArchiveException e) {
+					throw die("this can't happen: missing zip support");
+				}
 			}
 
 			@Override
-			public void putEntry(String path, FileMode mode, //
-					ObjectLoader loader, ArchiveOutputStream out) //
-					throws IOException {
+			public ArchiveEntry createArchiveEntry(String path, FileMode mode, long size) {
 				final ZipArchiveEntry entry = new ZipArchiveEntry(path);
 
 				if (mode == FileMode.REGULAR_FILE)
@@ -143,10 +150,8 @@ class Archive extends TextBuiltin {
 					entry.setUnixMode(mode.getBits());
 				else
 					warnArchiveEntryModeIgnored(path);
-				entry.setSize(loader.getSize());
-				out.putArchiveEntry(entry);
-				loader.copyTo(out);
-				out.closeArchiveEntry();
+				entry.setSize(size);
+				return entry;
 			}
 		});
 		formats = fmts;
