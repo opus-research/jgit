@@ -44,18 +44,36 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.ProcessResult.Status;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -87,12 +105,13 @@ public abstract class FS {
 					return new FS_Win32_Cygwin();
 				else
 					return new FS_Win32();
-			} else if (FS_POSIX_Java6.hasExecute())
-				return new FS_POSIX_Java6();
-			else
-				return new FS_POSIX_Java5();
+			} else {
+				return new FS_POSIX();
+			}
 		}
 	}
+
+	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -131,29 +150,14 @@ public abstract class FS {
 	 */
 	public static FS detect(Boolean cygwinUsed) {
 		if (factory == null) {
-			try {
-				Class<?> activatorClass = Class
-						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
-				// found Java7
-				factory = (FSFactory) activatorClass.newInstance();
-			} catch (ClassNotFoundException e) {
-				// Java7 module not found
-				// Silently ignore failure to find Java7 FS factory
-				factory = new FS.FSFactory();
-			} catch (UnsupportedClassVersionError e) {
-				factory = new FS.FSFactory();
-			} catch (InstantiationException e) {
-				factory = new FS.FSFactory();
-			} catch (IllegalAccessException e) {
-				factory = new FS.FSFactory();
-			}
+			factory = new FS.FSFactory();
 		}
 		return factory.detect(cygwinUsed);
 	}
 
 	private volatile Holder<File> userHome;
 
-	private volatile Holder<File> gitPrefix;
+	private volatile Holder<File> gitSystemConfig;
 
 	/**
 	 * Constructs a file system abstraction.
@@ -170,7 +174,7 @@ public abstract class FS {
 	 */
 	protected FS(FS src) {
 		userHome = src.userHome;
-		gitPrefix = src.gitPrefix;
+		gitSystemConfig = src.gitSystemConfig;
 	}
 
 	/** @return a new instance of the same type of FS. */
@@ -402,60 +406,58 @@ public abstract class FS {
 	 * @param command
 	 *            as component array
 	 * @param encoding
+	 *            to be used to parse the command's output
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
-		final boolean debug = Boolean.parseBoolean(SystemReader.getInstance()
-				.getProperty("jgit.fs.debug")); //$NON-NLS-1$
+		return readPipe(dir, command, encoding, null);
+	}
+
+	/**
+	 * Execute a command and return a single line of output as a String
+	 *
+	 * @param dir
+	 *            Working directory for the command
+	 * @param command
+	 *            as component array
+	 * @param encoding
+	 *            to be used to parse the command's output
+	 * @param env
+	 *            Map of environment variables to be merged with those of the
+	 *            current process
+	 * @return the one-line output of the command
+	 * @since 4.0
+	 */
+	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
+		final boolean debug = LOG.isDebugEnabled();
 		try {
-			if (debug)
-				System.err.println("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
+			if (debug) {
+				LOG.debug("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
-			final Process p = Runtime.getRuntime().exec(command, null, dir);
-			final BufferedReader lineRead = new BufferedReader(
+			}
+			ProcessBuilder pb = new ProcessBuilder(command);
+			pb.directory(dir);
+			if (env != null) {
+				pb.environment().putAll(env);
+			}
+			Process p = pb.start();
+			BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
-			final AtomicBoolean gooblerFail = new AtomicBoolean(false);
-			Thread gobbler = new Thread() {
-				public void run() {
-					InputStream is = p.getErrorStream();
-					try {
-						int ch;
-						if (debug)
-							while ((ch = is.read()) != -1)
-								System.err.print((char) ch);
-						else
-							while (is.read() != -1) {
-								// ignore
-							}
-					} catch (IOException e) {
-						// Just print on stderr for debugging
-						if (debug)
-							e.printStackTrace(System.err);
-						gooblerFail.set(true);
-					}
-					try {
-						is.close();
-					} catch (IOException e) {
-						// Just print on stderr for debugging
-						if (debug)
-							e.printStackTrace(System.err);
-						gooblerFail.set(true);
-					}
-				}
-			};
+			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
 			String r = null;
 			try {
 				r = lineRead.readLine();
 				if (debug) {
-					System.err.println("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-					System.err.println("(ignoring remaing output:"); //$NON-NLS-1$
+					LOG.debug("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+					LOG.debug("(ignoring remaing output:"); //$NON-NLS-1$
 				}
 				String l;
 				while ((l = lineRead.readLine()) != null) {
-					if (debug)
-						System.err.println(l);
+					if (debug) {
+						LOG.debug(l);
+					}
 				}
 			} finally {
 				p.getErrorStream().close();
@@ -467,53 +469,149 @@ public abstract class FS {
 					int rc = p.waitFor();
 					gobbler.join();
 					if (rc == 0 && r != null && r.length() > 0
-							&& !gooblerFail.get())
+							&& !gobbler.fail.get())
 						return r;
-					if (debug)
-						System.err.println("readpipe rc=" + rc); //$NON-NLS-1$
+					if (debug) {
+						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
+					}
 					break;
 				} catch (InterruptedException ie) {
 					// Stop bothering me, I have a zombie to reap.
 				}
 			}
 		} catch (IOException e) {
-			if (debug)
-				System.err.println(e);
-			// Ignore error (but report)
+			LOG.debug("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
 		}
-		if (debug)
-			System.err.println("readpipe returns null"); //$NON-NLS-1$
+		if (debug) {
+			LOG.debug("readpipe returns null"); //$NON-NLS-1$
+		}
 		return null;
 	}
 
-	/** @return the $prefix directory C Git would use. */
-	public File gitPrefix() {
-		Holder<File> p = gitPrefix;
-		if (p == null) {
-			String overrideGitPrefix = SystemReader.getInstance().getProperty(
-					"jgit.gitprefix"); //$NON-NLS-1$
-			if (overrideGitPrefix != null)
-				p = new Holder<File>(new File(overrideGitPrefix));
-			else
-				p = new Holder<File>(discoverGitPrefix());
-			gitPrefix = p;
+	private static class GobblerThread extends Thread {
+		private final Process p;
+		private final String desc;
+		private final String dir;
+		private final boolean debug = LOG.isDebugEnabled();
+		private final AtomicBoolean fail = new AtomicBoolean();
+
+		private GobblerThread(Process p, String[] command, File dir) {
+			this.p = p;
+			if (debug) {
+				this.desc = Arrays.asList(command).toString();
+				this.dir = dir.toString();
+			} else {
+				this.desc = null;
+				this.dir = null;
+			}
 		}
-		return p.value;
+
+		public void run() {
+			InputStream is = p.getErrorStream();
+			try {
+				int ch;
+				if (debug) {
+					while ((ch = is.read()) != -1) {
+						System.err.print((char) ch);
+					}
+				} else {
+					while (is.read() != -1) {
+						// ignore
+					}
+				}
+			} catch (IOException e) {
+				logError(e);
+				fail.set(true);
+			}
+			try {
+				is.close();
+			} catch (IOException e) {
+				logError(e);
+				fail.set(true);
+			}
+		}
+
+		private void logError(Throwable t) {
+			if (!debug) {
+				return;
+			}
+			String msg = MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
+			LOG.debug(msg, t);
+		}
 	}
 
-	/** @return the $prefix directory C Git would use. */
-	protected abstract File discoverGitPrefix();
+	/**
+	 * @return the path to the Git executable or {@code null} if it cannot be
+	 *         determined.
+	 * @since 4.0
+	 */
+	protected abstract File discoverGitExe();
 
 	/**
-	 * Set the $prefix directory C Git uses.
-	 *
-	 * @param path
-	 *            the directory. Null if C Git is not installed.
-	 * @return {@code this}
+	 * @return the path to the system-wide Git configuration file or
+	 *         {@code null} if it cannot be determined.
+	 * @since 4.0
 	 */
-	public FS setGitPrefix(File path) {
-		gitPrefix = new Holder<File>(path);
+	protected File discoverGitSystemConfig() {
+		File gitExe = discoverGitExe();
+		if (gitExe == null) {
+			return null;
+		}
+
+		// Trick Git into printing the path to the config file by using "echo"
+		// as the editor.
+		Map<String, String> env = new HashMap<>();
+		env.put("GIT_EDITOR", "echo"); //$NON-NLS-1$ //$NON-NLS-2$
+
+		String w = readPipe(gitExe.getParentFile(),
+				new String[] { "git", "config", "--system", "--edit" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+				Charset.defaultCharset().name(), env);
+		if (StringUtils.isEmptyOrNull(w)) {
+			return null;
+		}
+
+		return new File(w);
+	}
+
+	/**
+	 * @return the currently used path to the system-wide Git configuration
+	 *         file or {@code null} if none has been set.
+	 * @since 4.0
+	 */
+	public File getGitSystemConfig() {
+		if (gitSystemConfig == null) {
+			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
+		}
+		return gitSystemConfig.value;
+	}
+
+	/**
+	 * Set the path to the system-wide Git configuration file to use.
+	 *
+	 * @param configFile
+	 *            the path to the config file.
+	 * @return {@code this}
+	 * @since 4.0
+	 */
+	public FS setGitSystemConfig(File configFile) {
+		gitSystemConfig = new Holder<File>(configFile);
 		return this;
+	}
+
+	/**
+	 * @param grandchild
+	 * @return the parent directory of this file's parent directory or
+	 *         {@code null} in case there's no grandparent directory
+	 * @since 4.0
+	 */
+	protected static File resolveGrandparentFile(File grandchild) {
+		if (grandchild != null) {
+			File parent = grandchild.getParentFile();
+			if (parent != null)
+				return parent.getParentFile();
+		}
+		return null;
 	}
 
 	/**
@@ -597,7 +695,7 @@ public abstract class FS {
 	public void setHidden(File path, boolean hidden) throws IOException {
 		if (!path.getName().startsWith(".")) //$NON-NLS-1$
 			throw new IllegalArgumentException(
-					"Hiding only allowed for names that start with a period");
+					JGitText.get().hiddenFilesStartWithDot);
 	}
 
 	/**
@@ -614,7 +712,294 @@ public abstract class FS {
 	}
 
 	/**
-	 * Initialize a ProcesssBuilder to run a command using the system shell.
+	 * See {@link FileUtils#relativize(String, String)}.
+	 *
+	 * @param base
+	 *            The path against which <code>other</code> should be
+	 *            relativized.
+	 * @param other
+	 *            The path that will be made relative to <code>base</code>.
+	 * @return A relative path that, when resolved against <code>base</code>,
+	 *         will yield the original <code>other</code>.
+	 * @see FileUtils#relativize(String, String)
+	 * @since 3.7
+	 */
+	public String relativize(String base, String other) {
+		return FileUtils.relativize(base, other);
+	}
+
+	/**
+	 * Checks whether the given hook is defined for the given repository, then
+	 * runs it with the given arguments.
+	 * <p>
+	 * The hook's standard output and error streams will be redirected to
+	 * <code>System.out</code> and <code>System.err</code> respectively. The
+	 * hook will have no stdin.
+	 * </p>
+	 *
+	 * @param repository
+	 *            The repository for which a hook should be run.
+	 * @param hookName
+	 *            The name of the hook to be executed.
+	 * @param args
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
+	 * @return The ProcessResult describing this hook's execution.
+	 * @throws JGitInternalException
+	 *             if we fail to run the hook somehow. Causes may include an
+	 *             interrupted process or I/O errors.
+	 * @since 4.0
+	 */
+	public ProcessResult runHookIfPresent(Repository repository,
+			final String hookName,
+			String[] args) throws JGitInternalException {
+		return runHookIfPresent(repository, hookName, args, System.out, System.err,
+				null);
+	}
+
+	/**
+	 * Checks whether the given hook is defined for the given repository, then
+	 * runs it with the given arguments.
+	 *
+	 * @param repository
+	 *            The repository for which a hook should be run.
+	 * @param hookName
+	 *            The name of the hook to be executed.
+	 * @param args
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
+	 * @param outRedirect
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
+	 * @param errRedirect
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
+	 * @param stdinArgs
+	 *            A string to pass on to the standard input of the hook. May be
+	 *            <code>null</code>.
+	 * @return The ProcessResult describing this hook's execution.
+	 * @throws JGitInternalException
+	 *             if we fail to run the hook somehow. Causes may include an
+	 *             interrupted process or I/O errors.
+	 * @since 4.0
+	 */
+	public ProcessResult runHookIfPresent(Repository repository,
+			final String hookName,
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
+		return new ProcessResult(Status.NOT_SUPPORTED);
+	}
+
+	/**
+	 * See
+	 * {@link #runHookIfPresent(Repository, String, String[], PrintStream, PrintStream, String)}
+	 * . Should only be called by FS supporting shell scripts execution.
+	 *
+	 * @param repository
+	 *            The repository for which a hook should be run.
+	 * @param hookName
+	 *            The name of the hook to be executed.
+	 * @param args
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
+	 * @param outRedirect
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
+	 * @param errRedirect
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
+	 * @param stdinArgs
+	 *            A string to pass on to the standard input of the hook. May be
+	 *            <code>null</code>.
+	 * @return The ProcessResult describing this hook's execution.
+	 * @throws JGitInternalException
+	 *             if we fail to run the hook somehow. Causes may include an
+	 *             interrupted process or I/O errors.
+	 * @since 4.0
+	 */
+	protected ProcessResult internalRunHookIfPresent(Repository repository,
+			final String hookName, String[] args, PrintStream outRedirect,
+			PrintStream errRedirect, String stdinArgs)
+			throws JGitInternalException {
+		final File hookFile = findHook(repository, hookName);
+		if (hookFile == null)
+			return new ProcessResult(Status.NOT_PRESENT);
+
+		final String hookPath = hookFile.getAbsolutePath();
+		final File runDirectory;
+		if (repository.isBare())
+			runDirectory = repository.getDirectory();
+		else
+			runDirectory = repository.getWorkTree();
+		final String cmd = relativize(runDirectory.getAbsolutePath(),
+				hookPath);
+		ProcessBuilder hookProcess = runInShell(cmd, args);
+		hookProcess.directory(runDirectory);
+		try {
+			return new ProcessResult(runProcess(hookProcess, outRedirect,
+					errRedirect, stdinArgs), Status.OK);
+		} catch (IOException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExecutionOfHook,
+					hookName), e);
+		} catch (InterruptedException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionHookExecutionInterrupted,
+							hookName), e);
+		}
+	}
+
+
+	/**
+	 * Tries to find a hook matching the given one in the given repository.
+	 *
+	 * @param repository
+	 *            The repository within which to find a hook.
+	 * @param hookName
+	 *            The name of the hook we're trying to find.
+	 * @return The {@link File} containing this particular hook if it exists in
+	 *         the given repository, <code>null</code> otherwise.
+	 * @since 4.0
+	 */
+	public File findHook(Repository repository, final String hookName) {
+		File gitDir = repository.getDirectory();
+		if (gitDir == null)
+			return null;
+		final File hookFile = new File(new File(gitDir,
+				Constants.HOOKS), hookName);
+		return hookFile.isFile() ? hookFile : null;
+	}
+
+	/**
+	 * Runs the given process until termination, clearing its stdout and stderr
+	 * streams on-the-fly.
+	 *
+	 * @param hookProcessBuilder
+	 *            The process builder configured for this hook.
+	 * @param outRedirect
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
+	 * @param errRedirect
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
+	 * @param stdinArgs
+	 *            A string to pass on to the standard input of the hook. Can be
+	 *            <code>null</code>.
+	 * @return the exit value of this hook.
+	 * @throws IOException
+	 *             if an I/O error occurs while executing this hook.
+	 * @throws InterruptedException
+	 *             if the current thread is interrupted while waiting for the
+	 *             process to end.
+	 * @since 3.7
+	 */
+	protected int runProcess(ProcessBuilder hookProcessBuilder,
+			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
+			throws IOException, InterruptedException {
+		final ExecutorService executor = Executors.newFixedThreadPool(2);
+		Process process = null;
+		// We'll record the first I/O exception that occurs, but keep on trying
+		// to dispose of our open streams and file handles
+		IOException ioException = null;
+		try {
+			process = hookProcessBuilder.start();
+			final Callable<Void> errorGobbler = new StreamGobbler(
+					process.getErrorStream(), errRedirect);
+			final Callable<Void> outputGobbler = new StreamGobbler(
+					process.getInputStream(), outRedirect);
+			executor.submit(errorGobbler);
+			executor.submit(outputGobbler);
+			if (stdinArgs != null) {
+				final PrintWriter stdinWriter = new PrintWriter(
+						process.getOutputStream());
+				stdinWriter.print(stdinArgs);
+				stdinWriter.flush();
+				// We are done with this hook's input. Explicitly close its
+				// stdin now to kick off any blocking read the hook might have.
+				stdinWriter.close();
+			}
+			return process.waitFor();
+		} catch (IOException e) {
+			ioException = e;
+		} finally {
+			shutdownAndAwaitTermination(executor);
+			if (process != null) {
+				try {
+					process.waitFor();
+				} catch (InterruptedException e) {
+					// Thrown by the outer try.
+					// Swallow this one to carry on our cleanup, and clear the
+					// interrupted flag (processes throw the exception without
+					// clearing the flag).
+					Thread.interrupted();
+				}
+				// A process doesn't clean its own resources even when destroyed
+				// Explicitly try and close all three streams, preserving the
+				// outer I/O exception if any.
+				try {
+					process.getErrorStream().close();
+				} catch (IOException e) {
+					ioException = ioException != null ? ioException : e;
+				}
+				try {
+					process.getInputStream().close();
+				} catch (IOException e) {
+					ioException = ioException != null ? ioException : e;
+				}
+				try {
+					process.getOutputStream().close();
+				} catch (IOException e) {
+					ioException = ioException != null ? ioException : e;
+				}
+				process.destroy();
+			}
+		}
+		// We can only be here if the outer try threw an IOException.
+		throw ioException;
+	}
+
+	/**
+	 * Shuts down an {@link ExecutorService} in two phases, first by calling
+	 * {@link ExecutorService#shutdown() shutdown} to reject incoming tasks, and
+	 * then calling {@link ExecutorService#shutdownNow() shutdownNow}, if
+	 * necessary, to cancel any lingering tasks. Returns true if the pool has
+	 * been properly shutdown, false otherwise.
+	 * <p>
+	 *
+	 * @param pool
+	 *            the pool to shutdown
+	 * @return <code>true</code> if the pool has been properly shutdown,
+	 *         <code>false</code> otherwise.
+	 */
+	private static boolean shutdownAndAwaitTermination(ExecutorService pool) {
+		boolean hasShutdown = true;
+		pool.shutdown(); // Disable new tasks from being submitted
+		try {
+			// Wait a while for existing tasks to terminate
+			if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+				pool.shutdownNow(); // Cancel currently executing tasks
+				// Wait a while for tasks to respond to being canceled
+				if (!pool.awaitTermination(5, TimeUnit.SECONDS))
+					hasShutdown = false;
+			}
+		} catch (InterruptedException ie) {
+			// (Re-)Cancel if current thread also interrupted
+			pool.shutdownNow();
+			// Preserve interrupt status
+			Thread.currentThread().interrupt();
+			hasShutdown = false;
+		}
+		return hasShutdown;
+	}
+
+	/**
+	 * Initialize a ProcessBuilder to run a command using the system shell.
 	 *
 	 * @param cmd
 	 *            command to execute. This string should originate from the
@@ -685,28 +1070,28 @@ public abstract class FS {
 			return lastModifiedTime;
 		}
 
-		private boolean isDirectory;
+		private final boolean isDirectory;
 
-		private boolean isSymbolicLink;
+		private final boolean isSymbolicLink;
 
-		private boolean isRegularFile;
+		private final boolean isRegularFile;
 
-		private long creationTime;
+		private final long creationTime;
 
-		private long lastModifiedTime;
+		private final long lastModifiedTime;
 
-		private boolean isExecutable;
+		private final boolean isExecutable;
 
-		private File file;
+		private final File file;
 
-		private boolean exists;
+		private final boolean exists;
 
 		/**
 		 * file length
 		 */
 		protected long length = -1;
 
-		FS fs;
+		final FS fs;
 
 		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
 				boolean isExecutable, boolean isSymbolicLink,
@@ -725,14 +1110,14 @@ public abstract class FS {
 		}
 
 		/**
-		 * Constructor when there are issues with reading
+		 * Constructor when there are issues with reading. All attributes except
+		 * given will be set to the default values.
 		 *
 		 * @param fs
 		 * @param path
 		 */
 		public Attributes(File path, FS fs) {
-			this.file = path;
-			this.fs = fs;
+			this(fs, path, false, false, false, false, false, 0L, 0L, 0L);
 		}
 
 		/**
@@ -801,5 +1186,51 @@ public abstract class FS {
 	 */
 	public String normalize(String name) {
 		return name;
+	}
+
+	/**
+	 * This runnable will consume an input stream's content into an output
+	 * stream as soon as it gets available.
+	 * <p>
+	 * Typically used to empty processes' standard output and error, preventing
+	 * them to choke.
+	 * </p>
+	 * <p>
+	 * <b>Note</b> that a {@link StreamGobbler} will never close either of its
+	 * streams.
+	 * </p>
+	 */
+	private static class StreamGobbler implements Callable<Void> {
+		private final BufferedReader reader;
+
+		private final BufferedWriter writer;
+
+		public StreamGobbler(InputStream stream, OutputStream output) {
+			this.reader = new BufferedReader(new InputStreamReader(stream));
+			if (output == null)
+				this.writer = null;
+			else
+				this.writer = new BufferedWriter(new OutputStreamWriter(output));
+		}
+
+		public Void call() throws IOException {
+			boolean writeFailure = false;
+
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				// Do not try to write again after a failure, but keep reading
+				// as long as possible to prevent the input stream from choking.
+				if (!writeFailure && writer != null) {
+					try {
+						writer.write(line);
+						writer.newLine();
+						writer.flush();
+					} catch (IOException e) {
+						writeFailure = true;
+					}
+				}
+			}
+			return null;
+		}
 	}
 }

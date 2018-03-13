@@ -64,6 +64,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -81,6 +83,8 @@ import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Traditional file system based {@link ObjectDatabase}.
@@ -101,11 +105,16 @@ import org.eclipse.jgit.util.FileUtils;
  * considered.
  */
 public class ObjectDirectory extends FileObjectDatabase {
+	private final static Logger LOG = LoggerFactory
+			.getLogger(ObjectDirectory.class);
+
 	private static final PackList NO_PACKS = new PackList(
 			FileSnapshot.DIRTY, new PackFile[0]);
 
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
 	private static final int RESOLVE_ABBREV_LIMIT = 256;
+
+	private static final String STALE_FILE_HANDLE_MSG = "stale file handle"; //$NON-NLS-1$
 
 	private final Config config;
 
@@ -328,9 +337,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				try {
 					p.resolve(matches, id, RESOLVE_ABBREV_LIMIT);
 				} catch (IOException e) {
-					// Assume the pack is corrupted.
-					//
-					removePack(p);
+					handlePackError(e, p);
 				}
 				if (matches.size() > RESOLVE_ABBREV_LIMIT)
 					return;
@@ -417,8 +424,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 						if (searchPacksAgain(pList))
 							continue SEARCH;
 					} catch (IOException e) {
-						// Assume the pack is corrupted.
-						removePack(p);
+						handlePackError(e, p);
 					}
 				}
 				break SEARCH;
@@ -498,8 +504,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 						if (searchPacksAgain(pList))
 							continue SEARCH;
 					} catch (IOException e) {
-						// Assume the pack is corrupted.
-						removePack(p);
+						handlePackError(e, p);
 					}
 				}
 				break SEARCH;
@@ -540,9 +545,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 					pList = scanPacks(pList);
 					continue SEARCH;
 				} catch (IOException e) {
-					// Assume the pack is corrupted.
-					//
-					removePack(p);
+					handlePackError(e, p);
 				}
 			}
 			break SEARCH;
@@ -550,6 +553,38 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 		for (AlternateHandle h : myAlternates())
 			h.db.selectObjectRepresentation(packer, otp, curs);
+	}
+
+	private void handlePackError(IOException e, PackFile p) {
+		String warnTmpl = null;
+		if ((e instanceof CorruptObjectException)
+				|| (e instanceof PackInvalidException)) {
+			warnTmpl = JGitText.get().corruptPack;
+			// Assume the pack is corrupted, and remove it from the list.
+			removePack(p);
+		} else if (e instanceof FileNotFoundException) {
+			warnTmpl = JGitText.get().packWasDeleted;
+			removePack(p);
+		} else if (e.getMessage() != null
+				&& e.getMessage().toLowerCase().contains(STALE_FILE_HANDLE_MSG)) {
+			warnTmpl = JGitText.get().packHandleIsStale;
+			removePack(p);
+		}
+		if (warnTmpl != null) {
+			if (LOG.isDebugEnabled()) {
+				LOG.debug(MessageFormat.format(warnTmpl,
+						p.getPackFile().getAbsolutePath()), e);
+			} else {
+				LOG.warn(MessageFormat.format(warnTmpl,
+						p.getPackFile().getAbsolutePath()));
+			}
+		} else {
+			// Don't remove the pack from the list, as the error may be
+			// transient.
+			LOG.error(MessageFormat.format(
+					JGitText.get().exceptionWhileReadingPack, p.getPackFile()
+							.getAbsolutePath()), e);
+		}
 	}
 
 	@Override

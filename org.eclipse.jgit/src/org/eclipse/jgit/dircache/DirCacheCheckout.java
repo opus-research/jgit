@@ -403,8 +403,7 @@ public class DirCacheCheckout {
 			MissingObjectException, IncorrectObjectTypeException,
 			CheckoutConflictException, IndexWriteException {
 		toBeDeleted.clear();
-		ObjectReader objectReader = repo.getObjectDatabase().newReader();
-		try {
+		try (ObjectReader objectReader = repo.getObjectDatabase().newReader()) {
 			if (headCommitTree != null)
 				preScanTwoTrees();
 			else
@@ -454,8 +453,6 @@ public class DirCacheCheckout {
 			// commit the index builder - a new index is persisted
 			if (!builder.commit())
 				throw new IndexWriteException();
-		} finally {
-			objectReader.release();
 		}
 		return toBeDeleted.size() == 0;
 	}
@@ -1056,8 +1053,7 @@ public class DirCacheCheckout {
 	 */
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
-		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
-		try {
+		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
 			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(new FileTreeIterator(repo));
 			tw.setRecursive(true);
@@ -1075,8 +1071,6 @@ public class DirCacheCheckout {
 				}
 			}
 			return false;
-		} finally {
-			tw.release();
 		}
 	}
 
@@ -1105,8 +1099,7 @@ public class DirCacheCheckout {
 	 */
 	private boolean isModifiedSubtree_IndexTree(String path, ObjectId tree)
 			throws CorruptObjectException, IOException {
-		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
-		try {
+		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
 			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(tree);
 			tw.setRecursive(true);
@@ -1124,76 +1117,7 @@ public class DirCacheCheckout {
 					return true;
 			}
 			return false;
-		} finally {
-			tw.release();
 		}
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename. Use this method only for checkout of a single entry.
-	 * Otherwise use
-	 * {@code checkoutEntry(Repository, File f, DirCacheEntry, ObjectReader)}
-	 * instead which allows to reuse one {@code ObjectReader} for multiple
-	 * entries.
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repository
-	 * @param f
-	 *            this parameter is ignored.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @throws IOException
-	 * @deprecated Use the overloaded form that accepts {@link ObjectReader}.
-	 */
-	@Deprecated
-	public static void checkoutEntry(final Repository repository, File f,
-			DirCacheEntry entry) throws IOException {
-		ObjectReader or = repository.newObjectReader();
-		try {
-			checkoutEntry(repository, f, entry, or);
-		} finally {
-			or.release();
-		}
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 * @param f
-	 *            this parameter is ignored.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @throws IOException
-	 * @deprecated Do not pass File object.
-	 */
-	@Deprecated
-	public static void checkoutEntry(final Repository repo, File f,
-			DirCacheEntry entry, ObjectReader or) throws IOException {
-		if (f == null || repo.getWorkTree() == null)
-			throw new IllegalArgumentException();
-		if (!f.equals(new File(repo.getWorkTree(), entry.getPathString())))
-			throw new IllegalArgumentException();
-		checkoutEntry(repo, entry, or);
 	}
 
 	/**
@@ -1268,6 +1192,7 @@ public class DirCacheCheckout {
 		entry.setLastModified(f.lastModified());
 	}
 
+	@SuppressWarnings("deprecation")
 	private static void checkValidPath(CanonicalTreeParser t)
 			throws InvalidPathException {
 		ObjectChecker chk = new ObjectChecker()
@@ -1284,10 +1209,8 @@ public class DirCacheCheckout {
 	 * @throws InvalidPathException
 	 *             if the path is invalid
 	 * @since 3.3
-	 * @deprecated Use {@link SystemReader#checkPath(String)}.
 	 */
-	@Deprecated
-	public static void checkValidPath(String path) throws InvalidPathException {
+	static void checkValidPath(String path) throws InvalidPathException {
 		try {
 			SystemReader.getInstance().checkPath(path);
 		} catch (CorruptObjectException e) {
