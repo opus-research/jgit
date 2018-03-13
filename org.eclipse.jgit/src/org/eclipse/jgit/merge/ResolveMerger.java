@@ -205,8 +205,10 @@ public class ResolveMerger extends ThreeWayMerger {
 
 			if (!inCore) {
 				// No problem found. The only thing left to be done is to
-				// checkout all files from "theirs" which have been selected to
-				// go into the new index.
+				// checkout
+				// all files from "theirs" which have been selected to go into
+				// the
+				// new index.
 				checkout();
 
 				// All content-merges are successfully done. If we can now write the
@@ -342,9 +344,8 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @return the entry which was added to the index
 	 */
 	private DirCacheEntry keep(DirCacheEntry e) {
-		DirCacheEntry newEntry = new DirCacheEntry(e.getPathString(),
-				e.getStage());
-		newEntry.setFileMode(e.getFileMode());
+		DirCacheEntry newEntry = new DirCacheEntry(e.getPathString(), e.getStage());
+			newEntry.setFileMode(e.getFileMode());
 		newEntry.setObjectId(e.getObjectId());
 		newEntry.setLastModified(e.getLastModified());
 		newEntry.setLength(e.getLength());
@@ -410,10 +411,10 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		DirCacheEntry ourDce = null;
 
-		if (index == null || index.getDirCacheEntry() == null) {
+		if (index == null) {
 			// create a fake DCE, but only if ours is valid. ours is kept only
 			// in case it is valid, so a null ourDce is ok in all other cases.
-			if (nonTree(modeO)) {
+			if (modeO != 0) {
 				ourDce = new DirCacheEntry(tw.getRawPath());
 				ourDce.setObjectId(tw.getObjectId(T_OURS));
 				ourDce.setFileMode(tw.getFileMode(T_OURS));
@@ -614,16 +615,19 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private boolean isWorktreeDirty(WorkingTreeIterator work) {
-		if (inCore || work == null)
+		if (inCore)
 			return false;
 
 		final int modeF = tw.getRawMode(T_FILE);
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		boolean isDirty = work.isModeDifferent(modeO);
-		if (!isDirty && nonTree(modeF))
-			isDirty = !tw.idEqual(T_FILE, T_OURS);
+		final boolean isDirty;
+		if (nonTree(modeF))
+			isDirty = work.isModeDifferent(modeO)
+					|| !tw.idEqual(T_FILE, T_OURS);
+		else
+			isDirty = false;
 
 		if (isDirty)
 			failingPaths.put(tw.getPathString(),
@@ -706,9 +710,6 @@ public class ResolveMerger extends ThreeWayMerger {
 				throw new UnsupportedOperationException();
 
 			of = new File(workTree, tw.getPathString());
-			File parentFolder = of.getParentFile();
-			if (!parentFolder.exists())
-				parentFolder.mkdirs();
 			fos = new FileOutputStream(of);
 			try {
 				fmt.formatMerge(fos, result, Arrays.asList(commitNames),
@@ -716,7 +717,8 @@ public class ResolveMerger extends ThreeWayMerger {
 			} finally {
 				fos.close();
 			}
-		} else if (!result.containsConflicts()) {
+		}
+		else if (!result.containsConflicts()) {
 			// When working inCore, only trivial merges can be handled,
 			// so we generate objects only in conflict free cases
 			of = File.createTempFile("merge_", "_temp", null);
