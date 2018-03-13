@@ -51,7 +51,7 @@
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>org.eclipse.jgit-parent</artifactId>
   <packaging>pom</packaging>
-  <version>4.8.0-SNAPSHOT</version>
+  <version>4.9.0-SNAPSHOT</version>
 
   <name>JGit - Parent</name>
   <url>${jgit-url}</url>
@@ -69,6 +69,10 @@
     <url>http://git.eclipse.org/c/jgit/jgit.git/</url>
     <connection>scm:git:https://git.eclipse.org/r/jgit/jgit</connection>
   </scm>
+
+  <prerequisites>
+    <maven>3.3.1</maven>
+  </prerequisites>
 
   <ciManagement>
     <system>hudson</system>
@@ -200,8 +204,8 @@
     <commons-compress-version>1.6</commons-compress-version>
     <osgi-core-version>4.3.1</osgi-core-version>
     <servlet-api-version>3.1.0</servlet-api-version>
-    <jetty-version>9.3.17.v20170317</jetty-version>
-    <japicmp-version>0.8.1</japicmp-version>
+    <jetty-version>9.4.5.v20170502</jetty-version>
+    <japicmp-version>0.10.0</japicmp-version>
     <httpclient-version>4.3.6</httpclient-version>
     <slf4j-version>1.7.2</slf4j-version>
     <log4j-version>1.2.15</log4j-version>
@@ -386,7 +390,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
-          <version>3.7</version>
+          <version>3.8</version>
           <configuration>
             <sourceEncoding>utf-8</sourceEncoding>
             <minimumTokens>100</minimumTokens>

@@ -47,17 +47,22 @@ import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.ignore.internal.IMatcher;
+import org.eclipse.jgit.ignore.internal.PathMatcher;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -92,6 +97,11 @@ public class DescribeCommand extends GitCommand<String> {
 	 * Whether to always use long output format or not.
 	 */
 	private boolean longDesc;
+
+	/**
+	 * Pattern matchers to be applied to tags under consideration
+	 */
+	private List<IMatcher> matchers = new ArrayList<>();
 
 	/**
 	 *
@@ -170,6 +180,54 @@ public class DescribeCommand extends GitCommand<String> {
 	}
 
 	/**
+	 * Sets one or more {@code glob(7)} patterns that tags must match to be considered.
+	 * If multiple patterns are provided, tags only need match one of them.
+	 *
+	 * @param patterns the {@code glob(7)} pattern or patterns
+	 * @return {@code this}
+	 * @throws InvalidPatternException if the pattern passed in was invalid.
+	 *
+	 * @see <a
+	 *      href="https://www.kernel.org/pub/software/scm/git/docs/git-describe.html"
+	 *      >Git documentation about describe</a>
+	 * @since 4.9
+	 */
+	public DescribeCommand setMatch(String... patterns) throws InvalidPatternException {
+		for (String p : patterns) {
+			matchers.add(PathMatcher.createPathMatcher(p, null, false));
+		}
+		return this;
+	}
+
+	private Optional<Ref> getBestMatch(List<Ref> tags) {
+		if (tags == null || tags.size() == 0) {
+			return Optional.empty();
+		} else if (matchers.size() == 0) {
+			// No matchers, simply return the first tag entry
+			return Optional.of(tags.get(0));
+		} else {
+			// Find the first tag that matches one of the matchers; precedence according to matcher definition order
+			for (IMatcher matcher : matchers) {
+				Optional<Ref> match = tags.stream()
+						.filter(tag -> matcher.matches(tag.getName(), false))
+						.findFirst();
+				if (match.isPresent()) {
+					return match;
+				}
+			}
+			return Optional.empty();
+		}
+	}
+
+	private ObjectId getObjectIdFromRef(Ref r) {
+		ObjectId key = repo.peel(r).getPeeledObjectId();
+		if (key == null) {
+			key = r.getObjectId();
+		}
+		return key;
+	}
+
+	/**
 	 * Describes the specified commit. Target defaults to HEAD if no commit was
 	 * set explicitly.
 	 *
@@ -189,14 +247,9 @@ public class DescribeCommand extends GitCommand<String> {
 			if (target == null)
 				setTarget(Constants.HEAD);
 
-			Map<ObjectId, Ref> tags = new HashMap<>();
-
-			for (Ref r : repo.getRefDatabase().getRefs(R_TAGS).values()) {
-				ObjectId key = repo.peel(r).getPeeledObjectId();
-				if (key == null)
-					key = r.getObjectId();
-				tags.put(key, r);
-			}
+			Collection<Ref> tagList = repo.getRefDatabase().getRefs(R_TAGS).values();
+			Map<ObjectId, List<Ref>> tags = tagList.stream()
+					.collect(Collectors.groupingBy(this::getObjectIdFromRef));
 
 			// combined flags of all the candidate instances
 			final RevFlagSet allFlags = new RevFlagSet();
@@ -242,11 +295,11 @@ public class DescribeCommand extends GitCommand<String> {
 			}
 			List<Candidate> candidates = new ArrayList<>();    // all the candidates we find
 
-			// is the target already pointing to a tag? if so, we are done!
-			Ref lucky = tags.get(target);
-			if (lucky != null) {
-				return longDesc ? longDescription(lucky, 0, target) : lucky
-						.getName().substring(R_TAGS.length());
+			// is the target already pointing to a suitable tag? if so, we are done!
+			Optional<Ref> bestMatch = getBestMatch(tags.get(target));
+			if (bestMatch.isPresent()) {
+				return longDesc ? longDescription(bestMatch.get(), 0, target) :
+						bestMatch.get().getName().substring(R_TAGS.length());
 			}
 
 			w.markStart(target);
@@ -258,9 +311,9 @@ public class DescribeCommand extends GitCommand<String> {
 					// if a tag already dominates this commit,
 					// then there's no point in picking a tag on this commit
 					// since the one that dominates it is always more preferable
-					Ref t = tags.get(c);
-					if (t != null) {
-						Candidate cd = new Candidate(c, t);
+					bestMatch = getBestMatch(tags.get(c));
+					if (bestMatch.isPresent()) {
+						Candidate cd = new Candidate(c, bestMatch.get());
 						candidates.add(cd);
 						cd.depth = seen;
 					}

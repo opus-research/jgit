@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016, Google Inc.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,60 +41,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.junit;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
+import static org.junit.Assert.assertEquals;
 
-/**
- * Simple work queue to run tasks in the background
- */
-class WorkQueue {
-	private static final ScheduledThreadPoolExecutor executor;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
-	static final Object executorKiller;
+public final class StrictWorkMonitor implements ProgressMonitor {
+	private int lastWork, totalWork;
 
-	static {
-		// To support garbage collection, start our thread but
-		// swap out the thread factory. When our class is GC'd
-		// the executorKiller will finalize and ask the executor
-		// to shutdown, ending the worker.
-		//
-		int threads = 1;
-		executor = new ScheduledThreadPoolExecutor(threads,
-				new ThreadFactory() {
-					private final ThreadFactory baseFactory = Executors
-							.defaultThreadFactory();
-
-					@Override
-					public Thread newThread(Runnable taskBody) {
-						Thread thr = baseFactory.newThread(taskBody);
-						thr.setName("JGit-WorkQueue"); //$NON-NLS-1$
-						thr.setDaemon(true);
-						return thr;
-					}
-				});
-		executor.setRemoveOnCancelPolicy(true);
-		executor.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-		executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-		executor.prestartAllCoreThreads();
-
-		// Now that the threads are running, its critical to swap out
-		// our own thread factory for one that isn't in the ClassLoader.
-		// This allows the class to GC.
-		//
-		executor.setThreadFactory(Executors.defaultThreadFactory());
-
-		executorKiller = new Object() {
-			@Override
-			protected void finalize() {
-				executor.shutdownNow();
-			}
-		};
+	@Override
+	public void start(int totalTasks) {
+		// empty
 	}
 
-	static ScheduledThreadPoolExecutor getExecutor() {
-		return executor;
+	@Override
+	public void beginTask(String title, int total) {
+		this.totalWork = total;
+		lastWork = 0;
+	}
+
+	@Override
+	public void update(int completed) {
+		lastWork += completed;
+	}
+
+	@Override
+	public void endTask() {
+		assertEquals("Units of work recorded", totalWork, lastWork);
+	}
+
+	@Override
+	public boolean isCancelled() {
+		return false;
 	}
 }
