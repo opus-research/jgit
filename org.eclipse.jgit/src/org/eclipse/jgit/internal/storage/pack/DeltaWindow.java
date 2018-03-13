@@ -160,6 +160,7 @@ final class DeltaWindow {
 						clear(n);
 				}
 				res.set(next);
+				clearWindowOnTypeSwitch();
 
 				if (res.object.isEdge() || res.object.doNotAttemptDelta()) {
 					// We don't actually want to make a delta for
@@ -194,6 +195,15 @@ final class DeltaWindow {
 		return DeltaIndex.estimateIndexSize(len) - len;
 	}
 
+	private void clearWindowOnTypeSwitch() {
+		DeltaWindowEntry p = res.prev;
+		if (!p.empty() && res.type() != p.type()) {
+			for (; p != res; p = p.prev) {
+				clear(p);
+			}
+		}
+	}
+
 	private void clear(DeltaWindowEntry ent) {
 		if (ent.index != null)
 			loaded -= ent.index.getIndexSize();
@@ -207,8 +217,6 @@ final class DeltaWindow {
 		// This lets us look at the bigger objects that came before.
 		for (DeltaWindowEntry src = res.prev; src != res; src = src.prev) {
 			if (src.empty())
-				break;
-			if (src.type() != res.type())
 				break;
 			if (delta(src) /* == NEXT_SRC */)
 				continue;
