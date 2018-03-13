@@ -239,33 +239,21 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	public BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
-		if (local != null) {
-			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
-			allowOfsDelta = cfg.allowOfsDelta;
-		} else {
-			allowOfsDelta = true;
-		}
+		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
 		includeTags = transport.getTagOpt() != TagOpt.NO_TAGS;
 		thinPack = transport.isFetchThin();
+		allowOfsDelta = cfg.allowOfsDelta;
 
-		if (local != null) {
-			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<RevCommit>();
-			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
-			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
-			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
-			ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
+		walk = new RevWalk(local);
+		reachableCommits = new RevCommitList<RevCommit>();
+		REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
+		COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
+		STATE = walk.newFlag("STATE"); //$NON-NLS-1$
+		ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
 
-			walk.carry(COMMON);
-			walk.carry(REACHABLE);
-			walk.carry(ADVERTISED);
-		} else {
-			walk = null;
-			REACHABLE = null;
-			COMMON = null;
-			STATE = null;
-			ADVERTISED = null;
-		}
+		walk.carry(COMMON);
+		walk.carry(REACHABLE);
+		walk.carry(ADVERTISED);
 	}
 
 	private static class FetchConfig {
@@ -369,8 +357,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	@Override
 	public void close() {
-		if (walk != null)
-			walk.release();
+		walk.release();
 		super.close();
 	}
 
