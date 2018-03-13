@@ -44,7 +44,7 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -74,7 +74,7 @@ public class PathFilter extends TreeFilter {
 	 *             the path supplied was the empty string.
 	 */
 	public static PathFilter create(String path) {
-		while (path.endsWith("/"))
+		while (path.endsWith("/")) //$NON-NLS-1$
 			path = path.substring(0, path.length() - 1);
 		if (path.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().emptyPathNotPermitted);
@@ -113,7 +113,18 @@ public class PathFilter extends TreeFilter {
 		return this;
 	}
 
+	@SuppressWarnings("nls")
 	public String toString() {
 		return "PATH(\"" + pathStr + "\")";
+	}
+
+	/**
+	 * @param walker
+	 *            The walk to check against.
+	 * @return {@code true} if the path length of this filter matches the length
+	 *         of the current path of the supplied TreeWalk.
+	 */
+	public boolean isDone(final TreeWalk walker) {
+		return pathRaw.length == walker.getPathLength();
 	}
 }

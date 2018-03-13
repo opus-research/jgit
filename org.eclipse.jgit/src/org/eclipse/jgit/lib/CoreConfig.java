@@ -74,22 +74,42 @@ public class CoreConfig {
 		INPUT;
 	}
 
+	/**
+	 * Permissible values for {@code core.checkstat}
+	 *
+	 * @since 2.3
+	 */
+	public static enum CheckStat {
+		/**
+		 * Only check the size and whole second part of time stamp when
+		 * comparing the stat info in the dircache with actual file stat info.
+		 */
+		MINIMAL,
+
+		/**
+		 * Check as much of the dircache stat info as possible. Implementation
+		 * limits may apply.
+		 */
+		DEFAULT
+	}
+
 	private final int compression;
 
 	private final int packIndexVersion;
 
 	private final boolean logAllRefUpdates;
 
-	private final boolean fileMode;
-
-	private final AutoCRLF autoCRLF;
+	private final String excludesfile;
 
 	private CoreConfig(final Config rc) {
-		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt("pack", "indexversion", 2);
-		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		fileMode = rc.getBoolean("core", "filemode", true);
-		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
+		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_COMPRESSION, DEFAULT_COMPRESSION);
+		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
+				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
+		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
+		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
 	}
 
 	/**
@@ -101,7 +121,6 @@ public class CoreConfig {
 
 	/**
 	 * @return the preferred pack index file format; 0 for oldest possible.
-	 * @see org.eclipse.jgit.transport.IndexPack
 	 */
 	public int getPackIndexVersion() {
 		return packIndexVersion;
@@ -115,16 +134,9 @@ public class CoreConfig {
 	}
 
 	/**
-	 * @return whether to trust file modes
+	 * @return path of excludesfile
 	 */
-	public boolean isFileMode() {
-		return fileMode;
-	}
-
-	/**
-	 * @return whether automatic CRLF conversion has been configured
-	 */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+	public String getExcludesFile() {
+		return excludesfile;
 	}
 }

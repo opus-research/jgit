@@ -45,21 +45,44 @@
 
 package org.eclipse.jgit.junit;
 
+import java.io.File;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 
 public class MockSystemReader extends SystemReader {
+	private final class MockConfig extends FileBasedConfig {
+		private MockConfig(File cfgLocation, FS fs) {
+			super(cfgLocation, fs);
+		}
+
+		@Override
+		public void load() throws IOException, ConfigInvalidException {
+			// Do nothing
+		}
+
+		@Override
+		public boolean isOutdated() {
+			return false;
+		}
+	}
+
 	final Map<String, String> values = new HashMap<String, String>();
 
 	FileBasedConfig userGitConfig;
+
+	FileBasedConfig systemGitConfig;
 
 	public MockSystemReader() {
 		init(Constants.OS_USER_NAME_KEY);
@@ -67,17 +90,9 @@ public class MockSystemReader extends SystemReader {
 		init(Constants.GIT_AUTHOR_EMAIL_KEY);
 		init(Constants.GIT_COMMITTER_NAME_KEY);
 		init(Constants.GIT_COMMITTER_EMAIL_KEY);
-		userGitConfig = new FileBasedConfig(null, null) {
-			@Override
-			public void load() throws IOException, ConfigInvalidException {
-				// Do nothing
-			}
-
-			@Override
-			public boolean isOutdated() {
-				return false;
-			}
-		};
+		userGitConfig = new MockConfig(null, null);
+		systemGitConfig = new MockConfig(null, null);
+		setCurrentPlatform();
 	}
 
 	private void init(final String n) {
@@ -103,8 +118,15 @@ public class MockSystemReader extends SystemReader {
 	}
 
 	@Override
-	public FileBasedConfig openUserConfig(FS fs) {
+	public FileBasedConfig openUserConfig(Config parent, FS fs) {
+		assert parent == null || parent == systemGitConfig;
 		return userGitConfig;
+	}
+
+	@Override
+	public FileBasedConfig openSystemConfig(Config parent, FS fs) {
+		assert parent == null;
+		return systemGitConfig;
 	}
 
 	@Override
@@ -119,6 +141,57 @@ public class MockSystemReader extends SystemReader {
 
 	@Override
 	public int getTimezone(long when) {
-		return TimeZone.getTimeZone("GMT-03:30").getOffset(when) / (60 * 1000);
+		return getTimeZone().getOffset(when) / (60 * 1000);
+	}
+
+	@Override
+	public TimeZone getTimeZone() {
+		return TimeZone.getTimeZone("GMT-03:30");
+	}
+
+	@Override
+	public Locale getLocale() {
+		return Locale.US;
+	}
+
+	@Override
+	public SimpleDateFormat getSimpleDateFormat(String pattern) {
+		return new SimpleDateFormat(pattern, getLocale());
+	}
+
+	@Override
+	public DateFormat getDateTimeInstance(int dateStyle, int timeStyle) {
+		return DateFormat
+				.getDateTimeInstance(dateStyle, timeStyle, getLocale());
+	}
+
+	/**
+	 * Assign some properties for the currently executing platform
+	 */
+	public void setCurrentPlatform() {
+		setProperty("os.name", System.getProperty("os.name"));
+		setProperty("file.separator", System.getProperty("file.separator"));
+		setProperty("path.separator", System.getProperty("path.separator"));
+		setProperty("line.separator", System.getProperty("line.separator"));
+	}
+
+	/**
+	 * Emulate Windows
+	 */
+	public void setWindows() {
+		setProperty("os.name", "Windows");
+		setProperty("file.separator", "\\");
+		setProperty("path.separator", ";");
+		setProperty("line.separator", "\r\n");
+	}
+
+	/**
+	 * Emulate Unix
+	 */
+	public void setUnix() {
+		setProperty("os.name", "*nix"); // Essentially anything but Windows
+		setProperty("file.separator", "/");
+		setProperty("path.separator", ":");
+		setProperty("line.separator", "\n");
 	}
 }

@@ -43,30 +43,35 @@
 
 package org.eclipse.jgit.http.test;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.util.List;
 
 import javax.servlet.ServletException;
 
-import junit.framework.TestCase;
-
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.MultiException;
 import org.eclipse.jgit.http.server.GitServlet;
-import org.eclipse.jgit.http.test.util.AppServer;
-import org.eclipse.jgit.http.test.util.MockServletConfig;
-import org.eclipse.jgit.http.test.util.RecordingLogger;
+import org.eclipse.jgit.junit.http.AppServer;
+import org.eclipse.jgit.junit.http.MockServletConfig;
+import org.eclipse.jgit.junit.http.RecordingLogger;
+import org.junit.After;
+import org.junit.Test;
 
-public class GitServletInitTest extends TestCase {
+public class GitServletInitTest {
 	private AppServer server;
 
-	protected void tearDown() throws Exception {
+	@After
+	public void tearDown() throws Exception {
 		if (server != null) {
 			server.tearDown();
 			server = null;
 		}
-		super.tearDown();
 	}
 
+	@Test
 	public void testDefaultConstructor_NoBasePath() throws Exception {
 		GitServlet s = new GitServlet();
 		try {
@@ -77,6 +82,7 @@ public class GitServletInitTest extends TestCase {
 		}
 	}
 
+	@Test
 	public void testDefaultConstructor_WithBasePath() throws Exception {
 		MockServletConfig c = new MockServletConfig();
 		c.setInitParameter("base-path", ".");
@@ -87,23 +93,38 @@ public class GitServletInitTest extends TestCase {
 		s.destroy();
 	}
 
+	@Test
 	public void testInitUnderContainer_NoBasePath() throws Exception {
 		server = new AppServer();
 
 		ServletContextHandler app = server.addContext("/");
 		ServletHolder s = app.addServlet(GitServlet.class, "/git");
 		s.setInitOrder(1);
+		s.getServletHandler().setStartWithUnavailable(false);
 
-		server.setUp();
+		try {
+			server.setUp();
+		} catch (Exception e) {
+			Throwable why = null;
+			if (e instanceof MultiException) {
+				MultiException multi = (MultiException) e;
+				List<Throwable> reasons = multi.getThrowables();
+				why = reasons.get(0);
+				assertTrue("Expected ServletException",
+						why instanceof ServletException);
+			} else if (e instanceof ServletException)
+				why = e;
 
-		List<RecordingLogger.Warning> events = RecordingLogger.getWarnings();
-		assertFalse("Servlet started without base-path", events.isEmpty());
-
-		Throwable why = events.get(0).getCause();
-		assertTrue("Caught ServletException", why instanceof ServletException);
-		assertTrue("Wanted base-path", why.getMessage().contains("base-path"));
+			if (why != null) {
+				assertTrue("Wanted base-path",
+						why.getMessage().contains("base-path"));
+				return;
+			}
+		}
+		fail("Expected ServletException complaining about unset base-path");
 	}
 
+	@Test
 	public void testInitUnderContainer_WithBasePath() throws Exception {
 		server = new AppServer();
 

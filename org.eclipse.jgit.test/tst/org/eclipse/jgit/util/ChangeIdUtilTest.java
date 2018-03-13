@@ -43,19 +43,20 @@
  */
 package org.eclipse.jgit.util;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-
-import junit.framework.TestCase;
 
 import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.junit.Test;
 
 /**
  * Portions of this test is from CommitMsgHookTest in the Android project Gerrit
  */
-public class ChangeIdUtilTest extends TestCase {
+public class ChangeIdUtilTest {
 
 	private final String SOB1 = "Signed-off-by: J Author <ja@example.com>\n";
 
@@ -100,6 +101,7 @@ public class ChangeIdUtilTest extends TestCase {
 		committer = new PersonIdent(committer, when, tz);
 	}
 
+	@Test
 	public void testClean() {
 		assertEquals("hej", ChangeIdUtil.clean("hej\n\n"));
 		assertEquals("hej\n\nsan", ChangeIdUtil.clean("hej\n\nsan\n\n"));
@@ -110,6 +112,7 @@ public class ChangeIdUtilTest extends TestCase {
 				.clean("#no\nhej\nsan\nSigned-off-by: me \n#men"));
 	}
 
+	@Test
 	public void testId() throws IOException {
 		String msg = "A\nMessage\n";
 		ObjectId id = ChangeIdUtil.computeChangeId(treeId, parentId, p, q, msg);
@@ -117,61 +120,121 @@ public class ChangeIdUtilTest extends TestCase {
 				.toString(id));
 	}
 
+	@Test
 	public void testHasChangeid() throws Exception {
 		assertEquals(
-				"has changeid\n\nBug: 33\nmore text\nSigned-off-by: me@you.too\nChange-Id: I0123456789012345678901234567890123456789\nAnd then some\n",
-				call("has changeid\n\nBug: 33\nmore text\nSigned-off-by: me@you.too\nChange-Id: I0123456789012345678901234567890123456789\nAnd then some\n"));
+				"has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\n",
+				call("has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\n"));
 	}
 
+	@Test
 	public void testHasChangeidWithReplacement() throws Exception {
 		assertEquals(
-				"has changeid\n\nBug: 33\nmore text\nSigned-off-by: me@you.too\nChange-Id: I988d2d7a6f2c0578fccabd4ebd3cec0768bc7f9f\nAnd then some\n",
-				call("has changeid\n\nBug: 33\nmore text\nSigned-off-by: me@you.too\nChange-Id: I0123456789012345678901234567890123456789\nAnd then some\n",
+				"has changeid\nmore text\n\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I2178563fada5edb2c99a8d8c0d619471b050ec24\nBug: 33\n",
+				call("has changeid\nmore text\n\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\nBug: 33\n",
 						true));
 	}
 
+	@Test
+	public void testHasChangeidWithReplacementInLastLine() throws Exception {
+		assertEquals(
+				"has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I1d6578f4c96e3db4dd707705fe3d17bf658c4758\n",
+				call("has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\n",
+						true));
+	}
+
+	@Test
+	public void testHasChangeidWithReplacementInLastLineNoLineBreak()
+			throws Exception {
+		assertEquals(
+				"has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I1d6578f4c96e3db4dd707705fe3d17bf658c4758",
+				call("has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789",
+						true));
+	}
+
+	@Test
+	public void testHasChangeidWithSpacesBeforeId() throws Exception {
+		assertEquals(
+				"has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: Ie7575eaf450fdd0002df2e642426faf251de3ad9\n",
+				call("has changeid\nmore text\n\nBug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id:    I0123456789012345678901234567890123456789\n",
+						true));
+	}
+
+	@Test
+	public void testHasChangeidWithReplacementWithChangeIdInCommitMessage()
+			throws Exception {
+		assertEquals(
+				"has changeid\nmore text\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\n\n"
+						+ "Bug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: Ie48d10d59ef67995ca89688ac0171b88f10dd520\n",
+				call("has changeid\nmore text\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\n\n"
+						+ "Bug: 33\nSigned-off-by: me@you.too\n"
+						+ "Change-Id: I0123456789012345678901234567890123456789\n",
+						true));
+	}
+
+	@Test
 	public void testOneliner() throws Exception {
 		assertEquals(
 				"oneliner\n\nChange-Id: I3a98091ce4470de88d52ae317fcd297e2339f063\n",
 				call("oneliner\n"));
 	}
 
+	@Test
 	public void testOnelinerFollowedByBlank() throws Exception {
 		assertEquals(
 				"oneliner followed by blank\n\nChange-Id: I3a12c21ef342a18498f95c62efbc186cd782b743\n",
 				call("oneliner followed by blank\n"));
 	}
 
+	@Test
 	public void testATwoLines() throws Exception {
 		assertEquals(
 				"a two lines\nwith text withour break after subject line\n\nChange-Id: I549a0fed3d69b7876c54b4f5a35637135fd43fac\n",
 				call("a two lines\nwith text withour break after subject line\n"));
 	}
 
+	@Test
 	public void testRegularCommit() throws Exception {
 		assertEquals(
 				"regular commit\n\nwith header and body\n\nChange-Id: I62d8749d3c3a888c11e3fadc3924220a19389766\n",
 				call("regular commit\n\nwith header and body\n"));
 	}
 
+	@Test
 	public void testRegularCommitWithSob_ButNoBody() throws Exception {
 		assertEquals(
 				"regular commit with sob, but no body\n\nChange-Id: I0f0b4307e9944ecbd5a9f6b9489e25cfaede43c4\nSigned-off-by: me@you.too\n",
 				call("regular commit with sob, but no body\n\nSigned-off-by: me@you.too\n"));
 	}
 
+	@Test
 	public void testACommitWithBug_SubButNoBody() throws Exception {
 		assertEquals(
 				"a commit with bug, sub but no body\n\nBug: 33\nChange-Id: I337e264868613dab6d1e11a34f394db369487412\nSigned-off-by: me@you.too\n",
 				call("a commit with bug, sub but no body\n\nBug: 33\nSigned-off-by: me@you.too\n"));
 	}
 
+	@Test
 	public void testACommitWithSubject_NoBodySobAndBug() throws Exception {
 		assertEquals(
 				"a commit with subject, no body sob and bug\n\nChange-Id: Ib3616d4bf77707a3215a6cb0602c004ee119a445\nSigned-off-by: me@you.too\nBug: 33\n",
 				call("a commit with subject, no body sob and bug\n\nSigned-off-by: me@you.too\nBug: 33\n"));
 	}
 
+	@Test
 	public void testACommitWithSubjectBug_NonFooterLineAndSob()
 			throws Exception {
 		assertEquals(
@@ -179,18 +242,21 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a commit with subject bug, non-footer line and sob\n\nBug: 33\nmore text\nSigned-off-by: me@you.too\n"));
 	}
 
+	@Test
 	public void testACommitWithSubject_NonFooterAndBugAndSob() throws Exception {
 		assertEquals(
 				"a commit with subject, non-footer and bug and sob\n\nmore text (two empty lines after bug)\nBug: 33\n\n\nChange-Id: Idac75ccbad2ab6727b8612e344df5190d87891dd\nSigned-off-by: me@you.too\n",
 				call("a commit with subject, non-footer and bug and sob\n\nmore text (two empty lines after bug)\nBug: 33\n\n\nSigned-off-by: me@you.too\n"));
 	}
 
+	@Test
 	public void testACommitWithSubjectBodyBugBrackersAndSob() throws Exception {
 		assertEquals(
 				"a commit with subject body, bug. brackers and sob\n\nText\n\nBug: 33\nChange-Id: I90ecb589bef766302532c3e00915e10114b00f62\n[bracket]\nSigned-off-by: me@you.too\n",
 				call("a commit with subject body, bug. brackers and sob\n\nText\n\nBug: 33\n[bracket]\nSigned-off-by: me@you.too\n\n"));
 	}
 
+	@Test
 	public void testACommitWithSubjectBodyBugLineWithASpaceAndSob()
 			throws Exception {
 		assertEquals(
@@ -198,12 +264,14 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a commit with subject body, bug. line with a space and sob\n\nText\n\nBug: 33\n \nSigned-off-by: me@you.too\n\n"));
 	}
 
+	@Test
 	public void testACommitWithSubjectBodyBugEmptyLineAndSob() throws Exception {
 		assertEquals(
 				"a commit with subject body, bug. empty line and sob\n\nText\n\nBug: 33\nChange-Id: I33f119f533313883e6ada3df600c4f0d4db23a76\n \nSigned-off-by: me@you.too\n",
 				call("a commit with subject body, bug. empty line and sob\n\nText\n\nBug: 33\n \nSigned-off-by: me@you.too\n\n"));
 	}
 
+	@Test
 	public void testEmptyMessages() throws Exception {
 		// Empty input must not produce a change id.
 		hookDoesNotModify("");
@@ -222,6 +290,7 @@ public class ChangeIdUtilTest extends TestCase {
 				+ "new file mode 100644\nindex 0000000..c78b7f0\n");
 	}
 
+	@Test
 	public void testChangeIdAlreadySet() throws Exception {
 		// If a Change-Id is already present in the footer, the hook must
 		// not modify the message but instead must leave the identity alone.
@@ -243,6 +312,7 @@ public class ChangeIdUtilTest extends TestCase {
 				"Change-Id: I4f4e2e1e8568ddc1509baecb8c1270a1fb4b6da7\n");
 	}
 
+	@Test
 	public void testChangeIdAlreadySetWithReplacement() throws Exception {
 		// If a Change-Id is already present in the footer, the hook
 		// replaces the Change-Id with the new value..
@@ -284,6 +354,7 @@ public class ChangeIdUtilTest extends TestCase {
 				true));
 	}
 
+	@Test
 	public void testTimeAltersId() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -313,6 +384,7 @@ public class ChangeIdUtilTest extends TestCase {
 		committer = new PersonIdent(committer, now, tz);
 	}
 
+	@Test
 	public void testFirstParentAltersId() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -326,6 +398,7 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a\n"));
 	}
 
+	@Test
 	public void testDirCacheAltersId() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -339,6 +412,7 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a\n"));
 	}
 
+	@Test
 	public void testSingleLineMessages() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -364,6 +438,7 @@ public class ChangeIdUtilTest extends TestCase {
 				call("Fix-A-Widget: this thing\n"));
 	}
 
+	@Test
 	public void testMultiLineMessagesWithoutFooter() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -389,6 +464,7 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a\n" + "\n" + "b\nc\nd\ne\n" + "\n" + "f\ng\nh\n"));
 	}
 
+	@Test
 	public void testSingleLineMessagesWithSignedOffBy() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -404,6 +480,7 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a\n" + "\n" + SOB1 + SOB2));
 	}
 
+	@Test
 	public void testMultiLineMessagesWithSignedOffBy() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -453,6 +530,7 @@ public class ChangeIdUtilTest extends TestCase {
 						SOB2));
 	}
 
+	@Test
 	public void testNoteInMiddle() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -466,6 +544,7 @@ public class ChangeIdUtilTest extends TestCase {
 						"does not fix it.\n"));
 	}
 
+	@Test
 	public void testKernelStyleFooter() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -482,6 +561,7 @@ public class ChangeIdUtilTest extends TestCase {
 						SOB2));
 	}
 
+	@Test
 	public void testChangeIdAfterBugOrIssue() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -521,6 +601,7 @@ public class ChangeIdUtilTest extends TestCase {
 						"index 0000000..c78b7f0\n"));
 	}
 
+	@Test
 	public void testWithEndingURL() throws Exception {
 		assertEquals("a\n" + //
 				"\n" + //
@@ -554,6 +635,63 @@ public class ChangeIdUtilTest extends TestCase {
 				call("a\n" + //
 						"\n" + //
 						"git://example.com/ fixes this\n"));
+	}
+
+	@Test
+	public void testIndexOfChangeId() {
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n\n\n",
+				"\n"));
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+										+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n \n \n",
+								"\n"));
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "Change-Id:  I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
+
+		// leading whitespace is rejected by Gerrit
+		assertEquals(-1, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ " Change-Id:  I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
+		assertEquals(-1, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "\t Change-Id:  I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
+
+		assertEquals(-1, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "Change-Id: \n", "\n"));
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701 \n",
+				"\n"));
+		assertEquals(12, ChangeIdUtil.indexOfChangeId("x\n" + "\n"
+				+ "Bug 4711\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
+		assertEquals(56, ChangeIdUtil.indexOfChangeId("x\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n"
+				+ "\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
+		assertEquals(-1, ChangeIdUtil.indexOfChangeId("x\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n"
+				+ "\n" + "x\n", "\n"));
+		assertEquals(-1, ChangeIdUtil.indexOfChangeId("x\n\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n"
+				+ "\n" + "x\n", "\n"));
+		assertEquals(5, ChangeIdUtil.indexOfChangeId("x\r\n" + "\r\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\r\n",
+				"\r\n"));
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\r" + "\r"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\r",
+				"\r"));
+		assertEquals(3, ChangeIdUtil.indexOfChangeId("x\r" + "\r"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\r",
+				"\r"));
+		assertEquals(8, ChangeIdUtil.indexOfChangeId("x\ny\n\nz\n" + "\n"
+				+ "Change-Id: I3b7e4e16b503ce00f07ba6ad01d97a356dad7701\n",
+				"\n"));
 	}
 
 	private void hookDoesNotModify(final String in) throws Exception {
