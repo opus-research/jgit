@@ -356,9 +356,8 @@ public class DirCacheCheckout {
 				// The only entry we have is the index entry. If that entry is a
 				// conflict simply remove it. Otherwise keep that entry in the
 				// index
-				final DirCacheEntry ie = i.getDirCacheEntry();
-				if (ie != null && ie.getStage() == 0)
-					keep(ie);
+				if (i.getDirCacheEntry().getStage() == 0)
+					keep(i.getDirCacheEntry());
 			}
 		}
 	}
