@@ -59,10 +59,10 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm;
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.Sequence;
+import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -83,6 +83,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * A three-way merger performing a content-merge if necessary
@@ -119,7 +120,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private ObjectId resultTree;
 
-	private List<String> unmergedPathes = new ArrayList<String>();
+	private List<String> unmergedPaths = new ArrayList<String>();
 
 	private List<String> modifiedFiles = new LinkedList<String>();
 
@@ -127,7 +128,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<String, MergeResult<? extends Sequence>>();
 
-	private Map<String, MergeFailureReason> failingPathes = new HashMap<String, MergeFailureReason>();
+	private Map<String, MergeFailureReason> failingPaths = new HashMap<String, MergeFailureReason>();
 
 	private ObjectInserter oi;
 
@@ -182,7 +183,6 @@ public class ResolveMerger extends ThreeWayMerger {
 			DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
 			tw = new NameConflictTreeWalk(db);
-			tw.reset();
 			tw.addTree(mergeBase());
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
@@ -224,7 +224,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				builder = null;
 			}
 
-			if (getUnmergedPathes().isEmpty()) {
+			if (getUnmergedPaths().isEmpty()) {
 				resultTree = dircache.writeTree(oi);
 				return true;
 			} else {
@@ -244,10 +244,10 @@ public class ResolveMerger extends ThreeWayMerger {
 				createDir(f.getParentFile());
 				DirCacheCheckout.checkoutEntry(db,
 						f,
-						entry.getValue(), true);
+						entry.getValue());
 			} else {
 				if (!f.delete())
-					failingPathes.put(entry.getKey(),
+					failingPaths.put(entry.getKey(),
 							MergeFailureReason.COULD_NOT_DELETE);
 			}
 			modifiedFiles.add(entry.getKey());
@@ -261,7 +261,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				p = p.getParentFile();
 			if (p == null || p.isDirectory())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
-			p.delete();
+			FileUtils.delete(p);
 			if (!f.mkdirs())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 		}
@@ -369,7 +369,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		// Each index entry has to match ours, means: it has to be clean
 		if (nonTree(modeI)
 				&& !(tw.idEqual(T_INDEX, T_OURS) && modeO == modeI)) {
-			failingPathes.put(tw.getPathString(), MergeFailureReason.DIRTY_INDEX);
+			failingPaths.put(tw.getPathString(), MergeFailureReason.DIRTY_INDEX);
 			return false;
 		}
 
@@ -416,7 +416,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				if (nonTree(modeB))
 					add(tw.getRawPath(), base, DirCacheEntry.STAGE_1);
 				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2);
-				unmergedPathes.add(tw.getPathString());
+				unmergedPaths.add(tw.getPathString());
 				enterSubtree = false;
 				return true;
 			}
@@ -424,7 +424,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				if (nonTree(modeB))
 					add(tw.getRawPath(), base, DirCacheEntry.STAGE_1);
 				add(tw.getRawPath(), theirs, DirCacheEntry.STAGE_3);
-				unmergedPathes.add(tw.getPathString());
+				unmergedPaths.add(tw.getPathString());
 				enterSubtree = false;
 				return true;
 			}
@@ -446,16 +446,15 @@ public class ResolveMerger extends ThreeWayMerger {
 				// is not modified
 				if (work != null
 						&& (!nonTree(work.getEntryRawMode()) || work
-								.isModified(index.getDirCacheEntry(), true,
-										true, db.getFS()))) {
-					failingPathes.put(tw.getPathString(),
+								.isModified(index.getDirCacheEntry(), true))) {
+					failingPaths.put(tw.getPathString(),
 							MergeFailureReason.DIRTY_WORKTREE);
 					return false;
 				}
 			}
 
 			if (!contentMerge(base, ours, theirs)) {
-				unmergedPathes.add(tw.getPathString());
+				unmergedPaths.add(tw.getPathString());
 			}
 			modifiedFiles.add(tw.getPathString());
 		}
@@ -530,7 +529,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			} finally {
 				is.close();
 				if (inCore)
-					of.delete();
+					FileUtils.delete(of);
 			}
 			builder.add(dce);
 			return true;
@@ -574,15 +573,15 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @return the paths with conflicts. This is a subset of the files listed
 	 *         by {@link #getModifiedFiles()}
 	 */
-	public List<String> getUnmergedPathes() {
-		return unmergedPathes;
+	public List<String> getUnmergedPaths() {
+		return unmergedPaths;
 	}
 
 	/**
 	 * @return the paths of files which have been modified by this merge. A
 	 *         file will be modified if a content-merge works on this path or if
 	 *         the merge algorithm decides to take the theirs-version. This is a
-	 *         superset of the files listed by {@link #getUnmergedPathes()}.
+	 *         superset of the files listed by {@link #getUnmergedPaths()}.
 	 */
 	public List<String> getModifiedFiles() {
 		return modifiedFiles;
@@ -610,8 +609,8 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *         a conflict). <code>null</code> is returned if this merge didn't
 	 *         fail abnormally.
 	 */
-	public Map<String, MergeFailureReason> getFailingPathes() {
-		return (failingPathes.size() == 0) ? null : failingPathes;
+	public Map<String, MergeFailureReason> getFailingPaths() {
+		return (failingPaths.size() == 0) ? null : failingPaths;
 	}
 
 	/**

@@ -42,6 +42,11 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -51,14 +56,14 @@ import java.io.IOException;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
+import org.junit.Before;
+import org.junit.Test;
 
 public class PullCommandTest extends RepositoryTestCase {
 	/** Second Test repository */
@@ -72,6 +77,7 @@ public class PullCommandTest extends RepositoryTestCase {
 
 	private File targetFile;
 
+	@Test
 	public void testPullFastForward() throws Exception {
 		PullResult res = target.pull().call();
 		// nothing to update since we don't have different data yet
@@ -94,6 +100,7 @@ public class PullCommandTest extends RepositoryTestCase {
 		assertFileContentsEqual(targetFile, "Another change");
 	}
 
+	@Test
 	public void testPullConflict() throws Exception {
 		PullResult res = target.pull().call();
 		// nothing to update since we don't have different data yet
@@ -127,6 +134,7 @@ public class PullCommandTest extends RepositoryTestCase {
 		assertFileContentsEqual(targetFile, result);
 	}
 
+	@Test
 	public void testPullLocalConflict() throws Exception {
 		target.branchCreate().setName("basedOnMaster").setStartPoint(
 				"refs/heads/master").setUpstreamMode(SetupUpstreamMode.TRACK)
@@ -168,7 +176,8 @@ public class PullCommandTest extends RepositoryTestCase {
 	}
 
 	@Override
-	protected void setUp() throws Exception {
+	@Before
+	public void setUp() throws Exception {
 		super.setUp();
 		dbTarget = createWorkRepository();
 		source = new Git(db);
@@ -179,13 +188,7 @@ public class PullCommandTest extends RepositoryTestCase {
 		writeToFile(sourceFile, "Hello world");
 		// and commit it
 		source.add().addFilepattern("SomeFile.txt").call();
-		RevCommit commit = source.commit().setMessage(
-				"Initial commit for source").call();
-
-		// point the master branch to the new commit
-		RefUpdate upd = dbTarget.updateRef("refs/heads/master");
-		upd.setNewObjectId(commit.getId());
-		upd.update();
+		source.commit().setMessage("Initial commit for source").call();
 
 		// configure the target repo to connect to the source via "origin"
 		StoredConfig targetConfig = dbTarget.getConfig();
@@ -199,13 +202,13 @@ public class PullCommandTest extends RepositoryTestCase {
 						.getPath()));
 		config.addFetchRefSpec(new RefSpec(
 				"+refs/heads/*:refs/remotes/origin/*"));
-		targetConfig.save();
 		config.update(targetConfig);
+		targetConfig.save();
 
 		targetFile = new File(dbTarget.getWorkTree(), "SomeFile.txt");
-		writeToFile(targetFile, "Hello world");
 		// make sure we have the same content
 		target.pull().call();
+		assertFileContentsEqual(targetFile, "Hello world");
 	}
 
 	private void writeToFile(File actFile, String string) throws IOException {

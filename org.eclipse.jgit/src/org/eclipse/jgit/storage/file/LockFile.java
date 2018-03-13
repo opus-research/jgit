@@ -89,11 +89,11 @@ public class LockFile {
 
 	private FileOutputStream os;
 
-	private boolean needStatInformation;
+	private boolean needSnapshot;
 
 	private boolean fsync;
 
-	private long commitLastModified;
+	private FileSnapshot commitSnapshot;
 
 	private final FS fs;
 
@@ -334,12 +334,24 @@ public class LockFile {
 
 	/**
 	 * Request that {@link #commit()} remember modification time.
+	 * <p>
+	 * This is an alias for {@code setNeedSnapshot(true)}.
 	 *
 	 * @param on
 	 *            true if the commit method must remember the modification time.
 	 */
 	public void setNeedStatInformation(final boolean on) {
-		needStatInformation = on;
+		setNeedSnapshot(on);
+	}
+
+	/**
+	 * Request that {@link #commit()} remember the {@link FileSnapshot}.
+	 *
+	 * @param on
+	 *            true if the commit method must remember the FileSnapshot.
+	 */
+	public void setNeedSnapshot(final boolean on) {
+		needSnapshot = on;
 	}
 
 	/**
@@ -397,7 +409,7 @@ public class LockFile {
 		if (lck.renameTo(ref))
 			return true;
 		if (!ref.exists() || deleteRef())
-			if (lck.renameTo(ref))
+			if (renameLock())
 				return true;
 		unlock();
 		return false;
@@ -422,9 +434,28 @@ public class LockFile {
 		return false;
 	}
 
+	private boolean renameLock() {
+		if (!fs.retryFailedLockFileCommit())
+			return lck.renameTo(ref);
+
+		// File renaming fails on windows if another thread is
+		// concurrently reading the same file. So try a few times.
+		//
+		for (int attempts = 0; attempts < 10; attempts++) {
+			if (lck.renameTo(ref))
+				return true;
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				return false;
+			}
+		}
+		return false;
+	}
+
 	private void saveStatInformation() {
-		if (needStatInformation)
-			commitLastModified = lck.lastModified();
+		if (needSnapshot)
+			commitSnapshot = FileSnapshot.save(lck);
 	}
 
 	/**
@@ -433,7 +464,12 @@ public class LockFile {
 	 * @return modification time of the lock file right before we committed it.
 	 */
 	public long getCommitLastModified() {
-		return commitLastModified;
+		return commitSnapshot.lastModified();
+	}
+
+	/** @return get the {@link FileSnapshot} just before commit. */
+	public FileSnapshot getCommitSnapshot() {
+		return commitSnapshot;
 	}
 
 	/**

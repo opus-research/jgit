@@ -56,8 +56,10 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.TagOpt;
 import org.eclipse.jgit.transport.Transport;
 
 /**
@@ -86,6 +88,9 @@ public class FetchCommand extends GitCommand<FetchResult> {
 
 	private int timeout;
 
+	private CredentialsProvider credentialsProvider;
+
+	private TagOpt tagOption;
 
 	/**
 	 * @param repo
@@ -120,7 +125,10 @@ public class FetchCommand extends GitCommand<FetchResult> {
 			transport.setRemoveDeletedRefs(removeDeletedRefs);
 			transport.setTimeout(timeout);
 			transport.setDryRun(dryRun);
+			if (tagOption != null)
+				transport.setTagOpt(tagOption);
 			transport.setFetchThin(thin);
+			transport.setCredentialsProvider(credentialsProvider);
 
 			try {
 				FetchResult result = transport.fetch(monitor, refSpecs);
@@ -318,4 +326,27 @@ public class FetchCommand extends GitCommand<FetchResult> {
 		return this;
 	}
 
+	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return {@code this}
+	 */
+	public FetchCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
+		checkCallable();
+		this.credentialsProvider = credentialsProvider;
+		return this;
+	}
+
+	/**
+	 * Sets the specification of annotated tag behavior during fetch
+	 *
+	 * @param tagOpt
+	 * @return {@code this}
+	 */
+	public FetchCommand setTagOpt(TagOpt tagOpt) {
+		checkCallable();
+		this.tagOption = tagOpt;
+		return this;
+	}
 }

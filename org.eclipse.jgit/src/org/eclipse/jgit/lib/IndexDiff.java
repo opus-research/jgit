@@ -53,6 +53,9 @@ import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
@@ -60,7 +63,7 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
+import org.eclipse.jgit.treewalk.filter.IndexDiffFilter;
 import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
@@ -78,6 +81,51 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * </ul>
  */
 public class IndexDiff {
+
+	private final class ProgressReportingFilter extends TreeFilter {
+
+		private final ProgressMonitor monitor;
+
+		private int count = 0;
+
+		private int stepSize;
+
+		private final int total;
+
+		private ProgressReportingFilter(ProgressMonitor monitor, int total) {
+			this.monitor = monitor;
+			this.total = total;
+			stepSize = total / 100;
+			if (stepSize == 0)
+				stepSize = 1000;
+		}
+
+		@Override
+		public boolean shouldBeRecursive() {
+			return false;
+		}
+
+		@Override
+		public boolean include(TreeWalk walker)
+				throws MissingObjectException,
+				IncorrectObjectTypeException, IOException {
+			count++;
+			if (count % stepSize == 0) {
+				if (count <= total)
+					monitor.update(stepSize);
+				if (monitor.isCancelled())
+					throw StopWalkException.INSTANCE;
+			}
+			return true;
+		}
+
+		@Override
+		public TreeFilter clone() {
+			throw new IllegalStateException(
+					"Do not clone this kind of filter: "
+							+ getClass().getName());
+		}
+	}
 
 	private final static int TREE = 0;
 
@@ -105,7 +153,9 @@ public class IndexDiff {
 
 	private Set<String> untracked = new HashSet<String>();
 
-	private Set<String> assumeUnchanged = new HashSet<String>();
+	private Set<String> assumeUnchanged;
+
+	private DirCache dirCache;
 
 	/**
 	 * Construct an IndexDiff
@@ -160,16 +210,44 @@ public class IndexDiff {
 	}
 
 	/**
-	 * Run the diff operation. Until this is called, all lists will be empty
+	 * Run the diff operation. Until this is called, all lists will be empty.
+	 * Use {@link #diff(ProgressMonitor, int, int, String)} if a progress
+	 * monitor is required.
 	 *
 	 * @return if anything is different between index, tree, and workdir
 	 * @throws IOException
 	 */
 	public boolean diff() throws IOException {
-		boolean changesExist = false;
-		DirCache dirCache = repository.readDirCache();
+		return diff(null, 0, 0, "");
+	}
+
+	/**
+	 * Run the diff operation. Until this is called, all lists will be empty.
+	 * <p>
+	 * The operation may be aborted by the progress monitor. In that event it
+	 * will report what was found before the cancel operation was detected.
+	 * Callers should ignore the result if monitor.isCancelled() is true. If a
+	 * progress monitor is not needed, callers should use {@link #diff()}
+	 * instead. Progress reporting is crude and approximate and only intended
+	 * for informing the user.
+	 *
+	 * @param monitor
+	 *            for reporting progress, may be null
+	 * @param estWorkTreeSize
+	 *            number or estimated files in the working tree
+	 * @param estIndexSize
+	 *            number of estimated entries in the cache
+	 * @param title
+	 *
+	 * @return if anything is different between index, tree, and workdir
+	 * @throws IOException
+	 */
+	public boolean diff(final ProgressMonitor monitor, int estWorkTreeSize,
+			int estIndexSize, final String title)
+			throws IOException {
+		dirCache = repository.readDirCache();
+
 		TreeWalk treeWalk = new TreeWalk(repository);
-		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		// add the trees (tree, dirchache, workdir)
 		if (tree != null)
@@ -178,13 +256,23 @@ public class IndexDiff {
 			treeWalk.addTree(new EmptyTreeIterator());
 		treeWalk.addTree(new DirCacheIterator(dirCache));
 		treeWalk.addTree(initialWorkingTreeIterator);
-		Collection<TreeFilter> filters = new ArrayList<TreeFilter>(
-				filter == null ? 3 : 4);
+		Collection<TreeFilter> filters = new ArrayList<TreeFilter>(4);
+
+		if (monitor != null) {
+			// Get the maximum size of the work tree and index
+			// and add some (quite arbitrary)
+			if (estIndexSize == 0)
+				estIndexSize = dirCache.getEntryCount();
+			int total = Math.max(estIndexSize * 10 / 9,
+					estWorkTreeSize * 10 / 9);
+			monitor.beginTask(title, total);
+			filters.add(new ProgressReportingFilter(monitor, total));
+		}
+
 		if (filter != null)
 			filters.add(filter);
-		filters.add(new NotIgnoredFilter(WORKDIR));
 		filters.add(new SkipWorkTreeFilter(INDEX));
-		filters.add(TreeFilter.ANY_DIFF);
+		filters.add(new IndexDiffFilter(INDEX, WORKDIR));
 		treeWalk.setFilter(AndTreeFilter.create(filters));
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
@@ -193,42 +281,30 @@ public class IndexDiff {
 					DirCacheIterator.class);
 			WorkingTreeIterator workingTreeIterator = treeWalk.getTree(WORKDIR,
 					WorkingTreeIterator.class);
-			FileMode fileModeTree = treeWalk.getFileMode(TREE);
-
-			if (dirCacheIterator != null) {
-				if (dirCacheIterator.getDirCacheEntry().isAssumeValid())
-					assumeUnchanged.add(dirCacheIterator.getEntryPathString());
-			}
 
 			if (treeIterator != null) {
 				if (dirCacheIterator != null) {
-					if (!treeIterator.getEntryObjectId().equals(
-							dirCacheIterator.getEntryObjectId())) {
+					if (!treeIterator.idEqual(dirCacheIterator)
+							|| treeIterator.getEntryRawMode()
+							!= dirCacheIterator.getEntryRawMode()) {
 						// in repo, in index, content diff => changed
-						changed.add(dirCacheIterator.getEntryPathString());
-						changesExist = true;
+						changed.add(treeWalk.getPathString());
 					}
 				} else {
 					// in repo, not in index => removed
-					if (!fileModeTree.equals(FileMode.TYPE_TREE)) {
-						removed.add(treeIterator.getEntryPathString());
-						changesExist = true;
-						if (workingTreeIterator != null)
-							untracked.add(workingTreeIterator
-									.getEntryPathString());
-					}
+					removed.add(treeWalk.getPathString());
+					if (workingTreeIterator != null)
+						untracked.add(treeWalk.getPathString());
 				}
 			} else {
 				if (dirCacheIterator != null) {
 					// not in repo, in index => added
-					added.add(dirCacheIterator.getEntryPathString());
-					changesExist = true;
+					added.add(treeWalk.getPathString());
 				} else {
 					// not in repo, not in index => untracked
 					if (workingTreeIterator != null
 							&& !workingTreeIterator.isEntryIgnored()) {
-						untracked.add(workingTreeIterator.getEntryPathString());
-						changesExist = true;
+						untracked.add(treeWalk.getPathString());
 					}
 				}
 			}
@@ -236,18 +312,27 @@ public class IndexDiff {
 			if (dirCacheIterator != null) {
 				if (workingTreeIterator == null) {
 					// in index, not in workdir => missing
-					missing.add(dirCacheIterator.getEntryPathString());
-					changesExist = true;
+					missing.add(treeWalk.getPathString());
 				} else {
-					if (!dirCacheIterator.idEqual(workingTreeIterator)) {
+					if (workingTreeIterator.isModified(
+							dirCacheIterator.getDirCacheEntry(), true)) {
 						// in index, in workdir, content differs => modified
-						modified.add(dirCacheIterator.getEntryPathString());
-						changesExist = true;
+						modified.add(treeWalk.getPathString());
 					}
 				}
 			}
 		}
-		return changesExist;
+
+		// consume the remaining work
+		if (monitor != null)
+			monitor.endTask();
+
+		if (added.isEmpty() && changed.isEmpty() && removed.isEmpty()
+				&& missing.isEmpty() && modified.isEmpty()
+				&& untracked.isEmpty())
+			return false;
+		else
+			return true;
 	}
 
 	/**
@@ -286,7 +371,7 @@ public class IndexDiff {
 	}
 
 	/**
-	 * @return list of files on modified on disk relative to the index
+	 * @return list of files that are not ignored, and not in the index.
 	 */
 	public Set<String> getUntracked() {
 		return untracked;
@@ -296,6 +381,13 @@ public class IndexDiff {
 	 * @return list of files with the flag assume-unchanged
 	 */
 	public Set<String> getAssumeUnchanged() {
+		if (assumeUnchanged == null) {
+			HashSet<String> unchanged = new HashSet<String>();
+			for (int i = 0; i < dirCache.getEntryCount(); i++)
+				if (dirCache.getEntry(i).isAssumeValid())
+					unchanged.add(dirCache.getEntry(i).getPathString());
+			assumeUnchanged = unchanged;
+		}
 		return assumeUnchanged;
 	}
 }
