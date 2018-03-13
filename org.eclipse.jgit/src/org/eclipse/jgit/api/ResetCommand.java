@@ -47,6 +47,7 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
@@ -135,7 +136,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	 *
 	 * @return the Ref after reset
 	 */
-	public Ref call() throws IOException {
+	public Ref call() throws GitAPIException {
 		checkCallable();
 
 		Ref r;
@@ -193,10 +194,6 @@ public class ResetCommand extends GitCommand<Ref> {
 			if (ru.forceUpdate() == RefUpdate.Result.LOCK_FAILURE)
 				throw new JGitInternalException(MessageFormat.format(
 						JGitText.get().cannotLock, ru.getName()));
-
-			ObjectId origHead = ru.getOldObjectId();
-			if (origHead != null)
-				repo.writeOrigHead(origHead);
 
 			switch (mode) {
 				case HARD:
