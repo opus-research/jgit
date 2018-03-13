@@ -384,19 +384,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		try (RevWalk revWalk = new RevWalk(repo);
 				TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader())) {
 			treeWalk.setRecursive(true);
-			if (!checkoutAllPaths) {
+			if (!checkoutAllPaths)
 				treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
-			}
-			if (isCheckoutIndex() && name == null) {
+			if (isCheckoutIndex())
 				checkoutPathsFromIndex(treeWalk, dc);
-			} else {
-				RevCommit commit;
-				if (name != null) {
-					ObjectId branch = repo.resolve(name);
-					commit = revWalk.parseCommit(branch);
-				} else {
-					commit = revWalk.parseCommit(getStartPointObjectId());
-				}
+			else {
+				RevCommit commit = revWalk.parseCommit(getStartPointObjectId());
 				checkoutPathsFromCommit(treeWalk, dc, commit);
 			}
 		} finally {
