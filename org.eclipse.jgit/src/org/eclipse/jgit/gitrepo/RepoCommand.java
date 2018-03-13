@@ -89,7 +89,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FileUtils;
-
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -561,12 +560,14 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 	}
 
+	@SuppressWarnings("serial")
 	private static class ManifestErrorException extends GitAPIException {
 		ManifestErrorException(Throwable cause) {
 			super(RepoText.get().invalidManifest, cause);
 		}
 	}
 
+	@SuppressWarnings("serial")
 	private static class RemoteUnavailableException extends GitAPIException {
 		RemoteUnavailableException(String uri) {
 			super(MessageFormat.format(RepoText.get().errorRemoteUnavailable, uri));
@@ -751,26 +752,26 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				Config cfg = new Config();
 				for (Project proj : bareProjects) {
 					String name = proj.path;
-					String uri = proj.name;
+					String nameUri = proj.name;
 					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
-					cfg.setString("submodule", name, "url", uri); //$NON-NLS-1$ //$NON-NLS-2$
+					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
 					// create gitlink
 					DirCacheEntry dcEntry = new DirCacheEntry(name);
 					ObjectId objectId;
 					if (ObjectId.isId(proj.revision))
 						objectId = ObjectId.fromString(proj.revision);
 					else {
-						objectId = callback.sha1(uri, proj.revision);
+						objectId = callback.sha1(nameUri, proj.revision);
 					}
 					if (objectId == null)
-						throw new RemoteUnavailableException(uri);
+						throw new RemoteUnavailableException(nameUri);
 					dcEntry.setObjectId(objectId);
 					dcEntry.setFileMode(FileMode.GITLINK);
 					builder.add(dcEntry);
 
 					for (CopyFile copyfile : proj.copyfiles) {
 						byte[] src = callback.readFile(
-								uri, proj.revision, copyfile.src);
+								nameUri, proj.revision, copyfile.src);
 						objectId = inserter.insert(Constants.OBJ_BLOB, src);
 						dcEntry = new DirCacheEntry(copyfile.dest);
 						dcEntry.setObjectId(objectId);
@@ -876,8 +877,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private static String findRef(String ref, Repository repo)
 			throws IOException {
 		if (!ObjectId.isId(ref)) {
-			Ref r = repo.getRef(
-					Constants.DEFAULT_REMOTE_NAME + "/" + ref);
+			Ref r = repo.getRef(Constants.DEFAULT_REMOTE_NAME + "/" + ref); //$NON-NLS-1$
 			if (r != null)
 				return r.getName();
 		}
