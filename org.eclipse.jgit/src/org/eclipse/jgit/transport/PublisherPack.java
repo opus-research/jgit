@@ -46,7 +46,9 @@ package org.eclipse.jgit.transport;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A PublisherPack is a single pack update for the listed commands. It may be
@@ -65,6 +67,8 @@ public class PublisherPack {
 
 	private final Collection<ReceiveCommand> commands;
 
+	private final Set<SubscribeSpec> existingSpecs;
+
 	private final String repositoryName;
 
 	/**
@@ -72,11 +76,15 @@ public class PublisherPack {
 	 * @param updates
 	 * @param slices
 	 * @param number
+	 * @param specs
 	 */
 	public PublisherPack(String name, Collection<ReceiveCommand> updates,
-			List<PublisherPackSlice> slices, long number) {
+			List<PublisherPackSlice> slices, long number,
+			Collection<SubscribeSpec> specs) {
 		repositoryName = name;
 		commands = updates;
+		existingSpecs = new LinkedHashSet<SubscribeSpec>();
+		existingSpecs.addAll(specs);
 		dataSlices = Collections.unmodifiableList(slices);
 		packNumber = number;
 	}
@@ -125,16 +133,9 @@ public class PublisherPack {
 	 * @return true if all of this pack's refs match {@code subscribeSpecs}.
 	 */
 	public boolean match(Collection<SubscribeSpec> subscribeSpecs) {
-		for (ReceiveCommand cmd : commands) {
-			boolean matched = false;
-			for (SubscribeSpec spec : subscribeSpecs)
-				if (spec.isMatch(cmd.getRefName())) {
-					matched = true;
-					break;
-				}
-			if (!matched)
+		for (SubscribeSpec s : subscribeSpecs)
+			if (!existingSpecs.contains(s))
 				return false;
-		}
 		return true;
 	}
 
@@ -142,5 +143,10 @@ public class PublisherPack {
 	public void release() {
 		for (PublisherPackSlice s : dataSlices)
 			s.release();
+	}
+
+	@Override
+	public String toString() {
+		return "PublisherPack[num=" + packNumber + ", " + commands + "]";
 	}
 }

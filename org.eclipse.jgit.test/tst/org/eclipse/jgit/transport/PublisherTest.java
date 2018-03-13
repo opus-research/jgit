@@ -47,10 +47,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -135,7 +138,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testSubscribe() throws Exception {
 		setUpPublisher(1);
-		PublisherClientTest pc = new PublisherClientTest(0) {
+		PublisherClientTest pc = new PublisherClientTest(0, 100) {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
@@ -203,7 +206,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testInitialUpdate() throws Exception {
 		setUpPublisher(1);
-		PublisherClientTest c = new PublisherClientTest(0) {
+		PublisherClientTest c = new PublisherClientTest(0, 100) {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
@@ -220,11 +223,8 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 		connectLatch.await();
 
-		// Wait for all buffers to be flushed and ready
-		Thread.sleep(2000);
-
-		byte out[] = c.getByteOutputStream().toByteArray();
-		InputStream rawIn = new ByteArrayInputStream(out);
+		InputStream rawIn = new BufferedInputStream(c
+				.getPipedInputStream(), 8192);
 		PacketLineIn in = new PacketLineIn(rawIn);
 		String line;
 		String parts[];
@@ -266,9 +266,12 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		List<PublisherClientTest> testClients = new ArrayList<
 				PublisherTest.PublisherClientTest>();
 
+		// Estimate size per ReceiveCommand
+		int space = update_size * 100;
+
 		for (int i = 0; i < clients; i++) {
 			// Delay each write() by 5ms * client number
-			PublisherClientTest t = new PublisherClientTest(i * 5) {
+			PublisherClientTest t = new PublisherClientTest(i * 5, space) {
 				@Override
 				protected void writeSubscribePacket(PacketLineOut pckLineOut)
 						throws IOException {
@@ -293,13 +296,10 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			publisher.onPush(db, refUpdates);
 		}
 
-		// Wait for all buffers to be flushed and ready
-		Thread.sleep(2000);
-
 		for (PublisherClientTest c : testClients) {
 			try {
-				byte out[] = c.getByteOutputStream().toByteArray();
-				InputStream rawIn = new ByteArrayInputStream(out);
+				InputStream rawIn = new BufferedInputStream(c
+						.getPipedInputStream(), 8192);
 				PacketLineIn in = new PacketLineIn(rawIn);
 				String line;
 				String parts[];
@@ -314,7 +314,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				int updatesLeft = updates;
 				while (updatesLeft > 0) {
 					line = in.readString();
-					if (line.startsWith("heartbeat "))
+					if (line.startsWith("heartbeat"))
 						continue;
 					assertEquals("update testrepository", line);
 
@@ -333,8 +333,9 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 					updatesLeft--;
 				}
 			} catch (Exception e) {
-				e.initCause(new Throwable(c.getPublisherState().getKey()));
-				throw e;
+				throw new Exception(c.getPublisherState().getKey(), e);
+			} finally {
+				c.close();
 			}
 		}
 	}
@@ -344,7 +345,9 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 		PublisherSession state;
 
-		ByteArrayOutputStream output;
+		PipedOutputStream output;
+
+		PipedInputStream input;
 
 		/**
 		 * Connect first so we can get a fast-restart key, then disconnect and
@@ -352,8 +355,9 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		 * instance.
 		 *
 		 * @param delayWrite
+		 * @param space
 		 */
-		public PublisherClientTest(final int delayWrite) {
+		public PublisherClientTest(final int delayWrite, int space) {
 			super(publisher);
 			state = publisher.connectClient(this);
 			state.disconnect();
@@ -369,9 +373,10 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			byte buf[] = fillIn.toByteArray();
 
 			final InputStream myIn = new ByteArrayInputStream(buf);
-			output = new ByteArrayOutputStream() {
+			output = new PipedOutputStream() {
 				@Override
-				public synchronized void write(byte[] b, int off, int len) {
+				public synchronized void write(byte[] b, int off, int len)
+						throws IOException {
 					try {
 						Thread.sleep(delayWrite);
 					} catch (InterruptedException e) {
@@ -380,6 +385,13 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 					super.write(b, off, len);
 				}
 			};
+			input = new PipedInputStream(space + 1024);
+			try {
+				output.connect(input);
+			} catch (IOException e1) {
+				// Never happens
+			}
+
 			final PublisherClient me = this;
 			subscribeThread = new Thread() {
 				@Override
@@ -397,7 +409,14 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 		@Override
 		public synchronized void close() {
-			// Nothing
+			try {
+				if (output != null) {
+					output.close();
+					input.close();
+				}
+			} catch (IOException e) {
+				fail(e.getMessage());
+			}
 		}
 
 		protected abstract void writeSubscribePacket(PacketLineOut pckLineOut)
@@ -411,8 +430,8 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			return state;
 		}
 
-		public ByteArrayOutputStream getByteOutputStream() {
-			return output;
+		public PipedInputStream getPipedInputStream() {
+			return input;
 		}
 	}
 }

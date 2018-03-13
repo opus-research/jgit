@@ -126,6 +126,8 @@ public class PublisherBuffer {
 					.getWriteIterator(); size.get() > capacity
 					&& it.hasNext();) {
 				s = it.next();
+				if (s.isClosed())
+					continue;
 				try {
 					s.store();
 				} catch (IOException e) {

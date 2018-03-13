@@ -48,14 +48,19 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.PublisherPackSlice.LoadCallback;
@@ -108,18 +113,49 @@ public class PublisherPackFactory {
 	 * @param repositoryName
 	 * @param refUpdates
 	 * @param repository
+	 * @param existingSpecs
 	 * @return new publisher pack with created slices
 	 * @throws IOException
 	 */
 	public PublisherPack buildPack(int consumers, String repositoryName,
-			Collection<ReceiveCommand> refUpdates, Repository repository)
+			Collection<ReceiveCommand> refUpdates, Repository repository,
+			Collection<SubscribeSpec> existingSpecs)
 			throws IOException {
+		// Generate a list of ObjectIds that we expect clients to have because
+		// they are subscribed to existingSpecs. Don't include ObjectIds that
+		// match refUpdates because this is called post-receive. Instead, assume
+		// the client has the old ObjectId for that update.
+		Set<String> updatedRefs = new LinkedHashSet<String>();
+		for (ReceiveCommand rc : refUpdates)
+			updatedRefs.add(rc.getRefName());
+		Set<ObjectId> existingObjects = new LinkedHashSet<ObjectId>();
+		RefDatabase refdb = repository.getRefDatabase();
+		Collection<Ref> matchingRefs = Collections.emptyList();
+		for (SubscribeSpec spec : existingSpecs) {
+			String refName = spec.getRefName();
+			if (spec.isWildcard()) {
+				String refNamePrefix = refName.substring(
+						0, refName.length() - 1);
+				Map<String, Ref> refMap = refdb.getRefs(refNamePrefix);
+				for (String updatedRef : updatedRefs) {
+					if (updatedRef.startsWith(refNamePrefix))
+						refMap.remove(updatedRef.substring(
+								refNamePrefix.length()));
+				}
+				matchingRefs = refMap.values();
+			} else if (updatedRefs.contains(refName))
+				continue;
+			else
+				matchingRefs = Collections.singleton(refdb.getRef(refName));
+			for (Ref r : matchingRefs)
+				existingObjects.add(r.getLeaf().getObjectId());
+		}
 		long packNum = packNumber.incrementAndGet();
 		List<PublisherPackSlice> slices = new ArrayList<PublisherPackSlice>();
 		OutputStream packOut = createSliceStream(consumers, slices, packNum);
 		PacketLineOut packDataLine = new PacketLineOut(packOut);
 
-		Set<ObjectId> remoteObjects = new HashSet<ObjectId>();
+		existingObjects.addAll(existingObjects);
 		Set<ObjectId> newObjects = new HashSet<ObjectId>();
 		PackWriter writer = new PackWriter(repository);
 		boolean writePack = false;
@@ -138,7 +174,7 @@ public class PublisherPackFactory {
 				if (r.getType() != Type.DELETE)
 					writePack = true;
 				if (!ObjectId.zeroId().equals(r.getOldId()))
-					remoteObjects.add(r.getOldId());
+					existingObjects.add(r.getOldId());
 				if (!ObjectId.zeroId().equals(r.getNewId()))
 					newObjects.add(r.getNewId());
 			}
@@ -151,7 +187,7 @@ public class PublisherPackFactory {
 				writer.setReuseValidatingObjects(false);
 				writer.setDeltaBaseAsOffset(true);
 				writer.preparePack(NullProgressMonitor.INSTANCE, newObjects,
-						remoteObjects);
+						existingObjects);
 				writer.writePack(NullProgressMonitor.INSTANCE,
 						NullProgressMonitor.INSTANCE, packOut);
 			}
@@ -163,7 +199,8 @@ public class PublisherPackFactory {
 		} finally {
 			writer.release();
 		}
-		return new PublisherPack(repositoryName, refUpdates, slices, packNum);
+		return new PublisherPack(
+				repositoryName, refUpdates, slices, packNum, existingSpecs);
 	}
 
 	/**
@@ -190,7 +227,7 @@ public class PublisherPackFactory {
 				buffer.allocate(slice);
 			}
 
-			public void stored(PublisherPackSlice slice) {
+			public void unloaded(PublisherPackSlice slice) {
 				buffer.deallocate(slice);
 			}
 		};
