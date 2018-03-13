@@ -62,7 +62,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String DIRCExtensionIsTooLargeAt;
 	/***/ public String DIRCExtensionNotSupportedByThisVersion;
 	/***/ public String DIRCHasTooManyEntries;
-	/***/ public String DIRCUnrecognizedExtendedFlags;
 	/***/ public String JRELacksMD5Implementation;
 	/***/ public String URINotSupported;
 	/***/ public String URLNotFound;
@@ -277,10 +276,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidWindowSize;
 	/***/ public String isAStaticFlagAndHasNorevWalkInstance;
 	/***/ public String kNotInRange;
-	/***/ public String largeObjectException;
-	/***/ public String largeObjectOutOfMemory;
-	/***/ public String largeObjectExceedsByteArray;
-	/***/ public String largeObjectExceedsLimit;
 	/***/ public String lengthExceedsMaximumArraySize;
 	/***/ public String listingAlternates;
 	/***/ public String localObjectsIncomplete;
@@ -438,12 +433,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;
-	/***/ public String unknownObject;
 	/***/ public String unknownObjectType;
 	/***/ public String unknownRepositoryFormat2;
 	/***/ public String unknownRepositoryFormat;
 	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
+	/***/ public String unpackError;
 	/***/ public String unreadablePackIndex;
 	/***/ public String unrecognizedRef;
 	/***/ public String unsupportedCommand0;
