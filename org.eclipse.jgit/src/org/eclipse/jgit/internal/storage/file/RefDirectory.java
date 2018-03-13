@@ -98,6 +98,8 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
 import org.eclipse.jgit.util.RefMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Traditional file system based {@link RefDatabase}.
@@ -115,6 +117,9 @@ import org.eclipse.jgit.util.RefMap;
  * overall size of a Git repository on disk.
  */
 public class RefDirectory extends RefDatabase {
+	private final static Logger LOG = LoggerFactory
+			.getLogger(RefDirectory.class);
+
 	/** Magic string denoting the start of a symbolic reference file. */
 	public static final String SYMREF = "ref: "; //$NON-NLS-1$
 
@@ -138,8 +143,6 @@ public class RefDirectory extends RefDatabase {
 	private final ReflogWriter logWriter;
 
 	private final File packedRefsFile;
-
-	private final String[] refSearchPaths;
 
 	/**
 	 * Immutable sorted list of loose references.
@@ -170,14 +173,13 @@ public class RefDirectory extends RefDatabase {
 	 */
 	private final AtomicInteger lastNotifiedModCnt = new AtomicInteger();
 
-	RefDirectory(final FileRepository db, String[] refSearchPaths) {
+	RefDirectory(final FileRepository db) {
 		final FS fs = db.getFS();
 		parent = db;
 		gitDir = db.getDirectory();
 		logWriter = new ReflogWriter(db);
 		refsDir = fs.resolve(gitDir, R_REFS);
 		packedRefsFile = fs.resolve(gitDir, PACKED_REFS);
-		this.refSearchPaths = refSearchPaths;
 
 		looseRefs.set(RefList.<LooseRef> emptyList());
 		packedRefs.set(PackedRefList.NO_PACKED_REFS);
@@ -263,7 +265,7 @@ public class RefDirectory extends RefDatabase {
 	public Ref getRef(final String needle) throws IOException {
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = null;
-		for (String prefix : refSearchPaths) {
+		for (String prefix : SEARCH_PATH) {
 			try {
 				ref = readRef(prefix + needle, packed);
 				if (ref != null) {
@@ -749,22 +751,37 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList readPackedRefs() throws IOException {
-		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
-		final BufferedReader br;
-		final MessageDigest digest = Constants.newMessageDigest();
-		try {
-			br = new BufferedReader(new InputStreamReader(
-					new DigestInputStream(new FileInputStream(packedRefsFile),
-							digest), CHARSET));
-		} catch (FileNotFoundException noPackedRefs) {
-			// Ignore it and leave the new list empty.
-			return PackedRefList.NO_PACKED_REFS;
-		}
-		try {
-			return new PackedRefList(parsePackedRefs(br), snapshot,
-					ObjectId.fromRaw(digest.digest()));
-		} finally {
-			br.close();
+		int maxStaleRetries = 5;
+		int retries = 0;
+		while (true) {
+			final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
+			final BufferedReader br;
+			final MessageDigest digest = Constants.newMessageDigest();
+			try {
+				br = new BufferedReader(new InputStreamReader(
+						new DigestInputStream(new FileInputStream(packedRefsFile),
+								digest), CHARSET));
+			} catch (FileNotFoundException noPackedRefs) {
+				// Ignore it and leave the new list empty.
+				return PackedRefList.NO_PACKED_REFS;
+			}
+			try {
+				return new PackedRefList(parsePackedRefs(br), snapshot,
+						ObjectId.fromRaw(digest.digest()));
+			} catch (IOException e) {
+				if (FileUtils.isStaleFileHandle(e) && retries < maxStaleRetries) {
+					if (LOG.isDebugEnabled()) {
+						LOG.debug(MessageFormat.format(
+								JGitText.get().packedRefsHandleIsStale,
+								Integer.valueOf(retries)), e);
+					}
+					retries++;
+					continue;
+				}
+				throw e;
+			} finally {
+				br.close();
+			}
 		}
 	}
 
@@ -884,7 +901,6 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	@SuppressWarnings("null")
 	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
@@ -923,6 +939,7 @@ public class RefDirectory extends RefDatabase {
 			final String target = RawParseUtils.decode(buf, 5, n);
 			if (ref != null && ref.isSymbolic()
 					&& ref.getTarget().getName().equals(target)) {
+				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
@@ -937,6 +954,7 @@ public class RefDirectory extends RefDatabase {
 			id = ObjectId.fromString(buf, 0);
 			if (ref != null && !ref.isSymbolic()
 					&& ref.getTarget().getObjectId().equals(id)) {
+				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
