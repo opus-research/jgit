@@ -497,15 +497,18 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			long rawLen = getEntryLength();
 			if (rawLen == 0)
 				canonLen = 0;
-			InputStream is = current().openInputStream();
-			try {
-				// canonLen gets updated here
-				possiblyFilteredInputStream(current(), is, current()
-						.getLength());
-			} finally {
-				safeClose(is);
+			if (getEntryLastModified() == 0)
+				System.out.println("W0?");
+			// else {
+				InputStream is = current().openInputStream();
+				try {
+					possiblyFilteredInputStream(current(), is, current()
+							.getLength());
+				} finally {
+					safeClose(is);
+				}
 			}
-		}
+		// }
 		return canonLen;
 	}
 
