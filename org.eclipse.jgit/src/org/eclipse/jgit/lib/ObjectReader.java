@@ -57,7 +57,7 @@ import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
  */
 public abstract class ObjectReader {
 	/** Type hint indicating the caller doesn't know the type. */
-	public static final int OBJ_ANY = -1;
+	protected static final int OBJ_ANY = -1;
 
 	/**
 	 * Construct a new reader from the same data.
