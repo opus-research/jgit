@@ -56,10 +56,10 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 
 /**
@@ -277,6 +277,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			}
 
 			writer.setUseCachedPacks(true);
+			writer.setUseBitmaps(true);
 			writer.setThin(thinPack);
 			writer.setReuseValidatingObjects(false);
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
