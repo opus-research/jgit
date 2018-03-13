@@ -74,7 +74,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -161,7 +160,7 @@ public abstract class BaseReceivePack {
 	private boolean expectDataAfterPackFooter;
 
 	/** Should an incoming transfer validate objects? */
-	private ObjectChecker objectChecker;
+	private boolean checkReceivedObjects;
 
 	/** Should an incoming transfer permit create requests? */
 	private boolean allowCreates;
@@ -255,7 +254,7 @@ public abstract class BaseReceivePack {
 		walk = new RevWalk(db);
 
 		final ReceiveConfig cfg = db.getConfig().get(ReceiveConfig.KEY);
-		objectChecker = cfg.newObjectChecker();
+		checkReceivedObjects = cfg.checkReceivedObjects;
 		allowCreates = cfg.allowCreates;
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
@@ -274,41 +273,24 @@ public abstract class BaseReceivePack {
 		};
 
 		final boolean checkReceivedObjects;
-		final boolean allowLeadingZeroFileMode;
-		final boolean safeForWindows;
-		final boolean safeForMacOS;
 
 		final boolean allowCreates;
+
 		final boolean allowDeletes;
+
 		final boolean allowNonFastForwards;
+
 		final boolean allowOfsDelta;
 
 		ReceiveConfig(final Config config) {
-			checkReceivedObjects = config.getBoolean(
-					"receive", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
-					config.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
-			allowLeadingZeroFileMode = checkReceivedObjects
-					&& config.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
-			safeForWindows = checkReceivedObjects
-					&& config.getBoolean("fsck", "safeForWindows", false); //$NON-NLS-1$ //$NON-NLS-2$
-			safeForMacOS = checkReceivedObjects
-					&& config.getBoolean("fsck", "safeForMacOS", false); //$NON-NLS-1$ //$NON-NLS-2$
-
+			checkReceivedObjects = config.getBoolean("receive", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
+					false);
 			allowCreates = true;
 			allowDeletes = !config.getBoolean("receive", "denydeletes", false); //$NON-NLS-1$ //$NON-NLS-2$
 			allowNonFastForwards = !config.getBoolean("receive", //$NON-NLS-1$
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-		}
-
-		ObjectChecker newObjectChecker() {
-			if (!checkReceivedObjects)
-				return null;
-			return new ObjectChecker()
-				.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
-				.setSafeForWindows(safeForWindows)
-				.setSafeForMacOS(safeForMacOS);
 		}
 	}
 
@@ -499,29 +481,16 @@ public abstract class BaseReceivePack {
 	 *         of the connection.
 	 */
 	public boolean isCheckReceivedObjects() {
-		return objectChecker != null;
+		return checkReceivedObjects;
 	}
 
 	/**
 	 * @param check
 	 *            true to enable checking received objects; false to assume all
 	 *            received objects are valid.
-	 * @see #setObjectChecker(ObjectChecker)
 	 */
 	public void setCheckReceivedObjects(final boolean check) {
-		if (check && objectChecker == null)
-			setObjectChecker(new ObjectChecker());
-		else if (!check && objectChecker != null)
-			setObjectChecker(null);
-	}
-
-	/**
-	 * @param impl if non-null the object checking instance to verify each
-	 *        received object with; null to disable object checking.
-	 * @since 3.4
-	 */
-	public void setObjectChecker(ObjectChecker impl) {
-		objectChecker = impl;
+		checkReceivedObjects = check;
 	}
 
 	/** @return true if the client can request refs to be created. */
@@ -1014,7 +983,7 @@ public abstract class BaseReceivePack {
 			parser.setCheckEofAfterPackFooter(!biDirectionalPipe
 					&& !isExpectDataAfterPackFooter());
 			parser.setExpectDataAfterPackFooter(isExpectDataAfterPackFooter());
-			parser.setObjectChecker(objectChecker);
+			parser.setObjectChecking(isCheckReceivedObjects());
 			parser.setLockMessage(lockMsg);
 			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
 			packLock = parser.parse(receiving, resolving);
@@ -1036,12 +1005,6 @@ public abstract class BaseReceivePack {
 	private void checkConnectivity() throws IOException {
 		ObjectIdSubclassMap<ObjectId> baseObjects = null;
 		ObjectIdSubclassMap<ObjectId> providedObjects = null;
-		ProgressMonitor checking = NullProgressMonitor.INSTANCE;
-		if (sideBand) {
-			SideBandProgressMonitor m = new SideBandProgressMonitor(msgOut);
-			m.setDelayStart(750, TimeUnit.MILLISECONDS);
-			checking = m;
-		}
 
 		if (checkReferencedIsReachable) {
 			baseObjects = parser.getBaseObjectIds();
@@ -1077,10 +1040,8 @@ public abstract class BaseReceivePack {
 			}
 		}
 
-		checking.beginTask(JGitText.get().countingObjects, ProgressMonitor.UNKNOWN);
 		RevCommit c;
 		while ((c = ow.next()) != null) {
-			checking.update(1);
 			if (providedObjects != null //
 					&& !c.has(RevFlag.UNINTERESTING) //
 					&& !providedObjects.contains(c))
@@ -1089,7 +1050,6 @@ public abstract class BaseReceivePack {
 
 		RevObject o;
 		while ((o = ow.nextObject()) != null) {
-			checking.update(1);
 			if (o.has(RevFlag.UNINTERESTING))
 				continue;
 
@@ -1103,7 +1063,6 @@ public abstract class BaseReceivePack {
 			if (o instanceof RevBlob && !db.hasObject(o))
 				throw new MissingObjectException(o, Constants.TYPE_BLOB);
 		}
-		checking.endTask();
 
 		if (baseObjects != null) {
 			for (ObjectId id : baseObjects) {
