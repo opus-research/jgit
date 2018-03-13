@@ -45,12 +45,8 @@
 
 package org.eclipse.jgit.pgm;
 
-import static org.eclipse.jgit.lib.Constants.HEAD;
-import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
-
 import java.io.BufferedOutputStream;
 import java.io.PrintWriter;
-import java.text.MessageFormat;
 import java.util.List;
 
 import org.eclipse.jgit.diff.DiffEntry;
@@ -60,14 +56,10 @@ import org.eclipse.jgit.diff.RawTextIgnoreLeadingWhitespace;
 import org.eclipse.jgit.diff.RawTextIgnoreTrailingWhitespace;
 import org.eclipse.jgit.diff.RawTextIgnoreWhitespaceChange;
 import org.eclipse.jgit.diff.RenameDetector;
-import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -77,14 +69,11 @@ class Diff extends TextBuiltin {
 	private final DiffFormatter diffFmt = new DiffFormatter( //
 			new BufferedOutputStream(System.out));
 
-	@Argument(index = 0, metaVar = "metaVar_treeish")
+	@Argument(index = 0, metaVar = "metaVar_treeish", required = true)
 	private AbstractTreeIterator oldTree;
 
-	@Argument(index = 1, metaVar = "metaVar_treeish")
+	@Argument(index = 1, metaVar = "metaVar_treeish", required = true)
 	private AbstractTreeIterator newTree;
-
-	@Option(name = "--cached", usage = "usage_cached")
-	private boolean cached;
 
 	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;
@@ -139,7 +128,7 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--full-index")
 	void abbrev(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setAbbreviationLength(OBJECT_ID_STRING_LENGTH);
+		diffFmt.setAbbreviationLength(Constants.OBJECT_ID_STRING_LENGTH);
 	}
 
 	@Option(name = "--src-prefix", usage = "usage_srcPrefix")
@@ -164,27 +153,6 @@ class Diff extends TextBuiltin {
 	protected void run() throws Exception {
 		diffFmt.setRepository(db);
 		try {
-			if (cached) {
-				if (oldTree == null) {
-					ObjectId head = db.resolve(HEAD + "^{tree}");
-					if (head == null)
-						die(MessageFormat.format(CLIText.get().notATree, HEAD));
-					CanonicalTreeParser p = new CanonicalTreeParser();
-					ObjectReader reader = db.newObjectReader();
-					try {
-						p.reset(reader, head);
-					} finally {
-						reader.release();
-					}
-					oldTree = p;
-				}
-				newTree = new DirCacheIterator(db.readDirCache());
-			} else if (oldTree == null) {
-				oldTree = new DirCacheIterator(db.readDirCache());
-				newTree = new FileTreeIterator(db);
-			} else if (newTree == null)
-				newTree = new FileTreeIterator(db);
-
 			diffFmt.setProgressMonitor(new TextProgressMonitor());
 			diffFmt.setPathFilter(pathFilter);
 			if (detectRenames != null)
