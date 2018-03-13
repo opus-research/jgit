@@ -56,6 +56,7 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.BaseReceivePack.ReceiveConfig;
 import org.junit.Test;
 
 /** Test for push certificate parsing. */
@@ -91,7 +92,7 @@ public class PushCertificateParserTest {
 				new DfsRepositoryDescription("repo"));
 
 		PushCertificateParser parser = new PushCertificateParser(
-				db, new SignedPushConfig(cfg));
+				db, new ReceiveConfig(cfg));
 		parser.receiveHeader(pckIn, false);
 		parser.addCommand(pckIn.readStringRaw());
 		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readStringRaw());
