@@ -146,13 +146,10 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 * @param extensions
 	 *            additional pack file extensions with the same base as the pack
 	 */
-	public PackFile(final File packFile, Iterable<PackExt> extensions) {
+	public PackFile(final File packFile, int extensions) {
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
-		int bits = 0;
-		for (PackExt ext : extensions)
-			bits |= 1 << ext.getPosition();
-		this.extensions = bits;
+		this.extensions = extensions;
 
 		// Multiply by 31 here so we can more directly combine with another
 		// value in WindowCache.hash(), without doing the multiply there.
@@ -1060,22 +1057,17 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	synchronized PackBitmapIndex getBitmapIndex() throws IOException {
-		if (bitmapIdx == null) {
-			PackIndex packIndex = idx();
-			if (packIndex.hasBitmapIndex()) {
-				return packIndex.getBitmapIndex(getReverseIdx());
-			} else if (hasExt(BITMAP_INDEX)) {
-				final PackBitmapIndex idx = PackBitmapIndex.open(
-						extFile(BITMAP_INDEX), idx(), getReverseIdx());
+		if (bitmapIdx == null && hasExt(BITMAP_INDEX)) {
+			final PackBitmapIndex idx = PackBitmapIndex.open(
+					extFile(BITMAP_INDEX), idx(), getReverseIdx());
 
-				if (packChecksum == null)
-					packChecksum = idx.packChecksum;
-				else if (!Arrays.equals(packChecksum, idx.packChecksum))
-					throw new PackMismatchException(
-							JGitText.get().packChecksumMismatch);
+			if (packChecksum == null)
+				packChecksum = idx.packChecksum;
+			else if (!Arrays.equals(packChecksum, idx.packChecksum))
+				throw new PackMismatchException(
+						JGitText.get().packChecksumMismatch);
 
-				bitmapIdx = idx;
-			}
+			bitmapIdx = idx;
 		}
 		return bitmapIdx;
 	}

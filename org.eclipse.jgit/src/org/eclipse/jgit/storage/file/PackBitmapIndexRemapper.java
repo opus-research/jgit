@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.storage.file;
 
+import java.util.Collections;
+import java.util.Iterator;
+
 import javaewah.EWAHCompressedBitmap;
 import javaewah.IntIterator;
 
@@ -58,9 +61,10 @@ import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;
  * implementations this implementation is not thread safe, as it is intended to
  * be used with a PackBitmapIndexBuilder, which is also not thread safe.
  */
-public class PackBitmapIndexRemapper extends PackBitmapIndex {
+public class PackBitmapIndexRemapper extends PackBitmapIndex
+		implements Iterable<PackBitmapIndexRemapper.Entry> {
 
-	private final PackBitmapIndex oldPackIndex;
+	private final BasePackBitmapIndex oldPackIndex;
 	private final PackBitmapIndex newPackIndex;
 	private final ObjectIdOwnerMap<StoredBitmap> convertedBitmaps;
 	private final BitSet inflated;
@@ -76,18 +80,30 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex {
 	 *            the bitmap index with the new mapping.
 	 * @return a bitmap index that attempts to do the mapping between the two.
 	 */
-	public static PackBitmapIndex newPackBitmapIndex(
+	public static PackBitmapIndexRemapper newPackBitmapIndex(
 			BitmapIndex prevBitmapIndex, PackBitmapIndex newIndex) {
 		if (!(prevBitmapIndex instanceof BitmapIndexImpl))
-			return newIndex;
+			return new PackBitmapIndexRemapper(newIndex);
+
+		PackBitmapIndex prevIndex = ((BitmapIndexImpl) prevBitmapIndex)
+				.getPackBitmapIndex();
+		if (!(prevIndex instanceof BasePackBitmapIndex))
+			return new PackBitmapIndexRemapper(newIndex);
 
 		return new PackBitmapIndexRemapper(
-				((BitmapIndexImpl) prevBitmapIndex).getPackBitmapIndex(),
-				newIndex);
+				(BasePackBitmapIndex) prevIndex, newIndex);
+	}
+
+	private PackBitmapIndexRemapper(PackBitmapIndex newPackIndex) {
+		this.oldPackIndex = null;
+		this.newPackIndex = newPackIndex;
+		this.convertedBitmaps = null;
+		this.inflated = null;
+		this.prevToNewMapping = null;
 	}
 
 	private PackBitmapIndexRemapper(
-			PackBitmapIndex oldPackIndex, PackBitmapIndex newPackIndex) {
+			BasePackBitmapIndex oldPackIndex, PackBitmapIndex newPackIndex) {
 		this.oldPackIndex = oldPackIndex;
 		this.newPackIndex = newPackIndex;
 		convertedBitmaps = new ObjectIdOwnerMap<StoredBitmap>();
@@ -120,25 +136,62 @@ public class PackBitmapIndexRemapper extends PackBitmapIndex {
 		return newPackIndex.ofObjectType(bitmap, type);
 	}
 
+	public Iterator<Entry> iterator() {
+		if (oldPackIndex == null)
+			return Collections.<Entry> emptyList().iterator();
+
+		final Iterator<StoredBitmap> it = oldPackIndex.getBitmaps().iterator();
+		return new Iterator<Entry>() {
+			public boolean hasNext() {
+				return it.hasNext();
+			}
+
+			public Entry next() {
+				StoredBitmap sb = it.next();
+				return new Entry(sb, sb.getFlags());
+			}
+
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+		};
+	}
+
 	@Override
 	public EWAHCompressedBitmap getBitmap(AnyObjectId objectId) {
 		EWAHCompressedBitmap bitmap = newPackIndex.getBitmap(objectId);
-		if (bitmap != null)
+		if (bitmap != null || oldPackIndex == null)
 			return bitmap;
 
 		StoredBitmap stored = convertedBitmaps.get(objectId);
 		if (stored != null)
 			return stored.getBitmap();
 
-		EWAHCompressedBitmap oldBitmap = oldPackIndex.getBitmap(objectId);
+		StoredBitmap oldBitmap = oldPackIndex.getBitmaps().get(objectId);
 		if (oldBitmap == null)
 			return null;
 
 		inflated.clear();
-		for (IntIterator ii = oldBitmap.intIterator(); ii.hasNext();)
-			inflated.set(prevToNewMapping[ii.next()]);
+		for (IntIterator i = oldBitmap.getBitmap().intIterator(); i.hasNext();)
+			inflated.set(prevToNewMapping[i.next()]);
 		bitmap = inflated.toEWAHCompressedBitmap();
-		convertedBitmaps.add(new StoredBitmap(objectId, bitmap, null));
+		convertedBitmaps.add(
+				new StoredBitmap(objectId, bitmap, null, oldBitmap.getFlags()));
 		return bitmap;
+	}
+
+	/** An entry in the old PackBitmapIndex. */
+	public final class Entry extends ObjectId {
+		private final int flags;
+
+		private Entry(AnyObjectId src, int flags) {
+			super(src);
+			this.flags = flags;
+		}
+
+		/** @return the flags associated with the bitmap. */
+		public int getFlags() {
+			return flags;
+		}
 	}
 }
