@@ -99,7 +99,7 @@ public class ReflogEntry {
 	}
 
 	/**
-	 * @return user performing the change
+	 * @return user performin the change
 	 */
 	public PersonIdent getWho() {
 		return who;
@@ -116,16 +116,5 @@ public class ReflogEntry {
 	public String toString() {
 		return "Entry[" + oldId.name() + ", " + newId.name() + ", " + getWho() + ", "
 				+ getComment() + "]";
-	}
-
-	/**
-	 * @return a {@link CheckoutEntry} with parsed information about a branch
-	 *         switch, or null if the entry is not a checkout
-	 */
-	public CheckoutEntry parseCheckout() {
-		if (getComment().startsWith(CheckoutEntry.CHECKOUT_MOVING_FROM))
-			return new CheckoutEntry(this);
-		else
-			return null;
 	}
 }
