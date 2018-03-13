@@ -296,8 +296,6 @@ public class PackWriter implements AutoCloseable {
 
 	private ObjectCountCallback callback;
 
-	private long blobMaxBytes = -1;
-
 	/**
 	 * Create writer for specified repository.
 	 * <p>
@@ -581,16 +579,6 @@ public class PackWriter implements AutoCloseable {
 		this.shallowPack = true;
 		this.depth = depth;
 		this.unshallowObjects = unshallow;
-	}
-
-	/**
-	 * @param bytes
-	 *            exclude blobs of size greater than this, unless they
-	 *            appear as a file of name starting with ".git".
-	 * @since 4.10
-	 */
-	public void setBlobMaxBytes(long bytes) {
-		blobMaxBytes = bytes;
 	}
 
 	/**
@@ -1906,7 +1894,7 @@ public class PackWriter implements AutoCloseable {
 				byte[] pathBuf = walker.getPathBuffer();
 				int pathLen = walker.getPathLength();
 				bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-				filterAndAddObject(o, walker, pathHash);
+				addObject(o, pathHash);
 				countingMonitor.update(1);
 			}
 		} else {
@@ -1916,7 +1904,7 @@ public class PackWriter implements AutoCloseable {
 					continue;
 				if (exclude(o))
 					continue;
-				filterAndAddObject(o, walker, walker.getPathHashCode());
+				addObject(o, walker.getPathHashCode());
 				countingMonitor.update(1);
 			}
 		}
@@ -2006,34 +1994,6 @@ public class PackWriter implements AutoCloseable {
 		otp.setPathHash(pathHashCode);
 		objectsLists[type].add(otp);
 		objectsMap.add(otp);
-	}
-
-	/**
-	 * Adds the given object as an object to be packed, first performing
-	 * blob-max-bytes filtering.
-	 *
-	 * @see #setBlobMaxBytes
-	 */
-	private void filterAndAddObject(@NonNull RevObject object,
-			@NonNull ObjectWalk walk, int pathHashCode) throws IOException {
-		boolean oversized = false;
-		// Check if this object needs to be rejected, doing the cheaper
-		// checks first.
-		boolean reject = blobMaxBytes >= 0 &&
-			object.getType() == OBJ_BLOB &&
-			!walk.isGitFile() &&
-			(oversized = reader.getObjectSize(object, OBJ_BLOB) > blobMaxBytes);
-		if (reject) {
-			// If this blob is rejected because of size, it may
-			// need to still be included later (in the case that it
-			// appears as a ".git*" file). Mark it as unseen so
-			// that future traversals to this blob do not skip it.
-			if (oversized) {
-				object.remove(RevFlag.SEEN);
-			}
-		} else {
-			addObject(object, pathHashCode);
-		}
 	}
 
 	private boolean exclude(AnyObjectId objectId) {
