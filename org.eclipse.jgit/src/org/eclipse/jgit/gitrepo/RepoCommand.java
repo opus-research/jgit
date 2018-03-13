@@ -731,9 +731,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * Returns the child if either base or child is not a bare path. This provides a missing feature in
 	 * java.net.URI (see http://bugs.java.com/view_bug.do?bug_id=6226081).
 	 */
-	private static final String SLASH = "/"; //$NON-NLS-1$
 	static URI relativize(URI current, URI target) {
-
 		// We only handle bare paths for now.
 		if (!target.toString().equals(target.getPath())) {
 			return target;
@@ -746,46 +744,37 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		String dest = target.normalize().getPath();
 
 		// TODO(hanwen): maybe (absolute, relative) should throw an exception.
-		if (cur.startsWith(SLASH) != dest.startsWith(SLASH)) {
+		if (cur.startsWith("/") != dest.startsWith("/")) { //$NON-NLS-1$//$NON-NLS-2$
 			return target;
 		}
 
-		while (cur.startsWith(SLASH)) {
+		while (cur.startsWith("/")) { //$NON-NLS-1$
 			cur = cur.substring(1);
 		}
-		while (dest.startsWith(SLASH)) {
+		while (dest.startsWith("/")) { //$NON-NLS-1$
 			dest = dest.substring(1);
 		}
 
-		if (cur.indexOf('/') == -1 || dest.indexOf('/') == -1) {
-			// Avoid having to special-casing in the next two ifs.
-			String prefix = "prefix/"; //$NON-NLS-1$
-			cur = prefix + cur;
-			dest = prefix + dest;
-		}
-
-		if (!cur.endsWith(SLASH)) {
+		if (!cur.endsWith("/")) { //$NON-NLS-1$
 			// The current file doesn't matter.
-			int lastSlash = cur.lastIndexOf('/');
-			cur = cur.substring(0, lastSlash);
+			cur = cur.substring(0, cur.lastIndexOf('/'));
 		}
 		String destFile = ""; //$NON-NLS-1$
-		if (!dest.endsWith(SLASH)) {
+		if (!dest.endsWith("/")) { //$NON-NLS-1$
 			// We always have to provide the destination file.
-			int lastSlash = dest.lastIndexOf('/');
-			destFile = dest.substring(lastSlash + 1, dest.length());
+			destFile = dest.substring(dest.lastIndexOf('/') + 1, dest.length());
 			dest = dest.substring(0, dest.lastIndexOf('/'));
 		}
 
-		String[] cs = cur.split(SLASH);
-		String[] ds = dest.split(SLASH);
+		String[] cs = cur.split("/"); //$NON-NLS-1$
+		String[] ds = dest.split("/"); //$NON-NLS-1$
 
 		int common = 0;
 		while (common < cs.length && common < ds.length && cs[common].equals(ds[common])) {
 			common++;
 		}
 
-		StringJoiner j = new StringJoiner(SLASH);
+		StringJoiner j = new StringJoiner("/"); //$NON-NLS-1$
 		for (int i = common; i < cs.length; i++) {
 			j.add(".."); //$NON-NLS-1$
 		}
