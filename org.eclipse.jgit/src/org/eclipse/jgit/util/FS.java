@@ -44,13 +44,15 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -108,7 +110,7 @@ public abstract class FS {
 		}
 	}
 
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -488,9 +490,9 @@ public abstract class FS {
 		private final String desc;
 		private final String dir;
 		private final boolean debug = LOG.isDebugEnabled();
-		private final AtomicBoolean fail = new AtomicBoolean();
+		final AtomicBoolean fail = new AtomicBoolean();
 
-		private GobblerThread(Process p, String[] command, File dir) {
+		GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
 			if (debug) {
 				this.desc = Arrays.asList(command).toString();
@@ -551,6 +553,14 @@ public abstract class FS {
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
 		if (gitExe == null) {
+			return null;
+		}
+
+		// Bug 480782: Check if the discovered git executable is JGit CLI
+		String v = readPipe(gitExe.getParentFile(),
+				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
+				Charset.defaultCharset().name());
+		if (v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
@@ -869,88 +879,52 @@ public abstract class FS {
 	 * Runs the given process until termination, clearing its stdout and stderr
 	 * streams on-the-fly.
 	 *
-	 * @param processBuilder
-	 *            The process builder configured for this process.
+	 * @param hookProcessBuilder
+	 *            The process builder configured for this hook.
 	 * @param outRedirect
-	 *            A OutputStream on which to redirect the processes stdout. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost.
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
 	 * @param errRedirect
-	 *            A OutputStream on which to redirect the processes stderr. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            error will be lost.
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
 	 * @param stdinArgs
 	 *            A string to pass on to the standard input of the hook. Can be
 	 *            <code>null</code>.
-	 * @return the exit value of this process.
+	 * @return the exit value of this hook.
 	 * @throws IOException
-	 *             if an I/O error occurs while executing this process.
+	 *             if an I/O error occurs while executing this hook.
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 4.2
+	 * @since 3.7
 	 */
-	public int runProcess(ProcessBuilder processBuilder,
+	protected int runProcess(ProcessBuilder hookProcessBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
 			throws IOException, InterruptedException {
-		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
-				stdinArgs.getBytes(Constants.CHARACTER_ENCODING));
-		return runProcess(processBuilder, outRedirect, errRedirect, in);
-	}
-
-	/**
-	 * Runs the given process until termination, clearing its stdout and stderr
-	 * streams on-the-fly.
-	 *
-	 * @param processBuilder
-	 *            The process builder configured for this process.
-	 * @param outRedirect
-	 *            An OutputStream on which to redirect the processes stdout. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost. If binary is set to <code>false</code>
-	 *            then it is expected that the process emits text data which
-	 *            should be processed line by line.
-	 * @param errRedirect
-	 *            An OutputStream on which to redirect the processes stderr. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            error will be lost.
-	 * @param inRedirect
-	 *            An InputStream from which to redirect the processes stdin. Can
-	 *            be <code>null</code>, in which case the process doesn't get
-	 *            any data over stdin. If binary is set to
-	 *            <code>false</code> then it is expected that the process
-	 *            expects text data which should be processed line by line.
-	 * @return the return code of this process.
-	 * @throws IOException
-	 *             if an I/O error occurs while executing this process.
-	 * @throws InterruptedException
-	 *             if the current thread is interrupted while waiting for the
-	 *             process to end.
-	 * @since 4.2
-	 */
-	public int runProcess(ProcessBuilder processBuilder,
-			OutputStream outRedirect, OutputStream errRedirect,
-			InputStream inRedirect) throws IOException,
-			InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
 		// We'll record the first I/O exception that occurs, but keep on trying
 		// to dispose of our open streams and file handles
 		IOException ioException = null;
 		try {
-			process = processBuilder.start();
+			process = hookProcessBuilder.start();
 			final Callable<Void> errorGobbler = new StreamGobbler(
 					process.getErrorStream(), errRedirect);
 			final Callable<Void> outputGobbler = new StreamGobbler(
 					process.getInputStream(), outRedirect);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
-			OutputStream outputStream = process.getOutputStream();
-			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream)
-						.call();
+			if (stdinArgs != null) {
+				final PrintWriter stdinWriter = new PrintWriter(
+						process.getOutputStream());
+				stdinWriter.print(stdinArgs);
+				stdinWriter.flush();
+				// We are done with this hook's input. Explicitly close its
+				// stdin now to kick off any blocking read the hook might have.
+				stdinWriter.close();
 			}
-			outputStream.close();
 			return process.waitFor();
 		} catch (IOException e) {
 			ioException = e;
@@ -1228,27 +1202,30 @@ public abstract class FS {
 	 * </p>
 	 */
 	private static class StreamGobbler implements Callable<Void> {
-		private InputStream in;
+		private final BufferedReader reader;
 
-		private OutputStream out;
+		private final BufferedWriter writer;
 
 		public StreamGobbler(InputStream stream, OutputStream output) {
-			this.in = stream;
-			this.out = output;
+			this.reader = new BufferedReader(new InputStreamReader(stream));
+			if (output == null)
+				this.writer = null;
+			else
+				this.writer = new BufferedWriter(new OutputStreamWriter(output));
 		}
 
 		public Void call() throws IOException {
 			boolean writeFailure = false;
-			byte buffer[] = new byte[4096];
-			int readBytes;
-			while ((readBytes = in.read(buffer)) != -1) {
-				// Do not try to write again after a failure, but keep
-				// reading as long as possible to prevent the input stream
-				// from choking.
-				if (!writeFailure && out != null) {
+
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				// Do not try to write again after a failure, but keep reading
+				// as long as possible to prevent the input stream from choking.
+				if (!writeFailure && writer != null) {
 					try {
-						out.write(buffer, 0, readBytes);
-						out.flush();
+						writer.write(line);
+						writer.newLine();
+						writer.flush();
 					} catch (IOException e) {
 						writeFailure = true;
 					}
