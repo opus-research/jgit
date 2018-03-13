@@ -6,7 +6,6 @@ Bundle-Version: 4.1.0.qualifier
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-Localization: plugin
 Bundle-Vendor: %Provider-Name
-Bundle-ActivationPolicy: lazy
 Import-Package: org.apache.http;version="[4.1.0,5.0.0)",
  org.apache.http.client;version="[4.1.0,5.0.0)",
  org.apache.http.client.methods;version="[4.1.0,5.0.0)",
@@ -27,5 +26,4 @@ Export-Package: org.eclipse.jgit.transport.http.apache;version="4.1.0";
    javax.net.ssl,
    org.apache.http.client,
    org.apache.http.client.methods,
-   org.apache.http",
- org.eclipse.jgit.transport.http.apache.internal;x-internal:=true
+   org.apache.http"

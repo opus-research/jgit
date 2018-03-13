@@ -261,6 +261,11 @@ public class FS_POSIX extends FS {
 	}
 
 	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -288,6 +293,16 @@ public class FS_POSIX extends FS {
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		// no action on POSIX
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 
 	/**
@@ -320,9 +335,6 @@ public class FS_POSIX extends FS {
 	@Override
 	public File findHook(Repository repository, String hookName) {
 		final File gitdir = repository.getDirectory();
-		if (gitdir == null) {
-			return null;
-		}
 		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
 				.resolve(hookName);
 		if (Files.isExecutable(hookPath))

@@ -5,7 +5,6 @@ Bundle-SymbolicName: org.eclipse.jgit
 Bundle-Version: 4.1.0.qualifier
 Bundle-Localization: plugin
 Bundle-Vendor: %provider_name
-Bundle-ActivationPolicy: lazy
 Export-Package: org.eclipse.jgit.api;version="4.1.0";
   uses:="org.eclipse.jgit.revwalk,
    org.eclipse.jgit.treewalk.filter,
@@ -21,8 +20,7 @@ Export-Package: org.eclipse.jgit.api;version="4.1.0";
    org.eclipse.jgit.transport,
    org.eclipse.jgit.merge",
  org.eclipse.jgit.api.errors;version="4.1.0";
-  uses:="org.eclipse.jgit.lib,
-   org.eclipse.jgit.errors",
+  uses:="org.eclipse.jgit.lib,org.eclipse.jgit.errors",
  org.eclipse.jgit.attributes;version="4.1.0",
  org.eclipse.jgit.blame;version="4.1.0";
   uses:="org.eclipse.jgit.lib,
@@ -53,12 +51,9 @@ Export-Package: org.eclipse.jgit.api;version="4.1.0";
  org.eclipse.jgit.gitrepo;version="4.1.0";
   uses:="org.eclipse.jgit.api,
    org.eclipse.jgit.lib,
-   org.eclipse.jgit.revwalk,
-   org.xml.sax.helpers,
-   org.xml.sax",
+   org.eclipse.jgit.revwalk",
  org.eclipse.jgit.gitrepo.internal;version="4.1.0";x-internal:=true,
- org.eclipse.jgit.hooks;version="4.1.0";
-  uses:="org.eclipse.jgit.lib",
+ org.eclipse.jgit.hooks;version="4.1.0",
  org.eclipse.jgit.ignore;version="4.1.0",
  org.eclipse.jgit.ignore.internal;version="4.1.0";x-friends:="org.eclipse.jgit.test",
  org.eclipse.jgit.internal;version="4.1.0";x-friends:="org.eclipse.jgit.test,org.eclipse.jgit.http.test",
@@ -97,8 +92,7 @@ Export-Package: org.eclipse.jgit.api;version="4.1.0";
    org.eclipse.jgit.revwalk,
    org.eclipse.jgit.merge",
  org.eclipse.jgit.patch;version="4.1.0";
-  uses:="org.eclipse.jgit.lib,
-   org.eclipse.jgit.diff",
+  uses:="org.eclipse.jgit.lib,org.eclipse.jgit.diff",
  org.eclipse.jgit.revplot;version="4.1.0";
   uses:="org.eclipse.jgit.lib,
    org.eclipse.jgit.revwalk",
@@ -109,12 +103,9 @@ Export-Package: org.eclipse.jgit.api;version="4.1.0";
    org.eclipse.jgit.diff,
    org.eclipse.jgit.revwalk.filter",
  org.eclipse.jgit.revwalk.filter;version="4.1.0";
-  uses:="org.eclipse.jgit.revwalk,
-   org.eclipse.jgit.lib,
-   org.eclipse.jgit.util",
+  uses:="org.eclipse.jgit.revwalk,org.eclipse.jgit.util",
  org.eclipse.jgit.storage.file;version="4.1.0";
-  uses:="org.eclipse.jgit.lib,
-   org.eclipse.jgit.util",
+  uses:="org.eclipse.jgit.lib,org.eclipse.jgit.util",
  org.eclipse.jgit.storage.pack;version="4.1.0";
   uses:="org.eclipse.jgit.lib",
  org.eclipse.jgit.submodule;version="4.1.0";
@@ -153,9 +144,9 @@ Export-Package: org.eclipse.jgit.api;version="4.1.0";
    org.eclipse.jgit.storage.file,
    org.ietf.jgss",
  org.eclipse.jgit.util.io;version="4.1.0"
+Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
-Require-Bundle: com.jcraft.jsch;bundle-version="[0.1.37,0.2.0)",
- org.eclipse.jdt.annotation;bundle-version="[1.1.0,2.0.0)";resolution:=optional
+Require-Bundle: com.jcraft.jsch;bundle-version="[0.1.37,0.2.0)"
 Import-Package: com.googlecode.javaewah;version="[0.7.9,0.8.0)",
  javax.crypto,
  javax.net.ssl,

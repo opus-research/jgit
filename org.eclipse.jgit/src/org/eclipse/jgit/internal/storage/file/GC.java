@@ -175,17 +175,13 @@ public class GC {
 	/**
 	 * Delete old pack files. What is 'old' is defined by specifying a set of
 	 * old pack files and a set of new pack files. Each pack file contained in
-	 * old pack files but not contained in new pack files will be deleted. If an
-	 * expirationDate is set then pack files which are younger than the
-	 * expirationDate will not be deleted.
+	 * old pack files but not contained in new pack files will be deleted.
 	 *
 	 * @param oldPacks
 	 * @param newPacks
-	 * @throws ParseException
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
-			Collection<PackFile> newPacks) throws ParseException {
-		long expireDate = getExpireDate();
+			Collection<PackFile> newPacks) {
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old pack file is also among the list of new
@@ -194,8 +190,7 @@ public class GC {
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
 
-			if (!oldPack.shouldBeKept()
-					&& oldPack.getPackFile().lastModified() < expireDate) {
+			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
 				prunePack(oldName);
 			}
@@ -308,7 +303,22 @@ public class GC {
 	 */
 	public void prune(Set<ObjectId> objectsToKeep) throws IOException,
 			ParseException {
-		long expireDate = getExpireDate();
+		long expireDate = Long.MAX_VALUE;
+
+		if (expire == null && expireAgeMillis == -1) {
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
+			if (pruneExpireStr == null)
+				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
+			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
+					.getInstance().getLocale());
+			expireAgeMillis = -1;
+		}
+		if (expire != null)
+			expireDate = expire.getTime();
+		if (expireAgeMillis != -1)
+			expireDate = System.currentTimeMillis() - expireAgeMillis;
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -423,26 +433,6 @@ public class GC {
 			f.delete();
 
 		repo.getObjectDatabase().close();
-	}
-
-	private long getExpireDate() throws ParseException {
-		long expireDate = Long.MAX_VALUE;
-
-		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
-			if (pruneExpireStr == null)
-				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
-			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
-					.getInstance().getLocale());
-			expireAgeMillis = -1;
-		}
-		if (expire != null)
-			expireDate = expire.getTime();
-		if (expireAgeMillis != -1)
-			expireDate = System.currentTimeMillis() - expireAgeMillis;
-		return expireDate;
 	}
 
 	/**
@@ -569,14 +559,7 @@ public class GC {
 			if (rest != null)
 				ret.add(rest);
 		}
-		try {
-			deleteOldPacks(toBeDeleted, ret);
-		} catch (ParseException e) {
-			// TODO: the exception has to be wrapped into an IOException because
-			// throwing the ParseException directly would break the API, instead
-			// we should throw a ConfigInvalidException
-			throw new IOException(e);
-		}
+		deleteOldPacks(toBeDeleted, ret);
 		prunePacked();
 
 		lastPackedRefs = refsBefore;
