@@ -99,7 +99,7 @@ final class LargePackedWholeObject extends ObjectLoader {
 
 	@Override
 	public ObjectStream openStream() throws MissingObjectException, IOException {
-		DfsReader ctx = db.newReader();
+		DfsReader ctx = new DfsReader(db);
 		InputStream in;
 		try {
 			in = new PackInputStream(pack, objectOffset + headerLength, ctx);

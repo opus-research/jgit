@@ -170,7 +170,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	}
 
 	@Override
-	public DfsReader newReader() {
+	public ObjectReader newReader() {
 		return new DfsReader(this);
 	}
 
