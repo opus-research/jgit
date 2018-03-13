@@ -119,41 +119,37 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 			// Check for FAST_FORWARD, ALREADY_UP_TO_DATE
 			RevWalk revWalk = new RevWalk(repo);
-			try {
-				RevCommit headCommit = revWalk.lookupCommit(head.getObjectId());
+			RevCommit headCommit = revWalk.lookupCommit(head.getObjectId());
 
-				Ref ref = commits.get(0);
+			Ref ref = commits.get(0);
 
-				refLogMessage.append(ref.getName());
+			refLogMessage.append(ref.getName());
 
-				// handle annotated tags
-				ObjectId objectId = ref.getPeeledObjectId();
-				if (objectId == null)
-					objectId = ref.getObjectId();
+			// handle annotated tags
+			ObjectId objectId = ref.getPeeledObjectId();
+			if (objectId == null)
+				objectId = ref.getObjectId();
 
-				RevCommit srcCommit = revWalk.lookupCommit(objectId);
-				if (revWalk.isMergedInto(srcCommit, headCommit)) {
-					setCallable(false);
-					return new MergeResult(headCommit,
-							MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy);
-				} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
-					// FAST_FORWARD detected: skip doing a real merge but only
-					// update HEAD
-					refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
-					checkoutNewHead(revWalk, headCommit, srcCommit);
-					updateHead(refLogMessage, srcCommit, head.getObjectId());
-					setCallable(false);
-					return new MergeResult(srcCommit, MergeStatus.FAST_FORWARD,
-							mergeStrategy);
-				} else {
-					return new MergeResult(
-							headCommit,
-							MergeResult.MergeStatus.NOT_SUPPORTED,
-							mergeStrategy,
-							JGitText.get().onlyAlreadyUpToDateAndFastForwardMergesAreAvailable);
-				}
-			} finally {
-				revWalk.release();
+			RevCommit srcCommit = revWalk.lookupCommit(objectId);
+			if (revWalk.isMergedInto(srcCommit, headCommit)) {
+				setCallable(false);
+				return new MergeResult(headCommit,
+						MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy);
+			} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
+				// FAST_FORWARD detected: skip doing a real merge but only
+				// update HEAD
+				refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
+				checkoutNewHead(revWalk, headCommit, srcCommit);
+				updateHead(refLogMessage, srcCommit, head.getObjectId());
+				setCallable(false);
+				return new MergeResult(srcCommit, MergeStatus.FAST_FORWARD,
+						mergeStrategy);
+			} else {
+				return new MergeResult(
+						headCommit,
+						MergeResult.MergeStatus.NOT_SUPPORTED,
+						mergeStrategy,
+						JGitText.get().onlyAlreadyUpToDateAndFastForwardMergesAreAvailable);
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException(
@@ -167,7 +163,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			RevCommit newHeadCommit) throws IOException, CheckoutConflictException {
 		GitIndex index = repo.getIndex();
 
-		File workDir = repo.getWorkTree();
+		File workDir = repo.getWorkDir();
 		if (workDir != null) {
 			WorkDirCheckout workDirCheckout = new WorkDirCheckout(repo,
 					workDir, headCommit.asCommit(revWalk).getTree(), index,

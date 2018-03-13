@@ -82,11 +82,11 @@ class RewriteTreeFilter extends RevFilter {
 
 	private final TreeWalk pathFilter;
 
-	private final Repository repository;
+	private final Repository repo;
 
 	RewriteTreeFilter(final RevWalk walker, final TreeFilter t) {
-		repository = walker.repository;
-		pathFilter = new TreeWalk(walker.reader);
+		repo = walker.db;
+		pathFilter = new TreeWalk(repo);
 		pathFilter.setFilter(t);
 		pathFilter.setRecursive(t.shouldBeRecursive());
 	}
@@ -239,7 +239,7 @@ class RewriteTreeFilter extends RevFilter {
 		tw.reset(trees);
 
 		List<DiffEntry> files = DiffEntry.scan(tw);
-		RenameDetector rd = new RenameDetector(repository);
+		RenameDetector rd = new RenameDetector(repo);
 		rd.addAll(files);
 		files = rd.compute();
 

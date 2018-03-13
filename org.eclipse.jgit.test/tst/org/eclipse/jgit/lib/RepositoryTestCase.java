@@ -54,7 +54,6 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 /**
  * Base class for most JGit unit tests.
@@ -84,7 +83,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 
 	protected File writeTrashFile(final String name, final String data)
 			throws IOException {
-		File path = new File(db.getWorkTree(), name);
+		File path = new File(db.getWorkDir(), name);
 		write(path, data);
 		return path;
 	}
@@ -103,7 +102,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	}
 
 	/** Test repository, initialized for this test case. */
-	protected FileRepository db;
+	protected Repository db;
 
 	/** Working directory of {@link #db}. */
 	protected File trash;
@@ -112,6 +111,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	protected void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
-		trash = db.getWorkTree();
+		trash = db.getWorkDir();
 	}
 }
