@@ -3,6 +3,7 @@
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2006-2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, Daniel Megert <daniel_megert@ch.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -51,6 +52,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
@@ -79,8 +81,11 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.CheckoutEntry;
 import org.eclipse.jgit.storage.file.ReflogEntry;
 import org.eclipse.jgit.storage.file.ReflogReader;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -373,23 +378,67 @@ public abstract class Repository {
 	 *             on serious errors
 	 */
 	public ObjectId resolve(final String revstr)
-			throws AmbiguousObjectException, IOException {
+			throws AmbiguousObjectException, IncorrectObjectTypeException,
+			RevisionSyntaxException, IOException {
 		RevWalk rw = new RevWalk(this);
 		try {
-			return resolve(rw, revstr);
+			Object resolved = resolve(rw, revstr);
+			if (resolved instanceof String) {
+				return getRef((String) resolved).getLeaf().getObjectId();
+			} else {
+				return (ObjectId) resolved;
+			}
 		} finally {
 			rw.release();
 		}
 	}
 
-	private ObjectId resolve(final RevWalk rw, final String revstr) throws IOException {
+	/**
+	 * Simplify an expression, but unlike {@link #resolve(String)} it will not
+	 * resolve a branch passed or resulting from the expression, such as @{-}.
+	 * Thus this method can be used to process an expression to a method that
+	 * expects a branch or revision id.
+	 *
+	 * @param revstr
+	 * @return object id or ref name from resolved expression
+	 * @throws AmbiguousObjectException
+	 * @throws IOException
+	 */
+	public String simplify(final String revstr)
+			throws AmbiguousObjectException, IOException {
+		RevWalk rw = new RevWalk(this);
+		try {
+			Object resolved = resolve(rw, revstr);
+			if (resolved != null)
+				if (resolved instanceof String)
+					return (String) resolved;
+				else
+					return ((AnyObjectId) resolved).getName();
+			return null;
+		} finally {
+			rw.release();
+		}
+	}
+
+	private Object resolve(final RevWalk rw, final String revstr)
+			throws IOException {
 		char[] revChars = revstr.toCharArray();
 		RevObject rev = null;
+		String name = null;
+		int done = 0;
 		for (int i = 0; i < revChars.length; ++i) {
 			switch (revChars[i]) {
 			case '^':
 				if (rev == null) {
-					rev = parseSimple(rw, new String(revChars, 0, i));
+					if (name == null)
+						if (done == 0)
+							name = new String(revChars, done, i);
+						else {
+							done = i + 1;
+							break;
+						}
+					rev = parseSimple(rw, name);
+					name = null;
 					if (rev == null)
 						return null;
 				}
@@ -429,6 +478,7 @@ public abstract class Repository {
 								rev = commit.getParent(pnum - 1);
 						}
 						i = j - 1;
+						done = j;
 						break;
 					case '{':
 						int k;
@@ -441,21 +491,22 @@ public abstract class Repository {
 						}
 						i = k;
 						if (item != null)
-							if (item.equals("tree")) {
+							if (item.equals("tree")) { //$NON-NLS-1$
 								rev = rw.parseTree(rev);
-							} else if (item.equals("commit")) {
+							} else if (item.equals("commit")) { //$NON-NLS-1$
 								rev = rw.parseCommit(rev);
-							} else if (item.equals("blob")) {
+							} else if (item.equals("blob")) { //$NON-NLS-1$
 								rev = rw.peel(rev);
 								if (!(rev instanceof RevBlob))
 									throw new IncorrectObjectTypeException(rev,
 											Constants.TYPE_BLOB);
-							} else if (item.equals("")) {
+							} else if (item.equals("")) { //$NON-NLS-1$
 								rev = rw.peel(rev);
 							} else
 								throw new RevisionSyntaxException(revstr);
 						else
 							throw new RevisionSyntaxException(revstr);
+						done = k;
 						break;
 					default:
 						rev = rw.parseAny(rev);
@@ -468,7 +519,6 @@ public abstract class Repository {
 						} else
 							throw new IncorrectObjectTypeException(rev,
 									Constants.TYPE_COMMIT);
-
 					}
 				} else {
 					rev = rw.peel(rev);
@@ -482,10 +532,19 @@ public abstract class Repository {
 						throw new IncorrectObjectTypeException(rev,
 								Constants.TYPE_COMMIT);
 				}
+				done = i + 1;
 				break;
 			case '~':
 				if (rev == null) {
-					rev = parseSimple(rw, new String(revChars, 0, i));
+					if (name == null)
+						if (done == 0)
+							name = new String(revChars, done, i);
+						else {
+							done = i + 1;
+							break;
+						}
+					rev = parseSimple(rw, name);
+					name = null;
 					if (rev == null)
 						return null;
 				}
@@ -521,8 +580,13 @@ public abstract class Repository {
 					--dist;
 				}
 				i = l - 1;
+				done = l;
 				break;
 			case '@':
+				if (rev != null)
+					throw new RevisionSyntaxException(revstr);
+				if (i + 1 < revChars.length && revChars[i + 1] != '{')
+					continue;
 				int m;
 				String time = null;
 				for (m = i + 2; m < revChars.length; ++m) {
@@ -532,35 +596,92 @@ public abstract class Repository {
 					}
 				}
 				if (time != null) {
-					String refName = new String(revChars, 0, i);
-					Ref resolved = getRefDatabase().getRef(refName);
-					if (resolved == null)
-						return null;
-					rev = resolveReflog(rw, resolved, time);
+					if (time.equals("upstream")) { //$NON-NLS-1$
+						if (name == null)
+							name = new String(revChars, done, i);
+						if (name.equals("")) //$NON-NLS-1$
+							// Currently checked out branch, HEAD if
+							// detached
+							name = Constants.HEAD;
+						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
+							throw new RevisionSyntaxException(revstr);
+						Ref ref = getRef(name);
+						name = null;
+						if (ref == null)
+							return null;
+						if (ref.isSymbolic())
+							ref = ref.getLeaf();
+						name = ref.getName();
+
+						RemoteConfig remoteConfig;
+						try {
+							remoteConfig = new RemoteConfig(getConfig(),
+									"origin"); //$NON-NLS-1$
+						} catch (URISyntaxException e) {
+							throw new RevisionSyntaxException(revstr);
+						}
+						String remoteBranchName = getConfig()
+								.getString(
+										ConfigConstants.CONFIG_BRANCH_SECTION,
+								Repository.shortenRefName(ref.getName()),
+										ConfigConstants.CONFIG_KEY_MERGE);
+						List<RefSpec> fetchRefSpecs = remoteConfig
+								.getFetchRefSpecs();
+						for (RefSpec refSpec : fetchRefSpecs) {
+							if (refSpec.matchSource(remoteBranchName)) {
+								RefSpec expandFromSource = refSpec
+										.expandFromSource(remoteBranchName);
+								name = expandFromSource.getDestination();
+								break;
+							}
+						}
+						if (name == null)
+							throw new RevisionSyntaxException(revstr);
+					} else if (time.matches("^-\\d+$")) { //$NON-NLS-1$
+						if (name != null)
+							throw new RevisionSyntaxException(revstr);
+						else {
+							String previousCheckout = resolveReflogCheckout(-Integer
+									.parseInt(time));
+							if (ObjectId.isId(previousCheckout))
+								rev = parseSimple(rw, previousCheckout);
+							else
+								name = previousCheckout;
+						}
+					} else {
+						if (name == null)
+							name = new String(revChars, done, i);
+						if (name.equals("")) //$NON-NLS-1$
+							name = Constants.HEAD;
+						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
+							throw new RevisionSyntaxException(revstr);
+						Ref ref = getRef(name);
+						name = null;
+						if (ref == null)
+							return null;
+						// @{n} means current branch, not HEAD@{1} unless
+						// detached
+						if (ref.isSymbolic())
+							ref = ref.getLeaf();
+						rev = resolveReflog(rw, ref, time);
+					}
 					i = m;
 				} else
-					i = m - 1;
+					throw new RevisionSyntaxException(revstr);
 				break;
 			case ':': {
 				RevTree tree;
 				if (rev == null) {
-					// We might not yet have parsed the left hand side.
-					ObjectId id;
-					try {
-						if (i == 0)
-							id = resolve(rw, Constants.HEAD);
-						else
-							id = resolve(rw, new String(revChars, 0, i));
-					} catch (RevisionSyntaxException badSyntax) {
-						throw new RevisionSyntaxException(revstr);
-					}
-					if (id == null)
-						return null;
-					tree = rw.parseTree(id);
-				} else {
-					tree = rw.parseTree(rev);
+					if (name == null)
+						name = new String(revChars, done, i);
+					if (name.equals("")) //$NON-NLS-1$
+						name = Constants.HEAD;
+					rev = parseSimple(rw, name);
+					name = null;
 				}
-
+				if (rev == null)
+					return null;
+				tree = rw.parseTree(rev);
 				if (i == revChars.length - 1)
 					return tree.copy();
 
@@ -569,13 +690,23 @@ public abstract class Repository {
 						tree);
 				return tw != null ? tw.getObjectId(0) : null;
 			}
-
 			default:
 				if (rev != null)
 					throw new RevisionSyntaxException(revstr);
 			}
 		}
-		return rev != null ? rev.copy() : resolveSimple(revstr);
+		if (rev != null)
+			return rev.copy();
+		if (name != null)
+			return name;
+		if (done == revstr.length())
+			return null;
+		name = revstr.substring(done);
+		if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
+			throw new RevisionSyntaxException(revstr);
+		if (getRef(name) != null)
+			return name;
+		return resolveSimple(name);
 	}
 
 	private static boolean isHex(char c) {
@@ -601,14 +732,16 @@ public abstract class Repository {
 		if (ObjectId.isId(revstr))
 			return ObjectId.fromString(revstr);
 
-		Ref r = getRefDatabase().getRef(revstr);
-		if (r != null)
-			return r.getObjectId();
+		if (Repository.isValidRefName("x/" + revstr)) { //$NON-NLS-1$
+			Ref r = getRefDatabase().getRef(revstr);
+			if (r != null)
+				return r.getObjectId();
+		}
 
 		if (AbbreviatedObjectId.isId(revstr))
 			return resolveAbbreviation(revstr);
 
-		int dashg = revstr.indexOf("-g");
+		int dashg = revstr.indexOf("-g"); //$NON-NLS-1$
 		if ((dashg + 5) < revstr.length() && 0 <= dashg
 				&& isHex(revstr.charAt(dashg + 2))
 				&& isHex(revstr.charAt(dashg + 3))
@@ -622,6 +755,19 @@ public abstract class Repository {
 		return null;
 	}
 
+	private String resolveReflogCheckout(int checkoutNo)
+			throws IOException {
+		List<ReflogEntry> reflogEntries = new ReflogReader(this, Constants.HEAD)
+				.getReverseEntries();
+		for (ReflogEntry entry : reflogEntries) {
+			CheckoutEntry checkout = entry.parseCheckout();
+			if (checkout != null)
+				if (checkoutNo-- == 1)
+					return checkout.getFromBranch();
+		}
+		return null;
+	}
+
 	private RevCommit resolveReflog(RevWalk rw, Ref ref, String time)
 			throws IOException {
 		int number;
@@ -631,10 +777,7 @@ public abstract class Repository {
 			throw new RevisionSyntaxException(MessageFormat.format(
 					JGitText.get().invalidReflogRevision, time));
 		}
-		if (number < 0)
-			throw new RevisionSyntaxException(MessageFormat.format(
-					JGitText.get().invalidReflogRevision, time));
-
+		assert number >= 0;
 		ReflogReader reader = new ReflogReader(this, ref.getName());
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
@@ -684,14 +827,15 @@ public abstract class Repository {
 		getRefDatabase().close();
 	}
 
+	@SuppressWarnings("nls")
 	public String toString() {
 		String desc;
 		if (getDirectory() != null)
 			desc = getDirectory().getPath();
 		else
-			desc = getClass().getSimpleName() + "-"
+			desc = getClass().getSimpleName() + "-" //$NON-NLS-1$
 					+ System.identityHashCode(this);
-		return "Repository[" + desc + "]";
+		return "Repository[" + desc + "]"; //$NON-NLS-1$
 	}
 
 	/**
@@ -925,22 +1069,22 @@ public abstract class Repository {
 			return RepositoryState.BARE;
 
 		// Pre Git-1.6 logic
-		if (new File(getWorkTree(), ".dotest").exists())
+		if (new File(getWorkTree(), ".dotest").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING;
-		if (new File(getDirectory(), ".dotest-merge").exists())
+		if (new File(getDirectory(), ".dotest-merge").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_INTERACTIVE;
 
 		// From 1.6 onwards
-		if (new File(getDirectory(),"rebase-apply/rebasing").exists())
+		if (new File(getDirectory(),"rebase-apply/rebasing").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_REBASING;
-		if (new File(getDirectory(),"rebase-apply/applying").exists())
+		if (new File(getDirectory(),"rebase-apply/applying").exists()) //$NON-NLS-1$
 			return RepositoryState.APPLY;
-		if (new File(getDirectory(),"rebase-apply").exists())
+		if (new File(getDirectory(),"rebase-apply").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING;
 
-		if (new File(getDirectory(),"rebase-merge/interactive").exists())
+		if (new File(getDirectory(),"rebase-merge/interactive").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_INTERACTIVE;
-		if (new File(getDirectory(),"rebase-merge").exists())
+		if (new File(getDirectory(),"rebase-merge").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
@@ -959,7 +1103,7 @@ public abstract class Repository {
 			return RepositoryState.MERGING;
 		}
 
-		if (new File(getDirectory(), "BISECT_LOG").exists())
+		if (new File(getDirectory(), "BISECT_LOG").exists()) //$NON-NLS-1$
 			return RepositoryState.BISECTING;
 
 		if (new File(getDirectory(), Constants.CHERRY_PICK_HEAD).exists()) {
@@ -993,7 +1137,7 @@ public abstract class Repository {
 		final int len = refName.length();
 		if (len == 0)
 			return false;
-		if (refName.endsWith(".lock"))
+		if (refName.endsWith(".lock")) //$NON-NLS-1$
 			return false;
 
 		int components = 1;
@@ -1014,6 +1158,8 @@ public abstract class Repository {
 			case '/':
 				if (i == 0 || i == len - 1)
 					return false;
+				if (p == '/')
+					return false;
 				components++;
 				break;
 			case '{':
@@ -1023,6 +1169,7 @@ public abstract class Repository {
 			case '~': case '^': case ':':
 			case '?': case '[': case '*':
 			case '\\':
+			case '\u007F':
 				return false;
 			}
 			p = c;
@@ -1048,7 +1195,7 @@ public abstract class Repository {
 			File absWd = workDir.isAbsolute() ? workDir : workDir.getAbsoluteFile();
 			File absFile = file.isAbsolute() ? file : file.getAbsoluteFile();
 			if (absWd == workDir && absFile == file)
-				return "";
+				return ""; //$NON-NLS-1$
 			return stripWorkDir(absWd, absFile);
 		}
 

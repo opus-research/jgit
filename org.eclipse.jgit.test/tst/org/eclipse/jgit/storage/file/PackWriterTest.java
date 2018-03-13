@@ -44,6 +44,7 @@
 package org.eclipse.jgit.storage.file;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -134,9 +135,9 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testContructor() throws IOException {
 		writer = new PackWriter(config, db.newObjectReader());
-		assertEquals(false, writer.isDeltaBaseAsOffset());
-		assertEquals(true, config.isReuseDeltas());
-		assertEquals(true, config.isReuseObjects());
+		assertFalse(writer.isDeltaBaseAsOffset());
+		assertTrue(config.isReuseDeltas());
+		assertTrue(config.isReuseObjects());
 		assertEquals(0, writer.getObjectCount());
 	}
 
@@ -148,14 +149,14 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		config.setReuseDeltas(false);
 		config.setReuseObjects(false);
 		config.setDeltaBaseAsOffset(false);
-		assertEquals(false, config.isReuseDeltas());
-		assertEquals(false, config.isReuseObjects());
-		assertEquals(false, config.isDeltaBaseAsOffset());
+		assertFalse(config.isReuseDeltas());
+		assertFalse(config.isReuseObjects());
+		assertFalse(config.isDeltaBaseAsOffset());
 
 		writer = new PackWriter(config, db.newObjectReader());
 		writer.setDeltaBaseAsOffset(true);
-		assertEquals(true, writer.isDeltaBaseAsOffset());
-		assertEquals(false, config.isDeltaBaseAsOffset());
+		assertTrue(writer.isDeltaBaseAsOffset());
+		assertFalse(config.isDeltaBaseAsOffset());
 	}
 
 	/**
@@ -478,7 +479,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 						contentB.getId()));
 	}
 
-	private void assertContent(PackIndex pi, List<ObjectId> expected) {
+	private static void assertContent(PackIndex pi, List<ObjectId> expected) {
 		assertEquals("Pack index has wrong size.", expected.size(),
 				pi.getObjectCount());
 		for (int i = 0; i < pi.getObjectCount(); i++)
@@ -488,7 +489,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 					expected.contains(pi.getObjectId(i)));
 	}
 
-	private PackIndex writePack(FileRepository repo,
+	private static PackIndex writePack(FileRepository repo,
 			Set<? extends ObjectId> want, Set<PackIndex> excludeObjects)
 			throws IOException {
 		PackWriter pw = new PackWriter(repo);

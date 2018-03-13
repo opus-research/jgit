@@ -417,7 +417,7 @@ public class DirCacheCheckout {
 			builder.finish();
 
 			File file = null;
-			String last = "";
+			String last = ""; //$NON-NLS-1$
 			// when deleting files process them in the opposite order as they have
 			// been reported. This ensures the files are deleted before we delete
 			// their parent folders
@@ -552,8 +552,8 @@ public class DirCacheCheckout {
 		 *      ------------------------------------------------------------------
 		 * 1    D        D       F       Y         N       Y       N           Update
 		 * 2    D        D       F       N         N       Y       N           Conflict
-		 * 3    D        F       D                 Y       N       N           Update
-		 * 4    D        F       D                 N       N       N           Update
+		 * 3    D        F       D                 Y       N       N           Keep
+		 * 4    D        F       D                 N       N       N           Conflict
 		 * 5    D        F       F       Y         N       N       Y           Keep
 		 * 6    D        F       F       N         N       N       Y           Keep
 		 * 7    F        D       F       Y         Y       N       N           Update
@@ -615,10 +615,7 @@ public class DirCacheCheckout {
 
 				break;
 			case 0xDFD: // 3 4
-				// CAUTION: I put it into removed instead of updated, because
-				// that's what our tests expect
-				// updated.put(name, mId);
-				remove(name);
+				keep(dce);
 				break;
 			case 0xF0D: // 18
 				remove(name);
@@ -703,12 +700,13 @@ public class DirCacheCheckout {
 
 			/**
 			 * <pre>
-			 * 		    I (index)                H        M        Result
-			 * 	        -------------------------------------------------------
-			 * 	        0 nothing             nothing  nothing  (does not happen)
-			 * 	        1 nothing             nothing  exists   use M
-			 * 	        2 nothing             exists   nothing  remove path from index
-			 * 	        3 nothing             exists   exists   use M
+			 * 	          I (index)     H        M     H==M  Result
+			 * 	        -------------------------------------------
+			 * 	        0 nothing    nothing  nothing        (does not happen)
+			 * 	        1 nothing    nothing  exists         use M
+			 * 	        2 nothing    exists   nothing        remove path from index
+			 * 	        3 nothing    exists   exists   yes   keep index
+			 * 	          nothing    exists   exists   no    fail
 			 * </pre>
 			 */
 
@@ -716,8 +714,12 @@ public class DirCacheCheckout {
 				update(name, mId, mMode); // 1
 			else if (m == null)
 				remove(name); // 2
-			else
-				update(name, mId, mMode); // 3
+			else { // 3
+				if (equalIdAndMode(hId, hMode, mId, mMode))
+					keep(dce);
+				else
+					conflict(name, dce, h, m);
+			}
 		} else {
 			if (h == null) {
 				/**
@@ -963,7 +965,7 @@ public class DirCacheCheckout {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File parentDir = f.getParentFile();
 		parentDir.mkdirs();
-		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
+		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir); //$NON-NLS-1$
 		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		FileOutputStream rawChannel = new FileOutputStream(tmpFile);
 		OutputStream channel;
@@ -1005,10 +1007,10 @@ public class DirCacheCheckout {
 
 	private static byte[][] forbidden;
 	static {
-		String[] list = new String[] { "AUX", "COM1", "COM2", "COM3", "COM4",
-				"COM5", "COM6", "COM7", "COM8", "COM9", "CON", "LPT1", "LPT2",
-				"LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "NUL",
-				"PRN" };
+		String[] list = new String[] { "AUX", "COM1", "COM2", "COM3", "COM4", //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$
+				"COM5", "COM6", "COM7", "COM8", "COM9", "CON", "LPT1", "LPT2", //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$ //$NON-NLS-6$ //$NON-NLS-7$ //$NON-NLS-8$
+				"LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "NUL", //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$ //$NON-NLS-6$ //$NON-NLS-7$ //$NON-NLS-8$
+				"PRN" }; //$NON-NLS-1$
 		forbidden = new byte[list.length][];
 		for (int i = 0; i < list.length; ++i)
 			forbidden[i] = Constants.encodeASCII(list[i]);
@@ -1022,9 +1024,8 @@ public class DirCacheCheckout {
 	}
 
 	private static boolean isValidPathSegment(CanonicalTreeParser t) {
-		String osName = SystemReader.getInstance().getProperty("os.name");
-		boolean isWindows = "Windows".equals(osName);
-		boolean isOSX = "Darwin".equals(osName) || "Mac OS X".equals(osName);
+		boolean isWindows = SystemReader.getInstance().isWindows();
+		boolean isOSX = SystemReader.getInstance().isMacOS();
 		boolean ignCase = isOSX || isWindows;
 
 		int ptr = t.getNameOffset();

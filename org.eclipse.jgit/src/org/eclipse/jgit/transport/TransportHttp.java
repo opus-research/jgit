@@ -226,7 +226,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		HttpConfig(final Config rc) {
 			postBuffer = rc.getInt("http", "postbuffer", 1 * 1024 * 1024); //$NON-NLS-1$  //$NON-NLS-2$
-			sslVerify = rc.getBoolean("http", "sslVerify", true);
+			sslVerify = rc.getBoolean("http", "sslVerify", true); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 
 		private HttpConfig() {
@@ -505,7 +505,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
 
-		if (!http.sslVerify && "https".equals(u.getProtocol())) {
+		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			disableSslVerify(conn);
 		}
 
@@ -514,8 +514,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache"); //$NON-NLS-1$
 		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
-		conn.setConnectTimeout(getTimeout() * 1000);
-		conn.setReadTimeout(getTimeout() * 1000);
+		int timeOut = getTimeout();
+		if (timeOut != -1) {
+			int effTimeOut = timeOut * 1000;
+			conn.setConnectTimeout(effTimeOut);
+			conn.setReadTimeout(effTimeOut);
+		}
 		authMethod.configureRequest(conn);
 		return conn;
 	}
@@ -524,7 +528,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			throws IOException {
 		final TrustManager[] trustAllCerts = new TrustManager[] { new DummyX509TrustManager() };
 		try {
-			SSLContext ctx = SSLContext.getInstance("SSL");
+			SSLContext ctx = SSLContext.getInstance("SSL"); //$NON-NLS-1$
 			ctx.init(null, trustAllCerts, null);
 			final HttpsURLConnection sslConn = (HttpsURLConnection) conn;
 			sslConn.setSSLSocketFactory(ctx.getSocketFactory());

@@ -49,6 +49,8 @@ package org.eclipse.jgit.util;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -66,7 +68,7 @@ import org.eclipse.jgit.storage.file.FileBasedConfig;
  * </p>
  */
 public abstract class SystemReader {
-	private static SystemReader INSTANCE = new SystemReader() {
+	private static SystemReader DEFAULT = new SystemReader() {
 		private volatile String hostname;
 
 		public String getenv(String variable) {
@@ -91,14 +93,14 @@ public abstract class SystemReader {
 					}
 				};
 			}
-			File etc = fs.resolve(prefix, "etc");
-			File config = fs.resolve(etc, "gitconfig");
+			File etc = fs.resolve(prefix, "etc"); //$NON-NLS-1$
+			File config = fs.resolve(etc, "gitconfig"); //$NON-NLS-1$
 			return new FileBasedConfig(parent, config, fs);
 		}
 
 		public FileBasedConfig openUserConfig(Config parent, FS fs) {
 			final File home = fs.userHome();
-			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs);
+			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs); //$NON-NLS-1$
 		}
 
 		public String getHostname() {
@@ -108,7 +110,7 @@ public abstract class SystemReader {
 					hostname = localMachine.getCanonicalHostName();
 				} catch (UnknownHostException e) {
 					// we do nothing
-					hostname = "localhost";
+					hostname = "localhost"; //$NON-NLS-1$
 				}
 				assert hostname != null;
 			}
@@ -126,6 +128,8 @@ public abstract class SystemReader {
 		}
 	};
 
+	private static SystemReader INSTANCE = DEFAULT;
+
 	/** @return the live instance to read system properties. */
 	public static SystemReader getInstance() {
 		return INSTANCE;
@@ -136,7 +140,10 @@ public abstract class SystemReader {
 	 *            the new instance to use when accessing properties.
 	 */
 	public static void setInstance(SystemReader newReader) {
-		INSTANCE = newReader;
+		if (newReader == null)
+			INSTANCE = DEFAULT;
+		else
+			INSTANCE = newReader;
 	}
 
 	/**
@@ -235,6 +242,32 @@ public abstract class SystemReader {
 	 */
 	public DateFormat getDateTimeInstance(int dateStyle, int timeStyle) {
 		return DateFormat.getDateTimeInstance(dateStyle, timeStyle);
+	}
+
+	/**
+	 * @return true if we are running on a Windows.
+	 */
+	public boolean isWindows() {
+		String osDotName = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return getProperty("os.name"); //$NON-NLS-1$
+					}
+				});
+		return osDotName.startsWith("Windows"); //$NON-NLS-1$
+	}
+
+	/**
+	 * @return true if we are running on Mac OS X
+	 */
+	public boolean isMacOS() {
+		String osDotName = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return getProperty("os.name"); //$NON-NLS-1$
+					}
+				});
+		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 }

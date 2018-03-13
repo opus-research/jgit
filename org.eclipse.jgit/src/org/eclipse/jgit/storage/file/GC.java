@@ -50,9 +50,11 @@ import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -68,12 +70,15 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -81,6 +86,7 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.GitDateParser;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -90,11 +96,15 @@ import org.eclipse.jgit.util.FileUtils;
  * adapted to FileRepositories.
  */
 public class GC {
+	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago"; //$NON-NLS-1$
+
 	private final FileRepository repo;
 
 	private ProgressMonitor pm;
 
-	private long expireAgeMillis;
+	private long expireAgeMillis = -1;
+
+	private Date expire;
 
 	/**
 	 * the refs which existed during the last call to {@link #repack()}. This is
@@ -121,7 +131,6 @@ public class GC {
 	public GC(FileRepository repo) {
 		this.repo = repo;
 		this.pm = NullProgressMonitor.INSTANCE;
-		this.expireAgeMillis = 14 * 24 * 60 * 60 * 1000L;
 	}
 
 	/**
@@ -135,8 +144,12 @@ public class GC {
 	 *
 	 * @return the collection of {@link PackFile}'s which are newly created
 	 * @throws IOException
+	 * @throws ParseException
+	 *             If the configuration parameter "gc.pruneexpire" couldn't be
+	 *             parsed
 	 */
-	public Collection<PackFile> gc() throws IOException {
+	public Collection<PackFile> gc() throws IOException, ParseException {
+		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack();
@@ -177,8 +190,8 @@ public class GC {
 
 			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
-				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions);
-				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions);
+				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions); //$NON-NLS-1$
+				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions); //$NON-NLS-1$
 			}
 		}
 		// close the complete object database. Thats my only chance to force
@@ -247,11 +260,27 @@ public class GC {
 	 *            a set of objects which should explicitly not be pruned
 	 *
 	 * @throws IOException
+	 * @throws ParseException
+	 *             If the configuration parameter "gc.pruneexpire" couldn't be
+	 *             parsed
 	 */
-	public void prune(Set<ObjectId> objectsToKeep)
-			throws IOException {
-		long expireDate = (expireAgeMillis == 0) ? Long.MAX_VALUE : System
-				.currentTimeMillis() - expireAgeMillis;
+	public void prune(Set<ObjectId> objectsToKeep) throws IOException,
+			ParseException {
+		long expireDate = Long.MAX_VALUE;
+
+		if (expire == null && expireAgeMillis == -1) {
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
+			if (pruneExpireStr == null)
+				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
+			expire = GitDateParser.parse(pruneExpireStr, null);
+			expireAgeMillis = -1;
+		}
+		if (expire != null)
+			expireDate = expire.getTime();
+		if (expireAgeMillis != -1)
+			expireDate = System.currentTimeMillis() - expireAgeMillis;
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -262,34 +291,38 @@ public class GC {
 		if (fanout != null && fanout.length > 0) {
 			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
 					fanout.length);
-			for (String d : fanout) {
-				pm.update(1);
-				if (d.length() != 2)
-					continue;
-				File[] entries = new File(objects, d).listFiles();
-				if (entries == null)
-					continue;
-				for (File f : entries) {
-					String fName = f.getName();
-					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+			try {
+				for (String d : fanout) {
+					pm.update(1);
+					if (d.length() != 2)
 						continue;
-					if (f.lastModified() >= expireDate)
+					File[] entries = new File(objects, d).listFiles();
+					if (entries == null)
 						continue;
-					try {
-						ObjectId id = ObjectId.fromString(d + fName);
-						if (objectsToKeep.contains(id))
+					for (File f : entries) {
+						String fName = f.getName();
+						if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 							continue;
-						if (indexObjects == null)
-							indexObjects = listNonHEADIndexObjects();
-						if (indexObjects.contains(id))
+						if (f.lastModified() >= expireDate)
 							continue;
-						deletionCandidates.put(id, f);
-					} catch (IllegalArgumentException notAnObject) {
-						// ignoring the file that does not represent loose
-						// object
-						continue;
+						try {
+							ObjectId id = ObjectId.fromString(d + fName);
+							if (objectsToKeep.contains(id))
+								continue;
+							if (indexObjects == null)
+								indexObjects = listNonHEADIndexObjects();
+							if (indexObjects.contains(id))
+								continue;
+							deletionCandidates.put(id, f);
+						} catch (IllegalArgumentException notAnObject) {
+							// ignoring the file that does not represent loose
+							// object
+							continue;
+						}
 					}
 				}
+			} finally {
+				pm.endTask();
 			}
 		}
 		if (deletionCandidates.isEmpty())
@@ -581,9 +614,9 @@ public class GC {
 			      default:
 					throw new IOException(MessageFormat.format(
 							JGitText.get().corruptObjectInvalidMode3, String
-									.format("%o", Integer.valueOf(treeWalk
+									.format("%o", Integer.valueOf(treeWalk //$NON-NLS-1$
 											.getRawMode(0)),
-											(objectId == null) ? "null"
+											(objectId == null) ? "null" //$NON-NLS-1$
 													: objectId.name(), treeWalk
 											.getPathString(), repo
 											.getIndexFile())));
@@ -618,17 +651,18 @@ public class GC {
 
 			// create temporary files
 			String id = pw.computeName().getName();
-			File packdir = new File(repo.getObjectsDirectory(), "pack");
-			tmpPack = File.createTempFile("gc_", ".pack_tmp", packdir);
+			File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
+			tmpPack = File.createTempFile("gc_", ".pack_tmp", packdir); //$NON-NLS-1$ //$NON-NLS-2$
 			tmpIdx = new File(packdir, tmpPack.getName().substring(0,
 					tmpPack.getName().lastIndexOf('.'))
-					+ ".idx_tmp");
+					+ ".idx_tmp"); //$NON-NLS-1$
 
 			if (!tmpIdx.createNewFile())
 				throw new IOException(MessageFormat.format(
 						JGitText.get().cannotCreateIndexfile, tmpIdx.getPath()));
 
 			// write the packfile
+			@SuppressWarnings("resource" /* java 7 */)
 			FileChannel channel = new FileOutputStream(tmpPack).getChannel();
 			OutputStream channelStream = Channels.newOutputStream(channel);
 			try {
@@ -640,6 +674,7 @@ public class GC {
 			}
 
 			// write the packindex
+			@SuppressWarnings("resource")
 			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);
 			try {
@@ -651,9 +686,9 @@ public class GC {
 			}
 
 			// rename the temporary files to real files
-			File realPack = nameFor(id, ".pack");
+			File realPack = nameFor(id, ".pack"); //$NON-NLS-1$
 			tmpPack.setReadOnly();
-			File realIdx = nameFor(id, ".idx");
+			File realIdx = nameFor(id, ".idx"); //$NON-NLS-1$
 			realIdx.setReadOnly();
 			boolean delete = true;
 			try {
@@ -662,7 +697,7 @@ public class GC {
 				delete = false;
 				if (!tmpIdx.renameTo(realIdx)) {
 					File newIdx = new File(realIdx.getParentFile(),
-							realIdx.getName() + ".new");
+							realIdx.getName() + ".new"); //$NON-NLS-1$
 					if (!tmpIdx.renameTo(newIdx))
 						newIdx = tmpIdx;
 					throw new IOException(MessageFormat.format(
@@ -686,8 +721,8 @@ public class GC {
 	}
 
 	private File nameFor(String name, String ext) {
-		File packdir = new File(repo.getObjectsDirectory(), "pack");
-		return new File(packdir, "pack-" + name + ext);
+		File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
+		return new File(packdir, "pack-" + name + ext); //$NON-NLS-1$
 	}
 
 	/**
@@ -711,6 +746,26 @@ public class GC {
 		 * The number of objects stored as loose objects.
 		 */
 		public long numberOfLooseObjects;
+
+		/**
+		 * The sum of the sizes of all files used to persist loose objects.
+		 */
+		public long sizeOfLooseObjects;
+
+		/**
+		 * The sum of the sizes of all pack files.
+		 */
+		public long sizeOfPackedObjects;
+
+		/**
+		 * The number of loose refs.
+		 */
+		public long numberOfLooseRefs;
+
+		/**
+		 * The number of refs stored in pack files.
+		 */
+		public long numberOfPackedRefs;
 	}
 
 	/**
@@ -723,25 +778,38 @@ public class GC {
 	public RepoStatistics getStatistics() throws IOException {
 		RepoStatistics ret = new RepoStatistics();
 		Collection<PackFile> packs = repo.getObjectDatabase().getPacks();
-		for (PackFile f : packs)
+		for (PackFile f : packs) {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
-		ret.numberOfPackFiles = packs.size();
+			ret.numberOfPackFiles++;
+			ret.sizeOfPackedObjects += f.getPackFile().length();
+		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
 		if (fanout != null && fanout.length > 0) {
 			for (String d : fanout) {
 				if (d.length() != 2)
 					continue;
-				String[] entries = new File(objDir, d).list();
+				File[] entries = new File(objDir, d).listFiles();
 				if (entries == null)
 					continue;
-				for (String e : entries) {
-					if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+				for (File f : entries) {
+					if (f.getName().length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
 					ret.numberOfLooseObjects++;
+					ret.sizeOfLooseObjects += f.length();
 				}
 			}
 		}
+
+		RefDatabase refDb = repo.getRefDatabase();
+		for (Ref r : refDb.getRefs(RefDatabase.ALL).values()) {
+			Storage storage = r.getStorage();
+			if (storage == Storage.LOOSE || storage == Storage.LOOSE_PACKED)
+				ret.numberOfLooseRefs++;
+			if (storage == Storage.PACKED || storage == Storage.LOOSE_PACKED)
+				ret.numberOfPackedRefs++;
+		}
+
 		return ret;
 	}
 
@@ -767,5 +835,24 @@ public class GC {
 	 */
 	public void setExpireAgeMillis(long expireAgeMillis) {
 		this.expireAgeMillis = expireAgeMillis;
+		expire = null;
 	}
+
+	/**
+	 * During gc() or prune() each unreferenced, loose object which has been
+	 * created or modified after or at <code>expire</code> will not be pruned.
+	 * Only older objects may be pruned. If set to null then every object is a
+	 * candidate for pruning.
+	 *
+	 * @param expire
+	 *            instant in time which defines object expiration
+	 *            objects with modification time before this instant are expired
+	 *            objects with modification time newer or equal to this instant
+	 *            are not expired
+	 */
+	public void setExpire(Date expire) {
+		this.expire = expire;
+		expireAgeMillis = -1;
+	}
+
 }

@@ -48,6 +48,7 @@
 
 package org.eclipse.jgit.lib;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -117,7 +118,7 @@ public class ConfigTest {
 
 		final Object[] expArr = values.toArray();
 		final String[] actArr = c.getStringList("my", null, "somename");
-		assertTrue(Arrays.equals(expArr, actArr));
+		assertArrayEquals(expArr, actArr);
 
 		final String expText = "[my]\n\tsomename = value1\n\tsomename = value2\n";
 		assertEquals(expText, c.toText());
@@ -464,17 +465,18 @@ public class ConfigTest {
 		assertEquals(result, config.toText());
 	}
 
-	private void assertReadLong(long exp) throws ConfigInvalidException {
+	private static void assertReadLong(long exp) throws ConfigInvalidException {
 		assertReadLong(exp, String.valueOf(exp));
 	}
 
-	private void assertReadLong(long exp, String act)
+	private static void assertReadLong(long exp, String act)
 			throws ConfigInvalidException {
 		final Config c = parse("[s]\na = " + act + "\n");
 		assertEquals(exp, c.getLong("s", null, "a", 0L));
 	}
 
-	private Config parse(final String content) throws ConfigInvalidException {
+	private static Config parse(final String content)
+			throws ConfigInvalidException {
 		final Config c = new Config(null);
 		c.fromText(content);
 		return c;

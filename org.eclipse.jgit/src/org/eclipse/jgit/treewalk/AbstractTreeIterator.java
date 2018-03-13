@@ -671,4 +671,10 @@ public abstract class AbstractTreeIterator {
 	public void getName(byte[] buffer, int offset) {
 		System.arraycopy(path, pathOffset, buffer, offset, pathLen - pathOffset);
 	}
+
+	@SuppressWarnings("nls")
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + "[" + getEntryPathString() + "]"; //$NON-NLS-1$
+	}
 }
