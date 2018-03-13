@@ -396,7 +396,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		FileOutputStream fos = new FileOutputStream(file);
 		try {
 			fos.write(content.getBytes("UTF-8"));
-			fos.write('\n');
 		} finally {
 			fos.close();
 		}
@@ -459,10 +458,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private String readFile(File directory, String fileName) throws IOException {
-		byte[] content = IO.readFully(new File(directory, fileName));
-		// strip off the last LF
-		return RawParseUtils.decode(content, 0, RawParseUtils
-				.nextLF(content, 0) - 1);
+		return RawParseUtils
+				.decode(IO.readFully(new File(directory, fileName)));
 	}
 
 	private void checkoutCommit(RevCommit commit) throws IOException {
