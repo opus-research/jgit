@@ -580,16 +580,30 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
+	 * @param opType
+	 *            the operationtype (checkin/checkout) which should be used
+	 * @return the EOL stream type of the current entry using the config and
+	 *         {@link #getAttributes()} Note that this method may return null if
+	 *         the {@link TreeWalk} is not based on a working tree
+	 */
+	// TODO(msohn) make this method public in 4.4
+	@Nullable
+	EolStreamType getEolStreamType(OperationType opType) {
+			if (attributesNodeProvider == null || config == null)
+				return null;
+		return EolStreamTypeUtil.detectStreamType(opType,
+					config.get(WorkingTreeOptions.KEY), getAttributes());
+	}
+
+	/**
 	 * @return the EOL stream type of the current entry using the config and
 	 *         {@link #getAttributes()} Note that this method may return null if
 	 *         the {@link TreeWalk} is not based on a working tree
 	 * @since 4.3
 	 */
+	// TODO(msohn) deprecate this method in 4.4
 	public @Nullable EolStreamType getEolStreamType() {
-			if (attributesNodeProvider == null || config == null)
-				return null;
-			return EolStreamTypeUtil.detectStreamType(operationType,
-					config.get(WorkingTreeOptions.KEY), getAttributes());
+		return (getEolStreamType(operationType));
 	}
 
 	/** Reset this walker so new tree iterators can be added to it. */
@@ -1353,15 +1367,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		String filterCommand = filterCommandsByNameDotType.get(key);
 		if (filterCommand != null)
 			return filterCommand;
-		boolean useBuiltin = config.getBoolean(Constants.ATTR_FILTER,
-				filterDriverName, Constants.ATTR_FILTER_USE_BUILTIN, false);
-		if (useBuiltin) {
-			filterCommand = Constants.BUILTIN_FILTER_PREFIX + filterDriverName
-					+ "/" + filterCommandType;
-		} else {
-			filterCommand = config.getString(Constants.ATTR_FILTER,
+		filterCommand = config.getString(Constants.ATTR_FILTER,
 				filterDriverName, filterCommandType);
-		}
 		if (filterCommand != null)
 			filterCommandsByNameDotType.put(key, filterCommand);
 		return filterCommand;

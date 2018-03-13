@@ -172,17 +172,18 @@ public class BuiltinCommandsTest extends RepositoryTestCase {
 		writeTrashFile("Test.txt", "Hello again");
 		git.add().addFilepattern("Test.txt").call();
 		assertEquals(
-				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.txt, mode:100644, content:Hello again]",
+				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.txt, mode:100644, content:cHceclclcoc cacgcacicn]",
 				indexState(CONTENT));
 		assertEquals("Hello again", read("Test.txt"));
 		deleteTrashFile("Test.txt");
 		git.checkout().addPath("Test.txt").call();
-		assertEquals("sHseslslsos sasgsasisn", read("Test.txt"));
+		assertEquals("scsHscsescslscslscsoscs scsascsgscsascsiscsn",
+				read("Test.txt"));
 
 		writeTrashFile("Test.bin", "Hello again");
 		git.add().addFilepattern("Test.bin").call();
 		assertEquals(
-				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.bin, mode:100644, content:Hello again][Test.txt, mode:100644, content:Hello again]",
+				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.bin, mode:100644, content:Hello again][Test.txt, mode:100644, content:cHceclclcoc cacgcacicn]",
 				indexState(CONTENT));
 		deleteTrashFile("Test.bin");
 		git.checkout().addPath("Test.bin").call();
@@ -193,7 +194,7 @@ public class BuiltinCommandsTest extends RepositoryTestCase {
 
 		git.add().addFilepattern("Test.txt").call();
 		assertEquals(
-				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.bin, mode:100644, content:Hello again][Test.txt, mode:100644, content:sHseslslsos sasgsasisn]",
+				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.bin, mode:100644, content:Hello again][Test.txt, mode:100644, content:scsHscsescslscslscsoscs scsascsgscsascsiscsn]",
 				indexState(CONTENT));
 
 		config.setString("filter", "test", "clean", null);
