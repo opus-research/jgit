@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2016, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.http.test;
 
-package org.eclipse.jgit.pgm.debug;
+import javax.servlet.http.HttpServletRequest;
 
-import java.io.FileInputStream;
-import java.io.IOException;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
-import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
-import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.kohsuke.args4j.Argument;
+/** A simple repository resolver for tests. */
+public final class TestRepositoryResolver
+		implements RepositoryResolver<HttpServletRequest> {
 
-@Command
-class ReadReftable extends TextBuiltin {
-	@Argument(index = 0)
-	private String input;
+	private final TestRepository<Repository> repo;
 
-	@Argument(index = 1, required = false)
-	private String ref;
+	private final String repoName;
 
-	@Override
-	protected void run() throws Exception {
-		try (FileInputStream in = new FileInputStream(input);
-				BlockSource src = BlockSource.from(in);
-				ReftableReader reader = new ReftableReader(src)) {
-			try (RefCursor rc = ref != null
-					? reader.seekRef(ref)
-					: reader.allRefs()) {
-				while (rc.next()) {
-					write(rc.getRef());
-				}
-			}
-		}
+	/**
+	 * Creates a new {@link TestRepositoryResolver} that resolves the given name to
+	 * the given repository.
+	 *
+	 * @param repo
+	 *            to resolve to
+	 * @param repoName
+	 *            to match
+	 */
+	public TestRepositoryResolver(TestRepository<Repository> repo, String repoName) {
+		this.repo = repo;
+		this.repoName = repoName;
 	}
 
-	private void write(Ref r) throws IOException {
-		if (r.isSymbolic()) {
-			outw.println(r.getTarget().getName() + '\t' + r.getName());
-			return;
+	@Override
+	public Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotEnabledException {
+		if (!name.equals(repoName)) {
+			throw new RepositoryNotFoundException(name);
 		}
-
-		ObjectId id1 = r.getObjectId();
-		if (id1 != null) {
-			outw.println(id1.name() + '\t' + r.getName());
-		}
-
-		ObjectId id2 = r.getPeeledObjectId();
-		if (id2 != null) {
-			outw.println('^' + id2.name());
-		}
+		Repository db = repo.getRepository();
+		db.incrementOpen();
+		return db;
 	}
 }
