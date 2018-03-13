@@ -71,7 +71,7 @@ import org.eclipse.jgit.util.NB;
  * {@code ReftableReader} is not thread-safe. Concurrent readers need their own
  * instance to read from the same file.
  */
-public class ReftableReader extends RefCursor {
+public class ReftableReader implements AutoCloseable {
 	/** @return an empty reftable. */
 	public static ReftableReader emptyTable() {
 		try {
@@ -101,6 +101,7 @@ public class ReftableReader extends RefCursor {
 
 	private byte blockType;
 	private long scanEnd;
+	private boolean includeDeletes;
 
 	private byte[] match;
 	private Ref ref;
@@ -117,7 +118,22 @@ public class ReftableReader extends RefCursor {
 		this.src = src;
 	}
 
-	@Override
+	/**
+	 * @param deletes
+	 *            if {@code true} deleted references will be returned. If
+	 *            {@code false} (default behavior), deleted references will be
+	 *            skipped, and not returned.
+	 */
+	public void setIncludeDeletes(boolean deletes) {
+		includeDeletes = deletes;
+	}
+
+	/**
+	 * Seek to the first reference in the file, to iterate in order.
+	 *
+	 * @throws IOException
+	 *             reftable cannot be read.
+	 */
 	public void seekToFirstRef() throws IOException {
 		if (blockSize == 0) {
 			readFileHeader();
@@ -128,7 +144,19 @@ public class ReftableReader extends RefCursor {
 		block = readBlock(0);
 	}
 
-	@Override
+	/**
+	 * Seek either to a reference, or a reference subtree.
+	 * <p>
+	 * If {@code refName} ends with {@code "/"} the method will seek to the
+	 * subtree of all references starting with {@code refName} as a prefix.
+	 * <p>
+	 * Otherwise, only {@code refName} will be found, if present.
+	 *
+	 * @param refName
+	 *            reference name or subtree to find.
+	 * @throws IOException
+	 *             reftable cannot be read.
+	 */
 	public void seek(String refName) throws IOException {
 		byte[] rn = refName.getBytes(UTF_8);
 		byte[] key = rn;
@@ -143,7 +171,12 @@ public class ReftableReader extends RefCursor {
 		seek(key, refIndex, 0, refEnd);
 	}
 
-	@Override
+	/**
+	 * Seek reader to read log records.
+	 *
+	 * @throws IOException
+	 *             reftable cannot be read.
+	 */
 	public void seekToFirstLog() throws IOException {
 		initLogIndex();
 		initScan(LOG_BLOCK_TYPE, logEnd);
@@ -153,7 +186,17 @@ public class ReftableReader extends RefCursor {
 		}
 	}
 
-	@Override
+	/**
+	 * Seek to a timestamp in a reference's log.
+	 *
+	 * @param refName
+	 *            exact name of the reference whose log to read.
+	 * @param timeUsec
+	 *            time in microseconds since the epoch to scan backwards from.
+	 *            Records at this time and older will be returned.
+	 * @throws IOException
+	 *             reftable cannot be read.
+	 */
 	public void seekLog(String refName, long timeUsec) throws IOException {
 		byte[] key = LogEntry.key(refName, timeUsec);
 
@@ -207,7 +250,13 @@ public class ReftableReader extends RefCursor {
 		} while (low < end);
 	}
 
-	@Override
+	/**
+	 * Check if another reference is available.
+	 *
+	 * @return {@code true} if there is another reference.
+	 * @throws IOException
+	 *             reftable cannot be read.
+	 */
 	public boolean next() throws IOException {
 		for (;;) {
 			if (block == null || blockType != block.type()) {
@@ -245,22 +294,28 @@ public class ReftableReader extends RefCursor {
 		return false;
 	}
 
-	@Override
-	public String getRefName() {
-		return ref != null ? ref.getName() : block.name();
+	/** @return {@code true} if the current reference was deleted. */
+	public boolean wasDeleted() {
+		Ref r = getRef();
+		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
 	}
 
-	@Override
+	/** @return reference at the current position. */
 	public Ref getRef() {
 		return ref;
 	}
 
-	@Override
+	/** @return name of the current reference. */
+	public String getRefName() {
+		return ref != null ? ref.getName() : block.name();
+	}
+
+	/** @return time of reflog entry, microseconds since the epoch. */
 	public long getReflogTimeUsec() {
 		return logTimeUsec;
 	}
 
-	@Override
+	/** @return current log entry. */
 	public ReflogEntry getReflogEntry() {
 		return log;
 	}
