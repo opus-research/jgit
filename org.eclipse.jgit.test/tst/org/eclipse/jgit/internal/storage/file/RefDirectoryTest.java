@@ -47,7 +47,6 @@ import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
-import static org.eclipse.jgit.lib.ObjectId.zeroId;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -75,7 +74,6 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
@@ -1299,9 +1297,9 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
+				newCommand(A, B, "refs/heads/master",
 						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(B, A, "refs/heads/masters",
+				newCommand(B, A, "refs/heads/masters",
 						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.addCommand(commands);
@@ -1321,9 +1319,9 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
+				newCommand(A, B, "refs/heads/master",
 						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(B, A, "refs/heads/masters",
+				newCommand(B, A, "refs/heads/masters",
 						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
@@ -1343,7 +1341,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 			throws IOException {
 		writeLooseRef("refs/heads/master", B);
 		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(B, A, "refs/heads/master",
+				newCommand(B, A, "refs/heads/master",
 						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
@@ -1364,12 +1362,11 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
+				newCommand(A, B, "refs/heads/master",
 						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(zeroId(), A, "refs/heads/master/x",
+				newCommand(null, A, "refs/heads/master/x",
 						ReceiveCommand.Type.CREATE),
-				new ReceiveCommand(zeroId(), A, "refs/heads",
-						ReceiveCommand.Type.CREATE));
+				newCommand(null, A, "refs/heads", ReceiveCommand.Type.CREATE));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
@@ -1392,11 +1389,11 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master",
+				newCommand(A, B, "refs/heads/master",
 						ReceiveCommand.Type.UPDATE),
-				new ReceiveCommand(zeroId(), A, "refs/heads/masters/x",
+				newCommand(null, A, "refs/heads/masters/x",
 						ReceiveCommand.Type.CREATE),
-				new ReceiveCommand(B, zeroId(), "refs/heads/masters",
+				newCommand(B, null, "refs/heads/masters",
 						ReceiveCommand.Type.DELETE));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
@@ -1409,6 +1406,12 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals("[HEAD, refs/heads/master, refs/heads/masters/x]", refs
 				.keySet().toString());
 		assertEquals(A.getId(), refs.get("refs/heads/masters/x").getObjectId());
+	}
+
+	private static ReceiveCommand newCommand(RevCommit a, RevCommit b,
+			String string, Type update) {
+		return new ReceiveCommand(a != null ? a.getId() : null,
+				b != null ? b.getId() : null, string, update);
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
