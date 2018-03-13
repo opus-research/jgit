@@ -195,7 +195,6 @@ public class PersonIdent implements Serializable {
 	 * @param aName
 	 * @param aEmailAddress
 	 * @param when
-	 * @since 4.6
 	 */
 	public PersonIdent(String aName, String aEmailAddress,
 			ProposedTimestamp when) {
