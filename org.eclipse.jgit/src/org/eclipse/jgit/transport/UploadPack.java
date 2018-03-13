@@ -128,16 +128,12 @@ public class UploadPack {
 		 * advertised.
 		 * <p>
 		 * This may happen, for example, when a custom {@link RefFilter} is set.
-		 *
-		 * @since 3.1
 		 */
 		TIP,
 
 		/**
 		 * Client may ask for any commit reachable from any reference, even if that
 		 * reference wasn't advertised.
-		 *
-		 * @since 3.1
 		 */
 		REACHABLE_COMMIT_TIP,
 
@@ -555,7 +551,6 @@ public class UploadPack {
 	 * @param tc
 	 *            configuration controlling transfer options. If null the source
 	 *            repository's settings will be used.
-	 * @since 3.1
 	 */
 	public void setTransferConfig(TransferConfig tc) {
 		this.transferConfig = tc != null ? tc : new TransferConfig(db);
@@ -815,6 +810,8 @@ public class UploadPack {
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
 		advertised = adv.send(getAdvertisedOrDefaultRefs());
+		if (adv.isEmpty())
+			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
 	}
 
@@ -873,10 +870,13 @@ public class UploadPack {
 			if (!line.startsWith("want ") || line.length() < 45) //$NON-NLS-1$
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "want", line)); //$NON-NLS-1$
 
-			if (isFirst && line.length() > 45) {
-				final FirstLine firstLine = new FirstLine(line);
-				options = firstLine.getOptions();
-				line = firstLine.getLine();
+			if (isFirst) {
+				if (line.length() > 45) {
+					FirstLine firstLine = new FirstLine(line);
+					options = firstLine.getOptions();
+					line = firstLine.getLine();
+				} else
+					options = Collections.emptySet();
 			}
 
 			wantIds.add(ObjectId.fromString(line.substring(5)));
