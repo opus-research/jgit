@@ -61,11 +61,7 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 
 	static final Ref[] NO_REFS = {};
 
-	PlotLane[] forkingOffLanes;
-
 	PlotLane[] passingLanes;
-
-	PlotLane[] mergingLanes;
 
 	PlotLane lane;
 
@@ -81,38 +77,23 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 	 */
 	protected PlotCommit(final AnyObjectId id) {
 		super(id);
-		forkingOffLanes = NO_LANES;
 		passingLanes = NO_LANES;
-		mergingLanes = NO_LANES;
 		children = NO_CHILDREN;
 		refs = NO_REFS;
 	}
 
-	void addForkingOffLane(final PlotLane f) {
-		forkingOffLanes = addLane(f, forkingOffLanes);
-	}
-
 	void addPassingLane(final PlotLane c) {
-		passingLanes = addLane(c, passingLanes);
-	}
-
-	void addMergingLane(final PlotLane m) {
-		mergingLanes = addLane(m, mergingLanes);
-	}
-
-	private static PlotLane[] addLane(final PlotLane l, PlotLane[] lanes) {
-		final int cnt = lanes.length;
+		final int cnt = passingLanes.length;
 		if (cnt == 0)
-			lanes = new PlotLane[] { l };
+			passingLanes = new PlotLane[] { c };
 		else if (cnt == 1)
-			lanes = new PlotLane[] { lanes[0], l };
+			passingLanes = new PlotLane[] { passingLanes[0], c };
 		else {
 			final PlotLane[] n = new PlotLane[cnt + 1];
-			System.arraycopy(lanes, 0, n, 0, cnt);
-			n[cnt] = l;
-			lanes = n;
+			System.arraycopy(passingLanes, 0, n, 0, cnt);
+			n[cnt] = c;
+			passingLanes = n;
 		}
-		return lanes;
 	}
 
 	void addChild(final PlotCommit c) {
@@ -204,9 +185,7 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 
 	@Override
 	public void reset() {
-		forkingOffLanes = NO_LANES;
 		passingLanes = NO_LANES;
-		mergingLanes = NO_LANES;
 		children = NO_CHILDREN;
 		lane = null;
 		super.reset();
