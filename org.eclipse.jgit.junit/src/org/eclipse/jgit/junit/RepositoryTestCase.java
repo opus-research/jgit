@@ -272,19 +272,14 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	}
 
 	/**
-	 * Return a standardized path. Replaces '\' by '/' and "^<driveletter>:" by
-	 * "/cygdrive/<driveletter>"
+	 * Replaces '\' by '/'
 	 *
 	 * @param str
-	 *            the path to be standardized
-	 * @return a standardized path
+	 *            the string in which backslashes should be replaced
+	 * @return the resulting string with slashes
 	 */
-	public static String standardizePath(String str) {
+	public static String slashify(String str) {
 		str = str.replace('\\', '/');
-		if (str.matches("^[A-Z]:.*")) {
-			str = "/cygdrive/" + str.substring(0, 1).toLowerCase()
-					+ str.substring(2);
-		}
 		return str;
 	}
 

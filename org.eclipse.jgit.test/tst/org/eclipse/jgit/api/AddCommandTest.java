@@ -45,6 +45,7 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -124,7 +125,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + standardizePath(script.getPath()));
+				"sh " + slashify(script.getPath()));
 		config.save();
 
 		git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
@@ -140,20 +141,19 @@ public class AddCommandTest extends RepositoryTestCase {
 			throws IOException, GitAPIException {
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 		writeTrashFile("src/a.txt", "foo");
-		File script = writeTempFile("echo $PWD $GIT_DIR");
+		File script = writeTempFile("echo $GIT_DIR; echo 1 >xyz");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + standardizePath(script.getPath()));
+				"sh " + slashify(script.getPath()));
 		config.save();
 		git.add().addFilepattern("src/a.txt").call();
 
-		String path = standardizePath(db.getWorkTree().getCanonicalPath());
-
 		String gitDir = db.getDirectory().getAbsolutePath();
-		assertEquals("[src/a.txt, mode:100644, content:" + path + " " + gitDir
+		assertEquals("[src/a.txt, mode:100644, content:" + gitDir
 				+ "\n]", indexState(CONTENT));
+		assertTrue(new File(db.getWorkTree(), "xyz").exists());
 	}
 
 	@Test
@@ -168,9 +168,9 @@ public class AddCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + standardizePath(script.getPath()));
+				"sh " + slashify(script.getPath()));
 		config.setString("filter", "tstFilter2", "clean",
-				"sh " + standardizePath(script2.getPath()));
+				"sh " + slashify(script2.getPath()));
 		config.save();
 
 		git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
@@ -199,7 +199,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + standardizePath(script.getPath()) + " %f");
+				"sh " + slashify(script.getPath()) + " %f");
 		writeTrashFile(".gitattributes", "* filter=tstFilter");
 
 		git.add().addFilepattern("; echo virus").call();
@@ -258,7 +258,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "clean",
-				"sh " + standardizePath(script.getPath()));
+				"sh " + slashify(script.getPath()));
 		config.save();
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 
