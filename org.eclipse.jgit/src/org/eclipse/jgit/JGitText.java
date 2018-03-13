@@ -296,6 +296,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidCharacterInBase64Data;
 	/***/ public String invalidCommitParentNumber;
 	/***/ public String invalidEncryption;
+	/***/ public String invalidGitdirRef;
 	/***/ public String invalidGitType;
 	/***/ public String invalidId;
 	/***/ public String invalidIdLength;
@@ -415,6 +416,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String problemWithResolvingPushRefSpecsLocally;
 	/***/ public String progressMonUploading;
 	/***/ public String propertyIsAlreadyNonNull;
+	/***/ public String pruneLoosePackedObjects;
+	/***/ public String pruneLooseUnreferencedObjects;
 	/***/ public String pullOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;

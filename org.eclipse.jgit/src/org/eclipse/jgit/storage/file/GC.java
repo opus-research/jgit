@@ -69,8 +69,9 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.ObjectWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
@@ -79,79 +80,88 @@ import org.eclipse.jgit.util.FileUtils;
 /**
  * A garbage collector for git {@link FileRepository}. This class started as a
  * copy of DfsGarbageCollector from Shawn O. Pearce adapted to FileRepositories.
- * Additionally the index is taken into account and reflogs will be handled.
+ * Additionally the index is taken into account and reflogs are handled.
  */
 public class GC {
+	private FileRepository repo;
+
+	private ProgressMonitor pm;
+
+	private long expireAgeMillis;
+
+	/**
+	 * Creates a new garbage collector
+	 *
+	 * @param pm
+	 *            a progress monitor
+	 * @param repo
+	 *            the repo to work on
+	 * @param expireAgeMillis
+	 *            During gc() or prune() each unreferenced, loose object which
+	 *            has been created or modified in the last <expireAgeMillis>
+	 *            milliseconds will not be pruned. Only older objects may be
+	 *            pruned. If set to 0 then every object is a candidate for
+	 *            pruning.
+	 */
+
+	public GC(FileRepository repo, ProgressMonitor pm, long expireAgeMillis) {
+		this.repo = repo;
+		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
+		this.expireAgeMillis = expireAgeMillis;
+	}
+
 	/**
 	 * Runs a garbage collector on a {@link FileRepository}. It will
 	 * <ul>
-	 * <li>repack all reachable objects into two packfiles and delete the old
-	 * packfiles</li>
-	 * <li>prunes all loose objects which are now reachable by packs</li>
+	 * <li>repack all reachable objects into new pack files and delete the old
+	 * pack files</li>
+	 * <li>prune all loose objects which are now reachable by packs</li>
 	 * </ul>
 	 *
-	 * @param pm
-	 *            a progressmonitor
-	 * @param repo
-	 *            the repo to work on
-	 * @param expireDays
-	 *            each unreferenced, loose object which has been created or
-	 *            modified in the last <expireDays> number of days will not be
-	 *            pruned. Only older objects may be pruned. If set to 0 then
-	 *            every object is a candidate for pruning.
 	 * @return the collection of {@link PackFile}'s which are created newly
 	 * @throws IOException
 	 *
 	 */
-	public static Collection<PackFile> gc(ProgressMonitor pm,
-			FileRepository repo, int expireDays)
-			throws IOException {
-		if (pm == null)
-			pm = NullProgressMonitor.INSTANCE;
-
-		packRefs(pm, repo);
+	public Collection<PackFile> gc() throws IOException {
+		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
-		Collection<PackFile> newPacks = repack(pm, repo);
-		prune(pm, repo, Collections.<ObjectId> emptySet(), expireDays);
+		Collection<PackFile> newPacks = repack();
+		prune(Collections.<ObjectId> emptySet());
 		// TODO: implement rerere_gc(pm);
 		return newPacks;
 	}
 
 	/**
-	 * Delete all old packs. We may during repack() rewrite a Packfile (packfile
-	 * names are computed from the id's of the contained objects. If you happen
-	 * to write the same objects into a new packfile then what you had in a old
-	 * packfile then you create a file with the same name). Then this file
-	 * should not be deleted although it existed before gc.
+	 * Delete old pack files. What is 'old' is defined by specifying a set of
+	 * old pack files and a set of new pack files. Each pack file contained in
+	 * old pack files but not contained in new pack files will be deleted.
 	 *
-	 * @param repo
-	 *            the repo to work on
 	 * @param oldPacks
 	 * @param newPacks
 	 * @param ignoreErrors
 	 *            <code>true</code> if we should ignore the fact that a certain
-	 *            packfile or indexfile couldn't be deleted. If set to
-	 *            <code>false</code> and {@link IOException} is thrown in such
+	 *            pack files or index files couldn't be deleted.
+	 *            <code>false</code> if an exception should be thrown in such
 	 *            cases
 	 * @throws IOException
+	 *             if a pack file couldn't be deleted and
+	 *             <code>ignoreErrors</code> is set to <code>false</code>
 	 */
-	private static void deleteOldPacks(FileRepository repo,
-			Collection<PackFile> oldPacks, Collection<PackFile> newPacks,
-			boolean ignoreErrors)
+	private void deleteOldPacks(Collection<PackFile> oldPacks,
+			Collection<PackFile> newPacks, boolean ignoreErrors)
 			throws IOException {
-
 		int deleteOptions = FileUtils.RETRY | FileUtils.SKIP_MISSING;
 		if (ignoreErrors)
 			deleteOptions |= FileUtils.IGNORE_ERRORS;
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
-			// check whether an old Packfile is also among the list of new
-			// packfiles. Then we shouldn't delete it.
+			// check whether an old pack file is also among the list of new
+			// pack files. Then we must not delete it.
 			for (PackFile newPack : newPacks)
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
-			FileUtils.delete(nameFor(repo, oldName, ".pack"), deleteOptions);
-			FileUtils.delete(nameFor(repo, oldName, ".idx"), deleteOptions);
+			FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions);
+			FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions);
 		}
 	}
 
@@ -160,25 +170,16 @@ public class GC {
 	 * which can be found in packs. If certain objects can't be pruned (e.g.
 	 * because the filesystem delete operation fails) this is silently ignored.
 	 *
-	 * @param pm
-	 *            a progressmonitor
-	 * @param repo
-	 *            the repo to work on
-	 * @param objectsToKeep
-	 *            a set of objects which should explicitly not be pruned
 	 * @throws IOException
 	 */
-	public static void prunePacked(ProgressMonitor pm, FileRepository repo,
-			Set<ObjectId> objectsToKeep) throws IOException {
+	public void prunePacked() throws IOException {
 		ObjectDirectory objdb = repo.getObjectDatabase();
 		Collection<PackFile> packs = objdb.getPacks();
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
 
 		if (fanout != null && fanout.length > 0) {
-			if (pm == null)
-				pm = NullProgressMonitor.INSTANCE;
-			pm.beginTask("prune loose objects", fanout.length);
+			pm.beginTask(JGitText.get().pruneLoosePackedObjects, fanout.length);
 			try {
 				for (String d : fanout) {
 					pm.update(1);
@@ -204,7 +205,7 @@ public class GC {
 								found = true;
 								break;
 							}
-						if (found && !objectsToKeep.contains(id))
+						if (found)
 							FileUtils.delete(objdb.fileFor(id), FileUtils.RETRY
 									| FileUtils.SKIP_MISSING
 									| FileUtils.IGNORE_ERRORS);
@@ -222,43 +223,41 @@ public class GC {
 	 * unreferenced. If certain objects can't be pruned (e.g. because the
 	 * filesystem delete operation fails) this is silently ignored.
 	 *
-	 * @param pm
-	 *            a progressmonitor
-	 * @param repo
-	 *            the repo to work on
 	 * @param objectsToKeep
 	 *            a set of objects which should explicitly not be pruned
-	 * @param expireDays
-	 *            each object which has been created or modified in the last
-	 *            <expireDays> number of days will not been pruned. Only older
-	 *            objects may be pruned. If set to 0 then every object is a
-	 *            candidate for pruning.
 	 * @throws IOException
 	 */
-	public static void prune(ProgressMonitor pm, FileRepository repo,
-			Set<ObjectId> objectsToKeep, int expireDays) throws IOException {
+	public void prune(Set<ObjectId> objectsToKeep)
+			throws IOException {
 		ObjectDirectory objdb = repo.getObjectDatabase();
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
-		long expireDate = System.currentTimeMillis()
-				- (expireDays * 24 * 60 * 60 * 1000);
+		long expireDate = System.currentTimeMillis() - expireAgeMillis;
 
 		if (fanout != null && fanout.length > 0) {
-			if (pm == null)
-				pm = NullProgressMonitor.INSTANCE;
-			pm.beginTask("prune loose objects", fanout.length);
+			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
+					fanout.length);
+			ObjectWalk w = null;
 			try {
 				// Expensive: create a Objectwalk which walks over all
 				// referenced objects.
-				ObjectWalk w=new ObjectWalk(repo);
-				for (Ref f:repo.getAllRefs().values())
+				w = new ObjectWalk(repo);
+				for (Ref f : repo.getAllRefs().values())
 					w.markStart(w.parseAny(f.getObjectId()));
-				for (Ref f:repo.getRefDatabase().getAdditionalRefs())
+				for (Ref f : repo.getRefDatabase().getAdditionalRefs())
 					w.markStart(w.parseAny(f.getObjectId()));
-				for (ObjectId oid:listNonHEADIndexObjects(repo))
+				for (ObjectId oid : listNonHEADIndexObjects())
 					w.markStart(w.parseAny(oid));
-				while(w.nextObject()!=null);
-
+				for (;;) {
+					final RevCommit c = w.next();
+					if (c == null)
+						break;
+				}
+				for (;;) {
+					final RevObject o = w.nextObject();
+					if (o == null)
+						break;
+				}
 				for (String d : fanout) {
 					pm.update(1);
 					if (d.length() != 2)
@@ -291,21 +290,25 @@ public class GC {
 
 			} finally {
 				pm.endTask();
+				if (w != null)
+					w.dispose();
 			}
 		}
 	}
 
 	/**
+<<<<<<< HEAD
+	 * Packs all objects which are reachable from any of the heads into one pack
+	 * file. Additionally all objects which are not reachable from any head but
+	 * which are reachable from any of the other refs (e.g. tags), special refs
+	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. All old
+	 * pack files which existed before are deleted.
+=======
 	 * packs all non-symbolic, loose refs into the packed-refs.
-	 * 
-	 * @param pm
-	 *            a progressmonitor
-	 * @param repo
-	 *            the repo to work on
+	 *
 	 * @throws IOException
 	 */
-	public static void packRefs(ProgressMonitor pm, FileRepository repo)
-			throws IOException {
+	public void packRefs() throws IOException {
 		Set<Entry<String, Ref>> refEntries = repo.getAllRefs().entrySet();
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
@@ -332,23 +335,16 @@ public class GC {
 	 * but which are reachable from any of the other refs (e.g. tags), special
 	 * refs (e.g. FETCH_HEAD) or index are packed into a separate packfile. All
 	 * old packfiles which existed before are deleted.
+>>>>>>> Allow to pack a set of loose and packed refs into a new packed-ref file
 	 *
-	 * @param pm
-	 *            a progressmonitor
-	 * @param repo
-	 *            the repo to work on
-	 * @return a collection of the newly created packfiles
+	 * @return a collection of the newly created pack files
 	 * @throws IOException
-	 *
+	 *             when during reading of refs, index, packfiles, objects,
+	 *             reflog-entries or during writing to the packfiles
+	 *             {@link IOException} occurs
 	 */
-	public static Collection<PackFile> repack(ProgressMonitor pm,
-			FileRepository repo)
-			throws IOException {
+	public Collection<PackFile> repack() throws IOException {
 		Collection<PackFile> toBeDeleted = repo.getObjectDatabase().getPacks();
-
-		PackConfig packConfig = new PackConfig(repo);
-		if (packConfig.getIndexVersion() != 2)
-			throw new IllegalStateException("Only index version 2");
 
 		Map<String, Ref> refsBefore = repo.getAllRefs();
 		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
@@ -357,7 +353,7 @@ public class GC {
 		Set<ObjectId> allHeads = new HashSet<ObjectId>();
 		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
 		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
-		Set<ObjectId> indexObjects = listNonHEADIndexObjects(repo);
+		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
 
 		for (Ref ref : refsBefore.values()) {
 			if (ref.isSymbolic() || ref.getObjectId() == null)
@@ -379,7 +375,7 @@ public class GC {
 
 		List<PackFile> ret = new ArrayList<PackFile>(2);
 		if (!allHeads.isEmpty()) {
-			PackFile heads = writePack(pm, repo, allHeads,
+			PackFile heads = writePack(allHeads,
 					Collections.<ObjectId> emptySet(), tagTargets);
 			if (heads != null)
 				ret.add(heads);
@@ -392,12 +388,12 @@ public class GC {
 			// stop traversing when he finds a head?
 			// My problem: I don't have the PackIndex anymore and PackFile
 			// doesn't expose it.
-			PackFile rest = writePack(pm, repo, nonHeads, allHeads, tagTargets);
+			PackFile rest = writePack(nonHeads, allHeads, tagTargets);
 			if (rest != null)
 				ret.add(rest);
 		}
-		deleteOldPacks(repo, toBeDeleted, ret, true);
-		prunePacked(pm, repo, Collections.<ObjectId> emptySet());
+		deleteOldPacks(toBeDeleted, ret, true);
+		prunePacked();
 		return ret;
 	}
 
@@ -405,25 +401,22 @@ public class GC {
 	 * Return a list of those objects in the index which differ from whats in
 	 * HEAD
 	 *
-	 * @param repo
-	 *
 	 * @return a set of ObjectIds of changed objects in the index
 	 * @throws IOException
 	 * @throws CorruptObjectException
 	 * @throws NoWorkTreeException
 	 */
-	private static Set<ObjectId> listNonHEADIndexObjects(FileRepository repo)
-			throws CorruptObjectException,
-			IOException {
+	private Set<ObjectId> listNonHEADIndexObjects()
+			throws CorruptObjectException, IOException {
 		RevWalk revWalk = null;
 		DirCache dc = null;
 		try {
-			// Even bare repos may have an index check for the existance of an
+			// Even bare repos may have an index check for the existence of an
 			// index file. Only checking for isBare() is wrong.
 			if (repo.getIndexFile() == null)
-				return (Collections.emptySet());
+				return Collections.emptySet();
 		} catch (NoWorkTreeException e) {
-			return (Collections.emptySet());
+			return Collections.emptySet();
 		}
 		TreeWalk treeWalk = new TreeWalk(repo);
 		try {
@@ -441,7 +434,7 @@ public class GC {
 			Set<ObjectId> ret = new HashSet<ObjectId>();
 			while (treeWalk.next()) {
 				ObjectId objectId = treeWalk.getObjectId(0);
-				if (objectId != ObjectId.zeroId())
+				if (!ObjectId.zeroId().equals(objectId))
 					ret.add(objectId);
 			}
 			return ret;
@@ -452,9 +445,8 @@ public class GC {
 		}
 	}
 
-	private static PackFile writePack(ProgressMonitor pm, FileRepository repo,
-			Set<? extends ObjectId> want, Set<? extends ObjectId> have,
-			Set<ObjectId> tagTargets)
+	private PackFile writePack(Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have, Set<ObjectId> tagTargets)
 			throws IOException {
 
 		PackWriter pw = new PackWriter(repo);
@@ -466,12 +458,12 @@ public class GC {
 			pw.preparePack(pm, want, have);
 			if (0 < pw.getObjectCount()) {
 				String id = pw.computeName().getName();
-				File pack = nameFor(repo, id, ".pack");
-				File idx = nameFor(repo, id, ".idx");
+				File pack = nameFor(id, ".pack");
+				File idx = nameFor(id, ".idx");
 				if (!pack.createNewFile()) {
 					for (PackFile f : repo.getObjectDatabase().getPacks())
 						if (f.getPackName().equals(id))
-							return (f);
+							return f;
 					throw new IOException(
 							MessageFormat.format(
 									JGitText.get().cannotCreatePackfile,
@@ -506,8 +498,85 @@ public class GC {
 		}
 	}
 
-	private static File nameFor(FileRepository repo, String name, String t) {
+	private File nameFor(String name, String t) {
 		File packdir = new File(repo.getObjectsDirectory(), "pack");
 		return new File(packdir, "pack-" + name + t);
+	}
+
+	/**
+	 * A class holding statistical data for a FileRepository regarding how many
+	 * objects are stored as loose or packed objects
+	 */
+	public class RepoStatistics {
+		/**
+		 * The number of objects stored in pack files. If the same object is
+		 * stored in multiple pack files then it is counted as often as it
+		 * occurs in pack files.
+		 */
+		public long nrOfPackedObjects;
+
+		/**
+		 * The number of pack files
+		 */
+		public long nrOfPackFiles;
+
+		/**
+		 * The number of objects stored as loose objects.
+		 */
+		public long nrOfLooseObjects;
+	}
+
+	/**
+	 * Returns the number of objects stored in pack files. If an object is
+	 * contained in multiple pack files it is counted as often as it occurs.
+	 *
+	 * @return the number of objects stored in pack files
+	 * @throws IOException
+	 */
+	public RepoStatistics getStatistics() throws IOException {
+		RepoStatistics ret = new RepoStatistics();
+		ret.nrOfPackedObjects = 0;
+		for (PackFile f : repo.getObjectDatabase().getPacks())
+			ret.nrOfPackedObjects += f.getObjectCount();
+		ret.nrOfPackFiles = repo.getObjectDatabase().getPacks().size();
+		ret.nrOfLooseObjects = 0;
+		File objDir = repo.getObjectsDirectory();
+		String[] fanout = objDir.list();
+		if (fanout != null && fanout.length > 0) {
+			for (String d : fanout) {
+				if (d.length() != 2)
+					continue;
+				String[] entries = new File(objDir, d).list();
+				if (entries == null)
+					continue;
+				for (String e : entries) {
+					if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+						continue;
+					ret.nrOfLooseObjects++;
+				}
+			}
+		}
+		return ret;
+	}
+
+	/**
+	 * Set's the progress monitor used for garbage collection methods.
+	 *
+	 * @param pm
+	 */
+	public void setProgressMonitor(ProgressMonitor pm) {
+		this.pm = ((pm == null) ? NullProgressMonitor.INSTANCE : pm);
+	}
+
+	/**
+	 * During gc() or prune() each unreferenced, loose object which has been
+	 * created or modified in the last <expireAgeMillis> milliseconds will not
+	 * be pruned. Only older objects may be pruned. If set to 0 then every
+	 * object is a candidate for pruning.
+	 *
+	 * @param expireAgeMillis
+	 */
+	public void setExpireAgeMillis(long expireAgeMillis) {
+		this.expireAgeMillis = expireAgeMillis;
 	}
 }
