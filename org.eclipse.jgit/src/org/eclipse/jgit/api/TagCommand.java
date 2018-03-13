@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
@@ -107,7 +106,7 @@ public class TagCommand extends GitCommand<RevTag> {
 	 *             {@link Exception#getCause()}. Expect only
 	 *             {@code IOException's} to be wrapped.
 	 */
-	public RevTag call() throws GitAPIException, JGitInternalException,
+	public RevTag call() throws JGitInternalException,
 			ConcurrentRefUpdateException, InvalidTagNameException, NoHeadException {
 		checkCallable();
 
