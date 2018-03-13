@@ -220,14 +220,8 @@ public class DfsPackCompactor {
 				pw.setReuseDeltaCommits(false);
 
 				addObjectsToPack(pw, ctx, pm);
-				if (pw.getObjectCount() == 0) {
-					List<DfsPackDescription> remove = toPrune();
-					if (remove.size() > 0)
-						objdb.commitPack(
-								Collections.<DfsPackDescription>emptyList(),
-								remove);
+				if (pw.getObjectCount() == 0)
 					return;
-				}
 
 				boolean rollback = true;
 				DfsPackDescription pack = objdb.newPack(COMPACT);

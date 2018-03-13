@@ -49,7 +49,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -72,40 +71,23 @@ public class GitDateParser {
 	// Since SimpleDateFormat instances are expensive to instantiate they should
 	// be cached. Since they are also not threadsafe they are cached using
 	// ThreadLocal.
-	private static ThreadLocal<Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>> formatCache =
-			new ThreadLocal<Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>>() {
-
-		protected Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>> initialValue() {
-			return new HashMap<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>();
+	private static ThreadLocal<Map<ParseableSimpleDateFormat, SimpleDateFormat>> formatCache = new ThreadLocal<Map<ParseableSimpleDateFormat, SimpleDateFormat>>() {
+		protected Map<ParseableSimpleDateFormat, SimpleDateFormat> initialValue() {
+			return new HashMap<ParseableSimpleDateFormat, SimpleDateFormat>();
 		}
 	};
 
-	// Gets an instance of a SimpleDateFormat for the specified locale. If there
-	// is not already an appropriate instance in the (ThreadLocal) cache then
-	// create one and put it into the cache.
-	private static SimpleDateFormat getDateFormat(ParseableSimpleDateFormat f,
-			Locale locale) {
-		Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>> cache = formatCache
+	// Gets an instance of a SimpleDateFormat. If there is not already an
+	// appropriate instance in the (ThreadLocal) cache the create one and put in
+	// into the cache
+	private static SimpleDateFormat getDateFormat(ParseableSimpleDateFormat f) {
+		Map<ParseableSimpleDateFormat, SimpleDateFormat> map = formatCache
 				.get();
-		Map<ParseableSimpleDateFormat, SimpleDateFormat> map = cache
-				.get(locale);
-		if (map == null) {
-			map = new HashMap<ParseableSimpleDateFormat, SimpleDateFormat>();
-			cache.put(locale, map);
-			return getNewSimpleDateFormat(f, locale, map);
-		}
 		SimpleDateFormat dateFormat = map.get(f);
 		if (dateFormat != null)
 			return dateFormat;
-		SimpleDateFormat df = getNewSimpleDateFormat(f, locale, map);
-		return df;
-	}
-
-	private static SimpleDateFormat getNewSimpleDateFormat(
-			ParseableSimpleDateFormat f, Locale locale,
-			Map<ParseableSimpleDateFormat, SimpleDateFormat> map) {
 		SimpleDateFormat df = SystemReader.getInstance().getSimpleDateFormat(
-				f.formatStr, locale);
+				f.formatStr);
 		map.put(f, df);
 		return df;
 	}
@@ -123,7 +105,7 @@ public class GitDateParser {
 		SHORT_WITH_DOTS("yyyy.MM.dd"), // //$NON-NLS-1$
 		SHORT_WITH_SLASH("MM/dd/yyyy"), // //$NON-NLS-1$
 		DEFAULT("EEE MMM dd HH:mm:ss yyyy Z"), // //$NON-NLS-1$
-		LOCAL("EEE MMM dd HH:mm:ss yyyy"); //$NON-NLS-1$
+		LOCAL("EEE MMM dd HH:mm:ss yyyy");
 
 		String formatStr;
 
@@ -133,9 +115,9 @@ public class GitDateParser {
 	}
 
 	/**
-	 * Parses a string into a {@link Date} using the default locale. Since this
-	 * parser also supports relative formats (e.g. "yesterday") the caller can
-	 * specify the reference date. These types of strings can be parsed:
+	 * Parses a string into a {@link Date}. Since this parser also supports
+	 * relative formats (e.g. "yesterday") the caller can specify the reference
+	 * date. These types of strings can be parsed:
 	 * <ul>
 	 * <li>"never"</li>
 	 * <li>"now"</li>
@@ -169,49 +151,6 @@ public class GitDateParser {
 	 */
 	public static Date parse(String dateStr, Calendar now)
 			throws ParseException {
-		return parse(dateStr, now, Locale.getDefault());
-	}
-
-	/**
-	 * Parses a string into a {@link Date} using the given locale. Since this
-	 * parser also supports relative formats (e.g. "yesterday") the caller can
-	 * specify the reference date. These types of strings can be parsed:
-	 * <ul>
-	 * <li>"never"</li>
-	 * <li>"now"</li>
-	 * <li>"yesterday"</li>
-	 * <li>"(x) years|months|weeks|days|hours|minutes|seconds ago"<br>
-	 * Multiple specs can be combined like in "2 weeks 3 days ago". Instead of
-	 * ' ' one can use '.' to seperate the words</li>
-	 * <li>"yyyy-MM-dd HH:mm:ss Z" (ISO)</li>
-	 * <li>"EEE, dd MMM yyyy HH:mm:ss Z" (RFC)</li>
-	 * <li>"yyyy-MM-dd"</li>
-	 * <li>"yyyy.MM.dd"</li>
-	 * <li>"MM/dd/yyyy",</li>
-	 * <li>"dd.MM.yyyy"</li>
-	 * <li>"EEE MMM dd HH:mm:ss yyyy Z" (DEFAULT)</li>
-	 * <li>"EEE MMM dd HH:mm:ss yyyy" (LOCAL)</li>
-	 * </ul>
-	 *
-	 * @param dateStr
-	 *            the string to be parsed
-	 * @param now
-	 *            the base date which is used for the calculation of relative
-	 *            formats. E.g. if baseDate is "25.8.2012" then parsing of the
-	 *            string "1 week ago" would result in a date corresponding to
-	 *            "18.8.2012". This is used when a JGit command calls this
-	 *            parser often but wants a consistent starting point for calls.<br>
-	 *            If set to <code>null</code> then the current time will be used
-	 *            instead.
-	 * @param locale
-	 *            locale to be used to parse the date string
-	 * @return the parsed {@link Date}
-	 * @throws ParseException
-	 *             if the given dateStr was not recognized
-	 * @since 3.2
-	 */
-	public static Date parse(String dateStr, Calendar now, Locale locale)
-			throws ParseException {
 		dateStr = dateStr.trim();
 		Date ret;
 
@@ -222,7 +161,7 @@ public class GitDateParser {
 			return ret;
 		for (ParseableSimpleDateFormat f : ParseableSimpleDateFormat.values()) {
 			try {
-				return parse_simple(dateStr, f, locale);
+				return parse_simple(dateStr, f);
 			} catch (ParseException e) {
 				// simply proceed with the next parser
 			}
@@ -238,10 +177,9 @@ public class GitDateParser {
 	}
 
 	// tries to parse a string with the formats supported by SimpleDateFormat
-	private static Date parse_simple(String dateStr,
-			ParseableSimpleDateFormat f, Locale locale)
+	private static Date parse_simple(String dateStr, ParseableSimpleDateFormat f)
 			throws ParseException {
-		SimpleDateFormat dateFormat = getDateFormat(f, locale);
+		SimpleDateFormat dateFormat = getDateFormat(f);
 		dateFormat.setLenient(false);
 		return dateFormat.parse(dateStr);
 	}

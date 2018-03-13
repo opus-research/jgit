@@ -86,7 +86,6 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -245,9 +244,8 @@ public class ResolveMerger extends ThreeWayMerger {
 				String fileName = toBeDeleted.get(i);
 				File f = new File(db.getWorkTree(), fileName);
 				if (!f.delete())
-					if (!f.isDirectory())
-						failingPaths.put(fileName,
-								MergeFailureReason.COULD_NOT_DELETE);
+					failingPaths.put(fileName,
+							MergeFailureReason.COULD_NOT_DELETE);
 				modifiedFiles.add(fileName);
 			}
 		} finally {
@@ -256,11 +254,11 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void createDir(File f) throws IOException {
-		if (!db.getFS().isDirectory(f) && !f.mkdirs()) {
+		if (!f.isDirectory() && !f.mkdirs()) {
 			File p = f;
-			while (p != null && !db.getFS().exists(p))
+			while (p != null && !p.exists())
 				p = p.getParentFile();
-			if (p == null || db.getFS().isDirectory(p))
+			if (p == null || p.isDirectory())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 			FileUtils.delete(p);
 			if (!f.mkdirs())
@@ -439,7 +437,7 @@ public class ResolveMerger extends ThreeWayMerger {
 					else {
 						// the preferred version THEIRS has a different mode
 						// than ours. Check it out!
-						if (isWorktreeDirty(work, ourDce))
+						if (isWorktreeDirty(work))
 							return false;
 						// we know about length and lastMod only after we have written the new content.
 						// This will happen later. Set these values to 0 for know.
@@ -477,7 +475,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// THEIRS. THEIRS is chosen.
 
 			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty(work, ourDce))
+			if (isWorktreeDirty(work))
 				return false;
 			if (nonTree(modeT)) {
 				// we know about length and lastMod only after we have written
@@ -535,7 +533,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		if (nonTree(modeO) && nonTree(modeT)) {
 			// Check worktree before modifying files
-			if (isWorktreeDirty(work, ourDce))
+			if (isWorktreeDirty(work))
 				return false;
 
 			// Don't attempt to resolve submodule link conflicts
@@ -566,7 +564,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				// OURS was deleted checkout THEIRS
 				if (modeO == 0) {
 					// Check worktree before checking out THEIRS
-					if (isWorktreeDirty(work, ourDce))
+					if (isWorktreeDirty(work))
 						return false;
 					if (nonTree(modeT)) {
 						if (e != null)
@@ -625,8 +623,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		return isDirty;
 	}
 
-	private boolean isWorktreeDirty(WorkingTreeIterator work,
-			DirCacheEntry ourDce) throws IOException {
+	private boolean isWorktreeDirty(WorkingTreeIterator work) {
 		if (work == null)
 			return false;
 
@@ -634,15 +631,9 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		boolean isDirty;
-		if (ourDce != null)
-			isDirty = work.isModified(ourDce, true, reader);
-		else {
-			isDirty = work.isModeDifferent(modeO);
-			if (!isDirty && nonTree(modeF))
-				isDirty = !tw.idEqual(T_FILE, T_OURS);
-		}
-
+		boolean isDirty = work.isModeDifferent(modeO);
+		if (!isDirty && nonTree(modeF))
+			isDirty = !tw.idEqual(T_FILE, T_OURS);
 		// Ignore existing empty directories
 		if (isDirty && modeF == FileMode.TYPE_TREE
 				&& modeO == FileMode.TYPE_MISSING)
@@ -727,10 +718,9 @@ public class ResolveMerger extends ThreeWayMerger {
 				// support write operations
 				throw new UnsupportedOperationException();
 
-			FS fs = db.getFS();
 			of = new File(workTree, tw.getPathString());
 			File parentFolder = of.getParentFile();
-			if (!fs.exists(parentFolder))
+			if (!parentFolder.exists())
 				parentFolder.mkdirs();
 			fos = new FileOutputStream(of);
 			try {
