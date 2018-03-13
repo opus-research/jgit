@@ -10,7 +10,7 @@
 #define ROUND3_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= r3(a,b,c,d,T);}
 #define ROUND4_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= r4(a,b,c,d,T);}
 
-	/* Condition to go backwarsd: if (t > step) */
+	/* Condition to go backwards: if (t > step) */
   /* t=80-66 have no identified DV; skip.
 	ROUND4_STEP_BW(b, c, d, e, a, 79)
 	ROUND4_STEP_BW(c, d, e, a, b, 78)
