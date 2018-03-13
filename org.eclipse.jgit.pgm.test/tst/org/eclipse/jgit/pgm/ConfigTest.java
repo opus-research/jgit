@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,50 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
+package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
-
-import java.util.Arrays;
+import static org.junit.Assert.assertArrayEquals;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.util.GitDateFormatter;
-import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.junit.Before;
 import org.junit.Test;
 
-/**
- * Test construction of squash message by {@link SquashMessageFormatterTest}.
- */
-public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
-	private GitDateFormatter dateFormatter;
-	private SquashMessageFormatter msgFormatter;
-	private RevCommit revCommit;
-
+public class ConfigTest extends CLIRepositoryTestCase {
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		dateFormatter = new GitDateFormatter(Format.DEFAULT);
-		msgFormatter = new SquashMessageFormatter();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
-	public void testCommit() throws Exception {
-		Git git = new Git(db);
-		revCommit = git.commit().setMessage("squash_me").call();
-
-		Ref master = db.getRef("refs/heads/master");
-		String message = msgFormatter.format(Arrays.asList(revCommit), master);
-		assertEquals(
-				"Squashed commit of the following:\n\ncommit "
-						+ revCommit.getName() + "\nAuthor: "
-						+ revCommit.getAuthorIdent().getName() + " <"
-						+ revCommit.getAuthorIdent().getEmailAddress()
-						+ ">\nDate:   " + dateFormatter.formatDate(author)
-						+ "\n\n\tsquash_me\n", message);
+	public void testListConfig() throws Exception {
+		String[] output = execute("git config --list");
+		assertArrayEquals("expected default configuration", //
+				new String[] { "core.autocrlf=false", //
+						"core.filemode=true", //
+						"core.logallrefupdates=true", //
+						"core.repositoryformatversion=0", //
+						"" /* ends with LF (last line empty) */}, output);
 	}
 }

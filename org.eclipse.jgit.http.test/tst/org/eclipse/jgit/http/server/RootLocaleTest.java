@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+package org.eclipse.jgit.http.server;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-
+import org.eclipse.jgit.nls.NLS;
+import org.junit.Before;
 import org.junit.Test;
 
-public class SquashCommitMsgTest extends RepositoryTestCase {
-	private static final String squashMsg = "squashed commit";
+public class RootLocaleTest {
+	@Before
+	public void setUp() {
+		NLS.setLocale(NLS.ROOT_LOCALE);
+	}
 
 	@Test
-	public void testReadWriteMergeMsg() throws IOException {
-		assertEquals(db.readSquashCommitMsg(), null);
-		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
-		db.writeSquashCommitMsg(squashMsg);
-		assertEquals(squashMsg, db.readSquashCommitMsg());
-		assertEquals(read(new File(db.getDirectory(), Constants.SQUASH_MSG)),
-				squashMsg);
-		db.writeSquashCommitMsg(null);
-		assertEquals(db.readSquashCommitMsg(), null);
-		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
-		FileOutputStream fos = new FileOutputStream(new File(db.getDirectory(),
-				Constants.SQUASH_MSG));
-		try {
-			fos.write(squashMsg.getBytes(Constants.CHARACTER_ENCODING));
-		} finally {
-			fos.close();
-		}
-		assertEquals(db.readSquashCommitMsg(), squashMsg);
+	public void testHttpServerText() {
+		NLS.getBundleFor(HttpServerText.class);
 	}
 }
