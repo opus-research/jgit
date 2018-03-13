@@ -77,13 +77,14 @@ public abstract class RefRename {
 		source = src;
 		destination = dst;
 
+		Repository repo = destination.getRepository();
 		String cmd = "";
 		if (source.getName().startsWith(Constants.R_HEADS)
 				&& destination.getName().startsWith(Constants.R_HEADS))
 			cmd = "Branch: ";
 		setRefLogMessage(cmd + "renamed "
-				+ Repository.shortenRefName(source.getName()) + " to "
-				+ Repository.shortenRefName(destination.getName()));
+				+ repo.shortenRefName(source.getName()) + " to "
+				+ repo.shortenRefName(destination.getName()));
 	}
 
 	/** @return identity of the user making the change in the reflog. */
