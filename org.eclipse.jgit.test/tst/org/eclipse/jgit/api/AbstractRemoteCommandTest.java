@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,77 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.errors.UnsupportedCredentialItem;
-import org.eclipse.jgit.transport.NetRC.NetRCEntry;
+import static org.junit.Assert.assertEquals;
 
-/**
- * Simple .netrc credentials provider. It can lookup the first machine entry
- * from your .netrc file.
- *
- * @since 3.5
- */
-public class NetRCCredentialsProvider extends CredentialsProvider {
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-	NetRC netrc = new NetRC();
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-	/** */
-	public NetRCCredentialsProvider() {
+public class AbstractRemoteCommandTest extends RepositoryTestCase {
+
+	protected static final String REMOTE_NAME = "test";
+
+	protected RemoteConfig setupRemote()
+			throws IOException, URISyntaxException {
+		// create another repository
+		Repository remoteRepository = createWorkRepository();
+
+		// set it up as a remote to this repository
+		final StoredConfig config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, REMOTE_NAME);
+
+		RefSpec refSpec = new RefSpec();
+		refSpec = refSpec.setForceUpdate(true);
+		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*",
+				Constants.R_REMOTES + REMOTE_NAME + "/*");
+		remoteConfig.addFetchRefSpec(refSpec);
+
+		URIish uri = new URIish(
+				remoteRepository.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+
+		remoteConfig.update(config);
+		config.save();
+
+		return remoteConfig;
 	}
 
-	/**
-	 * Install default provider for the .netrc parser.
-	 */
-	public static void install() {
-		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
+	protected void assertRemoteConfigEquals(RemoteConfig expected,
+			RemoteConfig actual) {
+		assertEquals(expected.getName(), actual.getName());
+		assertEquals(expected.getURIs(), actual.getURIs());
+		assertEquals(expected.getPushURIs(), actual.getPushURIs());
+		assertEquals(expected.getFetchRefSpecs(), actual.getFetchRefSpecs());
+		assertEquals(expected.getPushRefSpecs(), actual.getPushRefSpecs());
 	}
 
-	@Override
-	public boolean supports(CredentialItem... items) {
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username)
-				continue;
-			else if (i instanceof CredentialItem.Password)
-				continue;
-			else
-				return false;
-		}
-		return true;
-	}
-
-	@Override
-	public boolean get(URIish uri, CredentialItem... items)
-			throws UnsupportedCredentialItem {
-		NetRCEntry cc = netrc.getEntry(uri.getHost());
-
-		if (cc == null)
-			return false;
-
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username) {
-				((CredentialItem.Username) i).setValue(cc.login);
-				continue;
-			}
-			if (i instanceof CredentialItem.Password) {
-				((CredentialItem.Password) i).setValue(cc.password);
-				continue;
-			}
-			if (i instanceof CredentialItem.StringType) {
-				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
-					((CredentialItem.StringType) i).setValue(new String(
-							cc.password));
-					continue;
-				}
-			}
-			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
-					+ ":" + i.getPromptText()); //$NON-NLS-1$
-		}
-		return !isAnyNull(items);
-	}
-
-	@Override
-	public boolean isInteractive() {
-		return false;
-	}
 }

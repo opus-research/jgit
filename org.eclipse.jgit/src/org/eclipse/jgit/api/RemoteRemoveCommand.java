@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,77 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.errors.UnsupportedCredentialItem;
-import org.eclipse.jgit.transport.NetRC.NetRCEntry;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.RemoteConfig;
 
 /**
- * Simple .netrc credentials provider. It can lookup the first machine entry
- * from your .netrc file.
+ * Used to remove an existing remote.
  *
- * @since 3.5
+ * This class has setters for all supported options and arguments of this
+ * command and a {@link #call()} method to finally execute the command.
+ *
+ * @see <a href=
+ *      "http://www.kernel.org/pub/software/scm/git/docs/git-remote.html" > Git
+ *      documentation about Remote</a>
+ *
+ * @since 4.2
  */
-public class NetRCCredentialsProvider extends CredentialsProvider {
+public class RemoteRemoveCommand extends GitCommand<RemoteConfig> {
 
-	NetRC netrc = new NetRC();
+	private String name;
 
-	/** */
-	public NetRCCredentialsProvider() {
+	/**
+	 * @param repo
+	 */
+	protected RemoteRemoveCommand(Repository repo) {
+		super(repo);
 	}
 
 	/**
-	 * Install default provider for the .netrc parser.
+	 * The name of the remote to remove.
+	 *
+	 * @param name
+	 *            a remote name
 	 */
-	public static void install() {
-		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
+	public void setName(String name) {
+		this.name = name;
 	}
 
+	/**
+	 * Executes the {@code remote} command with all the options and parameters
+	 * collected by the setter methods of this class.
+	 *
+	 * @return the {@link RemoteConfig} object of the removed remote
+	 */
 	@Override
-	public boolean supports(CredentialItem... items) {
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username)
-				continue;
-			else if (i instanceof CredentialItem.Password)
-				continue;
-			else
-				return false;
+	public RemoteConfig call() throws GitAPIException {
+		checkCallable();
+
+		try {
+			StoredConfig config = repo.getConfig();
+			RemoteConfig remote = new RemoteConfig(config, name);
+			config.unsetSection(ConfigConstants.CONFIG_KEY_REMOTE, name);
+			config.save();
+			return remote;
+		} catch (IOException | URISyntaxException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		}
-		return true;
+
 	}
 
-	@Override
-	public boolean get(URIish uri, CredentialItem... items)
-			throws UnsupportedCredentialItem {
-		NetRCEntry cc = netrc.getEntry(uri.getHost());
-
-		if (cc == null)
-			return false;
-
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username) {
-				((CredentialItem.Username) i).setValue(cc.login);
-				continue;
-			}
-			if (i instanceof CredentialItem.Password) {
-				((CredentialItem.Password) i).setValue(cc.password);
-				continue;
-			}
-			if (i instanceof CredentialItem.StringType) {
-				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
-					((CredentialItem.StringType) i).setValue(new String(
-							cc.password));
-					continue;
-				}
-			}
-			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
-					+ ":" + i.getPromptText()); //$NON-NLS-1$
-		}
-		return !isAnyNull(items);
-	}
-
-	@Override
-	public boolean isInteractive() {
-		return false;
-	}
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,77 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.errors.UnsupportedCredentialItem;
-import org.eclipse.jgit.transport.NetRC.NetRCEntry;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
-/**
- * Simple .netrc credentials provider. It can lookup the first machine entry
- * from your .netrc file.
- *
- * @since 3.5
- */
-public class NetRCCredentialsProvider extends CredentialsProvider {
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
+import org.junit.Test;
 
-	NetRC netrc = new NetRC();
+public class RemoteAddCommandTest extends AbstractRemoteCommandTest {
 
-	/** */
-	public NetRCCredentialsProvider() {
+	@Test
+	public void testAdd() throws Exception {
+		// create another repository
+		Repository remoteRepository = createWorkRepository();
+		URIish uri = new URIish(
+				remoteRepository.getDirectory().toURI().toURL());
+
+		// execute the command to add a new remote
+		RemoteAddCommand cmd = Git.wrap(db).remoteAdd();
+		cmd.setName(REMOTE_NAME);
+		cmd.setUri(uri);
+		RemoteConfig remote = cmd.call();
+
+		// assert that the added remote represents the remote repository
+		assertEquals(REMOTE_NAME, remote.getName());
+		assertArrayEquals(new URIish[] { uri }, remote.getURIs().toArray());
+		assertEquals(1, remote.getFetchRefSpecs().size());
+		assertEquals(
+				String.format("+refs/heads/*:refs/remotes/%s/*", REMOTE_NAME),
+				remote.getFetchRefSpecs().get(0).toString());
+
+		// assert that the added remote is available in the git configuration
+		assertRemoteConfigEquals(remote,
+				new RemoteConfig(db.getConfig(), REMOTE_NAME));
 	}
 
-	/**
-	 * Install default provider for the .netrc parser.
-	 */
-	public static void install() {
-		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
-	}
-
-	@Override
-	public boolean supports(CredentialItem... items) {
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username)
-				continue;
-			else if (i instanceof CredentialItem.Password)
-				continue;
-			else
-				return false;
-		}
-		return true;
-	}
-
-	@Override
-	public boolean get(URIish uri, CredentialItem... items)
-			throws UnsupportedCredentialItem {
-		NetRCEntry cc = netrc.getEntry(uri.getHost());
-
-		if (cc == null)
-			return false;
-
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username) {
-				((CredentialItem.Username) i).setValue(cc.login);
-				continue;
-			}
-			if (i instanceof CredentialItem.Password) {
-				((CredentialItem.Password) i).setValue(cc.password);
-				continue;
-			}
-			if (i instanceof CredentialItem.StringType) {
-				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
-					((CredentialItem.StringType) i).setValue(new String(
-							cc.password));
-					continue;
-				}
-			}
-			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
-					+ ":" + i.getPromptText()); //$NON-NLS-1$
-		}
-		return !isAnyNull(items);
-	}
-
-	@Override
-	public boolean isInteractive() {
-		return false;
-	}
 }

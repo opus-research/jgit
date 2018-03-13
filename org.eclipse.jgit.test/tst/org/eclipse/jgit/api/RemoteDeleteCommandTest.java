@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,77 +40,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.errors.UnsupportedCredentialItem;
-import org.eclipse.jgit.transport.NetRC.NetRCEntry;
+import static org.junit.Assert.assertTrue;
 
-/**
- * Simple .netrc credentials provider. It can lookup the first machine entry
- * from your .netrc file.
- *
- * @since 3.5
- */
-public class NetRCCredentialsProvider extends CredentialsProvider {
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.junit.Test;
 
-	NetRC netrc = new NetRC();
+public class RemoteDeleteCommandTest extends AbstractRemoteCommandTest {
 
-	/** */
-	public NetRCCredentialsProvider() {
+	@Test
+	public void testDelete() throws Exception {
+		// setup an initial remote
+		RemoteConfig remoteConfig = setupRemote();
+
+		// execute the command to remove the remote
+		RemoteRemoveCommand cmd = Git.wrap(db).remoteRemove();
+		cmd.setName(REMOTE_NAME);
+		RemoteConfig remote = cmd.call();
+
+		// assert that the removed remote is the initial remote
+		assertRemoteConfigEquals(remoteConfig, remote);
+		// assert that there are no remotes left
+		assertTrue(RemoteConfig.getAllRemoteConfigs(db.getConfig()).isEmpty());
 	}
 
-	/**
-	 * Install default provider for the .netrc parser.
-	 */
-	public static void install() {
-		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
-	}
-
-	@Override
-	public boolean supports(CredentialItem... items) {
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username)
-				continue;
-			else if (i instanceof CredentialItem.Password)
-				continue;
-			else
-				return false;
-		}
-		return true;
-	}
-
-	@Override
-	public boolean get(URIish uri, CredentialItem... items)
-			throws UnsupportedCredentialItem {
-		NetRCEntry cc = netrc.getEntry(uri.getHost());
-
-		if (cc == null)
-			return false;
-
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username) {
-				((CredentialItem.Username) i).setValue(cc.login);
-				continue;
-			}
-			if (i instanceof CredentialItem.Password) {
-				((CredentialItem.Password) i).setValue(cc.password);
-				continue;
-			}
-			if (i instanceof CredentialItem.StringType) {
-				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
-					((CredentialItem.StringType) i).setValue(new String(
-							cc.password));
-					continue;
-				}
-			}
-			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
-					+ ":" + i.getPromptText()); //$NON-NLS-1$
-		}
-		return !isAnyNull(items);
-	}
-
-	@Override
-	public boolean isInteractive() {
-		return false;
-	}
 }
