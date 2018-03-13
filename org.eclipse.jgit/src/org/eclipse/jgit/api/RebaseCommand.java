@@ -281,9 +281,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					return RebaseResult.INTERACTIVE_PREPARED_RESULT;
 				if (res != null) {
 					autoStashApply();
-					if (rebaseState.getDir().exists())
-						FileUtils.delete(rebaseState.getDir(),
-								FileUtils.RECURSIVE);
 					return res;
 				}
 			}

@@ -44,7 +44,6 @@ package org.eclipse.jgit.archive;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -53,7 +52,6 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.archive.internal.ArchiveText;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
@@ -61,8 +59,8 @@ import org.eclipse.jgit.lib.ObjectLoader;
  * PKWARE's ZIP format.
  */
 public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".zip")); //$NON-NLS-1$
+	private static final List<String> SUFFIXES =
+			Collections.unmodifiableList(Arrays.asList(".zip"));
 
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		return new ZipArchiveOutputStream(s);
@@ -71,20 +69,7 @@ public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		// ZipArchiveEntry detects directories by checking
-		// for '/' at the end of the filename.
-		if (path.endsWith("/") && mode != FileMode.TREE)
-			throw new IllegalArgumentException(MessageFormat.format(
-					ArchiveText.get().pathDoesNotMatchMode, path, mode));
-		if (!path.endsWith("/") && mode == FileMode.TREE)
-			path = path + "/";
-
 		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
-		if (mode == FileMode.TREE) {
-			out.putArchiveEntry(entry);
-			out.closeArchiveEntry();
-			return;
-		}
 
 		if (mode == FileMode.REGULAR_FILE) {
 			// ok
@@ -92,9 +77,8 @@ public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 				|| mode == FileMode.SYMLINK) {
 			entry.setUnixMode(mode.getBits());
 		} else {
-			// Unsupported mode (e.g., GITLINK).
-			throw new IllegalArgumentException(MessageFormat.format(
-					ArchiveText.get().unsupportedMode, mode));
+			// TODO(jrn): Let the caller know the tree contained
+			// an entry with unsupported mode (e.g., a submodule).
 		}
 		entry.setSize(loader.getSize());
 		out.putArchiveEntry(entry);
