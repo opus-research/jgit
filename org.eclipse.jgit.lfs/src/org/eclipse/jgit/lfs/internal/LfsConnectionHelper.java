@@ -1,3 +1,45 @@
+/*
+ * Copyright (C) 2017, Markus Duft <markus.duft@ssi-schaefer.com>
+ * and other copyright owners as documented in the project's IP log.
+ *
+ * This program and the accompanying materials are made available
+ * under the terms of the Eclipse Distribution License v1.0 which
+ * accompanies this distribution, is reproduced below, and is
+ * available at http://www.eclipse.org/org/documents/edl-v10.php
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * - Redistributions of source code must retain the above copyright
+ *   notice, this list of conditions and the following disclaimer.
+ *
+ * - Redistributions in binary form must reproduce the above
+ *   copyright notice, this list of conditions and the following
+ *   disclaimer in the documentation and/or other materials provided
+ *   with the distribution.
+ *
+ * - Neither the name of the Eclipse Foundation, Inc. nor the
+ *   names of its contributors may be used to endorse or promote
+ *   products derived from this software without specific prior
+ *   written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+ * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 package org.eclipse.jgit.lfs.internal;
 
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
@@ -37,7 +79,9 @@ public class LfsConnectionHelper {
 	/**
 	 * Determine URL of LFS server by looking into config parameters lfs.url,
 	 * lfs.<remote>.url or remote.<remote>.url. The LFS server URL is computed
-	 * from remote.<remote>.url by appending "/info/lfs"
+	 * from remote.<remote>.url by appending "/info/lfs". In case there is no
+	 * URL configured, a SSH remote URI can be used to auto-detect the LFS URI
+	 * by using the remote "git-lfs-authenticate" command.
 	 *
 	 * @param db
 	 *            the repository to work with
@@ -61,7 +105,8 @@ public class LfsConnectionHelper {
 			for (String remote : db.getRemoteNames()) {
 				lfsEndpoint = config.getString("lfs", remote, "url"); //$NON-NLS-1$ //$NON-NLS-2$
 				// TODO: only works for origin?
-				if (lfsEndpoint == null && (remote.equals("origin"))) { //$NON-NLS-1$
+				if (lfsEndpoint == null
+						&& (remote.equals(Constants.DEFAULT_REMOTE_NAME))) {
 					remoteUrl = config.getString("remote", remote, "url"); //$NON-NLS-1$ //$NON-NLS-2$
 				}
 				break;
@@ -117,7 +162,7 @@ public class LfsConnectionHelper {
 
 	private static String extractProjectName(URIish u) {
 		String path = u.getPath().substring(1);
-		if (path.endsWith(".git")) {
+		if (path.endsWith(".git")) { //$NON-NLS-1$
 			return path.substring(0, path.length() - 4);
 		} else {
 			return path;

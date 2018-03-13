@@ -8,6 +8,7 @@ import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lfs.internal.LfsText;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
@@ -19,9 +20,20 @@ import org.eclipse.jgit.util.SystemReader;
  */
 public class InstallLfsCommand implements Callable<Void>{
 
+	private static final String[] ARGS_USER = new String[] { "lfs", "install" }; //$NON-NLS-1$//$NON-NLS-2$
+
+	private static final String[] ARGS_LOCAL = new String[] { "lfs", "install", //$NON-NLS-1$//$NON-NLS-2$
+			"--local" }; //$NON-NLS-1$
+
+	private Repository repository;
+
 	@Override
 	public Void call() throws Exception {
-		StoredConfig cfg = loadUserConfig();
+		StoredConfig cfg = null;
+		if (repository == null)
+			cfg = loadUserConfig();
+		else
+			cfg = repository.getConfig();
 
 		cfg.setBoolean(ConfigConstants.CONFIG_FILTER_SECTION, Constants.LFS,
 				ConfigConstants.CONFIG_KEY_USEJGITBUILTIN, true);
@@ -32,11 +44,24 @@ public class InstallLfsCommand implements Callable<Void>{
 
 		// try to run git lfs install, we really don't care if it is present
 		// and/or works here (yet).
-		FS.DETECTED.runProcess(FS.DETECTED.runInShell("git", //$NON-NLS-1$
-				new String[] { "lfs", "install" }), //$NON-NLS-1$ //$NON-NLS-2$
-				null, null, (String) null);
+		ProcessBuilder builder = FS.DETECTED.runInShell("git", //$NON-NLS-1$
+				repository == null ? ARGS_USER : ARGS_LOCAL);
+		if (repository != null) {
+			builder.directory(repository.isBare() ? repository.getDirectory()
+					: repository.getWorkTree());
+		}
+		FS.DETECTED.runProcess(builder, null, null, (String) null);
 
 		return null;
+	}
+
+	/**
+	 * @param repo
+	 *            the repository to install LFS into locally instead of the user
+	 *            configuration
+	 */
+	public void setRepository(Repository repo) {
+		this.repository = repo;
 	}
 
 	private StoredConfig loadUserConfig() throws IOException {
