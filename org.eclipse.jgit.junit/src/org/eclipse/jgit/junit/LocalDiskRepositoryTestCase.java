@@ -114,17 +114,23 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	protected void setUp() throws Exception {
 		super.setUp();
 
-		if (shutdownHook == null) {
-			shutdownHook = new Thread() {
-				@Override
-				public void run() {
-					System.gc();
-					recursiveDelete("SHUTDOWN", trash, false, false);
-				}
-			};
-			Runtime.getRuntime().addShutdownHook(shutdownHook);
+		synchronized(this) {
+			if (shutdownHook == null) {
+				shutdownHook = new Thread() {
+					@Override
+					public void run() {
+						// On windows accidentally open files or memory
+						// mapped regions may prevent files from being deleted.
+						// Suggesting a GC increases the likelihood that our
+						// test repositories actually get removed after the
+						// tests, even in the case of failure.
+						System.gc();
+						recursiveDelete("SHUTDOWN", trash, false, false);
+					}
+				};
+				Runtime.getRuntime().addShutdownHook(shutdownHook);
+			}
 		}
-
 		recursiveDelete(testName(), trash, true, false);
 
 		mockSystemReader = new MockSystemReader();
