@@ -60,7 +60,6 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -70,7 +69,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
  * Walks a working directory tree as part of a {@link TreeWalk}.
@@ -117,23 +115,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 **/
-	private final boolean canonicalizeEolsForIdCalculation;
-
-	/**
-	 * Create a new iterator with no parent.
-	 *
-	 * @param canonicalizeEolsForIdCalculation
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
-	 */
-	protected WorkingTreeIterator(boolean canonicalizeEolsForIdCalculation) {
+	/** Create a new iterator with no parent. */
+	protected WorkingTreeIterator() {
 		super();
 		nameEncoder = Constants.CHARSET.newEncoder();
-		this.canonicalizeEolsForIdCalculation = canonicalizeEolsForIdCalculation;
 	}
 
 	/**
@@ -150,15 +135,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            may be null or the empty string to indicate the prefix is the
 	 *            root of the repository. A trailing slash ('/') is
 	 *            automatically appended if the prefix does not end in '/'.
-	 * @param canonicalizeEolsForIdCalculation
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
 	 */
-	protected WorkingTreeIterator(final String prefix,
-			boolean canonicalizeEolsForIdCalculation) {
+	protected WorkingTreeIterator(final String prefix) {
 		super(prefix);
 		nameEncoder = Constants.CHARSET.newEncoder();
-		this.canonicalizeEolsForIdCalculation = canonicalizeEolsForIdCalculation;
 	}
 
 	/**
@@ -170,7 +150,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		nameEncoder = p.nameEncoder;
-		canonicalizeEolsForIdCalculation = p.canonicalizeEolsForIdCalculation;
 	}
 
 	/**
@@ -212,7 +191,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return zeroid;
 	}
 
-	private void initializeDigestAndReadBuffer() {
+	private void initializeDigest() {
 		if (contentDigest != null)
 			return;
 
@@ -221,7 +200,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			contentDigest = Constants.newMessageDigest();
 		} else {
 			final WorkingTreeIterator p = (WorkingTreeIterator) parent;
-			p.initializeDigestAndReadBuffer();
+			p.initializeDigest();
 			contentReadBuffer = p.contentReadBuffer;
 			contentDigest = p.contentDigest;
 		}
@@ -235,43 +214,17 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private byte[] idBufferBlob(final Entry e) {
 		try {
-			final InputStream raw = e.openInputStream();
-			if (raw == null)
+			final InputStream is = e.openInputStream();
+			if (is == null)
 				return zeroid;
 			try {
-				initializeDigestAndReadBuffer();
+				initializeDigest();
 
 				contentDigest.reset();
 				contentDigest.update(hblob);
 				contentDigest.update((byte) ' ');
 
-				final boolean canonicalizeEols;
-				if (canonicalizeEolsForIdCalculation) {
-					final InputStream is = e.openInputStream();
-					try {
-						canonicalizeEols = !RawText.isBinary(is);
-					} finally {
-						is.close();
-					}
-				}
-				else {
-					canonicalizeEols = false;
-				}
-
-				final long blobLength;
-				if (!canonicalizeEols) {
-					blobLength = e.getLength();
-				}
-				else {
-					final InputStream is = e.openInputStream();
-					try {
-						blobLength = determineCanonicalizedLength(is);
-					}
-					finally {
-						is.close();
-					}
-				}
-
+				final long blobLength = e.getLength();
 				long sz = blobLength;
 				if (sz == 0) {
 					contentDigest.update((byte) '0');
@@ -286,7 +239,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				}
 				contentDigest.update((byte) 0);
 
-				final InputStream is = canonicalizeEols ? new EolCanonicalizingInputStream(raw) : raw;
 				for (;;) {
 					final int r = is.read(contentReadBuffer);
 					if (r <= 0)
@@ -299,7 +251,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				return contentDigest.digest();
 			} finally {
 				try {
-					raw.close();
+					is.close();
 				} catch (IOException err2) {
 					// Suppress any error related to closing an input
 					// stream. We don't care, we should not have any
@@ -311,16 +263,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			//
 			return zeroid;
 		}
-	}
-
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 *
-	 * @return true if EOLs should be canonicalized.
-	 */
-	public boolean isCanonicalizeEolsForIdCalculation() {
-		return canonicalizeEolsForIdCalculation;
 	}
 
 	@Override
@@ -613,17 +555,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Content differs: that's a real change!
 			return true;
 		}
-	}
-
-	private long determineCanonicalizedLength(InputStream raw) throws IOException {
-		long length = 0;
-
-		final EolCanonicalizingInputStream is = new EolCanonicalizingInputStream(raw);
-		for (int read = 0; read != -1; read = is.read(contentReadBuffer)) {
-			length += read;
-		}
-
-		return length;
 	}
 
 	/** A single entry within a working directory tree. */

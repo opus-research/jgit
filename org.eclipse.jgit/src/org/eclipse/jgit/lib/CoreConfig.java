@@ -67,13 +67,10 @@ public class CoreConfig {
 
 	private final boolean logAllRefUpdates;
 
-	private final boolean autocrlf;
-
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
 		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		autocrlf = rc.getBoolean("core", "autocrlf", false);
 	}
 
 	/**
@@ -97,12 +94,5 @@ public class CoreConfig {
 	 */
 	public boolean isLogAllRefUpdates() {
 		return logAllRefUpdates;
-	}
-
-	/**
-	 * @return whether automatic CRLF conversion has been configured
-	 */
-	public boolean isAutocrlf() {
-		return autocrlf;
 	}
 }

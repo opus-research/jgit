@@ -83,7 +83,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the repository whose working tree will be scanned.
 	 */
 	public FileTreeIterator(Repository repo) {
-		this(repo.getWorkDir(), repo.getFS(), repo.getConfig().getCore().isAutocrlf());
+		this(repo.getWorkDir(), repo.getFS());
 		initRootIterator(repo);
 	}
 
@@ -96,12 +96,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to
 	 *            perform certain file system operations.
-	 * @param canonicalizeEolsForIdCalculation
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
 	 */
-	public FileTreeIterator(final File root, FS fs, boolean canonicalizeEolsForIdCalculation) {
-		super(canonicalizeEolsForIdCalculation);
+	public FileTreeIterator(final File root, FS fs) {
 		directory = root;
 		this.fs = fs;
 		init(entries());
