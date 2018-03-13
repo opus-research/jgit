@@ -50,9 +50,9 @@ import static org.eclipse.jgit.transport.PushCertificateParser.VERSION;
 
 import java.text.MessageFormat;
 import java.util.List;
-import java.util.Objects;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.PersonIdent;
 
 /**
  * The required information to verify the push.
@@ -81,16 +81,17 @@ public class PushCertificate {
 	}
 
 	private final String version;
-	private final PushCertificateIdent pusher;
+	private final PersonIdent pusher;
 	private final String pushee;
 	private final String nonce;
 	private final NonceStatus nonceStatus;
 	private final List<ReceiveCommand> commands;
+	private final String rawCommands;
 	private final String signature;
 
-	PushCertificate(String version, PushCertificateIdent pusher, String pushee,
+	PushCertificate(String version, PersonIdent pusher, String pushee,
 			String nonce, NonceStatus nonceStatus, List<ReceiveCommand> commands,
-			String signature) {
+			String rawCommands, String signature) {
 		if (version == null || version.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, VERSION));
@@ -98,6 +99,10 @@ public class PushCertificate {
 		if (pusher == null) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, PUSHER));
+		}
+		if (pushee == null || pushee.isEmpty()) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().pushCertificateInvalidField, PUSHEE));
 		}
 		if (nonce == null || nonce.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
@@ -108,7 +113,8 @@ public class PushCertificate {
 					JGitText.get().pushCertificateInvalidField,
 					"nonce status")); //$NON-NLS-1$
 		}
-		if (commands == null || commands.isEmpty()) {
+		if (commands == null || commands.isEmpty()
+				|| rawCommands == null || rawCommands.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField,
 					"command")); //$NON-NLS-1$
@@ -118,7 +124,7 @@ public class PushCertificate {
 					JGitText.get().pushCertificateInvalidSignature);
 		}
 		if (!signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE)
-				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE + '\n')) {
+				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE)) {
 			throw new IllegalArgumentException(
 					JGitText.get().pushCertificateInvalidSignature);
 		}
@@ -128,6 +134,7 @@ public class PushCertificate {
 		this.nonce = nonce;
 		this.nonceStatus = nonceStatus;
 		this.commands = commands;
+		this.rawCommands = rawCommands;
 		this.signature = signature;
 	}
 
@@ -140,18 +147,18 @@ public class PushCertificate {
 	}
 
 	/**
-	 * @return the raw line that signed the cert, as a string.
+	 * @return the identity of the pusher who signed the cert, as a string.
 	 * @since 4.0
 	 */
 	public String getPusher() {
-		return pusher.getRaw();
+		return pusher.toExternalString();
 	}
 
 	/**
 	 * @return identity of the pusher who signed the cert.
 	 * @since 4.1
 	 */
-	public PushCertificateIdent getPusherIdent() {
+	public PersonIdent getPusherIdent() {
 		return pusher;
 	}
 
@@ -165,7 +172,7 @@ public class PushCertificate {
 
 	/**
 	 * @return the raw nonce value that was presented by the pusher.
-	 * @since 4.1
+	 * @since 4.0
 	 */
 	public String getNonce() {
 		return nonce;
@@ -198,79 +205,16 @@ public class PushCertificate {
 		return signature;
 	}
 
-	/**
-	 * @return text payload of the certificate for the signature verifier.
-	 * @since 4.1
-	 */
+	/** @return text payload of the certificate for the signature verifier. */
 	public String toText() {
-		return toStringBuilder().toString();
-	}
-
-	/**
-	 * @return original text payload plus signature; the final output will be
-	 *     valid as input to {@link PushCertificateParser#fromString(String)}.
-	 * @since 4.1
-	 */
-	public String toTextWithSignature() {
-		return toStringBuilder().append(signature).toString();
-	}
-
-	private StringBuilder toStringBuilder() {
-		StringBuilder sb = new StringBuilder()
+		return new StringBuilder()
 				.append(VERSION).append(' ').append(version).append('\n')
-				.append(PUSHER).append(' ').append(getPusher())
-				.append('\n');
-		if (pushee != null) {
-			sb.append(PUSHEE).append(' ').append(pushee).append('\n');
-		}
-		sb.append(NONCE).append(' ').append(nonce).append('\n')
-				.append('\n');
-		for (ReceiveCommand cmd : commands) {
-			sb.append(cmd.getOldId().name())
-				.append(' ').append(cmd.getNewId().name())
-				.append(' ').append(cmd.getRefName()).append('\n');
-		}
-		return sb;
-	}
-
-	@Override
-	public int hashCode() {
-		return signature.hashCode();
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (!(o instanceof PushCertificate)) {
-			return false;
-		}
-		PushCertificate p = (PushCertificate) o;
-		return version.equals(p.version)
-				&& pusher.equals(p.pusher)
-				&& Objects.equals(pushee, p.pushee)
-				&& nonceStatus == p.nonceStatus
-				&& signature.equals(p.signature)
-				&& commandsEqual(this, p);
-	}
-
-	private static boolean commandsEqual(PushCertificate c1, PushCertificate c2) {
-		if (c1.commands.size() != c2.commands.size()) {
-			return false;
-		}
-		for (int i = 0; i < c1.commands.size(); i++) {
-			ReceiveCommand cmd1 = c1.commands.get(i);
-			ReceiveCommand cmd2 = c2.commands.get(i);
-			if (!cmd1.getOldId().equals(cmd2.getOldId())
-					|| !cmd1.getNewId().equals(cmd2.getNewId())
-					|| !cmd1.getRefName().equals(cmd2.getRefName())) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + '['
-				 + toTextWithSignature() + ']';
+				.append(PUSHER).append(' ').append(pusher.toExternalString())
+				.append('\n')
+				.append(PUSHEE).append(' ').append(pushee).append('\n')
+				.append(NONCE).append(' ').append(nonce).append('\n')
+				.append('\n')
+				.append(rawCommands)
+				.toString();
 	}
 }

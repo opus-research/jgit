@@ -178,9 +178,6 @@ public class PackStatistics {
 		/** The collection of reused packs in the upload. */
 		public List<CachedPack> reusedPacks;
 
-		/** Commits with no parents. */
-		public Set<ObjectId> rootCommits;
-
 		/** If a shallow pack, the depth in commits. */
 		public int depth;
 
@@ -300,11 +297,6 @@ public class PackStatistics {
 	 */
 	public List<CachedPack> getReusedPacks() {
 		return statistics.reusedPacks;
-	}
-
-	/** @return unmodifiable collection of the root commits of the history. */
-	public Set<ObjectId> getRootCommits() {
-		return statistics.rootCommits;
 	}
 
 	/**

@@ -42,9 +42,6 @@
  */
 package org.eclipse.jgit.gitrepo;
 
-import static org.eclipse.jgit.lib.Constants.DEFAULT_REMOTE_NAME;
-import static org.eclipse.jgit.lib.Constants.R_REMOTES;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -108,8 +105,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private String uri;
 	private String groups;
 	private String branch;
-	private String targetBranch = Constants.HEAD;
-	private boolean recordRemoteBranch = false;
 	private PersonIdent author;
 	private RemoteReader callback;
 	private InputStream inputStream;
@@ -229,27 +224,27 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/**
 	 * @param repo
 	 */
-	public RepoCommand(Repository repo) {
+	public RepoCommand(final Repository repo) {
 		super(repo);
 	}
 
 	/**
 	 * Set path to the manifest XML file.
-	 * <p>
+	 *
 	 * Calling {@link #setInputStream} will ignore the path set here.
 	 *
 	 * @param path
 	 *            (with <code>/</code> as separator)
 	 * @return this command
 	 */
-	public RepoCommand setPath(String path) {
+	public RepoCommand setPath(final String path) {
 		this.path = path;
 		return this;
 	}
 
 	/**
 	 * Set the input stream to the manifest XML.
-	 * <p>
+	 *
 	 * Setting inputStream will ignore the path set. It will be closed in
 	 * {@link #call}.
 	 *
@@ -257,7 +252,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @return this command
 	 * @since 3.5
 	 */
-	public RepoCommand setInputStream(InputStream inputStream) {
+	public RepoCommand setInputStream(final InputStream inputStream) {
 		this.inputStream = inputStream;
 		return this;
 	}
@@ -268,7 +263,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @param uri
 	 * @return this command
 	 */
-	public RepoCommand setURI(String uri) {
+	public RepoCommand setURI(final String uri) {
 		this.uri = uri;
 		return this;
 	}
@@ -279,14 +274,14 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @param groups groups separated by comma, examples: default|all|G1,-G2,-G3
 	 * @return this command
 	 */
-	public RepoCommand setGroups(String groups) {
+	public RepoCommand setGroups(final String groups) {
 		this.groups = groups;
 		return this;
 	}
 
 	/**
 	 * Set default branch.
-	 * <p>
+	 *
 	 * This is generally the name of the branch the manifest file was in. If
 	 * there's no default revision (branch) specified in manifest and no
 	 * revision specified in project, this branch will be used.
@@ -294,50 +289,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @param branch
 	 * @return this command
 	 */
-	public RepoCommand setBranch(String branch) {
+	public RepoCommand setBranch(final String branch) {
 		this.branch = branch;
-		return this;
-	}
-
-	/**
-	 * Set target branch.
-	 * <p>
-	 * This is the target branch of the super project to be updated. If not set,
-	 * default is HEAD.
-	 * <p>
-	 * For non-bare repositories, HEAD will always be used and this will be
-	 * ignored.
-	 *
-	 * @param branch
-	 * @return this command
-	 * @since 4.1
-	 */
-	public RepoCommand setTargetBranch(String branch) {
-		this.targetBranch = Constants.R_HEADS + branch;
-		return this;
-	}
-
-	/**
-	 * Set whether the branch name should be recorded in .gitmodules
-	 * <p>
-	 * Submodule entries in .gitmodules can include a "branch" field
-	 * to indicate what remote branch each submodule tracks.
-	 * <p>
-	 * That field is used by "git submodule update --remote" to update
-	 * to the tip of the tracked branch when asked and by Gerrit to
-	 * update the superproject when a change on that branch is merged.
-	 * <p>
-	 * Subprojects that request a specific commit or tag will not have
-	 * a branch name recorded.
-	 * <p>
-	 * Not implemented for non-bare repositories.
-	 *
-	 * @param enable Whether to record the branch name
-	 * @return this command
-	 * @since 4.2
-	 */
-	public RepoCommand setRecordRemoteBranch(boolean enable) {
-		this.recordRemoteBranch = enable;
 		return this;
 	}
 
@@ -356,7 +309,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Set the author/committer for the bare repository commit.
-	 * <p>
+	 *
 	 * For non-bare repositories, the current user will be used and this will be
 	 * ignored.
 	 *
@@ -457,14 +410,10 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					// create gitlink
 					DirCacheEntry dcEntry = new DirCacheEntry(name);
 					ObjectId objectId;
-					if (ObjectId.isId(proj.getRevision())) {
+					if (ObjectId.isId(proj.getRevision()))
 						objectId = ObjectId.fromString(proj.getRevision());
-					} else {
+					else {
 						objectId = callback.sha1(nameUri, proj.getRevision());
-						if (recordRemoteBranch)
-							// can be branch or tag
-							cfg.setString("submodule", name, "branch", //$NON-NLS-1$ //$NON-NLS-2$
-									proj.getRevision());
 					}
 					if (objectId == null)
 						throw new RemoteUnavailableException(nameUri);
@@ -496,7 +445,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				ObjectId treeId = index.writeTree(inserter);
 
 				// Create a Commit object, populate it and write it
-				ObjectId headId = repo.resolve(targetBranch + "^{commit}"); //$NON-NLS-1$
+				ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
 				CommitBuilder commit = new CommitBuilder();
 				commit.setTreeId(treeId);
 				if (headId != null)
@@ -508,7 +457,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				ObjectId commitId = inserter.insert(commit);
 				inserter.flush();
 
-				RefUpdate ru = repo.updateRef(targetBranch);
+				RefUpdate ru = repo.updateRef(Constants.HEAD);
 				ru.setNewObjectId(commitId);
 				ru.setExpectedOldObjectId(headId != null ? headId : ObjectId.zeroId());
 				Result rc = ru.update(rw);
@@ -522,14 +471,12 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					case REJECTED:
 					case LOCK_FAILURE:
 						throw new ConcurrentRefUpdateException(
-								MessageFormat.format(
-										JGitText.get().cannotLock, targetBranch),
-								ru.getRef(),
+								JGitText.get().couldNotLockHEAD, ru.getRef(),
 								rc);
 					default:
 						throw new JGitInternalException(MessageFormat.format(
 								JGitText.get().updatingRefFailed,
-								targetBranch, commitId.name(), rc));
+								Constants.HEAD, commitId.name(), rc));
 				}
 
 				return rw.parseCommit(commitId);
@@ -577,7 +524,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private static String findRef(String ref, Repository repo)
 			throws IOException {
 		if (!ObjectId.isId(ref)) {
-			Ref r = repo.exactRef(R_REMOTES + DEFAULT_REMOTE_NAME + "/" + ref); //$NON-NLS-1$
+			Ref r = repo.getRef(Constants.DEFAULT_REMOTE_NAME + "/" + ref); //$NON-NLS-1$
 			if (r != null)
 				return r.getName();
 		}

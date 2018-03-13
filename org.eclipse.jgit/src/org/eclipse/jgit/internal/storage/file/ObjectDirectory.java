@@ -114,6 +114,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
 	private static final int RESOLVE_ABBREV_LIMIT = 256;
 
+	private static final String STALE_FILE_HANDLE_MSG = "stale file handle"; //$NON-NLS-1$
+
 	private final Config config;
 
 	private final File objects;
@@ -433,14 +435,16 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
 			throws IOException {
-		File path = fileFor(id);
-		try (FileInputStream in = new FileInputStream(path)) {
-			unpackedObjectCache.add(id);
-			return UnpackedObject.open(in, path, id, curs);
-		} catch (FileNotFoundException noFile) {
-			if (path.exists()) {
-				throw noFile;
+		try {
+			File path = fileFor(id);
+			FileInputStream in = new FileInputStream(path);
+			try {
+				unpackedObjectCache.add(id);
+				return UnpackedObject.open(in, path, id, curs);
+			} finally {
+				in.close();
 			}
+		} catch (FileNotFoundException noFile) {
 			unpackedObjectCache.remove(id);
 			return null;
 		}
@@ -511,14 +515,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private long getLooseObjectSize(WindowCursor curs, AnyObjectId id)
 			throws IOException {
-		File f = fileFor(id);
-		try (FileInputStream in = new FileInputStream(f)) {
-			unpackedObjectCache.add(id);
-			return UnpackedObject.getSize(in, id, curs);
-		} catch (FileNotFoundException noFile) {
-			if (f.exists()) {
-				throw noFile;
+		try {
+			FileInputStream in = new FileInputStream(fileFor(id));
+			try {
+				unpackedObjectCache.add(id);
+				return UnpackedObject.getSize(in, id, curs);
+			} finally {
+				in.close();
 			}
+		} catch (FileNotFoundException noFile) {
 			unpackedObjectCache.remove(id);
 			return -1;
 		}
@@ -558,13 +563,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 			// Assume the pack is corrupted, and remove it from the list.
 			removePack(p);
 		} else if (e instanceof FileNotFoundException) {
-			if (p.getPackFile().exists()) {
-				warnTmpl = JGitText.get().packInaccessible;
-			} else {
-				warnTmpl = JGitText.get().packWasDeleted;
-			}
+			warnTmpl = JGitText.get().packWasDeleted;
 			removePack(p);
-		} else if (FileUtils.isStaleFileHandle(e)) {
+		} else if (e.getMessage() != null
+				&& e.getMessage().toLowerCase().contains(STALE_FILE_HANDLE_MSG)) {
 			warnTmpl = JGitText.get().packHandleIsStale;
 			removePack(p);
 		}
@@ -600,7 +602,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 
 		final File dst = fileFor(id);
-		if (dst.exists()) {
+		if (fs.exists(dst)) {
 			// We want to be extra careful and avoid replacing an object
 			// that already exists. We can't be sure renameTo() would
 			// fail on all platforms if dst exists, so we check first.
