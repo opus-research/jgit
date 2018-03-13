@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,51 +41,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit.http;
+package org.eclipse.jgit.junit;
 
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import static org.junit.Assert.assertEquals;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
-public class MockServletConfig implements ServletConfig {
-	private final Map<String, String> parameters = new HashMap<>();
+public final class StrictWorkMonitor implements ProgressMonitor {
+	private int lastWork, totalWork;
 
-	public void setInitParameter(String name, String value) {
-		parameters.put(name, value);
+	@Override
+	public void start(int totalTasks) {
+		// empty
 	}
 
 	@Override
-	public String getInitParameter(String name) {
-		return parameters.get(name);
+	public void beginTask(String title, int total) {
+		this.totalWork = total;
+		lastWork = 0;
 	}
 
 	@Override
-	public Enumeration<String> getInitParameterNames() {
-		final Iterator<String> i = parameters.keySet().iterator();
-		return new Enumeration<String>() {
-			@Override
-			public boolean hasMoreElements() {
-				return i.hasNext();
-			}
-
-			@Override
-			public String nextElement() {
-				return i.next();
-			}
-		};
+	public void update(int completed) {
+		lastWork += completed;
 	}
 
 	@Override
-	public String getServletName() {
-		return "MOCK_SERVLET";
+	public void endTask() {
+		assertEquals("Units of work recorded", totalWork, lastWork);
 	}
 
 	@Override
-	public ServletContext getServletContext() {
-		return null;
+	public boolean isCancelled() {
+		return false;
 	}
 }
