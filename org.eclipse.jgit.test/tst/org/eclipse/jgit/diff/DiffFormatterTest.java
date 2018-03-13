@@ -288,8 +288,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		assertEquals(expected.toString(), actual);
 	}
 
-	private static String makeDiffHeader(String pathA, String pathB,
-			ObjectId aId,
+	private String makeDiffHeader(String pathA, String pathB, ObjectId aId,
 			ObjectId bId) {
 		String a = aId.abbreviate(8).name();
 		String b = bId.abbreviate(8).name();
@@ -299,7 +298,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 				"+++ b/" + pathB + "\n";
 	}
 
-	private static String makeDiffHeaderModeChange(String pathA, String pathB,
+	private String makeDiffHeaderModeChange(String pathA, String pathB,
 			ObjectId aId, ObjectId bId, String modeA, String modeB) {
 		String a = aId.abbreviate(8).name();
 		String b = bId.abbreviate(8).name();
