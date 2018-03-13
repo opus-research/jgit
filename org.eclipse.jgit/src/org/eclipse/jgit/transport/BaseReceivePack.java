@@ -69,7 +69,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -846,23 +845,21 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Gets an unmodifiable view of the option strings associated with the push.
+	 * Gets the list of string options associated with this push.
 	 *
 	 * @return pushOptions
+	 * @throws RequestNotYetReadException
+	 *             if the client's request has not yet been read from the wire,
+	 *             so we do not know if they expect push options. Note that the
+	 *             client may have already written the request, it just has not
+	 *             been read.
 	 * @since 4.5
 	 */
-	@Nullable
-	public List<String> getPushOptions() {
-		if (allowPushOptions) {
-			if (enabledCapabilities == null) {
-				throw new RequestNotYetReadException();
-			}
-
-			return pushOptions == null ? null
-					: Collections.unmodifiableList(pushOptions);
-		} else {
-			throw new IllegalStateException();
+	public List<String> getPushOptions() throws RequestNotYetReadException {
+		if (enabledCapabilities == null) {
+			throw new RequestNotYetReadException();
 		}
+		return Collections.unmodifiableList(pushOptions);
 	}
 
 	/**
