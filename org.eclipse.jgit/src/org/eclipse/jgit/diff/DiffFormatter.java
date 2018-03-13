@@ -103,7 +103,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
  * Format a Git style patch script.
  */
 public class DiffFormatter {
-	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
+	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n");
 
 	/** Magic return content indicating it is empty or no content present. */
 	private static final byte[] EMPTY = new byte[] {};
@@ -117,8 +117,6 @@ public class DiffFormatter {
 
 	private ObjectReader reader;
 
-	private DiffConfig diffCfg;
-
 	private int context = 3;
 
 	private int abbreviationLength = 7;
@@ -129,9 +127,9 @@ public class DiffFormatter {
 
 	private int binaryFileThreshold = CoreConfig.getDefaultStreamFileThreshold();
 
-	private String oldPrefix = "a/"; //$NON-NLS-1$
+	private String oldPrefix = "a/";
 
-	private String newPrefix = "b/"; //$NON-NLS-1$
+	private String newPrefix = "b/";
 
 	private TreeFilter pathFilter = TreeFilter.ALL;
 
@@ -173,15 +171,14 @@ public class DiffFormatter {
 
 		db = repository;
 		reader = db.newObjectReader();
-		diffCfg = db.getConfig().get(DiffConfig.KEY);
 
 		ContentSource cs = ContentSource.create(reader);
 		source = new ContentSource.Pair(cs, cs);
 
 		DiffConfig dc = db.getConfig().get(DiffConfig.KEY);
 		if (dc.isNoPrefix()) {
-			setOldPrefix(""); //$NON-NLS-1$
-			setNewPrefix(""); //$NON-NLS-1$
+			setOldPrefix("");
+			setNewPrefix("");
 		}
 		setDetectRenames(dc.isRenameDetectionEnabled());
 
@@ -279,7 +276,6 @@ public class DiffFormatter {
 	 * Get the prefix applied in front of old file paths.
 	 *
 	 * @return the prefix
-	 * @since 2.0
 	 */
 	public String getOldPrefix() {
 		return this.oldPrefix;
@@ -302,7 +298,6 @@ public class DiffFormatter {
 	 * Get the prefix applied in front of new file paths.
 	 *
 	 * @return the prefix
-	 * @since 2.0
 	 */
 	public String getNewPrefix() {
 		return this.newPrefix;
@@ -535,7 +530,7 @@ public class DiffFormatter {
 		String oldPath = ((FollowFilter) pathFilter).getPath();
 		for (DiffEntry ent : files) {
 			if (isRename(ent) && ent.getNewPath().equals(oldPath)) {
-				pathFilter = FollowFilter.create(ent.getOldPath(), diffCfg);
+				pathFilter = FollowFilter.create(ent.getOldPath());
 				return Collections.singletonList(ent);
 			}
 		}
@@ -631,15 +626,15 @@ public class DiffFormatter {
 		format(res.header, res.a, res.b);
 	}
 
-	private static void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
+	private void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
 			throws IOException {
 		if (ent.getOldMode() == GITLINK) {
-			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name() //$NON-NLS-1$
-					+ "\n")); //$NON-NLS-1$
+			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name()
+					+ "\n"));
 		}
 		if (ent.getNewMode() == GITLINK) {
-			o.write(encodeASCII("+Subproject commit " + ent.getNewId().name() //$NON-NLS-1$
-					+ "\n")); //$NON-NLS-1$
+			o.write(encodeASCII("+Subproject commit " + ent.getNewId().name()
+					+ "\n"));
 		}
 	}
 
@@ -755,7 +750,7 @@ public class DiffFormatter {
 		writeLine(' ', text, line);
 	}
 
-	private static boolean isEndOfLineMissing(final RawText text, final int line) {
+	private boolean isEndOfLineMissing(final RawText text, final int line) {
 		return line + 1 == text.size() && text.isMissingNewlineAtEnd();
 	}
 
@@ -910,11 +905,6 @@ public class DiffFormatter {
 			editList = new EditList();
 			type = PatchType.UNIFIED;
 
-		} else if (ent.getOldId() == null || ent.getNewId() == null) {
-			// Content not changed (e.g. only mode, pure rename)
-			editList = new EditList();
-			type = PatchType.UNIFIED;
-
 		} else {
 			assertHaveRepository();
 
@@ -924,7 +914,7 @@ public class DiffFormatter {
 			if (aRaw == BINARY || bRaw == BINARY //
 					|| RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
 				formatOldNewPaths(buf, ent);
-				buf.write(encodeASCII("Binary files differ\n")); //$NON-NLS-1$
+				buf.write(encodeASCII("Binary files differ\n"));
 				editList = new EditList();
 				type = PatchType.BINARY;
 
@@ -969,6 +959,9 @@ public class DiffFormatter {
 		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
 
+		if (isBinary(entry.getPath(side)))
+			return BINARY;
+
 		AbbreviatedObjectId id = entry.getId(side);
 		if (!id.isComplete()) {
 			Collection<ObjectId> ids = reader.resolve(id);
@@ -1007,29 +1000,8 @@ public class DiffFormatter {
 		}
 	}
 
-	/**
-	 * Output the first header line
-	 *
-	 * @param o
-	 *            The stream the formatter will write the first header line to
-	 * @param type
-	 *            The {@link ChangeType}
-	 * @param oldPath
-	 *            old path to the file
-	 * @param newPath
-	 *            new path to the file
-	 * @throws IOException
-	 *             the stream threw an exception while writing to it.
-	 */
-	protected void formatGitDiffFirstHeaderLine(ByteArrayOutputStream o,
-			final ChangeType type, final String oldPath, final String newPath)
-			throws IOException {
-		o.write(encodeASCII("diff --git ")); //$NON-NLS-1$
-		o.write(encode(quotePath(oldPrefix + (type == ADD ? newPath : oldPath))));
-		o.write(' ');
-		o.write(encode(quotePath(newPrefix
-				+ (type == DELETE ? oldPath : newPath))));
-		o.write('\n');
+	private boolean isBinary(String path) {
+		return false;
 	}
 
 	private void formatHeader(ByteArrayOutputStream o, DiffEntry ent)
@@ -1040,64 +1012,73 @@ public class DiffFormatter {
 		final FileMode oldMode = ent.getOldMode();
 		final FileMode newMode = ent.getNewMode();
 
-		formatGitDiffFirstHeaderLine(o, type, oldp, newp);
-
-		if ((type == MODIFY || type == COPY || type == RENAME)
-				&& !oldMode.equals(newMode)) {
-			o.write(encodeASCII("old mode ")); //$NON-NLS-1$
-			oldMode.copyTo(o);
-			o.write('\n');
-
-			o.write(encodeASCII("new mode ")); //$NON-NLS-1$
-			newMode.copyTo(o);
-			o.write('\n');
-		}
+		o.write(encodeASCII("diff --git "));
+		o.write(encode(quotePath(oldPrefix + (type == ADD ? newp : oldp))));
+		o.write(' ');
+		o.write(encode(quotePath(newPrefix + (type == DELETE ? oldp : newp))));
+		o.write('\n');
 
 		switch (type) {
 		case ADD:
-			o.write(encodeASCII("new file mode ")); //$NON-NLS-1$
+			o.write(encodeASCII("new file mode "));
 			newMode.copyTo(o);
 			o.write('\n');
 			break;
 
 		case DELETE:
-			o.write(encodeASCII("deleted file mode ")); //$NON-NLS-1$
+			o.write(encodeASCII("deleted file mode "));
 			oldMode.copyTo(o);
 			o.write('\n');
 			break;
 
 		case RENAME:
-			o.write(encodeASCII("similarity index " + ent.getScore() + "%")); //$NON-NLS-1$ //$NON-NLS-2$
+			o.write(encodeASCII("similarity index " + ent.getScore() + "%"));
 			o.write('\n');
 
-			o.write(encode("rename from " + quotePath(oldp))); //$NON-NLS-1$
+			o.write(encode("rename from " + quotePath(oldp)));
 			o.write('\n');
 
-			o.write(encode("rename to " + quotePath(newp))); //$NON-NLS-1$
+			o.write(encode("rename to " + quotePath(newp)));
 			o.write('\n');
 			break;
 
 		case COPY:
-			o.write(encodeASCII("similarity index " + ent.getScore() + "%")); //$NON-NLS-1$ //$NON-NLS-2$
+			o.write(encodeASCII("similarity index " + ent.getScore() + "%"));
 			o.write('\n');
 
-			o.write(encode("copy from " + quotePath(oldp))); //$NON-NLS-1$
+			o.write(encode("copy from " + quotePath(oldp)));
 			o.write('\n');
 
-			o.write(encode("copy to " + quotePath(newp))); //$NON-NLS-1$
+			o.write(encode("copy to " + quotePath(newp)));
 			o.write('\n');
+
+			if (!oldMode.equals(newMode)) {
+				o.write(encodeASCII("new file mode "));
+				newMode.copyTo(o);
+				o.write('\n');
+			}
 			break;
 
 		case MODIFY:
 			if (0 < ent.getScore()) {
-				o.write(encodeASCII("dissimilarity index " //$NON-NLS-1$
-						+ (100 - ent.getScore()) + "%")); //$NON-NLS-1$
+				o.write(encodeASCII("dissimilarity index "
+						+ (100 - ent.getScore()) + "%"));
 				o.write('\n');
 			}
 			break;
 		}
 
-		if (ent.getOldId() != null && !ent.getOldId().equals(ent.getNewId())) {
+		if ((type == MODIFY || type == RENAME) && !oldMode.equals(newMode)) {
+			o.write(encodeASCII("old mode "));
+			oldMode.copyTo(o);
+			o.write('\n');
+
+			o.write(encodeASCII("new mode "));
+			newMode.copyTo(o);
+			o.write('\n');
+		}
+
+		if (!ent.getOldId().equals(ent.getNewId())) {
 			formatIndexLine(o, ent);
 		}
 	}
@@ -1112,9 +1093,9 @@ public class DiffFormatter {
 	 */
 	protected void formatIndexLine(OutputStream o, DiffEntry ent)
 			throws IOException {
-		o.write(encodeASCII("index " // //$NON-NLS-1$
+		o.write(encodeASCII("index " //
 				+ format(ent.getOldId()) //
-				+ ".." // //$NON-NLS-1$
+				+ ".." //
 				+ format(ent.getNewId())));
 		if (ent.getOldMode().equals(ent.getNewMode())) {
 			o.write(' ');
@@ -1148,8 +1129,8 @@ public class DiffFormatter {
 			break;
 		}
 
-		o.write(encode("--- " + oldp + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
-		o.write(encode("+++ " + newp + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
+		o.write(encode("--- " + oldp + "\n"));
+		o.write(encode("+++ " + newp + "\n"));
 	}
 
 	private int findCombinedEnd(final List<Edit> edits, final int i) {

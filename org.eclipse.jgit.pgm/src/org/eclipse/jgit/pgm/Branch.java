@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -62,7 +60,6 @@ import org.eclipse.jgit.lib.RefRename;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RefUpdate.Result;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
@@ -148,7 +145,7 @@ class Branch extends TextBuiltin {
 				else
 					startBranch = Constants.HEAD;
 				Ref startRef = db.getRef(startBranch);
-				ObjectId startAt = db.resolve(startBranch + "^0"); //$NON-NLS-1$
+				ObjectId startAt = db.resolve(startBranch + "^0");
 				if (startRef != null)
 					startBranch = startRef.getName();
 				else
@@ -177,13 +174,13 @@ class Branch extends TextBuiltin {
 	}
 
 	private void list() throws Exception {
-		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
+		Map<String, Ref> refs = db.getAllRefs();
 		Ref head = refs.get(Constants.HEAD);
 		// This can happen if HEAD is stillborn
 		if (head != null) {
 			String current = head.getLeaf().getName();
 			if (current.equals(Constants.HEAD))
-				addRef("(no branch)", head); //$NON-NLS-1$
+				addRef("(no branch)", head);
 			addRefs(refs, Constants.R_HEADS, !remote);
 			addRefs(refs, Constants.R_REMOTES, remote);
 
@@ -218,18 +215,18 @@ class Branch extends TextBuiltin {
 
 	private void printHead(final ObjectReader reader, final String ref,
 			final boolean isCurrent, final Ref refObj) throws Exception {
-		outw.print(isCurrent ? '*' : ' ');
-		outw.print(' ');
-		outw.print(ref);
+		out.print(isCurrent ? '*' : ' ');
+		out.print(' ');
+		out.print(ref);
 		if (verbose) {
 			final int spaces = maxNameLength - ref.length() + 1;
-			outw.format("%" + spaces + "s", ""); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			out.format("%" + spaces + "s", "");
 			final ObjectId objectId = refObj.getObjectId();
-			outw.print(reader.abbreviate(objectId).name());
-			outw.print(' ');
-			outw.print(rw.parseCommit(objectId).getShortMessage());
+			out.print(reader.abbreviate(objectId).name());
+			out.print(' ');
+			out.print(rw.parseCommit(objectId).getShortMessage());
 		}
-		outw.println();
+		out.println();
 	}
 
 	private void delete(boolean force) throws IOException {
@@ -250,9 +247,9 @@ class Branch extends TextBuiltin {
 			} else if (result == Result.NEW)
 				throw die(MessageFormat.format(CLIText.get().branchNotFound, branch));
 			if (remote)
-				outw.println(MessageFormat.format(CLIText.get().deletedRemoteBranch, branch));
+				out.println(MessageFormat.format(CLIText.get().deletedRemoteBranch, branch));
 			else if (verbose)
-				outw.println(MessageFormat.format(CLIText.get().deletedBranch, branch));
+				out.println(MessageFormat.format(CLIText.get().deletedBranch, branch));
 		}
 	}
 }

@@ -329,7 +329,7 @@ public class NoteMapMerger {
 			throw new NotesMergeConflictException(baseList, oursList,
 					theirsList);
 		ObjectId resultTreeId = m.getResultTreeId();
-		AbbreviatedObjectId none = AbbreviatedObjectId.fromString(""); //$NON-NLS-1$
+		AbbreviatedObjectId none = AbbreviatedObjectId.fromString("");
 		return NoteParser.parse(none, resultTreeId, reader).nonNotes;
 	}
 

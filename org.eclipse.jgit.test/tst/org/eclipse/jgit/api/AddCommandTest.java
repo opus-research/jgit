@@ -44,7 +44,9 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -52,17 +54,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -73,7 +75,7 @@ import org.junit.Test;
 public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
-	public void testAddNothing() throws GitAPIException {
+	public void testAddNothing() {
 		Git git = new Git(db);
 
 		try {
@@ -86,7 +88,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddNonExistingSingleFile() throws GitAPIException {
+	public void testAddNonExistingSingleFile() throws NoFilepatternException {
 		Git git = new Git(db);
 
 		DirCache dc = git.add().addFilepattern("a.txt").call();
@@ -95,7 +97,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleFile() throws IOException, GitAPIException {
+	public void testAddExistingSingleFile() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -112,8 +114,8 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleSmallFileWithNewLine() throws IOException,
-			GitAPIException {
+	public void testAddExistingSingleFileWithNewLine() throws IOException,
+			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -136,37 +138,8 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleMediumSizeFileWithNewLine()
-			throws IOException, GitAPIException {
-		File file = new File(db.getWorkTree(), "a.txt");
-		FileUtils.createNewFile(file);
-		StringBuilder data = new StringBuilder();
-		for (int i = 0; i < 1000; ++i) {
-			data.append("row1\r\nrow2");
-		}
-		String crData = data.toString();
-		PrintWriter writer = new PrintWriter(file);
-		writer.print(crData);
-		writer.close();
-		String lfData = data.toString().replaceAll("\r", "");
-		Git git = new Git(db);
-		db.getConfig().setString("core", null, "autocrlf", "false");
-		git.add().addFilepattern("a.txt").call();
-		assertEquals("[a.txt, mode:100644, content:" + data + "]",
-				indexState(CONTENT));
-		db.getConfig().setString("core", null, "autocrlf", "true");
-		git.add().addFilepattern("a.txt").call();
-		assertEquals("[a.txt, mode:100644, content:" + lfData + "]",
-				indexState(CONTENT));
-		db.getConfig().setString("core", null, "autocrlf", "input");
-		git.add().addFilepattern("a.txt").call();
-		assertEquals("[a.txt, mode:100644, content:" + lfData + "]",
-				indexState(CONTENT));
-	}
-
-	@Test
 	public void testAddExistingSingleBinaryFile() throws IOException,
-			GitAPIException {
+			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -189,8 +162,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleFileInSubDir() throws IOException,
-			GitAPIException {
+	public void testAddExistingSingleFileInSubDir() throws IOException, NoFilepatternException {
 		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
@@ -208,8 +180,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleFileTwice() throws IOException,
-			GitAPIException {
+	public void testAddExistingSingleFileTwice() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -631,11 +602,6 @@ public class AddCommandTest extends RepositoryTestCase {
 			public boolean canExecute(File f) {
 				return true;
 			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
 		};
 
 		Git git = Git.open(db.getDirectory(), executableFs);
@@ -676,11 +642,6 @@ public class AddCommandTest extends RepositoryTestCase {
 			public boolean canExecute(File f) {
 				return false;
 			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
 		};
 
 		config = db.getConfig();
@@ -697,7 +658,41 @@ public class AddCommandTest extends RepositoryTestCase {
 		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
 	}
 
-	private static DirCacheEntry addEntryToBuilder(String path, File file,
+	@Test
+	public void testSubmoduleDeleteNotStagedWithUpdate() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		assertNotNull(git.commit().setMessage("create file").call());
+
+		SubmoduleAddCommand command = new SubmoduleAddCommand(db);
+		String path = "sub";
+		command.setPath(path);
+		String uri = db.getDirectory().toURI().toString();
+		command.setURI(uri);
+		Repository repo = command.call();
+		assertNotNull(repo);
+		assertNotNull(git.commit().setMessage("add submodule").call());
+
+		assertTrue(git.status().call().isClean());
+
+		FileUtils.delete(repo.getWorkTree(), FileUtils.RECURSIVE);
+		FileUtils.mkdir(new File(db.getWorkTree(), path), false);
+
+		assertNotNull(git.add().addFilepattern(".").setUpdate(true).call());
+
+		Status status = git.status().call();
+		assertFalse(status.isClean());
+		assertTrue(status.getAdded().isEmpty());
+		assertTrue(status.getChanged().isEmpty());
+		assertTrue(status.getRemoved().isEmpty());
+		assertTrue(status.getUntracked().isEmpty());
+		assertTrue(status.getModified().isEmpty());
+		assertEquals(1, status.getMissing().size());
+		assertEquals(path, status.getMissing().iterator().next());
+	}
+
+	private DirCacheEntry addEntryToBuilder(String path, File file,
 			ObjectInserter newObjectInserter, DirCacheBuilder builder, int stage)
 			throws IOException {
 		FileInputStream inputStream = new FileInputStream(file);

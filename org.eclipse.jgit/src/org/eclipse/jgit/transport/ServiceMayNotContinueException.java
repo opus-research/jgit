@@ -45,13 +45,7 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.internal.JGitText;
-
-/**
- * Indicates a transport service may not continue execution.
- *
- * @since 2.0
- */
+/** Indicates a transport service may not continue execution. */
 public class ServiceMayNotContinueException extends IOException {
 	private static final long serialVersionUID = 1L;
 
@@ -69,30 +63,6 @@ public class ServiceMayNotContinueException extends IOException {
 	 */
 	public ServiceMayNotContinueException(String msg) {
 		super(msg);
-	}
-
-	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
-	 * @param cause
-	 *            the cause of the exception.
-	 * @since 3.2
-	 */
-	public ServiceMayNotContinueException(String msg, Throwable cause) {
-		super(msg);
-		initCause(cause);
-	}
-
-	/**
-	 * Initialize with an "internal server error" message and a cause.
-	 *
-	 * @param cause
-	 *            the cause of the exception.
-	 * @since 3.2
-	 */
-	public ServiceMayNotContinueException(Throwable cause) {
-		this(JGitText.get().internalServerError, cause);
 	}
 
 	/** @return true if the message was already output to the client. */

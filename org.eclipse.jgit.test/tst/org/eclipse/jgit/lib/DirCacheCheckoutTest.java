@@ -71,7 +71,6 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -262,10 +261,11 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		merge = buildTree(mkmap("foo", "a"));
 		tw = TreeWalk.forPath(db, "foo", merge);
+		ObjectId anotherId = tw.getObjectId(0);
 
 		prescanTwoTrees(head, merge);
 
-		assertConflict("foo");
+		assertEquals(anotherId, getUpdated().get("foo"));
 	}
 
 	void setupCase(HashMap<String, String> headEntries, HashMap<String, String> mergeEntries, HashMap<String, String> indexEntries) throws IOException {
@@ -464,12 +464,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	 *     ------------------------------------------------------------------
 	 *1    D        D       F       Y         N       Y       N           Update
 	 *2    D        D       F       N         N       Y       N           Conflict
-	 *3    D        F       D                 Y       N       N           Keep
-	 *4    D        F       D                 N       N       N           Conflict
+	 *3    D        F       D                 Y       N       N           Update
+	 *4    D        F       D                 N       N       N           Update
 	 *5    D        F       F       Y         N       N       Y           Keep
-	 *5b   D        F       F       Y         N       N       N           Conflict
 	 *6    D        F       F       N         N       N       Y           Keep
-	 *6b   D        F       F       N         N       N       N           Conflict
 	 *7    F        D       F       Y         Y       N       N           Update
 	 *8    F        D       F       N         Y       N       N           Conflict
 	 *9    F        D       F       Y         N       N       N           Update
@@ -524,16 +522,18 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testDirectoryFileConflicts_3() throws Exception {
-		// 3
+		// 3 - the first to break!
 		doit(mk("DF/DF"), mk("DF/DF"), mk("DF"));
-		assertNoConflicts();
+		assertUpdated("DF/DF");
+		assertRemoved("DF");
 	}
 
 	@Test
 	public void testDirectoryFileConflicts_4() throws Exception {
 		// 4 (basically same as 3, just with H and M different)
 		doit(mk("DF/DF"), mkmap("DF/DF", "foo"), mk("DF"));
-		assertConflict("DF/DF");
+		assertUpdated("DF/DF");
+		assertRemoved("DF");
 
 	}
 
@@ -542,17 +542,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		// 5
 		doit(mk("DF/DF"), mk("DF"), mk("DF"));
 		assertRemoved("DF/DF");
-		assertEquals(0, dco.getConflicts().size());
-		assertEquals(0, dco.getUpdated().size());
-	}
 
-	@Test
-	public void testDirectoryFileConflicts_5b() throws Exception {
-		// 5
-		doit(mk("DF/DF"), mkmap("DF", "different"), mk("DF"));
-		assertRemoved("DF/DF");
-		assertConflict("DF");
-		assertEquals(0, dco.getUpdated().size());
 	}
 
 	@Test
@@ -562,19 +552,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		writeTrashFile("DF", "different");
 		go();
 		assertRemoved("DF/DF");
-		assertEquals(0, dco.getConflicts().size());
-		assertEquals(0, dco.getUpdated().size());
-	}
-
-	@Test
-	public void testDirectoryFileConflicts_6b() throws Exception {
-		// 6
-		setupCase(mk("DF/DF"), mk("DF"), mkmap("DF", "different"));
-		writeTrashFile("DF", "again different");
-		go();
-		assertRemoved("DF/DF");
-		assertConflict("DF");
-		assertEquals(0, dco.getUpdated().size());
 	}
 
 	@Test
@@ -961,7 +938,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		} catch (CheckoutConflictException e) {
 			assertIndex(mk("foo"));
 			assertWorkDir(mkmap("foo", "different"));
-			assertEquals(Arrays.asList("foo"), getConflicts());
+			assertTrue(getConflicts().equals(Arrays.asList("foo")));
 			assertTrue(new File(trash, "foo").isFile());
 		}
 	}

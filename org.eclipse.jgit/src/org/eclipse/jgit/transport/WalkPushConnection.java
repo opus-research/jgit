@@ -58,7 +58,6 @@ import java.util.TreeMap;
 
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -68,6 +67,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
@@ -137,12 +137,6 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
-		push(monitor, refUpdates, null);
-	}
-
-	public void push(final ProgressMonitor monitor,
-			final Map<String, RemoteRefUpdate> refUpdates, OutputStream out)
-			throws TransportException {
 		markStartedOperation();
 		packNames = null;
 		newRefs = new TreeMap<String, Ref>(getRefsMap());
@@ -155,7 +149,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		final List<RemoteRefUpdate> updates = new ArrayList<RemoteRefUpdate>();
 		for (final RemoteRefUpdate u : refUpdates.values()) {
 			final String n = u.getRemoteName();
-			if (!n.startsWith("refs/") || !Repository.isValidRefName(n)) { //$NON-NLS-1$
+			if (!n.startsWith("refs/") || !Repository.isValidRefName(n)) {
 				u.setStatus(Status.REJECTED_OTHER_REASON);
 				u.setMessage(JGitText.get().funnyRefname);
 				continue;
@@ -245,10 +239,10 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			for (final String n : dest.getPackNames())
 				packNames.put(n, n);
 
-			final String base = "pack-" + writer.computeName().name(); //$NON-NLS-1$
-			final String packName = base + ".pack"; //$NON-NLS-1$
-			pathPack = "pack/" + packName; //$NON-NLS-1$
-			pathIdx = "pack/" + base + ".idx"; //$NON-NLS-1$ //$NON-NLS-2$
+			final String base = "pack-" + writer.computeName().name();
+			final String packName = base + ".pack";
+			pathPack = "pack/" + packName;
+			pathIdx = "pack/" + base + ".idx";
 
 			if (packNames.remove(packName) != null) {
 				// The remote already contains this pack. We should
@@ -262,8 +256,8 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			// Write the pack file, then the index, as readers look the
 			// other direction (index, then pack file).
 			//
-			final String wt = "Put " + base.substring(0, 12); //$NON-NLS-1$
-			OutputStream os = dest.writeFile(pathPack, monitor, wt + "..pack"); //$NON-NLS-1$
+			final String wt = "Put " + base.substring(0, 12);
+			OutputStream os = dest.writeFile(pathPack, monitor, wt + "..pack");
 			try {
 				os = new SafeBufferedOutputStream(os);
 				writer.writePack(monitor, monitor, os);
@@ -271,7 +265,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 				os.close();
 			}
 
-			os = dest.writeFile(pathIdx, monitor, wt + "..idx"); //$NON-NLS-1$
+			os = dest.writeFile(pathIdx, monitor, wt + "..idx");
 			try {
 				os = new SafeBufferedOutputStream(os);
 				writer.writeIndex(os);
@@ -360,7 +354,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 	private void createNewRepository(final List<RemoteRefUpdate> updates)
 			throws TransportException {
 		try {
-			final String ref = "ref: " + pickHEAD(updates) + "\n"; //$NON-NLS-1$ //$NON-NLS-2$
+			final String ref = "ref: " + pickHEAD(updates) + "\n";
 			final byte[] bytes = Constants.encode(ref);
 			dest.writeFile(ROOT_DIR + Constants.HEAD, bytes);
 		} catch (IOException e) {
@@ -368,8 +362,8 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		}
 
 		try {
-			final String config = "[core]\n" //$NON-NLS-1$
-					+ "\trepositoryformatversion = 0\n"; //$NON-NLS-1$
+			final String config = "[core]\n"
+					+ "\trepositoryformatversion = 0\n";
 			final byte[] bytes = Constants.encode(config);
 			dest.writeFile(ROOT_DIR + Constants.CONFIG, bytes);
 		} catch (IOException e) {

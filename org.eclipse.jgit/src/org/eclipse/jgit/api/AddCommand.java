@@ -48,7 +48,6 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -93,15 +92,11 @@ public class AddCommand extends GitCommand<DirCache> {
 	}
 
 	/**
-	 * Add a path to a file/directory whose content should be added.
-	 * <p>
-	 * A directory name (e.g. <code>dir</code> to add <code>dir/file1</code> and
-	 * <code>dir/file2</code>) can also be given to add all files in the
-	 * directory, recursively. Fileglobs (e.g. *.c) are not yet supported.
-	 *
 	 * @param filepattern
-	 *            repository-relative path of file/directory to add (with
-	 *            <code>/</code> as separator)
+	 *            File to add content from. Also a leading directory name (e.g.
+	 *            dir to add dir/file1 and dir/file2) can be given to add all
+	 *            files in the directory, recursively. Fileglobs (e.g. *.c) are
+	 *            not yet supported.
 	 * @return {@code this}
 	 */
 	public AddCommand addFilepattern(String filepattern) {
@@ -127,14 +122,14 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
-	public DirCache call() throws GitAPIException, NoFilepatternException {
+	public DirCache call() throws NoFilepatternException {
 
 		if (filepatterns.isEmpty())
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
 		checkCallable();
 		DirCache dc = null;
 		boolean addAll = false;
-		if (filepatterns.contains(".")) //$NON-NLS-1$
+		if (filepatterns.contains("."))
 			addAll = true;
 
 		ObjectInserter inserter = repo.newObjectInserter();
@@ -181,12 +176,10 @@ public class AddCommand extends GitCommand<DirCache> {
 									entry.setLength(sz);
 									entry.setLastModified(f
 											.getEntryLastModified());
-									long contentSize = f
-											.getEntryContentLength();
 									InputStream in = f.openEntryStream();
 									try {
 										entry.setObjectId(inserter.insert(
-												Constants.OBJ_BLOB, contentSize, in));
+												Constants.OBJ_BLOB, sz, in));
 									} finally {
 										in.close();
 									}

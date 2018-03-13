@@ -46,40 +46,12 @@
 package org.eclipse.jgit.transport;
 
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.http.HttpConnectionFactory;
-import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
 
 /**
  * The base class for transports that use HTTP as underlying protocol. This class
  * allows customizing HTTP connection settings.
  */
 public abstract class HttpTransport extends Transport {
-	/**
-	 * factory for creating HTTP connections
-	 *
-	 * @since 3.3
-	 */
-	protected static HttpConnectionFactory connectionFactory = new JDKHttpConnectionFactory();
-
-	/**
-	 * @return the {@link HttpConnectionFactory} used to create new connections
-	 * @since 3.3
-	 */
-	public static HttpConnectionFactory getConnectionFactory() {
-		return connectionFactory;
-	}
-
-	/**
-	 * Set the {@link HttpConnectionFactory} to be used to create new
-	 * connections
-	 *
-	 * @param cf
-	 * @since 3.3
-	 */
-	public static void setConnectionFactory(HttpConnectionFactory cf) {
-		connectionFactory = cf;
-	}
-
 	/**
 	 * Create a new transport instance.
 	 *
@@ -93,14 +65,5 @@ public abstract class HttpTransport extends Transport {
 	 */
 	protected HttpTransport(Repository local, URIish uri) {
 		super(local, uri);
-	}
-
-	/**
-	 * Create a minimal HTTP transport instance not tied to a single repository.
-	 *
-	 * @param uri
-	 */
-	protected HttpTransport(URIish uri) {
-		super(uri);
 	}
 }

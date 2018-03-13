@@ -101,10 +101,8 @@ public final class AbbreviatedObjectId implements Serializable {
 	public static final AbbreviatedObjectId fromString(final byte[] buf,
 			final int offset, final int end) {
 		if (end - offset > Constants.OBJECT_ID_STRING_LENGTH)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidIdLength,
-					Integer.valueOf(end - offset),
-					Integer.valueOf(Constants.OBJECT_ID_STRING_LENGTH)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidIdLength
+					, end - offset, Constants.OBJECT_ID_STRING_LENGTH));
 		return fromHexString(buf, offset, end);
 	}
 
@@ -375,9 +373,8 @@ public final class AbbreviatedObjectId implements Serializable {
 		return new String(b, 0, nibbles);
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
-		return "AbbreviatedObjectId[" + name() + "]"; //$NON-NLS-1$
+		return "AbbreviatedObjectId[" + name() + "]";
 	}
 }

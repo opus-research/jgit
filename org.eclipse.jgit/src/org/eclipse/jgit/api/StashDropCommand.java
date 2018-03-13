@@ -54,14 +54,14 @@ import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.ReflogWriter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
-import org.eclipse.jgit.lib.ReflogEntry;
-import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.ReflogEntry;
+import org.eclipse.jgit.storage.file.ReflogReader;
+import org.eclipse.jgit.storage.file.ReflogWriter;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -69,7 +69,6 @@ import org.eclipse.jgit.util.FileUtils;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
- * @since 2.0
  */
 public class StashDropCommand extends GitCommand<ObjectId> {
 
@@ -167,9 +166,8 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 	 * stash reference after the drop occurs
 	 *
 	 * @return commit id of stash reference or null if no more stashed changes
-	 * @throws GitAPIException
 	 */
-	public ObjectId call() throws GitAPIException {
+	public ObjectId call() throws GitAPIException, JGitInternalException {
 		checkCallable();
 
 		Ref stashRef = getRef();
@@ -181,9 +179,9 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 			return null;
 		}
 
+		ReflogReader reader = new ReflogReader(repo, R_STASH);
 		List<ReflogEntry> entries;
 		try {
-			ReflogReader reader = repo.getReflogReader(R_STASH);
 			entries = reader.getReverseEntries();
 		} catch (IOException e) {
 			throw new JGitInternalException(JGitText.get().stashDropFailed, e);

@@ -47,6 +47,7 @@ package org.eclipse.jgit.util;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.ConnectException;
+import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URISyntaxException;
@@ -55,81 +56,80 @@ import java.net.URLEncoder;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.transport.http.HttpConnection;
 
 /** Extra utilities to support usage of HTTP. */
 public class HttpSupport {
 	/** The {@code GET} HTTP method. */
-	public static final String METHOD_GET = "GET"; //$NON-NLS-1$
+	public static final String METHOD_GET = "GET";
 
 	/** The {@code POST} HTTP method. */
-	public static final String METHOD_POST = "POST"; //$NON-NLS-1$
+	public static final String METHOD_POST = "POST";
 
 	/** The {@code Cache-Control} header. */
-	public static final String HDR_CACHE_CONTROL = "Cache-Control"; //$NON-NLS-1$
+	public static final String HDR_CACHE_CONTROL = "Cache-Control";
 
 	/** The {@code Pragma} header. */
-	public static final String HDR_PRAGMA = "Pragma"; //$NON-NLS-1$
+	public static final String HDR_PRAGMA = "Pragma";
 
 	/** The {@code User-Agent} header. */
-	public static final String HDR_USER_AGENT = "User-Agent"; //$NON-NLS-1$
+	public static final String HDR_USER_AGENT = "User-Agent";
 
 	/** The {@code Date} header. */
-	public static final String HDR_DATE = "Date"; //$NON-NLS-1$
+	public static final String HDR_DATE = "Date";
 
 	/** The {@code Expires} header. */
-	public static final String HDR_EXPIRES = "Expires"; //$NON-NLS-1$
+	public static final String HDR_EXPIRES = "Expires";
 
 	/** The {@code ETag} header. */
-	public static final String HDR_ETAG = "ETag"; //$NON-NLS-1$
+	public static final String HDR_ETAG = "ETag";
 
 	/** The {@code If-None-Match} header. */
-	public static final String HDR_IF_NONE_MATCH = "If-None-Match"; //$NON-NLS-1$
+	public static final String HDR_IF_NONE_MATCH = "If-None-Match";
 
 	/** The {@code Last-Modified} header. */
-	public static final String HDR_LAST_MODIFIED = "Last-Modified"; //$NON-NLS-1$
+	public static final String HDR_LAST_MODIFIED = "Last-Modified";
 
 	/** The {@code If-Modified-Since} header. */
-	public static final String HDR_IF_MODIFIED_SINCE = "If-Modified-Since"; //$NON-NLS-1$
+	public static final String HDR_IF_MODIFIED_SINCE = "If-Modified-Since";
 
 	/** The {@code Accept} header. */
-	public static final String HDR_ACCEPT = "Accept"; //$NON-NLS-1$
+	public static final String HDR_ACCEPT = "Accept";
 
 	/** The {@code Content-Type} header. */
-	public static final String HDR_CONTENT_TYPE = "Content-Type"; //$NON-NLS-1$
+	public static final String HDR_CONTENT_TYPE = "Content-Type";
 
 	/** The {@code Content-Length} header. */
-	public static final String HDR_CONTENT_LENGTH = "Content-Length"; //$NON-NLS-1$
+	public static final String HDR_CONTENT_LENGTH = "Content-Length";
 
 	/** The {@code Content-Encoding} header. */
-	public static final String HDR_CONTENT_ENCODING = "Content-Encoding"; //$NON-NLS-1$
+	public static final String HDR_CONTENT_ENCODING = "Content-Encoding";
 
 	/** The {@code Content-Range} header. */
-	public static final String HDR_CONTENT_RANGE = "Content-Range"; //$NON-NLS-1$
+	public static final String HDR_CONTENT_RANGE = "Content-Range";
 
 	/** The {@code Accept-Ranges} header. */
-	public static final String HDR_ACCEPT_RANGES = "Accept-Ranges"; //$NON-NLS-1$
+	public static final String HDR_ACCEPT_RANGES = "Accept-Ranges";
 
 	/** The {@code If-Range} header. */
-	public static final String HDR_IF_RANGE = "If-Range"; //$NON-NLS-1$
+	public static final String HDR_IF_RANGE = "If-Range";
 
 	/** The {@code Range} header. */
-	public static final String HDR_RANGE = "Range"; //$NON-NLS-1$
+	public static final String HDR_RANGE = "Range";
 
 	/** The {@code Accept-Encoding} header. */
-	public static final String HDR_ACCEPT_ENCODING = "Accept-Encoding"; //$NON-NLS-1$
+	public static final String HDR_ACCEPT_ENCODING = "Accept-Encoding";
 
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
-	public static final String ENCODING_GZIP = "gzip"; //$NON-NLS-1$
+	public static final String ENCODING_GZIP = "gzip";
 
 	/** The standard {@code text/plain} MIME type. */
-	public static final String TEXT_PLAIN = "text/plain"; //$NON-NLS-1$
+	public static final String TEXT_PLAIN = "text/plain";
 
 	/** The {@code Authorization} header. */
-	public static final String HDR_AUTHORIZATION = "Authorization"; //$NON-NLS-1$
+	public static final String HDR_AUTHORIZATION = "Authorization";
 
 	/** The {@code WWW-Authenticate} header. */
-	public static final String HDR_WWW_AUTHENTICATE = "WWW-Authenticate"; //$NON-NLS-1$
+	public static final String HDR_WWW_AUTHENTICATE = "WWW-Authenticate";
 
 	/**
 	 * URL encode a value string into an output buffer.
@@ -143,7 +143,7 @@ public class HttpSupport {
 		if (key == null || key.length() == 0)
 			return;
 		try {
-			urlstr.append(URLEncoder.encode(key, "UTF-8")); //$NON-NLS-1$
+			urlstr.append(URLEncoder.encode(key, "UTF-8"));
 		} catch (UnsupportedEncodingException e) {
 			throw new RuntimeException(JGitText.get().couldNotURLEncodeToUTF8, e);
 		}
@@ -158,12 +158,11 @@ public class HttpSupport {
 	 * @param c
 	 *            connection the code should be obtained from.
 	 * @return r HTTP status code, usually 200 to indicate success. See
-	 *         {@link HttpConnection} for other defined constants.
+	 *         {@link HttpURLConnection} for other defined constants.
 	 * @throws IOException
 	 *             communications error prevented obtaining the response code.
-	 * @since 3.3
 	 */
-	public static int response(final HttpConnection c) throws IOException {
+	public static int response(final HttpURLConnection c) throws IOException {
 		try {
 			return c.getResponseCode();
 		} catch (ConnectException ce) {
@@ -172,35 +171,7 @@ public class HttpSupport {
 			//
 			if ("Connection timed out: connect".equals(ce.getMessage()))
 				throw new ConnectException(MessageFormat.format(JGitText.get().connectionTimeOut, host));
-			throw new ConnectException(ce.getMessage() + " " + host); //$NON-NLS-1$
-		}
-	}
-
-	/**
-	 * Get the HTTP response code from the request.
-	 * <p>
-	 * Roughly the same as <code>c.getResponseCode()</code> but the
-	 * ConnectException is translated to be more understandable.
-	 *
-	 * @param c
-	 *            connection the code should be obtained from.
-	 * @return r HTTP status code, usually 200 to indicate success. See
-	 *         {@link HttpConnection} for other defined constants.
-	 * @throws IOException
-	 *             communications error prevented obtaining the response code.
-	 */
-	public static int response(final java.net.HttpURLConnection c)
-			throws IOException {
-		try {
-			return c.getResponseCode();
-		} catch (ConnectException ce) {
-			final String host = c.getURL().getHost();
-			// The standard J2SE error message is not very useful.
-			//
-			if ("Connection timed out: connect".equals(ce.getMessage()))
-				throw new ConnectException(MessageFormat.format(
-						JGitText.get().connectionTimeOut, host));
-			throw new ConnectException(ce.getMessage() + " " + host); //$NON-NLS-1$
+			throw new ConnectException(ce.getMessage() + " " + host);
 		}
 	}
 
