@@ -46,7 +46,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
@@ -77,7 +77,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
  */
 public class ManifestParser extends DefaultHandler {
 	private final String filename;
-	private final String baseUrl;
+	private final URI baseUrl;
 	private final String defaultBranch;
 	private final Repository rootRepo;
 	private final Map<String, Remote> remotes;
@@ -125,14 +125,14 @@ public class ManifestParser extends DefaultHandler {
 		this.defaultBranch = defaultBranch;
 		this.rootRepo = rootRepo;
 
-		// Strip trailing /s to match repo behavior.
-		int lastIndex = baseUrl.length() - 1;
-		while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-			lastIndex--;
-		this.baseUrl = baseUrl.substring(0, lastIndex + 1);
+		// Strip trailing '/' to match repo behavior.
+		while (baseUrl.endsWith("/")) { //$NON-NLS-1$
+			baseUrl = baseUrl.substring(0, baseUrl.length()-1);
+		}
+		this.baseUrl = URI.create(baseUrl);
 
-		plusGroups = new HashSet<String>();
-		minusGroups = new HashSet<String>();
+		plusGroups = new HashSet<>();
+		minusGroups = new HashSet<>();
 		if (groups == null || groups.length() == 0
 				|| groups.equals("default")) { //$NON-NLS-1$
 			// default means "all,-notdefault"
@@ -146,9 +146,9 @@ public class ManifestParser extends DefaultHandler {
 			}
 		}
 
-		remotes = new HashMap<String, Remote>();
-		projects = new ArrayList<RepoProject>();
-		filteredProjects = new ArrayList<RepoProject>();
+		remotes = new HashMap<>();
+		projects = new ArrayList<>();
+		filteredProjects = new ArrayList<>();
 	}
 
 	/**
@@ -257,13 +257,7 @@ public class ManifestParser extends DefaultHandler {
 			return;
 
 		// Only do the following after we finished reading everything.
-		Map<String, String> remoteUrls = new HashMap<String, String>();
-		URI baseUri;
-		try {
-			baseUri = new URI(baseUrl);
-		} catch (URISyntaxException e) {
-			throw new SAXException(e);
-		}
+		Map<String, String> remoteUrls = new HashMap<>();
 		if (defaultRevision == null && defaultRemote != null) {
 			Remote remote = remotes.get(defaultRemote);
 			if (remote != null) {
@@ -295,8 +289,7 @@ public class ManifestParser extends DefaultHandler {
 			}
 			String remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				remoteUrl =
-						baseUri.resolve(remotes.get(remote).fetch).toString();
+				remoteUrl = baseUrl.resolve(remotes.get(remote).fetch).toString();
 				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
 					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
 				remoteUrls.put(remote, remoteUrl);
@@ -324,7 +317,7 @@ public class ManifestParser extends DefaultHandler {
 	 *
 	 * @return filtered projects list reference, never null
 	 */
-	public List<RepoProject> getFilteredProjects() {
+	public @NonNull List<RepoProject> getFilteredProjects() {
 		return filteredProjects;
 	}
 
