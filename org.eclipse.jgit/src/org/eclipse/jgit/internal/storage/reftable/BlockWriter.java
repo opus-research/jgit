@@ -50,7 +50,7 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_B
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_CHAINED;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_DATA;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_COMMITTER;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_IDENT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_MESSAGE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_RESTARTS;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
@@ -160,7 +160,7 @@ class BlockWriter {
 
 	boolean tryAdd(Entry entry) {
 		if (entry instanceof ObjEntry
-				&& computeBlockBytes(1, entry.sizeBytes()) > blockLimitBytes) {
+				&& computeBlockBytes(entry.sizeBytes(), 1) > blockLimitBytes) {
 			// If the ObjEntry has so many ref block pointers that its
 			// encoding overflows any block, reconfigure it to tell readers to
 			// instead scan all refs for this ObjectId. That significantly
@@ -229,43 +229,40 @@ class BlockWriter {
 
 	private int computeBlockBytes(int entryBytes, boolean restart) {
 		return computeBlockBytes(
-				restartCnt + (restart ? 1 : 0),
-				entriesSumBytes + entryBytes);
+				entriesSumBytes + entryBytes,
+				restartCnt + (restart ? 1 : 0));
 	}
 
-	private static int computeBlockBytes(int restartCnt, int entryBytes) {
+	private static int computeBlockBytes(int entryBytes, int restartCnt) {
 		return 4 // 4-byte block header
-				+ 2 // 2-byte restart_count
+				+ entryBytes
 				+ restartCnt * 3 // restart_offset
-				+ entryBytes;
+				+ 2; // 2-byte restart_count
 	}
 
 	void writeTo(ReftableOutputStream os) throws IOException {
-		if (restartCnt == 0 || restartCnt > MAX_RESTARTS) {
-			throw new IllegalStateException();
-		}
-
 		os.beginBlock(blockType);
-		os.writeInt16(restartCnt);
-		int restartTbl = os.bytesWrittenInBlock();
-		os.reserve(restartCnt * 3);
-
-		int ri = 0;
+		IntList restarts = new IntList(restartCnt);
 		for (Entry entry : entries) {
 			if (entry.restart) {
-				int ptr = restartTbl + (ri++ * 3);
-				int offset = os.bytesWrittenInBlock();
-				os.patchInt24(ptr, offset);
+				restarts.add(os.bytesWrittenInBlock());
 			}
 			entry.writeKey(os);
 			entry.writeValue(os);
 		}
+		if (restarts.size() == 0 || restarts.size() > MAX_RESTARTS) {
+			throw new IllegalStateException();
+		}
+		for (int i = 0; i < restarts.size(); i++) {
+			os.writeInt24(restarts.get(i));
+		}
+		os.writeInt16(restarts.size());
 		os.flushBlock();
 	}
 
 	private BlockSizeTooSmallException blockSizeTooSmall(Entry entry) {
 		// Compute size required to fit this entry by itself.
-		int min = FILE_HEADER_LEN + computeBlockBytes(1, entry.sizeBytes());
+		int min = FILE_HEADER_LEN + computeBlockBytes(entry.sizeBytes(), 1);
 		return new BlockSizeTooSmallException(min);
 	}
 
@@ -625,7 +622,7 @@ class BlockWriter {
 			if (tz == moreRecent.tz
 					&& Arrays.equals(name, moreRecent.name)
 					&& Arrays.equals(email, moreRecent.email)) {
-				type |= LOG_SAME_COMMITTER; // same committer
+				type |= LOG_SAME_IDENT; // same identity
 			}
 			if (Arrays.equals(msg, moreRecent.msg)) {
 				type |= LOG_SAME_MESSAGE; // same message;
@@ -647,7 +644,7 @@ class BlockWriter {
 
 			int n = OBJECT_ID_LENGTH;
 			n += computeVarintSize(timeSecs);
-			if ((type & LOG_SAME_COMMITTER) == 0) { // not same committer
+			if ((type & LOG_SAME_IDENT) == 0) { // not same identity
 				n += 2; // tz
 				n += computeVarintSize(name.length) + name.length;
 				n += computeVarintSize(email.length) + email.length;
@@ -675,7 +672,7 @@ class BlockWriter {
 			// chained, moreRecent oldId is this newId; record this oldId.
 			os.writeId(oldId);
 			os.writeVarint(timeSecs);
-			if ((type & LOG_SAME_COMMITTER) == 0) { // not same committer
+			if ((type & LOG_SAME_IDENT) == 0) { // not same identity
 				os.writeInt16(tz);
 				os.writeVarintString(name);
 				os.writeVarintString(email);

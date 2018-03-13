@@ -70,12 +70,12 @@ class ReftableConstants {
 	 *
 	 * <pre>
 	 * 100b -> chained ids, moreRecent old is this new (0x4)
-	 * 101b -> same committer (| 0x1)
+	 * 101b -> same ident (| 0x1)
 	 * 110b -> same message (| 0x2)
 	 * </pre>
 	 */
 	static final int LOG_CHAINED = 0x4;
-	static final int LOG_SAME_COMMITTER = 0x1;
+	static final int LOG_SAME_IDENT = 0x1;
 	static final int LOG_SAME_MESSAGE = 0x2;
 
 	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
