@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,71 +43,70 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.util.List;
+import java.io.IOException;
 
-import org.eclipse.jgit.api.NotesCommand.SubCommand;
+import org.eclipse.jgit.api.ListBranchCommand.ListMode;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.notes.Note;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Before;
 import org.junit.Test;
 
-public class NotesCommandTest extends RepositoryTestCase {
-
-	private Git git;
-
-	private RevCommit commit1, commit2;
-
-	private static final String FILE = "test.txt";
+public class GitConstructionTest extends RepositoryTestCase {
+	private Repository bareRepo;
 
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
+		Git git = new Git(db);
+		git.commit().setMessage("initial commit").call();
+		writeTrashFile("Test.txt", "Hello world");
+		git.add().addFilepattern("Test.txt").call();
+		git.commit().setMessage("Initial commit").call();
 
-		git = new Git(db);
-		// commit something
-		writeTrashFile(FILE, "Hello world");
-		git.add().addFilepattern(FILE).call();
-		commit1 = git.commit().setMessage("Initial commit").call();
-		git.rm().addFilepattern(FILE).call();
-		commit2 = git.commit().setMessage("Removed file").call();
-		git.notes().setSubCommand(SubCommand.ADD).setObjectId(commit1)
-				.setMessage("data").call();
+		bareRepo = Git.cloneRepository().setBare(true)
+				.setURI(db.getDirectory().toURI().toString()).call()
+				.getRepository();
 	}
 
 	@Test
-	public void testListNotes() throws Exception {
-		NotesCommand command = git.notes();
-		List<Note> notes = command.call();
-		assertTrue(notes.size() == 1);
+	public void testWrap() {
+		Git git = Git.wrap(db);
+		assertEquals(1, git.branchList().call().size());
+
+		git = Git.wrap(bareRepo);
+		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
+				.size());
+
+		try {
+			Git.wrap(null);
+			fail("Expected exception has not been thrown");
+		} catch (NullPointerException e) {
+			// should not get here
+		}
 	}
 
 	@Test
-	public void testAddAndRemoveNote() throws Exception {
-		NotesCommand command = git.notes();
-		command.setSubCommand(SubCommand.ADD);
-		command.setObjectId(commit2);
-		command.setMessage("data");
-		List<Note> notes = command.call();
+	public void testOpen() throws IOException {
+		Git git = Git.open(db.getDirectory());
+		assertEquals(1, git.branchList().call().size());
 
-		command.setSubCommand(SubCommand.SHOW);
-		command.setObjectId(commit2);
-		notes = command.call();
-		Note n = notes.get(0);
-		String content = new String(db.open(n.getData()).getCachedBytes(),
-				"UTF-8");
-		assertEquals(content, "data");
+		git = Git.open(bareRepo.getDirectory());
+		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
+				.size());
 
-		command.setSubCommand(SubCommand.REMOVE);
-		command.setMessage(null);
-		command.call();
+		git = Git.open(db.getWorkTree());
+		assertEquals(1, git.branchList().setListMode(ListMode.ALL).call()
+				.size());
 
-		command.setSubCommand(SubCommand.SHOW);
-		notes = command.call();
-		assertTrue(notes.size() == 0);
+		try {
+			Git.open(db.getObjectsDirectory());
+			fail("Expected exception has not been thrown");
+		} catch (RepositoryNotFoundException e) {
+			// should not get here
+		}
 	}
-
 }
