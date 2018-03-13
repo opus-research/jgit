@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,21 +43,51 @@
 
 package org.eclipse.jgit.diff;
 
-import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
-import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
-
-public class MyersDiffTest extends AbstractDiffTestCase {
-	@Override
-	protected DiffAlgorithm algorithm() {
-		return MyersDiff.INSTANCE;
+public class DiffTestDataGenerator {
+	/**
+	 * Generate sequence of characters in ascending order. The first character
+	 * is a space. All subsequent characters have an ASCII code one greater then
+	 * the ASCII code of the preceding character. On exception: the character
+	 * following which follows '~' is again a ' '.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len) {
+		return generateSequence(len, 0, 0);
 	}
 
-	public void testPerformanceTestDeltaLength() {
-		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
-		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
-		CharArray ac = new CharArray(a);
-		CharArray bc = new CharArray(b);
-		EditList r = algorithm().diff(new CharCmp(), ac, bc);
-		assertEquals(131, r.size());
+	/**
+	 * Generate sequence of characters similar to the one returned by
+	 * {@link #generateSequence(int)}. But this time in each chunk of
+	 * <skipPeriod> characters the last <skipLength> characters are left out. By
+	 * calling this method twice with two different prime skipPeriod values and
+	 * short skipLength values you create test data which is similar to what
+	 * programmers do to their source code - huge files with only few
+	 * insertions/deletions/changes.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @param skipPeriod
+	 * @param skipLength
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len, int skipPeriod,
+			int skipLength) {
+		StringBuilder text = new StringBuilder(len);
+		int skipStart = skipPeriod - skipLength;
+		int skippedChars = 0;
+		int block = 0;
+		for (int i = 0; i - skippedChars < len; ++i) {
+			if ((i % skipPeriod) == 1)
+				text.append((char) (256 + block++));
+			else if (skipPeriod == 0 || i % skipPeriod < skipStart) {
+				text.append((char) (32 + i % 95));
+			} else {
+				skippedChars++;
+			}
+		}
+		return text.toString();
 	}
 }
