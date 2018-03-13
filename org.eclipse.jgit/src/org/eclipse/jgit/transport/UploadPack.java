@@ -49,7 +49,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -90,8 +89,6 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a fetch connection, transmitting objects.
  */
 public class UploadPack {
-	static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = BasePackFetchConnection.OPTION_ALLOW_TIP_SHA1_IN_WANT;
-
 	static final String OPTION_INCLUDE_TAG = BasePackFetchConnection.OPTION_INCLUDE_TAG;
 
 	static final String OPTION_MULTI_ACK = BasePackFetchConnection.OPTION_MULTI_ACK;
@@ -116,27 +113,8 @@ public class UploadPack {
 	public static enum RequestPolicy {
 		/** Client may only ask for objects the server advertised a reference for. */
 		ADVERTISED,
-
-		/**
-		 * Client may ask for any commit reachable from a reference advertised by
-		 * the server.
-		 */
+		/** Client may ask for any commit reachable from a reference. */
 		REACHABLE_COMMIT,
-
-		/**
-		 * Client may ask for objects that are the tip of any reference, even if not
-		 * advertised.
-		 * <p>
-		 * This may happen, for example, when a custom {@link RefFilter} is set.
-		 */
-		TIP,
-
-		/**
-		 * Client may ask for any commit reachable from any reference, even if that
-		 * reference wasn't advertised.
-		 */
-		REACHABLE_COMMIT_TIP,
-
 		/** Client may ask for any SHA-1 in the repository. */
 		ANY;
 	}
@@ -187,9 +165,6 @@ public class UploadPack {
 
 	/** Configuration to pass into the PackWriter. */
 	private PackConfig packConfig;
-
-	/** Configuration for various transfer options. */
-	private TransferConfig transferConfig;
 
 	/** Timeout in seconds to wait for client interaction. */
 	private int timeout;
@@ -278,7 +253,7 @@ public class UploadPack {
 
 	private final RevFlagSet SAVE;
 
-	private RequestPolicy requestPolicy;
+	private RequestPolicy requestPolicy = RequestPolicy.ADVERTISED;
 
 	private MultiAck multiAck = MultiAck.OFF;
 
@@ -310,8 +285,6 @@ public class UploadPack {
 		SAVE.add(PEER_HAS);
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
-
-		transferConfig = new TransferConfig(db);
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -351,10 +324,7 @@ public class UploadPack {
 			refs = allRefs;
 		else
 			refs = db.getAllRefs();
-		if (refFilter == RefFilter.DEFAULT)
-			refs = transferConfig.getRefFilter().filter(refs);
-		else
-			refs = refFilter.filter(refs);
+		refs = refFilter.filter(refs);
 	}
 
 	/** @return timeout (in seconds) before aborting an IO operation. */
@@ -393,6 +363,8 @@ public class UploadPack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
+		if (!biDirectionalPipe && requestPolicy == RequestPolicy.ADVERTISED)
+			requestPolicy = RequestPolicy.REACHABLE_COMMIT;
 	}
 
 	/** @return policy used by the service to validate client requests. */
@@ -406,13 +378,11 @@ public class UploadPack {
 	 *            By default the policy is {@link RequestPolicy#ADVERTISED},
 	 *            which is the Git default requiring clients to only ask for an
 	 *            object that a reference directly points to. This may be relaxed
-	 *            to {@link RequestPolicy#REACHABLE_COMMIT} or
-	 *            {@link RequestPolicy#REACHABLE_COMMIT_TIP} when callers have
-	 *            {@link #setBiDirectionalPipe(boolean)} set to false.
-	 *            Overrides any policy specified in a {@link TransferConfig}.
+	 *            to {@link RequestPolicy#REACHABLE_COMMIT} when callers
+	 *            have {@link #setBiDirectionalPipe(boolean)} set to false.
 	 */
 	public void setRequestPolicy(RequestPolicy policy) {
-		requestPolicy = policy;
+		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
 	}
 
 	/** @return the hook used while advertising the refs to the client */
@@ -447,8 +417,7 @@ public class UploadPack {
 	 * <p>
 	 * Only refs allowed by this filter will be sent to the client.
 	 * The filter is run against the refs specified by the
-	 * {@link AdvertiseRefsHook} (if applicable). If null or not set, uses the
-	 * filter implied by the {@link TransferConfig}.
+	 * {@link AdvertiseRefsHook} (if applicable).
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -481,15 +450,6 @@ public class UploadPack {
 	 */
 	public void setPackConfig(PackConfig pc) {
 		this.packConfig = pc;
-	}
-
-	/**
-	 * @param tc
-	 *            configuration controlling transfer options. If null the source
-	 *            repository's settings will be used.
-	 */
-	public void setTransferConfig(TransferConfig tc) {
-		this.transferConfig = tc != null ? tc : new TransferConfig(db);
 	}
 
 	/** @return the configured logger. */
@@ -595,33 +555,18 @@ public class UploadPack {
 		return refs;
 	}
 
-	private RequestPolicy getEffectiveRequestPolicy() {
-		RequestPolicy rp;
-		if (requestPolicy != null)
-			rp = requestPolicy;
-		else if (transferConfig.isAllowTipSha1InWant())
-			rp = RequestPolicy.TIP;
-		else
-			rp = RequestPolicy.ADVERTISED;
-
-		if (!biDirectionalPipe) {
-			if (rp == RequestPolicy.ADVERTISED)
-				rp = RequestPolicy.REACHABLE_COMMIT;
-			else if (rp == RequestPolicy.TIP)
-				rp = RequestPolicy.REACHABLE_COMMIT_TIP;
-		}
-		return rp;
-	}
-
 	private void service() throws IOException {
-		requestPolicy = getEffectiveRequestPolicy();
-
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else if (requestPolicy == RequestPolicy.ANY)
 			advertised = Collections.emptySet();
-		else
-			advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
+		else {
+			advertised = new HashSet<ObjectId>();
+			for (Ref ref : getAdvertisedOrDefaultRefs().values()) {
+				if (ref.getObjectId() != null)
+					advertised.add(ref.getObjectId());
+			}
+		}
 
 		boolean sendPack;
 		try {
@@ -671,15 +616,6 @@ public class UploadPack {
 
 		if (sendPack)
 			sendPack();
-	}
-
-	private static Set<ObjectId> refIdSet(Collection<Ref> refs) {
-		Set<ObjectId> ids = new HashSet<ObjectId>(refs.size());
-		for (Ref ref : refs) {
-			if (ref.getObjectId() != null)
-				ids.add(ref.getObjectId());
-		}
-		return ids;
 	}
 
 	private void reportErrorDuringNegotiate(String msg) {
@@ -757,9 +693,6 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_SHALLOW);
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
-		if (requestPolicy == RequestPolicy.TIP
-				|| requestPolicy == RequestPolicy.REACHABLE_COMMIT_TIP)
-			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
 		advertised = adv.send(getAdvertisedOrDefaultRefs());
 		adv.end();
@@ -886,10 +819,10 @@ public class UploadPack {
 	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
 			throws IOException {
 		preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
-		if (wantAll.isEmpty() && !wantIds.isEmpty())
-			parseWants();
 		if (peerHas.isEmpty())
 			return last;
+		if (wantAll.isEmpty() && !wantIds.isEmpty())
+			parseWants();
 
 		sentReady = false;
 		int haveCnt = 0;
@@ -989,8 +922,6 @@ public class UploadPack {
 		AsyncRevObjectQueue q = walk.parseAny(wantIds, true);
 		try {
 			List<RevCommit> checkReachable = null;
-			Set<ObjectId> reachableFrom = null;
-			Set<ObjectId> tips = null;
 			RevObject obj;
 			while ((obj = q.next()) != null) {
 				if (!advertised.contains(obj)) {
@@ -1004,28 +935,8 @@ public class UploadPack {
 							throw new PackProtocolException(MessageFormat.format(
 								JGitText.get().wantNotValid, obj));
 						}
-						if (checkReachable == null) {
+						if (checkReachable == null)
 							checkReachable = new ArrayList<RevCommit>();
-							reachableFrom = advertised;
-						}
-						checkReachable.add((RevCommit) obj);
-						break;
-					case TIP:
-						if (tips == null)
-							tips = refIdSet(db.getAllRefs().values());
-						if (!tips.contains(obj))
-							throw new PackProtocolException(MessageFormat.format(
-									JGitText.get().wantNotValid, obj));
-						break;
-					case REACHABLE_COMMIT_TIP:
-						if (!(obj instanceof RevCommit)) {
-							throw new PackProtocolException(MessageFormat.format(
-								JGitText.get().wantNotValid, obj));
-						}
-						if (checkReachable == null) {
-							checkReachable = new ArrayList<RevCommit>();
-							reachableFrom = refIdSet(db.getAllRefs().values());
-						}
 						checkReachable.add((RevCommit) obj);
 						break;
 					case ANY:
@@ -1043,7 +954,7 @@ public class UploadPack {
 				}
 			}
 			if (checkReachable != null)
-				checkNotAdvertisedWants(checkReachable, reachableFrom);
+				checkNotAdvertisedWants(checkReachable);
 			wantIds.clear();
 		} catch (MissingObjectException notFound) {
 			ObjectId id = notFound.getObjectId();
@@ -1061,18 +972,17 @@ public class UploadPack {
 		}
 	}
 
-	private void checkNotAdvertisedWants(List<RevCommit> notAdvertisedWants,
-			Set<ObjectId> reachableFrom)
+	private void checkNotAdvertisedWants(List<RevCommit> notAdvertisedWants)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException {
-		// Walk the requested commits back to the provided set of commits. If any
-		// commit exists, a branch was deleted or rewound and the repository owner
-		// no longer exports that requested item. If the requested commit is merged
-		// into an advertised branch it will be marked UNINTERESTING and no commits
-		// return.
+		// Walk the requested commits back to the advertised commits.
+		// If any commit exists, a branch was deleted or rewound and
+		// the repository owner no longer exports that requested item.
+		// If the requested commit is merged into an advertised branch
+		// it will be marked UNINTERESTING and no commits return.
 
 		for (RevCommit c : notAdvertisedWants)
 			walk.markStart(c);
-		for (ObjectId id : reachableFrom) {
+		for (ObjectId id : advertised) {
 			try {
 				walk.markUninteresting(walk.parseCommit(id));
 			} catch (IncorrectObjectTypeException notCommit) {
