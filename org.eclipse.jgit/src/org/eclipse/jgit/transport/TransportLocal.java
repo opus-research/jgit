@@ -111,14 +111,6 @@ class TransportLocal extends Transport implements PackTransport {
 		remoteGitDir = d;
 	}
 
-	UploadPack createUploadPack(final Repository dst) {
-		return new UploadPack(dst);
-	}
-
-	ReceivePack createReceivePack(final Repository dst) {
-		return new ReceivePack(dst);
-	}
-
 	@Override
 	public FetchConnection openFetch() throws TransportException {
 		final String up = getOptionUploadPack();
@@ -205,7 +197,7 @@ class TransportLocal extends Transport implements PackTransport {
 			worker = new Thread("JGit-Upload-Pack") {
 				public void run() {
 					try {
-						final UploadPack rp = createUploadPack(dst);
+						final UploadPack rp = new UploadPack(dst);
 						rp.upload(out_r, in_w, null);
 					} catch (IOException err) {
 						// Client side of the pipes should report the problem.
@@ -337,7 +329,7 @@ class TransportLocal extends Transport implements PackTransport {
 			worker = new Thread("JGit-Receive-Pack") {
 				public void run() {
 					try {
-						final ReceivePack rp = createReceivePack(dst);
+						final ReceivePack rp = new ReceivePack(dst);
 						rp.receive(out_r, in_w, System.err);
 					} catch (IOException err) {
 						// Client side of the pipes should report the problem.
