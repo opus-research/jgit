@@ -54,7 +54,6 @@ import org.junit.Test;
 
 public class FileNameMatcherTest {
 
-	@SuppressWarnings("boxing")
 	private void assertMatch(final String pattern, final String input,
 			final boolean matchExpected, final boolean appendCanMatchExpected)
 			throws InvalidPatternException {
@@ -64,7 +63,6 @@ public class FileNameMatcherTest {
 		assertEquals(appendCanMatchExpected, matcher.canAppendMatch());
 	}
 
-	@SuppressWarnings("boxing")
 	private void assertFileNameMatch(final String pattern, final String input,
 			final char excludedCharacter, final boolean matchExpected,
 			final boolean appendCanMatchExpected)

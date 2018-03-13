@@ -72,7 +72,6 @@ public class NotTreeFilterTest extends RepositoryTestCase {
 		assertSame(a, n.negate());
 	}
 
-	@SuppressWarnings("boxing")
 	@Test
 	public void testShouldBeRecursive_ALL() throws Exception {
 		final TreeFilter a = TreeFilter.ALL;
