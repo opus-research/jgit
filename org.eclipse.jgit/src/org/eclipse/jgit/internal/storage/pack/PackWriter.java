@@ -1147,9 +1147,7 @@ public class PackWriter {
 		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
 				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
 		try {
-			final long limit = Math.min(
-					config.getBigFileThreshold(),
-					Integer.MAX_VALUE);
+			final long limit = config.getBigFileThreshold();
 			for (;;) {
 				try {
 					if (!sizeQueue.next())
@@ -1159,13 +1157,13 @@ public class PackWriter {
 					if (ignoreMissingUninteresting) {
 						ObjectToPack otp = sizeQueue.getCurrent();
 						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta();
+							otp.setDoNotDelta(true);
 							continue;
 						}
 
 						otp = objectsMap.get(notFound.getObjectId());
 						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta();
+							otp.setDoNotDelta(true);
 							continue;
 						}
 					}
@@ -1177,10 +1175,14 @@ public class PackWriter {
 					otp = objectsMap.get(sizeQueue.getObjectId());
 
 				long sz = sizeQueue.getSize();
-				if (DeltaIndex.BLKSZ < sz && sz < limit)
-					otp.setWeight((int) sz);
+				if (limit <= sz || Integer.MAX_VALUE <= sz)
+					otp.setDoNotDelta(true); // too big, avoid costly files
+
+				else if (sz <= DeltaIndex.BLKSZ)
+					otp.setDoNotDelta(true); // too small, won't work
+
 				else
-					otp.setDoNotDelta(); // too small, or too big
+					otp.setWeight((int) sz);
 				monitor.update(1);
 			}
 		} finally {
@@ -1243,28 +1245,8 @@ public class PackWriter {
 				stats.deltasFound++;
 	}
 
-	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type)
-			throws IOException {
+	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			ObjectToPack b = otp.getDeltaBase();
-			if (b != null) { // Reusing delta, and base also in pack
-				otp.setVisited();
-				int d = 0;
-				do {
-					if (d < b.getChainLength())
-						break;
-					b.setChainLength(++d);
-					if (b.visited()) { // break any cycles in delta chain
-						reselectNonDelta(b);
-						break;
-					}
-					b.setVisited();
-					b = b.getDeltaBase();
-				} while (b != null);
-				for (b = otp; b != null && b.visited(); b = b.getDeltaBase())
-					b.clearVisited();
-				continue;
-			}
 			if (otp.isDoNotDelta()) // delta is disabled for this path
 				continue;
 			if (otp.isDeltaRepresentation()) // already reusing a delta
@@ -1273,17 +1255,6 @@ public class PackWriter {
 			list[cnt++] = otp;
 		}
 		return cnt;
-	}
-
-	private void reselectNonDelta(ObjectToPack otp) throws IOException {
-		otp.clearDeltaBase();
-		otp.clearReuseAsIs();
-		boolean old = reuseDeltas;
-		reuseDeltas = false;
-		reuseSupport.selectObjectRepresentation(this,
-				NullProgressMonitor.INSTANCE,
-				Collections.singleton(otp));
-		reuseDeltas = old;
 	}
 
 	private void searchForDeltas(final ProgressMonitor monitor,
@@ -1477,7 +1448,13 @@ public class PackWriter {
 			// (for example due to a concurrent repack) and a different base
 			// was chosen, forcing a cycle. Select something other than a
 			// delta, and write this object.
-			reselectNonDelta(otp);
+			//
+			reuseDeltas = false;
+			otp.clearDeltaBase();
+			otp.clearReuseAsIs();
+			reuseSupport.selectObjectRepresentation(this,
+					NullProgressMonitor.INSTANCE,
+					Collections.singleton(otp));
 		}
 		otp.markWantWrite();
 
