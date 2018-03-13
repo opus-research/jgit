@@ -53,11 +53,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ObjectWritingException;
 
 /**
@@ -149,8 +147,10 @@ public class ObjectWriter {
 			final ObjectId id = e.getId();
 
 			if (id == null)
-				throw new ObjectWritingException(MessageFormat.format(
-						JGitText.get().objectAtPathDoesNotHaveId, e.getFullName()));
+				throw new ObjectWritingException("Object at path \""
+						+ e.getFullName() + "\" does not have an id assigned."
+						+ "  All object ids must be assigned prior"
+						+ " to writing a tree.");
 
 			e.getMode().copyTo(o);
 			o.write(' ');

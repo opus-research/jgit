@@ -45,9 +45,6 @@
 package org.eclipse.jgit.errors;
 
 import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 /**
  * Attempt to add an entry to a tree that already exists.
@@ -62,6 +59,6 @@ public class EntryExistsException extends IOException {
 	 * @param name workdir relative file name
 	 */
 	public EntryExistsException(final String name) {
-		super(MessageFormat.format(JGitText.get().treeEntryAlreadyExists, name));
+		super("Tree entry \"" + name + "\" already exists.");
 	}
 }

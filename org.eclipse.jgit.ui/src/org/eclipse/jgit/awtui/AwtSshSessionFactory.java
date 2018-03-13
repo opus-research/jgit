@@ -96,7 +96,7 @@ public class AwtSshSessionFactory extends SshConfigSessionFactory {
 		}
 
 		public boolean promptYesNo(final String msg) {
-			return JOptionPane.showConfirmDialog(null, msg, UIText.get().warning,
+			return JOptionPane.showConfirmDialog(null, msg, "Warning",
 					JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
 		}
 

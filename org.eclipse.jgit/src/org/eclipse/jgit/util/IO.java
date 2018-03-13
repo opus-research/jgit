@@ -53,9 +53,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 /**
  * Input/Output utilities
@@ -98,7 +95,7 @@ public class IO {
 		try {
 			final long sz = in.getChannel().size();
 			if (sz > max)
-				throw new IOException(MessageFormat.format(JGitText.get().fileIsTooLarge, path));
+				throw new IOException("File is too large: " + path);
 			final byte[] buf = new byte[(int) sz];
 			IO.readFully(in, buf, 0, buf.length);
 			return buf;
@@ -132,7 +129,7 @@ public class IO {
 		while (len > 0) {
 			final int r = fd.read(dst, off, len);
 			if (r <= 0)
-				throw new EOFException(JGitText.get().shortReadOfBlock);
+				throw new EOFException("Short read of block.");
 			off += r;
 			len -= r;
 		}
@@ -161,7 +158,7 @@ public class IO {
 		while (len > 0) {
 			final int r = fd.read(ByteBuffer.wrap(dst, off, len), pos);
 			if (r <= 0)
-				throw new EOFException(JGitText.get().shortReadOfBlock);
+				throw new EOFException("Short read of block.");
 			pos += r;
 			off += r;
 			len -= r;
@@ -190,7 +187,7 @@ public class IO {
 		while (toSkip > 0) {
 			final long r = fd.skip(toSkip);
 			if (r <= 0)
-				throw new EOFException(JGitText.get().shortSkipOfBlock);
+				throw new EOFException("Short skip of block");
 			toSkip -= r;
 		}
 	}
