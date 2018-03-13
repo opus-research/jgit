@@ -40,23 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.ignore;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
+import java.util.Arrays;
+
+import org.eclipse.jgit.ignore.FastIgnoreRule;
+import org.eclipse.jgit.ignore.IgnoreRule;
 import org.junit.Test;
-
+import org.junit.runner.RunWith;
+import org.junit.runners.*;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 /**
- * Tests git attributes pattern matches
- * <p>
- * Inspired by {@link org.eclipse.jgit.ignore.IgnoreMatcherTest}
- * </p>
+ * Tests ignore pattern matches
  */
-public class AttributesMatcherTest {
+@SuppressWarnings("deprecation")
+@RunWith(Parameterized.class)
+public class IgnoreMatcherParametrizedTest {
+
+	@Parameters(name = "JGit? {0}")
+	public static Iterable<Boolean[]> data() {
+		return Arrays.asList(new Boolean[][] { { Boolean.FALSE },
+				{ Boolean.TRUE } });
+	}
+
+	@Parameter
+	public Boolean useJGitRule;
 
 	@Test
 	public void testBasic() {
@@ -69,27 +81,28 @@ public class AttributesMatcherTest {
 
 	@Test
 	public void testFileNameWildcards() {
-		//Test basic * and ? for any pattern + any character
+		// Test basic * and ? for any pattern + any character
 		String pattern = "*.st?";
 		assertMatched(pattern, "/test.stp");
 		assertMatched(pattern, "/anothertest.stg");
 		assertMatched(pattern, "/anothertest.st0");
 		assertNotMatched(pattern, "/anothertest.sta1");
-		//Check that asterisk does not expand to "/"
+		// Check that asterisk does not expand to "/"
 		assertNotMatched(pattern, "/another/test.sta1");
 
-		//Same as above, with a leading slash to ensure that doesn't cause problems
+		// Same as above, with a leading slash to ensure that doesn't cause
+		// problems
 		pattern = "/*.st?";
 		assertMatched(pattern, "/test.stp");
 		assertMatched(pattern, "/anothertest.stg");
 		assertMatched(pattern, "/anothertest.st0");
 		assertNotMatched(pattern, "/anothertest.sta1");
-		//Check that asterisk does not expand to "/"
+		// Check that asterisk does not expand to "/"
 		assertNotMatched(pattern, "/another/test.sta1");
 
-		//Test for numbers
+		// Test for numbers
 		pattern = "*.sta[0-5]";
-		assertMatched(pattern,  "/test.sta5");
+		assertMatched(pattern, "/test.sta5");
 		assertMatched(pattern, "/test.sta4");
 		assertMatched(pattern, "/test.sta3");
 		assertMatched(pattern, "/test.sta2");
@@ -99,9 +112,9 @@ public class AttributesMatcherTest {
 		assertNotMatched(pattern, "test.stag");
 		assertNotMatched(pattern, "test.sta6");
 
-		//Test for letters
+		// Test for letters
 		pattern = "/[tv]est.sta[a-d]";
-		assertMatched(pattern,  "/test.staa");
+		assertMatched(pattern, "/test.staa");
 		assertMatched(pattern, "/test.stab");
 		assertMatched(pattern, "/test.stac");
 		assertMatched(pattern, "/test.stad");
@@ -109,7 +122,7 @@ public class AttributesMatcherTest {
 		assertNotMatched(pattern, "test.stae");
 		assertNotMatched(pattern, "test.sta9");
 
-		//Test child directory/file is matched
+		// Test child directory/file is matched
 		pattern = "/src/ne?";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new");
@@ -117,7 +130,7 @@ public class AttributesMatcherTest {
 		assertMatched(pattern, "/src/new/a/a.c");
 		assertNotMatched(pattern, "/src/new.c");
 
-		//Test name-only fnmatcher matches
+		// Test name-only fnmatcher matches
 		pattern = "ne?";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new");
@@ -129,27 +142,28 @@ public class AttributesMatcherTest {
 
 	@Test
 	public void testTargetWithoutLeadingSlash() {
-		//Test basic * and ? for any pattern + any character
+		// Test basic * and ? for any pattern + any character
 		String pattern = "/*.st?";
 		assertMatched(pattern, "test.stp");
 		assertMatched(pattern, "anothertest.stg");
 		assertMatched(pattern, "anothertest.st0");
 		assertNotMatched(pattern, "anothertest.sta1");
-		//Check that asterisk does not expand to ""
+		// Check that asterisk does not expand to ""
 		assertNotMatched(pattern, "another/test.sta1");
 
-		//Same as above, with a leading slash to ensure that doesn't cause problems
+		// Same as above, with a leading slash to ensure that doesn't cause
+		// problems
 		pattern = "/*.st?";
 		assertMatched(pattern, "test.stp");
 		assertMatched(pattern, "anothertest.stg");
 		assertMatched(pattern, "anothertest.st0");
 		assertNotMatched(pattern, "anothertest.sta1");
-		//Check that asterisk does not expand to ""
+		// Check that asterisk does not expand to ""
 		assertNotMatched(pattern, "another/test.sta1");
 
-		//Test for numbers
+		// Test for numbers
 		pattern = "/*.sta[0-5]";
-		assertMatched(pattern,  "test.sta5");
+		assertMatched(pattern, "test.sta5");
 		assertMatched(pattern, "test.sta4");
 		assertMatched(pattern, "test.sta3");
 		assertMatched(pattern, "test.sta2");
@@ -159,9 +173,9 @@ public class AttributesMatcherTest {
 		assertNotMatched(pattern, "test.stag");
 		assertNotMatched(pattern, "test.sta6");
 
-		//Test for letters
+		// Test for letters
 		pattern = "/[tv]est.sta[a-d]";
-		assertMatched(pattern,  "test.staa");
+		assertMatched(pattern, "test.staa");
 		assertMatched(pattern, "test.stab");
 		assertMatched(pattern, "test.stac");
 		assertMatched(pattern, "test.stad");
@@ -169,7 +183,7 @@ public class AttributesMatcherTest {
 		assertNotMatched(pattern, "test.stae");
 		assertNotMatched(pattern, "test.sta9");
 
-		//Test child directory/file is matched
+		// Test child directory/file is matched
 		pattern = "/src/ne?";
 		assertMatched(pattern, "src/new/");
 		assertMatched(pattern, "src/new");
@@ -177,7 +191,7 @@ public class AttributesMatcherTest {
 		assertMatched(pattern, "src/new/a/a.c");
 		assertNotMatched(pattern, "src/new.c");
 
-		//Test name-only fnmatcher matches
+		// Test name-only fnmatcher matches
 		pattern = "ne?";
 		assertMatched(pattern, "src/new/");
 		assertMatched(pattern, "src/new");
@@ -188,16 +202,17 @@ public class AttributesMatcherTest {
 	}
 
 	@Test
-	public void testParentDirectoryGitAttributes() {
-		//Contains git attribute patterns such as might be seen in a parent directory
+	public void testParentDirectoryGitIgnores() {
+		// Contains git ignore patterns such as might be seen in a parent
+		// directory
 
-		//Test for wildcards
+		// Test for wildcards
 		String pattern = "/*/*.c";
 		assertMatched(pattern, "/file/a.c");
 		assertMatched(pattern, "/src/a.c");
 		assertNotMatched(pattern, "/src/new/a.c");
 
-		//Test child directory/file is matched
+		// Test child directory/file is matched
 		pattern = "/src/new";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new");
@@ -205,7 +220,7 @@ public class AttributesMatcherTest {
 		assertMatched(pattern, "/src/new/a/a.c");
 		assertNotMatched(pattern, "/src/new.c");
 
-		//Test child directory is matched, slash after name
+		// Test child directory is matched, slash after name
 		pattern = "/src/new/";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new/a.c");
@@ -213,7 +228,7 @@ public class AttributesMatcherTest {
 		assertNotMatched(pattern, "/src/new");
 		assertNotMatched(pattern, "/src/new.c");
 
-		//Test directory is matched by name only
+		// Test directory is matched by name only
 		pattern = "b1";
 		assertMatched(pattern, "/src/new/a/b1/a.c");
 		assertNotMatched(pattern, "/src/new/a/b2/file.c");
@@ -237,14 +252,14 @@ public class AttributesMatcherTest {
 		/*
 		 * Name-only matches do not contain any path separators
 		 */
-		//Test matches for file extension
+		// Test matches for file extension
 		String pattern = "*.stp";
 		assertMatched(pattern, "/test.stp");
 		assertMatched(pattern, "/src/test.stp");
 		assertNotMatched(pattern, "/test.stp1");
 		assertNotMatched(pattern, "/test.astp");
 
-		//Test matches for name-only, applies to file name or folder name
+		// Test matches for name-only, applies to file name or folder name
 		pattern = "src";
 		assertMatched(pattern, "/src");
 		assertMatched(pattern, "/src/");
@@ -253,7 +268,7 @@ public class AttributesMatcherTest {
 		assertMatched(pattern, "/new/src/a.c");
 		assertMatched(pattern, "/file/src");
 
-		//Test matches for name-only, applies only to folder names
+		// Test matches for name-only, applies only to folder names
 		pattern = "src/";
 		assertMatched(pattern, "/src/");
 		assertMatched(pattern, "/src/a.c");
@@ -262,8 +277,8 @@ public class AttributesMatcherTest {
 		assertNotMatched(pattern, "/src");
 		assertNotMatched(pattern, "/file/src");
 
-		//Test matches for name-only, applies to file name or folder name
-		//With a small wildcard
+		// Test matches for name-only, applies to file name or folder name
+		// With a small wildcard
 		pattern = "?rc";
 		assertMatched(pattern, "/src/a.c");
 		assertMatched(pattern, "/src/new/a.c");
@@ -271,8 +286,8 @@ public class AttributesMatcherTest {
 		assertMatched(pattern, "/file/src");
 		assertMatched(pattern, "/src/");
 
-		//Test matches for name-only, applies to file name or folder name
-		//With a small wildcard
+		// Test matches for name-only, applies to file name or folder name
+		// With a small wildcard
 		pattern = "?r[a-c]";
 		assertMatched(pattern, "/src/a.c");
 		assertMatched(pattern, "/src/new/a.c");
@@ -294,74 +309,9 @@ public class AttributesMatcherTest {
 	}
 
 	@Test
-	public void testGetters() {
-		AttributesRule r = new AttributesRule("/pattern/", "");
-		assertFalse(r.isNameOnly());
-		assertTrue(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertTrue(r.getAttributes().isEmpty());
-		assertEquals(r.getPattern(), "/pattern");
-
-		r = new AttributesRule("/patter?/", "");
-		assertFalse(r.isNameOnly());
-		assertTrue(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertTrue(r.getAttributes().isEmpty());
-		assertEquals(r.getPattern(), "/patter?");
-
-		r = new AttributesRule("patt*", "");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertTrue(r.getAttributes().isEmpty());
-		assertEquals(r.getPattern(), "patt*");
-
-		r = new AttributesRule("pattern", "attribute1");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertFalse(r.getAttributes().isEmpty());
-		assertEquals(r.getAttributes().size(), 1);
-		assertEquals(r.getPattern(), "pattern");
-
-		r = new AttributesRule("pattern", "attribute1 -attribute2");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
-
-		r = new AttributesRule("pattern", "attribute1 \t-attribute2 \t");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
-
-		r = new AttributesRule("pattern", "attribute1\t-attribute2\t");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
-
-		r = new AttributesRule("pattern", "attribute1\t -attribute2\t ");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
-
-		r = new AttributesRule("pattern",
-				"attribute1 -attribute2  attribute3=value ");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 3);
-		assertEquals(r.getPattern(), "pattern");
-		assertEquals(r.getAttributes().get(0).toString(), "attribute1");
-		assertEquals(r.getAttributes().get(1).toString(), "-attribute2");
-		assertEquals(r.getAttributes().get(2).toString(), "attribute3=value");
+	public void testNegation() {
+		String pattern = "!/test.stp";
+		assertMatched(pattern, "/test.stp");
 	}
 
 	/**
@@ -369,7 +319,7 @@ public class AttributesMatcherTest {
 	 * target is meant to be a directory.
 	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitattributes file
+	 *            Pattern as it would appear in a .gitignore file
 	 * @param target
 	 *            Target file path relative to repository's GIT_DIR
 	 */
@@ -384,7 +334,7 @@ public class AttributesMatcherTest {
 	 * target is meant to be a directory.
 	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitattributes file
+	 *            Pattern as it would appear in a .gitignore file
 	 * @param target
 	 *            Target file path relative to repository's GIT_DIR
 	 */
@@ -399,15 +349,23 @@ public class AttributesMatcherTest {
 	 * target is meant to be a directory.
 	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitattributes file
+	 *            Pattern as it would appear in a .gitignore file
 	 * @param target
 	 *            Target file path relative to repository's GIT_DIR
-	 * @return Result of {@link AttributesRule#isMatch(String, boolean)}
+	 * @return Result of {@link FastIgnoreRule#isMatch(String, boolean)}
 	 */
-	private static boolean match(String pattern, String target) {
-		AttributesRule r = new AttributesRule(pattern, "");
-		//If speed of this test is ever an issue, we can use a presetRule field
-		//to avoid recompiling a pattern each time.
-		return r.isMatch(target, target.endsWith("/"));
+	private boolean match(String pattern, String target) {
+		boolean isDirectory = target.endsWith("/");
+		if (useJGitRule.booleanValue()) {
+			IgnoreRule r = new IgnoreRule(pattern);
+			// If speed of this test is ever an issue, we can use a presetRule
+			// field
+			// to avoid recompiling a pattern each time.
+			return r.isMatch(target, isDirectory);
+		}
+		FastIgnoreRule r = new FastIgnoreRule(pattern);
+		// If speed of this test is ever an issue, we can use a presetRule field
+		// to avoid recompiling a pattern each time.
+		return r.isMatch(target, isDirectory);
 	}
 }

@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2013, Gunnar Wagenknecht
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
-import org.eclipse.jgit.attributes.Attribute.State;
-import org.junit.Test;
-
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * Tests {@link Attribute}
+ * Generic string matcher
+ *
+ * @since 3.6
  */
-public class AttributeTest {
+public interface IMatcher {
 
-	@Test
-	public void testBasic() {
-		Attribute a = new Attribute("delta", State.SET);
-		assertEquals(a.getKey(), "delta");
-		assertEquals(a.getState(), State.SET);
-		assertNull(a.getValue());
-		assertEquals(a.toString(), "delta");
+	/**
+	 * Matches entire given string
+	 *
+	 * @param path
+	 *            string which is not null, but might be empty
+	 * @param assumeDirectory
+	 *            true to assume this path as directory (even if it doesn't end
+	 *            with a slash)
+	 * @return true if this matcher pattern matches given string
+	 */
+	boolean matches(String path, boolean assumeDirectory);
 
-		a = new Attribute("delta", State.UNSET);
-		assertEquals(a.getKey(), "delta");
-		assertEquals(a.getState(), State.UNSET);
-		assertNull(a.getValue());
-		assertEquals(a.toString(), "-delta");
-
-		a = new Attribute("delta", "value");
-		assertEquals(a.getKey(), "delta");
-		assertEquals(a.getState(), State.CUSTOM);
-		assertEquals(a.getValue(), "value");
-		assertEquals(a.toString(), "delta=value");
-	}
+	/**
+	 * Matches only part of given string
+	 *
+	 * @param segment
+	 *            string which is not null, but might be empty
+	 * @param startIncl
+	 *            start index, inclusive
+	 * @param endExcl
+	 *            end index, exclusive
+	 * @param assumeDirectory
+	 *            true to assume this path as directory (even if it doesn't end
+	 *            with a slash)
+	 * @return true if this matcher pattern matches given string
+	 */
+	boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory);
 }
