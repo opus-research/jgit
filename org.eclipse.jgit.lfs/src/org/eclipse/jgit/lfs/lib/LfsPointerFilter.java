@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2015, 2017, Dariusz Luksza <dariusz@luksza.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,33 +40,64 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.lfs.lib;
+
+import java.io.IOException;
+
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lfs.LfsPointer;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectStream;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
- * Translation bundle for JGit LFS server
+ * Detects Large File pointers, as described in [1] in Git repository.
+ *
+ * [1] https://github.com/github/git-lfs/blob/master/docs/spec.md
+ *
+ * @since 4.7
  */
-public class LfsText extends TranslationBundle {
+public class LfsPointerFilter extends TreeFilter {
+
+	private LfsPointer pointer;
 
 	/**
-	 * @return an instance of this translation bundle
+	 * @return {@link LfsPointer} or {@code null}
 	 */
-	public static LfsText get() {
-		return NLS.getBundleFor(LfsText.class);
+	public LfsPointer getPointer() {
+		return pointer;
 	}
 
-	// @formatter:off
-	/***/ public String corruptLongObject;
-	/***/ public String inconsistentMediafileLength;
-	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
-	/***/ public String invalidLongId;
-	/***/ public String invalidLongIdLength;
-	/***/ public String requiredHashFunctionNotAvailable;
-	/***/ public String repositoryNotFound;
-	/***/ public String repositoryReadOnly;
-	/***/ public String lfsUnavailable;
-	/***/ public String lfsUnathorized;
-	/***/ public String lfsFailedToGetRepository;
+	@Override
+	public boolean include(TreeWalk walk) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		pointer = null;
+		if (walk.isSubtree()) {
+			return walk.isRecursive();
+		}
+		ObjectId objectId = walk.getObjectId(0);
+		ObjectLoader object = walk.getObjectReader().open(objectId);
+		if (object.getSize() > 1024) {
+			return false;
+		}
+
+		try (ObjectStream stream = object.openStream()) {
+			pointer = LfsPointer.parseLfsPointer(stream);
+			return pointer != null;
+		}
+	}
+
+	@Override
+	public boolean shouldBeRecursive() {
+		return false;
+	}
+
+	@Override
+	public TreeFilter clone() {
+		return new LfsPointerFilter();
+	}
 }

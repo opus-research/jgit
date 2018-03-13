@@ -164,7 +164,7 @@ public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	/** Empty set of objects for {@code preparePack()}. */
-	public static Set<ObjectId> NONE = Collections.emptySet();
+	public static final Set<ObjectId> NONE = Collections.emptySet();
 
 	private static final Map<WeakReference<PackWriter>, Boolean> instances =
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
@@ -1597,14 +1597,15 @@ public class PackWriter implements AutoCloseable {
 			}
 		}
 
-		TemporaryBuffer.Heap delta = delta(otp);
-		out.writeHeader(otp, delta.length());
+		try (TemporaryBuffer.Heap delta = delta(otp)) {
+			out.writeHeader(otp, delta.length());
 
-		Deflater deflater = deflater();
-		deflater.reset();
-		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
-		delta.writeTo(dst, null);
-		dst.finish();
+			Deflater deflater = deflater();
+			deflater.reset();
+			DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
+			delta.writeTo(dst, null);
+			dst.finish();
+		}
 		typeStats.cntDeltas++;
 		typeStats.deltaBytes += out.length() - otp.getOffset();
 	}

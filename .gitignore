@@ -3,9 +3,4 @@
 /buck-cache
 /buck-out
 /target
-bazel-bin
-bazel-genfiles
-bazel-jgit
-bazel-out
-bazel-testlogs
-*~
+infer-out
