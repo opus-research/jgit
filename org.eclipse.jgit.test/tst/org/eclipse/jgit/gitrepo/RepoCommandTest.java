@@ -62,6 +62,7 @@ import org.junit.Test;
 public class RepoCommandTest extends RepositoryTestCase {
 
 	private static final String BRANCH = "branch";
+	private static final String TAG = "release";
 
 	private Repository defaultDb;
 	private Repository notDefaultDb;
@@ -86,6 +87,7 @@ public class RepoCommandTest extends RepositoryTestCase {
 		oldCommitId = git.commit().setMessage("Initial commit").call().getId();
 		git.checkout().setName(BRANCH).setCreateBranch(true).call();
 		git.checkout().setName("master").call();
+		git.tag().setName(TAG).call();
 		JGitTestUtil.writeTrashFile(defaultDb, "hello.txt", "master world");
 		git.add().addFilepattern("hello.txt").call();
 		git.commit().setMessage("Second commit").call();
@@ -191,7 +193,7 @@ public class RepoCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testRepoManifestCopyFile() throws Exception {
+	public void testRepoManifestCopyfile() throws Exception {
 		Repository localDb = createWorkRepository();
 		StringBuilder xmlContent = new StringBuilder();
 		xmlContent.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
@@ -315,6 +317,31 @@ public class RepoCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testRevisionTag() throws Exception {
+		StringBuilder xmlContent = new StringBuilder();
+		xmlContent.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+			.append("<manifest>")
+			.append("<remote name=\"remote1\" fetch=\".\" />")
+			.append("<default revision=\"master\" remote=\"remote1\" />")
+			.append("<project path=\"foo\" name=\"")
+			.append(defaultUri)
+			.append("\" revision=\"")
+			.append(TAG)
+			.append("\" />")
+			.append("</manifest>");
+		writeTrashFile("manifest.xml", xmlContent.toString());
+		RepoCommand command = new RepoCommand(db);
+		command.setPath(db.getWorkTree().getAbsolutePath() + "/manifest.xml")
+			.setURI(rootUri)
+			.call();
+		File hello = new File(db.getWorkTree(), "foo/hello.txt");
+		BufferedReader reader = new BufferedReader(new FileReader(hello));
+		String content = reader.readLine();
+		reader.close();
+		assertEquals("submodule content is as expected.", "branch world", content);
+	}
+
+	@Test
 	public void testRevisionBare() throws Exception {
 		Repository remoteDb = createBareRepository();
 		Repository tempDb = createWorkRepository();
@@ -344,44 +371,6 @@ public class RepoCommandTest extends RepositoryTestCase {
 		String gitlink = localDb.resolve(Constants.HEAD + ":foo").name();
 		assertEquals("The gitlink is same as remote head",
 				oldCommitId.name(), gitlink);
-	}
-
-	@Test
-	public void testCopyFileBare() throws Exception {
-		Repository remoteDb = createBareRepository();
-		Repository tempDb = createWorkRepository();
-		StringBuilder xmlContent = new StringBuilder();
-		xmlContent.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-			.append("<manifest>")
-			.append("<remote name=\"remote1\" fetch=\".\" />")
-			.append("<default revision=\"master\" remote=\"remote1\" />")
-			.append("<project path=\"foo\" name=\"")
-			.append(defaultUri)
-			.append("\" revision=\"")
-			.append(BRANCH)
-			.append("\" >")
-			.append("<copyfile src=\"hello.txt\" dest=\"Hello\" />")
-			.append("</project>")
-			.append("</manifest>");
-		JGitTestUtil.writeTrashFile(tempDb, "manifest.xml", xmlContent.toString());
-		RepoCommand command = new RepoCommand(remoteDb);
-		command.setPath(tempDb.getWorkTree().getAbsolutePath() + "/manifest.xml")
-			.setURI(rootUri)
-			.call();
-		// Clone it
-		File directory = createTempDirectory("testCopyFileBare");
-		CloneCommand clone = Git.cloneRepository();
-		clone.setDirectory(directory);
-		clone.setURI(remoteDb.getDirectory().toURI().toString());
-		Repository localDb = clone.call().getRepository();
-		// The Hello file should exist
-		File hello = new File(localDb.getWorkTree(), "Hello");
-		assertTrue("The Hello file exists", hello.exists());
-		// The content of Hello file should be expected
-		BufferedReader reader = new BufferedReader(new FileReader(hello));
-		String content = reader.readLine();
-		reader.close();
-		assertEquals("The Hello file has expected content", "branch world", content);
 	}
 
 	private void resolveRelativeUris() {
