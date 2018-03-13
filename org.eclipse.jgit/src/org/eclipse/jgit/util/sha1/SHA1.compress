@@ -1,9 +1,9 @@
 /* Template for compress method; run through cpp. */
 
-#define ROUND1_STEP(a, b, c, d, e, T) e += s1(a,b,c,d,T); b = rotateLeft(b, 30)
-#define ROUND2_STEP(a, b, c, d, e, T) e += s2(a,b,c,d,T); b = rotateLeft(b, 30)
-#define ROUND3_STEP(a, b, c, d, e, T) e += s3(a,b,c,d,T); b = rotateLeft(b, 30)
-#define ROUND4_STEP(a, b, c, d, e, T) e += s4(a,b,c,d,T); b = rotateLeft(b, 30)
+#define ROUND1_STEP(a, b, c, d, e, T) e += s1(a,b,c,d,w[T]); b = rotateLeft(b, 30)
+#define ROUND2_STEP(a, b, c, d, e, T) e += s2(a,b,c,d,w[T]); b = rotateLeft(b, 30)
+#define ROUND3_STEP(a, b, c, d, e, T) e += s3(a,b,c,d,w[T]); b = rotateLeft(b, 30)
+#define ROUND4_STEP(a, b, c, d, e, T) e += s4(a,b,c,d,w[T]); b = rotateLeft(b, 30)
 
 	ROUND1_STEP(a, b, c, d, e, 0);
 	ROUND1_STEP(e, a, b, c, d, 1);

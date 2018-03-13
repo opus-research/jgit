@@ -119,7 +119,8 @@ public class SHA1 {
 	private final State hTmp = new State();
 
 	private SHA1() {
-		h.init();
+		// Magic initialization constants defined by FIPS180.
+		h.save(0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0);
 	}
 
 	/**
@@ -247,7 +248,7 @@ public class SHA1 {
 		// RFC 3174 6.1.b, extend state vector to 80 words.
 		for (int t = 16; t < 80; t++) {
 			int x = w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16];
-			w[t] = (x << 1) | (x >>> 31); // S^1(...)
+			w[t] = rotateLeft(x, 1); // S^1(...)
 		}
 	}
 
@@ -257,91 +258,91 @@ public class SHA1 {
 		int a = h.a, b = h.b, c = h.c, d = h.d, e = h.e;
 
 		// @formatter:off
-		 e += s1(a, b, c, d, 0);  b = rotateLeft(b, 30);
-		 d += s1(e, a, b, c, 1);  a = rotateLeft(a, 30);
-		 c += s1(d, e, a, b, 2);  e = rotateLeft(e, 30);
-		 b += s1(c, d, e, a, 3);  d = rotateLeft(d, 30);
-		 a += s1(b, c, d, e, 4);  c = rotateLeft(c, 30);
-		 e += s1(a, b, c, d, 5);  b = rotateLeft(b, 30);
-		 d += s1(e, a, b, c, 6);  a = rotateLeft(a, 30);
-		 c += s1(d, e, a, b, 7);  e = rotateLeft(e, 30);
-		 b += s1(c, d, e, a, 8);  d = rotateLeft(d, 30);
-		 a += s1(b, c, d, e, 9);  c = rotateLeft(c, 30);
-		 e += s1(a, b, c, d, 10);  b = rotateLeft(b, 30);
-		 d += s1(e, a, b, c, 11);  a = rotateLeft(a, 30);
-		 c += s1(d, e, a, b, 12);  e = rotateLeft(e, 30);
-		 b += s1(c, d, e, a, 13);  d = rotateLeft(d, 30);
-		 a += s1(b, c, d, e, 14);  c = rotateLeft(c, 30);
-		 e += s1(a, b, c, d, 15);  b = rotateLeft(b, 30);
-		 d += s1(e, a, b, c, 16);  a = rotateLeft(a, 30);
-		 c += s1(d, e, a, b, 17);  e = rotateLeft(e, 30);
-		 b += s1(c, d, e, a, 18);  d = rotateLeft(d, 30);
-		 a += s1(b, c, d, e, 19);  c = rotateLeft(c, 30);
+		 e += s1(a, b, c, d,w[ 0]);  b = rotateLeft( b, 30);
+		 d += s1(e, a, b, c,w[ 1]);  a = rotateLeft( a, 30);
+		 c += s1(d, e, a, b,w[ 2]);  e = rotateLeft( e, 30);
+		 b += s1(c, d, e, a,w[ 3]);  d = rotateLeft( d, 30);
+		 a += s1(b, c, d, e,w[ 4]);  c = rotateLeft( c, 30);
+		 e += s1(a, b, c, d,w[ 5]);  b = rotateLeft( b, 30);
+		 d += s1(e, a, b, c,w[ 6]);  a = rotateLeft( a, 30);
+		 c += s1(d, e, a, b,w[ 7]);  e = rotateLeft( e, 30);
+		 b += s1(c, d, e, a,w[ 8]);  d = rotateLeft( d, 30);
+		 a += s1(b, c, d, e,w[ 9]);  c = rotateLeft( c, 30);
+		 e += s1(a, b, c, d,w[ 10]);  b = rotateLeft( b, 30);
+		 d += s1(e, a, b, c,w[ 11]);  a = rotateLeft( a, 30);
+		 c += s1(d, e, a, b,w[ 12]);  e = rotateLeft( e, 30);
+		 b += s1(c, d, e, a,w[ 13]);  d = rotateLeft( d, 30);
+		 a += s1(b, c, d, e,w[ 14]);  c = rotateLeft( c, 30);
+		 e += s1(a, b, c, d,w[ 15]);  b = rotateLeft( b, 30);
+		 d += s1(e, a, b, c,w[ 16]);  a = rotateLeft( a, 30);
+		 c += s1(d, e, a, b,w[ 17]);  e = rotateLeft( e, 30);
+		 b += s1(c, d, e, a,w[ 18]);  d = rotateLeft( d, 30);
+		 a += s1(b, c, d, e,w[ 19]);  c = rotateLeft( c, 30);
 
-		 e += s2(a, b, c, d, 20);  b = rotateLeft(b, 30);
-		 d += s2(e, a, b, c, 21);  a = rotateLeft(a, 30);
-		 c += s2(d, e, a, b, 22);  e = rotateLeft(e, 30);
-		 b += s2(c, d, e, a, 23);  d = rotateLeft(d, 30);
-		 a += s2(b, c, d, e, 24);  c = rotateLeft(c, 30);
-		 e += s2(a, b, c, d, 25);  b = rotateLeft(b, 30);
-		 d += s2(e, a, b, c, 26);  a = rotateLeft(a, 30);
-		 c += s2(d, e, a, b, 27);  e = rotateLeft(e, 30);
-		 b += s2(c, d, e, a, 28);  d = rotateLeft(d, 30);
-		 a += s2(b, c, d, e, 29);  c = rotateLeft(c, 30);
-		 e += s2(a, b, c, d, 30);  b = rotateLeft(b, 30);
-		 d += s2(e, a, b, c, 31);  a = rotateLeft(a, 30);
-		 c += s2(d, e, a, b, 32);  e = rotateLeft(e, 30);
-		 b += s2(c, d, e, a, 33);  d = rotateLeft(d, 30);
-		 a += s2(b, c, d, e, 34);  c = rotateLeft(c, 30);
-		 e += s2(a, b, c, d, 35);  b = rotateLeft(b, 30);
-		 d += s2(e, a, b, c, 36);  a = rotateLeft(a, 30);
-		 c += s2(d, e, a, b, 37);  e = rotateLeft(e, 30);
-		 b += s2(c, d, e, a, 38);  d = rotateLeft(d, 30);
-		 a += s2(b, c, d, e, 39);  c = rotateLeft(c, 30);
+		 e += s2(a, b, c, d,w[ 20]);  b = rotateLeft( b, 30);
+		 d += s2(e, a, b, c,w[ 21]);  a = rotateLeft( a, 30);
+		 c += s2(d, e, a, b,w[ 22]);  e = rotateLeft( e, 30);
+		 b += s2(c, d, e, a,w[ 23]);  d = rotateLeft( d, 30);
+		 a += s2(b, c, d, e,w[ 24]);  c = rotateLeft( c, 30);
+		 e += s2(a, b, c, d,w[ 25]);  b = rotateLeft( b, 30);
+		 d += s2(e, a, b, c,w[ 26]);  a = rotateLeft( a, 30);
+		 c += s2(d, e, a, b,w[ 27]);  e = rotateLeft( e, 30);
+		 b += s2(c, d, e, a,w[ 28]);  d = rotateLeft( d, 30);
+		 a += s2(b, c, d, e,w[ 29]);  c = rotateLeft( c, 30);
+		 e += s2(a, b, c, d,w[ 30]);  b = rotateLeft( b, 30);
+		 d += s2(e, a, b, c,w[ 31]);  a = rotateLeft( a, 30);
+		 c += s2(d, e, a, b,w[ 32]);  e = rotateLeft( e, 30);
+		 b += s2(c, d, e, a,w[ 33]);  d = rotateLeft( d, 30);
+		 a += s2(b, c, d, e,w[ 34]);  c = rotateLeft( c, 30);
+		 e += s2(a, b, c, d,w[ 35]);  b = rotateLeft( b, 30);
+		 d += s2(e, a, b, c,w[ 36]);  a = rotateLeft( a, 30);
+		 c += s2(d, e, a, b,w[ 37]);  e = rotateLeft( e, 30);
+		 b += s2(c, d, e, a,w[ 38]);  d = rotateLeft( d, 30);
+		 a += s2(b, c, d, e,w[ 39]);  c = rotateLeft( c, 30);
 
-		 e += s3(a, b, c, d, 40);  b = rotateLeft(b, 30);
-		 d += s3(e, a, b, c, 41);  a = rotateLeft(a, 30);
-		 c += s3(d, e, a, b, 42);  e = rotateLeft(e, 30);
-		 b += s3(c, d, e, a, 43);  d = rotateLeft(d, 30);
-		 a += s3(b, c, d, e, 44);  c = rotateLeft(c, 30);
-		 e += s3(a, b, c, d, 45);  b = rotateLeft(b, 30);
-		 d += s3(e, a, b, c, 46);  a = rotateLeft(a, 30);
-		 c += s3(d, e, a, b, 47);  e = rotateLeft(e, 30);
-		 b += s3(c, d, e, a, 48);  d = rotateLeft(d, 30);
-		 a += s3(b, c, d, e, 49);  c = rotateLeft(c, 30);
-		 e += s3(a, b, c, d, 50);  b = rotateLeft(b, 30);
-		 d += s3(e, a, b, c, 51);  a = rotateLeft(a, 30);
-		 c += s3(d, e, a, b, 52);  e = rotateLeft(e, 30);
-		 b += s3(c, d, e, a, 53);  d = rotateLeft(d, 30);
-		 a += s3(b, c, d, e, 54);  c = rotateLeft(c, 30);
-		 e += s3(a, b, c, d, 55);  b = rotateLeft(b, 30);
-		 d += s3(e, a, b, c, 56);  a = rotateLeft(a, 30);
-		 c += s3(d, e, a, b, 57);  e = rotateLeft(e, 30);
+		 e += s3(a, b, c, d,w[ 40]);  b = rotateLeft( b, 30);
+		 d += s3(e, a, b, c,w[ 41]);  a = rotateLeft( a, 30);
+		 c += s3(d, e, a, b,w[ 42]);  e = rotateLeft( e, 30);
+		 b += s3(c, d, e, a,w[ 43]);  d = rotateLeft( d, 30);
+		 a += s3(b, c, d, e,w[ 44]);  c = rotateLeft( c, 30);
+		 e += s3(a, b, c, d,w[ 45]);  b = rotateLeft( b, 30);
+		 d += s3(e, a, b, c,w[ 46]);  a = rotateLeft( a, 30);
+		 c += s3(d, e, a, b,w[ 47]);  e = rotateLeft( e, 30);
+		 b += s3(c, d, e, a,w[ 48]);  d = rotateLeft( d, 30);
+		 a += s3(b, c, d, e,w[ 49]);  c = rotateLeft( c, 30);
+		 e += s3(a, b, c, d,w[ 50]);  b = rotateLeft( b, 30);
+		 d += s3(e, a, b, c,w[ 51]);  a = rotateLeft( a, 30);
+		 c += s3(d, e, a, b,w[ 52]);  e = rotateLeft( e, 30);
+		 b += s3(c, d, e, a,w[ 53]);  d = rotateLeft( d, 30);
+		 a += s3(b, c, d, e,w[ 54]);  c = rotateLeft( c, 30);
+		 e += s3(a, b, c, d,w[ 55]);  b = rotateLeft( b, 30);
+		 d += s3(e, a, b, c,w[ 56]);  a = rotateLeft( a, 30);
+		 c += s3(d, e, a, b,w[ 57]);  e = rotateLeft( e, 30);
 		state58.save(a, b, c, d, e);
-		 b += s3(c, d, e, a, 58);  d = rotateLeft(d, 30);
-		 a += s3(b, c, d, e, 59);  c = rotateLeft(c, 30);
+		 b += s3(c, d, e, a,w[ 58]);  d = rotateLeft( d, 30);
+		 a += s3(b, c, d, e,w[ 59]);  c = rotateLeft( c, 30);
 
-		 e += s4(a, b, c, d, 60);  b = rotateLeft(b, 30);
-		 d += s4(e, a, b, c, 61);  a = rotateLeft(a, 30);
-		 c += s4(d, e, a, b, 62);  e = rotateLeft(e, 30);
-		 b += s4(c, d, e, a, 63);  d = rotateLeft(d, 30);
-		 a += s4(b, c, d, e, 64);  c = rotateLeft(c, 30);
+		 e += s4(a, b, c, d,w[ 60]);  b = rotateLeft( b, 30);
+		 d += s4(e, a, b, c,w[ 61]);  a = rotateLeft( a, 30);
+		 c += s4(d, e, a, b,w[ 62]);  e = rotateLeft( e, 30);
+		 b += s4(c, d, e, a,w[ 63]);  d = rotateLeft( d, 30);
+		 a += s4(b, c, d, e,w[ 64]);  c = rotateLeft( c, 30);
 		state65.save(a, b, c, d, e);
-		 e += s4(a, b, c, d, 65);  b = rotateLeft(b, 30);
-		 d += s4(e, a, b, c, 66);  a = rotateLeft(a, 30);
-		 c += s4(d, e, a, b, 67);  e = rotateLeft(e, 30);
-		 b += s4(c, d, e, a, 68);  d = rotateLeft(d, 30);
-		 a += s4(b, c, d, e, 69);  c = rotateLeft(c, 30);
-		 e += s4(a, b, c, d, 70);  b = rotateLeft(b, 30);
-		 d += s4(e, a, b, c, 71);  a = rotateLeft(a, 30);
-		 c += s4(d, e, a, b, 72);  e = rotateLeft(e, 30);
-		 b += s4(c, d, e, a, 73);  d = rotateLeft(d, 30);
-		 a += s4(b, c, d, e, 74);  c = rotateLeft(c, 30);
-		 e += s4(a, b, c, d, 75);  b = rotateLeft(b, 30);
-		 d += s4(e, a, b, c, 76);  a = rotateLeft(a, 30);
-		 c += s4(d, e, a, b, 77);  e = rotateLeft(e, 30);
-		 b += s4(c, d, e, a, 78);  d = rotateLeft(d, 30);
-		 a += s4(b, c, d, e, 79);  c = rotateLeft(c, 30);
+		 e += s4(a, b, c, d,w[ 65]);  b = rotateLeft( b, 30);
+		 d += s4(e, a, b, c,w[ 66]);  a = rotateLeft( a, 30);
+		 c += s4(d, e, a, b,w[ 67]);  e = rotateLeft( e, 30);
+		 b += s4(c, d, e, a,w[ 68]);  d = rotateLeft( d, 30);
+		 a += s4(b, c, d, e,w[ 69]);  c = rotateLeft( c, 30);
+		 e += s4(a, b, c, d,w[ 70]);  b = rotateLeft( b, 30);
+		 d += s4(e, a, b, c,w[ 71]);  a = rotateLeft( a, 30);
+		 c += s4(d, e, a, b,w[ 72]);  e = rotateLeft( e, 30);
+		 b += s4(c, d, e, a,w[ 73]);  d = rotateLeft( d, 30);
+		 a += s4(b, c, d, e,w[ 74]);  c = rotateLeft( c, 30);
+		 e += s4(a, b, c, d,w[ 75]);  b = rotateLeft( b, 30);
+		 d += s4(e, a, b, c,w[ 76]);  a = rotateLeft( a, 30);
+		 c += s4(d, e, a, b,w[ 77]);  e = rotateLeft( e, 30);
+		 b += s4(c, d, e, a,w[ 78]);  d = rotateLeft( d, 30);
+		 a += s4(b, c, d, e,w[ 79]);  c = rotateLeft( c, 30);
 
 		// @formatter:on
 		h.save(h.a + a, h.b + b, h.c + c, h.d + d, h.e + e);
@@ -360,163 +361,135 @@ public class SHA1 {
 
 		// @formatter:off
 	  if (t == 65) {
-		{ c = rotateRight(c, 30);  a -= r4(b, c, d, e, 64);}
-		{ d = rotateRight(d, 30);  b -= r4(c, d, e, a, 63);}
-		{ e = rotateRight(e, 30);  c -= r4(d, e, a, b, 62);}
-		{ a = rotateRight(a, 30);  d -= r4(e, a, b, c, 61);}
-		{ b = rotateRight(b, 30);  e -= r4(a, b, c, d, 60);}
+		{ c = rotateRight( c, 30);  a -= s4(b, c, d, e,w2[ 64]);}
+		{ d = rotateRight( d, 30);  b -= s4(c, d, e, a,w2[ 63]);}
+		{ e = rotateRight( e, 30);  c -= s4(d, e, a, b,w2[ 62]);}
+		{ a = rotateRight( a, 30);  d -= s4(e, a, b, c,w2[ 61]);}
+		{ b = rotateRight( b, 30);  e -= s4(a, b, c, d,w2[ 60]);}
 
-		{ c = rotateRight(c, 30);  a -= r3(b, c, d, e, 59);}
-		{ d = rotateRight(d, 30);  b -= r3(c, d, e, a, 58);}
+		{ c = rotateRight( c, 30);  a -= s3(b, c, d, e,w2[ 59]);}
+		{ d = rotateRight( d, 30);  b -= s3(c, d, e, a,w2[ 58]);}
 	  }
-		{ e = rotateRight(e, 30);  c -= r3(d, e, a, b, 57);}
-		{ a = rotateRight(a, 30);  d -= r3(e, a, b, c, 56);}
-		{ b = rotateRight(b, 30);  e -= r3(a, b, c, d, 55);}
-		{ c = rotateRight(c, 30);  a -= r3(b, c, d, e, 54);}
-		{ d = rotateRight(d, 30);  b -= r3(c, d, e, a, 53);}
-		{ e = rotateRight(e, 30);  c -= r3(d, e, a, b, 52);}
-		{ a = rotateRight(a, 30);  d -= r3(e, a, b, c, 51);}
-		{ b = rotateRight(b, 30);  e -= r3(a, b, c, d, 50);}
-		{ c = rotateRight(c, 30);  a -= r3(b, c, d, e, 49);}
-		{ d = rotateRight(d, 30);  b -= r3(c, d, e, a, 48);}
-		{ e = rotateRight(e, 30);  c -= r3(d, e, a, b, 47);}
-		{ a = rotateRight(a, 30);  d -= r3(e, a, b, c, 46);}
-		{ b = rotateRight(b, 30);  e -= r3(a, b, c, d, 45);}
-		{ c = rotateRight(c, 30);  a -= r3(b, c, d, e, 44);}
-		{ d = rotateRight(d, 30);  b -= r3(c, d, e, a, 43);}
-		{ e = rotateRight(e, 30);  c -= r3(d, e, a, b, 42);}
-		{ a = rotateRight(a, 30);  d -= r3(e, a, b, c, 41);}
-		{ b = rotateRight(b, 30);  e -= r3(a, b, c, d, 40);}
+		{ e = rotateRight( e, 30);  c -= s3(d, e, a, b,w2[ 57]);}
+		{ a = rotateRight( a, 30);  d -= s3(e, a, b, c,w2[ 56]);}
+		{ b = rotateRight( b, 30);  e -= s3(a, b, c, d,w2[ 55]);}
+		{ c = rotateRight( c, 30);  a -= s3(b, c, d, e,w2[ 54]);}
+		{ d = rotateRight( d, 30);  b -= s3(c, d, e, a,w2[ 53]);}
+		{ e = rotateRight( e, 30);  c -= s3(d, e, a, b,w2[ 52]);}
+		{ a = rotateRight( a, 30);  d -= s3(e, a, b, c,w2[ 51]);}
+		{ b = rotateRight( b, 30);  e -= s3(a, b, c, d,w2[ 50]);}
+		{ c = rotateRight( c, 30);  a -= s3(b, c, d, e,w2[ 49]);}
+		{ d = rotateRight( d, 30);  b -= s3(c, d, e, a,w2[ 48]);}
+		{ e = rotateRight( e, 30);  c -= s3(d, e, a, b,w2[ 47]);}
+		{ a = rotateRight( a, 30);  d -= s3(e, a, b, c,w2[ 46]);}
+		{ b = rotateRight( b, 30);  e -= s3(a, b, c, d,w2[ 45]);}
+		{ c = rotateRight( c, 30);  a -= s3(b, c, d, e,w2[ 44]);}
+		{ d = rotateRight( d, 30);  b -= s3(c, d, e, a,w2[ 43]);}
+		{ e = rotateRight( e, 30);  c -= s3(d, e, a, b,w2[ 42]);}
+		{ a = rotateRight( a, 30);  d -= s3(e, a, b, c,w2[ 41]);}
+		{ b = rotateRight( b, 30);  e -= s3(a, b, c, d,w2[ 40]);}
 
-		{ c = rotateRight(c, 30);  a -= r2(b, c, d, e, 39);}
-		{ d = rotateRight(d, 30);  b -= r2(c, d, e, a, 38);}
-		{ e = rotateRight(e, 30);  c -= r2(d, e, a, b, 37);}
-		{ a = rotateRight(a, 30);  d -= r2(e, a, b, c, 36);}
-		{ b = rotateRight(b, 30);  e -= r2(a, b, c, d, 35);}
-		{ c = rotateRight(c, 30);  a -= r2(b, c, d, e, 34);}
-		{ d = rotateRight(d, 30);  b -= r2(c, d, e, a, 33);}
-		{ e = rotateRight(e, 30);  c -= r2(d, e, a, b, 32);}
-		{ a = rotateRight(a, 30);  d -= r2(e, a, b, c, 31);}
-		{ b = rotateRight(b, 30);  e -= r2(a, b, c, d, 30);}
-		{ c = rotateRight(c, 30);  a -= r2(b, c, d, e, 29);}
-		{ d = rotateRight(d, 30);  b -= r2(c, d, e, a, 28);}
-		{ e = rotateRight(e, 30);  c -= r2(d, e, a, b, 27);}
-		{ a = rotateRight(a, 30);  d -= r2(e, a, b, c, 26);}
-		{ b = rotateRight(b, 30);  e -= r2(a, b, c, d, 25);}
-		{ c = rotateRight(c, 30);  a -= r2(b, c, d, e, 24);}
-		{ d = rotateRight(d, 30);  b -= r2(c, d, e, a, 23);}
-		{ e = rotateRight(e, 30);  c -= r2(d, e, a, b, 22);}
-		{ a = rotateRight(a, 30);  d -= r2(e, a, b, c, 21);}
-		{ b = rotateRight(b, 30);  e -= r2(a, b, c, d, 20);}
+		{ c = rotateRight( c, 30);  a -= s2(b, c, d, e,w2[ 39]);}
+		{ d = rotateRight( d, 30);  b -= s2(c, d, e, a,w2[ 38]);}
+		{ e = rotateRight( e, 30);  c -= s2(d, e, a, b,w2[ 37]);}
+		{ a = rotateRight( a, 30);  d -= s2(e, a, b, c,w2[ 36]);}
+		{ b = rotateRight( b, 30);  e -= s2(a, b, c, d,w2[ 35]);}
+		{ c = rotateRight( c, 30);  a -= s2(b, c, d, e,w2[ 34]);}
+		{ d = rotateRight( d, 30);  b -= s2(c, d, e, a,w2[ 33]);}
+		{ e = rotateRight( e, 30);  c -= s2(d, e, a, b,w2[ 32]);}
+		{ a = rotateRight( a, 30);  d -= s2(e, a, b, c,w2[ 31]);}
+		{ b = rotateRight( b, 30);  e -= s2(a, b, c, d,w2[ 30]);}
+		{ c = rotateRight( c, 30);  a -= s2(b, c, d, e,w2[ 29]);}
+		{ d = rotateRight( d, 30);  b -= s2(c, d, e, a,w2[ 28]);}
+		{ e = rotateRight( e, 30);  c -= s2(d, e, a, b,w2[ 27]);}
+		{ a = rotateRight( a, 30);  d -= s2(e, a, b, c,w2[ 26]);}
+		{ b = rotateRight( b, 30);  e -= s2(a, b, c, d,w2[ 25]);}
+		{ c = rotateRight( c, 30);  a -= s2(b, c, d, e,w2[ 24]);}
+		{ d = rotateRight( d, 30);  b -= s2(c, d, e, a,w2[ 23]);}
+		{ e = rotateRight( e, 30);  c -= s2(d, e, a, b,w2[ 22]);}
+		{ a = rotateRight( a, 30);  d -= s2(e, a, b, c,w2[ 21]);}
+		{ b = rotateRight( b, 30);  e -= s2(a, b, c, d,w2[ 20]);}
 
-		{ c = rotateRight(c, 30);  a -= r1(b, c, d, e, 19);}
-		{ d = rotateRight(d, 30);  b -= r1(c, d, e, a, 18);}
-		{ e = rotateRight(e, 30);  c -= r1(d, e, a, b, 17);}
-		{ a = rotateRight(a, 30);  d -= r1(e, a, b, c, 16);}
-		{ b = rotateRight(b, 30);  e -= r1(a, b, c, d, 15);}
-		{ c = rotateRight(c, 30);  a -= r1(b, c, d, e, 14);}
-		{ d = rotateRight(d, 30);  b -= r1(c, d, e, a, 13);}
-		{ e = rotateRight(e, 30);  c -= r1(d, e, a, b, 12);}
-		{ a = rotateRight(a, 30);  d -= r1(e, a, b, c, 11);}
-		{ b = rotateRight(b, 30);  e -= r1(a, b, c, d, 10);}
-		{ c = rotateRight(c, 30);  a -= r1(b, c, d, e, 9);}
-		{ d = rotateRight(d, 30);  b -= r1(c, d, e, a, 8);}
-		{ e = rotateRight(e, 30);  c -= r1(d, e, a, b, 7);}
-		{ a = rotateRight(a, 30);  d -= r1(e, a, b, c, 6);}
-		{ b = rotateRight(b, 30);  e -= r1(a, b, c, d, 5);}
-		{ c = rotateRight(c, 30);  a -= r1(b, c, d, e, 4);}
-		{ d = rotateRight(d, 30);  b -= r1(c, d, e, a, 3);}
-		{ e = rotateRight(e, 30);  c -= r1(d, e, a, b, 2);}
-		{ a = rotateRight(a, 30);  d -= r1(e, a, b, c, 1);}
-		{ b = rotateRight(b, 30);  e -= r1(a, b, c, d, 0);}
+		{ c = rotateRight( c, 30);  a -= s1(b, c, d, e,w2[ 19]);}
+		{ d = rotateRight( d, 30);  b -= s1(c, d, e, a,w2[ 18]);}
+		{ e = rotateRight( e, 30);  c -= s1(d, e, a, b,w2[ 17]);}
+		{ a = rotateRight( a, 30);  d -= s1(e, a, b, c,w2[ 16]);}
+		{ b = rotateRight( b, 30);  e -= s1(a, b, c, d,w2[ 15]);}
+		{ c = rotateRight( c, 30);  a -= s1(b, c, d, e,w2[ 14]);}
+		{ d = rotateRight( d, 30);  b -= s1(c, d, e, a,w2[ 13]);}
+		{ e = rotateRight( e, 30);  c -= s1(d, e, a, b,w2[ 12]);}
+		{ a = rotateRight( a, 30);  d -= s1(e, a, b, c,w2[ 11]);}
+		{ b = rotateRight( b, 30);  e -= s1(a, b, c, d,w2[ 10]);}
+		{ c = rotateRight( c, 30);  a -= s1(b, c, d, e,w2[ 9]);}
+		{ d = rotateRight( d, 30);  b -= s1(c, d, e, a,w2[ 8]);}
+		{ e = rotateRight( e, 30);  c -= s1(d, e, a, b,w2[ 7]);}
+		{ a = rotateRight( a, 30);  d -= s1(e, a, b, c,w2[ 6]);}
+		{ b = rotateRight( b, 30);  e -= s1(a, b, c, d,w2[ 5]);}
+		{ c = rotateRight( c, 30);  a -= s1(b, c, d, e,w2[ 4]);}
+		{ d = rotateRight( d, 30);  b -= s1(c, d, e, a,w2[ 3]);}
+		{ e = rotateRight( e, 30);  c -= s1(d, e, a, b,w2[ 2]);}
+		{ a = rotateRight( a, 30);  d -= s1(e, a, b, c,w2[ 1]);}
+		{ b = rotateRight( b, 30);  e -= s1(a, b, c, d,w2[ 0]);}
 
 		hIn.save(a, b, c, d, e);
 		a = s.a; b = s.b; c = s.c; d = s.d; e = s.e;
 
 	  if (t == 58) {
-		{ b += sr3(c, d, e, a, 58);  d = rotateLeft(d, 30);}
-		{ a += sr3(b, c, d, e, 59);  c = rotateLeft(c, 30);}
+		{ b += s3(c, d, e, a,w2[ 58]);  d = rotateLeft( d, 30);}
+		{ a += s3(b, c, d, e,w2[ 59]);  c = rotateLeft( c, 30);}
 
-		{ e += sr4(a, b, c, d, 60);  b = rotateLeft(b, 30);}
-		{ d += sr4(e, a, b, c, 61);  a = rotateLeft(a, 30);}
-		{ c += sr4(d, e, a, b, 62);  e = rotateLeft(e, 30);}
-		{ b += sr4(c, d, e, a, 63);  d = rotateLeft(d, 30);}
-		{ a += sr4(b, c, d, e, 64);  c = rotateLeft(c, 30);}
+		{ e += s4(a, b, c, d,w2[ 60]);  b = rotateLeft( b, 30);}
+		{ d += s4(e, a, b, c,w2[ 61]);  a = rotateLeft( a, 30);}
+		{ c += s4(d, e, a, b,w2[ 62]);  e = rotateLeft( e, 30);}
+		{ b += s4(c, d, e, a,w2[ 63]);  d = rotateLeft( d, 30);}
+		{ a += s4(b, c, d, e,w2[ 64]);  c = rotateLeft( c, 30);}
 	  }
-		{ e += sr4(a, b, c, d, 65);  b = rotateLeft(b, 30);}
-		{ d += sr4(e, a, b, c, 66);  a = rotateLeft(a, 30);}
-		{ c += sr4(d, e, a, b, 67);  e = rotateLeft(e, 30);}
-		{ b += sr4(c, d, e, a, 68);  d = rotateLeft(d, 30);}
-		{ a += sr4(b, c, d, e, 69);  c = rotateLeft(c, 30);}
-		{ e += sr4(a, b, c, d, 70);  b = rotateLeft(b, 30);}
-		{ d += sr4(e, a, b, c, 71);  a = rotateLeft(a, 30);}
-		{ c += sr4(d, e, a, b, 72);  e = rotateLeft(e, 30);}
-		{ b += sr4(c, d, e, a, 73);  d = rotateLeft(d, 30);}
-		{ a += sr4(b, c, d, e, 74);  c = rotateLeft(c, 30);}
-		{ e += sr4(a, b, c, d, 75);  b = rotateLeft(b, 30);}
-		{ d += sr4(e, a, b, c, 76);  a = rotateLeft(a, 30);}
-		{ c += sr4(d, e, a, b, 77);  e = rotateLeft(e, 30);}
-		{ b += sr4(c, d, e, a, 78);  d = rotateLeft(d, 30);}
-		{ a += sr4(b, c, d, e, 79);  c = rotateLeft(c, 30);}
+		{ e += s4(a, b, c, d,w2[ 65]);  b = rotateLeft( b, 30);}
+		{ d += s4(e, a, b, c,w2[ 66]);  a = rotateLeft( a, 30);}
+		{ c += s4(d, e, a, b,w2[ 67]);  e = rotateLeft( e, 30);}
+		{ b += s4(c, d, e, a,w2[ 68]);  d = rotateLeft( d, 30);}
+		{ a += s4(b, c, d, e,w2[ 69]);  c = rotateLeft( c, 30);}
+		{ e += s4(a, b, c, d,w2[ 70]);  b = rotateLeft( b, 30);}
+		{ d += s4(e, a, b, c,w2[ 71]);  a = rotateLeft( a, 30);}
+		{ c += s4(d, e, a, b,w2[ 72]);  e = rotateLeft( e, 30);}
+		{ b += s4(c, d, e, a,w2[ 73]);  d = rotateLeft( d, 30);}
+		{ a += s4(b, c, d, e,w2[ 74]);  c = rotateLeft( c, 30);}
+		{ e += s4(a, b, c, d,w2[ 75]);  b = rotateLeft( b, 30);}
+		{ d += s4(e, a, b, c,w2[ 76]);  a = rotateLeft( a, 30);}
+		{ c += s4(d, e, a, b,w2[ 77]);  e = rotateLeft( e, 30);}
+		{ b += s4(c, d, e, a,w2[ 78]);  d = rotateLeft( d, 30);}
+		{ a += s4(b, c, d, e,w2[ 79]);  c = rotateLeft( c, 30);}
 
 		// @formatter:on
 		hTmp.save(hIn.a + a, hIn.b + b, hIn.c + c, hIn.d + d, hIn.e + e);
 	}
 
-	private int s1(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f1(b, c, d) + 0x5A827999 + w[t];
+	private static int s1(int a, int b, int c, int d, int w_t) {
+		return rotateLeft(a, 5)
+				// f: 0 <= t <= 19
+				+ ((b & c) | ((~b) & d))
+				+ 0x5A827999 + w_t;
 	}
 
-	private int s2(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f2(b, c, d) + 0x6ED9EBA1 + w[t];
+	private static int s2(int a, int b, int c, int d, int w_t) {
+		return rotateLeft(a, 5)
+				// f: 20 <= t <= 39
+				+ (b ^ c ^ d)
+				+ 0x6ED9EBA1 + w_t;
 	}
 
-	private int s3(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f3(b, c, d) + 0x8F1BBCDC + w[t];
+	private static int s3(int a, int b, int c, int d, int w_t) {
+		return rotateLeft(a, 5)
+				// f: 40 <= t <= 59
+				+ ((b & c) | (b & d) | (c & d))
+				+ 0x8F1BBCDC + w_t;
 	}
 
-	private int sr3(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f3(b, c, d) + 0x8F1BBCDC + w2[t];
-	}
-
-	private int s4(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f2(b, c, d) + 0xCA62C1D6 + w[t];
-	}
-
-	private int sr4(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f2(b, c, d) + 0xCA62C1D6 + w2[t];
-	}
-
-	private int r1(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f1(b, c, d) + 0x5A827999 + w2[t];
-	}
-
-	private int r2(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f2(b, c, d) + 0x6ED9EBA1 + w2[t];
-	}
-
-	private int r3(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f3(b, c, d) + 0x8F1BBCDC + w2[t];
-	}
-
-	private int r4(int a, int b, int c, int d, int t) {
-		return rotateLeft(a, 5) + f2(b, c, d) + 0xCA62C1D6 + w2[t];
-	}
-
-	private static int f1(int b, int c, int d) {
-		// f: 0 <= t <= 19
-		return (b & c) | ((~b) & d);
-	}
-
-	private static int f2(int b, int c, int d) {
-		// f: 20 <= t <= 39
-		// f: 60 <= t <= 79
-		return b ^ c ^ d;
-	}
-
-	private static int f3(int b, int c, int d) {
-		// f: 40 <= t <= 59
-		return (b & c) | (b & d) | (c & d);
+	private static int s4(int a, int b, int c, int d, int w_t) {
+		return rotateLeft(a, 5)
+				// f: 60 <= t <= 79
+				+ (b ^ c ^ d)
+				+ 0xCA62C1D6 + w_t;
 	}
 
 	private static boolean eq(State q, State r) {
@@ -625,29 +598,12 @@ public class SHA1 {
 		return foundCollision;
 	}
 
-	/**
-	 * Reset this instance to compute another hash.
-	 *
-	 * @return {@code this}.
-	 */
-	public SHA1 reset() {
-		h.init();
-		length = 0;
-		foundCollision = false;
-		return this;
-	}
-
 	private static final class State {
 		int a;
 		int b;
 		int c;
 		int d;
 		int e;
-
-		final void init() {
-			// Magic initialization constants defined by FIPS180.
-			save(0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0);
-		}
 
 		final void save(int a1, int b1, int c1, int d1, int e1) {
 			a = a1;

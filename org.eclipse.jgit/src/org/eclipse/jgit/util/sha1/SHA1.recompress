@@ -1,14 +1,14 @@
 /* Template for recompress method; run through cpp. */
 
-#define ROUND1_STEP(a, b, c, d, e, T) {e += sr1(a,b,c,d,T); b = rotateLeft(b, 30);}
-#define ROUND2_STEP(a, b, c, d, e, T) {e += sr2(a,b,c,d,T); b = rotateLeft(b, 30);}
-#define ROUND3_STEP(a, b, c, d, e, T) {e += sr3(a,b,c,d,T); b = rotateLeft(b, 30);}
-#define ROUND4_STEP(a, b, c, d, e, T) {e += sr4(a,b,c,d,T); b = rotateLeft(b, 30);}
+#define ROUND1_STEP(a, b, c, d, e, T) {e += s1(a,b,c,d,w2[T]); b = rotateLeft(b, 30);}
+#define ROUND2_STEP(a, b, c, d, e, T) {e += s2(a,b,c,d,w2[T]); b = rotateLeft(b, 30);}
+#define ROUND3_STEP(a, b, c, d, e, T) {e += s3(a,b,c,d,w2[T]); b = rotateLeft(b, 30);}
+#define ROUND4_STEP(a, b, c, d, e, T) {e += s4(a,b,c,d,w2[T]); b = rotateLeft(b, 30);}
 
-#define ROUND1_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= r1(a,b,c,d,T);}
-#define ROUND2_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= r2(a,b,c,d,T);}
-#define ROUND3_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= r3(a,b,c,d,T);}
-#define ROUND4_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= r4(a,b,c,d,T);}
+#define ROUND1_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= s1(a,b,c,d,w2[T]);}
+#define ROUND2_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= s2(a,b,c,d,w2[T]);}
+#define ROUND3_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= s3(a,b,c,d,w2[T]);}
+#define ROUND4_STEP_BW(a, b, c, d, e, T) {b = rotateRight(b, 30); e -= s4(a,b,c,d,w2[T]);}
 
 	/* Condition to go backwards: if (t > step) */
   /* t=80-66 have no identified DV; skip.
