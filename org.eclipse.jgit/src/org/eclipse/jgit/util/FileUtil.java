@@ -55,7 +55,6 @@ import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.text.Normalizer;
-import java.text.Normalizer.Form;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FS.Attributes;
@@ -69,16 +68,11 @@ public class FileUtil {
 	 * @param path
 	 * @return target path of the symlink
 	 * @throws IOException
+	 * @deprecated use {@link FileUtils#readSymLink(File)} instead
 	 */
+	@Deprecated
 	public static String readSymlink(File path) throws IOException {
-		Path nioPath = path.toPath();
-		Path target = Files.readSymbolicLink(nioPath);
-		String targetString = target.toString();
-		if (SystemReader.getInstance().isWindows())
-			targetString = targetString.replace('\\', '/');
-		else if (SystemReader.getInstance().isMacOS())
-			targetString = Normalizer.normalize(targetString, Form.NFC);
-		return targetString;
+		return FileUtils.readSymLink(path);
 	}
 
 	/**
@@ -87,16 +81,12 @@ public class FileUtil {
 	 * @param target
 	 *            target of the symlink to be created
 	 * @throws IOException
+	 * @deprecated use {@link FileUtils#createSymLink(File, String)} instead
 	 */
+	@Deprecated
 	public static void createSymLink(File path, String target)
 			throws IOException {
-		Path nioPath = path.toPath();
-		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS))
-			Files.delete(nioPath);
-		if (SystemReader.getInstance().isWindows())
-			target = target.replace('/', '\\');
-		Path nioTarget = new File(target).toPath();
-		Files.createSymbolicLink(nioPath, nioTarget);
+		FileUtils.createSymLink(path, target);
 	}
 
 	/**
