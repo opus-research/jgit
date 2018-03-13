@@ -724,15 +724,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			theirsText = theirs == null ? RawText.EMPTY_TEXT : getRawText(
 				theirs.getEntryObjectId(), reader);
 		} catch (BinaryBlobException e) {
-			ArrayList<RawText> texts = new ArrayList<>();
-			baseText = new RawText(reader.open(base.getEntryObjectId(), OBJ_BLOB).getCachedBytes());
-			texts.add(baseText);
-			texts.add(baseText);
-			MergeResult<RawText> r = new MergeResult<RawText>(texts);
-
-			// Add base as a NO_CONFLICT, so the worktree (if applicable) contains
-			// at least something.
-			r.add(0, 0, 1, MergeChunk.ConflictState.NO_CONFLICT);
+			MergeResult<RawText> r = new MergeResult<>(Collections.<RawText>emptyList());
 			r.setContainsConflicts(true);
 			return r;
 		}
