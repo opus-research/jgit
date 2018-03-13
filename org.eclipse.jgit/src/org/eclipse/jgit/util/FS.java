@@ -279,7 +279,6 @@ public abstract class FS {
 	 * @param f
 	 * @throws IOException
 	 *             this may be a Java7 subclass with detailed information
-	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
 		if (!f.delete())
@@ -637,34 +636,32 @@ public abstract class FS {
 
 	/**
 	 * File attributes we typically care for.
-	 *
-	 * @since 3.3
 	 */
 	public static class Attributes {
 
 		/**
-		 * @return true if this are the attributes of a directory
+		 * @return true if this is the attributes of an executable file
 		 */
 		public boolean isDirectory() {
 			return isDirectory;
 		}
 
 		/**
-		 * @return true if this are the attributes of an executable file
+		 * @return true if this is the attributes of an executable file
 		 */
 		public boolean isExecutable() {
 			return isExecutable;
 		}
 
 		/**
-		 * @return true if this are the attributes of a symbolic link
+		 * @return true if this is the attributes of a symbolic link
 		 */
 		public boolean isSymbolicLink() {
 			return isSymbolicLink;
 		}
 
 		/**
-		 * @return true if this are the attributes of a regular file
+		 * @return true if this is the attributes of a regular file
 		 */
 		public boolean isRegularFile() {
 			return isRegularFile;
@@ -678,7 +675,7 @@ public abstract class FS {
 		}
 
 		/**
-		 * @return the time (milliseconds since 1970-01-01) when this object was
+		 * @return the time (milliseconds since 1900-01-01) when this object was
 		 *         last modified
 		 */
 		public long getLastModifiedTime() {
@@ -766,7 +763,6 @@ public abstract class FS {
 	/**
 	 * @param path
 	 * @return the file attributes we care for
-	 * @since 3.3
 	 */
 	public Attributes getAttributes(File path) {
 		boolean isDirectory = isDirectory(path);
@@ -779,27 +775,5 @@ public abstract class FS {
 		long createTime = 0L;
 		return new Attributes(this, path, exists, isDirectory, canExecute,
 				isSymlink, isFile, createTime, lastModified, -1);
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param file
-	 * @return NFC-format File
-	 * @since 3.3
-	 */
-	public File normalize(File file) {
-		return file;
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param name
-	 * @return NFC-format string
-	 * @since 3.3
-	 */
-	public String normalize(String name) {
-		return name;
 	}
 }
