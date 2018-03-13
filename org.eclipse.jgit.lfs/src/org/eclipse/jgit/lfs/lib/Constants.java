@@ -58,14 +58,14 @@ public final class Constants {
 	/**
 	 * lfs folder
 	 * 
-	 * @since 4.5
+	 * @since 4.6
 	 */
 	public static final String LFS = "lfs";
 
 	/**
 	 * Hash function used natively by Git LFS extension for large objects.
 	 *
-	 * @since 4.5
+	 * @since 4.6
 	 */
 	public static final String LONG_HASH_FUNCTION = "SHA-256";
 

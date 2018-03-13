@@ -53,7 +53,7 @@ import org.eclipse.jgit.lib.Repository;
 /**
  * Registry for built-in filters
  *
- * @since 4.5
+ * @since 4.6
  */
 public class FilterCommandRegistry {
 	private static ConcurrentHashMap<String, FilterCommandFactory> filterCommandRegistry = new ConcurrentHashMap<>();

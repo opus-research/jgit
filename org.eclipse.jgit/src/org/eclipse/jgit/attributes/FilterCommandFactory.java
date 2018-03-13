@@ -51,7 +51,7 @@ import org.eclipse.jgit.lib.Repository;
 /**
  * The factory responsible for creating instances of {@link FilterCommand}.
  *
- * @since 4.5
+ * @since 4.6
  */
 public interface FilterCommandFactory {
 	/**

@@ -56,7 +56,7 @@ import org.eclipse.jgit.lfs.lib.LongObjectId;
 /**
  * Represents an LFS pointer file
  *
- * @since 4.5
+ * @since 4.6
  */
 public class LfsPointer {
 	/**
