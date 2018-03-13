@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk.filter;
 
-package org.eclipse.jgit.lib;
+import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
-import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.junit.Test;
 
-public class BranchTrackingStatusTest extends RepositoryTestCase {
-	private TestRepository<Repository> util;
+/**
+ * Limits the number of commits output.
+ */
+public class MaxCountRevFilter extends RevFilter {
 
-	protected RevWalk rw;
+	private int maxCount;
+
+	private int count;
+
+	/**
+	 * Create a new max count filter.
+	 *
+	 * @param maxCount
+	 *            the limit
+	 * @return a new filter
+	 */
+	public static RevFilter create(int maxCount) {
+		if (maxCount < 0)
+			throw new IllegalArgumentException(
+					JGitText.get().maxCountMustBeNonNegative);
+		return new MaxCountRevFilter(maxCount);
+	}
+
+	private MaxCountRevFilter(int maxCount) {
+		this.count = 0;
+		this.maxCount = maxCount;
+	}
 
 	@Override
-	public void setUp() throws Exception {
-		super.setUp();
-		util = new TestRepository<Repository>(db);
-		StoredConfig config = util.getRepository().getConfig();
-		config.setString(ConfigConstants.CONFIG_BRANCH_SECTION, "master",
-				ConfigConstants.CONFIG_KEY_REMOTE, "origin");
-		config.setString(ConfigConstants.CONFIG_BRANCH_SECTION, "master",
-				ConfigConstants.CONFIG_KEY_MERGE, "refs/heads/master");
-		config.setString(ConfigConstants.CONFIG_REMOTE_SECTION, "origin",
-				"fetch", "+refs/heads/*:refs/remotes/origin/*");
+	public boolean include(RevWalk walker, RevCommit cmit)
+			throws StopWalkException, MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		count++;
+		if (count > maxCount)
+			throw StopWalkException.INSTANCE;
+		return true;
 	}
 
-	@Test
-	public void shouldWorkInNormalCase() throws Exception {
-		RevCommit remoteTracking = util.branch("refs/remotes/origin/master")
-				.commit().create();
-		util.branch("master").commit().parent(remoteTracking).create();
-		util.branch("master").commit().create();
-
-		BranchTrackingStatus status = BranchTrackingStatus.of(
-				util.getRepository(), "master");
-		assertEquals(2, status.getAheadCount());
-		assertEquals(0, status.getBehindCount());
-		assertEquals("refs/remotes/origin/master",
-				status.getRemoteTrackingBranch());
-	}
-
-	@Test
-	public void shouldWorkWithoutMergeBase() throws Exception {
-		util.branch("refs/remotes/origin/master").commit().create();
-		util.branch("master").commit().create();
-
-		BranchTrackingStatus status = BranchTrackingStatus.of(util.getRepository(), "master");
-		assertEquals(1, status.getAheadCount());
-		assertEquals(1, status.getBehindCount());
-	}
-
-	@Test
-	public void shouldReturnNullWhenBranchDoesntExist() throws Exception {
-		BranchTrackingStatus status = BranchTrackingStatus.of(
-				util.getRepository(), "doesntexist");
-
-		assertNull(status);
+	@Override
+	public RevFilter clone() {
+		return new MaxCountRevFilter(maxCount);
 	}
 }
