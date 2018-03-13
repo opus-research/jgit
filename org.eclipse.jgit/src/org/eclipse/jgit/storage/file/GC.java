@@ -199,7 +199,7 @@ public class GC {
 		HashSet<ObjectId> allHeads = new HashSet<ObjectId>();
 		HashSet<ObjectId> nonHeads = new HashSet<ObjectId>();
 		HashSet<ObjectId> tagTargets = new HashSet<ObjectId>();
-		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
+		HashSet<ObjectId> indexObjects = listNonHEADIndexObjects();
 
 		for (Ref ref : refsBefore.values()) {
 			if (ref.isSymbolic() || ref.getObjectId() == null)
