@@ -89,7 +89,8 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 	public StashDropCommand(Repository repo) {
 		super(repo);
 		if (!(repo.getRefDatabase() instanceof RefDirectory)) {
-			throw new IllegalArgumentException(JGitText.get().stashDropNotSupported);
+			throw new UnsupportedOperationException(
+					JGitText.get().stashDropNotSupported);
 		}
 	}
 

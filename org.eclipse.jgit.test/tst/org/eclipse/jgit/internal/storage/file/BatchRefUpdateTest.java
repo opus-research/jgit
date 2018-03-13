@@ -73,6 +73,8 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 
+import org.eclipse.jgit.events.ListenerHandle;
+import org.eclipse.jgit.events.RefsChangedListener;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.StrictWorkMonitor;
 import org.eclipse.jgit.junit.TestRepository;
@@ -94,6 +96,7 @@ import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -118,13 +121,32 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	private RevCommit A;
 	private RevCommit B;
 
+	/**
+	 * When asserting the number of RefsChangedEvents you must account for one
+	 * additional event due to the initial ref setup via a number of calls to
+	 * {@link #writeLooseRef(String, AnyObjectId)} (will be fired in execute()
+	 * when it is detected that the on-disk loose refs have changed), or for one
+	 * additional event per {@link #writeRef(String, AnyObjectId)}.
+	 */
+	private int refsChangedEvents;
+
+	private ListenerHandle handle;
+
+	private RefsChangedListener refsChangedListener = event -> {
+		refsChangedEvents++;
+	};
+
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
 		diskRepo = createBareRepository();
-		setLogAllRefUpdates(true);
+		StoredConfig cfg = diskRepo.getConfig();
+		cfg.load();
+		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
+		cfg.save();
 
 		refdir = (RefDirectory) diskRepo.getRefDatabase();
 		refdir.setRetrySleepMs(Arrays.asList(0, 0));
@@ -132,6 +154,15 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		repo = new TestRepository<>(diskRepo);
 		A = repo.commit().create();
 		B = repo.commit(repo.getRevWalk().parseCommit(A));
+		refsChangedEvents = 0;
+		handle = diskRepo.getListenerList()
+				.addRefsChangedListener(refsChangedListener);
+	}
+
+	@After
+	public void removeListener() {
+		handle.remove();
+		refsChangedEvents = 0;
 	}
 
 	@Test
@@ -149,11 +180,13 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 			assertRefs(
 					"refs/heads/master", A,
 					"refs/heads/masters", B);
+			assertEquals(1, refsChangedEvents);
 		} else {
 			assertResults(cmds, OK, REJECTED_NONFASTFORWARD);
 			assertRefs(
 					"refs/heads/master", B,
 					"refs/heads/masters", B);
+			assertEquals(2, refsChangedEvents);
 		}
 	}
 
@@ -171,6 +204,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/masters", A);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 	}
 
 	@Test
@@ -192,6 +226,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 
 		assertResults(cmds, OK);
 		assertRefs("refs/heads/master", A);
+		assertEquals(2, refsChangedEvents);
 	}
 
 	@Test
@@ -213,6 +248,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 			assertRefs(
 					"refs/heads/master", A,
 					"refs/heads/masters", B);
+			assertEquals(1, refsChangedEvents);
 		} else {
 			// Non-atomic updates are applied in order: master succeeds, then master/x
 			// fails due to conflict.
@@ -220,6 +256,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 			assertRefs(
 					"refs/heads/master", B,
 					"refs/heads/masters", B);
+			assertEquals(2, refsChangedEvents);
 		}
 	}
 
@@ -238,6 +275,15 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/masters/x", A);
+		if (atomic) {
+			assertEquals(2, refsChangedEvents);
+		} else {
+			// The non-atomic case actually produces 5 events, but that's an
+			// implementation detail. We expect at least 4 events, one for the
+			// initial read due to writeLooseRef(), and then one for each
+			// successful ref update.
+			assertTrue(refsChangedEvents >= 4);
+		}
 	}
 
 	@Test
@@ -254,11 +300,13 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		if (atomic) {
 			assertResults(cmds, REJECTED_MISSING_OBJECT, TRANSACTION_ABORTED);
 			assertRefs("refs/heads/master", A);
+			assertEquals(1, refsChangedEvents);
 		} else {
 			assertResults(cmds, REJECTED_MISSING_OBJECT, OK);
 			assertRefs(
 					"refs/heads/master", A,
 					"refs/heads/foo2", B);
+			assertEquals(2, refsChangedEvents);
 		}
 	}
 
@@ -276,9 +324,11 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		if (atomic) {
 			assertResults(cmds, TRANSACTION_ABORTED, REJECTED_MISSING_OBJECT);
 			assertRefs("refs/heads/master", A);
+			assertEquals(1, refsChangedEvents);
 		} else {
 			assertResults(cmds, OK, REJECTED_MISSING_OBJECT);
 			assertRefs("refs/heads/master", B);
+			assertEquals(2, refsChangedEvents);
 		}
 	}
 
@@ -292,9 +342,11 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		if (atomic) {
 			assertResults(cmds, LOCK_FAILURE, TRANSACTION_ABORTED);
 			assertRefs();
+			assertEquals(0, refsChangedEvents);
 		} else {
 			assertResults(cmds, LOCK_FAILURE, OK);
 			assertRefs("refs/heads/foo2", B);
+			assertEquals(1, refsChangedEvents);
 		}
 	}
 
@@ -310,11 +362,13 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		if (atomic) {
 			assertResults(cmds, LOCK_FAILURE, TRANSACTION_ABORTED);
 			assertRefs("refs/heads/master", A);
+			assertEquals(1, refsChangedEvents);
 		} else {
 			assertResults(cmds, LOCK_FAILURE, OK);
 			assertRefs(
 					"refs/heads/master", A,
 					"refs/heads/foo2", B);
+			assertEquals(2, refsChangedEvents);
 		}
 	}
 
@@ -330,9 +384,11 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		if (atomic) {
 			assertResults(cmds, TRANSACTION_ABORTED, LOCK_FAILURE);
 			assertRefs("refs/heads/master", A);
+			assertEquals(1, refsChangedEvents);
 		} else {
 			assertResults(cmds, OK, LOCK_FAILURE);
 			assertRefs("refs/heads/master", B);
+			assertEquals(2, refsChangedEvents);
 		}
 	}
 
@@ -353,6 +409,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/branch", B);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 		assertReflogUnchanged(oldLogs, "refs/heads/master");
 		assertReflogUnchanged(oldLogs, "refs/heads/branch");
 	}
@@ -377,6 +434,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 				"refs/heads/master", B,
 				"refs/heads/branch1", B,
 				"refs/heads/branch2", A);
+		assertEquals(atomic ? 3 : 4, refsChangedEvents);
 		assertReflogEquals(
 				reflog(A, B, new PersonIdent(diskRepo), "a reflog"),
 				getLastReflog("refs/heads/master"));
@@ -405,6 +463,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 				"refs/heads/master", B,
 				"refs/heads/branch1", A,
 				"refs/heads/branch2", A);
+		assertEquals(atomic ? 3 : 5, refsChangedEvents);
 		assertReflogEquals(
 				// Always forced; setAllowNonFastForwards(true) bypasses the check.
 				reflog(A, B, new PersonIdent(diskRepo), "forced-update"),
@@ -427,6 +486,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 
 		assertResults(cmds, OK);
 		assertRefs("refs/heads/master", B);
+		assertEquals(2, refsChangedEvents);
 		assertReflogEquals(
 				reflog(A, B, new PersonIdent(diskRepo), "fast-forward"),
 				getLastReflog("refs/heads/master"));
@@ -445,6 +505,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/branch", A);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 		assertReflogEquals(
 				reflog(A, B, new PersonIdent(diskRepo), "a reflog: fast-forward"),
 				getLastReflog("refs/heads/master"));
@@ -467,6 +528,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 						.setRefLogIdent(ident));
 
 		assertResults(cmds, OK, OK);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/branch", B);
@@ -494,6 +556,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 
 		assertResults(cmds, OK, OK);
 		assertRefs("refs/heads/branch", B);
+		assertEquals(atomic ? 3 : 4, refsChangedEvents);
 		assertNull(getLastReflog("refs/heads/master"));
 		assertReflogEquals(
 				reflog(A, B, new PersonIdent(diskRepo), "a reflog"),
@@ -511,6 +574,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 
 		assertResults(cmds, OK, OK);
 		assertRefs("refs/heads/master/x", A);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 		assertNull(getLastReflog("refs/heads/master"));
 		assertReflogEquals(
 				reflog(zeroId(), A, new PersonIdent(diskRepo), "a reflog"),
@@ -531,10 +595,12 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 
 		if (atomic) {
 			assertResults(cmds, TRANSACTION_ABORTED, LOCK_FAILURE);
+			assertEquals(1, refsChangedEvents);
 			assertReflogUnchanged(oldLogs, "refs/heads/master");
 			assertReflogUnchanged(oldLogs, "refs/heads/branch");
 		} else {
 			assertResults(cmds, OK, LOCK_FAILURE);
+			assertEquals(2, refsChangedEvents);
 			assertReflogEquals(
 					reflog(A, B, new PersonIdent(diskRepo), "a reflog"),
 					getLastReflog("refs/heads/master"));
@@ -557,6 +623,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 						.setRefLogMessage("a reflog", true));
 
 		assertResults(cmds, OK, OK);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 		assertReflogEquals(
 				reflog(A, B, ident, "custom log"),
 				getLastReflog("refs/heads/master"),
@@ -581,74 +648,10 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		execute(newBatchUpdate(cmds).setRefLogMessage("a reflog", true));
 
 		assertResults(cmds, OK, OK);
+		assertEquals(atomic ? 2 : 3, refsChangedEvents);
 		assertReflogUnchanged(oldLogs, "refs/heads/master");
 		assertReflogEquals(
 				reflog(zeroId(), B, new PersonIdent(diskRepo), "a reflog: created"),
-				getLastReflog("refs/heads/branch"));
-	}
-
-	@Test
-	public void refLogNotWrittenWithoutConfigOption() throws Exception {
-		setLogAllRefUpdates(false);
-		writeRef("refs/heads/master", A);
-
-		Map<String, ReflogEntry> oldLogs =
-				getLastReflogs("refs/heads/master", "refs/heads/branch");
-		assertTrue(oldLogs.isEmpty());
-
-		List<ReceiveCommand> cmds = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master", UPDATE),
-				new ReceiveCommand(zeroId(), B, "refs/heads/branch", CREATE));
-		execute(newBatchUpdate(cmds).setRefLogMessage("a reflog", false));
-
-		assertResults(cmds, OK, OK);
-		assertReflogUnchanged(oldLogs, "refs/heads/master");
-		assertReflogUnchanged(oldLogs, "refs/heads/branch");
-	}
-
-	@Test
-	public void forceRefLogInUpdate() throws Exception {
-		setLogAllRefUpdates(false);
-		writeRef("refs/heads/master", A);
-		assertTrue(
-				getLastReflogs("refs/heads/master", "refs/heads/branch").isEmpty());
-
-		List<ReceiveCommand> cmds = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master", UPDATE),
-				new ReceiveCommand(zeroId(), B, "refs/heads/branch", CREATE));
-		execute(
-				newBatchUpdate(cmds)
-						.setRefLogMessage("a reflog", false)
-						.setForceRefLog(true));
-
-		assertResults(cmds, OK, OK);
-		assertReflogEquals(
-				reflog(A, B, new PersonIdent(diskRepo), "a reflog"),
-				getLastReflog("refs/heads/master"));
-		assertReflogEquals(
-				reflog(zeroId(), B, new PersonIdent(diskRepo), "a reflog"),
-				getLastReflog("refs/heads/branch"));
-	}
-
-	@Test
-	public void forceRefLogInCommand() throws Exception {
-		setLogAllRefUpdates(false);
-		writeRef("refs/heads/master", A);
-
-		Map<String, ReflogEntry> oldLogs =
-				getLastReflogs("refs/heads/master", "refs/heads/branch");
-		assertTrue(oldLogs.isEmpty());
-
-		List<ReceiveCommand> cmds = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master", UPDATE),
-				new ReceiveCommand(zeroId(), B, "refs/heads/branch", CREATE));
-		cmds.get(1).setForceRefLog(true);
-		execute(newBatchUpdate(cmds).setRefLogMessage("a reflog", false));
-
-		assertResults(cmds, OK, OK);
-		assertReflogUnchanged(oldLogs, "refs/heads/master");
-		assertReflogEquals(
-				reflog(zeroId(), B, new PersonIdent(diskRepo), "a reflog"),
 				getLastReflog("refs/heads/branch"));
 	}
 
@@ -670,12 +673,14 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 			if (atomic) {
 				assertResults(cmds, LOCK_FAILURE, TRANSACTION_ABORTED);
 				assertRefs("refs/heads/master", A);
+				assertEquals(1, refsChangedEvents);
 			} else {
 				// Only operates on loose refs, doesn't care that packed-refs is locked.
 				assertResults(cmds, OK, OK);
 				assertRefs(
 						"refs/heads/master", B,
 						"refs/heads/branch", B);
+				assertEquals(3, refsChangedEvents);
 			}
 		} finally {
 			myLock.unlock();
@@ -701,11 +706,13 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 			if (atomic) {
 				assertResults(cmds, TRANSACTION_ABORTED, LOCK_FAILURE);
 				assertRefs("refs/heads/master", A);
+				assertEquals(1, refsChangedEvents);
 			} else {
 				assertResults(cmds, OK, LOCK_FAILURE);
 				assertRefs(
 						"refs/heads/branch", B,
 						"refs/heads/master", A);
+				assertEquals(2, refsChangedEvents);
 			}
 		} finally {
 			myLock.unlock();
@@ -725,6 +732,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 
 			assertFalse(getLockFile("refs/heads/master").exists());
 			assertResults(cmds, OK);
+			assertEquals(2, refsChangedEvents);
 			assertRefs("refs/heads/master", B);
 		} finally {
 			myLock.unlock();
@@ -777,17 +785,10 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		}
 
 		assertResults(cmds, OK, OK);
+		assertEquals(2, refsChangedEvents);
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/branch", B);
-	}
-
-	private void setLogAllRefUpdates(boolean enable) throws Exception {
-		StoredConfig cfg = diskRepo.getConfig();
-		cfg.load();
-		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, enable);
-		cfg.save();
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
