@@ -184,9 +184,9 @@ A ref block is written as:
 
     'r'
     uint24( block_len )
-    uint16( restart_count )
-    uint24( restart_offset )+
     ref_record+
+    uint24( restart_offset )+
+    uint16( restart_count )
     padding?
 
 Blocks begin with `block_type = 'r'` and a 3-byte `block_len` which
@@ -288,9 +288,9 @@ saves space.
 Index block format:
 
     uint32( (1 << 31) | block_len )
-    uint16( restart_count )
-    uint24( restart_offset )+
     index_record+
+    uint24( restart_offset )+
+    uint16( restart_count )
     padding?
 
 The index block header starts with the high bit set.  This identifies
@@ -362,9 +362,9 @@ An object block is written as:
 
     'o'
     uint24( block_len )
-    uint16( restart_count )
-    uint24( restart_offset )+
     obj_record+
+    uint24( restart_offset )+
+    uint16( restart_count )
     padding?
 
 Fields are identical to ref block.  Binary search using the restart
@@ -461,9 +461,9 @@ A log block is written as:
     'g'
     uint24( block_len )
     zlib_deflate {
-      uint16( restart_count )
-      uint24( restart_offset )+
       log_record+
+      uint24( restart_offset )+
+      uint16( restart_count )
     }
 
 Log blocks look similar to ref blocks, except `block_type = 'g'`.
@@ -534,7 +534,7 @@ log record key described above.
     log_chained {
       old_id
       varint( time_seconds )
-      not_same_committer {
+      not_same_ident {
         sint16( tz_offset )
         varint( name_length    )  name
         varint( email_length   )  email
@@ -578,11 +578,15 @@ The `message_length` may be 0, in which case there was no message
 supplied for the update.
 
 For `log_type = 0x4..0x7` the `log_chained` section is used instead to
-compress information that already appeared in a prior log record.  The
-`log_chained` always includes `old_id` for this record, as `new_id` is
+compress information that already appeared in a prior log record, up
+to and including the prior restart, but not records before that
+restart.  This allows readers to only handle chained records within
+the span of a single restart's linear search.
+
+The `log_chained` always includes `old_id` for this record, as `new_id` is
 implied by the prior (by file order, more recent) record's `old_id`.
 
-The `not_same_committer` block appears if `log_type & 0x1` is true,
+The `not_same_ident` block appears if `log_type & 0x1` is true,
 `not_same_message` block appears if `log_type & 0x2` is true.  When
 one of these blocks is missing, its values are implied by the prior
 (more recent) log record.
