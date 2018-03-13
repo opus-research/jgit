@@ -50,24 +50,20 @@ import static org.eclipse.jgit.lib.FileMode.GITLINK;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.HunkHeader;
 import org.eclipse.jgit.patch.FileHeader.PatchType;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 
@@ -86,8 +82,6 @@ public class DiffFormatter {
 	private int abbreviationLength;
 
 	private RawText.Factory rawTextFactory = RawText.FACTORY;
-
-	private long bigFileThreshold = 50 * 1024 * 1024;
 
 	/**
 	 * Create a new formatter with a default level of context.
@@ -116,9 +110,6 @@ public class DiffFormatter {
 	 */
 	public void setRepository(Repository repository) {
 		db = repository;
-
-		CoreConfig cfg = db.getConfig().get(CoreConfig.KEY);
-		bigFileThreshold = cfg.getStreamFileThreshold();
 	}
 
 	/**
@@ -164,19 +155,6 @@ public class DiffFormatter {
 	 */
 	public void setRawTextFactory(RawText.Factory type) {
 		rawTextFactory = type;
-	}
-
-	/**
-	 * Set the maximum file size that should be considered for diff output.
-	 * <p>
-	 * Text files that are larger than this size will not have a difference
-	 * generated during output.
-	 *
-	 * @param bigFileThreshold
-	 *            the limit, in bytes.
-	 */
-	public void setBigFileThreshold(long bigFileThreshold) {
-		this.bigFileThreshold = bigFileThreshold;
 	}
 
 	/**
@@ -246,8 +224,8 @@ public class DiffFormatter {
 
 	private void writeDiffHeader(OutputStream o, DiffEntry ent)
 			throws IOException {
-		String oldName = quotePath("a/" + ent.getOldPath());
-		String newName = quotePath("b/" + ent.getNewPath());
+		String oldName = quotePath("a/" + ent.getOldName());
+		String newName = quotePath("b/" + ent.getNewName());
 		o.write(encode("diff --git " + oldName + " " + newName + "\n"));
 
 		switch (ent.getChangeType()) {
@@ -267,10 +245,10 @@ public class DiffFormatter {
 			o.write(encodeASCII("similarity index " + ent.getScore() + "%"));
 			o.write('\n');
 
-			o.write(encode("rename from " + quotePath(ent.getOldPath())));
+			o.write(encode("rename from " + quotePath(ent.getOldName())));
 			o.write('\n');
 
-			o.write(encode("rename to " + quotePath(ent.getNewPath())));
+			o.write(encode("rename to " + quotePath(ent.getNewName())));
 			o.write('\n');
 			break;
 
@@ -278,23 +256,15 @@ public class DiffFormatter {
 			o.write(encodeASCII("similarity index " + ent.getScore() + "%"));
 			o.write('\n');
 
-			o.write(encode("copy from " + quotePath(ent.getOldPath())));
+			o.write(encode("copy from " + quotePath(ent.getOldName())));
 			o.write('\n');
 
-			o.write(encode("copy to " + quotePath(ent.getNewPath())));
+			o.write(encode("copy to " + quotePath(ent.getNewName())));
 			o.write('\n');
 
 			if (!ent.getOldMode().equals(ent.getNewMode())) {
 				o.write(encodeASCII("new file mode "));
 				ent.getNewMode().copyTo(o);
-				o.write('\n');
-			}
-			break;
-		case MODIFY:
-			int score = ent.getScore();
-			if (0 < score && score <= 100) {
-				o.write(encodeASCII("dissimilarity index " + (100 - score)
-						+ "%"));
 				o.write('\n');
 			}
 			break;
@@ -348,32 +318,9 @@ public class DiffFormatter {
 
 		if (db == null)
 			throw new IllegalStateException(JGitText.get().repositoryIsRequired);
-
 		if (id.isComplete()) {
-			ObjectLoader ldr = db.open(id.toObjectId());
-			if (!ldr.isLarge())
-				return ldr.getCachedBytes();
-
-			long sz = ldr.getSize();
-			if (sz < bigFileThreshold && sz < Integer.MAX_VALUE) {
-				byte[] buf;
-				try {
-					buf = new byte[(int) sz];
-				} catch (OutOfMemoryError noMemory) {
-					LargeObjectException e;
-
-					e = new LargeObjectException(id.toObjectId());
-					e.initCause(noMemory);
-					throw e;
-				}
-				InputStream in = ldr.openStream();
-				try {
-					IO.readFully(in, buf, 0, buf.length);
-				} finally {
-					in.close();
-				}
-				return buf;
-			}
+			ObjectLoader ldr = db.openObject(id.toObjectId());
+			return ldr.getCachedBytes();
 		}
 
 		return new byte[] {};

@@ -104,9 +104,4 @@ class FS_POSIX_Java6 extends FS {
 			throw new Error(e);
 		}
 	}
-
-	@Override
-	public boolean retryFailedLockFileCommit() {
-		return false;
-	}
 }

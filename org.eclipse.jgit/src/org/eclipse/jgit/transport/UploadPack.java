@@ -56,10 +56,10 @@ import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PackWriter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -69,8 +69,6 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -102,9 +100,6 @@ public class UploadPack {
 
 	/** Revision traversal support over {@link #db}. */
 	private final RevWalk walk;
-
-	/** Configuration to pass into the PackWriter. */
-	private PackConfig packConfig;
 
 	/** Timeout in seconds to wait for client interaction. */
 	private int timeout;
@@ -263,17 +258,6 @@ public class UploadPack {
 	}
 
 	/**
-	 * Set the configuration used by the pack generator.
-	 *
-	 * @param pc
-	 *            configuration controlling packing parameters. If null the
-	 *            source repository's settings will be used.
-	 */
-	public void setPackConfig(PackConfig pc) {
-		this.packConfig = pc;
-	}
-
-	/**
 	 * Execute the upload task on the socket.
 	 *
 	 * @param input
@@ -311,7 +295,6 @@ public class UploadPack {
 			pckOut = new PacketLineOut(rawOut);
 			service();
 		} finally {
-			walk.release();
 			if (timer != null) {
 				try {
 					timer.terminate();
@@ -410,15 +393,11 @@ public class UploadPack {
 			}
 			if (!o.has(ADVERTISED))
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()));
-			try {
-				want(o);
-			} catch (IOException e) {
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()), e);
-			}
+			want(o);
 		}
 	}
 
-	private void want(RevObject o) throws MissingObjectException, IOException {
+	private void want(RevObject o) {
 		if (!o.has(WANT)) {
 			o.add(WANT);
 			wantAll.add(o);
@@ -427,7 +406,9 @@ public class UploadPack {
 				wantCommits.add((RevCommit) o);
 
 			else if (o instanceof RevTag) {
-				o = walk.peel(o);
+				do {
+					o = ((RevTag) o).getObject();
+				} while (o instanceof RevTag);
 				if (o instanceof RevCommit)
 					want(o);
 			}
@@ -563,6 +544,8 @@ public class UploadPack {
 	}
 
 	private void sendPack() throws IOException {
+		final boolean thin = options.contains(OPTION_THIN_PACK);
+		final boolean progress = !options.contains(OPTION_NO_PROGRESS);
 		final boolean sideband = options.contains(OPTION_SIDE_BAND)
 				|| options.contains(OPTION_SIDE_BAND_64K);
 
@@ -576,38 +559,32 @@ public class UploadPack {
 
 			packOut = new SideBandOutputStream(SideBandOutputStream.CH_DATA,
 					bufsz, rawOut);
-			if (!options.contains(OPTION_NO_PROGRESS))
+			if (progress)
 				pm = new SideBandProgressMonitor(new SideBandOutputStream(
 						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut));
 		}
 
-		PackConfig cfg = packConfig;
-		if (cfg == null)
-			cfg = new PackConfig(db);
-		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
-		try {
-			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
-			pw.setThin(options.contains(OPTION_THIN_PACK));
-			pw.preparePack(pm, wantAll, commonBase);
-			if (options.contains(OPTION_INCLUDE_TAG)) {
-				for (final Ref r : refs.values()) {
-					final RevObject o;
-					try {
-						o = walk.parseAny(r.getObjectId());
-					} catch (IOException e) {
-						continue;
-					}
-					if (o.has(WANT) || !(o instanceof RevTag))
-						continue;
-					final RevTag t = (RevTag) o;
-					if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
-						pw.addObject(t);
+		final PackWriter pw;
+		pw = new PackWriter(db, pm, NullProgressMonitor.INSTANCE);
+		pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
+		pw.setThin(thin);
+		pw.preparePack(wantAll, commonBase);
+		if (options.contains(OPTION_INCLUDE_TAG)) {
+			for (final Ref r : refs.values()) {
+				final RevObject o;
+				try {
+					o = walk.parseAny(r.getObjectId());
+				} catch (IOException e) {
+					continue;
 				}
+				if (o.has(WANT) || !(o instanceof RevTag))
+					continue;
+				final RevTag t = (RevTag) o;
+				if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
+					pw.addObject(t);
 			}
-			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-		} finally {
-			pw.release();
 		}
+		pw.writePack(packOut);
 		packOut.flush();
 
 		if (sideband)

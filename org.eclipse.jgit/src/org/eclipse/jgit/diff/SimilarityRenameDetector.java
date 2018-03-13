@@ -50,12 +50,11 @@ import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.lib.Repository;
 
 class SimilarityRenameDetector {
 	/**
@@ -72,7 +71,7 @@ class SimilarityRenameDetector {
 
 	private static final int SCORE_SHIFT = 2 * BITS_PER_INDEX;
 
-	private ObjectReader reader;
+	private final Repository repo;
 
 	/**
 	 * All sources to consider for copies or renames.
@@ -112,9 +111,9 @@ class SimilarityRenameDetector {
 
 	private List<DiffEntry> out;
 
-	SimilarityRenameDetector(ObjectReader reader, List<DiffEntry> srcs,
+	SimilarityRenameDetector(Repository repo, List<DiffEntry> srcs,
 			List<DiffEntry> dsts) {
-		this.reader = reader;
+		this.repo = repo;
 		this.srcs = srcs;
 		this.dsts = dsts;
 	}
@@ -266,7 +265,7 @@ class SimilarityRenameDetector {
 				// nameScore returns a value between 0 and 100, but we want it
 				// to be in the same range as the content score. This allows it
 				// to be dropped into the pretty formula for the final score.
-				int nameScore = nameScore(srcEnt.oldPath, dstEnt.newPath) * 100;
+				int nameScore = nameScore(srcEnt.oldName, dstEnt.newName) * 100;
 
 				int score = (contentScore * 99 + nameScore * 1) / 10000;
 
@@ -337,13 +336,13 @@ class SimilarityRenameDetector {
 
 	private SimilarityIndex hash(ObjectId objectId) throws IOException {
 		SimilarityIndex r = new SimilarityIndex();
-		r.hash(reader.open(objectId));
+		r.hash(repo.openObject(objectId));
 		r.sort();
 		return r;
 	}
 
 	private long size(ObjectId objectId) throws IOException {
-		return reader.getObjectSize(objectId, Constants.OBJ_BLOB);
+		return repo.openObject(objectId).getSize();
 	}
 
 	private static int score(long value) {

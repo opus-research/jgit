@@ -67,7 +67,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String branchIsNotAnAncestorOfYourCurrentHEAD;
 	/***/ public String branchNotFound;
 	/***/ public String cacheTreePathInfo;
-	/***/ public String configFileNotFound;
 	/***/ public String cannotBeRenamed;
 	/***/ public String cannotChekoutNoHeadsAdvertisedByRemote;
 	/***/ public String cannotCreateCommand;
