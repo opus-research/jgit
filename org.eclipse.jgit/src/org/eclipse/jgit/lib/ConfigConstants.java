@@ -47,6 +47,8 @@ package org.eclipse.jgit.lib;
 /**
  * Constants for use with the Configuration classes: section names,
  * configuration keys
+ *
+ * @since 3.3
  */
 @SuppressWarnings("nls")
 public class ConfigConstants {
@@ -123,7 +125,11 @@ public class ConfigConstants {
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
 
-	/** The "symlinks key */
+	/**
+	 * The "symlinks" key
+	 * 
+	 * @since 3.3
+	 */
 	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
 
 	/** The "streamFileThreshold" key */
@@ -196,7 +202,11 @@ public class ConfigConstants {
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
 
-	/** The "hidedotfiles" key */
+	/**
+	 * The "hidedotfiles" key
+	 *
+	 * @since 3.3
+	 */
 	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
 
 	/** The "precomposeunicode" key */
