@@ -98,6 +98,7 @@ public class DhtCachedPack extends CachedPack {
 	void copyAsIs(PackOutputStream out, boolean validate, DhtReader ctx)
 			throws IOException {
 		Prefetcher p = new Prefetcher(ctx, 0);
+		p.setCacheLoadedChunks(false);
 		p.push(info.chunks);
 		copyPack(out, ctx, p, validate);
 	}
