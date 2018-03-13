@@ -55,8 +55,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Read Git style pkt-line formatting from an input stream.
@@ -71,8 +69,6 @@ import org.slf4j.LoggerFactory;
 public class PacketLineIn {
 	/** Magic return from {@link #readString()} when a flush packet is found. */
 	public static final String END = new StringBuilder(0).toString(); 	/* must not string pool */
-	private static final Logger log = LoggerFactory
-			.getLogger(PacketLineIn.class);
 
 	static enum AckNackResult {
 		/** NAK */
@@ -140,16 +136,12 @@ public class PacketLineIn {
 	 */
 	public String readString() throws IOException {
 		int len = readLength();
-		if (len == 0) {
-			log.info("flush packet"); //$NON-NLS-1$
+		if (len == 0)
 			return END;
-		}
 
 		len -= 4; // length header (4 bytes)
-		if (len == 0) {
-			log.info(""); //$NON-NLS-1$
+		if (len == 0)
 			return ""; //$NON-NLS-1$
-		}
 
 		byte[] raw;
 		if (len <= lineBuffer.length)
@@ -160,11 +152,7 @@ public class PacketLineIn {
 		IO.readFully(in, raw, 0, len);
 		if (raw[len - 1] == '\n')
 			len--;
-
-		String decodedBuffer = RawParseUtils.decode(Constants.CHARSET, raw, 0,
-				len);
-		log.info(decodedBuffer);
-		return decodedBuffer;
+		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 
 	/**
@@ -179,10 +167,8 @@ public class PacketLineIn {
 	 */
 	public String readStringRaw() throws IOException {
 		int len = readLength();
-		if (len == 0) {
-			log.info("flush packet"); //$NON-NLS-1$
+		if (len == 0)
 			return END;
-		}
 
 		len -= 4; // length header (4 bytes)
 
@@ -193,11 +179,7 @@ public class PacketLineIn {
 			raw = new byte[len];
 
 		IO.readFully(in, raw, 0, len);
-
-		String decodedBuffer = RawParseUtils.decode(Constants.CHARSET, raw, 0,
-				len);
-		log.info(decodedBuffer);
-		return decodedBuffer;
+		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 
 	void discardUntilEnd() throws IOException {
@@ -212,7 +194,6 @@ public class PacketLineIn {
 
 	int readLength() throws IOException {
 		IO.readFully(in, lineBuffer, 0, 4);
-
 		try {
 			final int len = RawParseUtils.parseHexInt16(lineBuffer, 0);
 			if (len != 0 && len < 4)
