@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -136,9 +135,8 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * twice on an instance.
 	 *
 	 * @return the Ref after reset
-	 * @throws GitAPIException
 	 */
-	public Ref call() throws GitAPIException, CheckoutConflictException {
+	public Ref call() throws GitAPIException {
 		checkCallable();
 
 		Ref r;
@@ -221,8 +219,6 @@ public class ResetCommand extends GitCommand<Ref> {
 					resetMerge();
 				else if (cherryPicking)
 					resetCherryPick();
-				else if (repo.readSquashCommitMsg() != null)
-					repo.writeSquashCommitMsg(null /* delete */);
 			}
 
 			setCallable(false);
@@ -370,19 +366,13 @@ public class ResetCommand extends GitCommand<Ref> {
 		}
 	}
 
-	private void checkoutIndex(RevCommit commit) throws IOException,
-			GitAPIException {
+	private void checkoutIndex(RevCommit commit) throws IOException {
 		DirCache dc = repo.lockDirCache();
 		try {
 			DirCacheCheckout checkout = new DirCacheCheckout(repo, dc,
 					commit.getTree());
 			checkout.setFailOnConflict(false);
-			try {
-				checkout.checkout();
-			} catch (org.eclipse.jgit.errors.CheckoutConflictException cce) {
-				throw new CheckoutConflictException(checkout.getConflicts(),
-						cce);
-			}
+			checkout.checkout();
 		} finally {
 			dc.unlock();
 		}
