@@ -54,7 +54,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.List;
@@ -64,7 +63,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.lfs.errors.LfsBandwidthLimitExceeded;
 import org.eclipse.jgit.lfs.errors.LfsException;
+import org.eclipse.jgit.lfs.errors.LfsRateLimitExceeded;
 import org.eclipse.jgit.lfs.errors.LfsRepositoryNotFound;
 import org.eclipse.jgit.lfs.errors.LfsRepositoryReadOnly;
 import org.eclipse.jgit.lfs.errors.LfsValidationError;
@@ -84,7 +85,12 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json"; //$NON-NLS-1$
+	private static final String CONTENTTYPE_VND_GIT_LFS_JSON =
+			"application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
+
+	private static final int SC_RATE_LIMIT_EXCEEDED = 429;
+
+	private static final int SC_BANDWIDTH_LIMIT_EXCEEDED = 509;
 
 	private Gson gson = createGson();
 
@@ -99,11 +105,16 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	 * @return the large file repository storing large files or null if the
 	 *         request is not supported.
 	 * @throws LfsException
+	 * @since 4.5
 	 */
 	protected abstract LargeFileRepository getLargeFileRepository(
 			LfsRequest request, String path) throws LfsException;
 
-	/** LFS request. */
+	/**
+	 * LFS request.
+	 *
+	 * @since 4.5
+	 */
 	protected static class LfsRequest {
 		private String operation;
 
@@ -134,37 +145,39 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		Writer w = new BufferedWriter(
 				new OutputStreamWriter(res.getOutputStream(), UTF_8));
 
-		Reader r = new BufferedReader(new InputStreamReader(req.getInputStream(), UTF_8));
+		Reader r = new BufferedReader(
+				new InputStreamReader(req.getInputStream(), UTF_8));
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
 		String path = req.getPathInfo();
 
+		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 		LargeFileRepository repo = null;
 		try {
 			repo = getLargeFileRepository(request, path);
+			if (repo == null) {
+				sendError(res, w, SC_SERVICE_UNAVAILABLE,
+						"LFS is not available"); //$NON-NLS-1$
+			} else {
+				res.setStatus(SC_OK);
+				TransferHandler handler = TransferHandler
+						.forOperation(request.operation, repo, request.objects);
+				gson.toJson(handler.process(), w);
+			}
 		} catch (LfsValidationError e) {
-			sendError(res, SC_UNPROCESSABLE_ENTITY, e.getMessage());
-			return;
+			sendError(res, w, SC_UNPROCESSABLE_ENTITY, e.getMessage());
 		} catch (LfsRepositoryNotFound e) {
-			sendError(res, SC_NOT_FOUND, e.getMessage());
-			return;
+			sendError(res, w, SC_NOT_FOUND, e.getMessage());
 		} catch (LfsRepositoryReadOnly e) {
-			sendError(res, SC_FORBIDDEN, e.getMessage());
-			return;
+			sendError(res, w, SC_FORBIDDEN, e.getMessage());
+		} catch (LfsRateLimitExceeded e) {
+			sendError(res, w, SC_RATE_LIMIT_EXCEEDED, e.getMessage());
+		} catch (LfsBandwidthLimitExceeded e) {
+			sendError(res, w, SC_BANDWIDTH_LIMIT_EXCEEDED, e.getMessage());
 		} catch (LfsException e) {
-			sendError(res, SC_SERVICE_UNAVAILABLE, e.getMessage());
-			return;
+			sendError(res, w, SC_SERVICE_UNAVAILABLE, e.getMessage());
+		} finally {
+			w.flush();
 		}
-		if (repo == null) {
-			res.setStatus(SC_SERVICE_UNAVAILABLE);
-			return;
-		}
-
-		res.setStatus(SC_OK);
-		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
-		TransferHandler handler = TransferHandler
-				.forOperation(request.operation, repo, request.objects);
-		gson.toJson(handler.process(), w);
-		w.flush();
 	}
 
 	static class Error {
@@ -175,21 +188,16 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		}
 	}
 
-	private void sendError(HttpServletResponse rsp, int status, String message)
-			throws IOException {
+	private void sendError(HttpServletResponse rsp, Writer writer, int status,
+			String message) {
 		rsp.setStatus(status);
-		PrintWriter writer = rsp.getWriter();
 		gson.toJson(new Error(message), writer);
-		writer.flush();
-		writer.close();
-		rsp.flushBuffer();
 	}
 
 	private Gson createGson() {
-		GsonBuilder gb = new GsonBuilder()
-				.setFieldNamingPolicy(
-						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.setPrettyPrinting().disableHtmlEscaping();
-		return gb.create();
+		return new GsonBuilder()
+				.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+				.disableHtmlEscaping()
+				.create();
 	}
 }
