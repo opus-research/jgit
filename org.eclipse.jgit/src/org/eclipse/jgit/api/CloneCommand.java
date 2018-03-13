@@ -183,7 +183,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 		Repository repository = null;
 		FetchResult fetchResult = null;
-		Thread cleanupHook = registerShutdownHook();
 		try {
 			repository = init();
 			fetchResult = fetch(repository, u);
@@ -206,8 +205,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			}
 			cleanup();
 			throw e;
-		} finally {
-			Runtime.getRuntime().removeShutdownHook(cleanupHook);
 		}
 		if (!noCheckout) {
 			try {
@@ -221,18 +218,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			}
 		}
 		return new Git(repository, true);
-	}
-
-	private Thread registerShutdownHook() {
-		Thread cleanupHook = new Thread() {
-
-			@Override
-			public void run() {
-				cleanup();
-			}
-		};
-		Runtime.getRuntime().addShutdownHook(cleanupHook);
-		return cleanupHook;
 	}
 
 	private static boolean isNonEmptyDirectory(File dir) {
