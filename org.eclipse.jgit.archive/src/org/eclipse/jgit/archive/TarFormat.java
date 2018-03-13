@@ -78,11 +78,8 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 					path, TarConstants.LF_SYMLINK);
 			entry.setLinkName(new String(
 					loader.getCachedBytes(100), "UTF-8")); //$NON-NLS-1$
-                        try {
-				out.putArchiveEntry(entry);
-			} finally {
-				out.closeArchiveEntry();
-			}
+			out.putArchiveEntry(entry);
+			out.closeArchiveEntry();
 			return;
 		}
 
@@ -95,8 +92,8 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 			// an entry with unsupported mode (e.g., a submodule).
 		}
 		entry.setSize(loader.getSize());
+		out.putArchiveEntry(entry);
 		try {
-			out.putArchiveEntry(entry);
 			loader.copyTo(out);
 		} finally {
 			out.closeArchiveEntry();
