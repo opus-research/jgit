@@ -145,10 +145,10 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 	 * @since 3.7
 	 */
 	@Override
-	public File findHook(Repository repository, String hookName) {
+	public File findHook(Repository repository, Hook hook) {
 		final File gitdir = repository.getDirectory();
 		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
-				.resolve(hookName);
+				.resolve(hook.getName());
 		if (Files.isExecutable(hookPath))
 			return hookPath.toFile();
 		return null;
