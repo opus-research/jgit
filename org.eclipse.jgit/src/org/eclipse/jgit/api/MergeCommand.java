@@ -210,18 +210,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
-				refLogMessage.append(": Merge made by ");
-				refLogMessage.append(mergeStrategy.getName());
-				refLogMessage.append('.');
+
 				if (noProblems) {
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
 							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-
-					RevCommit newHead = new Git(getRepository()).commit()
-							.setReflogComment(refLogMessage.toString()).call();
+					RevCommit newHead = new Git(getRepository()).commit().call();
 					return new MergeResult(newHead.getId(),
 							null, new ObjectId[] {
 									headCommit.getId(), srcCommit.getId() },

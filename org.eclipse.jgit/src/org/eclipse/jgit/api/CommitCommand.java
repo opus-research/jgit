@@ -114,8 +114,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	private List<ObjectId> parents = new LinkedList<ObjectId>();
 
-	private String reflogComment;
-
 	/**
 	 * @param repo
 	 */
@@ -220,14 +218,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						RevCommit revCommit = revWalk.parseCommit(commitId);
 						RefUpdate ru = repo.updateRef(Constants.HEAD);
 						ru.setNewObjectId(commitId);
-						if (reflogComment != null) {
-							ru.setRefLogMessage(reflogComment, false);
-						} else {
-							String prefix = amend ? "commit (amend): "
-									: "commit: ";
-							ru.setRefLogMessage(
-									prefix + revCommit.getShortMessage(), false);
-						}
+						String prefix = amend ? "commit (amend): " : "commit: ";
+						ru.setRefLogMessage(
+								prefix + revCommit.getShortMessage(), false);
+
 						ru.setExpectedOldObjectId(headId);
 						Result rc = ru.forceUpdate();
 						switch (rc) {
@@ -670,17 +664,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public CommitCommand setInsertChangeId(boolean insertChangeId) {
 		checkCallable();
 		this.insertChangeId = insertChangeId;
-		return this;
-	}
-
-	/**
-	 * Override the message written to the reflog
-	 *
-	 * @param reflogComment
-	 * @return {@code this}
-	 */
-	public CommitCommand setReflogComment(String reflogComment) {
-		this.reflogComment = reflogComment;
 		return this;
 	}
 

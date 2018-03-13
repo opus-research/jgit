@@ -63,11 +63,9 @@ import java.util.Comparator;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileSnapshot;
 import org.eclipse.jgit.storage.file.LockFile;
 import org.eclipse.jgit.util.FS;
@@ -225,9 +223,6 @@ public class DirCache {
 
 	/** Keep track of whether the index has changed or not */
 	private FileSnapshot snapshot;
-
-	/** related repository **/
-	private Repository repository;
 
 	/**
 	 * Create a new in-core index representation.
@@ -572,8 +567,6 @@ public class DirCache {
 		if (!tmp.commit())
 			return false;
 		snapshot = tmp.getCommitSnapshot();
-		if (repository != null)
-			repository.fireEvent(new IndexChangedEvent());
 		return true;
 	}
 
@@ -719,6 +712,11 @@ public class DirCache {
 	 * @return all entries recursively contained within the subtree.
 	 */
 	public DirCacheEntry[] getEntriesWithin(String path) {
+		if (path.length() == 0) {
+			final DirCacheEntry[] r = new DirCacheEntry[sortedEntries.length];
+			System.arraycopy(sortedEntries, 0, r, 0, sortedEntries.length);
+			return r;
+		}
 		if (!path.endsWith("/"))
 			path += "/";
 		final byte[] p = Constants.encode(path);
@@ -795,14 +793,5 @@ public class DirCache {
 			}
 		}
 		return false;
-	}
-
-	/**
-	 * Sets the related repository
-	 *
-	 * @param repository
-	 */
-	public void setRepository(final Repository repository) {
-		this.repository = repository;
 	}
 }
