@@ -66,7 +66,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 
 	public void testReadIndex_LsFiles() throws Exception {
 		final Map<String, CGitIndexRecord> ls = readLsFiles();
-		final DirCache dc = new DirCache(index, FS.DETECTED, true);
+		final DirCache dc = new DirCache(index, FS.DETECTED);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(ls.size(), dc.getEntryCount());
@@ -80,7 +80,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	public void testTreeWalk_LsFiles() throws Exception {
 		final Repository db = createBareRepository();
 		final Map<String, CGitIndexRecord> ls = readLsFiles();
-		final DirCache dc = new DirCache(index, db.getFS(), false);
+		final DirCache dc = new DirCache(index, db.getFS());
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(ls.size(), dc.getEntryCount());
@@ -104,7 +104,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 
 	public void testUnsupportedOptionalExtension() throws Exception {
 		final DirCache dc = new DirCache(pathOf("gitgit.index.ZZZZ"),
-				FS.DETECTED, false);
+				FS.DETECTED);
 		dc.read();
 		assertEquals(1, dc.getEntryCount());
 		assertEquals("A", dc.getEntry(0).getPathString());
@@ -112,7 +112,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 
 	public void testUnsupportedRequiredExtension() throws Exception {
 		final DirCache dc = new DirCache(pathOf("gitgit.index.aaaa"),
-				FS.DETECTED, false);
+				FS.DETECTED);
 		try {
 			dc.read();
 			fail("Cache loaded an unsupported extension");
@@ -124,7 +124,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 
 	public void testCorruptChecksumAtFooter() throws Exception {
 		final DirCache dc = new DirCache(pathOf("gitgit.index.badchecksum"),
-				FS.DETECTED, false);
+				FS.DETECTED);
 		try {
 			dc.read();
 			fail("Cache loaded despite corrupt checksum");
@@ -147,7 +147,7 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	public void testReadIndex_DirCacheTree() throws Exception {
 		final Map<String, CGitIndexRecord> cList = readLsFiles();
 		final Map<String, CGitLsTreeRecord> cTree = readLsTree();
-		final DirCache dc = new DirCache(index, FS.DETECTED, false);
+		final DirCache dc = new DirCache(index, FS.DETECTED);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(cList.size(), dc.getEntryCount());
