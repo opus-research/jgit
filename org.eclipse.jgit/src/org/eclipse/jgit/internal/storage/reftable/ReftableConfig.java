@@ -54,6 +54,7 @@ public class ReftableConfig {
 	private int logBlockSize;
 	private int restartInterval;
 	private int maxIndexLevels;
+	private boolean alignBlocks = true;
 	private boolean indexObjects = true;
 
 	/** Create a default configuration. */
@@ -95,6 +96,7 @@ public class ReftableConfig {
 		this.logBlockSize = cfg.logBlockSize;
 		this.restartInterval = cfg.restartInterval;
 		this.maxIndexLevels = cfg.maxIndexLevels;
+		this.alignBlocks = cfg.alignBlocks;
 		this.indexObjects = cfg.indexObjects;
 	}
 
@@ -164,6 +166,21 @@ public class ReftableConfig {
 		maxIndexLevels = Math.max(0, levels);
 	}
 
+	/** @return {@code true} if the writer should align blocks. */
+	public boolean isAlignBlocks() {
+		return alignBlocks;
+	}
+
+	/**
+	 * @param align
+	 *            if {@code true} blocks are written aligned to multiples of
+	 *            {@link #getRefBlockSize()}. May increase file size due to NUL
+	 *            padding bytes added between blocks. Default is {@code true}.
+	 */
+	public void setAlignBlocks(boolean align) {
+		alignBlocks = align;
+	}
+
 	/** @return {@code true} if the writer should index object to ref. */
 	public boolean isIndexObjects() {
 		return indexObjects;
@@ -193,6 +210,7 @@ public class ReftableConfig {
 		logBlockSize = rc.getInt("reftable", "logBlockSize", logBlockSize); //$NON-NLS-1$ //$NON-NLS-2$
 		restartInterval = rc.getInt("reftable", "restartInterval", restartInterval); //$NON-NLS-1$ //$NON-NLS-2$
 		maxIndexLevels = rc.getInt("reftable", "indexLevels", maxIndexLevels); //$NON-NLS-1$ //$NON-NLS-2$
+		alignBlocks = rc.getBoolean("reftable", "alignBlocks", alignBlocks); //$NON-NLS-1$ //$NON-NLS-2$
 		indexObjects = rc.getBoolean("reftable", "indexObjects", indexObjects); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 }

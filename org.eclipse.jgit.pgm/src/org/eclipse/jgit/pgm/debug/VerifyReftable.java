@@ -77,7 +77,7 @@ class VerifyReftable extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		List<Ref> refs = WriteReftable.read(lsRemotePath);
+		List<Ref> refs = WriteReftable.readRefs(lsRemotePath);
 
 		try (FileInputStream in = new FileInputStream(reftablePath);
 				BlockSource src = BlockSource.from(in);
@@ -113,7 +113,7 @@ class VerifyReftable extends TextBuiltin {
 		TextProgressMonitor pm = new TextProgressMonitor(errw);
 		pm.beginTask("random seek", rnd.size());
 		for (Ref exp : rnd) {
-			try (RefCursor rc = reader.seek(exp.getName())) {
+			try (RefCursor rc = reader.seekRef(exp.getName())) {
 				verify(exp, rc);
 				if (rc.next()) {
 					throw die("should not have ref after " + exp.getName());
