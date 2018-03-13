@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2014, Sasa Zivkov <sasa.zivkov@sap.com>, SAP AG
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,32 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.errors;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import java.io.IOException;
+import java.text.MessageFormat;
 
-public class BranchTest extends CLIRepositoryTestCase {
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
-	}
+import org.eclipse.jgit.internal.JGitText;
 
-	@Test
-	public void testList() throws Exception {
-		assertEquals("* master 6fd41be initial commit",
-				execute("git branch -v")[0]);
-	}
+/**
+ * Thrown when a pack exceeds a given size limit
+ *
+ * @since 3.3
+ */
+public class TooLargePackException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	@Test
-	public void testExistingBranch() throws Exception {
-		assertEquals("fatal: A branch named 'master' already exists.",
-				execute("git branch master")[0]);
+	/**
+	 * Construct a too large pack exception.
+	 *
+	 * @param packSizeLimit
+	 *            the pack size limit (in bytes) that was exceeded
+	 */
+	public TooLargePackException(long packSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackTooLarge,
+				Long.valueOf(packSizeLimit)));
 	}
 }
