@@ -35,51 +35,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.api.CommitCommand;
-import org.eclipse.jgit.api.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.JGitInternalException;
-import org.eclipse.jgit.api.NoHeadException;
-import org.eclipse.jgit.api.NoMessageException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.util.RawParseUtils;
-import org.kohsuke.args4j.Option;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
-@Command(common = true, usage = "usage_recordChangesToRepository")
-class Commit extends TextBuiltin {
-	// I don't support setting the committer, because also the native git
-	// command doesn't allow this.
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheCheckout;
 
-	@Option(name = "--author", metaVar="metaVar_author", usage = "usage_CommitAuthor")
-	private String author;
-
-	@Option(name = "--message", aliases = { "-m" }, metaVar="metaVar_message", usage="usage_CommitMessage", required=true)
-	private String message;
+public class DirCacheCheckoutTest extends ReadTreeTest {
+	private DirCacheCheckout dco;
+	@Override
+	public void prescanTwoTrees(Tree head, Tree merge)
+			throws IllegalStateException, IOException {
+		DirCache dc = db.lockDirCache();
+		try {
+			dco = new DirCacheCheckout(db, head.getTreeId(), dc, merge.getTreeId());
+			dco.preScanTwoTrees();
+		} finally {
+			dc.unlock();
+		}
+	}
 
 	@Override
-	protected void run() throws NoHeadException, NoMessageException,
-			ConcurrentRefUpdateException, JGitInternalException, Exception {
-		CommitCommand commitCmd = new Git(db).commit();
-		if (author != null)
-			commitCmd.setAuthor(RawParseUtils.parsePersonIdent(author));
-		if (message != null)
-			commitCmd.setMessage(message);
-		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit = commitCmd.call();
-
-		String branchName;
-		if (!head.isSymbolic())
-			branchName = CLIText.get().branchDetachedHEAD;
-		else {
-			branchName = head.getTarget().getName();
-			if (branchName.startsWith(Constants.R_HEADS))
-				branchName = branchName.substring(Constants.R_HEADS.length());
+	public void checkout() throws IOException {
+		DirCache dc = db.lockDirCache();
+		try {
+			dco = new DirCacheCheckout(db, theHead.getTreeId(), dc, theMerge.getTreeId());
+			dco.checkout();
+		} finally {
+			dc.unlock();
 		}
-		out.println("[" + branchName + " " + commit.name() + "] "
-				+ commit.getShortMessage());
+	}
+
+	@Override
+	public List<String> getRemoved() {
+		return dco.getRemoved();
+	}
+
+	@Override
+	public Map<String, ObjectId> getUpdated() {
+		return dco.getUpdated();
+	}
+
+	@Override
+	public List<String> getConflicts() {
+		return dco.getConflicts();
 	}
 }

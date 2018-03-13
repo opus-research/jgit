@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com> and
+ * Copyright (C) 2010, Chrisian Halstrick <christian.halstrick@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -35,16 +35,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.errors;
+
+import java.io.IOException;
+
+import org.eclipse.jgit.JGitText;
 
 /**
- * Exception thrown when a tag command was called with an invalid tag name (or
- * null), such as bad~tag.
+ * Cannot write a modified index. This is a serious error that users need to be
+ * made aware of.
  */
-public class InvalidTagNameException extends GitAPIException {
+public class IndexWriteException extends IOException {
 	private static final long serialVersionUID = 1L;
 
-	InvalidTagNameException(String msg) {
-		super(msg);
+	/**
+	 * Constructs an IndexWriteException with the default message.
+	 */
+	public IndexWriteException() {
+		super(JGitText.get().indexWriteException);
+	}
+
+	/**
+	 * Constructs an IndexWriteException with the specified detail message.
+	 *
+	 * @param s message
+	 */
+	public IndexWriteException(final String s) {
+		super(s);
+	}
+
+	/**
+	 * Constructs an IndexWriteException with the specified detail message.
+	 *
+	 * @param s message
+	 * @param cause root cause exception
+	 */
+	public IndexWriteException(final String s, final Throwable cause) {
+		super(s);
+		initCause(cause);
 	}
 }
