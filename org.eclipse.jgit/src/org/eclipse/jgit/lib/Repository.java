@@ -96,8 +96,6 @@ public class Repository {
 
 	private final File gitDir;
 
-	private final FileBasedConfig userConfig;
-
 	private final RepositoryConfig config;
 
 	private final RefDatabase refs;
@@ -193,11 +191,26 @@ public class Repository {
 				throw new IllegalArgumentException("Either GIT_DIR or GIT_WORK_TREE must be passed to Repository constructor");
 		}
 
+		final FileBasedConfig userConfig;
 		userConfig = SystemReader.getInstance().openUserConfig();
+		try {
+			userConfig.load();
+		} catch (ConfigInvalidException e1) {
+			IOException e2 = new IOException("User config file "
+					+ userConfig.getFile().getAbsolutePath() + " invalid: "
+					+ e1);
+			e2.initCause(e1);
+			throw e2;
+		}
 		config = new RepositoryConfig(userConfig, FS.resolve(gitDir, "config"));
 
-		loadUserConfig();
-		loadConfig();
+		try {
+			getConfig().load();
+		} catch (ConfigInvalidException e1) {
+			IOException e2 = new IOException("Unknown repository format");
+			e2.initCause(e1);
+			throw e2;
+		}
 
 		if (workDir == null) {
 			String workTreeConfig = getConfig().getString("core", null, "worktree");
@@ -230,29 +243,6 @@ public class Repository {
 			}
 		}
 	}
-
-	private void loadUserConfig() throws IOException {
-		try {
-			userConfig.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("User config file "
-					+ userConfig.getFile().getAbsolutePath() + " invalid: "
-					+ e1);
-			e2.initCause(e1);
-			throw e2;
-		}
-	}
-
-	private void loadConfig() throws IOException {
-		try {
-			config.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("Unknown repository format");
-			e2.initCause(e1);
-			throw e2;
-		}
-	}
-
 
 	/**
 	 * Create a new Git repository initializing the necessary files and
@@ -330,20 +320,6 @@ public class Repository {
 	 * @return the configuration of this repository
 	 */
 	public RepositoryConfig getConfig() {
-		if (userConfig.isOutdated()) {
-			try {
-				loadUserConfig();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-		if (config.isOutdated()) {
-				try {
-					loadConfig();
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-		}
 		return config;
 	}
 
