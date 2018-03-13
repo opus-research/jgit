@@ -45,8 +45,6 @@ package org.eclipse.jgit.util.sha1;
 
 import java.util.Arrays;
 
-import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -58,6 +56,11 @@ import org.eclipse.jgit.util.NB;
  * @since 4.7
  */
 public class SHA1 {
+	/** @return a new context to compute a SHA-1 hash of data. */
+	public static SHA1 newInstance() {
+		return new SHA1();
+	}
+
 	// Magic initialization constants defined by FIPS180.
 	private int h0 = 0x67452301;
 	private int h1 = 0xEFCDAB89;
@@ -71,6 +74,9 @@ public class SHA1 {
 
 	/** Total number of bytes in the message. */
 	private long length;
+
+	private SHA1() {
+	}
 
 	/**
 	 * Update the digest computation by adding a byte.
@@ -247,30 +253,5 @@ public class SHA1 {
 		NB.encodeInt32(b, 12, h3);
 		NB.encodeInt32(b, 16, h4);
 		return b;
-	}
-
-	/**
-	 * Finish the digest and return the resulting hash.
-	 * <p>
-	 * Once {@code digest()} is called, this instance should be discarded.
-	 *
-	 * @return the ObjectId for the resulting hash.
-	 */
-	public ObjectId toObjectId() {
-		finish();
-		return new ObjectId(h0, h1, h2, h3, h4);
-	}
-
-	/**
-	 * Finish the digest and return the resulting hash.
-	 * <p>
-	 * Once {@code digest()} is called, this instance should be discarded.
-	 *
-	 * @param id
-	 *            destination to copy the digest to.
-	 */
-	public void digest(MutableObjectId id) {
-		finish();
-		id.set(h0, h1, h2, h3, h4);
 	}
 }

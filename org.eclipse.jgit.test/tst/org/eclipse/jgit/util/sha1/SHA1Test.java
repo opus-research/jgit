@@ -68,7 +68,7 @@ public class SHA1Test {
 		m.update(new byte[] {});
 		ObjectId m1 = ObjectId.fromRaw(m.digest());
 
-		SHA1 s = new SHA1();
+		SHA1 s = SHA1.newInstance();
 		s.update(new byte[] {});
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
@@ -85,7 +85,7 @@ public class SHA1Test {
 		m.update(TEST1.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId m1 = ObjectId.fromRaw(m.digest());
 
-		SHA1 s = new SHA1();
+		SHA1 s = SHA1.newInstance();
 		s.update(TEST1.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
@@ -102,7 +102,7 @@ public class SHA1Test {
 		m.update(TEST2.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId m1 = ObjectId.fromRaw(m.digest());
 
-		SHA1 s = new SHA1();
+		SHA1 s = SHA1.newInstance();
 		s.update(TEST2.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
