@@ -175,7 +175,7 @@ public abstract class BatchingProgressMonitor implements ProgressMonitor {
 
 		void delay(long time, TimeUnit unit) {
 			display = false;
-			timerFuture = AlarmQueue.getExecutor().schedule(this, time, unit);
+			timerFuture = WorkQueue.getExecutor().schedule(this, time, unit);
 		}
 
 		public void run() {
@@ -210,7 +210,7 @@ public abstract class BatchingProgressMonitor implements ProgressMonitor {
 
 		private void restartTimer() {
 			display = false;
-			timerFuture = AlarmQueue.getExecutor().schedule(this, 1,
+			timerFuture = WorkQueue.getExecutor().schedule(this, 1,
 					TimeUnit.SECONDS);
 		}
 

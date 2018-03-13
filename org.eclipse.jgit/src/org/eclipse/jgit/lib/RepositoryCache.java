@@ -52,8 +52,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.annotations.NonNull;
@@ -147,10 +145,10 @@ public class RepositoryCache {
 	 * @param db
 	 *            repository to unregister.
 	 */
-	public static void close(final Repository db) {
+	public static void close(@NonNull final Repository db) {
 		if (db.getDirectory() != null) {
 			FileKey key = FileKey.exact(db.getDirectory(), db.getFS());
-			cache.unregisterAndCloseRepository(key);
+			cache.unregisterAndCloseRepository(key, db);
 		}
 	}
 
@@ -201,17 +199,9 @@ public class RepositoryCache {
 		cache.clearAll();
 	}
 
-	static void reconfigure(RepositoryCacheConfig repositoryCacheConfig) {
-		cache.configureEviction(repositoryCacheConfig);
-	}
-
 	private final ConcurrentHashMap<Key, Reference<Repository>> cacheMap;
 
 	private final Lock[] openLocks;
-
-	private ScheduledFuture<?> cleanupTask;
-
-	private volatile long expireAfter;
 
 	private RepositoryCache() {
 		cacheMap = new ConcurrentHashMap<Key, Reference<Repository>>();
@@ -219,40 +209,32 @@ public class RepositoryCache {
 		for (int i = 0; i < openLocks.length; i++) {
 			openLocks[i] = new Lock();
 		}
-		configureEviction(new RepositoryCacheConfig());
-	}
 
-	private void configureEviction(
-			RepositoryCacheConfig repositoryCacheConfig) {
-		expireAfter = repositoryCacheConfig.getExpireAfter();
-		ScheduledThreadPoolExecutor scheduler = AlarmQueue.getExecutor();
-		synchronized (scheduler) {
-			if (cleanupTask != null) {
-				cleanupTask.cancel(false);
-			}
-			long newDelay = repositoryCacheConfig.getCleanupDelay();
-			cleanupTask = scheduler.scheduleWithFixedDelay(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						for (Reference<Repository> ref : cache.cacheMap
-								.values()) {
-							Repository repository = ref.get();
-							if (repository != null) {
-								if (repository.useCnt.get() == 0
-										&& (System.currentTimeMillis()
-												- repository.closedAt
-														.get() > expireAfter)) {
-									RepositoryCache.close(repository);
-								}
-							}
+		Runnable terminator = new Runnable() {
+
+			@Override
+			public void run() {
+				try {
+					for (Reference<Repository> ref : cache.cacheMap
+							.values()) {
+						Repository db = ref.get();
+						if (db != null && isExpired(db)) {
+							RepositoryCache.close(db);
 						}
-					} catch (Throwable e) {
-						LOG.error(e.getMessage(), e);
 					}
+				} catch (Throwable e) {
+					LOG.error(e.getMessage(), e);
 				}
-			}, newDelay, newDelay, TimeUnit.MILLISECONDS);
-		}
+			}
+
+			private boolean isExpired(Repository db) {
+				return db.useCnt.get() == 0 && (System.currentTimeMillis()
+						- db.closedAt.get() > 20000);
+			}
+		};
+
+		WorkQueue.getExecutor().scheduleWithFixedDelay(terminator, 10, 10,
+				TimeUnit.SECONDS);
 	}
 
 	@SuppressWarnings("resource")
@@ -291,11 +273,14 @@ public class RepositoryCache {
 		return oldRef != null ? oldRef.get() : null;
 	}
 
-	private void unregisterAndCloseRepository(final Key location) {
+	private void unregisterAndCloseRepository(final Key location,
+			Repository db) {
 		synchronized (lockFor(location)) {
-			Repository oldDb = unregisterRepository(location);
-			if (oldDb != null) {
-				oldDb.close();
+			if (db.useCnt.get() == 0) {
+				Repository oldDb = unregisterRepository(location);
+				if (oldDb != null) {
+					oldDb.close();
+				}
 			}
 		}
 	}
