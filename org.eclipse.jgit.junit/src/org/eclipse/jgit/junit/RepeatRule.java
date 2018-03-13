@@ -99,14 +99,14 @@ public class RepeatRule implements TestRule {
 		public void evaluate() throws Throwable {
 			for (int i = 0; i < repetitions; i++) {
 				try {
-				statement.evaluate();
+					statement.evaluate();
 				} catch (Throwable e) {
 					RepeatedTestException ex = new RepeatedTestException(
 							MessageFormat.format(
-							"Repeated test failed when run for the {0}. time",
-							Integer.valueOf(i + 1)),
+									"Repeated test failed when run for the {0}. time",
+									Integer.valueOf(i + 1)),
 							e);
-					LOG.log(Level.SEVERE, e.getMessage(), e);
+					LOG.log(Level.SEVERE, ex.getMessage(), ex);
 					throw ex;
 				}
 			}
