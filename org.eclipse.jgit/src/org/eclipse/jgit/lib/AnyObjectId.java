@@ -113,7 +113,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return < 0 if this id comes before other; 0 if this id is equal to
 	 *         other; > 0 if this id comes after other.
 	 */
-	public final int compareTo(final AnyObjectId other) {
+	public int compareTo(final AnyObjectId other) {
 		if (this == other)
 			return 0;
 
@@ -138,7 +138,7 @@ public abstract class AnyObjectId implements Comparable {
 		return NB.compareUInt32(w5, other.w5);
 	}
 
-	public final int compareTo(final Object other) {
+	public int compareTo(final Object other) {
 		return compareTo(((AnyObjectId) other));
 	}
 
@@ -153,7 +153,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return a negative integer, zero, or a positive integer as this object is
 	 *         less than, equal to, or greater than the specified object.
 	 */
-	public final int compareTo(final byte[] bs, final int p) {
+	public int compareTo(final byte[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, NB.decodeInt32(bs, p));
@@ -186,7 +186,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return a negative integer, zero, or a positive integer as this object is
 	 *         less than, equal to, or greater than the specified object.
 	 */
-	public final int compareTo(final int[] bs, final int p) {
+	public int compareTo(final int[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, bs[p]);
@@ -219,7 +219,7 @@ public abstract class AnyObjectId implements Comparable {
 		return abbr.prefixCompare(this) == 0;
 	}
 
-	public final int hashCode() {
+	public int hashCode() {
 		return w2;
 	}
 
@@ -230,11 +230,11 @@ public abstract class AnyObjectId implements Comparable {
 	 *            the other id to compare to. May be null.
 	 * @return true only if both ObjectIds have identical bits.
 	 */
-	public final boolean equals(final AnyObjectId other) {
+	public boolean equals(final AnyObjectId other) {
 		return other != null ? equals(this, other) : false;
 	}
 
-	public final boolean equals(final Object o) {
+	public boolean equals(final Object o) {
 		if (o instanceof AnyObjectId)
 			return equals((AnyObjectId) o);
 		else
