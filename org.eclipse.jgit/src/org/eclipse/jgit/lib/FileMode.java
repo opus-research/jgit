@@ -83,6 +83,7 @@ public abstract class FileMode {
 	public static final int TYPE_MISSING = 0000000;
 
 	/** Mode indicating an entry is a tree (aka directory). */
+	@SuppressWarnings("synthetic-access")
 	public static final FileMode TREE = new FileMode(TYPE_TREE,
 			Constants.OBJ_TREE) {
 		@Override
@@ -92,6 +93,7 @@ public abstract class FileMode {
 	};
 
 	/** Mode indicating an entry is a symbolic link. */
+	@SuppressWarnings("synthetic-access")
 	public static final FileMode SYMLINK = new FileMode(TYPE_SYMLINK,
 			Constants.OBJ_BLOB) {
 		@Override
@@ -101,6 +103,7 @@ public abstract class FileMode {
 	};
 
 	/** Mode indicating an entry is a non-executable file. */
+	@SuppressWarnings("synthetic-access")
 	public static final FileMode REGULAR_FILE = new FileMode(0100644,
 			Constants.OBJ_BLOB) {
 		@Override
@@ -110,6 +113,7 @@ public abstract class FileMode {
 	};
 
 	/** Mode indicating an entry is an executable file. */
+	@SuppressWarnings("synthetic-access")
 	public static final FileMode EXECUTABLE_FILE = new FileMode(0100755,
 			Constants.OBJ_BLOB) {
 		@Override
@@ -119,6 +123,7 @@ public abstract class FileMode {
 	};
 
 	/** Mode indicating an entry is a submodule commit in another repository. */
+	@SuppressWarnings("synthetic-access")
 	public static final FileMode GITLINK = new FileMode(TYPE_GITLINK,
 			Constants.OBJ_COMMIT) {
 		@Override
@@ -128,6 +133,7 @@ public abstract class FileMode {
 	};
 
 	/** Mode indicating an entry is missing during parallel walks. */
+	@SuppressWarnings("synthetic-access")
 	public static final FileMode MISSING = new FileMode(TYPE_MISSING,
 			Constants.OBJ_BAD) {
 		@Override
