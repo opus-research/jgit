@@ -76,6 +76,7 @@ public class CLIText extends TranslationBundle {
 	// @formatter:off
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
+	/***/ public String archiveEntryModeIgnored;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
