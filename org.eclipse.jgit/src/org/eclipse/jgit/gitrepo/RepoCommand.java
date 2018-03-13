@@ -48,12 +48,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.SubmoduleAddCommand;
@@ -75,27 +72,25 @@ import org.xml.sax.helpers.XMLReaderFactory;
  *
  * This will parse a repo XML manifest, convert it into .gitmodules file and the
  * repository config file.
+ *
+ * @see <a href="https://code.google.com/p/git-repo/">git-repo project page</a>
+ * @since 3.4
  */
 public class RepoCommand extends GitCommand<Void> {
 
 	private String path;
+
 	private String uri;
-	private String groups;
 
 	private ProgressMonitor monitor;
 
 	private static class Project {
 		final String name;
 		final String path;
-		final Set<String> groups;
 
-		Project(String name, String path, String groups) {
+		Project(String name, String path) {
 			this.name = name;
 			this.path = path;
-			this.groups = new HashSet<String>();
-			if (groups != null && groups.length() > 0) {
-				this.groups.addAll(Arrays.asList(groups.split(",")));
-			}
 		}
 	}
 
@@ -105,29 +100,14 @@ public class RepoCommand extends GitCommand<Void> {
 		private final String baseUrl;
 		private final Map<String, String> remotes;
 		private final List<Project> projects;
-		private final Set<String> plusGroups;
-		private final Set<String> minusGroups;
 		private String defaultRemote;
 
-		XmlManifest(RepoCommand command, String filename, String baseUrl, String groups) {
+		XmlManifest(RepoCommand command, String filename, String baseUrl) {
 			this.command = command;
 			this.filename = filename;
 			this.baseUrl = baseUrl;
 			remotes = new HashMap<String, String>();
 			projects = new ArrayList<Project>();
-			plusGroups = new HashSet<String>();
-			minusGroups = new HashSet<String>();
-			if (groups == null || groups.length() == 0 || groups.equals("default")) {
-				// default means "all,-notdefault"
-				minusGroups.add("notdefault");
-			} else {
-				for (String group : groups.split(",")) {
-					if (group.startsWith("-"))
-						minusGroups.add(group.substring(1));
-					else
-						plusGroups.add(group);
-				}
-			}
 		}
 
 		void read() throws IOException {
@@ -142,8 +122,10 @@ public class RepoCommand extends GitCommand<Void> {
 			try {
 				xr.parse(new InputSource(in));
 			} catch (SAXException e) {
-				throw new IOException(MessageFormat.format(
-							RepoText.get().errorParsingFromFile, filename), e);
+				IOException error = new IOException(MessageFormat.format(
+							RepoText.get().errorParsingManifestFile, filename));
+				error.initCause(e);
+				throw error;
 			} finally {
 				in.close();
 			}
@@ -155,17 +137,13 @@ public class RepoCommand extends GitCommand<Void> {
 				String localName,
 				String qName,
 				Attributes attributes) throws SAXException {
-			if ("project".equals(qName)) {
-				projects.add(new Project(
-							attributes.getValue("name"),
-							attributes.getValue("path"),
-							attributes.getValue("groups")));
-			} else if ("remote".equals(qName)) {
-				remotes.put(attributes.getValue("name"),
-						attributes.getValue("fetch"));
-			} else if ("default".equals(qName)) {
-				defaultRemote = attributes.getValue("remote");
-			} else if ("copyfile".equals(qName)) {
+			if ("project".equals(qName)) //$NON-NLS-1$
+				projects.add(new Project(attributes.getValue("name"), attributes.getValue("path"))); //$NON-NLS-1$ //$NON-NLS-2$
+			else if ("remote".equals(qName)) //$NON-NLS-1$
+				remotes.put(attributes.getValue("name"), attributes.getValue("fetch")); //$NON-NLS-1$ //$NON-NLS-2$
+			else if ("default".equals(qName)) //$NON-NLS-1$
+				defaultRemote = attributes.getValue("remote"); //$NON-NLS-1$
+			else if ("copyfile".equals(qName)) { //$NON-NLS-1$
 				// TODO(fishywang): Handle copyfile. Do nothing for now.
 			}
 		}
@@ -178,35 +156,15 @@ public class RepoCommand extends GitCommand<Void> {
 			}
 			final String remoteUrl;
 			try {
-				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote)));
+				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote))); //$NON-NLS-1$
 				remoteUrl = uri.normalize().toString();
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
 			}
 			for (Project proj : projects) {
-				if (inGroups(proj)) {
-					String url = remoteUrl + proj.name;
-					command.addSubmodule(url, proj.path);
-				}
+				String url = remoteUrl + proj.name;
+				command.addSubmodule(url, proj.path);
 			}
-		}
-
-		boolean inGroups(Project proj) {
-			for (String group : minusGroups) {
-				if (proj.groups.contains(group)) {
-					// minus groups have highest priority.
-					return false;
-				}
-			}
-			if (plusGroups.isEmpty() || plusGroups.contains("all")) {
-				// empty plus groups means "all"
-				return true;
-			}
-			for (String group : plusGroups) {
-				if (proj.groups.contains(group))
-					return true;
-			}
-			return false;
 		}
 	}
 
@@ -247,21 +205,10 @@ public class RepoCommand extends GitCommand<Void> {
 	}
 
 	/**
-	 * Set groups to sync
-	 *
-	 * @param groups groups separated by comma, examples: default|all|G1,-G2,-G3
-	 * @return this command
-	 */
-	public RepoCommand setGroups(final String groups) {
-		this.groups = groups;
-		return this;
-	}
-
-	/**
 	 * The progress monitor associated with the clone operation. By default,
 	 * this is set to <code>NullProgressMonitor</code>
 	 *
-	 * @see NullProgressMonitor
+	 * @see org.eclipse.jgit.lib.NullProgressMonitor
 	 * @param monitor
 	 * @return this command
 	 */
@@ -270,6 +217,7 @@ public class RepoCommand extends GitCommand<Void> {
 		return this;
 	}
 
+	@Override
 	public Void call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)
@@ -277,7 +225,7 @@ public class RepoCommand extends GitCommand<Void> {
 		if (uri == null || uri.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().uriNotConfigured);
 
-		XmlManifest manifest = new XmlManifest(this, path, uri, groups);
+		XmlManifest manifest = new XmlManifest(this, path, uri);
 		try {
 			manifest.read();
 		} catch (IOException e) {
@@ -288,13 +236,11 @@ public class RepoCommand extends GitCommand<Void> {
 	}
 
 	private void addSubmodule(String url, String name) throws SAXException {
-		SubmoduleAddCommand add = new SubmoduleAddCommand(repo)
-			.setPath(name)
-			.setURI(url);
+		SubmoduleAddCommand add = new SubmoduleAddCommand(repo);
 		if (monitor != null)
 			add.setProgressMonitor(monitor);
 		try {
-			Repository sub = add.call();
+			add.setPath(name).setURI(url).call();
 		} catch (GitAPIException e) {
 			throw new SAXException(e);
 		}
