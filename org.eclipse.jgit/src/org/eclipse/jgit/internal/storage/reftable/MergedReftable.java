@@ -99,11 +99,11 @@ public class MergedReftable extends Reftable {
 	}
 
 	@Override
-	public RefCursor seek(String name) throws IOException {
+	public RefCursor seekRef(String name) throws IOException {
 		boolean isPrefix = name.endsWith("/"); //$NON-NLS-1$
 		MergedRefCursor m = new MergedRefCursor();
 		for (int i = 0; i < tables.length; i++) {
-			m.add(new RefQueueEntry(tables[i].seek(name), i));
+			m.add(new RefQueueEntry(tables[i].seekRef(name), i));
 			if (!isPrefix && !m.queue.isEmpty()) {
 				return m;
 			}
@@ -146,12 +146,16 @@ public class MergedReftable extends Reftable {
 		}
 	}
 
+	int queueSize() {
+		return Math.max(1, tables.length);
+	}
+
 	private class MergedRefCursor extends RefCursor {
 		private final PriorityQueue<RefQueueEntry> queue;
 		private Ref ref;
 
 		MergedRefCursor() {
-			queue = new PriorityQueue<>(tables.length, RefQueueEntry::compare);
+			queue = new PriorityQueue<>(queueSize(), RefQueueEntry::compare);
 		}
 
 		void add(RefQueueEntry t) throws IOException {
@@ -234,7 +238,7 @@ public class MergedReftable extends Reftable {
 		private ReflogEntry entry;
 
 		MergedLogCursor() {
-			queue = new PriorityQueue<>(tables.length, LogQueueEntry::compare);
+			queue = new PriorityQueue<>(queueSize(), LogQueueEntry::compare);
 		}
 
 		void add(LogQueueEntry t) throws IOException {
