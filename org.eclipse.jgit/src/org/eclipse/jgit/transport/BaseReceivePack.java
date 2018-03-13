@@ -252,19 +252,13 @@ public abstract class BaseReceivePack {
 	/** The size of the received pack, including index size */
 	private Long packSize;
 
-	private PushCertificateParser pushCertificateParser;
+	PushCertificateParser pushCertificateParser;
 
 	/**
-	 * Get the push certificate used to verify the pusher's identity.
-	 * <p>
-	 * Only valid after commands are read from the wire.
-	 *
-	 * @return the parsed certificate, or null if push certificates are disabled.
-	 * @throws IOException if the certificate was present but invalid.
-	 * @since 4.1
+	 * @return the push certificate used to verify the pushers identity.
 	 */
-	public PushCertificate getPushCertificate() throws IOException {
-		return pushCertificateParser.build();
+	PushCertificate getPushCertificate() {
+		return pushCertificateParser;
 	}
 
 	/**
@@ -1020,11 +1014,9 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowQuiet)
 			adv.advertiseCapability(CAPABILITY_QUIET);
-		String nonce = pushCertificateParser.getAdvertiseNonce();
-		if (nonce != null) {
+		if (pushCertificateParser.enabled())
 			adv.advertiseCapability(
 				pushCertificateParser.getAdvertiseNonce());
-		}
 		if (db.getRefDatabase().performsAtomicTransactions())
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
@@ -1071,9 +1063,11 @@ public abstract class BaseReceivePack {
 							!isBiDirectionalPipe());
 			}
 
-			if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
+			if (line.equals("-----BEGIN PGP SIGNATURE-----\n")) //$NON-NLS-1$
 				pushCertificateParser.receiveSignature(pckIn);
-			}
+
+			if (pushCertificateParser.enabled())
+				pushCertificateParser.addCommand(line);
 
 			if (line.length() < 83) {
 				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
@@ -1088,7 +1082,6 @@ public abstract class BaseReceivePack {
 				cmd.setRef(refs.get(cmd.getRefName()));
 			}
 			commands.add(cmd);
-			pushCertificateParser.addCommand(cmd);
 		}
 	}
 
