@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.util;
 
-import java.text.MessageFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -50,8 +49,6 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Parses strings with time and date specifications into {@link Date}.
@@ -62,9 +59,6 @@ import org.eclipse.jgit.internal.JGitText;
  * understands.
  */
 public class GitDateParser {
-	/** */
-	public static final String NEVER = "never";
-
 	// Since SimpleDateFormat instances are expensive to instantiate they should
 	// be cached. Since they are also not threadsafe they are cached using
 	// ThreadLocal.
@@ -116,7 +110,6 @@ public class GitDateParser {
 	 * relative formats (e.g. "yesterday") the caller can specify the reference
 	 * date. These types of strings can be parsed:
 	 * <ul>
-	 * <li>"never"</li>
 	 * <li>"now"</li>
 	 * <li>"yesterday"</li>
 	 * <li>"(x) years|months|weeks|days|hours|minutes|seconds ago"<br>
@@ -142,57 +135,32 @@ public class GitDateParser {
 	 *            parser often but wants a consistent starting point for calls.<br>
 	 *            If set to <code>null</code> then the current time will be used
 	 *            instead.
-	 * @return the parsed {@link Date} or <code>null</code> if no specific date
-	 *         could be returned. If <code>null</code> is returned the caller
-	 *         should check with
-	 * @throws ParseException
-	 *             if the given dateStr was not recognized
+	 * @return the parsed {@link Date} or <code>null</code> if this string was
+	 *         not parseable.
 	 */
-	public static Date parse(String dateStr, Calendar now)
-			throws ParseException {
+	public static Date parse(String dateStr, Calendar now) {
 		dateStr = dateStr.trim();
 		Date ret;
-
-		if (isNever(dateStr))
-			return null;
 		ret = parse_relative(dateStr, now);
 		if (ret != null)
 			return ret;
 		for (ParseableSimpleDateFormat f : ParseableSimpleDateFormat.values()) {
-			try {
-				return parse_simple(dateStr, f);
-			} catch (ParseException e) {
-				// simply proceed with the next parser
-			}
+			ret = parse_simple(dateStr, f);
+			if (ret != null)
+				return ret;
 		}
-		ParseableSimpleDateFormat[] values = ParseableSimpleDateFormat.values();
-		StringBuilder allFormats = new StringBuilder("\"")
-				.append(values[0].formatStr);
-		for (int i = 1; i < values.length; i++)
-			allFormats.append("\", \"").append(values[i].formatStr);
-		allFormats.append("\"");
-		throw new ParseException(MessageFormat.format(
-				JGitText.get().cannotParseDate, dateStr, allFormats.toString()), 0);
+		return null;
 	}
 
 	// tries to parse a string with the formats supported by SimpleDateFormat
-	private static Date parse_simple(String dateStr, ParseableSimpleDateFormat f)
-			throws ParseException {
+	private static Date parse_simple(String dateStr, ParseableSimpleDateFormat f) {
 		SimpleDateFormat dateFormat = getDateFormat(f);
-		dateFormat.setLenient(false);
-		return dateFormat.parse(dateStr);
-	}
-
-	/**
-	 * Checks whether a string represents "never"
-	 *
-	 * @param dateStr
-	 *            the string to check
-	 * @return <code>true</code> if the dateStr represents "never",
-	 *         <code>false</code> otherwise
-	 */
-	public static boolean isNever(String dateStr) {
-		return ("never".equalsIgnoreCase(dateStr));
+		try {
+			dateFormat.setLenient(false);
+			return dateFormat.parse(dateStr);
+		} catch (ParseException e) {
+			return null;
+		}
 	}
 
 	// tries to parse a string with a relative time specification
