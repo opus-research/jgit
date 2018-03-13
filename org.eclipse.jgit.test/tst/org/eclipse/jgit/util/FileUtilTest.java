@@ -425,17 +425,9 @@ public class FileUtilTest {
 	@Test
 	public void testCreateSymlink() throws IOException {
 		FS fs = FS.DETECTED;
-		try {
-			fs.createSymLink(new File(trash, "x"), "y");
-		} catch (IOException e) {
-			if (fs.supportsSymlinks()) {
-				fail("FS claims to support symlinks but attempt to create symlink failed");
-			} else {
-				// show test as ignored
-				Assume.assumeTrue(false);
-			}
-			return;
-		}
+		// show test as ignored if the FS doesn't support symlinks
+		Assume.assumeTrue(fs.supportsSymlinks());
+		fs.createSymLink(new File(trash, "x"), "y");
 		assertTrue(fs.supportsSymlinks());
 		String target = fs.readSymLink(new File(trash, "x"));
 		assertEquals("y", target);
@@ -444,18 +436,10 @@ public class FileUtilTest {
 	@Test
 	public void testCreateSymlinkOverrideExisting() throws IOException {
 		FS fs = FS.DETECTED;
+		// show test as ignored if the FS doesn't support symlinks
+		Assume.assumeTrue(fs.supportsSymlinks());
 		File file = new File(trash, "x");
-		try {
-			fs.createSymLink(file, "y");
-		} catch (IOException e) {
-			if (fs.supportsSymlinks()) {
-				fail("FS claims to support symlinks but attempt to create symlink failed");
-			} else {
-				// show test as ignored
-				Assume.assumeTrue(false);
-			}
-			return;
-		}
+		fs.createSymLink(file, "y");
 		assertTrue(fs.supportsSymlinks());
 		String target = fs.readSymLink(file);
 		assertEquals("y", target);
