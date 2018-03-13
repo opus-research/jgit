@@ -71,7 +71,7 @@ public class GcOrphanFilesTest extends GcTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		packDir = repo.getObjectDatabase().getPackDirectory();
+		packDir = new File(repo.getObjectsDirectory(), PACK);
 	}
 
 	@Test
