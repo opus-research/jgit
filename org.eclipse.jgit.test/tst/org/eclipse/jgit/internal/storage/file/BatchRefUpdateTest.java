@@ -124,7 +124,11 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		super.setUp();
 
 		diskRepo = createBareRepository();
-		setLogAllRefUpdates(true);
+		StoredConfig cfg = diskRepo.getConfig();
+		cfg.load();
+		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
+		cfg.save();
 
 		refdir = (RefDirectory) diskRepo.getRefDatabase();
 		refdir.setRetrySleepMs(Arrays.asList(0, 0));
@@ -588,71 +592,6 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void refLogNotWrittenWithoutConfigOption() throws Exception {
-		setLogAllRefUpdates(false);
-		writeRef("refs/heads/master", A);
-
-		Map<String, ReflogEntry> oldLogs =
-				getLastReflogs("refs/heads/master", "refs/heads/branch");
-		assertTrue(oldLogs.isEmpty());
-
-		List<ReceiveCommand> cmds = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master", UPDATE),
-				new ReceiveCommand(zeroId(), B, "refs/heads/branch", CREATE));
-		execute(newBatchUpdate(cmds).setRefLogMessage("a reflog", false));
-
-		assertResults(cmds, OK, OK);
-		assertReflogUnchanged(oldLogs, "refs/heads/master");
-		assertReflogUnchanged(oldLogs, "refs/heads/branch");
-	}
-
-	@Test
-	public void forceRefLogInUpdate() throws Exception {
-		setLogAllRefUpdates(false);
-		writeRef("refs/heads/master", A);
-		assertTrue(
-				getLastReflogs("refs/heads/master", "refs/heads/branch").isEmpty());
-
-		List<ReceiveCommand> cmds = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master", UPDATE),
-				new ReceiveCommand(zeroId(), B, "refs/heads/branch", CREATE));
-		execute(
-				newBatchUpdate(cmds)
-						.setRefLogMessage("a reflog", false)
-						.setForceRefLog(true));
-
-		assertResults(cmds, OK, OK);
-		assertReflogEquals(
-				reflog(A, B, new PersonIdent(diskRepo), "a reflog"),
-				getLastReflog("refs/heads/master"));
-		assertReflogEquals(
-				reflog(zeroId(), B, new PersonIdent(diskRepo), "a reflog"),
-				getLastReflog("refs/heads/branch"));
-	}
-
-	@Test
-	public void forceRefLogInCommand() throws Exception {
-		setLogAllRefUpdates(false);
-		writeRef("refs/heads/master", A);
-
-		Map<String, ReflogEntry> oldLogs =
-				getLastReflogs("refs/heads/master", "refs/heads/branch");
-		assertTrue(oldLogs.isEmpty());
-
-		List<ReceiveCommand> cmds = Arrays.asList(
-				new ReceiveCommand(A, B, "refs/heads/master", UPDATE),
-				new ReceiveCommand(zeroId(), B, "refs/heads/branch", CREATE));
-		cmds.get(1).setForceRefLog(true);
-		execute(newBatchUpdate(cmds).setRefLogMessage("a reflog", false));
-
-		assertResults(cmds, OK, OK);
-		assertReflogUnchanged(oldLogs, "refs/heads/master");
-		assertReflogEquals(
-				reflog(zeroId(), B, new PersonIdent(diskRepo), "a reflog"),
-				getLastReflog("refs/heads/branch"));
-	}
-
-	@Test
 	public void packedRefsLockFailure() throws Exception {
 		writeLooseRef("refs/heads/master", A);
 
@@ -780,14 +719,6 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 		assertRefs(
 				"refs/heads/master", B,
 				"refs/heads/branch", B);
-	}
-
-	private void setLogAllRefUpdates(boolean enable) throws Exception {
-		StoredConfig cfg = diskRepo.getConfig();
-		cfg.load();
-		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, enable);
-		cfg.save();
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
