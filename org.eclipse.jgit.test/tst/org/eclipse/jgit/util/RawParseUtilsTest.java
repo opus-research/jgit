@@ -71,9 +71,12 @@ public class RawParseUtilsTest {
 
 	@Test
 	public void testParseEncoding_badEncoding() {
-		Charset result = RawParseUtils.parseEncoding(Constants.
-				encodeASCII("encoding xyz\n"));
-		assertNotNull(result);
-		assertEquals("Invalid", result.name());
+		try {
+			RawParseUtils.parseEncoding(Constants.encodeASCII("encoding xyz\n"));
+			fail("should throw an UnsupportedCharsetException: xyz");
+		} catch (UnsupportedCharsetException e) {
+			assertEquals("xyz", e.getMessage());
+		}
 	}
+
 }
