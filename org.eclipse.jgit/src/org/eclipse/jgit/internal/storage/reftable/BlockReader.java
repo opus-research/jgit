@@ -49,16 +49,15 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_DATA;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_NONE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_LEN_SPECIFIED;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseUpdateIndex;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
@@ -66,10 +65,10 @@ import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.CheckoutEntry;
@@ -80,7 +79,7 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.util.LongList;
+import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -88,7 +87,6 @@ import org.eclipse.jgit.util.RawParseUtils;
 class BlockReader {
 	private byte blockType;
 	private long endPosition;
-	private boolean truncated;
 
 	private byte[] buf;
 	private int bufLen;
@@ -96,9 +94,8 @@ class BlockReader {
 
 	private int keysStart;
 	private int keysEnd;
-
-	private int restartCnt;
-	private int restartTbl;
+	private int restartIdx;
+	private int restartCount;
 
 	private byte[] nameBuf = new byte[256];
 	private int nameLen;
@@ -106,10 +103,6 @@ class BlockReader {
 
 	byte type() {
 		return blockType;
-	}
-
-	boolean truncated() {
-		return truncated;
 	}
 
 	long endPosition() {
@@ -155,7 +148,12 @@ class BlockReader {
 		return compare(match, 0, match.length, nameBuf, 0, len) == 0;
 	}
 
-	long readPositionFromIndex() throws IOException {
+	boolean matchAbbrevId(byte[] match) {
+		int n = Math.min(match.length, nameLen);
+		return compare(match, 0, n, nameBuf, 0, n) == 0;
+	}
+
+	long readIndex() throws IOException {
 		if (blockType != INDEX_BLOCK_TYPE) {
 			throw invalidBlock();
 		}
@@ -181,49 +179,40 @@ class BlockReader {
 			return new ObjectIdRef.PeeledTag(PACKED, name, id1, id2);
 		}
 
-		case VALUE_SYMREF: {
-			String val = readValueString();
-			return new SymbolicRef(name, newRef(val));
-		}
+		case VALUE_SYMREF:
+			return new SymbolicRef(name, newRef(readValueString()));
 
+		case VALUE_LEN_SPECIFIED:
 		default:
 			throw invalidBlock();
 		}
 	}
 
-	@Nullable
-	LongList readBlockPositionList() {
+	IntList readBlockList() {
 		int n = valueType & VALUE_TYPE_MASK;
-		if (n == 0) {
-			n = readVarint32();
-			if (n == 0) {
-				return null;
-			}
+		if (n == VALUE_TYPE_MASK) {
+			n += readVarint32();
 		}
-
-		LongList b = new LongList(n);
-		b.add(readVarint64());
+		IntList b = new IntList(n);
+		b.add(readVarint32());
 		for (int j = 1; j < n; j++) {
-			long prior = b.get(j - 1);
-			b.add(prior + readVarint64());
+			int prior = b.get(j - 1);
+			b.add(prior + readVarint32());
 		}
 		return b;
 	}
 
-	long readLogUpdateIndex() {
-		return reverseUpdateIndex(NB.decodeUInt64(nameBuf, nameLen - 8));
+	long readLogTimeUsec() {
+		return reverseTime(NB.decodeInt64(nameBuf, nameLen - 8));
 	}
 
-	@Nullable
-	ReflogEntry readLogEntry() {
-		if ((valueType & VALUE_TYPE_MASK) == LOG_NONE) {
-			return null;
-		}
-
+	ReflogEntry readLog(long timeUsec) {
 		ObjectId oldId = readValueId();
 		ObjectId newId = readValueId();
-		PersonIdent who = readPersonIdent();
-		String msg = readValueString();
+		short tz = readInt16();
+		String name = readValueString();
+		String email = readValueString();
+		String comment = readValueString();
 
 		return new ReflogEntry() {
 			@Override
@@ -238,12 +227,13 @@ class BlockReader {
 
 			@Override
 			public PersonIdent getWho() {
-				return who;
+				long ms = TimeUnit.MICROSECONDS.toMillis(timeUsec);
+				return new PersonIdent(name, email, ms, tz);
 			}
 
 			@Override
 			public String getComment() {
-				return msg;
+				return comment;
 			}
 
 			@Override
@@ -267,18 +257,10 @@ class BlockReader {
 		return s;
 	}
 
-	private PersonIdent readPersonIdent() {
-		String name = readValueString();
-		String email = readValueString();
-		long ms = readVarint64() * 1000;
-		int tz = readInt16();
-		return new PersonIdent(name, email, ms, tz);
-	}
-
-	void readBlock(BlockSource src, long pos, int fileBlockSize)
+	void readBlock(BlockSource src, long pos, int estBlockSize)
 			throws IOException {
-		readBlockIntoBuf(src, pos, fileBlockSize);
-		parseBlockStart(src, pos, fileBlockSize);
+		readBlockIntoBuf(src, pos, estBlockSize);
+		parseBlockStart(pos);
 	}
 
 	private void readBlockIntoBuf(BlockSource src, long pos, int size)
@@ -298,8 +280,7 @@ class BlockReader {
 		endPosition = pos + bufLen;
 	}
 
-	private void parseBlockStart(BlockSource src, long pos, int fileBlockSize)
-			throws IOException {
+	private void parseBlockStart(long pos) throws IOException {
 		ptr = 0;
 		if (pos == 0) {
 			if (bufLen == FILE_HEADER_LEN) {
@@ -313,43 +294,41 @@ class BlockReader {
 		ptr += 4;
 
 		blockType = (byte) (typeAndSize >>> 24);
-		int blockLen = decodeBlockLen(typeAndSize);
+		int blockLen;
+		if ((blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE) {
+			// Index blocks are allowed to grow up to 31-bit blockSize.
+			blockType = INDEX_BLOCK_TYPE;
+			blockLen = decodeIndexSize(typeAndSize);
+		} else {
+			blockLen = typeAndSize & 0xffffff;
+		}
 		if (blockType == LOG_BLOCK_TYPE) {
 			// Log blocks must be inflated after the header.
-			long deflatedSize = inflateBuf(src, pos, blockLen, fileBlockSize);
+			long deflatedSize = inflateBuf(blockLen);
 			endPosition = pos + 4 + deflatedSize;
 		}
 		if (bufLen < blockLen) {
-			if (blockType != INDEX_BLOCK_TYPE) {
-				throw invalidBlock();
-			}
-			// Its OK during sequential scan for an index block to have been
-			// partially read and be truncated in-memory. This happens when
-			// the index block is larger than the file's blockSize. Caller
-			// will break out of its scan loop once it sees the blockType.
-			truncated = true;
+			throw invalidBlock();
 		} else if (bufLen > blockLen) {
 			bufLen = blockLen;
 		}
 
+		keysStart = ptr;
 		if (blockType != FILE_BLOCK_TYPE) {
-			restartCnt = NB.decodeUInt16(buf, bufLen - 2);
-			restartTbl = bufLen - (restartCnt * 3 + 2);
-			keysStart = ptr;
-			keysEnd = restartTbl;
+			restartCount = 1 + NB.decodeUInt16(buf, bufLen - 2);
+			restartIdx = bufLen - (restartCount * 4 + 2);
+			keysEnd = restartIdx;
 		} else {
-			keysStart = ptr;
-			keysEnd = ptr;
+			keysEnd = keysStart;
 		}
 	}
 
-	static int decodeBlockLen(int typeAndSize) {
-		return typeAndSize & 0xffffff;
+	static int decodeIndexSize(int typeAndSize) {
+		return typeAndSize & 0x7fffffff;
 	}
 
-	private long inflateBuf(BlockSource src, long pos, int blockLen,
-			int fileBlockSize) throws IOException {
-		byte[] dst = new byte[blockLen];
+	private long inflateBuf(int blockLen) throws IOException {
+		byte[] dst = new byte[4 + blockLen];
 		System.arraycopy(buf, 0, dst, 0, 4);
 
 		long deflatedSize = 0;
@@ -362,10 +341,6 @@ class BlockReader {
 				if (inf.finished()) {
 					deflatedSize = inf.getBytesRead();
 					break;
-				} else if (n <= 0 && inf.needsInput()) {
-					long p = pos + 4 + inf.getBytesRead();
-					readBlockIntoBuf(src, p, fileBlockSize);
-					inf.setInput(buf, 0, bufLen);
 				} else if (n <= 0) {
 					throw invalidBlock();
 				}
@@ -385,48 +360,44 @@ class BlockReader {
 		// An empty reftable has only the file header in first block.
 		blockType = FILE_BLOCK_TYPE;
 		ptr = FILE_HEADER_LEN;
-		restartCnt = 0;
-		restartTbl = bufLen;
+		restartCount = 0;
+		restartIdx = bufLen;
 		keysStart = bufLen;
 		keysEnd = bufLen;
 	}
 
 	void verifyIndex() throws IOException {
-		if (blockType != INDEX_BLOCK_TYPE || truncated) {
+		if (blockType != INDEX_BLOCK_TYPE) {
 			throw invalidBlock();
 		}
 	}
 
-	/**
-	 * Finds a key in the block and positions the current pointer on its record.
-	 * <p>
-	 * As a side-effect this method arranges for the current pointer to be near
-	 * or exactly on {@code key}, allowing other methods to access data from
-	 * that current record:
-	 * <ul>
-	 * <li>{@link #name()}
-	 * <li>{@link #match(byte[], boolean)}
-	 * <li>{@link #readRef()}
-	 * <li>{@link #readLogUpdateIndex()}
-	 * <li>{@link #readLogEntry()}
-	 * <li>{@link #readBlockPositionList()}
-	 * </ul>
-	 *
-	 * @param key
-	 *            key to find.
-	 * @return {@code <0} if the key occurs before the start of this block;
-	 *         {@code 0} if the block is positioned on the key; {@code >0} if
-	 *         the key occurs after the last key of this block.
-	 */
 	int seekKey(byte[] key) {
+		return seek(key, true);
+	}
+
+	int seekAbbrevId(byte[] key) {
+		return seek(key, false);
+	}
+
+	private static int compareKey(boolean useKeyLen, byte[] a,
+			byte[] b, int bi, int bLen) {
+		if (useKeyLen) {
+			return compare(a, 0, a.length, b, bi, bLen);
+		}
+		int n = Math.min(bLen, a.length);
+		return compare(a, 0, n, b, bi, n);
+	}
+
+	private int seek(byte[] key, boolean useKeyLen) {
 		int low = 0;
-		int end = restartCnt;
+		int end = restartCount;
 		for (;;) {
 			int mid = (low + end) >>> 1;
-			int p = NB.decodeUInt24(buf, restartTbl + mid * 3);
+			int p = NB.decodeInt32(buf, restartIdx + mid * 4);
 			ptr = p + 1; // skip 0 prefix length
 			int n = readVarint32() >>> 3;
-			int cmp = compare(key, 0, key.length, buf, ptr, n);
+			int cmp = compareKey(useKeyLen, key, buf, ptr, n);
 			if (cmp < 0) {
 				end = mid;
 			} else if (cmp == 0) {
@@ -436,37 +407,19 @@ class BlockReader {
 				low = mid + 1;
 			}
 			if (low >= end) {
-				return scanToKey(key, p, low, cmp);
+				return seekToKey(key, useKeyLen, p, low, cmp);
 			}
 		}
 	}
 
-	/**
-	 * Performs the linear search step within a restart interval.
-	 * <p>
-	 * Starts at a restart position whose key sorts before (or equal to)
-	 * {@code key} and walks sequentially through the following prefix
-	 * compressed records to find {@code key}.
-	 *
-	 * @param key
-	 *            key the caller wants to find.
-	 * @param rPtr
-	 *            current record pointer from restart table binary search.
-	 * @param rIdx
-	 *            current restart table index.
-	 * @param rCmp
-	 *            result of compare from restart table binary search.
-	 * @return {@code <0} if the key occurs before the start of this block;
-	 *         {@code 0} if the block is positioned on the key; {@code >0} if
-	 *         the key occurs after the last key of this block.
-	 */
-	private int scanToKey(byte[] key, int rPtr, int rIdx, int rCmp) {
+	private int seekToKey(byte[] key, boolean useKeyLen,
+			int rPtr, int rIdx, int rCmp) {
 		if (rCmp < 0) {
 			if (rIdx == 0) {
 				ptr = keysStart;
 				return -1;
 			}
-			ptr = NB.decodeUInt24(buf, restartTbl + (rIdx - 1) * 3);
+			ptr = NB.decodeInt32(buf, restartIdx + (rIdx - 1) * 4);
 		} else {
 			ptr = rPtr;
 		}
@@ -475,7 +428,7 @@ class BlockReader {
 		do {
 			int savePtr = ptr;
 			parseKey();
-			cmp = compare(key, 0, key.length, nameBuf, 0, nameLen);
+			cmp = compareKey(useKeyLen, key, nameBuf, 0, nameLen);
 			if (cmp <= 0) {
 				// cmp < 0, name should be in this block, but is not.
 				// cmp = 0, block is positioned at name.
@@ -500,6 +453,7 @@ class BlockReader {
 				ptr += 2 * OBJECT_ID_LENGTH;
 				return;
 			case VALUE_SYMREF:
+			case VALUE_LEN_SPECIFIED:
 				skipString();
 				return;
 			}
@@ -507,8 +461,8 @@ class BlockReader {
 
 		case OBJ_BLOCK_TYPE: {
 			int n = valueType & VALUE_TYPE_MASK;
-			if (n == 0) {
-				n = readVarint32();
+			if (n == VALUE_TYPE_MASK) {
+				n += readVarint32();
 			}
 			while (n-- > 0) {
 				readVarint32();
@@ -521,17 +475,11 @@ class BlockReader {
 			return;
 
 		case LOG_BLOCK_TYPE:
-			if ((valueType & VALUE_TYPE_MASK) == LOG_NONE) {
-				return;
-			} else if ((valueType & VALUE_TYPE_MASK) == LOG_DATA) {
-				ptr += 2 * OBJECT_ID_LENGTH; // oldId, newId
-				skipString(); // name
-				skipString(); // email
-				readVarint64(); // time
-				ptr += 2; // tz
-				skipString(); // msg
-				return;
-			}
+			ptr += 2 * OBJECT_ID_LENGTH + 2; // 2x id, 2-byte tz
+			skipString(); // name
+			skipString(); // email
+			skipString(); // comment
+			return;
 		}
 
 		throw new IllegalStateException();

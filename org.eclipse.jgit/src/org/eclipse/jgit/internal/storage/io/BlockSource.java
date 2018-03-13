@@ -154,7 +154,7 @@ public abstract class BlockSource implements AutoCloseable {
 	 *            size to read.
 	 * @return buffer containing the block content.
 	 * @throws IOException
-	 *             if block cannot be read.
+	 *             block cannot be read.
 	 */
 	public abstract ByteBuffer read(long position, int blockSize)
 			throws IOException;
@@ -164,19 +164,19 @@ public abstract class BlockSource implements AutoCloseable {
 	 *
 	 * @return total number of bytes in the file.
 	 * @throws IOException
-	 *             if size cannot be obtained.
+	 *             size cannot be obtained.
 	 */
 	public abstract long size() throws IOException;
 
 	/**
 	 * Advise the {@code BlockSource} a sequential scan is starting.
 	 *
-	 * @param startPos
+	 * @param start
 	 *            starting position.
-	 * @param endPos
+	 * @param end
 	 *            ending position.
 	 */
-	public void adviseSequentialRead(long startPos, long endPos) {
+	public void adviseSequentialRead(long start, long end) {
 		// Do nothing by default.
 	}
 

@@ -49,8 +49,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ReflogEntry;
 
 /**
@@ -60,12 +58,10 @@ import org.eclipse.jgit.lib.ReflogEntry;
  * to {@code true} to ensure the new reftable continues to use a delete marker
  * to shadow any lower reftable that may have the reference present.
  * <p>
- * By default all log entries within the range defined by
- * {@link #setMinUpdateIndex(long)} and {@link #setMaxUpdateIndex(long)} are
- * copied, even if no references in the output file match the log records.
- * Callers may truncate the log to a more recent time horizon with
- * {@link #setOldestReflogTimeMillis(long)}, or disable the log altogether with
- * {@code setOldestReflogTimeMillis(Long.MAX_VALUE)}.
+ * By default all log entries are copied, even if no references in the output
+ * file match the log records. Callers may truncate the log to a more recent
+ * time horizon with {@link #setOldestReflogTimeUsec(long)}, or disable the log
+ * altogether with {@code setOldestReflogTimeUsec(Long.MAX_VALUE)}.
  */
 public class ReftableCompactor {
 	private final ReftableWriter writer = new ReftableWriter();
@@ -74,10 +70,7 @@ public class ReftableCompactor {
 	private long compactBytesLimit;
 	private long bytesToCompact;
 	private boolean includeDeletes;
-	private long minUpdateIndex;
-	private long maxUpdateIndex;
-	private long oldestReflogTimeMillis;
-	private Stats stats;
+	private long oldestReflogTimeUsec;
 
 	/**
 	 * @param cfg
@@ -111,41 +104,15 @@ public class ReftableCompactor {
 	}
 
 	/**
-	 * @param min
-	 *            the minimum update index for log entries that appear in the
-	 *            compacted reftable. This should be 1 higher than the prior
-	 *            reftable's {@code maxUpdateIndex} if this table will be used
-	 *            in a stack.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setMinUpdateIndex(long min) {
-		minUpdateIndex = min;
-		return this;
-	}
-
-	/**
-	 * @param max
-	 *            the maximum update index for log entries that appear in the
-	 *            compacted reftable. This should be at least 1 higher than the
-	 *            prior reftable's {@code maxUpdateIndex} if this table will be
-	 *            used in a stack.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setMaxUpdateIndex(long max) {
-		maxUpdateIndex = max;
-		return this;
-	}
-
-	/**
-	 * @param timeMillis
+	 * @param timeUsec
 	 *            oldest log time to preserve. Entries whose timestamps are
-	 *            {@code >= timeMillis} will be copied into the output file. Log
-	 *            entries that predate {@code timeMillis} will be discarded.
-	 *            Specified in Java standard milliseconds since the epoch.
+	 *            {@code >= timeUsec} will be copied into the output file. Log
+	 *            entries that predate {@code timeUsec} will be discarded.
+	 *            Specified in microseconds since the epoch.
 	 * @return {@code this}
 	 */
-	public ReftableCompactor setOldestReflogTimeMillis(long timeMillis) {
-		oldestReflogTimeMillis = timeMillis;
+	public ReftableCompactor setOldestReflogTimeUsec(long timeUsec) {
+		oldestReflogTimeUsec = timeUsec;
 		return this;
 	}
 
@@ -160,7 +127,7 @@ public class ReftableCompactor {
 	 *            recent last so that the more recent tables can shadow the
 	 *            older results. Caller is responsible for closing the readers.
 	 */
-	public void addAll(List<? extends Reftable> readers) {
+	public void addAll(List<Reftable> readers) {
 		tables.addAll(readers);
 	}
 
@@ -178,7 +145,7 @@ public class ReftableCompactor {
 	 * @return {@code true} if the compactor accepted this table; {@code false}
 	 *         if the compactor has reached its limit.
 	 * @throws IOException
-	 *             if size of {@code reader} cannot be read.
+	 *             size of {@code reader} cannot be read.
 	 */
 	public boolean tryAddFirst(ReftableReader reader) throws IOException {
 		long sz = reader.size();
@@ -197,24 +164,16 @@ public class ReftableCompactor {
 	 *            stream to write the compacted tables to. Caller is responsible
 	 *            for closing {@code out}.
 	 * @throws IOException
-	 *             if tables cannot be read, or cannot be written.
+	 *             tables cannot be read, or cannot be written.
 	 */
 	public void compact(OutputStream out) throws IOException {
 		MergedReftable mr = new MergedReftable(new ArrayList<>(tables));
 		mr.setIncludeDeletes(includeDeletes);
 
-		writer.setMinUpdateIndex(minUpdateIndex);
-		writer.setMaxUpdateIndex(maxUpdateIndex);
 		writer.begin(out);
 		mergeRefs(mr);
 		mergeLogs(mr);
 		writer.finish();
-		stats = writer.getStats();
-	}
-
-	/** @return statistics of the last written reftable. */
-	public Stats getStats() {
-		return stats;
 	}
 
 	private void mergeRefs(MergedReftable mr) throws IOException {
@@ -226,34 +185,15 @@ public class ReftableCompactor {
 	}
 
 	private void mergeLogs(MergedReftable mr) throws IOException {
-		if (oldestReflogTimeMillis == Long.MAX_VALUE) {
-			return;
-		}
-
 		try (LogCursor lc = mr.allLogs()) {
 			while (lc.next()) {
-				long updateIndex = lc.getUpdateIndex();
-				if (updateIndex < minUpdateIndex
-						|| updateIndex > maxUpdateIndex) {
-					// Cannot merge log records outside the header's range.
-					continue;
-				}
-
-				String refName = lc.getRefName();
-				ReflogEntry log = lc.getReflogEntry();
-				if (log == null) {
-					if (includeDeletes) {
-						writer.deleteLog(refName, updateIndex);
-					}
-					continue;
-				}
-
-				PersonIdent who = log.getWho();
-				if (who.getWhen().getTime() >= oldestReflogTimeMillis) {
+				long timeUsec = lc.getReflogTimeUsec();
+				if (timeUsec >= oldestReflogTimeUsec) {
+					ReflogEntry log = lc.getReflogEntry();
 					writer.writeLog(
-							refName,
-							updateIndex,
-							who,
+							lc.getRefName(),
+							timeUsec,
+							log.getWho(),
 							log.getOldId(),
 							log.getNewId(),
 							log.getComment());

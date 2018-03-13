@@ -44,13 +44,10 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static org.eclipse.jgit.lib.RefDatabase.MAX_SYMBOLIC_REF_DEPTH;
-
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.SymbolicRef;
@@ -65,15 +62,16 @@ public abstract class Reftable implements AutoCloseable {
 	public static Reftable from(Collection<Ref> refs) {
 		try {
 			ReftableConfig cfg = new ReftableConfig();
+			cfg.setRefBlockSize(refs.size() < 10000 ? (4 << 10) : (64 << 10));
 			cfg.setIndexObjects(false);
-			cfg.setAlignBlocks(false);
-			ByteArrayOutputStream buf = new ByteArrayOutputStream();
+
+			MemoryReftable buf = new MemoryReftable(cfg.getRefBlockSize());
 			new ReftableWriter()
 				.setConfig(cfg)
-				.begin(buf)
+				.begin(buf.getOutput())
 				.sortAndWriteRefs(refs)
 				.finish();
-			return new ReftableReader(BlockSource.from(buf.toByteArray()));
+			return new ReftableReader(buf.getBlockSource());
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -97,7 +95,7 @@ public abstract class Reftable implements AutoCloseable {
 	 *
 	 * @return cursor to iterate.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
 	public abstract RefCursor allRefs() throws IOException;
 
@@ -105,67 +103,51 @@ public abstract class Reftable implements AutoCloseable {
 	 * Seek either to a reference, or a reference subtree.
 	 * <p>
 	 * If {@code refName} ends with {@code "/"} the method will seek to the
-	 * subtree of all references starting with {@code refName} as a prefix. If
-	 * no references start with this prefix, an empty cursor is returned.
+	 * subtree of all references starting with {@code refName} as a prefix.
 	 * <p>
-	 * Otherwise exactly {@code refName} will be looked for. If present, the
-	 * returned cursor will iterate exactly one entry. If not found, an empty
-	 * cursor is returned.
+	 * Otherwise, only {@code refName} will be found, if present.
 	 *
+	 * @return cursor to iterate.
 	 * @param refName
 	 *            reference name or subtree to find.
-	 * @return cursor to iterate; empty cursor if no references match.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
-	public abstract RefCursor seekRef(String refName) throws IOException;
+	public abstract RefCursor seek(String refName) throws IOException;
 
 	/**
 	 * Match references pointing to a specific object.
 	 *
+	 * @return cursor to iterate.
 	 * @param id
 	 *            object to find.
-	 * @return cursor to iterate; empty cursor if no references match.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
 	public abstract RefCursor byObjectId(AnyObjectId id) throws IOException;
 
 	/**
 	 * Seek reader to read log records.
 	 *
-	 * @return cursor to iterate; empty cursor if no logs are present.
+	 * @return cursor to iterate.
 	 * @throws IOException
-	 *             if logs cannot be read.
+	 *             logs cannot be read.
 	 */
 	public abstract LogCursor allLogs() throws IOException;
 
 	/**
-	 * Read a single reference's log.
+	 * Seek to a timestamp in a reference's log.
 	 *
 	 * @param refName
 	 *            exact name of the reference whose log to read.
-	 * @return cursor to iterate; empty cursor if no logs match.
+	 * @param timeUsec
+	 *            time in microseconds since the epoch to scan backwards from.
+	 *            Records at this time and older will be returned.
+	 * @return cursor to iterate.
 	 * @throws IOException
-	 *             if logs cannot be read.
+	 *             logs cannot be read.
 	 */
-	public LogCursor seekLog(String refName) throws IOException {
-		return seekLog(refName, Long.MAX_VALUE);
-	}
-
-	/**
-	 * Seek to an update index in a reference's log.
-	 *
-	 * @param refName
-	 *            exact name of the reference whose log to read.
-	 * @param updateIndex
-	 *            most recent index to return first in the log cursor. Log
-	 *            records at or before {@code updateIndex} will be returned.
-	 * @return cursor to iterate; empty cursor if no logs match.
-	 * @throws IOException
-	 *             if logs cannot be read.
-	 */
-	public abstract LogCursor seekLog(String refName, long updateIndex)
+	public abstract LogCursor seekLog(String refName, long timeUsec)
 			throws IOException;
 
 	/**
@@ -175,11 +157,11 @@ public abstract class Reftable implements AutoCloseable {
 	 *            reference name to find.
 	 * @return the reference, or {@code null} if not found.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
 	@Nullable
 	public Ref exactRef(String refName) throws IOException {
-		try (RefCursor rc = seekRef(refName)) {
+		try (RefCursor rc = seek(refName)) {
 			return rc.next() ? rc.getRef() : null;
 		}
 	}
@@ -197,10 +179,10 @@ public abstract class Reftable implements AutoCloseable {
 	 * @return {@code true} if the reference exists, or at least one reference
 	 *         exists in the subtree.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
 	public boolean hasRef(String refName) throws IOException {
-		try (RefCursor rc = seekRef(refName)) {
+		try (RefCursor rc = seek(refName)) {
 			return rc.next();
 		}
 	}
@@ -213,7 +195,7 @@ public abstract class Reftable implements AutoCloseable {
 	 * @return {@code true} if any reference exists directly referencing
 	 *         {@code id}, or a annotated tag that peels to {@code id}.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
 	public boolean hasId(AnyObjectId id) throws IOException {
 		try (RefCursor rc = byObjectId(id)) {
@@ -228,7 +210,7 @@ public abstract class Reftable implements AutoCloseable {
 	 *            reference to resolve.
 	 * @return resolved {@code symref}, or {@code null}.
 	 * @throws IOException
-	 *             if references cannot be read.
+	 *             references cannot be read.
 	 */
 	@Nullable
 	public Ref resolve(Ref symref) throws IOException {

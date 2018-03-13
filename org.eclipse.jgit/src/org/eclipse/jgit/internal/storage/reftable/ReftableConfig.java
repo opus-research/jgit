@@ -53,8 +53,6 @@ public class ReftableConfig {
 	private int refBlockSize = 4 << 10;
 	private int logBlockSize;
 	private int restartInterval;
-	private int maxIndexLevels;
-	private boolean alignBlocks = true;
 	private boolean indexObjects = true;
 
 	/** Create a default configuration. */
@@ -95,8 +93,6 @@ public class ReftableConfig {
 		this.refBlockSize = cfg.refBlockSize;
 		this.logBlockSize = cfg.logBlockSize;
 		this.restartInterval = cfg.restartInterval;
-		this.maxIndexLevels = cfg.maxIndexLevels;
-		this.alignBlocks = cfg.alignBlocks;
 		this.indexObjects = cfg.indexObjects;
 	}
 
@@ -116,18 +112,14 @@ public class ReftableConfig {
 		refBlockSize = Math.max(0, szBytes);
 	}
 
-	/**
-	 * @return desired output block size for log entries, in bytes. If 0 the
-	 *         writer will default to {@code 2 * getRefBlockSize()}.
-	 */
+	/** @return desired output block size for log entries, in bytes. */
 	public int getLogBlockSize() {
 		return logBlockSize;
 	}
 
 	/**
 	 * @param szBytes
-	 *            desired output block size for log entries, in bytes. If 0 will
-	 *            default to {@code 2 * getRefBlockSize()}.
+	 *            desired output block size for log entries, in bytes.
 	 */
 	public void setLogBlockSize(int szBytes) {
 		if (szBytes > MAX_BLOCK_SIZE) {
@@ -149,36 +141,6 @@ public class ReftableConfig {
 	 */
 	public void setRestartInterval(int interval) {
 		restartInterval = Math.max(0, interval);
-	}
-
-	/** @return maximum depth of the index; 0 for unlimited. */
-	public int getMaxIndexLevels() {
-		return maxIndexLevels;
-	}
-
-	/**
-	 * @param levels
-	 *            maximum number of levels to use in indexes. Lower levels of
-	 *            the index respect {@link #getRefBlockSize()}, and the highest
-	 *            level may exceed that if the number of levels is limited.
-	 */
-	public void setMaxIndexLevels(int levels) {
-		maxIndexLevels = Math.max(0, levels);
-	}
-
-	/** @return {@code true} if the writer should align blocks. */
-	public boolean isAlignBlocks() {
-		return alignBlocks;
-	}
-
-	/**
-	 * @param align
-	 *            if {@code true} blocks are written aligned to multiples of
-	 *            {@link #getRefBlockSize()}. May increase file size due to NUL
-	 *            padding bytes added between blocks. Default is {@code true}.
-	 */
-	public void setAlignBlocks(boolean align) {
-		alignBlocks = align;
 	}
 
 	/** @return {@code true} if the writer should index object to ref. */
@@ -209,8 +171,6 @@ public class ReftableConfig {
 		refBlockSize = rc.getInt("reftable", "blockSize", refBlockSize); //$NON-NLS-1$ //$NON-NLS-2$
 		logBlockSize = rc.getInt("reftable", "logBlockSize", logBlockSize); //$NON-NLS-1$ //$NON-NLS-2$
 		restartInterval = rc.getInt("reftable", "restartInterval", restartInterval); //$NON-NLS-1$ //$NON-NLS-2$
-		maxIndexLevels = rc.getInt("reftable", "indexLevels", maxIndexLevels); //$NON-NLS-1$ //$NON-NLS-2$
-		alignBlocks = rc.getBoolean("reftable", "alignBlocks", alignBlocks); //$NON-NLS-1$ //$NON-NLS-2$
 		indexObjects = rc.getBoolean("reftable", "indexObjects", indexObjects); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 }

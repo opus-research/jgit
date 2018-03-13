@@ -47,7 +47,6 @@ import java.io.IOException;
 
 import org.eclipse.jgit.lib.ReflogEntry;
 
-/** Empty {@link LogCursor} with no results. */
 class EmptyLogCursor extends LogCursor {
 	@Override
 	public boolean next() throws IOException {
@@ -60,7 +59,7 @@ class EmptyLogCursor extends LogCursor {
 	}
 
 	@Override
-	public long getUpdateIndex() {
+	public long getReflogTimeUsec() {
 		return 0;
 	}
 
