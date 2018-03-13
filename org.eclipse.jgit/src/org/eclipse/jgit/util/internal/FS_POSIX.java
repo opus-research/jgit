@@ -43,7 +43,6 @@
 package org.eclipse.jgit.util.internal;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -91,7 +90,7 @@ public abstract class FS_POSIX extends FS {
 
 	/**
 	 * Constructore
-	 *
+	 * 
 	 * @param src
 	 *            FS to copy some settings from
 	 */
@@ -102,11 +101,6 @@ public abstract class FS_POSIX extends FS {
 	@Override
 	public boolean isCaseSensitive() {
 		return !SystemReader.getInstance().isMacOS();
-	}
-
-	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		// Do nothing
 	}
 
 	@Override
