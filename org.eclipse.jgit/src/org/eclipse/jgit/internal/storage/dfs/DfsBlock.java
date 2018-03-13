@@ -52,7 +52,7 @@ import java.util.zip.Inflater;
 
 import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
 
-/** A cached slice of a {@link BlockBasedFile}. */
+/** A cached slice of a {@link DfsPackFile}. */
 final class DfsBlock {
 	final DfsStreamKey stream;
 
