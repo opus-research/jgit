@@ -41,33 +41,41 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.storage.file;
 
-/** A note bucket that has been loaded into the process. */
-abstract class InMemoryNoteBucket extends NoteBucket {
-	/**
-	 * Number of leading digits that leads to this bucket in the note path.
-	 *
-	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
-	 * is typically 2 higher than its parent, placing about 256 items in each
-	 * level of the tree.
-	 */
-	final int prefixLen;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.lib.CoreConfig;
 
-	/**
-	 * Chain of non-note tree entries found at this path in the tree.
-	 *
-	 * During parsing of a note tree into the in-memory representation,
-	 * {@link NoteParser} keeps track of all non-note tree entries and stores
-	 * them here as a sorted linked list. That list can be merged back with the
-	 * note data that is held by the subclass, allowing the tree to be
-	 * recreated.
-	 */
-	NonNoteEntry nonNotes;
+class WriteConfig {
+	/** Key for {@link Config#get(SectionParser)}. */
+	static final Config.SectionParser<WriteConfig> KEY = new SectionParser<WriteConfig>() {
+		public WriteConfig parse(final Config cfg) {
+			return new WriteConfig(cfg);
+		}
+	};
 
-	InMemoryNoteBucket(int prefixLen) {
-		this.prefixLen = prefixLen;
+	private final int compression;
+
+	private final boolean fsyncObjectFiles;
+
+	private final boolean fsyncRefFiles;
+
+	private WriteConfig(final Config rc) {
+		compression = rc.get(CoreConfig.KEY).getCompression();
+		fsyncObjectFiles = rc.getBoolean("core", "fsyncobjectfiles", false);
+		fsyncRefFiles = rc.getBoolean("core", "fsyncreffiles", false);
 	}
 
-	abstract InMemoryNoteBucket append(Note note);
+	int getCompression() {
+		return compression;
+	}
+
+	boolean getFSyncObjectFiles() {
+		return fsyncObjectFiles;
+	}
+
+	boolean getFSyncRefFiles() {
+		return fsyncRefFiles;
+	}
 }
