@@ -279,7 +279,8 @@ class PackWriterBitmapPreparer {
 	}
 
 	PackWriterBitmapWalker newBitmapWalker() {
-		return new PackWriterBitmapWalker(new ObjectWalk(reader), bitmapIndex);
+		return new PackWriterBitmapWalker(
+				new ObjectWalk(reader), bitmapIndex, null);
 	}
 
 	static final class BitmapCommit {
