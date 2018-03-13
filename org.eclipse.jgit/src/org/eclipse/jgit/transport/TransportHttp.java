@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2008-2017, Google Inc.
+ * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -69,6 +70,7 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -78,9 +80,11 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -103,9 +107,12 @@ import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.eclipse.jgit.util.io.UnionInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Transport over HTTP and FTP protocols.
@@ -126,9 +133,36 @@ import org.eclipse.jgit.util.io.UnionInputStream;
 public class TransportHttp extends HttpTransport implements WalkTransport,
 		PackTransport {
 
+	private static final Logger LOG = LoggerFactory
+			.getLogger(TransportHttp.class);
+
 	private static final String SVC_UPLOAD_PACK = "git-upload-pack"; //$NON-NLS-1$
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack"; //$NON-NLS-1$
+
+	private static final String MAX_REDIRECT_SYSTEM_PROPERTY = "http.maxRedirects"; //$NON-NLS-1$
+
+	private static final int DEFAULT_MAX_REDIRECTS = 5;
+
+	private static final int MAX_REDIRECTS = (new Supplier<Integer>() {
+
+		@Override
+		public Integer get() {
+			String rawValue = SystemReader.getInstance()
+					.getProperty(MAX_REDIRECT_SYSTEM_PROPERTY);
+			Integer value = Integer.valueOf(DEFAULT_MAX_REDIRECTS);
+			if (rawValue != null) {
+				try {
+					value = Integer.valueOf(Integer.parseUnsignedInt(rawValue));
+				} catch (NumberFormatException e) {
+					LOG.warn(MessageFormat.format(
+							JGitText.get().invalidSystemProperty,
+							MAX_REDIRECT_SYSTEM_PROPERTY, rawValue, value));
+				}
+			}
+			return value;
+		}
+	}).get().intValue();
 
 	/**
 	 * Accept-Encoding header in the HTTP request
@@ -230,14 +264,58 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	};
 
+	/**
+	 * Config values for http.followRedirect
+	 */
+	private static enum HttpRedirectMode implements Config.ConfigEnum {
+
+		/** Always follow redirects (up to the http.maxRedirects limit). */
+		TRUE("true"), //$NON-NLS-1$
+		/**
+		 * Only follow redirects on the initial GET request. This is the
+		 * default.
+		 */
+		INITIAL("initial"), //$NON-NLS-1$
+		/** Never follow redirects. */
+		FALSE("false"); //$NON-NLS-1$
+
+		private final String configValue;
+
+		private HttpRedirectMode(String configValue) {
+			this.configValue = configValue;
+		}
+
+		@Override
+		public String toConfigValue() {
+			return configValue;
+		}
+
+		@Override
+		public boolean matchConfigValue(String s) {
+			return configValue.equals(s);
+		}
+	}
+
 	private static class HttpConfig {
 		final int postBuffer;
 
 		final boolean sslVerify;
 
+		final HttpRedirectMode followRedirects;
+
+		final int maxRedirects;
+
 		HttpConfig(final Config rc) {
 			postBuffer = rc.getInt("http", "postbuffer", 1 * 1024 * 1024); //$NON-NLS-1$  //$NON-NLS-2$
 			sslVerify = rc.getBoolean("http", "sslVerify", true); //$NON-NLS-1$ //$NON-NLS-2$
+			followRedirects = rc.getEnum(HttpRedirectMode.values(), "http", //$NON-NLS-1$
+					null, "followRedirects", HttpRedirectMode.INITIAL); //$NON-NLS-1$
+			int redirectLimit = rc.getInt("http", "maxRedirects", //$NON-NLS-1$ //$NON-NLS-2$
+					MAX_REDIRECTS);
+			if (redirectLimit < 0) {
+				redirectLimit = MAX_REDIRECTS;
+			}
+			maxRedirects = redirectLimit;
 		}
 
 		HttpConfig() {
@@ -245,9 +323,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	final URL baseUrl;
+	private URL baseUrl;
 
-	private final URL objectsUrl;
+	private URL objectsUrl;
 
 	final HttpConfig http;
 
@@ -262,17 +340,31 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
+		setURI(uri);
+		http = local.getConfig().get(HttpConfig::new);
+		proxySelector = ProxySelector.getDefault();
+	}
+
+	private URL toURL(URIish urish) throws MalformedURLException {
+		String uriString = urish.toString();
+		if (!uriString.endsWith("/")) { //$NON-NLS-1$
+			uriString += '/';
+		}
+		return new URL(uriString);
+	}
+
+	/**
+	 * @param uri
+	 * @throws NotSupportedException
+	 * @since 4.9
+	 */
+	protected void setURI(final URIish uri) throws NotSupportedException {
 		try {
-			String uriString = uri.toString();
-			if (!uriString.endsWith("/")) //$NON-NLS-1$
-				uriString += "/"; //$NON-NLS-1$
-			baseUrl = new URL(uriString);
+			baseUrl = toURL(uri);
 			objectsUrl = new URL(baseUrl, "objects/"); //$NON-NLS-1$
 		} catch (MalformedURLException e) {
 			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
 		}
-		http = local.getConfig().get(HttpConfig::new);
-		proxySelector = ProxySelector.getDefault();
 	}
 
 	/**
@@ -283,15 +375,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	 */
 	TransportHttp(final URIish uri) throws NotSupportedException {
 		super(uri);
-		try {
-			String uriString = uri.toString();
-			if (!uriString.endsWith("/")) //$NON-NLS-1$
-				uriString += "/"; //$NON-NLS-1$
-			baseUrl = new URL(uriString);
-			objectsUrl = new URL(baseUrl, "objects/"); //$NON-NLS-1$
-		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
-		}
+		setURI(uri);
 		http = new HttpConfig();
 		proxySelector = ProxySelector.getDefault();
 	}
@@ -461,28 +545,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private HttpConnection connect(final String service)
 			throws TransportException, NotSupportedException {
-		final URL u;
-		try {
-			final StringBuilder b = new StringBuilder();
-			b.append(baseUrl);
-
-			if (b.charAt(b.length() - 1) != '/')
-				b.append('/');
-			b.append(Constants.INFO_REFS);
-
-			if (useSmartHttp) {
-				b.append(b.indexOf("?") < 0 ? '?' : '&'); //$NON-NLS-1$
-				b.append("service="); //$NON-NLS-1$
-				b.append(service);
-			}
-
-			u = new URL(b.toString());
-		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
-		}
-
-
+		URL u = getServiceURL(service);
 		int authAttempts = 1;
+		int redirects = 0;
 		Collection<Type> ignoreTypes = null;
 		for (;;) {
 			try {
@@ -532,6 +597,24 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					throw new TransportException(uri, MessageFormat.format(
 							JGitText.get().serviceNotPermitted, service));
 
+				case HttpConnection.HTTP_MOVED_PERM:
+				case HttpConnection.HTTP_MOVED_TEMP:
+				case HttpConnection.HTTP_SEE_OTHER:
+				case HttpConnection.HTTP_11_MOVED_TEMP:
+					// SEE_OTHER should actually never be sent by a git server,
+					// and in general should occur only on POST requests. But it
+					// doesn't hurt to accept it here as a redirect.
+					if (http.followRedirects == HttpRedirectMode.FALSE) {
+						throw new TransportException(MessageFormat.format(
+								JGitText.get().redirectsOff, uri,
+								Integer.valueOf(status)));
+					}
+					URIish newUri = redirect(conn.getHeaderField(HDR_LOCATION),
+							Constants.INFO_REFS, redirects++);
+					setURI(newUri);
+					u = getServiceURL(service);
+					authAttempts = 1;
+					break;
 				default:
 					String err = status + " " + conn.getResponseMessage(); //$NON-NLS-1$
 					throw new TransportException(uri, err);
@@ -557,6 +640,86 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 				throw new TransportException(uri, MessageFormat.format(JGitText.get().cannotOpenService, service), e);
 			}
+		}
+	}
+
+	private URIish redirect(String location, String checkFor, int redirects)
+			throws TransportException {
+		if (location == null || location.isEmpty()) {
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().redirectLocationMissing, uri, baseUrl));
+		}
+		if (redirects >= http.maxRedirects) {
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().redirectLimitExceeded, uri,
+					Integer.valueOf(http.maxRedirects), baseUrl, location));
+		}
+		try {
+			if (!isValidRedirect(baseUrl, location, checkFor)) {
+				throw new TransportException(
+						MessageFormat.format(JGitText.get().redirectBlocked,
+								uri, baseUrl, location));
+			}
+			location = location.substring(0, location.indexOf(checkFor));
+			URIish result = new URIish(location);
+			if (LOG.isInfoEnabled()) {
+				LOG.info(MessageFormat.format(JGitText.get().redirectHttp, uri,
+						Integer.valueOf(redirects), baseUrl, result));
+			}
+			return result;
+		} catch (URISyntaxException e) {
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().invalidRedirectLocation,
+					uri, baseUrl, location), e);
+		}
+	}
+
+	private boolean isValidRedirect(URL current, String next, String checkFor) {
+		// Protocols must be the same, or current is "http" and next "https". We
+		// do not follow redirects from https back to http.
+		String oldProtocol = current.getProtocol().toLowerCase(Locale.ROOT);
+		int schemeEnd = next.indexOf("://"); //$NON-NLS-1$
+		if (schemeEnd < 0) {
+			return false;
+		}
+		String newProtocol = next.substring(0, schemeEnd)
+				.toLowerCase(Locale.ROOT);
+		if (!oldProtocol.equals(newProtocol)) {
+			if (!"https".equals(newProtocol)) { //$NON-NLS-1$
+				return false;
+			}
+		}
+		// git allows only rewriting the root, i.e., everything before INFO_REFS
+		// or the service name
+		if (next.indexOf(checkFor) < 0) {
+			return false;
+		}
+		// Basically we should test here that whatever follows INFO_REFS is
+		// unchanged. But since we re-construct the query part
+		// anyway, it doesn't matter.
+		return true;
+	}
+
+	private URL getServiceURL(final String service)
+			throws NotSupportedException {
+		try {
+			final StringBuilder b = new StringBuilder();
+			b.append(baseUrl);
+
+			if (b.charAt(b.length() - 1) != '/') {
+				b.append('/');
+			}
+			b.append(Constants.INFO_REFS);
+
+			if (useSmartHttp) {
+				b.append(b.indexOf("?") < 0 ? '?' : '&'); //$NON-NLS-1$
+				b.append("service="); //$NON-NLS-1$
+				b.append(service);
+			}
+
+			return new URL(b.toString());
+		} catch (MalformedURLException e) {
+			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
 		}
 	}
 
@@ -597,6 +760,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			HttpSupport.disableSslVerify(conn);
 		}
+
+		// We must do our own redirect handling to implement git rules and to
+		// handle http->https redirects
+		conn.setInstanceFollowRedirects(false);
 
 		conn.setRequestMethod(method);
 		conn.setUseCaches(false);
@@ -893,8 +1060,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		protected final HttpExecuteStream execute;
 
-		private URL requestUrl;
-
 		final UnionInputStream in;
 
 		Service(String serviceName) {
@@ -907,15 +1072,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			this.in = new UnionInputStream(execute);
 		}
 
-		private URL getRequestUrl() throws IOException {
-			if (requestUrl == null) {
-				requestUrl = new URL(baseUrl, serviceName);
-			}
-			return requestUrl;
-		}
-
 		void openStream() throws IOException {
-			conn = httpOpen(METHOD_POST, getRequestUrl(), AcceptEncoding.GZIP);
+			conn = httpOpen(METHOD_POST, new URL(baseUrl, serviceName),
+					AcceptEncoding.GZIP);
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
 			conn.setRequestProperty(HDR_CONTENT_TYPE, requestType);
@@ -937,142 +1096,42 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				buf = out;
 			}
 
-			HttpAuthMethod authenticator = null;
 			int redirects = 0;
-			Collection<Type> ignoreTypes = EnumSet.noneOf(Type.class);
-			// Counts number of repeated authentication attempts using the same
-			// authentication scheme
-			int authAttempts = 1;
-			// Counts the number of 401s during NEGOTIATE
-			int negotiationRounds = 0;
 			for (;;) {
-				// The very first time, we will try with the authentication
-				// method used on the initial GET request. This is a hint only;
-				// it may fail. If so, we'll then re-try with proper 401
-				// handling, going though the available authentication schemes.
 				openStream();
 				if (buf != out) {
-					conn.setRequestProperty(HDR_CONTENT_ENCODING,
-							ENCODING_GZIP);
+					conn.setRequestProperty(HDR_CONTENT_ENCODING, ENCODING_GZIP);
 				}
 				conn.setFixedLengthStreamingMode((int) buf.length());
 				try (OutputStream httpOut = conn.getOutputStream()) {
 					buf.writeTo(httpOut, null);
 				}
 
-				final int status = HttpSupport.response(conn);
-				switch (status) {
-				case HttpConnection.HTTP_MOVED_PERM:
-					if (3 < redirects++) {
-						throw new TransportException(uri,
-								MessageFormat.format(
-										JGitText.get().tooManyRedirects,
-										Integer.valueOf(3), requestUrl));
-					}
-					String redirectUrl = HttpSupport.responseHeader(conn,
-							HDR_LOCATION);
-					requestUrl = new URL(redirectUrl);
-					continue;
-
-				case HttpConnection.HTTP_OK:
-					return;
-
-				case HttpConnection.HTTP_NOT_FOUND:
-					throw new NoRemoteRepositoryException(uri, MessageFormat
-							.format(JGitText.get().uriNotFound, requestUrl));
-
-				case HttpConnection.HTTP_UNAUTHORIZED:
-					int newAuthAttempts = authAttempts;
-					boolean rescan;
-					HttpAuthMethod nextMethod = null;
-					do {
-						rescan = false;
-						nextMethod = HttpAuthMethod.scanResponse(conn,
-								ignoreTypes);
-						switch (nextMethod.getType()) {
-						case NONE:
-							throw new TransportException(uri,
-									MessageFormat.format(
-											JGitText.get().authenticationNotSupported,
-											requestUrl));
-						case NEGOTIATE:
-							// RFC 4559 states "When using the SPNEGO [...] with
-							// [...] POST, the authentication should be complete
-							// [...] before sending the user data." So in theory
-							// the initial GET should have been authenticated
-							// already. (Unless there was a redirect?)
-							if (authenticator == null || authenticator
-									.getType() != nextMethod.getType()) {
-								if (authenticator != null) {
-									ignoreTypes.add(authenticator.getType());
-								}
-								authAttempts = 1;
-								newAuthAttempts = 2;
-							} else {
-								// Another round of NEGOTIATE. We must re-use
-								// the same object to get correct tokens.
-								nextMethod = authenticator;
-								// TODO: better state machine. When do we know
-								// that negotiate has failed finally? When the
-								// server doesn't advertise it anymore? In that
-								// case we're fine. But if the server keeps
-								// advertising it, we might otherwise end
-								// up in an endless loop here. The value of 10
-								// is arbitrary and may be too high or too low.
-								if (++negotiationRounds > 10) {
-									ignoreTypes
-											.add(HttpAuthMethod.Type.NEGOTIATE);
-									rescan = true;
-								}
-							}
-							break;
-						default:
-							// DIGEST or BASIC. Let's ignore NEGOTIATE; if it
-							// was available, we have tried it before.
-							ignoreTypes.add(HttpAuthMethod.Type.NEGOTIATE);
-							if (authenticator == null || authenticator
-									.getType() != nextMethod.getType()) {
-								if (authenticator != null) {
-									ignoreTypes.add(authenticator.getType());
-								}
-								authAttempts = 1;
-								newAuthAttempts = 2;
-							} else {
-								newAuthAttempts++;
-							}
-							break;
+				if (http.followRedirects == HttpRedirectMode.TRUE) {
+					final int status = HttpSupport.response(conn);
+					switch (status) {
+					case HttpConnection.HTTP_MOVED_PERM:
+					case HttpConnection.HTTP_MOVED_TEMP:
+					case HttpConnection.HTTP_11_MOVED_TEMP:
+						// SEE_OTHER after a POST doesn't make sense for a git
+						// server, so we don't handle it here and thus we'll
+						// report an error in openResponse() later on.
+						URIish newUri = redirect(
+								conn.getHeaderField(HDR_LOCATION),
+								'/' + serviceName, redirects++);
+						try {
+							baseUrl = toURL(newUri);
+						} catch (MalformedURLException e) {
+							throw new TransportException(MessageFormat.format(
+									JGitText.get().invalidRedirectLocation,
+									uri, baseUrl, newUri), e);
 						}
-					} while (rescan);
-					authMethod = nextMethod;
-					authenticator = nextMethod;
-					URIish requestUri = new URIish(requestUrl);
-					CredentialsProvider credentialsProvider = getCredentialsProvider();
-					if (credentialsProvider == null) {
-						throw new TransportException(requestUri,
-								JGitText.get().noCredentialsProvider);
+						continue;
+					default:
+						break;
 					}
-					if (authAttempts > 1) {
-						credentialsProvider.reset(requestUri);
-					}
-					if (3 < authAttempts || !authMethod.authorize(requestUri,
-							credentialsProvider)) {
-						throw new TransportException(requestUri,
-								JGitText.get().notAuthorized);
-					}
-					authAttempts = newAuthAttempts;
-					continue;
-
-				case HttpConnection.HTTP_FORBIDDEN:
-					throw new TransportException(new URIish(requestUrl),
-							MessageFormat.format(
-									JGitText.get().serviceNotPermitted,
-									serviceName));
-
-				default:
-					String err = status + ' ' + requestUrl.toString() + ' '
-							+ conn.getResponseMessage();
-					throw new TransportException(uri, err);
 				}
+				break;
 			}
 		}
 
