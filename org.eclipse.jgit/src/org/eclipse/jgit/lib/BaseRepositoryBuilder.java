@@ -135,8 +135,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 
 	private File workTree;
 
-	private DirectoryFlags directoryFlags = DirectoryFlags.DEFAULTS;
-
 	/** Directories limiting the search for a Git repository. */
 	private List<File> ceilingDirectories;
 
@@ -324,17 +322,6 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	/** @return the work tree directory, or null if not set. */
 	public File getWorkTree() {
 		return workTree;
-	}
-
-	// TODO: docs
-	public B setDirectoryFlags(DirectoryFlags directoryFlags) {
-		this.directoryFlags = directoryFlags;
-		return self();
-	}
-
-	// TODO: docs
-	public DirectoryFlags getDirectoryFlags() {
-		return directoryFlags;
 	}
 
 	/**
