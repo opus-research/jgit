@@ -66,8 +66,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -332,7 +330,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 				try {
 					p.resolve(matches, id, RESOLVE_ABBREV_LIMIT);
 				} catch (IOException e) {
-					handlePackError(e, p);
+					// Assume the pack is corrupted.
+					logCorruptPackError(e, p);
+					removePack(p);
 				}
 				if (matches.size() > RESOLVE_ABBREV_LIMIT)
 					return;
@@ -419,7 +419,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 						if (searchPacksAgain(pList))
 							continue SEARCH;
 					} catch (IOException e) {
-						handlePackError(e, p);
+						// Assume the pack is corrupted.
+						logCorruptPackError(e, p);
+						removePack(p);
 					}
 				}
 				break SEARCH;
@@ -499,7 +501,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 						if (searchPacksAgain(pList))
 							continue SEARCH;
 					} catch (IOException e) {
-						handlePackError(e, p);
+						// Assume the pack is corrupted.
+						logCorruptPackError(e, p);
+						removePack(p);
 					}
 				}
 				break SEARCH;
@@ -534,8 +538,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 					LocalObjectRepresentation rep = p.representation(curs, otp);
 					if (rep != null)
 						packer.select(otp, rep);
+				} catch (PackMismatchException e) {
+					// Pack was modified; refresh the entire pack list.
+					//
+					pList = scanPacks(pList);
+					continue SEARCH;
 				} catch (IOException e) {
-					handlePackError(e, p);
+					// Assume the pack is corrupted.
+					logCorruptPackError(e, p);
+					removePack(p);
 				}
 			}
 			break SEARCH;
@@ -545,19 +556,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 			h.db.selectObjectRepresentation(packer, otp, curs);
 	}
 
-	private void handlePackError(IOException e, PackFile p) {
-		String tmpl;
-		if ((e instanceof CorruptObjectException)
-				|| (e instanceof PackInvalidException)) {
-			tmpl = JGitText.get().corruptPack;
-			// Assume the pack is corrupted, and remove it from the list.
-			removePack(p);
-		} else {
-			tmpl = JGitText.get().exceptionWhileReadingPack;
-			// Don't remove the pack from the list, as the error may be
-			// transient.
-		}
-		StringBuilder buf = new StringBuilder(MessageFormat.format(tmpl,
+	private static void logCorruptPackError(IOException e, PackFile p) {
+		StringBuilder buf = new StringBuilder(MessageFormat.format(
+				JGitText.get().exceptionWhileReadingPack,
 				p.getPackFile().getAbsolutePath()));
 		StringWriter sw = new StringWriter();
 		e.printStackTrace(new PrintWriter(sw));
