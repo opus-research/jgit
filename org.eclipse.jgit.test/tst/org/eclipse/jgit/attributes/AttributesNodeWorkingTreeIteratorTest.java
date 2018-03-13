@@ -43,6 +43,8 @@
 package org.eclipse.jgit.attributes;
 
 import static java.util.Arrays.asList;
+import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -230,7 +232,8 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {
-					assertTrue(entryAttributes.getAll().contains(attribute));
+					assertThat(entryAttributes.getAll(),
+							hasItem(attribute));
 				}
 			} else {
 				assertTrue(

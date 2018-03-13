@@ -42,9 +42,11 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -320,7 +322,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	}
 
 	static void assertDerivedFrom(RevCommit derived, RevCommit original) {
-		assertNotEquals(original, derived);
+		assertThat(derived, not(equalTo(original)));
 		assertEquals(original.getFullMessage(), derived.getFullMessage());
 	}
 
