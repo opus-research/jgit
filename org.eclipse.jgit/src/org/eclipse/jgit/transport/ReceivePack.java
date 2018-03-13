@@ -97,7 +97,7 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
 /**
  * Implements the server side of a push connection, receiving objects.
  */
-public class ReceivePack implements ReceiveSession {
+public class ReceivePack {
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -246,14 +246,17 @@ public class ReceivePack implements ReceiveSession {
 		}
 	}
 
+	/** @return the repository this receive completes into. */
 	public final Repository getRepository() {
 		return db;
 	}
 
+	/** @return the RevWalk instance used by this connection. */
 	public final RevWalk getRevWalk() {
 		return walk;
 	}
 
+	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		if (refs == null) {
 			refs = refFilter.filter(db.getAllRefs());
@@ -271,11 +274,17 @@ public class ReceivePack implements ReceiveSession {
 		return refs;
 	}
 
+	/** @return the set of objects advertised as present in this repository. */
 	public final Set<ObjectId> getAdvertisedObjects() {
 		getAdvertisedRefs();
 		return advertisedHaves;
 	}
 
+	/**
+	 * @return true if this instance will validate all referenced, but not
+	 *         supplied by the client, objects are reachable from another
+	 *         reference.
+	 */
 	public boolean isCheckReferencedObjectsAreReachable() {
 		return checkReferencedIsReachable;
 	}
@@ -304,6 +313,10 @@ public class ReceivePack implements ReceiveSession {
 		this.checkReferencedIsReachable = b;
 	}
 
+	/**
+	 * @return true if this class expects a bi-directional pipe opened between
+	 *         the client and itself. The default is true.
+	 */
 	public boolean isBiDirectionalPipe() {
 		return biDirectionalPipe;
 	}
@@ -321,6 +334,11 @@ public class ReceivePack implements ReceiveSession {
 		biDirectionalPipe = twoWay;
 	}
 
+	/**
+	 * @return true if this instance will verify received objects are formatted
+	 *         correctly. Validating objects requires more CPU time on this side
+	 *         of the connection.
+	 */
 	public boolean isCheckReceivedObjects() {
 		return checkReceivedObjects;
 	}
@@ -334,6 +352,7 @@ public class ReceivePack implements ReceiveSession {
 		checkReceivedObjects = check;
 	}
 
+	/** @return true if the client can request refs to be created. */
 	public boolean isAllowCreates() {
 		return allowCreates;
 	}
@@ -346,6 +365,7 @@ public class ReceivePack implements ReceiveSession {
 		allowCreates = canCreate;
 	}
 
+	/** @return true if the client can request refs to be deleted. */
 	public boolean isAllowDeletes() {
 		return allowDeletes;
 	}
@@ -358,6 +378,10 @@ public class ReceivePack implements ReceiveSession {
 		allowDeletes = canDelete;
 	}
 
+	/**
+	 * @return true if the client can request non-fast-forward updates of a ref,
+	 *         possibly making objects unreachable.
+	 */
 	public boolean isAllowNonFastForwards() {
 		return allowNonFastForwards;
 	}
@@ -371,6 +395,7 @@ public class ReceivePack implements ReceiveSession {
 		allowNonFastForwards = canRewind;
 	}
 
+	/** @return identity of the user making the changes in the reflog. */
 	public PersonIdent getRefLogIdent() {
 		return refLogIdent;
 	}
@@ -391,6 +416,7 @@ public class ReceivePack implements ReceiveSession {
 		refLogIdent = pi;
 	}
 
+	/** @return the filter used while advertising the refs to the client */
 	public RefFilter getRefFilter() {
 		return refFilter;
 	}
@@ -410,6 +436,7 @@ public class ReceivePack implements ReceiveSession {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
+	/** @return the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -432,6 +459,7 @@ public class ReceivePack implements ReceiveSession {
 		preReceive = h != null ? h : PreReceiveHook.NULL;
 	}
 
+	/** @return the hook invoked after updates occur. */
 	public PostReceiveHook getPostReceiveHook() {
 		return postReceive;
 	}
@@ -450,6 +478,7 @@ public class ReceivePack implements ReceiveSession {
 		postReceive = h != null ? h : PostReceiveHook.NULL;
 	}
 
+	/** @return timeout (in seconds) before aborting an IO operation. */
 	public int getTimeout() {
 		return timeout;
 	}
@@ -479,10 +508,34 @@ public class ReceivePack implements ReceiveSession {
 		maxObjectSizeLimit = limit;
 	}
 
+	/** @return all of the command received by the current request. */
 	public List<ReceiveCommand> getAllCommands() {
 		return Collections.unmodifiableList(commands);
 	}
 
+	/**
+	 * Send an error message to the client.
+	 * <p>
+	 * If any error messages are sent before the references are advertised to
+	 * the client, the errors will be sent instead of the advertisement and the
+	 * receive operation will be aborted. All clients should receive and display
+	 * such early stage errors.
+	 * <p>
+	 * If the reference advertisements have already been sent, messages are sent
+	 * in a side channel. If the client doesn't support receiving messages, the
+	 * message will be discarded, with no other indication to the caller or to
+	 * the client.
+	 * <p>
+	 * {@link PreReceiveHook}s should always try to use
+	 * {@link ReceiveCommand#setResult(Result, String)} with a result status of
+	 * {@link Result#REJECTED_OTHER_REASON} to indicate any reasons for
+	 * rejecting an update. Messages attached to a command are much more likely
+	 * to be returned to the client.
+	 *
+	 * @param what
+	 *            string describing the problem identified by the hook. The
+	 *            string must not end with an LF, and must not contain an LF.
+	 */
 	public void sendError(final String what) {
 		if (refs == null) {
 			if (advertiseError == null)
@@ -498,6 +551,16 @@ public class ReceivePack implements ReceiveSession {
 		}
 	}
 
+	/**
+	 * Send a message to the client, if it supports receiving them.
+	 * <p>
+	 * If the client doesn't support receiving messages, the message will be
+	 * discarded, with no other indication to the caller or to the client.
+	 *
+	 * @param what
+	 *            string describing the problem identified by the hook. The
+	 *            string must not end with an LF, and must not contain an LF.
+	 */
 	public void sendMessage(final String what) {
 		try {
 			if (msgOut != null)
@@ -507,15 +570,24 @@ public class ReceivePack implements ReceiveSession {
 		}
 	}
 
-	public void onPostReceive() {
-		postReceive.onPostReceive(this, filterCommands(Result.OK));
-	}
-
-	public void onPreReceive() {
-		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
-	}
-
 	/**
+	 * Set a secondary "notice" channel for messages.
+	 * <p>
+	 * When run over SSH, for example, this should be tied back to the standard
+	 * error channel of the command execution. For most other network connections
+	 * this should be null.
+	 *
+	 * @param messages
+	 *            message output channel.
+	 */
+	public void setMessageOutputStream(final OutputStream messages) {
+		if (msgOut != null)
+			throw new IllegalStateException(
+					MessageFormat.format(JGitText.get().illegalStateExists, "msgOut"));
+		msgOut = messages;
+	}
+
+  /**
 	 * Execute the receive task on the socket.
 	 *
 	 * @param input
@@ -527,10 +599,8 @@ public class ReceivePack implements ReceiveSession {
 	 *            the output is buffered, otherwise write performance may
 	 *            suffer.
 	 * @param messages
-	 *            secondary "notice" channel to send additional messages out
-	 *            through. When run over SSH this should be tied back to the
-	 *            standard error channel of the command execution. For most
-	 *            other network connections this should be null.
+	 *            secondary "notice" channel for messages; see
+	 *            {@link #setMessageOutputStream(OutputStream)}.
 	 * @throws IOException
 	 */
 	public void receive(final InputStream input, final OutputStream output,
@@ -538,7 +608,7 @@ public class ReceivePack implements ReceiveSession {
 		try {
 			rawIn = input;
 			rawOut = output;
-			msgOut = messages;
+			setMessageOutputStream(messages);
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
@@ -657,7 +727,7 @@ public class ReceivePack implements ReceiveSession {
 				});
 			}
 
-			onPostReceive();
+			postReceive.onPostReceive(this, filterCommands(Result.OK));
 
 			if (unpackError != null)
 				throw new UnpackException(unpackError);
@@ -988,7 +1058,7 @@ public class ReceivePack implements ReceiveSession {
 	}
 
 	private void executeCommands() {
-		onPreReceive();
+		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
 
 		List<ReceiveCommand> toApply = filterCommands(Result.NOT_ATTEMPTED);
 		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
