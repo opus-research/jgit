@@ -49,7 +49,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FileUtils;
@@ -82,7 +81,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 *
 	 * @return a set of strings representing each file cleaned.
 	 */
-	public Set<String> call() throws GitAPIException, JGitInternalException {
+	public Set<String> call() {
 		Set<String> files = new TreeSet<String>();
 		try {
 			StatusCommand command = new StatusCommand(repo);
@@ -114,7 +113,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 	/**
 	 * If dryRun is set, the paths in question will not actually be deleted.
-	 *
+	 * 
 	 * @param dryRun
 	 *            whether to do a dry run or not
 	 * @return {@code this}

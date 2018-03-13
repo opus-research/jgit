@@ -46,8 +46,14 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
+import org.eclipse.jgit.api.errors.InvalidRefNameException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.dircache.InvalidPathException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.SystemReader;
@@ -332,11 +338,20 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 	 *            perform the actual test on the second checkout
 	 * @param path
 	 *            to the blob, one or more levels
-	 * @throws GitAPIException
 	 * @throws IOException
+	 * @throws RefAlreadyExistsException
+	 * @throws RefNotFoundException
+	 * @throws InvalidRefNameException
+	 * @throws MissingObjectException
+	 * @throws IncorrectObjectTypeException
+	 * @throws CheckoutConflictException
+	 * @throws JGitInternalException
 	 */
-	private void testMaliciousPath(boolean good, boolean secondCheckout,
-			String... path) throws GitAPIException, IOException {
+	private void testMaliciousPath(boolean good, boolean secondCheckout, String... path)
+			throws IOException, RefAlreadyExistsException,
+			RefNotFoundException, InvalidRefNameException,
+			MissingObjectException, IncorrectObjectTypeException,
+			JGitInternalException, CheckoutConflictException {
 		Git git = new Git(db);
 		ObjectInserter newObjectInserter;
 		newObjectInserter = git.getRepository().newObjectInserter();
