@@ -47,20 +47,12 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.OutputStream;
-
-import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.errors.MissingObjectException;
 
 /**
  * Base class for a set of loaders for different representations of Git objects.
  * New loaders are constructed for every object.
  */
 public abstract class ObjectLoader {
-	private static final int LARGE_OBJECT = 1024 * 1024;
-
 	/**
 	 * @return Git in pack object type, see {@link Constants}.
 	 */
@@ -72,27 +64,14 @@ public abstract class ObjectLoader {
 	public abstract long getSize();
 
 	/**
-	 * @return true if this object is too large to obtain as a byte array.
-	 *         Objects over a certain threshold should be accessed only by their
-	 *         {@link #openStream()} to prevent overflowing the JVM heap.
-	 */
-	public boolean isLarge() {
-		return LARGE_OBJECT <= getSize();
-	}
-
-	/**
 	 * Obtain a copy of the bytes of this object.
 	 * <p>
 	 * Unlike {@link #getCachedBytes()} this method returns an array that might
 	 * be modified by the caller.
 	 *
 	 * @return the bytes of this object.
-	 * @throws LargeObjectException
-	 *             if the object won't fit into a byte array, because
-	 *             {@link #isLarge()} returns true. Callers should use
-	 *             {@link #openStream()} instead to access the contents.
 	 */
-	public final byte[] getBytes() throws LargeObjectException {
+	public final byte[] getBytes() {
 		final byte[] data = getCachedBytes();
 		final byte[] copy = new byte[data.length];
 		System.arraycopy(data, 0, copy, 0, data.length);
@@ -108,69 +87,19 @@ public abstract class ObjectLoader {
 	 * Changes (if made) will affect the cache but not the repository itself.
 	 *
 	 * @return the cached bytes of this object. Do not modify it.
-	 * @throws LargeObjectException
-	 *             if the object won't fit into a byte array, because
-	 *             {@link #isLarge()} returns true. Callers should use
-	 *             {@link #openStream()} instead to access the contents.
 	 */
-	public abstract byte[] getCachedBytes() throws LargeObjectException;
+	public abstract byte[] getCachedBytes();
 
 	/**
-	 * Obtain an input stream to read this object's data.
-	 *
-	 * @return a stream of this object's data. Caller must close the stream when
-	 *         through with it. The returned stream is buffered with a
-	 *         reasonable buffer size.
-	 * @throws MissingObjectException
-	 *             the object no longer exists.
-	 * @throws IOException
-	 *             the object store cannot be accessed.
+	 * @return raw object type from object header, as stored in storage (pack,
+	 *         loose file). This may be different from {@link #getType()} result
+	 *         for packs (see {@link Constants}).
 	 */
-	public abstract ObjectStream openStream() throws MissingObjectException,
-			IOException;
+	public abstract int getRawType();
 
 	/**
-	 * Copy this object to the output stream.
-	 * <p>
-	 * For some object store implementations, this method may be more efficient
-	 * than reading from {@link #openStream()} into a temporary byte array, then
-	 * writing to the destination stream.
-	 * <p>
-	 * The default implementation of this method is to copy with a temporary
-	 * byte array for large objects, or to pass through the cached byte array
-	 * for small objects.
-	 *
-	 * @param out
-	 *            stream to receive the complete copy of this object's data.
-	 *            Caller is responsible for flushing or closing this stream
-	 *            after this method returns.
-	 * @throws MissingObjectException
-	 *             the object no longer exists.
-	 * @throws IOException
-	 *             the object store cannot be accessed, or the stream cannot be
-	 *             written to.
+	 * @return raw size of object from object header (pack, loose file).
+	 *         Interpretation of this value depends on {@link #getRawType()}.
 	 */
-	public void copyTo(OutputStream out) throws MissingObjectException,
-			IOException {
-		if (isLarge()) {
-			ObjectStream in = openStream();
-			try {
-				byte[] tmp = new byte[1024];
-				long copied = 0;
-				for (;;) {
-					int n = in.read(tmp);
-					if (n < 0)
-						break;
-					out.write(tmp, 0, n);
-					copied += n;
-				}
-				if (copied != getSize())
-					throw new EOFException();
-			} finally {
-				in.close();
-			}
-		} else {
-			out.write(getCachedBytes());
-		}
-	}
+	public abstract long getRawSize();
 }
