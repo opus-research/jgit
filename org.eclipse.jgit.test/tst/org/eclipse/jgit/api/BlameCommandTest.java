@@ -55,7 +55,7 @@ import org.junit.Test;
  */
 public class BlameCommandTest extends RepositoryTestCase {
 
-	private static String join(String... lines) {
+	private String join(String... lines) {
 		StringBuilder joined = new StringBuilder();
 		for (String line : lines)
 			joined.append(line).append('\n');

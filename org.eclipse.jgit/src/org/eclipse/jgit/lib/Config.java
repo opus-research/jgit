@@ -134,24 +134,24 @@ public class Config {
 					r.append('"');
 					inquote = false;
 				}
-				r.append("\\n\\\n"); //$NON-NLS-1$
+				r.append("\\n\\\n");
 				lineStart = r.length();
 				break;
 
 			case '\t':
-				r.append("\\t"); //$NON-NLS-1$
+				r.append("\\t");
 				break;
 
 			case '\b':
-				r.append("\\b"); //$NON-NLS-1$
+				r.append("\\b");
 				break;
 
 			case '\\':
-				r.append("\\\\"); //$NON-NLS-1$
+				r.append("\\\\");
 				break;
 
 			case '"':
-				r.append("\\\""); //$NON-NLS-1$
+				r.append("\\\"");
 				break;
 
 			case ';':
@@ -354,7 +354,7 @@ public class Config {
 	@SuppressWarnings("unchecked")
 	private static <T> T[] allValuesOf(final T value) {
 		try {
-			return (T[]) value.getClass().getMethod("values").invoke(null); //$NON-NLS-1$
+			return (T[]) value.getClass().getMethod("values").invoke(null);
 		} catch (Exception err) {
 			String typeName = value.getClass().getName();
 			String msg = MessageFormat.format(
@@ -393,9 +393,9 @@ public class Config {
 		for (T e : all) {
 			if (StringUtils.equalsIgnoreCase(e.name(), n))
 				return e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE")) //$NON-NLS-1$
+			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE"))
 				trueState = e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE")) //$NON-NLS-1$
+			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE"))
 				falseState = e;
 		}
 
@@ -664,11 +664,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
+			s = String.valueOf(value / GiB) + " g";
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
+			s = String.valueOf(value / MiB) + " m";
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
+			s = String.valueOf(value / KiB) + " k";
 		else
 			s = String.valueOf(value);
 
@@ -695,7 +695,7 @@ public class Config {
 	 */
 	public void setBoolean(final String section, final String subsection,
 			final String name, final boolean value) {
-		setString(section, subsection, name, value ? "true" : "false"); //$NON-NLS-1$ //$NON-NLS-2$
+		setString(section, subsection, name, value ? "true" : "false");
 	}
 
 	/**
@@ -937,8 +937,8 @@ public class Config {
 					out.append(' ');
 					String escaped = escapeValue(e.subsection);
 					// make sure to avoid double quotes here
-					boolean quoted = escaped.startsWith("\"") //$NON-NLS-1$
-							&& escaped.endsWith("\""); //$NON-NLS-1$
+					boolean quoted = escaped.startsWith("\"")
+							&& escaped.endsWith("\"");
 					if (!quoted)
 						out.append('"');
 					out.append(escaped);
@@ -947,11 +947,11 @@ public class Config {
 				}
 				out.append(']');
 			} else if (e.section != null && e.name != null) {
-				if (e.prefix == null || "".equals(e.prefix)) //$NON-NLS-1$
+				if (e.prefix == null || "".equals(e.prefix))
 					out.append('\t');
 				out.append(e.name);
 				if (MAGIC_EMPTY_VALUE != e.value) {
-					out.append(" ="); //$NON-NLS-1$
+					out.append(" =");
 					if (e.value != null) {
 						out.append(' ');
 						out.append(escapeValue(e.value));
@@ -1005,7 +1005,7 @@ public class Config {
 			} else if (e.section == null && Character.isWhitespace(c)) {
 				// Save the leading whitespace (if any).
 				if (e.prefix == null)
-					e.prefix = ""; //$NON-NLS-1$
+					e.prefix = "";
 				e.prefix += c;
 
 			} else if ('[' == c) {
@@ -1018,7 +1018,7 @@ public class Config {
 				}
 				if (']' != input)
 					throw new ConfigInvalidException(JGitText.get().badGroupHeader);
-				e.suffix = ""; //$NON-NLS-1$
+				e.suffix = "";
 
 			} else if (last != null) {
 				// Read a value.
@@ -1026,7 +1026,7 @@ public class Config {
 				e.subsection = last.subsection;
 				in.reset();
 				e.name = readKeyName(in);
-				if (e.name.endsWith("\n")) { //$NON-NLS-1$
+				if (e.name.endsWith("\n")) {
 					e.name = e.name.substring(0, e.name.length() - 1);
 					e.value = MAGIC_EMPTY_VALUE;
 				} else

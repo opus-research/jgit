@@ -73,7 +73,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
@@ -261,17 +260,10 @@ public class RefDirectory extends RefDatabase {
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = null;
 		for (String prefix : SEARCH_PATH) {
-			try {
-				ref = readRef(prefix + needle, packed);
-				if (ref != null) {
-					ref = resolve(ref, 0, null, null, packed);
-					break;
-				}
-			} catch (IOException e) {
-				if (!(!needle.contains("/") && "".equals(prefix) && e //$NON-NLS-1$ //$NON-NLS-2$
-						.getCause() instanceof InvalidObjectIdException)) {
-					throw e;
-				}
+			ref = readRef(prefix + needle, packed);
+			if (ref != null) {
+				ref = resolve(ref, 0, null, null, packed);
+				break;
 			}
 		}
 		fireRefsChanged();
@@ -356,7 +348,7 @@ public class RefDirectory extends RefDatabase {
 				if (newLoose == null && curIdx < curLoose.size())
 					newLoose = curLoose.copy(curIdx);
 
-			} else if (prefix.startsWith(R_REFS) && prefix.endsWith("/")) { //$NON-NLS-1$
+			} else if (prefix.startsWith(R_REFS) && prefix.endsWith("/")) {
 				curIdx = -(curLoose.find(prefix) + 1);
 				File dir = new File(refsDir, prefix.substring(R_REFS.length()));
 				scanTree(prefix, dir);
@@ -945,11 +937,7 @@ public class RefDirectory extends RefDatabase {
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
 			String content = RawParseUtils.decode(buf, 0, n);
-
-			IOException ioException = new IOException(MessageFormat.format(JGitText.get().notARef,
-					name, content));
-			ioException.initCause(notRef);
-			throw ioException;
+			throw new IOException(MessageFormat.format(JGitText.get().notARef, name, content));
 		}
 		return new LooseUnpeeled(otherSnapshot, name, id);
 	}
@@ -980,7 +968,7 @@ public class RefDirectory extends RefDatabase {
 	 *             a temporary name cannot be allocated.
 	 */
 	RefDirectoryUpdate newTemporaryUpdate() throws IOException {
-		File tmp = File.createTempFile("renamed_", "_ref", refsDir); //$NON-NLS-1$ //$NON-NLS-2$
+		File tmp = File.createTempFile("renamed_", "_ref", refsDir);
 		String name = Constants.R_REFS + tmp.getName();
 		Ref ref = new ObjectIdRef.Unpeeled(NEW, name, null);
 		return new RefDirectoryUpdate(this, ref);

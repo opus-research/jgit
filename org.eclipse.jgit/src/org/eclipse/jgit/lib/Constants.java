@@ -56,7 +56,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
 
 /** Misc. constants used throughout JGit. */
-@SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git for all objects. */
 	private static final String HASH_FUNCTION = "SHA-1";
@@ -340,9 +339,6 @@ public final class Constants {
 
 	/** Name of the submodules file */
 	public static final String DOT_GIT_MODULES = ".gitmodules";
-
-	/** Name of the .git/shallow file */
-	public static final String SHALLOW = "shallow";
 
 	/**
 	 * Create a new digest function for objects.

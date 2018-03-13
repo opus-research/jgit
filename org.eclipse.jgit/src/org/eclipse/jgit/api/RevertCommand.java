@@ -164,13 +164,13 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					String shortMessage = "Revert \"" + srcCommit.getShortMessage() + "\""; //$NON-NLS-2$
-					String newMessage = shortMessage + "\n\n" //$NON-NLS-1$
-							+ "This reverts commit " //$NON-NLS-1$
-							+ srcCommit.getId().getName() + ".\n"; //$NON-NLS-1$
+					String shortMessage = "Revert \"" + srcCommit.getShortMessage() + "\"";
+					String newMessage = shortMessage + "\n\n"
+							+ "This reverts commit "
+							+ srcCommit.getId().getName() + ".\n";
 					newHead = new Git(getRepository()).commit()
 							.setMessage(newMessage)
-							.setReflogComment("revert: " + shortMessage).call(); //$NON-NLS-1$
+							.setReflogComment("revert: " + shortMessage).call();
 					revertedRefs.add(src);
 				} else {
 					unmergedPaths = merger.getUnmergedPaths();

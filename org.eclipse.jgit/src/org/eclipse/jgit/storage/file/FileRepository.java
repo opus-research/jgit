@@ -178,8 +178,7 @@ public class FileRepository extends Repository {
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
-				getFS(), //
-				new File(getDirectory(), Constants.SHALLOW));
+				getFS());
 
 		if (objectDatabase.exists()) {
 			final long repositoryFormatVersion = getConfig().getLong(
@@ -249,8 +248,8 @@ public class FileRepository extends Repository {
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getDirectory(), "branches")); //$NON-NLS-1$
-		FileUtils.mkdir(new File(getDirectory(), "hooks")); //$NON-NLS-1$
+		FileUtils.mkdir(new File(getDirectory(), "branches"));
+		FileUtils.mkdir(new File(getDirectory(), "hooks"));
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -258,7 +257,7 @@ public class FileRepository extends Repository {
 
 		final boolean fileMode;
 		if (getFS().supportsExecute()) {
-			File tmp = File.createTempFile("try", "execute", getDirectory()); //$NON-NLS-1$ //$NON-NLS-2$
+			File tmp = File.createTempFile("try", "execute", getDirectory());
 
 			getFS().setExecute(tmp, true);
 			final boolean on = getFS().canExecute(tmp);
@@ -281,10 +280,6 @@ public class FileRepository extends Repository {
 					ConfigConstants.CONFIG_KEY_BARE, true);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
-		if (SystemReader.getInstance().isMacOS())
-			// Java has no other way
-			cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRECOMPOSEUNICODE, true);
 		cfg.save();
 	}
 
