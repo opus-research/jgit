@@ -62,7 +62,7 @@ public abstract class RefDatabase {
 	/**
 	 * Order of prefixes to search when using non-absolute references.
 	 * <p>
-	 * The implementation's {@link #getRef(String)} method must take this search
+	 * The implementation's {@link #findRef(String)} method must take this search
 	 * space into consideration when locating a reference by name. The first
 	 * entry in the path is always {@code ""}, ensuring that absolute references
 	 * are resolved without further mangling.
@@ -207,6 +207,21 @@ public abstract class RefDatabase {
 	}
 
 	/**
+	 * Compatibility synonym for {@link #findRef(String)}.
+	 *
+	 * @param name
+	 *            the name of the reference. May be a short name which must be
+	 *            searched for using the standard {@link #SEARCH_PATH}.
+	 * @return the reference (if it exists); else {@code null}.
+	 * @throws IOException
+	 *             the reference space cannot be accessed.
+	 * @deprecated Use {@link #findRef(String)} instead.
+	 */
+	public Ref getRef(String name) throws IOException {
+		return findRef(name);
+	}
+
+	/**
 	 * Read a single reference.
 	 * <p>
 	 * Aside from taking advantage of {@link #SEARCH_PATH}, this method may be
@@ -223,10 +238,10 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	public Ref getRef(String name) throws IOException {
-		String[] names = new String[SEARCH_PATH.length];
-		for (int i = 0; i < SEARCH_PATH.length; i++) {
-			names[i] = SEARCH_PATH[i] + name;
+	public Ref findRef(String name) throws IOException {
+		String[] names = SEARCH_PATH.clone();
+		for (int i = 0; i < names.length; i++) {
+			names[i] += name;
 		}
 		return firstExactRef(names);
 	}
@@ -244,7 +259,22 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	public abstract Ref exactRef(String name) throws IOException;
+	public Ref exactRef(String name) throws IOException {
+		int slash = name.lastIndexOf('/');
+		String prefix = name.substring(0, slash + 1);
+		String rest = name.substring(slash + 1);
+		Ref result = getRefs(prefix).get(rest);
+		if (result != null || slash != -1) {
+			return result;
+		}
+
+		for (Ref ref : getAdditionalRefs()) {
+			if (name.equals(ref.getName())) {
+				return ref;
+			}
+		}
+		return null;
+	}
 
 	/**
 	 * Read the specified references.
@@ -286,7 +316,7 @@ public abstract class RefDatabase {
 	 * @since 4.1
 	 */
 	public Ref firstExactRef(String... refs) throws IOException {
-		for (String name : refs) {
+		for (String name: refs) {
 			Ref ref = exactRef(name);
 			if (ref != null) {
 				return ref;
@@ -316,7 +346,7 @@ public abstract class RefDatabase {
 	 * The result list includes non-ref items such as MERGE_HEAD and
 	 * FETCH_RESULT cast to be refs. The names of these refs are not returned by
 	 * <code>getRefs(ALL)</code> but are accepted by {@link #getRef(String)}
-	 * and {@link #exactRef(String)}.
+	 * and {@link exactRef(String)}.
 	 *
 	 * @return a list of additional refs
 	 * @throws IOException

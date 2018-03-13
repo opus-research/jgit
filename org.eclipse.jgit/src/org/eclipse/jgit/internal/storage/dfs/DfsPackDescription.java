@@ -50,7 +50,7 @@ import java.util.Map;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
-import org.eclipse.jgit.storage.pack.PackStatistics;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 
 /**
  * Description of a DFS stored pack/index file.
@@ -75,7 +75,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private long deltaCount;
 
-	private PackStatistics stats;
+	private PackWriter.Statistics stats;
 
 	private int extensions;
 
@@ -225,11 +225,11 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *         DfsGarbageCollector or DfsPackCompactor, and only when the pack
 	 *         is being committed to the repository.
 	 */
-	public PackStatistics getPackStats() {
+	public PackWriter.Statistics getPackStats() {
 		return stats;
 	}
 
-	DfsPackDescription setPackStats(PackStatistics stats) {
+	DfsPackDescription setPackStats(PackWriter.Statistics stats) {
 		this.stats = stats;
 		setFileSize(PACK, stats.getTotalBytes());
 		setObjectCount(stats.getTotalObjects());

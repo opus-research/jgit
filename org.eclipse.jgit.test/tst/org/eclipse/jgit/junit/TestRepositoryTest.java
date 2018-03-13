@@ -307,9 +307,9 @@ public class TestRepositoryTest {
 		RevCommit toPick = tr.commit()
 				.parent(tr.commit().create()) // Can't cherry-pick root.
 				.author(new PersonIdent("Cherrypick Author", "cpa@example.com",
-						tr.getDate(), tr.getTimeZone()))
+						tr.getClock(), tr.getTimeZone()))
 				.author(new PersonIdent("Cherrypick Committer", "cpc@example.com",
-						tr.getDate(), tr.getTimeZone()))
+						tr.getClock(), tr.getTimeZone()))
 				.message("message to cherry-pick")
 				.add("bar", "bar contents\n")
 				.create();
