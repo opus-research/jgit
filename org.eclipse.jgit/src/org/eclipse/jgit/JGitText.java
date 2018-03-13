@@ -190,6 +190,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String countingObjects;
 	/***/ public String createBranchFailedUnknownReason;
 	/***/ public String createBranchUnexpectedResult;
+	/***/ public String createNewFileFailed;
 	/***/ public String credentialPassword;
 	/***/ public String credentialUsername;
 	/***/ public String daemonAlreadyRunning;
@@ -478,6 +479,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;
+	/***/ public String unexpectedCompareResult;
 	/***/ public String unexpectedEndOfConfigFile;
 	/***/ public String unexpectedHunkTrailer;
 	/***/ public String unexpectedOddResult;
