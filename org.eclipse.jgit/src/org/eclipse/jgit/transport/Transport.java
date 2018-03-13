@@ -1353,6 +1353,10 @@ public abstract class Transport implements AutoCloseable {
 	 * must close that network socket, disconnecting the two peers. If the
 	 * remote repository is actually local (same system) this method must close
 	 * any open file handles used to read the "remote" repository.
+	 * <p>
+	 * {@code AutoClosable.close()} declares that it throws {@link Exception}.
+	 * Implementers shouldn't throw checked exceptions. This override narrows
+	 * the signature to prevent them from doing so.
 	 */
 	public abstract void close();
 }

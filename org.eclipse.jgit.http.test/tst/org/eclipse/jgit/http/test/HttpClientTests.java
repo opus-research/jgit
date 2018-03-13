@@ -212,10 +212,9 @@ public class HttpClientTests extends HttpTestCase {
 
 		Repository dst = createBareRepository();
 		Ref head;
-		try (Transport t = Transport.open(dst, dumbAuthNoneURI)) {
-			try (FetchConnection c = t.openFetch()) {
-				head = c.getRef(Constants.HEAD);
-			}
+		try (Transport t = Transport.open(dst, dumbAuthNoneURI);
+				FetchConnection c = t.openFetch()) {
+			head = c.getRef(Constants.HEAD);
 		}
 		assertNull("has no " + Constants.HEAD, head);
 	}
@@ -230,10 +229,9 @@ public class HttpClientTests extends HttpTestCase {
 
 		Repository dst = createBareRepository();
 		Ref head;
-		try (Transport t = Transport.open(dst, smartAuthNoneURI)) {
-			try (FetchConnection c = t.openFetch()) {
-				head = c.getRef(Constants.HEAD);
-			}
+		try (Transport t = Transport.open(dst, smartAuthNoneURI);
+				FetchConnection c = t.openFetch()) {
+			head = c.getRef(Constants.HEAD);
 		}
 		assertNotNull("has " + Constants.HEAD, head);
 		assertEquals(Q, head.getObjectId());
@@ -339,11 +337,10 @@ public class HttpClientTests extends HttpTestCase {
 
 	@Test
 	public void testListRemoteWithoutLocalRepository() throws Exception {
-		try (Transport t = Transport.open(smartAuthNoneURI)) {
-			try (FetchConnection c = t.openFetch()) {
-				Ref head = c.getRef(Constants.HEAD);
-				assertNotNull(head);
-			}
+		try (Transport t = Transport.open(smartAuthNoneURI);
+				FetchConnection c = t.openFetch()) {
+			Ref head = c.getRef(Constants.HEAD);
+			assertNotNull(head);
 		}
 	}
 }

@@ -62,7 +62,9 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/** A helper to check if {@link KetchReplica} is ahead or behind leader. */
+/**
+ * A helper to check if a {@link KetchReplica} is ahead or behind the leader.
+ */
 class LagCheck implements AutoCloseable {
 	private final KetchReplica replica;
 	private final Repository repo;

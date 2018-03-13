@@ -163,11 +163,10 @@ public class RemoteGitReplica extends KetchReplica {
 		req.setRefs(adv);
 	}
 
-	private Map<String, Ref> push(Repository git, Transport tn,
-			List<RemoteCommand> cmds) throws NotSupportedException,
-					TransportException, IOException {
+	private Map<String, Ref> push(Repository git, Transport transport,
+			List<RemoteCommand> cmds) throws IOException {
 		Map<String, RemoteRefUpdate> updates = asUpdateMap(cmds);
-		try (PushConnection connection = tn.openPush()) {
+		try (PushConnection connection = transport.openPush()) {
 			Map<String, Ref> adv = connection.getRefsMap();
 			RemoteRefUpdate accepted = updates.get(getSystem().getTxnAccepted());
 			if (accepted != null && !isExpectedValue(adv, accepted)) {
