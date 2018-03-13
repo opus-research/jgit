@@ -84,7 +84,7 @@ import org.eclipse.jgit.util.FileUtils;
  */
 public class StashApplyCommand extends GitCommand<ObjectId> {
 
-	private static final String DEFAULT_REF = Constants.STASH + "@{0}"; //$NON-NLS-1$
+	private static final String DEFAULT_REF = Constants.STASH + "@{0}";
 
 	/**
 	 * Stash diff filter that looks for differences in the first three trees
@@ -115,7 +115,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 		@Override
 		public String toString() {
-			return "STASH_DIFF"; //$NON-NLS-1$
+			return "STASH_DIFF";
 		}
 	}
 
@@ -189,10 +189,11 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 		return false;
 	}
 
-	private ObjectId getHeadTree() throws GitAPIException {
+	private ObjectId getHeadTree() throws JGitInternalException,
+			GitAPIException {
 		final ObjectId headTree;
 		try {
-			headTree = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
+			headTree = repo.resolve(Constants.HEAD + "^{tree}");
 		} catch (IOException e) {
 			throw new JGitInternalException(JGitText.get().cannotReadTree, e);
 		}
@@ -201,7 +202,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 		return headTree;
 	}
 
-	private ObjectId getStashId() throws GitAPIException {
+	private ObjectId getStashId() throws JGitInternalException, GitAPIException {
 		final String revision = stashRef != null ? stashRef : DEFAULT_REF;
 		final ObjectId stashId;
 		try {
@@ -296,11 +297,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 * Apply the changes in a stashed commit to the working directory and index
 	 *
 	 * @return id of stashed commit that was applied
-	 * @throws GitAPIException
-	 * @throws WrongRepositoryStateException
 	 */
-	public ObjectId call() throws GitAPIException,
-			WrongRepositoryStateException {
+	public ObjectId call() throws GitAPIException, JGitInternalException {
 		checkCallable();
 
 		if (repo.getRepositoryState() != RepositoryState.SAFE)

@@ -171,10 +171,10 @@ public class ObjectDirectoryPackParser extends PackParser {
 	@Override
 	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
 			throws IOException {
-		tmpPack = File.createTempFile("incoming_", ".pack", db.getDirectory()); //$NON-NLS-1$ //$NON-NLS-2$
-		tmpIdx = new File(db.getDirectory(), baseName(tmpPack) + ".idx"); //$NON-NLS-1$
+		tmpPack = File.createTempFile("incoming_", ".pack", db.getDirectory());
+		tmpIdx = new File(db.getDirectory(), baseName(tmpPack) + ".idx");
 		try {
-			out = new RandomAccessFile(tmpPack, "rw"); //$NON-NLS-1$
+			out = new RandomAccessFile(tmpPack, "rw");
 
 			super.parse(receiving, resolving);
 
@@ -425,9 +425,9 @@ public class ObjectDirectoryPackParser extends PackParser {
 		}
 
 		final String name = ObjectId.fromRaw(d.digest()).name();
-		final File packDir = new File(db.getDirectory(), "pack"); //$NON-NLS-1$
-		final File finalPack = new File(packDir, "pack-" + name + ".pack"); //$NON-NLS-1$ //$NON-NLS-2$
-		final File finalIdx = new File(packDir, "pack-" + name + ".idx"); //$NON-NLS-1$ //$NON-NLS-2$
+		final File packDir = new File(db.getDirectory(), "pack");
+		final File finalPack = new File(packDir, "pack-" + name + ".pack");
+		final File finalIdx = new File(packDir, "pack-" + name + ".idx");
 		final PackLock keep = new PackLock(finalPack, db.getFS());
 
 		if (!packDir.exists() && !packDir.mkdir() && !packDir.exists()) {
@@ -479,7 +479,7 @@ public class ObjectDirectoryPackParser extends PackParser {
 		}
 
 		try {
-			newPack = db.openPack(finalPack);
+			newPack = db.openPack(finalPack, finalIdx);
 		} catch (IOException err) {
 			keep.unlock();
 			if (finalPack.exists())

@@ -47,7 +47,6 @@ package org.eclipse.jgit.lib;
  * Constants for use with the Configuration classes: section names,
  * configuration keys
  */
-@SuppressWarnings("nls")
 public class ConfigConstants {
 	/** The "core" section */
 	public static final String CONFIG_CORE_SECTION = "core";
@@ -75,9 +74,6 @@ public class ConfigConstants {
 
 	/** The "submodule" section */
 	public static final String CONFIG_SUBMODULE_SECTION = "submodule";
-
-	/** The "gc" section */
-	public static final String CONFIG_GC_SECTION = "gc";
 
 	/** The "pack" section */
 	public static final String CONFIG_PACK_SECTION = "pack";
@@ -182,13 +178,4 @@ public class ConfigConstants {
 
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
-
-	/** The "precomposeunicode" key */
-	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
-
-	/** The "pruneexpire" key */
-	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
-
-	/** The "mergeoptions" key */
-	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
 }

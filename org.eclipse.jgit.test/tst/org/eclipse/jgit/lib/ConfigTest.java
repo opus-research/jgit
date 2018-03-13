@@ -48,7 +48,6 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -76,16 +75,16 @@ public class ConfigTest {
 	@Test
 	public void test001_ReadBareKey() throws ConfigInvalidException {
 		final Config c = parse("[foo]\nbar\n");
-		assertTrue(c.getBoolean("foo", null, "bar", false));
+		assertEquals(true, c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
 	@Test
 	public void test002_ReadWithSubsection() throws ConfigInvalidException {
 		final Config c = parse("[foo \"zip\"]\nbar\n[foo \"zap\"]\nbar=false\nn=3\n");
-		assertTrue(c.getBoolean("foo", "zip", "bar", false));
+		assertEquals(true, c.getBoolean("foo", "zip", "bar", false));
 		assertEquals("", c.getString("foo","zip", "bar"));
-		assertFalse(c.getBoolean("foo", "zap", "bar", true));
+		assertEquals(false, c.getBoolean("foo", "zap", "bar", true));
 		assertEquals("false", c.getString("foo", "zap", "bar"));
 		assertEquals(3, c.getInt("foo", "zap", "n", 4));
 		assertEquals(4, c.getInt("foo", "zap","m", 4));
@@ -118,7 +117,7 @@ public class ConfigTest {
 
 		final Object[] expArr = values.toArray();
 		final String[] actArr = c.getStringList("my", null, "somename");
-		assertArrayEquals(expArr, actArr);
+		assertTrue(Arrays.equals(expArr, actArr));
 
 		final String expText = "[my]\n\tsomename = value1\n\tsomename = value2\n";
 		assertEquals(expText, c.toText());
@@ -127,7 +126,7 @@ public class ConfigTest {
 	@Test
 	public void test006_readCaseInsensitive() throws ConfigInvalidException {
 		final Config c = parse("[Foo]\nBar\n");
-		assertTrue(c.getBoolean("foo", null, "bar", false));
+		assertEquals(true, c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
@@ -289,28 +288,6 @@ public class ConfigTest {
 
 		c = parse("[s \"b\"]\n\tc = one two\n");
 		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
-
-		c = parse("[s \"b\"]\n\tc = one-two\n");
-		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
-	}
-
-	@Test
-	public void testGetInvalidEnum() throws ConfigInvalidException {
-		Config c = parse("[a]\n\tb = invalid\n");
-		try {
-			c.getEnum("a", null, "b", TestEnum.ONE_TWO);
-			fail();
-		} catch (IllegalArgumentException e) {
-			assertEquals("Invalid value: a.b=invalid", e.getMessage());
-		}
-
-		c = parse("[a \"b\"]\n\tc = invalid\n");
-		try {
-			c.getEnum("a", "b", "c", TestEnum.ONE_TWO);
-			fail();
-		} catch (IllegalArgumentException e) {
-			assertEquals("Invalid value: a.b.c=invalid", e.getMessage());
-		}
 	}
 
 	@Test
@@ -437,9 +414,9 @@ public class ConfigTest {
 				names.contains("repositoryformatversion"));
 
 		Iterator<String> itr = names.iterator();
+		assertEquals("repositoryFormatVersion", itr.next());
 		assertEquals("filemode", itr.next());
 		assertEquals("logAllRefUpdates", itr.next());
-		assertEquals("repositoryFormatVersion", itr.next());
 		assertFalse(itr.hasNext());
 	}
 
@@ -487,18 +464,17 @@ public class ConfigTest {
 		assertEquals(result, config.toText());
 	}
 
-	private static void assertReadLong(long exp) throws ConfigInvalidException {
+	private void assertReadLong(long exp) throws ConfigInvalidException {
 		assertReadLong(exp, String.valueOf(exp));
 	}
 
-	private static void assertReadLong(long exp, String act)
+	private void assertReadLong(long exp, String act)
 			throws ConfigInvalidException {
 		final Config c = parse("[s]\na = " + act + "\n");
 		assertEquals(exp, c.getLong("s", null, "a", 0L));
 	}
 
-	private static Config parse(final String content)
-			throws ConfigInvalidException {
+	private Config parse(final String content) throws ConfigInvalidException {
 		final Config c = new Config(null);
 		c.fromText(content);
 		return c;

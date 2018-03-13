@@ -190,7 +190,7 @@ public abstract class RefUpdate {
 	protected RefUpdate(final Ref ref) {
 		this.ref = ref;
 		oldValue = ref.getObjectId();
-		refLogMessage = ""; //$NON-NLS-1$
+		refLogMessage = "";
 	}
 
 	/** @return the reference database this update modifies. */
@@ -372,7 +372,7 @@ public abstract class RefUpdate {
 		if (msg == null && !appendStatus)
 			disableRefLog();
 		else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
+			refLogMessage = "";
 			refLogIncludeResult = true;
 		} else {
 			refLogMessage = msg;

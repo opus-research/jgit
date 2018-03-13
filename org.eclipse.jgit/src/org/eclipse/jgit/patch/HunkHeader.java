@@ -300,19 +300,17 @@ public class HunkHeader {
 		if (nContext + old.nDeleted < old.lineCount) {
 			final int missingCount = old.lineCount - (nContext + old.nDeleted);
 			script.error(buf, startOffset, MessageFormat.format(
-					JGitText.get().truncatedHunkOldLinesMissing,
-					Integer.valueOf(missingCount)));
+					JGitText.get().truncatedHunkOldLinesMissing, missingCount));
 
 		} else if (nContext + old.nAdded < newLineCount) {
 			final int missingCount = newLineCount - (nContext + old.nAdded);
 			script.error(buf, startOffset, MessageFormat.format(
-					JGitText.get().truncatedHunkNewLinesMissing,
-					Integer.valueOf(missingCount)));
+					JGitText.get().truncatedHunkNewLinesMissing, missingCount));
 
 		} else if (nContext + old.nDeleted > old.lineCount
 				|| nContext + old.nAdded > newLineCount) {
-			final String oldcnt = old.lineCount + ":" + newLineCount; //$NON-NLS-1$
-			final String newcnt = (nContext + old.nDeleted) + ":" //$NON-NLS-1$
+			final String oldcnt = old.lineCount + ":" + newLineCount;
+			final String newcnt = (nContext + old.nDeleted) + ":"
 					+ (nContext + old.nAdded);
 			script.warn(buf, startOffset, MessageFormat.format(
 					JGitText.get().hunkHeaderDoesNotMatchBodyLineCountOf, oldcnt, newcnt));
@@ -404,7 +402,6 @@ public class HunkHeader {
 		offsets[fileIdx] = end < 0 ? s.length() : end + 1;
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder buf = new StringBuilder();

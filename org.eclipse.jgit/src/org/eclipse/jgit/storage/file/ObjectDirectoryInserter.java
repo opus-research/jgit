@@ -95,8 +95,8 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	@Override
 	public ObjectId insert(final int type, long len, final InputStream is)
 			throws IOException {
-		if (len <= buffer().length) {
-			byte[] buf = buffer();
+		byte[] buf = buffer(len);
+		if (len <= buf.length) {
 			int actLen = IO.readFully(is, buf, 0);
 			return insert(type, buf, 0, actLen);
 
@@ -146,7 +146,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
 	private File toTemp(final MessageDigest md, final int type, long len,
 			final InputStream is) throws IOException, FileNotFoundException,
 			Error {
@@ -186,7 +185,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
 	private File toTemp(final int type, final byte[] buf, final int pos,
 			final int len) throws IOException, FileNotFoundException {
 		boolean delete = true;
@@ -224,7 +222,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	File newTempFile() throws IOException {
-		return File.createTempFile("noz", null, db.getDirectory()); //$NON-NLS-1$
+		return File.createTempFile("noz", null, db.getDirectory());
 	}
 
 	DeflaterOutputStream compress(final OutputStream out) {

@@ -6,9 +6,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,8 +26,6 @@ import org.eclipse.jgit.util.RefList;
  * is garbage collected. Closing the repository has no impact on its memory.
  */
 public class InMemoryRepository extends DfsRepository {
-	private static final AtomicInteger packId = new AtomicInteger();
-
 	private final DfsObjDatabase objdb;
 
 	private final DfsRefDatabase refdb;
@@ -38,16 +34,15 @@ public class InMemoryRepository extends DfsRepository {
 	 * Initialize a new in-memory repository.
 	 *
 	 * @param repoDesc
-	 *            description of the repository.
-	 * @since 2.0
+	 *             description of the repository.
 	 */
-	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
+	public InMemoryRepository(DfsRepository repoDesc) {
 		super(new DfsRepositoryBuilder<DfsRepositoryBuilder, InMemoryRepository>() {
 			@Override
 			public InMemoryRepository build() throws IOException {
 				throw new UnsupportedOperationException();
 			}
-		}.setRepositoryDescription(repoDesc));
+		});
 
 		objdb = new MemObjDatabase(this);
 		refdb = new MemRefDatabase();
@@ -64,6 +59,7 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	private class MemObjDatabase extends DfsObjDatabase {
+		private final AtomicInteger packId = new AtomicInteger();
 		private List<DfsPackDescription> packs = new ArrayList<DfsPackDescription>();
 
 		MemObjDatabase(DfsRepository repo) {
@@ -78,10 +74,8 @@ public class InMemoryRepository extends DfsRepository {
 		@Override
 		protected DfsPackDescription newPack(PackSource source) {
 			int id = packId.incrementAndGet();
-			DfsPackDescription desc = new MemPack(
-					"pack-" + id + "-" + source.name(), //$NON-NLS-1$ //$NON-NLS-2$
+			return new MemPack("pack-" + id + "-" + source.name(),
 					getRepository().getDescription());
-			return desc.setPackSource(source);
 		}
 
 		@Override
@@ -103,31 +97,50 @@ public class InMemoryRepository extends DfsRepository {
 		}
 
 		@Override
-		protected ReadableChannel openFile(DfsPackDescription desc, String ext)
-				throws FileNotFoundException, IOException {
+		protected ReadableChannel openPackFile(DfsPackDescription desc)
+				throws FileNotFoundException {
 			MemPack memPack = (MemPack) desc;
-			byte[] file = memPack.fileMap.get(ext);
-			if (file == null)
-				throw new FileNotFoundException(desc.getFileName(ext));
-			return new ByteArrayReadableChannel(file);
+			if (memPack.packFile == null)
+				throw new FileNotFoundException(desc.getPackName());
+			return new ByteArrayReadableChannel(memPack.packFile);
 		}
 
 		@Override
-		protected DfsOutputStream writeFile(
-				DfsPackDescription desc, final String ext) throws IOException {
+		protected ReadableChannel openPackIndex(DfsPackDescription desc)
+				throws FileNotFoundException {
+			MemPack memPack = (MemPack) desc;
+			if (memPack.packIndex == null)
+				throw new FileNotFoundException(desc.getIndexName());
+			return new ByteArrayReadableChannel(memPack.packIndex);
+		}
+
+		@Override
+		protected DfsOutputStream writePackFile(DfsPackDescription desc) {
 			final MemPack memPack = (MemPack) desc;
 			return new Out() {
 				@Override
 				public void flush() {
-					memPack.fileMap.put(ext, getData());
+					memPack.packFile = getData();
+				}
+			};
+		}
+
+		@Override
+		protected DfsOutputStream writePackIndex(DfsPackDescription desc) {
+			final MemPack memPack = (MemPack) desc;
+			return new Out() {
+				@Override
+				public void flush() {
+					memPack.packIndex = getData();
 				}
 			};
 		}
 	}
 
 	private static class MemPack extends DfsPackDescription {
-		private final Map<String, byte[]>
-				fileMap = new HashMap<String, byte[]>();
+		private byte[] packFile;
+
+		private byte[] packIndex;
 
 		MemPack(String name, DfsRepositoryDescription repoDesc) {
 			super(repoDesc, name);

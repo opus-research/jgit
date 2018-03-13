@@ -65,13 +65,6 @@ import org.eclipse.jgit.lib.PersonIdent;
 
 /** Handy utility functions to parse raw object contents. */
 public final class RawParseUtils {
-	/**
-	 * UTF-8 charset constant.
-	 *
-	 * @since 2.2
-	 */
-	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8"); //$NON-NLS-1$
-
 	private static final byte[] digits10;
 
 	private static final byte[] digits16;
@@ -82,7 +75,7 @@ public final class RawParseUtils {
 
 	static {
 		encodingAliases = new HashMap<String, Charset>();
-		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1")); //$NON-NLS-1$ //$NON-NLS-2$
+		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1"));
 
 		digits10 = new byte['9' + 1];
 		Arrays.fill(digits10, (byte) -1);
@@ -779,7 +772,7 @@ public final class RawParseUtils {
 		if (emailE < stop) {
 			email = decode(raw, emailB, emailE - 1);
 		} else {
-			email = "invalid"; //$NON-NLS-1$
+			email = "invalid";
 		}
 		if (emailB < stop)
 			name = decode(raw, nameB, emailB - 2);

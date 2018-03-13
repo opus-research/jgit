@@ -110,40 +110,36 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	/**
 	 * The name of the "rebase-merge" folder
 	 */
-	public static final String REBASE_MERGE = "rebase-merge"; //$NON-NLS-1$
+	public static final String REBASE_MERGE = "rebase-merge";
 
 	/**
 	 * The name of the "stopped-sha" file
 	 */
-	public static final String STOPPED_SHA = "stopped-sha"; //$NON-NLS-1$
+	public static final String STOPPED_SHA = "stopped-sha";
 
-	private static final String AUTHOR_SCRIPT = "author-script"; //$NON-NLS-1$
+	private static final String AUTHOR_SCRIPT = "author-script";
 
-	private static final String DONE = "done"; //$NON-NLS-1$
+	private static final String DONE = "done";
 
-	private static final String GIT_AUTHOR_DATE = "GIT_AUTHOR_DATE"; //$NON-NLS-1$
+	private static final String GIT_AUTHOR_DATE = "GIT_AUTHOR_DATE";
 
-	private static final String GIT_AUTHOR_EMAIL = "GIT_AUTHOR_EMAIL"; //$NON-NLS-1$
+	private static final String GIT_AUTHOR_EMAIL = "GIT_AUTHOR_EMAIL";
 
-	private static final String GIT_AUTHOR_NAME = "GIT_AUTHOR_NAME"; //$NON-NLS-1$
+	private static final String GIT_AUTHOR_NAME = "GIT_AUTHOR_NAME";
 
-	private static final String GIT_REBASE_TODO = "git-rebase-todo"; //$NON-NLS-1$
+	private static final String GIT_REBASE_TODO = "git-rebase-todo";
 
-	private static final String HEAD_NAME = "head-name"; //$NON-NLS-1$
+	private static final String HEAD_NAME = "head-name";
 
-	private static final String INTERACTIVE = "interactive"; //$NON-NLS-1$
+	private static final String INTERACTIVE = "interactive";
 
-	private static final String MESSAGE = "message"; //$NON-NLS-1$
+	private static final String MESSAGE = "message";
 
-	private static final String ONTO = "onto"; //$NON-NLS-1$
+	private static final String ONTO = "onto";
 
-	private static final String ONTO_NAME = "onto-name"; //$NON-NLS-1$
+	private static final String PATCH = "patch";
 
-	private static final String PATCH = "patch"; //$NON-NLS-1$
-
-	private static final String REBASE_HEAD = "head"; //$NON-NLS-1$
-
-	private static final String AMEND = "amend"; //$NON-NLS-1$
+	private static final String REBASE_HEAD = "head";
 
 	/**
 	 * The available operations
@@ -171,15 +167,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private RevCommit upstreamCommit;
 
-	private String upstreamCommitName;
-
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private final RevWalk walk;
 
 	private final File rebaseDir;
-
-	private InteractiveHandler interactiveHandler;
 
 	/**
 	 * @param repo
@@ -197,13 +189,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 * this method twice on an instance.
 	 *
 	 * @return an object describing the result of this command
-	 * @throws GitAPIException
-	 * @throws WrongRepositoryStateException
-	 * @throws NoHeadException
-	 * @throws RefNotFoundException
 	 */
-	public RebaseResult call() throws GitAPIException, NoHeadException,
-			RefNotFoundException, WrongRepositoryStateException {
+	public RebaseResult call() throws NoHeadException, RefNotFoundException,
+			JGitInternalException, GitAPIException {
 		RevCommit newHead = null;
 		boolean lastStepWasForward = false;
 		checkCallable();
@@ -219,16 +207,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case SKIP:
 				// fall through
 			case CONTINUE:
-				String upstreamCommitId = readFile(rebaseDir, ONTO);
-				try {
-					upstreamCommitName = readFile(rebaseDir, ONTO_NAME);
-				} catch (FileNotFoundException e) {
-					// Fall back to commit ID if file doesn't exist (e.g. rebase
-					// was started by C Git)
-					upstreamCommitName = upstreamCommitId;
-				}
+				String upstreamCommitName = readFile(rebaseDir, ONTO);
 				this.upstreamCommit = walk.parseCommit(repo
-						.resolve(upstreamCommitId));
+						.resolve(upstreamCommitName));
 				break;
 			case BEGIN:
 				RebaseResult res = initFilesAndRewind();
@@ -242,12 +223,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (operation == Operation.CONTINUE) {
 				newHead = continueRebase();
 
-				File amendFile = new File(rebaseDir, AMEND);
-				boolean amendExists = amendFile.exists();
-				if (amendExists) {
-					FileUtils.delete(amendFile);
-				}
-				if (newHead == null && !amendExists) {
+				if (newHead == null) {
 					// continueRebase() returns null only if no commit was
 					// neccessary. This means that no changes where left over
 					// after resolving all conflicts. In this case, cgit stops
@@ -263,30 +239,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			ObjectReader or = repo.newObjectReader();
 
 			List<Step> steps = loadSteps();
-			if (isInteractive()) {
-				interactiveHandler.prepareSteps(steps);
-				BufferedWriter fw = new BufferedWriter(
-						new OutputStreamWriter(new FileOutputStream(new File(
-								rebaseDir, GIT_REBASE_TODO)),
-								Constants.CHARACTER_ENCODING));
-				fw.newLine();
-				try {
-					StringBuilder sb = new StringBuilder();
-					for (Step step : steps) {
-						sb.setLength(0);
-						sb.append(step.action.token);
-						sb.append(" "); //$NON-NLS-1$
-						sb.append(step.commit.name());
-						sb.append(" "); //$NON-NLS-1$
-						sb.append(RawParseUtils.decode(step.shortMessage)
-								.trim());
-						fw.write(sb.toString());
-						fw.newLine();
-					}
-				} finally {
-					fw.close();
-				}
-			}
 			for (Step step : steps) {
 				popSteps(1);
 				Collection<ObjectId> ids = or.resolve(step.commit);
@@ -311,10 +263,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						// TODO if the content of this commit is already merged
 						// here we should skip this step in order to avoid
 						// confusing pseudo-changed
-						String ourCommitName = getOurCommitName();
 						CherryPickResult cherryPickResult = new Git(repo)
-								.cherryPick().include(commitToPick)
-								.setOurCommitName(ourCommitName).call();
+								.cherryPick().include(commitToPick).call();
 						switch (cherryPickResult.getStatus()) {
 						case FAILED:
 							if (operation == Operation.BEGIN)
@@ -327,20 +277,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						case OK:
 							newHead = cherryPickResult.getNewHead();
 						}
-					}
-					switch (step.action) {
-					case PICK:
-						continue; // continue rebase process on pick command
-					case REWORD:
-						String oldMessage = commitToPick.getFullMessage();
-						String newMessage = interactiveHandler
-								.modifyCommitMessage(oldMessage);
-						newHead = new Git(repo).commit().setMessage(newMessage)
-								.setAmend(true).call();
-						continue;
-					case EDIT:
-						createFile(rebaseDir, AMEND, commitToPick.name());
-						return stop(commitToPick);
 					}
 				} finally {
 					monitor.endTask();
@@ -355,19 +291,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				return RebaseResult.OK_RESULT;
 			}
 			return RebaseResult.FAST_FORWARD_RESULT;
-		} catch (CheckoutConflictException cce) {
-			return new RebaseResult(cce.getConflictingPaths());
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
-	}
-
-	private String getOurCommitName() {
-		// If onto is different from upstream, this should say "onto", but
-		// RebaseCommand doesn't support a different "onto" at the moment.
-		String ourCommitName = "Upstream, based on "
-				+ Repository.shortenRefName(upstreamCommitName);
-		return ourCommitName;
 	}
 
 	private void updateHead(String headName, RevCommit newHead)
@@ -399,8 +325,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RevCommit checkoutCurrentHead() throws IOException, NoHeadException {
-		ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
+	private RevCommit checkoutCurrentHead() throws IOException,
+			NoHeadException, JGitInternalException {
+		ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 		if (headTree == null)
 			throw new NoHeadException(
 					JGitText.get().cannotRebaseWithoutCurrentHead);
@@ -444,7 +371,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		treeWalk.addTree(new DirCacheIterator(dc));
-		ObjectId id = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
+		ObjectId id = repo.resolve(Constants.HEAD + "^{tree}");
 		if (id == null)
 			throw new NoHeadException(
 					JGitText.get().cannotRebaseWithoutCurrentHead);
@@ -498,23 +425,22 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	String toAuthorScript(PersonIdent author) {
 		StringBuilder sb = new StringBuilder(100);
 		sb.append(GIT_AUTHOR_NAME);
-		sb.append("='"); //$NON-NLS-1$
+		sb.append("='");
 		sb.append(author.getName());
-		sb.append("'\n"); //$NON-NLS-1$
+		sb.append("'\n");
 		sb.append(GIT_AUTHOR_EMAIL);
-		sb.append("='"); //$NON-NLS-1$
+		sb.append("='");
 		sb.append(author.getEmailAddress());
-		sb.append("'\n"); //$NON-NLS-1$
+		sb.append("'\n");
 		// the command line uses the "external String"
 		// representation for date and timezone
 		sb.append(GIT_AUTHOR_DATE);
-		sb.append("='"); //$NON-NLS-1$
-		sb.append("@"); // @ for time in seconds since 1970 //$NON-NLS-1$
+		sb.append("='");
 		String externalString = author.toExternalString();
 		sb
 				.append(externalString.substring(externalString
 						.lastIndexOf('>') + 2));
-		sb.append("'\n"); //$NON-NLS-1$
+		sb.append("'\n");
 		return sb.toString();
 	}
 
@@ -541,8 +467,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				String popCandidate = br.readLine();
 				if (popCandidate == null)
 					break;
-				if (popCandidate.length() == 0)
-					continue;
 				if (popCandidate.charAt(0) == '#')
 					continue;
 				int spaceIndex = popCandidate.indexOf(' ');
@@ -593,8 +517,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RebaseResult initFilesAndRewind() throws IOException,
-			GitAPIException {
+	private RebaseResult initFilesAndRewind() throws RefNotFoundException,
+			IOException, NoHeadException, JGitInternalException {
 		// we need to store everything into files so that we can implement
 		// --skip, --continue, and --abort
 
@@ -615,9 +539,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		RevCommit headCommit = walk.lookupCommit(headId);
 		RevCommit upstream = walk.lookupCommit(upstreamCommit.getId());
 
-		if (!isInteractive() && walk.isMergedInto(upstream, headCommit))
+		if (walk.isMergedInto(upstream, headCommit))
 			return RebaseResult.UP_TO_DATE_RESULT;
-		else if (!isInteractive() && walk.isMergedInto(headCommit, upstream)) {
+		else if (walk.isMergedInto(headCommit, upstream)) {
 			// head is already merged into upstream, fast-foward
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().resettingHead,
@@ -652,12 +576,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// create the folder for the meta information
 		FileUtils.mkdir(rebaseDir);
 
-		repo.writeOrigHead(headId);
+		createFile(repo.getDirectory(), Constants.ORIG_HEAD, headId.name());
 		createFile(rebaseDir, REBASE_HEAD, headId.name());
 		createFile(rebaseDir, HEAD_NAME, headName);
 		createFile(rebaseDir, ONTO, upstreamCommit.name());
-		createFile(rebaseDir, ONTO_NAME, upstreamCommitName);
-		createFile(rebaseDir, INTERACTIVE, ""); //$NON-NLS-1$
+		createFile(rebaseDir, INTERACTIVE, "");
 		BufferedWriter fw = new BufferedWriter(new OutputStreamWriter(
 				new FileOutputStream(new File(rebaseDir, GIT_REBASE_TODO)),
 				Constants.CHARACTER_ENCODING));
@@ -670,9 +593,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			for (RevCommit commit : cherryPickList) {
 				sb.setLength(0);
 				sb.append(Action.PICK.toToken());
-				sb.append(" "); //$NON-NLS-1$
+				sb.append(" ");
 				sb.append(reader.abbreviate(commit).name());
-				sb.append(" "); //$NON-NLS-1$
+				sb.append(" ");
 				sb.append(commit.getShortMessage());
 				fw.write(sb.toString());
 				fw.newLine();
@@ -698,20 +621,16 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return null;
 	}
 
-	private boolean isInteractive() {
-		return interactiveHandler != null;
-	}
-
 	/**
 	 * checks if we can fast-forward and returns the new head if it is possible
 	 *
 	 * @param newCommit
 	 * @return the new head, or null
+	 * @throws RefNotFoundException
 	 * @throws IOException
-	 * @throws GitAPIException
 	 */
-	public RevCommit tryFastForward(RevCommit newCommit) throws IOException,
-			GitAPIException {
+	public RevCommit tryFastForward(RevCommit newCommit)
+			throws RefNotFoundException, IOException {
 		Ref head = repo.getRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
@@ -734,7 +653,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private RevCommit tryFastForward(String headName, RevCommit oldCommit,
-			RevCommit newCommit) throws IOException, GitAPIException {
+			RevCommit newCommit) throws IOException, JGitInternalException {
 		boolean tryRebase = false;
 		for (RevCommit parentCommit : newCommit.getParents())
 			if (parentCommit.equals(oldCommit))
@@ -749,8 +668,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				RefUpdate rup = repo.updateRef(headName);
 				rup.setExpectedOldObjectId(oldCommit);
 				rup.setNewObjectId(newCommit);
-				rup.setRefLogMessage("Fast-foward from " + oldCommit.name() //$NON-NLS-1$
-						+ " to " + newCommit.name(), false); //$NON-NLS-1$
+				rup.setRefLogMessage("Fast-foward from " + oldCommit.name()
+						+ " to " + newCommit.name(), false);
 				Result res = rup.update(walk);
 				switch (res) {
 				case FAST_FORWARD:
@@ -758,7 +677,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				case FORCED:
 					break;
 				default:
-					throw new IOException("Could not fast-forward"); //$NON-NLS-1$
+					throw new IOException("Could not fast-forward");
 				}
 			}
 			return newCommit;
@@ -778,9 +697,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			// these operations are only possible while in a rebasing state
 			switch (repo.getRepositoryState()) {
 			case REBASING_INTERACTIVE:
-			case REBASING:
-			case REBASING_REBASING:
-			case REBASING_MERGE:
 				break;
 			default:
 				throw new WrongRepositoryStateException(MessageFormat.format(
@@ -817,18 +733,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private RebaseResult abort(RebaseResult result) throws IOException {
 		try {
-			ObjectId origHead = repo.readOrigHead();
-			String commitId = origHead != null ? origHead.name() : null;
+			String commitId = readFile(repo.getDirectory(), Constants.ORIG_HEAD);
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().abortingRebase, commitId),
 					ProgressMonitor.UNKNOWN);
 
 			DirCacheCheckout dco;
-			if (commitId == null)
-				throw new JGitInternalException(
-						JGitText.get().abortingRebaseFailedNoOrigHead);
-			ObjectId id = repo.resolve(commitId);
-			RevCommit commit = walk.parseCommit(id);
+			RevCommit commit = walk.parseCommit(repo.resolve(commitId));
 			if (result.getStatus().equals(Status.FAILED)) {
 				RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
 				dco = new DirCacheCheckout(repo, head.getTree(),
@@ -882,18 +793,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return RawParseUtils.decode(content, 0, end);
 	}
 
-	private boolean checkoutCommit(RevCommit commit) throws IOException,
-			CheckoutConflictException {
+	private boolean checkoutCommit(RevCommit commit) throws IOException {
 		try {
 			RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
 			DirCacheCheckout dco = new DirCacheCheckout(repo, head.getTree(),
 					repo.lockDirCache(), commit.getTree());
 			dco.setFailOnConflict(true);
-			try {
-				dco.checkout();
-			} catch (org.eclipse.jgit.errors.CheckoutConflictException cce) {
-				throw new CheckoutConflictException(dco.getConflicts(), cce);
-			}
+			dco.checkout();
 			// update the HEAD
 			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, true);
 			refUpdate.setExpectedOldObjectId(head);
@@ -914,7 +820,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return true;
 	}
 
-	List<Step> loadSteps() throws IOException {
+	private List<Step> loadSteps() throws IOException {
 		byte[] buf = IO.readFully(new File(rebaseDir, GIT_REBASE_TODO));
 		int ptr = 0;
 		int tokenBegin = 0;
@@ -922,12 +828,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		while (ptr < buf.length) {
 			tokenBegin = ptr;
 			ptr = RawParseUtils.nextLF(buf, ptr);
-			int nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
+			int nextSpace = 0;
 			int tokenCount = 0;
 			Step current = null;
 			while (tokenCount < 3 && nextSpace < ptr) {
 				switch (tokenCount) {
 				case 0:
+					nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
 					String actionToken = new String(buf, tokenBegin, nextSpace
 							- tokenBegin - 1);
 					tokenBegin = nextSpace;
@@ -973,7 +880,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 */
 	public RebaseCommand setUpstream(RevCommit upstream) {
 		this.upstreamCommit = upstream;
-		this.upstreamCommitName = upstream.name();
 		return this;
 	}
 
@@ -985,7 +891,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	public RebaseCommand setUpstream(AnyObjectId upstream) {
 		try {
 			this.upstreamCommit = walk.parseCommit(upstream);
-			this.upstreamCommitName = upstream.name();
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().couldNotReadObjectWhileParsingCommit,
@@ -1008,28 +913,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				throw new RefNotFoundException(MessageFormat.format(JGitText
 						.get().refNotResolved, upstream));
 			upstreamCommit = walk.parseCommit(repo.resolve(upstream));
-			upstreamCommitName = upstream;
 			return this;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
-	}
-
-	/**
-	 * Optionally override the name of the upstream. If this is used, it has to
-	 * come after any {@link #setUpstream} call.
-	 *
-	 * @param upstreamName
-	 *            the name which will be used to refer to upstream in conflicts
-	 * @return {@code this}
-	 */
-	public RebaseCommand setUpstreamName(String upstreamName) {
-		if (upstreamCommit == null) {
-			throw new IllegalStateException(
-					"setUpstreamName must be called after setUpstream.");
-		}
-		this.upstreamCommitName = upstreamName;
-		return this;
 	}
 
 	/**
@@ -1052,87 +939,31 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return this;
 	}
 
-	/**
-	 * Enables interactive rebase
-	 *
-	 * @param handler
-	 * @return this
-	 */
-	public RebaseCommand runInteractively(InteractiveHandler handler) {
-		this.interactiveHandler = handler;
-		return this;
-	}
-
-	/**
-	 * Allows configure rebase interactive process and modify commit message
-	 */
-	public interface InteractiveHandler {
-		/**
-		 * Given list of {@code steps} should be modified according to user
-		 * rebase configuration
-		 * @param steps
-		 *            initial configuration of rebase interactive
-		 */
-		void prepareSteps(List<Step> steps);
-
-		/**
-		 * Used for editing commit message on REWORD
-		 *
-		 * @param commit
-		 * @return new commit message
-		 */
-		String modifyCommitMessage(String commit);
-	}
-
-	/**
-	 * Describes rebase actions
-	 */
-	public static enum Action {
-		/** Use commit */
-		PICK("pick", "p"), //$NON-NLS-1$ //$NON-NLS-2$
-		/** Use commit, but edit the commit message */
-		REWORD("reword", "r"), //$NON-NLS-1$ //$NON-NLS-2$
-		/** Use commit, but stop for amending */
-		EDIT("edit", "e"); // later add SQUASH, FIXUP, etc. //$NON-NLS-1$ //$NON-NLS-2$
+	static enum Action {
+		PICK("pick"); // later add SQUASH, EDIT, etc.
 
 		private final String token;
 
-		private final String shortToken;
-
-		private Action(String token, String shortToken) {
+		private Action(String token) {
 			this.token = token;
-			this.shortToken = shortToken;
 		}
 
-		/**
-		 * @return full action token name
-		 */
 		public String toToken() {
 			return this.token;
 		}
 
-		@SuppressWarnings("nls")
-		@Override
-		public String toString() {
-			return "Action[" + token + "]";
-		}
-
 		static Action parse(String token) {
-			for (Action action : Action.values()) {
-				if (action.token.equals(token)
-						|| action.shortToken.equals(token))
-					return action;
-			}
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().unknownOrUnsupportedCommand, token,
-					Action.values()));
+			if (token.equals("pick") || token.equals("p"))
+				return PICK;
+			throw new JGitInternalException(
+					MessageFormat
+							.format(
+									"Unknown or unsupported command \"{0}\", only  \"pick\" is allowed",
+									token));
 		}
 	}
 
-	/**
-	 * Describes single rebase step
-	 */
-	public static class Step {
+	static class Step {
 		Action action;
 
 		AbbreviatedObjectId commit;
@@ -1141,48 +972,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		Step(Action action) {
 			this.action = action;
-		}
-
-		/**
-		 * @return rebase action type
-		 */
-		public Action getAction() {
-			return action;
-		}
-
-		/**
-		 * @param action
-		 */
-		public void setAction(Action action) {
-			this.action = action;
-		}
-
-		/**
-		 * @return abbreviated commit SHA-1 of commit that action will be
-		 *         performed on
-		 */
-		public AbbreviatedObjectId getCommit() {
-			return commit;
-		}
-
-		/**
-		 * @return short message commit of commit that action will be performed
-		 *         on
-		 */
-		public byte[] getShortMessage() {
-			return shortMessage;
-		}
-
-		@SuppressWarnings("nls")
-		@Override
-		public String toString() {
-			return "Step["
-					+ action
-					+ ", "
-					+ ((commit == null) ? "null" : commit)
-					+ ", "
-					+ ((shortMessage == null) ? "null" : new String(
-							shortMessage)) + "]";
 		}
 	}
 
@@ -1209,13 +998,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		String time = keyValueMap.get(GIT_AUTHOR_DATE);
 
 		// the time is saved as <seconds since 1970> <timezone offset>
-		int timeStart = 0;
-		if (time.startsWith("@")) //$NON-NLS-1$
-			timeStart = 1;
-		else
-			timeStart = 0;
-		long when = Long
-				.parseLong(time.substring(timeStart, time.indexOf(' '))) * 1000;
+		long when = Long.parseLong(time.substring(0, time.indexOf(' '))) * 1000;
 		String tzOffsetString = time.substring(time.indexOf(' ') + 1);
 		int multiplier = -1;
 		if (tzOffsetString.charAt(0) == '+')

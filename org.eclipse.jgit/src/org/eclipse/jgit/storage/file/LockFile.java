@@ -504,16 +504,6 @@ public class LockFile {
 	}
 
 	/**
-	 * Update the commit snapshot {@link #getCommitSnapshot()} before commit.
-	 * <p>
-	 * This may be necessary if you need time stamp before commit occurs, e.g
-	 * while writing the index.
-	 */
-	public void createCommitSnapshot() {
-		saveStatInformation();
-	}
-
-	/**
 	 * Unlock this file and abort this change.
 	 * <p>
 	 * The temporary file (if created) is deleted before returning.
@@ -538,7 +528,6 @@ public class LockFile {
 		}
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return "LockFile[" + lck + ", haveLck=" + haveLck + "]";

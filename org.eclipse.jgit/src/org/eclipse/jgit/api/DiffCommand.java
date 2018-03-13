@@ -50,7 +50,6 @@ import java.io.OutputStream;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
@@ -65,7 +64,6 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.io.NullOutputStream;
 
 /**
  * Show changes between commits, commit and working tree, etc.
@@ -109,18 +107,15 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 *
 	 * @return a DiffEntry for each path which is different
 	 */
-	public List<DiffEntry> call() throws GitAPIException {
-		final DiffFormatter diffFmt;
-		if (out != null && !showNameAndStatusOnly)
-			diffFmt = new DiffFormatter(new BufferedOutputStream(out));
-		else
-			diffFmt = new DiffFormatter(NullOutputStream.INSTANCE);
+	public List<DiffEntry> call() throws GitAPIException, IOException {
+		final DiffFormatter diffFmt = new DiffFormatter(
+				new BufferedOutputStream(out));
 		diffFmt.setRepository(repo);
 		diffFmt.setProgressMonitor(monitor);
 		try {
 			if (cached) {
 				if (oldTree == null) {
-					ObjectId head = repo.resolve(HEAD + "^{tree}"); //$NON-NLS-1$
+					ObjectId head = repo.resolve(HEAD + "^{tree}");
 					if (head == null)
 						throw new NoHeadException(JGitText.get().cannotReadTree);
 					CanonicalTreeParser p = new CanonicalTreeParser();
@@ -141,23 +136,21 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 			}
 
 			diffFmt.setPathFilter(pathFilter);
+			if (contextLines >= 0)
+				diffFmt.setContext(contextLines);
+			if (destinationPrefix != null)
+				diffFmt.setNewPrefix(destinationPrefix);
+			if (sourcePrefix != null)
+				diffFmt.setOldPrefix(sourcePrefix);
 
 			List<DiffEntry> result = diffFmt.scan(oldTree, newTree);
-			if (showNameAndStatusOnly)
+			if (showNameAndStatusOnly) {
 				return result;
-			else {
-				if (contextLines >= 0)
-					diffFmt.setContext(contextLines);
-				if (destinationPrefix != null)
-					diffFmt.setNewPrefix(destinationPrefix);
-				if (sourcePrefix != null)
-					diffFmt.setOldPrefix(sourcePrefix);
+			} else {
 				diffFmt.format(result);
 				diffFmt.flush();
 				return result;
 			}
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
 		} finally {
 			diffFmt.release();
 		}

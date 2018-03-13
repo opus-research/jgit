@@ -49,16 +49,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * A command being processed by {@link BaseReceivePack}.
+ * A command being processed by {@link ReceivePack}.
  * <p>
  * This command instance roughly translates to the server side representation of
  * the {@link RemoteRefUpdate} created by the client.
@@ -133,9 +129,8 @@ public class ReceiveCommand {
 	 *            commands to filter.
 	 * @param want
 	 *            desired status to filter by.
-	 * @return a copy of the command list containing only those commands with
-	 *         the desired status.
-	 * @since 2.0
+	 * @return a copy of the command list containing only those commands with the
+	 *         desired status.
 	 */
 	public static List<ReceiveCommand> filter(List<ReceiveCommand> commands,
 			final Result want) {
@@ -161,10 +156,8 @@ public class ReceiveCommand {
 
 	private String message;
 
-	private boolean typeIsCorrect;
-
 	/**
-	 * Create a new command for {@link BaseReceivePack}.
+	 * Create a new command for {@link ReceivePack}.
 	 *
 	 * @param oldId
 	 *            the old object id; must not be null. Use
@@ -190,7 +183,7 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Create a new command for {@link BaseReceivePack}.
+	 * Create a new command for {@link ReceivePack}.
 	 *
 	 * @param oldId
 	 *            the old object id; must not be null. Use
@@ -202,7 +195,6 @@ public class ReceiveCommand {
 	 *            name of the ref being affected.
 	 * @param type
 	 *            type of the command.
-	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
@@ -271,45 +263,14 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Update the type of this command by checking for fast-forward.
-	 * <p>
-	 * If the command's current type is UPDATE, a merge test will be performed
-	 * using the supplied RevWalk to determine if {@link #getOldId()} is fully
-	 * merged into {@link #getNewId()}. If some commits are not merged the
-	 * update type is changed to {@link Type#UPDATE_NONFASTFORWARD}.
-	 *
-	 * @param walk
-	 *            an instance to perform the merge test with. The caller must
-	 *            allocate and release this object.
-	 * @throws IOException
-	 *             either oldId or newId is not accessible in the repository
-	 *             used by the RevWalk. This usually indicates data corruption,
-	 *             and the command cannot be processed.
-	 */
-	public void updateType(RevWalk walk) throws IOException {
-		if (typeIsCorrect)
-			return;
-		if (type == Type.UPDATE && !AnyObjectId.equals(oldId, newId)) {
-			RevObject o = walk.parseAny(oldId);
-			RevObject n = walk.parseAny(newId);
-			if (!(o instanceof RevCommit)
-					|| !(n instanceof RevCommit)
-					|| !walk.isMergedInto((RevCommit) o, (RevCommit) n))
-				setType(Type.UPDATE_NONFASTFORWARD);
-		}
-		typeIsCorrect = true;
-	}
-
-	/**
 	 * Execute this command during a receive-pack session.
 	 * <p>
 	 * Sets the status of the command as a side effect.
 	 *
 	 * @param rp
 	 *            receive-pack session.
-	 * @since 2.0
 	 */
-	public void execute(final BaseReceivePack rp) {
+	public void execute(final ReceivePack rp) {
 		try {
 			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
 			ru.setRefLogIdent(rp.getRefLogIdent());
@@ -332,12 +293,13 @@ public class ReceiveCommand {
 				ru.setForceUpdate(rp.isAllowNonFastForwards());
 				ru.setExpectedOldObjectId(getOldId());
 				ru.setNewObjectId(getNewId());
-				ru.setRefLogMessage("push", true); //$NON-NLS-1$
+				ru.setRefLogMessage("push", true);
 				setResult(ru.update(rp.getRevWalk()));
 				break;
 			}
 		} catch (IOException err) {
-			reject(err);
+			setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
+					JGitText.get().lockError, err.getMessage()));
 		}
 	}
 
@@ -349,18 +311,7 @@ public class ReceiveCommand {
 		type = t;
 	}
 
-	void setTypeFastForwardUpdate() {
-		type = Type.UPDATE;
-		typeIsCorrect = true;
-	}
-
-	/**
-	 * Set the result of this command.
-	 *
-	 * @param r
-	 *            the new result code for this command.
-	 */
-	public void setResult(RefUpdate.Result r) {
+	private void setResult(final RefUpdate.Result r) {
 		switch (r) {
 		case NOT_ATTEMPTED:
 			setResult(Result.NOT_ATTEMPTED);
@@ -392,12 +343,6 @@ public class ReceiveCommand {
 		}
 	}
 
-	void reject(IOException err) {
-		setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
-				JGitText.get().lockError, err.getMessage()));
-	}
-
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return getType().name() + ": " + getOldId().name() + " "
