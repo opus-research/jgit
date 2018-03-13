@@ -1353,7 +1353,7 @@ public class DirCacheCheckout {
 				FileUtils.delete(tmpFile);
 			}
 		}
-		entry.setLastModified(f.lastModified());
+		entry.setLastModified(fs.lastModified(f));
 	}
 
 	// Run a external filter command
