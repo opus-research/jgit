@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,41 +41,34 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.http.server.glue;
 
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.transport.UploadPack;
+/** Sends a fixed status code to the client. */
+public class ErrorServlet extends HttpServlet {
+	private static final long serialVersionUID = 1L;
 
-/**
- * Create and configure {@link UploadPack} service instance.
- * <p>
- * Reading by upload-pack is permitted unless {@code http.uploadpack} is
- * explicitly set to false.
- */
-public class DefaultUploadPackFactory implements UploadPackFactory {
-	private static final SectionParser<ServiceConfig> CONFIG = new SectionParser<ServiceConfig>() {
-		public ServiceConfig parse(final Config cfg) {
-			return new ServiceConfig(cfg);
-		}
-	};
+	private final int status;
 
-	private static class ServiceConfig {
-		final boolean enabled;
-
-		ServiceConfig(final Config cfg) {
-			enabled = cfg.getBoolean("http", "uploadpack", true);
-		}
+	/**
+	 * Sends a specific status code.
+	 *
+	 * @param status
+	 *            the HTTP status code to always send.
+	 */
+	public ErrorServlet(final int status) {
+		this.status = status;
 	}
 
-	public UploadPack create(final HttpServletRequest req, final Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-		if (db.getConfig().get(CONFIG).enabled)
-			return new UploadPack(db);
-		else
-			throw new ServiceNotEnabledException();
+	@Override
+	protected void doGet(HttpServletRequest req, HttpServletResponse rsp)
+			throws ServletException, IOException {
+		rsp.sendError(status);
 	}
 }

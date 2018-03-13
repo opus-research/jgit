@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,39 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.http.server;
 
+import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
+import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+
+import java.io.IOException;
+
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.UploadPack;
 
-/** Create and configure {@link UploadPack} service instance. */
-public interface UploadPackFactory {
-	/** A factory disabling the UploadPack service for all repositories. */
-	public static final UploadPackFactory DISABLED = new UploadPackFactory() {
-		public UploadPack create(HttpServletRequest req, Repository db)
-				throws ServiceNotEnabledException {
-			throw new ServiceNotEnabledException();
+class AsIsFileFilter implements Filter {
+	private final AsIsFileService asIs;
+
+	AsIsFileFilter(final AsIsFileService getAnyFile) {
+		this.asIs = getAnyFile;
+	}
+
+	public void init(FilterConfig config) throws ServletException {
+		// Do nothing.
+	}
+
+	public void destroy() {
+		// Do nothing.
+	}
+
+	public void doFilter(ServletRequest request, ServletResponse response,
+			FilterChain chain) throws IOException, ServletException {
+		try {
+			final Repository db = getRepository(request);
+			asIs.access((HttpServletRequest) request, db);
+			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
 		}
-	};
-
-	/**
-	 * Create and configure a new UploadPack instance for a repository.
-	 *
-	 * @param req
-	 *            current HTTP request, in case information from the request may
-	 *            help configure the UploadPack instance.
-	 * @param db
-	 *            the repository the upload would read from.
-	 * @return the newly configured UploadPack instance, must not be null.
-	 * @throws ServiceNotEnabledException
-	 *             this factory refuses to create the instance because it is not
-	 *             allowed on the target repository, by any user.
-	 * @throws ServiceNotAuthorizedException
-	 *             this factory refuses to create the instance for this HTTP
-	 *             request and repository, such as due to a permission error.
-	 */
-	UploadPack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
+	}
 }

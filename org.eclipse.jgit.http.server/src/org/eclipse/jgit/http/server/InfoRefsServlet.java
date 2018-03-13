@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,7 +44,6 @@
 package org.eclipse.jgit.http.server;
 
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.nocache;
 import static org.eclipse.jgit.http.server.ServletUtils.send;
 
 import java.io.IOException;
@@ -66,15 +65,11 @@ import org.eclipse.jgit.transport.RefAdvertiser;
 class InfoRefsServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
-	private static final String ENCODING = "UTF-8";
-
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
 		// Assume a dumb client and send back the dumb client
 		// version of the info/refs file.
-		//
 		final byte[] raw = dumbHttp(req);
-		nocache(rsp);
 		rsp.setContentType("text/plain");
 		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
 		send(raw, req, rsp);
@@ -91,7 +86,6 @@ class InfoRefsServlet extends HttpServlet {
 				// Whoever decided that info/refs should use a different
 				// delimiter than the native git:// protocol shouldn't
 				// be allowed to design this sort of stuff. :-(
-				//
 				out.append(line.toString().replace(' ', '\t'));
 			}
 
@@ -106,6 +100,6 @@ class InfoRefsServlet extends HttpServlet {
 		Map<String, Ref> refs = new HashMap<String, Ref>(db.getAllRefs());
 		refs.remove(Constants.HEAD);
 		adv.send(refs.values());
-		return out.toString().getBytes(ENCODING);
+		return out.toString().getBytes(Constants.CHARACTER_ENCODING);
 	}
 }
