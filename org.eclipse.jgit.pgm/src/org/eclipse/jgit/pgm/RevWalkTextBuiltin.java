@@ -205,7 +205,7 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 			return new ObjectWalk(db);
 		if (argWalk != null)
 			return argWalk;
-		return argWalk = new RevWalk(db);
+		return new RevWalk(db);
 	}
 
 	protected int walkLoop() throws Exception {
