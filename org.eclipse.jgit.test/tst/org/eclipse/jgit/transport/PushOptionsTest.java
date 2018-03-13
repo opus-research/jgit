@@ -84,7 +84,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 	private InMemoryRepository client;
 	private ObjectId obj1;
 	private ObjectId obj2;
-	private ReceivePack baseReceivePack;
+	private BaseReceivePack baseReceivePack;
 
 	@Before
 	public void setUp() throws Exception {
