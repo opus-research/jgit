@@ -94,7 +94,12 @@ class Commit extends TextBuiltin {
 		commitCmd.setAmend(amend);
 		commitCmd.setAll(all);
 		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit = commitCmd.call();
+		RevCommit commit;
+		try {
+			commit = commitCmd.call();
+		} catch (JGitInternalException e) {
+			throw die(e.getMessage());
+		}
 
 		String branchName;
 		if (!head.isSymbolic())
@@ -104,7 +109,7 @@ class Commit extends TextBuiltin {
 			if (branchName.startsWith(Constants.R_HEADS))
 				branchName = branchName.substring(Constants.R_HEADS.length());
 		}
-		out.println("[" + branchName + " " + commit.name() + "] "
+		outw.println("[" + branchName + " " + commit.name() + "] "
 				+ commit.getShortMessage());
 	}
 }

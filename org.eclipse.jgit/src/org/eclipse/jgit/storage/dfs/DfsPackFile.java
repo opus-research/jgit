@@ -67,6 +67,7 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackReverseIndex;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
@@ -171,6 +172,15 @@ public final class DfsPackFile {
 		return packDesc;
 	}
 
+	/**
+	 * @return whether the pack index file is loaded and cached in memory.
+	 * @since 2.2
+	 */
+	public boolean isIndexLoaded() {
+		DfsBlockCache.Ref<PackIndex> idxref = index;
+		return idxref != null && idxref.get() != null;
+	}
+
 	/** @return bytes cached in memory for this pack, excluding the index. */
 	public long getCachedSize() {
 		return key.cachedSize.get();
@@ -205,6 +215,9 @@ public final class DfsPackFile {
 
 		if (invalid)
 			throw new PackInvalidException(getPackName());
+
+		Repository.getGlobalListenerList()
+				.dispatch(new BeforeDfsPackIndexLoadedEvent(this));
 
 		synchronized (initLock) {
 			idxref = index;
@@ -272,7 +285,19 @@ public final class DfsPackFile {
 		}
 	}
 
-	boolean hasObject(DfsReader ctx, AnyObjectId id) throws IOException {
+	/**
+	 * Check if an object is stored within this pack.
+	 *
+	 * @param ctx
+	 *            reader context to support reading from the backing store if
+	 *            the index is not already loaded in memory.
+	 * @param id
+	 *            object to be located.
+	 * @return true if the object exists in this pack; false if it does not.
+	 * @throws IOException
+	 *             the pack index is not available, or is corrupt.
+	 */
+	public boolean hasObject(DfsReader ctx, AnyObjectId id) throws IOException {
 		final long offset = idx(ctx).findOffset(id);
 		return 0 < offset && !isCorrupt(offset);
 	}
