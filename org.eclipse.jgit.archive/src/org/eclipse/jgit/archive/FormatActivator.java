@@ -77,8 +77,6 @@ public class FormatActivator implements BundleActivator {
 	 */
 	public static void start() {
 		register("tar", new TarFormat());
-		register("tgz", new TgzFormat());
-		register("txz", new TxzFormat());
 		register("zip", new ZipFormat());
 	}
 
