@@ -55,37 +55,26 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class GitDateParserTest {
-	SimpleDateFormat df;
-	private Date refDate;
-	private Date refDateMidnight;
-
 	@Before
-	public void setUp() throws ParseException {
-		MockSystemReader mockSystemReader = new MockSystemReader() {
-			@Override
-			public long getCurrentTime() {
-				return 1318125997291L;
-			}
-		};
+	public void setUp() {
+		MockSystemReader mockSystemReader = new MockSystemReader();
 		SystemReader.setInstance(mockSystemReader);
-		df = SystemReader.getInstance().getSimpleDateFormat(
-				"yyyy-MM-dd HH:mm:ss Z");
-		refDate = df.parse("2007-02-21 15:35:00 +0100");
-		refDateMidnight = df.parse("2007-02-21 00:00:00 +0100");
 	}
 
 	@Test
 	public void badlyFormatted() {
-		Assert.assertNull(GitDateParser.parse("foo", refDate));
-		Assert.assertNull(GitDateParser.parse("", refDate));
+		Calendar ref = new GregorianCalendar(SystemReader.getInstance()
+				.getTimeZone(), SystemReader.getInstance().getLocale());
+		Assert.assertNull(GitDateParser.parse("foo", ref));
+		Assert.assertNull(GitDateParser.parse("", ref));
 		Assert.assertNull(GitDateParser.parse("", null));
-		Assert.assertNull(GitDateParser.parse("1970", refDate));
-		Assert.assertNull(GitDateParser.parse("3000.3000.3000", refDate));
-		Assert.assertNull(GitDateParser.parse("3 yesterday ago", refDate));
-		Assert.assertNull(GitDateParser.parse("now yesterday ago", refDate));
-		Assert.assertNull(GitDateParser.parse("yesterdays", refDate));
-		Assert.assertNull(GitDateParser.parse("3.day. 2.week.ago", refDate));
-		Assert.assertNull(GitDateParser.parse("day ago", refDate));
+		Assert.assertNull(GitDateParser.parse("1970", ref));
+		Assert.assertNull(GitDateParser.parse("3000.3000.3000", ref));
+		Assert.assertNull(GitDateParser.parse("3 yesterday ago", ref));
+		Assert.assertNull(GitDateParser.parse("now yesterday ago", ref));
+		Assert.assertNull(GitDateParser.parse("yesterdays", ref));
+		Assert.assertNull(GitDateParser.parse("3.day. 2.week.ago", ref));
+		Assert.assertNull(GitDateParser.parse("day ago", ref));
 		Assert.assertNull(GitDateParser.parse("Gra Feb 21 15:35:00 2007 +0100",
 				null));
 		Assert.assertNull(GitDateParser.parse("Sun Feb 21 15:35:00 2007 +0100",
@@ -100,8 +89,7 @@ public class GitDateParserTest {
 		GregorianCalendar cal = new GregorianCalendar(SystemReader
 				.getInstance().getTimeZone(), SystemReader.getInstance()
 				.getLocale());
-		Date parse = GitDateParser.parse("yesterday", refDate);
-		cal.setTime(refDate);
+		Date parse = GitDateParser.parse("yesterday", cal);
 		cal.add(Calendar.DATE, -1);
 		cal.set(Calendar.HOUR_OF_DAY, 0);
 		cal.set(Calendar.MINUTE, 0);
@@ -112,8 +100,17 @@ public class GitDateParserTest {
 	}
 
 	@Test
-	public void now() {
-		Date parse = GitDateParser.parse("now", refDate);
+	public void now() throws ParseException {
+		String dateStr = "2007-02-21 15:35:00 +0100";
+		Date refDate = SystemReader.getInstance()
+				.getSimpleDateFormat("yyyy-MM-dd HH:mm:ss Z").parse(dateStr);
+
+		GregorianCalendar cal = new GregorianCalendar(SystemReader
+				.getInstance().getTimeZone(), SystemReader.getInstance()
+				.getLocale());
+		cal.setTime(refDate);
+
+		Date parse = GitDateParser.parse("now", cal);
 		Assert.assertEquals(refDate, parse);
 		long t1 = SystemReader.getInstance().getCurrentTime();
 		parse = GitDateParser.parse("now", null);
@@ -123,65 +120,109 @@ public class GitDateParserTest {
 
 	@Test
 	public void weeksAgo() throws ParseException {
-		Date parse = GitDateParser.parse("2 weeks ago", refDate);
+		String dateStr = "2007-02-21 15:35:00 +0100";
+		SimpleDateFormat df = SystemReader.getInstance()
+				.getSimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
+		Date refDate = df.parse(dateStr);
+		GregorianCalendar cal = new GregorianCalendar(SystemReader
+				.getInstance().getTimeZone(), SystemReader.getInstance()
+				.getLocale());
+		cal.setTime(refDate);
+
+		Date parse = GitDateParser.parse("2 weeks ago", cal);
 		Assert.assertEquals(df.parse("2007-02-07 15:35:00 +0100"), parse);
 	}
 
 	@Test
 	public void daysAndWeeksAgo() throws ParseException {
-		Date parse = GitDateParser.parse("3 days 2 weeks ago", refDate);
+		String dateStr = "2007-02-21 15:35:00 +0100";
+		SimpleDateFormat df = SystemReader.getInstance().getSimpleDateFormat(
+				"yyyy-MM-dd HH:mm:ss Z");
+		Date refDate = df.parse(dateStr);
+		GregorianCalendar cal = new GregorianCalendar(SystemReader
+				.getInstance().getTimeZone(), SystemReader.getInstance()
+				.getLocale());
+		cal.setTime(refDate);
+
+		Date parse = GitDateParser.parse("2 weeks ago", cal);
+		Assert.assertEquals(df.parse("2007-02-07 15:35:00 +0100"), parse);
+		parse = GitDateParser.parse("3 days 2 weeks ago", cal);
 		Assert.assertEquals(df.parse("2007-02-04 15:35:00 +0100"), parse);
-		parse = GitDateParser.parse("3.day.2.week.ago", refDate);
+		parse = GitDateParser.parse("3.day.2.week.ago", cal);
 		Assert.assertEquals(df.parse("2007-02-04 15:35:00 +0100"), parse);
 	}
 
 	@Test
-	public void iso() {
-		Date parse = GitDateParser.parse("2007-02-21 15:35:00 +0100", null);
-		Assert.assertEquals(refDate, parse);
+	public void iso() throws ParseException {
+		String dateStr = "2007-02-21 15:35:00 +0100";
+		Date exp = SystemReader.getInstance()
+				.getSimpleDateFormat("yyyy-MM-dd HH:mm:ss Z").parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void rfc() {
-		Date parse = GitDateParser.parse("Wed, 21 Feb 2007 15:35:00 +0100",
-				null);
-		Assert.assertEquals(refDate, parse);
+	public void rfc() throws ParseException {
+		String dateStr = "Wed, 21 Feb 2007 15:35:00 +0100";
+		Date exp = SystemReader.getInstance()
+				.getSimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z")
+				.parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void shortFmt() {
-		Date parse = GitDateParser.parse("2007-02-21", null);
-		Assert.assertEquals(refDateMidnight, parse);
+	public void shortFmt() throws ParseException {
+		String dateStr = "2007-02-21";
+		Date exp = SystemReader.getInstance().getSimpleDateFormat("yyyy-MM-dd")
+				.parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void shortWithDots() {
-		Date parse = GitDateParser.parse("2007.02.21", null);
-		Assert.assertEquals(refDateMidnight, parse);
+	public void shortWithDots() throws ParseException {
+		String dateStr = "2007.02.21";
+		Date exp = SystemReader.getInstance().getSimpleDateFormat("yyyy.MM.dd")
+				.parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void shortWithSlash() {
-		Date parse = GitDateParser.parse("02/21/2007", null);
-		Assert.assertEquals(refDateMidnight, parse);
+	public void shortWithSlash() throws ParseException {
+		String dateStr = "02/21/2007";
+		Date exp = SystemReader.getInstance().getSimpleDateFormat("MM/dd/yyyy")
+				.parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void shortWithDotsReverse() {
-		Date parse = GitDateParser.parse("21.02.2007", null);
-		Assert.assertEquals(refDateMidnight, parse);
+	public void shortWithDotsReverse() throws ParseException {
+		String dateStr = "21.02.2007";
+		Date exp = SystemReader.getInstance().getSimpleDateFormat("dd.MM.yyyy")
+				.parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void defaultFmt() {
-		Date parse = GitDateParser
-				.parse("Wed Feb 21 15:35:00 2007 +0100", null);
-		Assert.assertEquals(refDate, parse);
+	public void defaultFmt() throws ParseException {
+		String dateStr = "Wed Feb 21 15:35:00 2007 +0100";
+		Date exp = SystemReader.getInstance()
+				.getSimpleDateFormat("EEE MMM dd HH:mm:ss yyyy Z")
+				.parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 
 	@Test
-	public void local() {
-		Date parse = GitDateParser.parse("Wed Feb 21 15:35:00 2007", null);
-		Assert.assertEquals(refDate, parse);
+	public void local() throws ParseException {
+		String dateStr = "Wed Feb 21 15:35:00 2007";
+		Date exp = SystemReader.getInstance()
+				.getSimpleDateFormat("EEE MMM dd HH:mm:ss yyyy").parse(dateStr);
+		Date parse = GitDateParser.parse(dateStr, null);
+		Assert.assertEquals(exp, parse);
 	}
 }

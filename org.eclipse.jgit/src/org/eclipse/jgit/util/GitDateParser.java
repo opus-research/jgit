@@ -138,7 +138,7 @@ public class GitDateParser {
 	 * @return the parsed {@link Date} or <code>null</code> if this string was
 	 *         not parseable.
 	 */
-	public static Date parse(String dateStr, Date now) {
+	public static Date parse(String dateStr, Calendar now) {
 		dateStr = dateStr.trim();
 		Date ret;
 		ret = parse_relative(dateStr, now);
@@ -164,20 +164,24 @@ public class GitDateParser {
 	}
 
 	// tries to parse a string with a relative time specification
-	private static Date parse_relative(String dateStr, Date now) {
-		GregorianCalendar cal;
+	private static Date parse_relative(String dateStr, Calendar now) {
+		Calendar cal;
 		SystemReader sysRead = SystemReader.getInstance();
 
 		// check for the static words "yesterday" or "now"
 		if ("now".equals(dateStr)) {
-			return ((now == null) ? new Date(sysRead.getCurrentTime()) : now);
+			return ((now == null) ? new Date(sysRead.getCurrentTime()) : now
+					.getTime());
 		}
 
-		if ("yesterday".equals(dateStr)) {
+		if (now == null) {
 			cal = new GregorianCalendar(sysRead.getTimeZone(),
 					sysRead.getLocale());
-			cal.setTimeInMillis(now == null ? sysRead.getCurrentTime() : now
-					.getTime());
+			cal.setTimeInMillis(sysRead.getCurrentTime());
+		} else
+			cal = (Calendar) now.clone();
+
+		if ("yesterday".equals(dateStr)) {
 			cal.add(Calendar.DATE, -1);
 			cal.set(Calendar.HOUR_OF_DAY, 0);
 			cal.set(Calendar.MINUTE, 0);
@@ -195,8 +199,6 @@ public class GitDateParser {
 		if (partsLength < 3 || (partsLength & 1) == 0
 				|| !"ago".equals(parts[parts.length - 1]))
 			return null;
-		cal = new GregorianCalendar(sysRead.getTimeZone(), sysRead.getLocale());
-		cal.setTime(now == null ? new Date(sysRead.getCurrentTime()) : now);
 		int number;
 		for (int i = 0; i < parts.length - 2; i += 2) {
 			try {

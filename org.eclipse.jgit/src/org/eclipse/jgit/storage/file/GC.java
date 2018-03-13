@@ -53,7 +53,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -69,7 +68,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -83,7 +81,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.GitDateParser;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -97,9 +94,7 @@ public class GC {
 
 	private ProgressMonitor pm;
 
-	private long expireAgeMillis = -1;
-
-	private Date expire = null;
+	private long expireAgeMillis;
 
 	/**
 	 * the refs which existed during the last call to {@link #repack()}. This is
@@ -126,6 +121,7 @@ public class GC {
 	public GC(FileRepository repo) {
 		this.repo = repo;
 		this.pm = NullProgressMonitor.INSTANCE;
+		this.expireAgeMillis = 14 * 24 * 60 * 60 * 1000L;
 	}
 
 	/**
@@ -141,6 +137,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	public Collection<PackFile> gc() throws IOException {
+		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack();
@@ -254,21 +251,8 @@ public class GC {
 	 */
 	public void prune(Set<ObjectId> objectsToKeep)
 			throws IOException {
-		long expireDate = Long.MAX_VALUE;
-
-		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
-			if (pruneExpireStr == null)
-				pruneExpireStr = "2.weeks.ago";
-			expire = GitDateParser.parse(pruneExpireStr, null);
-			expireAgeMillis = -1;
-		}
-		if (expire != null)
-			expireDate = expire.getTime();
-		if (expireAgeMillis != -1)
-			expireDate = System.currentTimeMillis() - expireAgeMillis;
+		long expireDate = (expireAgeMillis == 0) ? Long.MAX_VALUE : System
+				.currentTimeMillis() - expireAgeMillis;
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -279,34 +263,38 @@ public class GC {
 		if (fanout != null && fanout.length > 0) {
 			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
 					fanout.length);
-			for (String d : fanout) {
-				pm.update(1);
-				if (d.length() != 2)
-					continue;
-				File[] entries = new File(objects, d).listFiles();
-				if (entries == null)
-					continue;
-				for (File f : entries) {
-					String fName = f.getName();
-					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+			try {
+				for (String d : fanout) {
+					pm.update(1);
+					if (d.length() != 2)
 						continue;
-					if (f.lastModified() >= expireDate)
+					File[] entries = new File(objects, d).listFiles();
+					if (entries == null)
 						continue;
-					try {
-						ObjectId id = ObjectId.fromString(d + fName);
-						if (objectsToKeep.contains(id))
+					for (File f : entries) {
+						String fName = f.getName();
+						if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 							continue;
-						if (indexObjects == null)
-							indexObjects = listNonHEADIndexObjects();
-						if (indexObjects.contains(id))
+						if (f.lastModified() >= expireDate)
 							continue;
-						deletionCandidates.put(id, f);
-					} catch (IllegalArgumentException notAnObject) {
-						// ignoring the file that does not represent loose
-						// object
-						continue;
+						try {
+							ObjectId id = ObjectId.fromString(d + fName);
+							if (objectsToKeep.contains(id))
+								continue;
+							if (indexObjects == null)
+								indexObjects = listNonHEADIndexObjects();
+							if (indexObjects.contains(id))
+								continue;
+							deletionCandidates.put(id, f);
+						} catch (IllegalArgumentException notAnObject) {
+							// ignoring the file that does not represent loose
+							// object
+							continue;
+						}
 					}
 				}
+			} finally {
+				pm.endTask();
 			}
 		}
 		if (deletionCandidates.isEmpty())
@@ -784,21 +772,5 @@ public class GC {
 	 */
 	public void setExpireAgeMillis(long expireAgeMillis) {
 		this.expireAgeMillis = expireAgeMillis;
-		expire = null;
 	}
-
-	/**
-	 * During gc() or prune() each unreferenced, loose object which has been
-	 * created or modified after <code>expire</code> will not be pruned. Only
-	 * older objects may be pruned. If set to null then every object is a
-	 * candidate for pruning.
-	 *
-	 * @param expire
-	 *            minimal age of objects to be pruned in milliseconds.
-	 */
-	public void setExpire(Date expire) {
-		this.expire = expire;
-		expireAgeMillis = -1;
-	}
-
 }
