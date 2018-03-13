@@ -151,10 +151,10 @@ class ReftableOutputStream extends OutputStream {
 		cur += 2;
 	}
 
-	void writeInt32(int val) {
-		ensureBytesAvailableInBlockBuf(4);
-		NB.encodeInt32(blockBuf, cur, val);
-		cur += 4;
+	void writeInt24(int val) {
+		ensureBytesAvailableInBlockBuf(3);
+		NB.encodeInt24(blockBuf, cur, val);
+		cur += 3;
 	}
 
 	void writeId(ObjectId id) {
