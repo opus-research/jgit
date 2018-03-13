@@ -54,7 +54,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 
 /**
- * A command being processed by {@link BaseReceivePack}.
+ * A command being processed by {@link ReceivePack}.
  * <p>
  * This command instance roughly translates to the server side representation of
  * the {@link RemoteRefUpdate} created by the client.
@@ -129,8 +129,9 @@ public class ReceiveCommand {
 	 *            commands to filter.
 	 * @param want
 	 *            desired status to filter by.
-	 * @return a copy of the command list containing only those commands with the
-	 *         desired status.
+	 * @return a copy of the command list containing only those commands with
+	 *         the desired status.
+	 * @since 2.0
 	 */
 	public static List<ReceiveCommand> filter(List<ReceiveCommand> commands,
 			final Result want) {
@@ -157,7 +158,7 @@ public class ReceiveCommand {
 	private String message;
 
 	/**
-	 * Create a new command for {@link BaseReceivePack}.
+	 * Create a new command for {@link ReceivePack}.
 	 *
 	 * @param oldId
 	 *            the old object id; must not be null. Use
@@ -183,7 +184,7 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Create a new command for {@link BaseReceivePack}.
+	 * Create a new command for {@link ReceivePack}.
 	 *
 	 * @param oldId
 	 *            the old object id; must not be null. Use
@@ -195,6 +196,7 @@ public class ReceiveCommand {
 	 *            name of the ref being affected.
 	 * @param type
 	 *            type of the command.
+	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
@@ -269,8 +271,9 @@ public class ReceiveCommand {
 	 *
 	 * @param rp
 	 *            receive-pack session.
+	 * @since 2.0
 	 */
-	public void execute(final BaseReceivePack rp) {
+	public void execute(final ReceivePack rp) {
 		try {
 			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
 			ru.setRefLogIdent(rp.getRefLogIdent());
