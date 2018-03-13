@@ -73,6 +73,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String anExceptionOccurredWhileTryingToAddTheIdOfHEAD;
 	/***/ public String anSSHSessionHasBeenAlreadyCreated;
 	/***/ public String atLeastOnePathIsRequired;
+	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;
@@ -198,6 +199,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
@@ -414,6 +416,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownObjectType;
 	/***/ public String unknownRepositoryFormat2;
 	/***/ public String unknownRepositoryFormat;
+	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
 	/***/ public String unpackError;
 	/***/ public String unreadablePackIndex;
