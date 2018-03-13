@@ -1048,7 +1048,7 @@ public class PackWriter implements AutoCloseable {
 				stats.reusedObjects += pack.getObjectCount();
 				stats.reusedDeltas += deltaCnt;
 				stats.totalDeltas += deltaCnt;
-				reuseSupport.copyPackAsIs(out, pack);
+				reuseSupport.copyPackAsIs(out, pack, reuseValidate);
 			}
 			writeChecksum(out);
 			out.flush();
@@ -1866,7 +1866,7 @@ public class PackWriter implements AutoCloseable {
 				false);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
-		if (useCachedPacks && reuseSupport != null && !reuseValidate
+		if (useCachedPacks && reuseSupport != null
 				&& (excludeInPacks == null || excludeInPacks.length == 0))
 			cachedPacks.addAll(
 					reuseSupport.getCachedPacksAndUpdate(needBitmap));
