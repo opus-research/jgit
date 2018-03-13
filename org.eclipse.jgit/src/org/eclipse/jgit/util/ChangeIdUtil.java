@@ -234,7 +234,7 @@ public class ChangeIdUtil {
 	/**
 	 * Find the index of the first line of the footer paragraph in an array of
 	 * the lines, or lines.length if no footer is available
-	 * 
+	 *
 	 * @param lines
 	 *            the commit message split into lines and the line delimiters
 	 *            stripped off
