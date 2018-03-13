@@ -329,9 +329,9 @@ public class ReftableWriter {
 
 	/**
 	 * @return an estimate of the current size in bytes of the reftable, if it
-	 *         was finished right now. The estimate is only accurate if the
-	 *         configuration has {@link ReftableConfig#setIndexObjects(boolean)}
-	 *         to {@code false}.
+	 *         was finished right now. Estimate is only accurate if
+	 *         {@link ReftableConfig#setIndexObjects(boolean)} is {@code false}
+	 *         and {@link ReftableConfig#setMaxIndexLevels(int)} is {@code 1}.
 	 */
 	public long estimateTotalBytes() {
 		long bytes = out.size();
@@ -339,7 +339,7 @@ public class ReftableWriter {
 			bytes += FILE_HEADER_LEN;
 		}
 		if (cur != null) {
-			// long position = out.size();
+			long curBlockPos = out.size();
 			int sz = cur.currentSize();
 			bytes += sz;
 
@@ -353,7 +353,7 @@ public class ReftableWriter {
 				if (idx == refs.idx) {
 					bytes += out.estimatePadBetweenBlocks(sz);
 				}
-				// TODO(sop) estimate index size
+				bytes += idx.estimateBytes(curBlockPos);
 			}
 		}
 		bytes += FILE_FOOTER_LEN;
@@ -744,6 +744,24 @@ public class ReftableWriter {
 
 		IndexBuilder(byte kt) {
 			keyType = kt;
+		}
+
+		int estimateBytes(long curBlockPos) {
+			BlockWriter b = new BlockWriter(
+					INDEX_BLOCK_TYPE, keyType,
+					MAX_INDEX_SIZE,
+					Math.max(restartInterval, entries.size() / MAX_RESTARTS));
+			try {
+				for (Entry e : entries) {
+					b.mustAdd(e);
+				}
+				if (cur != null) {
+					b.mustAdd(new IndexEntry(cur.lastKey(), curBlockPos));
+				}
+			} catch (BlockSizeTooSmallException e) {
+				return b.currentSize();
+			}
+			return b.currentSize();
 		}
 
 		void writeIndex() throws IOException {
