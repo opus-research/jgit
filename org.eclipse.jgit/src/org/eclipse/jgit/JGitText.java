@@ -426,8 +426,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String refAlreadyExists;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
-	/***/ public String reflogEntryNotFound;
-	/***/ public String reflogResolveRequiresPositiveInteger;
+	/***/ public String reflogsNotYetSupportedByRevisionParser;
 	/***/ public String remoteConfigHasNoURIAssociated;
 	/***/ public String remoteDoesNotHaveSpec;
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
