@@ -56,8 +56,6 @@ class TopoSortGenerator extends Generator {
 
 	private final int outputType;
 
-	private final DenseIntAnnotation inDegree;
-
 	/**
 	 * Create a new sorter and completely spin the generator.
 	 * <p>
@@ -75,14 +73,13 @@ class TopoSortGenerator extends Generator {
 			IncorrectObjectTypeException, IOException {
 		pending = new FIFORevQueue();
 		outputType = s.outputType() | SORT_TOPO;
-		inDegree = new DenseIntAnnotation();
 		s.shareFreeList(pending);
 		for (;;) {
 			final RevCommit c = s.next();
 			if (c == null)
 				break;
 			for (final RevCommit p : c.parents)
-				inDegree.incrementAndGet(p);
+				p.inDegree++;
 			pending.add(c);
 		}
 	}
@@ -105,7 +102,7 @@ class TopoSortGenerator extends Generator {
 			if (c == null)
 				return null;
 
-			if (inDegree.getInt(c) > 0) {
+			if (c.inDegree > 0) {
 				// At least one of our children is missing. We delay
 				// production until all of our children are output.
 				//
@@ -117,8 +114,7 @@ class TopoSortGenerator extends Generator {
 			// so it is OK for us to produce now as well.
 			//
 			for (final RevCommit p : c.parents) {
-				if (inDegree.decrementAndGet(p) == 0
-						&& (p.flags & TOPO_DELAY) != 0) {
+				if (--p.inDegree == 0 && (p.flags & TOPO_DELAY) != 0) {
 					// This parent tried to come before us, but we are
 					// his last child. unpop the parent so it goes right
 					// behind this child.

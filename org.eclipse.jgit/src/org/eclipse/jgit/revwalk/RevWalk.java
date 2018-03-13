@@ -192,8 +192,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private boolean retainBody;
 
-	private int nextCommitId;
-
 	/**
 	 * Create a new revision walker for a given repository.
 	 *
@@ -631,7 +629,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		RevCommit c = (RevCommit) objects.get(id);
 		if (c == null) {
 			c = createCommit(id);
-			c.annotationId = ++nextCommitId;
 			objects.add(c);
 		}
 		return c;
@@ -672,12 +669,9 @@ public class RevWalk implements Iterable<RevCommit> {
 		RevObject r = objects.get(id);
 		if (r == null) {
 			switch (type) {
-			case Constants.OBJ_COMMIT: {
-				RevCommit c = createCommit(id);
-				c.annotationId = ++nextCommitId;
-				r = c;
+			case Constants.OBJ_COMMIT:
+				r = createCommit(id);
 				break;
-			}
 			case Constants.OBJ_TREE:
 				r = new RevTree(id);
 				break;
@@ -828,7 +822,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		switch (type) {
 		case Constants.OBJ_COMMIT: {
 			final RevCommit c = createCommit(id);
-			c.annotationId = ++nextCommitId;
 			c.parseCanonical(this, getCachedBytes(c, ldr));
 			r = c;
 			break;
