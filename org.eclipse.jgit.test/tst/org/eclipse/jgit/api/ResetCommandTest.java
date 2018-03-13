@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.eclipse.jgit.api.ResetCommand.ResetType.HARD;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -148,6 +149,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		assertFalse(inHead(fileInIndexPath));
 		assertFalse(inIndex(indexFile.getName()));
 		assertReflog(prevHead, head);
+		assertEquals(prevHead, db.readOrigHead());
 	}
 
 	@Test
@@ -184,6 +186,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		assertFalse(inHead(fileInIndexPath));
 		assertTrue(inIndex(indexFile.getName()));
 		assertReflog(prevHead, head);
+		assertEquals(prevHead, db.readOrigHead());
 	}
 
 	@Test
@@ -205,6 +208,49 @@ public class ResetCommandTest extends RepositoryTestCase {
 		assertFalse(inIndex(indexFile.getName()));
 
 		assertReflog(prevHead, head);
+		assertEquals(prevHead, db.readOrigHead());
+	}
+
+	@Test
+	public void testMixedResetRetainsSizeAndModifiedTime() throws Exception {
+		git = new Git(db);
+
+		writeTrashFile("a.txt", "a").setLastModified(
+				System.currentTimeMillis() - 60 * 1000);
+		assertNotNull(git.add().addFilepattern("a.txt").call());
+		assertNotNull(git.commit().setMessage("a commit").call());
+
+		writeTrashFile("b.txt", "b").setLastModified(
+				System.currentTimeMillis() - 60 * 1000);
+		assertNotNull(git.add().addFilepattern("b.txt").call());
+		RevCommit commit2 = git.commit().setMessage("b commit").call();
+		assertNotNull(commit2);
+
+		DirCache cache = db.readDirCache();
+
+		DirCacheEntry aEntry = cache.getEntry("a.txt");
+		assertNotNull(aEntry);
+		assertTrue(aEntry.getLength() > 0);
+		assertTrue(aEntry.getLastModified() > 0);
+
+		DirCacheEntry bEntry = cache.getEntry("b.txt");
+		assertNotNull(bEntry);
+		assertTrue(bEntry.getLength() > 0);
+		assertTrue(bEntry.getLastModified() > 0);
+
+		git.reset().setMode(ResetType.MIXED).setRef(commit2.getName()).call();
+
+		cache = db.readDirCache();
+
+		DirCacheEntry mixedAEntry = cache.getEntry("a.txt");
+		assertNotNull(mixedAEntry);
+		assertEquals(aEntry.getLastModified(), mixedAEntry.getLastModified());
+		assertEquals(aEntry.getLastModified(), mixedAEntry.getLastModified());
+
+		DirCacheEntry mixedBEntry = cache.getEntry("b.txt");
+		assertNotNull(mixedBEntry);
+		assertEquals(bEntry.getLastModified(), mixedBEntry.getLastModified());
+		assertEquals(bEntry.getLastModified(), mixedBEntry.getLastModified());
 	}
 
 	@Test
@@ -292,6 +338,25 @@ public class ResetCommandTest extends RepositoryTestCase {
 		assertTrue(inHead(indexFile.getName()));
 		assertFalse(inIndex(indexFile.getName()));
 		assertFalse(inIndex(untrackedFile.getName()));
+	}
+
+	@Test
+	public void testHardResetOnTag() throws Exception {
+		setupRepository();
+		String tagName = "initialtag";
+		git.tag().setName(tagName).setObjectId(secondCommit)
+				.setMessage("message").call();
+
+		DirCacheEntry preReset = DirCache.read(db.getIndexFile(), db.getFS())
+				.getEntry(indexFile.getName());
+		assertNotNull(preReset);
+
+		git.add().addFilepattern(untrackedFile.getName()).call();
+
+		git.reset().setRef(tagName).setMode(HARD).call();
+
+		ObjectId head = db.resolve(Constants.HEAD);
+		assertTrue(head.equals(secondCommit));
 	}
 
 	private void assertReflog(ObjectId prevHead, ObjectId head)

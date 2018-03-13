@@ -322,7 +322,7 @@ public class PushCommand extends
 	 * @throws JGitInternalException
 	 *             the reference name cannot be resolved.
 	 */
-	public PushCommand add(String nameOrSpec) throws JGitInternalException {
+	public PushCommand add(String nameOrSpec) {
 		if (0 <= nameOrSpec.indexOf(':')) {
 			refSpecs.add(new RefSpec(nameOrSpec));
 		} else {

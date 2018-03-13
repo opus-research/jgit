@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.nls;
+import static org.junit.Assert.assertArrayEquals;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.junit.Before;
 import org.junit.Test;
 
-public class RootLocaleTest {
+public class ConfigTest extends CLIRepositoryTestCase {
+	@Override
 	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
-	}
-
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
-
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
-
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
-	}
-
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
+	public void testListConfig() throws Exception {
+		String[] output = execute("git config --list");
+		assertArrayEquals("expected default configuration", //
+				new String[] { "core.autocrlf=false", //
+						"core.filemode=true", //
+						"core.logallrefupdates=true", //
+						"core.repositoryformatversion=0", //
+						"" /* ends with LF (last line empty) */}, output);
 	}
 }
