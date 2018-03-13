@@ -74,8 +74,7 @@ public class AwtAuthenticator extends CachedAuthenticator {
 		panel.setLayout(new GridBagLayout());
 
 		final StringBuilder instruction = new StringBuilder();
-		instruction.append(UIText.get().enterUsernameAndPasswordFor);
-		instruction.append(" ");
+		instruction.append("Enter username and password for ");
 		if (getRequestorType() == RequestorType.PROXY) {
 			instruction.append(getRequestorType());
 			instruction.append(" ");
@@ -102,7 +101,7 @@ public class AwtAuthenticator extends CachedAuthenticator {
 		gbc.fill = GridBagConstraints.NONE;
 		gbc.gridx = 0;
 		gbc.weightx = 1;
-		panel.add(new JLabel(UIText.get().username), gbc);
+		panel.add(new JLabel("Username:"), gbc);
 
 		gbc.gridx = 1;
 		gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -117,7 +116,7 @@ public class AwtAuthenticator extends CachedAuthenticator {
 		gbc.fill = GridBagConstraints.NONE;
 		gbc.gridx = 0;
 		gbc.weightx = 1;
-		panel.add(new JLabel(UIText.get().password), gbc);
+		panel.add(new JLabel("Password:"), gbc);
 
 		gbc.gridx = 1;
 		gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -127,7 +126,7 @@ public class AwtAuthenticator extends CachedAuthenticator {
 		gbc.gridy++;
 
 		if (JOptionPane.showConfirmDialog(null, panel,
-				UIText.get().authenticationRequired, JOptionPane.OK_CANCEL_OPTION,
+				"Authentication Required", JOptionPane.OK_CANCEL_OPTION,
 				JOptionPane.QUESTION_MESSAGE) == JOptionPane.OK_OPTION) {
 			return new PasswordAuthentication(username.getText(), password
 					.getPassword());

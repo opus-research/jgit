@@ -51,7 +51,6 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
-import static org.eclipse.jgit.util.HttpSupport.METHOD_GET;
 import static org.eclipse.jgit.util.HttpSupport.METHOD_POST;
 
 import java.io.BufferedReader;
@@ -66,7 +65,6 @@ import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URL;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
@@ -75,7 +73,6 @@ import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -86,10 +83,10 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDirectory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.storage.file.RefDirectory;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -163,8 +160,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private boolean useSmartHttp = true;
 
-	private HttpAuthMethod authMethod = HttpAuthMethod.NONE;
-
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
@@ -175,7 +170,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			baseUrl = new URL(uriString);
 			objectsUrl = new URL(baseUrl, "objects/");
 		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
+			throw new NotSupportedException("Invalid URL " + uri, e);
 		}
 		http = local.getConfig().get(HTTP_KEY);
 		proxySelector = ProxySelector.getDefault();
@@ -221,7 +216,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (TransportException err) {
 			throw err;
 		} catch (IOException err) {
-			throw new TransportException(uri, JGitText.get().errorReadingInfoRefs, err);
+			throw new TransportException(uri, "error reading info/refs", err);
 		}
 	}
 
@@ -270,8 +265,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				break;
 
 			default:
-				throw new TransportException(uri, MessageFormat.format(
-						JGitText.get().cannotReadHEAD, status, conn.getResponseMessage()));
+				throw new TransportException(uri, "cannot read HEAD: " + status
+						+ " " + conn.getResponseMessage());
 			}
 		}
 
@@ -297,11 +292,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					return new SmartHttpPushConnection(in);
 
 				} else if (!useSmartHttp) {
-					final String msg = JGitText.get().smartHTTPPushDisabled;
+					final String msg = "smart HTTP push disabled";
 					throw new NotSupportedException(msg);
 
 				} else {
-					final String msg = JGitText.get().remoteDoesNotSupportSmartHTTPPush;
+					final String msg = "remote does not support smart HTTP push";
 					throw new NotSupportedException(msg);
 				}
 			} finally {
@@ -312,7 +307,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (TransportException err) {
 			throw err;
 		} catch (IOException err) {
-			throw new TransportException(uri, JGitText.get().errorReadingInfoRefs, err);
+			throw new TransportException(uri, "error reading info/refs", err);
 		}
 	}
 
@@ -340,71 +335,48 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 			u = new URL(b.toString());
 		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
+			throw new NotSupportedException("Invalid URL " + uri, e);
 		}
 
 		try {
-			int authAttempts = 1;
-			for (;;) {
-				final HttpURLConnection conn = httpOpen(u);
-				if (useSmartHttp) {
-					String exp = "application/x-" + service + "-advertisement";
-					conn.setRequestProperty(HDR_ACCEPT, exp + ", */*");
-				} else {
-					conn.setRequestProperty(HDR_ACCEPT, "*/*");
-				}
-				final int status = HttpSupport.response(conn);
-				switch (status) {
-				case HttpURLConnection.HTTP_OK:
-					return conn;
+			final HttpURLConnection conn = httpOpen(u);
+			if (useSmartHttp) {
+				String expType = "application/x-" + service + "-advertisement";
+				conn.setRequestProperty(HDR_ACCEPT, expType + ", */*");
+			} else {
+				conn.setRequestProperty(HDR_ACCEPT, "*/*");
+			}
+			final int status = HttpSupport.response(conn);
+			switch (status) {
+			case HttpURLConnection.HTTP_OK:
+				return conn;
 
-				case HttpURLConnection.HTTP_NOT_FOUND:
-					throw new NoRemoteRepositoryException(uri, u + " not found");
+			case HttpURLConnection.HTTP_NOT_FOUND:
+				throw new NoRemoteRepositoryException(uri, u + " not found");
 
-				case HttpURLConnection.HTTP_UNAUTHORIZED:
-					authMethod = HttpAuthMethod.scanResponse(conn);
-					if (authMethod == HttpAuthMethod.NONE)
-						throw new TransportException(uri,
-								"authentication not supported");
-					if (1 < authAttempts || uri.getUser() == null)
-						throw new TransportException(uri, "not authorized");
-					authMethod.authorize(uri);
-					authAttempts++;
-					continue;
+			case HttpURLConnection.HTTP_FORBIDDEN:
+				throw new TransportException(uri, service + " not permitted");
 
-				case HttpURLConnection.HTTP_FORBIDDEN:
-					throw new TransportException(uri, service
-							+ " not permitted");
-
-				default:
-					String err = status + " " + conn.getResponseMessage();
-					throw new TransportException(uri, err);
-				}
+			default:
+				String err = status + " " + conn.getResponseMessage();
+				throw new TransportException(uri, err);
 			}
 		} catch (NotSupportedException e) {
 			throw e;
 		} catch (TransportException e) {
 			throw e;
 		} catch (IOException e) {
-			throw new TransportException(uri, MessageFormat.format(JGitText.get().cannotOpenService, service), e);
+			throw new TransportException(uri, "cannot open " + service, e);
 		}
 	}
 
-	final HttpURLConnection httpOpen(URL u) throws IOException {
-		return httpOpen(METHOD_GET, u);
-	}
-
-	final HttpURLConnection httpOpen(String method, URL u) throws IOException {
+	final HttpURLConnection httpOpen(final URL u) throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
-		conn.setRequestMethod(method);
 		conn.setUseCaches(false);
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache");//$NON-NLS-1$
 		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
-		conn.setConnectTimeout(getTimeout() * 1000);
-		conn.setReadTimeout(getTimeout() * 1000);
-		authMethod.configureRequest(conn);
 		return conn;
 	}
 
@@ -417,7 +389,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	IOException wrongContentType(String expType, String actType) {
-		final String why = MessageFormat.format(JGitText.get().expectedReceivedContentType, expType, actType);
+		final String why = "expected Content-Type " + expType
+				+ "; received Content-Type " + actType;
 		return new TransportException(uri, why);
 	}
 
@@ -437,8 +410,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final byte[] magic = new byte[5];
 		IO.readFully(in, magic, 0, magic.length);
 		if (magic[4] != '#') {
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().expectedPktLineWithService, RawParseUtils.decode(magic)));
+			throw new TransportException(uri, "expected pkt-line with"
+					+ " '# service=', got '" + RawParseUtils.decode(magic)
+					+ "'");
 		}
 
 		final PacketLineIn pckIn = new PacketLineIn(new UnionInputStream(
@@ -446,8 +420,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final String exp = "# service=" + service;
 		final String act = pckIn.readString();
 		if (!exp.equals(act)) {
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().expectedGot, exp, act));
+			throw new TransportException(uri, "expected '" + exp + "', got '"
+					+ act + "'");
 		}
 
 		while (pckIn.readString() != PacketLineIn.END) {
@@ -572,15 +546,16 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		private PackProtocolException outOfOrderAdvertisement(final String n) {
-			return new PackProtocolException(MessageFormat.format(JGitText.get().advertisementOfCameBefore, n, n));
+			return new PackProtocolException("advertisement of " + n
+					+ "^{} came before " + n);
 		}
 
 		private PackProtocolException invalidAdvertisement(final String n) {
-			return new PackProtocolException(MessageFormat.format(JGitText.get().invalidAdvertisementOf, n));
+			return new PackProtocolException("invalid advertisement of " + n);
 		}
 
 		private PackProtocolException duplicateAdvertisement(final String n) {
-			return new PackProtocolException(MessageFormat.format(JGitText.get().duplicateAdvertisementsOf, n));
+			return new PackProtocolException("duplicate advertisements of " + n);
 		}
 
 		@Override
@@ -676,7 +651,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void openStream() throws IOException {
-			conn = httpOpen(METHOD_POST, new URL(baseUrl, serviceName));
+			conn = httpOpen(new URL(baseUrl, serviceName));
+			conn.setRequestMethod(METHOD_POST);
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
 			conn.setRequestProperty(HDR_CONTENT_TYPE, requestType);
@@ -691,8 +667,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				// our request buffer. Send with a Content-Length header.
 				//
 				if (out.length() == 0) {
-					throw new TransportException(uri,
-							JGitText.get().startingReadStageWithoutWrittenRequestDataPendingIsNotSupported);
+					throw new TransportException(uri, "Starting read stage"
+							+ " without written request data pending"
+							+ " is not supported");
 				}
 
 				// Try to compress the content, but only if that is smaller.

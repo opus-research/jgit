@@ -45,13 +45,11 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 
 /**
@@ -151,8 +149,8 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 				ent = new DirCacheEntry(e.path);
 				e.apply(ent);
 				if (ent.getRawMode() == 0)
-					throw new IllegalArgumentException(MessageFormat.format(JGitText.get().fileModeNotSetForPath
-							, ent.getPathString()));
+					throw new IllegalArgumentException("FileMode not set"
+							+ " for path " + ent.getPathString());							
 			} else {
 				ent = cache.getEntry(eIdx);
 				e.apply(ent);
@@ -243,7 +241,7 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 		}
 
 		public void apply(final DirCacheEntry ent) {
-			throw new UnsupportedOperationException(JGitText.get().noApplyInDelete);
+			throw new UnsupportedOperationException("No apply in delete");
 		}
 	}
 
@@ -273,7 +271,7 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 		}
 
 		public void apply(final DirCacheEntry ent) {
-			throw new UnsupportedOperationException(JGitText.get().noApplyInDelete);
+			throw new UnsupportedOperationException("No apply in delete");
 		}
 	}
 }

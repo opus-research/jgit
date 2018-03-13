@@ -43,19 +43,15 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
-import org.eclipse.jgit.revwalk.FollowFilter;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -81,9 +77,6 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 
 	@Option(name = "--total-count")
 	boolean count = false;
-
-	@Option(name = "--all")
-	boolean all = false;
 
 	char[] outbuffer = new char[Constants.OBJECT_ID_LENGTH * 2];
 
@@ -116,16 +109,11 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		enableRevSort(RevSort.BOUNDARY, on);
 	}
 
-	@Option(name = "--follow", metaVar = "metaVar_path")
-	void follow(final String path) {
-		pathFilter = FollowFilter.create(path);
-	}
-
-	@Argument(index = 0, metaVar = "metaVar_commitish")
+	@Argument(index = 0, metaVar = "commit-ish")
 	private final List<RevCommit> commits = new ArrayList<RevCommit>();
 
-	@Option(name = "--", metaVar = "metaVar_path", multiValued = true, handler = PathTreeFilterHandler.class)
-	protected TreeFilter pathFilter = TreeFilter.ALL;
+	@Option(name = "--", metaVar = "path", multiValued = true, handler = PathTreeFilterHandler.class)
+	private TreeFilter pathFilter = TreeFilter.ALL;
 
 	private final List<RevFilter> revLimiter = new ArrayList<RevFilter>();
 
@@ -150,9 +138,7 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		for (final RevSort s : sorting)
 			walk.sort(s, true);
 
-		if (pathFilter instanceof FollowFilter)
-			walk.setTreeFilter(pathFilter);
-		else if (pathFilter != TreeFilter.ALL)
+		if (pathFilter != TreeFilter.ALL)
 			walk.setTreeFilter(AndTreeFilter.create(pathFilter,
 					TreeFilter.ANY_DIFF));
 
@@ -161,22 +147,10 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		else if (revLimiter.size() > 1)
 			walk.setRevFilter(AndRevFilter.create(revLimiter));
 
-		if (all)
-			for (Ref a : db.getAllRefs().values()) {
-				ObjectId oid = a.getPeeledObjectId();
-				if (oid == null)
-					oid = a.getObjectId();
-				try {
-					commits.add(walk.parseCommit(oid));
-				} catch (IncorrectObjectTypeException e) {
-					// Ignore all refs which are not commits
-				}
-			}
-
 		if (commits.isEmpty()) {
 			final ObjectId head = db.resolve(Constants.HEAD);
 			if (head == null)
-				throw die(MessageFormat.format(CLIText.get().cannotResolve, Constants.HEAD));
+				throw die("Cannot resolve " + Constants.HEAD);
 			commits.add(walk.parseCommit(head));
 		}
 		for (final RevCommit c : commits) {
@@ -193,8 +167,9 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 			final long end = System.currentTimeMillis();
 			System.err.print(n);
 			System.err.print(' ');
-			System.err.println(MessageFormat.format(
-					CLIText.get().timeInMilliSeconds, end - start));
+			System.err.print(end - start);
+			System.err.print(" ms");
+			System.err.println();
 		}
 	}
 

@@ -128,9 +128,7 @@ class PendingGenerator extends Generator {
 			for (;;) {
 				final RevCommit c = pending.next();
 				if (c == null) {
-					walker.reader.walkAdviceEnd();
-					if (!(walker instanceof ObjectWalk))
-						walker.reader.release();
+					walker.curs.release();
 					return null;
 				}
 
@@ -176,8 +174,7 @@ class PendingGenerator extends Generator {
 					c.disposeBody();
 			}
 		} catch (StopWalkException swe) {
-			walker.reader.walkAdviceEnd();
-			walker.reader.release();
+			walker.curs.release();
 			pending.clear();
 			return null;
 		}

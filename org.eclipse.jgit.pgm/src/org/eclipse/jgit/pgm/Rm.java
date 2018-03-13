@@ -57,9 +57,9 @@ import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
-@Command(usage = "usage_StopTrackingAFile", common = true)
+@Command(usage = "Stop tracking a file", common = true)
 class Rm extends TextBuiltin {
-	@Argument(metaVar = "metaVar_path", usage = "usage_path", multiValued = true, required = true, handler = PathTreeFilterHandler.class)
+	@Argument(metaVar = "path", usage = "path", multiValued = true, required = true, handler = PathTreeFilterHandler.class)
 	@Option(name = "--", handler = StopOptionHandler.class)
 	private TreeFilter paths;
 
@@ -67,9 +67,9 @@ class Rm extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		root = db.getWorkTree();
+		root = db.getWorkDir();
 
-		final DirCache dirc = db.lockDirCache();
+		final DirCache dirc = DirCache.lock(db);
 		final DirCacheBuilder edit = dirc.builder();
 
 		final TreeWalk walk = new TreeWalk(db);

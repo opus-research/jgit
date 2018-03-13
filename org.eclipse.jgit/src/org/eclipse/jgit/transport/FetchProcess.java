@@ -48,7 +48,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -58,19 +57,18 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PackLock;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.LockFile;
-import org.eclipse.jgit.storage.file.PackLock;
 
 class FetchProcess {
 	/** Transport we will fetch over. */
@@ -124,8 +122,8 @@ class FetchProcess {
 			final Set<Ref> matched = new HashSet<Ref>();
 			for (final RefSpec spec : toFetch) {
 				if (spec.getSource() == null)
-					throw new TransportException(MessageFormat.format(
-							JGitText.get().sourceRefNotSpecifiedForRefspec, spec));
+					throw new TransportException(
+							"Source ref not specified for refspec: " + spec);
 
 				if (spec.isWildcard())
 					expandWildcard(spec, matched);
@@ -176,29 +174,24 @@ class FetchProcess {
 		}
 
 		final RevWalk walk = new RevWalk(transport.local);
-		try {
-			if (transport.isRemoveDeletedRefs())
-				deleteStaleTrackingRefs(result, walk);
-			for (TrackingRefUpdate u : localUpdates) {
-				try {
-					u.update(walk);
-					result.add(u);
-				} catch (IOException err) {
-					throw new TransportException(MessageFormat.format(JGitText
-							.get().failureUpdatingTrackingRef,
-							u.getLocalName(), err.getMessage()), err);
-				}
+		if (transport.isRemoveDeletedRefs())
+			deleteStaleTrackingRefs(result, walk);
+		for (TrackingRefUpdate u : localUpdates) {
+			try {
+				u.update(walk);
+				result.add(u);
+			} catch (IOException err) {
+				throw new TransportException("Failure updating tracking ref "
+						+ u.getLocalName() + ": " + err.getMessage(), err);
 			}
-		} finally {
-			walk.release();
 		}
 
 		if (!fetchHeadUpdates.isEmpty()) {
 			try {
 				updateFETCH_HEAD(result);
 			} catch (IOException err) {
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().failureUpdatingFETCH_HEAD, err.getMessage()), err);
+				throw new TransportException("Failure updating FETCH_HEAD: "
+						+ err.getMessage(), err);
 			}
 		}
 	}
@@ -214,7 +207,7 @@ class FetchProcess {
 		if (transport.isCheckFetchedObjects()
 				&& !conn.didFetchTestConnectivity() && !askForIsComplete())
 			throw new TransportException(transport.getURI(),
-					JGitText.get().peerDidNotSupplyACompleteObjectGraph);
+					"peer did not supply a complete object graph");
 	}
 
 	private void closeConnection(final FetchResult result) {
@@ -276,11 +269,8 @@ class FetchProcess {
 	}
 
 	private void updateFETCH_HEAD(final FetchResult result) throws IOException {
-		File meta = transport.local.getDirectory();
-		if (meta == null)
-			return;
-		final LockFile lock = new LockFile(new File(meta, "FETCH_HEAD"),
-				transport.local.getFS());
+		final LockFile lock = new LockFile(new File(transport.local
+				.getDirectory(), "FETCH_HEAD"));
 		try {
 			if (lock.lock()) {
 				final Writer w = new OutputStreamWriter(lock.getOutputStream());
@@ -302,20 +292,16 @@ class FetchProcess {
 	private boolean askForIsComplete() throws TransportException {
 		try {
 			final ObjectWalk ow = new ObjectWalk(transport.local);
-			try {
-				for (final ObjectId want : askFor.keySet())
-					ow.markStart(ow.parseAny(want));
-				for (final Ref ref : transport.local.getAllRefs().values())
-					ow.markUninteresting(ow.parseAny(ref.getObjectId()));
-				ow.checkConnectivity();
-			} finally {
-				ow.release();
-			}
+			for (final ObjectId want : askFor.keySet())
+				ow.markStart(ow.parseAny(want));
+			for (final Ref ref : transport.local.getAllRefs().values())
+				ow.markUninteresting(ow.parseAny(ref.getObjectId()));
+			ow.checkConnectivity();
 			return true;
 		} catch (MissingObjectException e) {
 			return false;
 		} catch (IOException e) {
-			throw new TransportException(JGitText.get().unableToCheckConnectivity, e);
+			throw new TransportException("Unable to check connectivity.", e);
 		}
 	}
 
@@ -331,7 +317,8 @@ class FetchProcess {
 			throws TransportException {
 		final Ref src = conn.getRef(spec.getSource());
 		if (src == null) {
-			throw new TransportException(MessageFormat.format(JGitText.get().remoteDoesNotHaveSpec, spec.getSource()));
+			throw new TransportException("Remote does not have "
+					+ spec.getSource() + " available for fetch.");
 		}
 		if (matched.add(src))
 			want(src, spec);
@@ -389,8 +376,9 @@ class FetchProcess {
 			} catch (IOException err) {
 				// Bad symbolic ref? That is the most likely cause.
 				//
-				throw new TransportException( MessageFormat.format(
-						JGitText.get().cannotResolveLocalTrackingRefForUpdating, spec.getDestination()), err);
+				throw new TransportException("Cannot resolve"
+						+ " local tracking ref " + spec.getDestination()
+						+ " for updating.", err);
 			}
 		}
 
@@ -444,12 +432,13 @@ class FetchProcess {
 			case FORCED:
 				break;
 			default:
-				throw new TransportException(transport.getURI(), MessageFormat.format(
-						JGitText.get().cannotDeleteStaleTrackingRef2, name, u.getResult().name()));
+				throw new TransportException(transport.getURI(),
+						"Cannot delete stale tracking ref " + name + ": "
+								+ u.getResult().name());
 			}
 		} catch (IOException e) {
-			throw new TransportException(transport.getURI(), MessageFormat.format(
-					JGitText.get().cannotDeleteStaleTrackingRef, name), e);
+			throw new TransportException(transport.getURI(),
+					"Cannot delete stale tracking ref " + name, e);
 		}
 	}
 

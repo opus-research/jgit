@@ -56,7 +56,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
 
@@ -108,7 +107,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 				// ignore a failure during close, we're already failing
 			}
 			if (c instanceof UnknownHostException)
-				throw new TransportException(uri, JGitText.get().unknownHost);
+				throw new TransportException(uri, "unknown host");
 			if (c instanceof ConnectException)
 				throw new TransportException(uri, c.getMessage());
 			throw new TransportException(uri, c.getMessage(), c);
@@ -152,7 +151,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 			readAdvertisedRefs();
 		}
@@ -191,7 +190,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 			readAdvertisedRefs();
 		}

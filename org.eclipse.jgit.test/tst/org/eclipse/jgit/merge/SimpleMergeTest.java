@@ -44,18 +44,17 @@
 
 package org.eclipse.jgit.merge;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.lib.CommitBuilder;
+import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -104,9 +103,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_validSubtreeSort() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -127,7 +126,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -156,9 +155,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_concurrentSubtreeChange() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -178,7 +177,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -203,9 +202,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_conflictSubtreeChange() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -225,7 +224,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -236,9 +235,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_leftDFconflict1() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -257,7 +256,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -268,9 +267,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_rightDFconflict1() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -289,7 +288,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -300,9 +299,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_leftDFconflict2() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -319,7 +318,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -330,9 +329,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testTrivialTwoWay_rightDFconflict2() throws Exception {
-		final DirCache treeB = db.readDirCache();
-		final DirCache treeO = db.readDirCache();
-		final DirCache treeT = db.readDirCache();
+		final DirCache treeB = DirCache.read(db);
+		final DirCache treeO = DirCache.read(db);
+		final DirCache treeT = DirCache.read(db);
 		{
 			final DirCacheBuilder b = treeB.builder();
 			final DirCacheBuilder o = treeO.builder();
@@ -349,7 +348,7 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId b = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId o = commit(ow, treeO, new ObjectId[] { b });
 		final ObjectId t = commit(ow, treeT, new ObjectId[] { b });
@@ -364,17 +363,15 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 				.getObjectId(0));
 	}
 
-	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
+	private ObjectId commit(final ObjectWriter ow, final DirCache treeB,
 			final ObjectId[] parentIds) throws Exception {
-		final CommitBuilder c = new CommitBuilder();
-		c.setTreeId(treeB.writeTree(odi));
+		final Commit c = new Commit(db);
+		c.setTreeId(treeB.writeTree(ow));
 		c.setAuthor(new PersonIdent("A U Thor", "a.u.thor", 1L, 0));
 		c.setCommitter(c.getAuthor());
 		c.setParentIds(parentIds);
 		c.setMessage("Tree " + c.getTreeId().name());
-		ObjectId id = odi.insert(c);
-		odi.flush();
-		return id;
+		return ow.writeCommit(c);
 	}
 
 	private DirCacheEntry makeEntry(final String path, final FileMode mode)
@@ -386,8 +383,9 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final String content) throws Exception {
 		final DirCacheEntry ent = new DirCacheEntry(path);
 		ent.setFileMode(mode);
-		ent.setObjectId(new ObjectInserter.Formatter().idFor(OBJ_BLOB,
-				Constants.encode(content)));
+		final byte[] contentBytes = Constants.encode(content);
+		ent.setObjectId(new ObjectWriter(db).computeBlobSha1(
+				contentBytes.length, new ByteArrayInputStream(contentBytes)));
 		return ent;
 	}
 }

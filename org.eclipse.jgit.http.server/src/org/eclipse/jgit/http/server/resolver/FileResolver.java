@@ -52,7 +52,6 @@ import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
-import org.eclipse.jgit.util.FS;
 
 /** Default resolver serving from a single root path in local filesystem. */
 public class FileResolver implements RepositoryResolver {
@@ -83,7 +82,7 @@ public class FileResolver implements RepositoryResolver {
 		final Repository db;
 		try {
 			final File gitdir = new File(basePath, repositoryName);
-			db = RepositoryCache.open(FileKey.lenient(gitdir, FS.DETECTED), true);
+			db = RepositoryCache.open(FileKey.lenient(gitdir), true);
 		} catch (IOException e) {
 			throw new RepositoryNotFoundException(repositoryName, e);
 		}
@@ -138,10 +137,8 @@ public class FileResolver implements RepositoryResolver {
 			Repository db) throws IOException {
 		if (isExportAll())
 			return true;
-		else if (db.getDirectory() != null)
-			return new File(db.getDirectory(), "git-daemon-export-ok").exists();
 		else
-			return false;
+			return new File(db.getDirectory(), "git-daemon-export-ok").exists();
 	}
 
 	private static boolean isUnreasonableName(final String name) {

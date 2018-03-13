@@ -46,9 +46,6 @@
 
 package org.eclipse.jgit.lib;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -71,7 +68,11 @@ public class MutableObjectId extends AnyObjectId {
 	 *            original entry, to copy id from
 	 */
 	MutableObjectId(MutableObjectId src) {
-		fromObjectId(src);
+		this.w1 = src.w1;
+		this.w2 = src.w2;
+		this.w3 = src.w3;
+		this.w4 = src.w4;
+		this.w5 = src.w5;
 	}
 
 	/** Make this id match {@link ObjectId#zeroId()}. */
@@ -81,20 +82,6 @@ public class MutableObjectId extends AnyObjectId {
 		w3 = 0;
 		w4 = 0;
 		w5 = 0;
-	}
-
-	/**
-	 * Copy an ObjectId into this mutable buffer.
-	 *
-	 * @param src
-	 *            the source id to copy from.
-	 */
-	public void fromObjectId(AnyObjectId src) {
-		this.w1 = src.w1;
-		this.w2 = src.w2;
-		this.w3 = src.w3;
-		this.w4 = src.w4;
-		this.w5 = src.w5;
 	}
 
 	/**
@@ -175,8 +162,7 @@ public class MutableObjectId extends AnyObjectId {
 	 */
 	public void fromString(final String str) {
 		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().invalidId, str));
+			throw new IllegalArgumentException("Invalid id: " + str);
 		fromHexString(Constants.encodeASCII(str), 0);
 	}
 

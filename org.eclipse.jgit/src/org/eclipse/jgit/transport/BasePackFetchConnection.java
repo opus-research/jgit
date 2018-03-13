@@ -47,13 +47,11 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -61,6 +59,7 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PackLock;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Config.SectionParser;
@@ -72,7 +71,6 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.transport.PacketLineIn.AckNackResult;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -98,8 +96,8 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * {@link #readAdvertisedRefs()} methods in constructor or before any use. They
  * should also handle resources releasing in {@link #close()} method if needed.
  */
-public abstract class BasePackFetchConnection extends BasePackConnection
-		implements FetchConnection {
+abstract class BasePackFetchConnection extends BasePackConnection implements
+		FetchConnection {
 	/**
 	 * Maximum number of 'have' lines to send before giving up.
 	 * <p>
@@ -177,13 +175,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private PacketLineOut pckState;
 
-	/**
-	 * Create a new connection to fetch using the native git transport.
-	 *
-	 * @param packTransport
-	 *            the transport.
-	 */
-	public BasePackFetchConnection(final PackTransport packTransport) {
+	BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
 		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
@@ -242,20 +234,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		return Collections.<PackLock> emptyList();
 	}
 
-	/**
-	 * Execute common ancestor negotiation and fetch the objects.
-	 *
-	 * @param monitor
-	 *            progress monitor to receive status updates.
-	 * @param want
-	 *            the advertised remote references the caller wants to fetch.
-	 * @param have
-	 *            additional objects to assume that already exist locally. This
-	 *            will be added to the set of objects reachable from the
-	 *            destination repository's references.
-	 * @throws TransportException
-	 *             if any exception occurs.
-	 */
 	protected void doFetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
@@ -288,12 +266,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			close();
 			throw new TransportException(err.getMessage(), err);
 		}
-	}
-
-	@Override
-	public void close() {
-		walk.release();
-		super.close();
 	}
 
 	private int maxTimeWanted(final Collection<Ref> wants) {
@@ -419,7 +391,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			// ACK status to tell us common objects for reuse in future
 			// requests.  If its not enabled, we can't talk to the peer.
 			//
-			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().statelessRPCRequiresOptionToBeEnabled, OPTION_MULTI_ACK_DETAILED));
+			throw new PackProtocolException(uri, "stateless RPC requires "
+					+ OPTION_MULTI_ACK_DETAILED + " to be enabled");
 		}
 
 		return line.toString();

@@ -52,7 +52,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Ref;
 
@@ -112,7 +111,7 @@ public abstract class BaseConnection implements Connection {
 	protected void markStartedOperation() throws TransportException {
 		if (startedOperation)
 			throw new TransportException(
-					JGitText.get().onlyOneOperationCallPerConnectionIsSupported);
+					"Only one operation call per connection is supported.");
 		startedOperation = true;
 	}
 
@@ -137,7 +136,7 @@ public abstract class BaseConnection implements Connection {
 	 */
 	protected void setMessageWriter(Writer writer) {
 		if (messageWriter != null)
-			throw new IllegalStateException(JGitText.get().writerAlreadyInitialized);
+			throw new IllegalStateException("Writer already initialized");
 		messageWriter = writer;
 	}
 }

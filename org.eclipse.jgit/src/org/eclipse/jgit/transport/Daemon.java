@@ -57,14 +57,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
-import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.util.FS;
 
 /** Basic daemon for the anonymous <code>git://</code> transport protocol. */
 public class Daemon {
@@ -90,8 +87,6 @@ public class Daemon {
 	private Thread acceptThread;
 
 	private int timeout;
-
-	private PackConfig packConfig;
 
 	/** Configure a daemon to listen on any available network port. */
 	public Daemon() {
@@ -123,7 +118,6 @@ public class Daemon {
 						final UploadPack rp = new UploadPack(db);
 						final InputStream in = dc.getInputStream();
 						rp.setTimeout(Daemon.this.getTimeout());
-						rp.setPackConfig(Daemon.this.packConfig);
 						rp.upload(in, dc.getOutputStream(), null);
 					}
 				}, new DaemonService("receive-pack", "receivepack") {
@@ -247,17 +241,6 @@ public class Daemon {
 	}
 
 	/**
-	 * Set the configuration used by the pack generator.
-	 *
-	 * @param pc
-	 *            configuration controlling packing parameters. If null the
-	 *            source repository's settings will be used.
-	 */
-	public void setPackConfig(PackConfig pc) {
-		this.packConfig = pc;
-	}
-
-	/**
 	 * Start this daemon on a background thread.
 	 *
 	 * @throws IOException
@@ -267,7 +250,7 @@ public class Daemon {
 	 */
 	public synchronized void start() throws IOException {
 		if (acceptThread != null)
-			throw new IllegalStateException(JGitText.get().daemonAlreadyRunning);
+			throw new IllegalStateException("Daemon already running");
 
 		final ServerSocket listenSock = new ServerSocket(
 				myAddress != null ? myAddress.getPort() : 0, BACKLOG,
@@ -384,7 +367,7 @@ public class Daemon {
 		}
 
 		for (final File baseDir : exportBase) {
-			final File gitdir = FileKey.resolve(new File(baseDir, name), FS.DETECTED);
+			final File gitdir = FileKey.resolve(new File(baseDir, name));
 			if (gitdir != null && canExport(gitdir))
 				return openRepository(gitdir);
 		}
@@ -393,7 +376,7 @@ public class Daemon {
 
 	private static Repository openRepository(final File gitdir) {
 		try {
-			return RepositoryCache.open(FileKey.exact(gitdir, FS.DETECTED));
+			return RepositoryCache.open(FileKey.exact(gitdir));
 		} catch (IOException err) {
 			// null signals it "wasn't found", which is all that is suitable
 			// for the remote client to know.

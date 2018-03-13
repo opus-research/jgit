@@ -44,12 +44,10 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
@@ -68,7 +66,7 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
  */
 class PushProcess {
 	/** Task name for {@link ProgressMonitor} used during opening connection. */
-	static final String PROGRESS_OPENING_CONNECTION = JGitText.get().openingConnection;
+	static final String PROGRESS_OPENING_CONNECTION = "Opening connection";
 
 	/** Transport used to perform this operation. */
 	private final Transport transport;
@@ -99,8 +97,9 @@ class PushProcess {
 		this.toPush = new HashMap<String, RemoteRefUpdate>();
 		for (final RemoteRefUpdate rru : toPush) {
 			if (this.toPush.put(rru.getRemoteName(), rru) != null)
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().duplicateRemoteRefUpdateIsIllegal, rru.getRemoteName()));
+				throw new TransportException(
+						"Duplicate remote ref update is illegal. Affected remote name: "
+								+ rru.getRemoteName());
 		}
 	}
 
@@ -122,38 +121,32 @@ class PushProcess {
 	 */
 	PushResult execute(final ProgressMonitor monitor)
 			throws NotSupportedException, TransportException {
+		monitor.beginTask(PROGRESS_OPENING_CONNECTION, ProgressMonitor.UNKNOWN);
+
+		final PushResult res = new PushResult();
+		connection = transport.openPush();
 		try {
-			monitor.beginTask(PROGRESS_OPENING_CONNECTION,
-					ProgressMonitor.UNKNOWN);
+			res.setAdvertisedRefs(transport.getURI(), connection.getRefsMap());
+			res.setRemoteUpdates(toPush);
+			monitor.endTask();
 
-			final PushResult res = new PushResult();
-			connection = transport.openPush();
-			try {
-				res.setAdvertisedRefs(transport.getURI(), connection
-						.getRefsMap());
-				res.setRemoteUpdates(toPush);
-				monitor.endTask();
-
-				final Map<String, RemoteRefUpdate> preprocessed = prepareRemoteUpdates();
-				if (transport.isDryRun())
-					modifyUpdatesForDryRun();
-				else if (!preprocessed.isEmpty())
-					connection.push(monitor, preprocessed);
-			} finally {
-				connection.close();
-				res.addMessages(connection.getMessages());
-			}
-			if (!transport.isDryRun())
-				updateTrackingRefs();
-			for (final RemoteRefUpdate rru : toPush.values()) {
-				final TrackingRefUpdate tru = rru.getTrackingRefUpdate();
-				if (tru != null)
-					res.add(tru);
-			}
-			return res;
+			final Map<String, RemoteRefUpdate> preprocessed = prepareRemoteUpdates();
+			if (transport.isDryRun())
+				modifyUpdatesForDryRun();
+			else if (!preprocessed.isEmpty())
+				connection.push(monitor, preprocessed);
 		} finally {
-			walker.release();
+			connection.close();
+			res.addMessages(connection.getMessages());
 		}
+		if (!transport.isDryRun())
+			updateTrackingRefs();
+		for (final RemoteRefUpdate rru : toPush.values()) {
+			final TrackingRefUpdate tru = rru.getTrackingRefUpdate();
+			if (tru != null)
+				res.add(tru);
+		}
+		return res;
 	}
 
 	private Map<String, RemoteRefUpdate> prepareRemoteUpdates()
@@ -207,8 +200,9 @@ class PushProcess {
 			} catch (MissingObjectException x) {
 				fastForward = false;
 			} catch (Exception x) {
-				throw new TransportException(transport.getURI(), MessageFormat.format(
-						JGitText.get().readingObjectsFromLocalRepositoryFailed, x.getMessage()), x);
+				throw new TransportException(transport.getURI(),
+						"reading objects from local repository failed: "
+								+ x.getMessage(), x);
 			}
 			rru.setFastForward(fastForward);
 			if (!fastForward && !rru.isForceUpdate())

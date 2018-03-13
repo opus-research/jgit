@@ -83,18 +83,15 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 
 	@Override
 	public synchronized Session getSession(String user, String pass,
-			String host, int port, FS fs) throws JSchException {
-		if (config == null)
-			config = OpenSshConfig.get(fs);
-
-		final OpenSshConfig.Host hc = config.lookup(host);
+			String host, int port) throws JSchException {
+		final OpenSshConfig.Host hc = getConfig().lookup(host);
 		host = hc.getHostName();
 		if (port <= 0)
 			port = hc.getPort();
 		if (user == null)
 			user = hc.getUser();
 
-		final Session session = createSession(hc, user, host, port, fs);
+		final Session session = createSession(hc, user, host, port);
 		if (pass != null)
 			session.setPassword(pass);
 		final String strictHostKeyCheckingPolicy = hc
@@ -120,17 +117,14 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 	 *            server name to connect to.
 	 * @param port
 	 *            port number of the SSH daemon (typically 22).
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @return new session instance, but otherwise unconfigured.
 	 * @throws JSchException
 	 *             the session could not be created.
 	 */
 	protected Session createSession(final OpenSshConfig.Host hc,
-			final String user, final String host, final int port, FS fs)
+			final String user, final String host, final int port)
 			throws JSchException {
-		return getJSch(hc, fs).getSession(user, host, port);
+		return getJSch(hc).getSession(user, host, port);
 	}
 
 	/**
@@ -149,54 +143,58 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 	 *
 	 * @param hc
 	 *            host configuration
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @return the JSch instance to use.
 	 * @throws JSchException
 	 *             the user configuration could not be created.
 	 */
-	protected JSch getJSch(final OpenSshConfig.Host hc, FS fs) throws JSchException {
-		if (defaultJSch == null) {
-			defaultJSch = createDefaultJSch(fs);
-			for (Object name : defaultJSch.getIdentityNames()) {
-				byIdentityFile.put((String) name, defaultJSch);
-			}
-		}
-
+	protected JSch getJSch(final OpenSshConfig.Host hc) throws JSchException {
+		final JSch def = getDefaultJSch();
 		final File identityFile = hc.getIdentityFile();
 		if (identityFile == null) {
-			return defaultJSch;
+			return def;
 		}
 
 		final String identityKey = identityFile.getAbsolutePath();
 		JSch jsch = byIdentityFile.get(identityKey);
 		if (jsch == null) {
 			jsch = new JSch();
-			jsch.setHostKeyRepository(defaultJSch.getHostKeyRepository());
+			jsch.setHostKeyRepository(def.getHostKeyRepository());
 			jsch.addIdentity(identityKey);
 			byIdentityFile.put(identityKey, jsch);
 		}
 		return jsch;
 	}
 
+	private JSch getDefaultJSch() throws JSchException {
+		if (defaultJSch == null) {
+			defaultJSch = createDefaultJSch();
+			for (Object name : defaultJSch.getIdentityNames()) {
+				byIdentityFile.put((String) name, defaultJSch);
+			}
+		}
+		return defaultJSch;
+	}
+
 	/**
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @return the new default JSch implementation.
 	 * @throws JSchException
 	 *             known host keys cannot be loaded.
 	 */
-	protected JSch createDefaultJSch(FS fs) throws JSchException {
+	protected JSch createDefaultJSch() throws JSchException {
 		final JSch jsch = new JSch();
-		knownHosts(jsch, fs);
-		identities(jsch, fs);
+		knownHosts(jsch);
+		identities(jsch);
 		return jsch;
 	}
 
-	private static void knownHosts(final JSch sch, FS fs) throws JSchException {
-		final File home = fs.userHome();
+	private OpenSshConfig getConfig() {
+		if (config == null)
+			config = OpenSshConfig.get();
+		return config;
+	}
+
+	private static void knownHosts(final JSch sch) throws JSchException {
+		final File home = FS.userHome();
 		if (home == null)
 			return;
 		final File known_hosts = new File(new File(home, ".ssh"), "known_hosts");
@@ -214,8 +212,8 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 		}
 	}
 
-	private static void identities(final JSch sch, FS fs) {
-		final File home = fs.userHome();
+	private static void identities(final JSch sch) {
+		final File home = FS.userHome();
 		if (home == null)
 			return;
 		final File sshdir = new File(home, ".ssh");

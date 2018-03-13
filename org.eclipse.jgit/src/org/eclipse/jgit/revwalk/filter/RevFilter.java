@@ -45,7 +45,6 @@ package org.eclipse.jgit.revwalk.filter;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
@@ -158,7 +157,7 @@ public abstract class RevFilter {
 	public static final RevFilter MERGE_BASE = new RevFilter() {
 		@Override
 		public boolean include(final RevWalk walker, final RevCommit c) {
-			throw new UnsupportedOperationException(JGitText.get().cannotBeCombined);
+			throw new UnsupportedOperationException("Cannot be combined.");
 		}
 
 		@Override
