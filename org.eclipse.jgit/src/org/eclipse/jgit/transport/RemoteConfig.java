@@ -192,18 +192,24 @@ public class RemoteConfig implements Serializable {
 				}
 			}
 		}
-		fetch = rc.getRefSpecs(SECTION, name, KEY_FETCH);
-		push = rc.getRefSpecs(SECTION, name, KEY_PUSH);
+		vlst = rc.getStringList(SECTION, name, KEY_FETCH);
+		fetch = new ArrayList<>(vlst.length);
+		for (final String s : vlst)
+			fetch.add(new RefSpec(s));
+
+		vlst = rc.getStringList(SECTION, name, KEY_PUSH);
+		push = new ArrayList<>(vlst.length);
+		for (final String s : vlst)
+			push.add(new RefSpec(s));
+
 		val = rc.getString(SECTION, name, KEY_UPLOADPACK);
-		if (val == null) {
+		if (val == null)
 			val = DEFAULT_UPLOAD_PACK;
-		}
 		uploadpack = val;
 
 		val = rc.getString(SECTION, name, KEY_RECEIVEPACK);
-		if (val == null) {
+		if (val == null)
 			val = DEFAULT_RECEIVE_PACK;
-		}
 		receivepack = val;
 
 		val = rc.getString(SECTION, name, KEY_TAGOPT);
