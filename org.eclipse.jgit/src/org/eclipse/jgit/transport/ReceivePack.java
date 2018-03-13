@@ -43,20 +43,13 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_DELETE_REFS;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_REPORT_STATUS;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_SIDE_BAND_64K;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
-import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
-
+import java.io.BufferedWriter;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -91,6 +84,12 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a push connection, receiving objects.
  */
 public class ReceivePack {
+	static final String CAPABILITY_REPORT_STATUS = BasePackPushConnection.CAPABILITY_REPORT_STATUS;
+
+	static final String CAPABILITY_DELETE_REFS = BasePackPushConnection.CAPABILITY_DELETE_REFS;
+
+	static final String CAPABILITY_OFS_DELTA = BasePackPushConnection.CAPABILITY_OFS_DELTA;
+
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -152,7 +151,9 @@ public class ReceivePack {
 
 	private PacketLineOut pckOut;
 
-	private Writer msgs;
+	private PrintWriter msgs;
+
+	private IndexPack ip;
 
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
@@ -163,20 +164,18 @@ public class ReceivePack {
 	/** Commands to execute, as received by the client. */
 	private List<ReceiveCommand> commands;
 
-	/** Error to display instead of advertising the references. */
-	private StringBuilder advertiseError;
-
 	/** An exception caught while unpacking and fsck'ing the objects. */
 	private Throwable unpackError;
 
-	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
+	/** if {@link #enabledCapablities} has {@link #CAPABILITY_REPORT_STATUS} */
 	private boolean reportStatus;
-
-	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
-	private boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
+
+	private boolean needNewObjectIds;
+
+	private boolean needBaseObjectIds;
 
 	/**
 	 * Create a new pack receive for an open repository.
@@ -241,6 +240,45 @@ public class ReceivePack {
 	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		return refs;
+	}
+
+	/**
+	 * Configure this receive pack instance to keep track of the objects assumed
+	 * for delta bases.
+	 * <p>
+	 * By default a receive pack doesn't save the objects that were used as
+	 * delta bases. Setting this flag to {@code true} will allow the caller to
+	 * use {@link #getBaseObjectIds()} to retrieve that list.
+	 *
+	 * @param b {@code true} to enable keeping track of delta bases.
+	 */
+	public void setNeedBaseObjectIds(boolean b) {
+		this.needBaseObjectIds = b;
+	}
+
+	/**
+	 *  @return the set of objects the incoming pack assumed for delta purposes
+	 */
+	public final Set<ObjectId> getBaseObjectIds() {
+		return ip.getBaseObjectIds();
+	}
+
+	/**
+	 * Configure this receive pack instance to keep track of new objects.
+	 * <p>
+	 * By default a receive pack doesn't save the new objects that were created
+	 * when it was instantiated. Setting this flag to {@code true} allows the
+	 * caller to use {@link #getNewObjectIds()} to retrieve that list.
+	 *
+	 * @param b {@code true} to enable keeping track of new objects.
+	 */
+	public void setNeedNewObjectIds(boolean b) {
+		this.needNewObjectIds = b;
+	}
+
+	/** @return the new objects that were sent by the user */
+	public final Set<ObjectId> getNewObjectIds() {
+		return ip.getNewObjectIds();
 	}
 
 	/**
@@ -431,17 +469,10 @@ public class ReceivePack {
 	}
 
 	/**
-	 * Send an error message to the client.
+	 * Send an error message to the client, if it supports receiving them.
 	 * <p>
-	 * If any error messages are sent before the references are advertised to
-	 * the client, the errors will be sent instead of the advertisement and the
-	 * receive operation will be aborted. All clients should receive and display
-	 * such early stage errors.
-	 * <p>
-	 * If the reference advertisements have already been sent, messages are sent
-	 * in a side channel. If the client doesn't support receiving messages, the
-	 * message will be discarded, with no other indication to the caller or to
-	 * the client.
+	 * If the client doesn't support receiving messages, the message will be
+	 * discarded, with no other indication to the caller or to the client.
 	 * <p>
 	 * {@link PreReceiveHook}s should always try to use
 	 * {@link ReceiveCommand#setResult(Result, String)} with a result status of
@@ -454,18 +485,7 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendError(final String what) {
-		if (refs == null) {
-			if (advertiseError == null)
-				advertiseError = new StringBuilder();
-			advertiseError.append(what).append('\n');
-		} else {
-			try {
-				if (msgs != null)
-					msgs.write("error: " + what + "\n");
-			} catch (IOException e) {
-				// Ignore write failures.
-			}
-		}
+		sendMessage("error", what);
 	}
 
 	/**
@@ -479,12 +499,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		try {
-			if (msgs != null)
-				msgs.write(what + "\n");
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+		sendMessage("remote", what);
+	}
+
+	private void sendMessage(final String type, final String what) {
+		if (msgs != null)
+			msgs.println(type + ": " + what);
 	}
 
 	/**
@@ -524,8 +544,16 @@ public class ReceivePack {
 
 			pckIn = new PacketLineIn(rawIn);
 			pckOut = new PacketLineOut(rawOut);
-			if (messages != null)
-				msgs = new OutputStreamWriter(messages, Constants.CHARSET);
+			if (messages != null) {
+				msgs = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(messages, Constants.CHARSET),
+						8192)) {
+					@Override
+					public void println() {
+						print('\n');
+					}
+				};
+			}
 
 			enabledCapablities = new HashSet<String>();
 			commands = new ArrayList<ReceiveCommand>();
@@ -533,19 +561,8 @@ public class ReceivePack {
 			service();
 		} finally {
 			try {
-				if (pckOut != null)
-					pckOut.flush();
-				if (msgs != null)
+				if (msgs != null) {
 					msgs.flush();
-
-				if (sideBand) {
-					// If we are using side band, we need to send a final
-					// flush-pkt to tell the remote peer the side band is
-					// complete and it should stop decoding. We need to
-					// use the original output stream as rawOut is now the
-					// side band data channel.
-					//
-					new PacketLineOut(output).end();
 				}
 			} finally {
 				unlockPack();
@@ -574,8 +591,6 @@ public class ReceivePack {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
 			refs = refFilter.filter(db.getAllRefs());
-		if (advertiseError != null)
-			return;
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -611,9 +626,10 @@ public class ReceivePack {
 			} else if (msgs != null) {
 				sendStatusReport(false, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgs.write(s + "\n");
+						msgs.println(s);
 					}
 				});
+				msgs.flush();
 			}
 
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
@@ -636,14 +652,8 @@ public class ReceivePack {
 	 *             the formatter failed to write an advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
-		if (advertiseError != null) {
-			adv.writeOne("ERR " + advertiseError);
-			return;
-		}
-
 		final RevFlag advertised = walk.newFlag("ADVERTISED");
 		adv.init(walk, advertised);
-		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
@@ -702,16 +712,6 @@ public class ReceivePack {
 
 	private void enableCapabilities() {
 		reportStatus = enabledCapablities.contains(CAPABILITY_REPORT_STATUS);
-
-		sideBand = enabledCapablities.contains(CAPABILITY_SIDE_BAND_64K);
-		if (sideBand) {
-			OutputStream out = rawOut;
-
-			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
-			pckOut = new PacketLineOut(rawOut);
-			msgs = new OutputStreamWriter(new SideBandOutputStream(CH_PROGRESS,
-					MAX_BUF, out), Constants.CHARSET);
-		}
 	}
 
 	private boolean needPack() {
@@ -730,8 +730,10 @@ public class ReceivePack {
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(10 * timeout * 1000);
 
-		final IndexPack ip = IndexPack.create(db, rawIn);
+		ip = IndexPack.create(db, rawIn);
 		ip.setFixThin(true);
+		ip.setNeedNewObjectIds(needNewObjectIds);
+		ip.setNeedBaseObjectIds(needBaseObjectIds);
 		ip.setObjectChecking(isCheckReceivedObjects());
 		ip.index(NullProgressMonitor.INSTANCE);
 
