@@ -408,7 +408,7 @@ public abstract class FS {
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
-		return readPipe(dir, command, encoding, null);
+		readPipe(dir, command, encoding, null);
 	}
 
 	/**
@@ -421,10 +421,8 @@ public abstract class FS {
 	 * @param encoding
 	 *            to be used to parse the command's output
 	 * @param env
-	 *            Map of environment variables to be merged with those of the
-	 *            current process
+	 *            Map of environment variables to be merged with those of the current process
 	 * @return the one-line output of the command
-	 * @since 4.0
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
@@ -433,12 +431,11 @@ public abstract class FS {
 				LOG.debug("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
 			}
-			ProcessBuilder pb = new ProcessBuilder(command);
+			final ProcessBuilder pb = new ProcessBuilder(command);
 			pb.directory(dir);
-			if (env != null) {
+			if (env != null)
 				pb.environment().putAll(env);
-			}
-			final Process p = pb.start();
+			Process p = pb.start();
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
@@ -530,10 +527,7 @@ public abstract class FS {
 		return p.value;
 	}
 
-	/**
-	 * @return the path to the Git executable.
-	 * @since 4.0
-	 */
+	/** @return the path to the Git executable. */
 	protected abstract File discoverGitExe();
 
 	/** @return the $prefix directory C Git would use. */
@@ -541,12 +535,6 @@ public abstract class FS {
 		return resolveGrandparentFile(discoverGitExe());
 	}
 
-	/**
-	 * @param grandchild
-	 * @return the parent directory of this file's parent directory or
-	 *         {@code null} in case there's no grandparent directory
-	 * @since 4.0
-	 */
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
 			File parent = grandchild.getParentFile();

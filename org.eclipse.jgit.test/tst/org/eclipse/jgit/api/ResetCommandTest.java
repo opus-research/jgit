@@ -537,10 +537,16 @@ public class ResetCommandTest extends RepositoryTestCase {
 	 */
 	private boolean inHead(String path) throws IOException {
 		ObjectId headId = db.resolve(Constants.HEAD);
-		try (RevWalk rw = new RevWalk(db);
-				TreeWalk tw = TreeWalk.forPath(db, path,
-						rw.parseTree(headId))) {
+		RevWalk rw = new RevWalk(db);
+		TreeWalk tw = null;
+		try {
+			tw = TreeWalk.forPath(db, path, rw.parseTree(headId));
 			return tw != null;
+		} finally {
+			rw.release();
+			rw.dispose();
+			if (tw != null)
+				tw.release();
 		}
 	}
 

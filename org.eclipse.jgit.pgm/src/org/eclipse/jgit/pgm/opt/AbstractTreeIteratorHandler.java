@@ -125,7 +125,8 @@ public class AbstractTreeIteratorHandler extends
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
 
 		final CanonicalTreeParser p = new CanonicalTreeParser();
-		try (ObjectReader curs = clp.getRepository().newObjectReader()) {
+		final ObjectReader curs = clp.getRepository().newObjectReader();
+		try {
 			p.reset(curs, clp.getRevWalk().parseTree(id));
 		} catch (MissingObjectException e) {
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
@@ -133,6 +134,8 @@ public class AbstractTreeIteratorHandler extends
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
 		} catch (IOException e) {
 			throw new CmdLineException(MessageFormat.format(CLIText.get().cannotReadBecause, name, e.getMessage()));
+		} finally {
+			curs.release();
 		}
 
 		setter.addValue(p);
