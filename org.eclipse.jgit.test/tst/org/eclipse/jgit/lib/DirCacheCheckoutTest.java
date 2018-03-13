@@ -938,7 +938,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		} catch (CheckoutConflictException e) {
 			assertIndex(mk("foo"));
 			assertWorkDir(mkmap("foo", "different"));
-			assertEquals(Arrays.asList("foo"), getConflicts());
+			assertTrue(getConflicts().equals(Arrays.asList("foo")));
 			assertTrue(new File(trash, "foo").isFile());
 		}
 	}
