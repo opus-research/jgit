@@ -89,8 +89,8 @@ public abstract class SystemReader {
 		}
 
 		public FileBasedConfig openSystemConfig(Config parent, FS fs) {
-			File config = fs.discoverGitSystemConfig();
-			if (config == null) {
+			File prefix = fs.gitPrefix();
+			if (prefix == null) {
 				return new FileBasedConfig(null, fs) {
 					public void load() {
 						// empty, do not load
@@ -102,6 +102,8 @@ public abstract class SystemReader {
 					}
 				};
 			}
+			File etc = fs.resolve(prefix, "etc"); //$NON-NLS-1$
+			File config = fs.resolve(etc, "gitconfig"); //$NON-NLS-1$
 			return new FileBasedConfig(parent, config, fs);
 		}
 

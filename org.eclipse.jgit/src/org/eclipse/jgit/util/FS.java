@@ -423,8 +423,10 @@ public abstract class FS {
 	 * @param encoding
 	 *            to be used to parse the command's output
 	 * @param env
-	 *            Map of environment variables to be merged with those of the current process
+	 *            Map of environment variables to be merged with those of the
+	 *            current process
 	 * @return the one-line output of the command
+	 * @since 4.0
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
@@ -435,8 +437,9 @@ public abstract class FS {
 			}
 			ProcessBuilder pb = new ProcessBuilder(command);
 			pb.directory(dir);
-			if (env != null)
+			if (env != null) {
 				pb.environment().putAll(env);
+			}
 			final Process p = pb.start();
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
@@ -529,25 +532,33 @@ public abstract class FS {
 		return p.value;
 	}
 
-	/** @return the path to the Git executable. */
+	/**
+	 * @return the path to the Git executable.
+	 * @since 4.0
+	 */
 	protected abstract File discoverGitExe();
 
-	/** @return the path to the system-wide Git configuration file. */
+	/**
+	 * @return the path to the system-wide Git configuration file.
+	 * @since 4.0
+	 */
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
-		if (gitExe == null)
+		if (gitExe == null) {
 			return null;
+		}
 
-		// Trick Git into printing the path to the config file by using "echo" as the editor.
+		// Trick Git into printing the path to the config file by using "echo"
+		// as the editor.
 		Map<String, String> env = new HashMap<>();
 		env.put("GIT_EDITOR", "echo"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		String w = readPipe(gitExe.getParentFile(),
-				new String[]{"git", "config", "--system", "--edit"}, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-				Charset.defaultCharset().name(),
-				env);
-		if (StringUtils.isEmptyOrNull(w))
+				new String[] { "git", "config", "--system", "--edit" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+				Charset.defaultCharset().name(), env);
+		if (StringUtils.isEmptyOrNull(w)) {
 			return null;
+		}
 
 		return new File(w);
 	}
@@ -557,6 +568,12 @@ public abstract class FS {
 		return resolveGrandparentFile(discoverGitExe());
 	}
 
+	/**
+	 * @param grandchild
+	 * @return the parent directory of this file's parent directory or
+	 *         {@code null} in case there's no grandparent directory
+	 * @since 4.0
+	 */
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
 			File parent = grandchild.getParentFile();
