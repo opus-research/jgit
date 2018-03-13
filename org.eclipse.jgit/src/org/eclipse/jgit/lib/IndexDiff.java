@@ -3,7 +3,6 @@
  * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
  * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
- * Copyright (C) 2014, Axel Richard <axel.richard@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -277,8 +276,6 @@ public class IndexDiff {
 
 	private IgnoreSubmoduleMode ignoreSubmoduleMode = null;
 
-	private Map<FileMode, Set<String>> fileModes = new HashMap<FileMode, Set<String>>();
-
 	/**
 	 * Construct an IndexDiff
 	 *
@@ -428,7 +425,6 @@ public class IndexDiff {
 		indexDiffFilter = new IndexDiffFilter(INDEX, WORKDIR);
 		filters.add(indexDiffFilter);
 		treeWalk.setFilter(AndTreeFilter.create(filters));
-		fileModes.clear();
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
 					AbstractTreeIterator.class);
@@ -542,15 +538,6 @@ public class IndexDiff {
 						modified.add(smw.getPath());
 					}
 				}
-			}
-
-			for (int i = 0; i < treeWalk.getTreeCount(); i++) {
-				Set<String> values = fileModes.get(treeWalk.getFileMode(i));
-				if (values == null) {
-					values = new HashSet<String>();
-				}
-				values.add(treeWalk.getPathString());
-				fileModes.put(treeWalk.getFileMode(i), values);
 			}
 		}
 
@@ -687,18 +674,5 @@ public class IndexDiff {
 	public FileMode getIndexMode(final String path) {
 		final DirCacheEntry entry = dirCache.getEntry(path);
 		return entry != null ? entry.getFileMode() : FileMode.MISSING;
-	}
-
-	/**
-	 * Get the list of paths that have the given file mode
-	 *
-	 * @param mode
-	 * @return the list of paths that have the given file mode
-	 */
-	public Set<String> getPathsWithIndexMode(final FileMode mode) {
-		Set<String> paths = fileModes.get(mode);
-		if (paths == null)
-			paths = new HashSet<String>();
-		return paths;
 	}
 }
