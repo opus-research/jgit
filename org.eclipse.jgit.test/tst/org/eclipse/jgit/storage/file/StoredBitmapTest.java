@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,65 +41,54 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.revwalk;
+package org.eclipse.jgit.storage.file;
 
-import java.text.MessageFormat;
+import static org.junit.Assert.*;
+import javaewah.EWAHCompressedBitmap;
+import javaewah.IntIterator;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;
+import org.junit.Test;
 
-/**
- * Application level mark bit for {@link RevObject}s.
- * <p>
- * To create a flag use {@link RevWalk#newFlag(String)}.
- */
-public class RevFlag {
-	/**
-	 * Uninteresting by {@link RevWalk#markUninteresting(RevCommit)}.
-	 * <p>
-	 * We flag commits as uninteresting if the caller does not want commits
-	 * reachable from a commit to {@link RevWalk#markUninteresting(RevCommit)}.
-	 * This flag is always carried into the commit's parents and is a key part
-	 * of the "rev-list B --not A" feature; A is marked UNINTERESTING.
-	 * <p>
-	 * This is a static flag. Its RevWalk is not available.
-	 */
-	public static final RevFlag UNINTERESTING = new StaticRevFlag(
-			"UNINTERESTING", RevWalk.UNINTERESTING);
+public class StoredBitmapTest {
 
-	final RevWalk walker;
-
-	final String name;
-
-	final int mask;
-
-	RevFlag(final RevWalk w, final String n, final int m) {
-		walker = w;
-		name = n;
-		mask = m;
+	@Test
+	public void testGetBitmapWithoutXor() {
+		EWAHCompressedBitmap b = bitmapOf(100);
+		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
+		assertEquals(b, sb.getBitmap());
 	}
 
-	/**
-	 * Get the revision walk instance this flag was created from.
-	 *
-	 * @return the walker this flag was allocated out of, and belongs to.
-	 */
-	public RevWalk getRevWalk() {
-		return walker;
+	@Test
+	public void testGetBitmapWithOneXor() {
+		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
+		assertEquals(bitmapOf(101), sb.getBitmap());
 	}
 
-	public String toString() {
-		return name;
+	@Test
+	public void testGetBitmapWithThreeXor() {
+		StoredBitmap sb = newStoredBitmap(
+				bitmapOf(100),
+				bitmapOf(90, 101),
+				bitmapOf(100, 101),
+				bitmapOf(50));
+		assertEquals(bitmapOf(50, 90), sb.getBitmap());
+		assertEquals(bitmapOf(50, 90), sb.getBitmap());
 	}
 
-	static class StaticRevFlag extends RevFlag {
-		StaticRevFlag(final String n, final int m) {
-			super(null, n, m);
-		}
+	private static final StoredBitmap newStoredBitmap(
+			EWAHCompressedBitmap... bitmaps) {
+		StoredBitmap sb = null;
+		for (EWAHCompressedBitmap bitmap : bitmaps)
+			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb);
+		return sb;
+	}
 
-		@Override
-		public RevWalk getRevWalk() {
-			throw new UnsupportedOperationException(MessageFormat.format(
-					JGitText.get().isAStaticFlagAndHasNorevWalkInstance, toString()));
-		}
+	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
+		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
+		for (int bit : bits)
+			b.set(bit);
+		return b;
 	}
 }

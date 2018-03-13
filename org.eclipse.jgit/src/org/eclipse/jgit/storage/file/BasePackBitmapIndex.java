@@ -96,10 +96,11 @@ abstract class BasePackBitmapIndex extends PackBitmapIndex {
 			// Expand the bitmap and cache the result.
 			XorCompressedBitmap xb = (XorCompressedBitmap) r;
 			EWAHCompressedBitmap out = xb.bitmap;
-			while (true) {
+			for (;;) {
 				r = xb.xorBitmap.bitmapContainer;
 				if (r instanceof EWAHCompressedBitmap) {
-					bitmapContainer = out = out.xor((EWAHCompressedBitmap) r);
+					out = out.xor((EWAHCompressedBitmap) r);
+					bitmapContainer = out;
 					return out;
 				}
 				xb = (XorCompressedBitmap) r;
