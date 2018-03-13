@@ -497,7 +497,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noCredentialsProvider;
 	/***/ public String noHEADExistsAndNoExplicitStartingRevisionWasSpecified;
 	/***/ public String noHMACsupport;
-	/***/ public String noLocationHeader;
 	/***/ public String noMergeBase;
 	/***/ public String noMergeHeadSpecified;
 	/***/ public String nonBareLinkFilesNotSupported;
