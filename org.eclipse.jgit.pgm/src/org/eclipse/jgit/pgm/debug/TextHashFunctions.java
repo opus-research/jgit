@@ -369,8 +369,7 @@ class TextHashFunctions extends TextBuiltin {
 		outw.flush();
 	}
 
-	private static void testOne(Function fun, RawText txt, int[] elements,
-			int cnt) {
+	private void testOne(Function fun, RawText txt, int[] elements, int cnt) {
 		final Hash cmp = fun.hash;
 		final Fold fold = fun.fold;
 
