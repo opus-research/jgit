@@ -52,13 +52,13 @@ import java.util.Set;
 /**
  * Subscribes to a single remote Publisher process with multiple repositories.
  */
-public class Subscriber {
+public class SubscriptionState {
 	private final Map<String, SubscribedRepository>
 			repoSubscriptions = new HashMap<String, SubscribedRepository>();
 
 	private String restartToken;
 
-	private String lastPackNumber;
+	private String lastPackId;
 
 	/** @return fast restart token, or null if none. */
 	public String getRestartToken() {
@@ -70,18 +70,18 @@ public class Subscriber {
 		restartToken = restart;
 	}
 
-	/** @return the last pack number. */
-	public String getLastPackNumber() {
-		return lastPackNumber;
+	/** @return the last pack id. */
+	public String getLastPackId() {
+		return lastPackId;
 	}
 
 	/**
-	 * Set the last pack number.
+	 * Set the last pack id.
 	 *
-	 * @param number
+	 * @param id
 	 */
-	public void setLastPackNumber(String number) {
-		lastPackNumber = number;
+	public void setLastPackId(String id) {
+		lastPackId = id;
 	}
 
 	/**
@@ -107,23 +107,25 @@ public class Subscriber {
 		return Collections.unmodifiableSet(repoSubscriptions.keySet());
 	}
 
-	/** Reset the state of this subscriber. */
+	/**
+	 * Reset the state of this subscriber and clear the subscribe specs of all
+	 * SubscribedRepositories.
+	 */
 	public void reset() {
 		List<RefSpec> clearSpecs = Collections.emptyList();
-		for (SubscribedRepository sr : repoSubscriptions.values()) {
-			if (sr != null)
-				sr.setSubscribeSpecs(clearSpecs);
-		}
+		for (SubscribedRepository sr : repoSubscriptions.values())
+			sr.setSubscribeSpecs(clearSpecs);
 		setRestartToken(null);
-		setLastPackNumber(null);
+		setLastPackId(null);
 	}
 
-	/** Release all resources used by this Subscriber. */
+	/**
+	 * Release all resources used by this Subscriber and close all
+	 * SubscribedRepositories.
+	 */
 	public void close() {
-		for (SubscribedRepository sr : repoSubscriptions.values()) {
-			if (sr != null)
-				sr.close();
-		}
+		for (SubscribedRepository sr : repoSubscriptions.values())
+			sr.close();
 		repoSubscriptions.clear();
 	}
 }
