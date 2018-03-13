@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
+import org.eclipse.jgit.api.MergeCommand.FastForwardMode.Merge;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.errors.CanceledException;
 import org.eclipse.jgit.api.errors.DetachedHeadException;
@@ -96,8 +97,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
 
 	private TagOpt tagOption;
-
-	private FastForwardMode fastForwardMode = FastForwardMode.FF;
 
 	private FetchRecurseSubmodulesMode submoduleRecurseMode = null;
 
@@ -350,9 +349,11 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			result = new PullResult(fetchRes, remote, rebaseRes);
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
-			MergeResult mergeRes = merge.include(upstreamName, commitToMerge)
-					.setStrategy(strategy).setProgressMonitor(monitor)
-					.setFastForward(fastForwardMode).call();
+			merge.include(upstreamName, commitToMerge);
+			merge.setStrategy(strategy);
+			merge.setProgressMonitor(monitor);
+			merge.setFastForward(getFastForwardMode());
+			MergeResult mergeRes = merge.call();
 			monitor.update(1);
 			result = new PullResult(fetchRes, remote, mergeRes);
 		}
@@ -435,21 +436,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	/**
-	 * Sets the fast forward mode.
-	 *
-	 * @param fastForwardMode
-	 *            corresponds to the --ff/--no-ff/--ff-only options. --ff is the
-	 *            default option.
-	 * @return {@code this}
-	 * @since 4.9
-	 */
-	public PullCommand setFastForward(FastForwardMode fastForwardMode) {
-		checkCallable();
-		this.fastForwardMode = fastForwardMode;
-		return this;
-	}
-
-	/**
 	 * Set the mode to be used for recursing into submodules.
 	 *
 	 * @param recurse
@@ -486,5 +472,18 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 					ConfigConstants.CONFIG_KEY_REBASE, BranchRebaseMode.NONE);
 		}
 		return mode;
+	}
+
+	private FastForwardMode getFastForwardMode() {
+		Config config = repo.getConfig();
+		Merge ffMode = config.getEnum(Merge.values(),
+				ConfigConstants.CONFIG_PULL_SECTION, null,
+				ConfigConstants.CONFIG_KEY_FF, null);
+		if (ffMode == null) {
+			ffMode = config.getEnum(Merge.values(),
+					ConfigConstants.CONFIG_MERGE_SECTION, null,
+					ConfigConstants.CONFIG_KEY_FF, null);
+		}
+		return ffMode != null ? FastForwardMode.valueOf(ffMode) : null;
 	}
 }
