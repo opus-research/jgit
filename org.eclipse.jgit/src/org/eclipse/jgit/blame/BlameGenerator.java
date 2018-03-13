@@ -291,8 +291,7 @@ public class BlameGenerator implements AutoCloseable {
 			throws IOException {
 		if (description == null)
 			description = JGitText.get().blameNotCommittedYet;
-		BlobCandidate c = new BlobCandidate(getRepository(), description,
-				resultPath);
+		BlobCandidate c = new BlobCandidate(description, resultPath);
 		c.sourceText = contents;
 		c.regionList = new Region(0, 0, contents.size());
 		remaining = contents.size();
@@ -322,8 +321,7 @@ public class BlameGenerator implements AutoCloseable {
 		if (ldr.getType() == OBJ_BLOB) {
 			if (description == null)
 				description = JGitText.get().blameNotCommittedYet;
-			BlobCandidate c = new BlobCandidate(getRepository(), description,
-					resultPath);
+			BlobCandidate c = new BlobCandidate(description, resultPath);
 			c.sourceBlob = id.toObjectId();
 			c.sourceText = new RawText(ldr.getCachedBytes(Integer.MAX_VALUE));
 			c.regionList = new Region(0, 0, c.sourceText.size());
@@ -336,7 +334,7 @@ public class BlameGenerator implements AutoCloseable {
 		if (!find(commit, resultPath))
 			return this;
 
-		Candidate c = new Candidate(getRepository(), commit, resultPath);
+		Candidate c = new Candidate(commit, resultPath);
 		c.sourceBlob = idBuf.toObjectId();
 		c.loadText(reader);
 		c.regionList = new Region(0, 0, c.sourceText.size());
@@ -420,8 +418,7 @@ public class BlameGenerator implements AutoCloseable {
 			// just pump the queue
 		}
 
-		ReverseCandidate c = new ReverseCandidate(getRepository(), result,
-				resultPath);
+		ReverseCandidate c = new ReverseCandidate(result, resultPath);
 		c.sourceBlob = idBuf.toObjectId();
 		c.loadText(reader);
 		c.regionList = new Region(0, 0, c.sourceText.size());
@@ -628,8 +625,7 @@ public class BlameGenerator implements AutoCloseable {
 			return false;
 		}
 
-		Candidate next = n.create(getRepository(), parent,
-				PathFilter.create(r.getOldPath()));
+		Candidate next = n.create(parent, PathFilter.create(r.getOldPath()));
 		next.sourceBlob = r.getOldId().toObjectId();
 		next.renameScore = r.getScore();
 		next.loadText(reader);
@@ -645,7 +641,7 @@ public class BlameGenerator implements AutoCloseable {
 
 	private boolean splitBlameWithParent(Candidate n, RevCommit parent)
 			throws IOException {
-		Candidate next = n.create(getRepository(), parent, n.sourcePath);
+		Candidate next = n.create(parent, n.sourcePath);
 		next.sourceBlob = idBuf.toObjectId();
 		next.loadText(reader);
 		return split(next, n);
@@ -732,12 +728,12 @@ public class BlameGenerator implements AutoCloseable {
 
 			Candidate p;
 			if (renames != null && renames[pIdx] != null) {
-				p = n.create(getRepository(), parent,
+				p = n.create(parent,
 						PathFilter.create(renames[pIdx].getOldPath()));
 				p.renameScore = renames[pIdx].getScore();
 				p.sourceBlob = renames[pIdx].getOldId().toObjectId();
 			} else if (ids != null && ids[pIdx] != null) {
-				p = n.create(getRepository(), parent, n.sourcePath);
+				p = n.create(parent, n.sourcePath);
 				p.sourceBlob = ids[pIdx];
 			} else {
 				continue;
