@@ -608,12 +608,12 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * Returns the object ids in the pack file that was created by this writer.
-	 *
+	 * <p>
 	 * This method can only be invoked after
 	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
 	 * been invoked and completed successfully.
 	 *
-	 * @return number of objects in pack.
+	 * @return set of objects in pack.
 	 * @throws IOException
 	 *             a cached pack cannot supply its object ids.
 	 */
@@ -623,17 +623,20 @@ public class PackWriter implements AutoCloseable {
 			throw new IOException(
 					JGitText.get().cachedPacksPreventsListingObjects);
 
-		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> objs = new ObjectIdOwnerMap<
-				ObjectIdOwnerMap.Entry>();
+		if (writeBitmaps != null) {
+			return writeBitmaps.getObjectSet();
+		}
+
+		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> r = new ObjectIdOwnerMap<>();
 		for (BlockList<ObjectToPack> objList : objectsLists) {
 			if (objList != null) {
 				for (ObjectToPack otp : objList)
-					objs.add(new ObjectIdOwnerMap.Entry(otp) {
+					r.add(new ObjectIdOwnerMap.Entry(otp) {
 						// A new entry that copies the ObjectId
 					});
 			}
 		}
-		return objs;
+		return r;
 	}
 
 	/**
@@ -1715,6 +1718,7 @@ public class PackWriter implements AutoCloseable {
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
 		BlockList<RevCommit> commits = new BlockList<RevCommit>();
+		Set<ObjectId> roots = new HashSet<>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
 			if (exclude(c))
@@ -1726,8 +1730,12 @@ public class PackWriter implements AutoCloseable {
 			}
 
 			commits.add(c);
+			if (c.getParentCount() == 0) {
+				roots.add(c.copy());
+			}
 			countingMonitor.update(1);
 		}
+		stats.rootCommits = Collections.unmodifiableSet(roots);
 
 		if (shallowPack) {
 			for (RevCommit cmit : commits) {
