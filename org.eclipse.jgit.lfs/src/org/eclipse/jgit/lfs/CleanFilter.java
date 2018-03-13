@@ -130,7 +130,6 @@ public class CleanFilter extends FilterCommand {
 		this.aOut = new AtomicObjectOutputStream(tmpFile.toAbsolutePath());
 	}
 
-	@Override
 	public int run() throws IOException {
 		try {
 			byte[] buf = new byte[8192];

@@ -333,7 +333,6 @@ public abstract class BaseReceivePack {
 	/** Configuration for receive operations. */
 	protected static class ReceiveConfig {
 		static final SectionParser<ReceiveConfig> KEY = new SectionParser<ReceiveConfig>() {
-			@Override
 			public ReceiveConfig parse(final Config cfg) {
 				return new ReceiveConfig(cfg);
 			}

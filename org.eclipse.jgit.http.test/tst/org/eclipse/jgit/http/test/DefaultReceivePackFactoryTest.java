@@ -71,7 +71,6 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 
 	private ReceivePackFactory<HttpServletRequest> factory;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

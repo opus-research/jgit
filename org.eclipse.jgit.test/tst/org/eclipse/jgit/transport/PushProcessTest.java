@@ -432,14 +432,12 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 			// nothing here
 		}
 
-		@Override
 		public void push(ProgressMonitor monitor,
 				Map<String, RemoteRefUpdate> refsToUpdate, OutputStream out)
 				throws TransportException {
 			push(monitor, refsToUpdate);
 		}
 
-		@Override
 		public void push(ProgressMonitor monitor,
 				Map<String, RemoteRefUpdate> refsToUpdate)
 				throws TransportException {

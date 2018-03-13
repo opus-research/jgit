@@ -128,12 +128,10 @@ public class MetaFilter implements Filter {
 		return register(new RegexPipeline.Binder(pattern));
 	}
 
-	@Override
 	public void init(FilterConfig filterConfig) throws ServletException {
 		servletContext = filterConfig.getServletContext();
 	}
 
-	@Override
 	public void destroy() {
 		if (pipelines != null) {
 			Set<Object> destroyed = newIdentitySet();
@@ -168,7 +166,6 @@ public class MetaFilter implements Filter {
 		};
 	}
 
-	@Override
 	public void doFilter(ServletRequest request, ServletResponse response,
 			FilterChain chain) throws IOException, ServletException {
 		HttpServletRequest req = (HttpServletRequest) request;

@@ -81,7 +81,6 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 
 	private TestRepository<Repository> test;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -90,7 +89,6 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 		test = new TestRepository<Repository>(db);
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (reader != null) {

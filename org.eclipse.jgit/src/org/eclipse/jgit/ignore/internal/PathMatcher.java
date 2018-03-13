@@ -170,7 +170,6 @@ public class PathMatcher extends AbstractMatcher {
 		}
 	}
 
-	@Override
 	public boolean matches(String path, boolean assumeDirectory) {
 		if (matchers == null)
 			return simpleMatch(path, assumeDirectory);
@@ -210,7 +209,6 @@ public class PathMatcher extends AbstractMatcher {
 		return false;
 	}
 
-	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		throw new UnsupportedOperationException(
