@@ -49,8 +49,6 @@ import java.text.MessageFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
@@ -241,7 +239,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 				for (String sfx : fmt.suffixes())
 					if (filenameSuffix.endsWith(sfx))
 						return fmt;
-		return lookupFormat("tar");
+		return lookupFormat("tar"); //$NON-NLS-1$
 	}
 
 	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
@@ -335,7 +333,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * Set the intended filename for the produced archive. Currently the only
 	 * effect is to determine the default archive format when none is specified
 	 * with {@link #setFormat(String)}.
-	 * 
+	 *
 	 * @param filename
 	 *            intended filename for the archive
 	 * @return this
@@ -345,7 +343,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		int dot = filename.indexOf('.', slash + 1);
 
 		if (dot == -1)
-			this.suffix = "";
+			this.suffix = ""; //$NON-NLS-1$
 		else
 			this.suffix = filename.substring(dot);
 		return this;
