@@ -53,7 +53,7 @@ class Version extends TextBuiltin {
 		if (pkg == null || pkg.getImplementationVersion() == null)
 			throw die(CLIText.get().cannotReadPackageInformation);
 
-		outw.println(MessageFormat.format(CLIText.get().jgitVersion, pkg.getImplementationVersion()));
+		out.println(MessageFormat.format(CLIText.get().jgitVersion, pkg.getImplementationVersion()));
 	}
 
 	@Override

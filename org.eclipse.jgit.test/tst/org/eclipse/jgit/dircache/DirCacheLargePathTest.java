@@ -43,40 +43,29 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
-import org.junit.Test;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 
 public class DirCacheLargePathTest extends RepositoryTestCase {
-	@Test
 	public void testPath_4090() throws Exception {
 		testLongPath(4090);
 	}
 
-	@Test
 	public void testPath_4094() throws Exception {
 		testLongPath(4094);
 	}
 
-	@Test
 	public void testPath_4095() throws Exception {
 		testLongPath(4095);
 	}
 
-	@Test
 	public void testPath_4096() throws Exception {
 		testLongPath(4096);
 	}
 
-	@Test
 	public void testPath_16384() throws Exception {
 		testLongPath(16384);
 	}

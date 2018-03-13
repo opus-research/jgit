@@ -43,25 +43,18 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.junit.Before;
-import org.junit.Test;
 
-public class RefMapTest {
+public class RefMapTest extends TestCase {
 	private static final ObjectId ID_ONE = ObjectId
 			.fromString("41eb0d88f833b558bddeb269b7ab77399cdf98ed");
 
@@ -74,14 +67,13 @@ public class RefMapTest {
 
 	private RefList<Ref> resolved;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		packed = RefList.emptyList();
 		loose = RefList.emptyList();
 		resolved = RefList.emptyList();
 	}
 
-	@Test
 	public void testEmpty_NoPrefix1() {
 		RefMap map = new RefMap("", packed, loose, resolved);
 		assertTrue(map.isEmpty()); // before size was computed
@@ -94,7 +86,6 @@ public class RefMapTest {
 		assertNull(map.get("a"));
 	}
 
-	@Test
 	public void testEmpty_NoPrefix2() {
 		RefMap map = new RefMap();
 		assertTrue(map.isEmpty()); // before size was computed
@@ -107,7 +98,6 @@ public class RefMapTest {
 		assertNull(map.get("a"));
 	}
 
-	@Test
 	public void testNotEmpty_NoPrefix() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		packed = toList(master);
@@ -119,7 +109,6 @@ public class RefMapTest {
 		assertSame(master, map.values().iterator().next());
 	}
 
-	@Test
 	public void testEmpty_WithPrefix() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		packed = toList(master);
@@ -133,7 +122,6 @@ public class RefMapTest {
 		assertFalse(map.keySet().iterator().hasNext());
 	}
 
-	@Test
 	public void testNotEmpty_WithPrefix() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		packed = toList(master);
@@ -145,7 +133,6 @@ public class RefMapTest {
 		assertSame(master, map.values().iterator().next());
 	}
 
-	@Test
 	public void testClear() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		loose = toList(master);
@@ -159,7 +146,6 @@ public class RefMapTest {
 		assertEquals(0, map.size());
 	}
 
-	@Test
 	public void testIterator_RefusesRemove() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		loose = toList(master);
@@ -176,7 +162,6 @@ public class RefMapTest {
 		}
 	}
 
-	@Test
 	public void testIterator_FailsAtEnd() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		loose = toList(master);
@@ -193,7 +178,6 @@ public class RefMapTest {
 		}
 	}
 
-	@Test
 	public void testIterator_MissingUnresolvedSymbolicRefIsBug() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		final Ref headR = newRef("HEAD", master);
@@ -212,7 +196,6 @@ public class RefMapTest {
 		}
 	}
 
-	@Test
 	public void testMerge_HeadMaster() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		final Ref headU = newRef("HEAD", "refs/heads/master");
@@ -238,7 +221,6 @@ public class RefMapTest {
 		assertFalse(itr.hasNext());
 	}
 
-	@Test
 	public void testMerge_PackedLooseLoose() {
 		final Ref refA = newRef("A", ID_ONE);
 		final Ref refB_ONE = newRef("B", ID_ONE);
@@ -267,7 +249,6 @@ public class RefMapTest {
 		assertFalse(itr.hasNext());
 	}
 
-	@Test
 	public void testMerge_WithPrefix() {
 		final Ref a = newRef("refs/heads/A", ID_ONE);
 		final Ref b = newRef("refs/heads/foo/bar/B", ID_TWO);
@@ -301,7 +282,6 @@ public class RefMapTest {
 		assertFalse(itr.hasNext());
 	}
 
-	@Test
 	public void testPut_KeyMustMatchName_NoPrefix() {
 		final Ref refA = newRef("refs/heads/A", ID_ONE);
 		RefMap map = new RefMap("", packed, loose, resolved);
@@ -313,7 +293,6 @@ public class RefMapTest {
 		}
 	}
 
-	@Test
 	public void testPut_KeyMustMatchName_WithPrefix() {
 		final Ref refA = newRef("refs/heads/A", ID_ONE);
 		RefMap map = new RefMap("refs/heads/", packed, loose, resolved);
@@ -325,7 +304,6 @@ public class RefMapTest {
 		}
 	}
 
-	@Test
 	public void testPut_NoPrefix() {
 		final Ref refA_one = newRef("refs/heads/A", ID_ONE);
 		final Ref refA_two = newRef("refs/heads/A", ID_TWO);
@@ -345,7 +323,6 @@ public class RefMapTest {
 		assertSame(refA_one, map.get(refA_one.getName()));
 	}
 
-	@Test
 	public void testPut_WithPrefix() {
 		final Ref refA_one = newRef("refs/heads/A", ID_ONE);
 		final Ref refA_two = newRef("refs/heads/A", ID_TWO);
@@ -365,7 +342,6 @@ public class RefMapTest {
 		assertSame(refA_one, map.get("A"));
 	}
 
-	@Test
 	public void testPut_CollapseResolved() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		final Ref headU = newRef("HEAD", "refs/heads/master");
@@ -381,7 +357,6 @@ public class RefMapTest {
 		assertSame(headR, map.get("HEAD"));
 	}
 
-	@Test
 	public void testRemove() {
 		final Ref master = newRef("refs/heads/master", ID_ONE);
 		final Ref headU = newRef("HEAD", "refs/heads/master");
@@ -403,7 +378,6 @@ public class RefMapTest {
 		assertTrue(map.isEmpty());
 	}
 
-	@Test
 	public void testToString_NoPrefix() {
 		final Ref a = newRef("refs/heads/A", ID_ONE);
 		final Ref b = newRef("refs/heads/B", ID_TWO);
@@ -421,7 +395,6 @@ public class RefMapTest {
 		assertEquals(exp.toString(), map.toString());
 	}
 
-	@Test
 	public void testToString_WithPrefix() {
 		final Ref a = newRef("refs/heads/A", ID_ONE);
 		final Ref b = newRef("refs/heads/foo/B", ID_TWO);
@@ -441,7 +414,6 @@ public class RefMapTest {
 		assertEquals(exp.toString(), map.toString());
 	}
 
-	@Test
 	public void testEntryType() {
 		final Ref a = newRef("refs/heads/A", ID_ONE);
 		final Ref b = newRef("refs/heads/B", ID_TWO);
@@ -454,13 +426,12 @@ public class RefMapTest {
 		Map.Entry<String, Ref> ent_b = itr.next();
 
 		assertEquals(ent_a.hashCode(), "A".hashCode());
-		assertEquals(ent_a, ent_a);
+		assertTrue(ent_a.equals(ent_a));
 		assertFalse(ent_a.equals(ent_b));
 
 		assertEquals(a.toString(), ent_a.toString());
 	}
 
-	@Test
 	public void testEntryTypeSet() {
 		final Ref refA_one = newRef("refs/heads/A", ID_ONE);
 		final Ref refA_two = newRef("refs/heads/A", ID_TWO);
@@ -480,7 +451,7 @@ public class RefMapTest {
 		assertEquals(1, map.size());
 	}
 
-	private static RefList<Ref> toList(Ref... refs) {
+	private RefList<Ref> toList(Ref... refs) {
 		RefList.Builder<Ref> b = new RefList.Builder<Ref>(refs.length);
 		b.addAll(refs, 0, refs.length);
 		return b.toRefList();

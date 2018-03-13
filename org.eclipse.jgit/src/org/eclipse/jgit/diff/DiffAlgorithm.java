@@ -45,7 +45,7 @@ package org.eclipse.jgit.diff;
 
 /**
  * Compares two {@link Sequence}s to create an {@link EditList} of changes.
- * <p>
+ *
  * An algorithm's {@code diff} method must be callable from concurrent threads
  * without data collisions. This permits some algorithms to use a singleton
  * pattern, with concurrent invocations using the same singleton. Other
@@ -53,38 +53,6 @@ package org.eclipse.jgit.diff;
  * a unique instance per thread.
  */
 public abstract class DiffAlgorithm {
-	/**
-	 * Supported diff algorithm
-	 */
-	public enum SupportedAlgorithm {
-		/**
-		 * Myers diff algorithm
-		 */
-		MYERS,
-
-		/**
-		 * Histogram diff algorithm
-		 */
-		HISTOGRAM
-	}
-
-	/**
-	 * @param alg
-	 *            the diff algorithm for which an implementation should be
-	 *            returned
-	 * @return an implementation of the specified diff algorithm
-	 */
-	public static DiffAlgorithm getAlgorithm(SupportedAlgorithm alg) {
-		switch (alg) {
-		case MYERS:
-			return MyersDiff.INSTANCE;
-		case HISTOGRAM:
-			return new HistogramDiff();
-		default:
-			throw new IllegalArgumentException();
-		}
-	}
-
 	/**
 	 * Compare two sequences and identify a list of edits between them.
 	 *
@@ -117,24 +85,7 @@ public abstract class DiffAlgorithm {
 			SubsequenceComparator<S> cs = new SubsequenceComparator<S>(cmp);
 			Subsequence<S> as = Subsequence.a(a, region);
 			Subsequence<S> bs = Subsequence.b(b, region);
-			EditList e = Subsequence.toBase(diffNonCommon(cs, as, bs), as, bs);
-
-			// The last insertion may need to be shifted later if it
-			// inserts elements that were previously reduced out as
-			// common at the end.
-			//
-			Edit last = e.get(e.size() - 1);
-			if (last.getType() == Edit.Type.INSERT) {
-				while (last.endB < b.size()
-						&& cmp.equals(b, last.beginB, b, last.endB)) {
-					last.beginA++;
-					last.endA++;
-					last.beginB++;
-					last.endB++;
-				}
-			}
-
-			return e;
+			return Subsequence.toBase(diffNonCommon(cs, as, bs), as, bs);
 		}
 
 		case EMPTY:

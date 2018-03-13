@@ -43,73 +43,48 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.hasChunkedEncodingRequestBug;
-import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.UPLOAD_PACK;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.UPLOAD_PACK_REQUEST_TYPE;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.UPLOAD_PACK_RESULT_TYPE;
-import static org.eclipse.jgit.http.server.GitSmartHttpTools.sendError;
-import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
-import static org.eclipse.jgit.http.server.ServletUtils.consumeRequestBody;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 
 import java.io.IOException;
-import java.util.List;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
-import org.eclipse.jgit.transport.ServiceMayNotContinueException;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.transport.resolver.UploadPackFactory;
+import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 
 /** Server side implementation of smart fetch over HTTP. */
 class UploadPackServlet extends HttpServlet {
+	private static final String REQ_TYPE = "application/x-git-upload-pack-request";
+
+	private static final String RSP_TYPE = "application/x-git-upload-pack-result";
+
 	private static final long serialVersionUID = 1L;
 
 	static class InfoRefs extends SmartServiceInfoRefs {
-		private final UploadPackFactory<HttpServletRequest> uploadPackFactory;
+		private final UploadPackFactory uploadPackFactory;
 
-		InfoRefs(UploadPackFactory<HttpServletRequest> uploadPackFactory,
-				List<Filter> filters) {
-			super(UPLOAD_PACK, filters);
+		InfoRefs(final UploadPackFactory uploadPackFactory) {
+			super("git-upload-pack");
 			this.uploadPackFactory = uploadPackFactory;
 		}
 
 		@Override
-		protected void begin(HttpServletRequest req, Repository db)
-				throws IOException, ServiceNotEnabledException,
-				ServiceNotAuthorizedException {
-			UploadPack up = uploadPackFactory.create(req, db);
-			req.setAttribute(ATTRIBUTE_HANDLER, up);
-		}
-
-		@Override
-		protected void advertise(HttpServletRequest req,
+		protected void advertise(HttpServletRequest req, Repository db,
 				PacketLineOutRefAdvertiser pck) throws IOException,
 				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			UploadPack up = (UploadPack) req.getAttribute(ATTRIBUTE_HANDLER);
+			UploadPack up = uploadPackFactory.create(req, db);
 			try {
-				up.setBiDirectionalPipe(false);
 				up.sendAdvertisedRefs(pck);
 			} finally {
 				up.getRevWalk().release();
@@ -117,100 +92,49 @@ class UploadPackServlet extends HttpServlet {
 		}
 	}
 
-	static class Factory implements Filter {
-		private final UploadPackFactory<HttpServletRequest> uploadPackFactory;
+	private final UploadPackFactory uploadPackFactory;
 
-		Factory(UploadPackFactory<HttpServletRequest> uploadPackFactory) {
-			this.uploadPackFactory = uploadPackFactory;
-		}
-
-		public void doFilter(ServletRequest request, ServletResponse response,
-				FilterChain chain) throws IOException, ServletException {
-			HttpServletRequest req = (HttpServletRequest) request;
-			HttpServletResponse rsp = (HttpServletResponse) response;
-			UploadPack rp;
-			try {
-				rp = uploadPackFactory.create(req, getRepository(req));
-			} catch (ServiceNotAuthorizedException e) {
-				rsp.sendError(SC_UNAUTHORIZED);
-				return;
-
-			} catch (ServiceNotEnabledException e) {
-				sendError(req, rsp, SC_FORBIDDEN);
-				return;
-			}
-
-			try {
-				req.setAttribute(ATTRIBUTE_HANDLER, rp);
-				chain.doFilter(req, rsp);
-			} finally {
-				req.removeAttribute(ATTRIBUTE_HANDLER);
-			}
-		}
-
-		public void init(FilterConfig filterConfig) throws ServletException {
-			// Nothing.
-		}
-
-		public void destroy() {
-			// Nothing.
-		}
+	UploadPackServlet(final UploadPackFactory uploadPackFactory) {
+		this.uploadPackFactory = uploadPackFactory;
 	}
 
 	@Override
 	public void doPost(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		if (!UPLOAD_PACK_REQUEST_TYPE.equals(req.getContentType())) {
+		if (!REQ_TYPE.equals(req.getContentType())) {
 			rsp.sendError(SC_UNSUPPORTED_MEDIA_TYPE);
 			return;
 		}
 
-		int[] version = parseVersion(req.getHeader(HDR_USER_AGENT));
-		if (hasChunkedEncodingRequestBug(version, req)) {
-			GitSmartHttpTools.sendError(req, rsp, SC_BAD_REQUEST, "\n\n"
-					+ HttpServerText.get().clientHas175ChunkedEncodingBug);
-			return;
-		}
-
-		SmartOutputStream out = new SmartOutputStream(req, rsp, false) {
-			@Override
-			public void flush() throws IOException {
-				doFlush();
-			}
-		};
-
-		UploadPack up = (UploadPack) req.getAttribute(ATTRIBUTE_HANDLER);
+		final Repository db = getRepository(req);
 		try {
+			final UploadPack up = uploadPackFactory.create(req, db);
 			up.setBiDirectionalPipe(false);
-			rsp.setContentType(UPLOAD_PACK_RESULT_TYPE);
+			rsp.setContentType(RSP_TYPE);
 
+			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
+				@Override
+				public void flush() throws IOException {
+					doFlush();
+				}
+			};
 			up.upload(getInputStream(req), out, null);
 			out.close();
 
-		} catch (ServiceMayNotContinueException e) {
-			if (e.isOutput()) {
-				consumeRequestBody(req);
-				out.close();
-			} else if (!rsp.isCommitted()) {
-				rsp.reset();
-				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
-			}
+		} catch (ServiceNotAuthorizedException e) {
+			rsp.reset();
+			rsp.sendError(SC_UNAUTHORIZED);
 			return;
 
-		} catch (UploadPackInternalServerErrorException e) {
-			// Special case exception, error message was sent to client.
-			getServletContext().log(
-					HttpServerText.get().internalErrorDuringUploadPack,
-					e.getCause());
-			consumeRequestBody(req);
-			out.close();
+		} catch (ServiceNotEnabledException e) {
+			rsp.reset();
+			rsp.sendError(SC_FORBIDDEN);
+			return;
 
-		} catch (Throwable e) {
+		} catch (IOException e) {
 			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
-			if (!rsp.isCommitted()) {
-				rsp.reset();
-				sendError(req, rsp, SC_INTERNAL_SERVER_ERROR);
-			}
+			rsp.reset();
+			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;
 		}
 	}

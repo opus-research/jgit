@@ -102,7 +102,7 @@ public class IgnoreNode {
 		String txt;
 		while ((txt = br.readLine()) != null) {
 			txt = txt.trim();
-			if (txt.length() > 0 && !txt.startsWith("#")) //$NON-NLS-1$
+			if (txt.length() > 0 && !txt.startsWith("#"))
 				rules.add(new IgnoreRule(txt));
 		}
 	}

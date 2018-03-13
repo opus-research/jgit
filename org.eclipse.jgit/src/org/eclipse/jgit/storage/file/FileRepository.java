@@ -52,11 +52,10 @@ import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
-import org.eclipse.jgit.events.IndexChangedEvent;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -67,7 +66,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateHandle;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateRepository;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -96,8 +94,6 @@ import org.eclipse.jgit.util.SystemReader;
  *
  */
 public class FileRepository extends Repository {
-	private final FileBasedConfig systemConfig;
-
 	private final FileBasedConfig userConfig;
 
 	private final FileBasedConfig repoConfig;
@@ -105,8 +101,6 @@ public class FileRepository extends Repository {
 	private final RefDatabase refs;
 
 	private final ObjectDirectory objectDatabase;
-
-	private FileSnapshot snapshot;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -157,18 +151,15 @@ public class FileRepository extends Repository {
 	public FileRepository(final BaseRepositoryBuilder options) throws IOException {
 		super(options);
 
-		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
-		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
-				getFS());
-		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
-				getDirectory(), Constants.CONFIG),
+		userConfig = SystemReader.getInstance().openUserConfig(getFS());
+		repoConfig = new FileBasedConfig(userConfig, //
+				getFS().resolve(getDirectory(), "config"), //
 				getFS());
 
-		loadSystemConfig();
 		loadUserConfig();
 		loadRepoConfig();
 
-		repoConfig.addChangeListener(new ConfigChangedListener() {
+		getConfig().addChangeListener(new ConfigChangedListener() {
 			public void onConfigChanged(ConfigChangedEvent event) {
 				fireEvent(event);
 			}
@@ -178,32 +169,17 @@ public class FileRepository extends Repository {
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
-				getFS(), //
-				new File(getDirectory(), Constants.SHALLOW));
+				getFS());
 
 		if (objectDatabase.exists()) {
-			final long repositoryFormatVersion = getConfig().getLong(
+			final String repositoryFormatVersion = getConfig().getString(
 					ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
-			if (repositoryFormatVersion > 0)
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION);
+			if (!"0".equals(repositoryFormatVersion)) {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
-						Long.valueOf(repositoryFormatVersion)));
-		}
-
-		if (!isBare())
-			snapshot = FileSnapshot.save(getIndexFile());
-	}
-
-	private void loadSystemConfig() throws IOException {
-		try {
-			systemConfig.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException(MessageFormat.format(JGitText
-					.get().systemConfigFileInvalid, systemConfig.getFile()
-					.getAbsolutePath(), e1));
-			e2.initCause(e1);
-			throw e2;
+						repositoryFormatVersion));
+			}
 		}
 	}
 
@@ -245,12 +221,11 @@ public class FileRepository extends Repository {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
-		FileUtils.mkdirs(getDirectory(), true);
+		getDirectory().mkdirs();
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getDirectory(), "branches")); //$NON-NLS-1$
-		FileUtils.mkdir(new File(getDirectory(), "hooks")); //$NON-NLS-1$
+		new File(getDirectory(), "branches").mkdir();
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -258,14 +233,14 @@ public class FileRepository extends Repository {
 
 		final boolean fileMode;
 		if (getFS().supportsExecute()) {
-			File tmp = File.createTempFile("try", "execute", getDirectory()); //$NON-NLS-1$ //$NON-NLS-2$
+			File tmp = File.createTempFile("try", "execute", getDirectory());
 
 			getFS().setExecute(tmp, true);
 			final boolean on = getFS().canExecute(tmp);
 
 			getFS().setExecute(tmp, false);
 			final boolean off = getFS().canExecute(tmp);
-			FileUtils.delete(tmp);
+			tmp.delete();
 
 			fileMode = on && !off;
 		} else {
@@ -281,10 +256,8 @@ public class FileRepository extends Repository {
 					ConfigConstants.CONFIG_KEY_BARE, true);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
-		if (SystemReader.getInstance().isMacOS())
-			// Java has no other way
-			cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRECOMPOSEUNICODE, true);
+		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOCRLF, false);
 		cfg.save();
 	}
 
@@ -311,13 +284,6 @@ public class FileRepository extends Repository {
 	 * @return the configuration of this repository
 	 */
 	public FileBasedConfig getConfig() {
-		if (systemConfig.isOutdated()) {
-			try {
-				loadSystemConfig();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
 		if (userConfig.isOutdated()) {
 			try {
 				loadUserConfig();
@@ -352,12 +318,8 @@ public class FileRepository extends Repository {
 				Repository repo;
 
 				repo = ((AlternateRepository) d).repository;
-				for (Ref ref : repo.getAllRefs().values()) {
-					if (ref.getObjectId() != null)
-						r.add(ref.getObjectId());
-					if (ref.getPeeledObjectId() != null)
-						r.add(ref.getPeeledObjectId());
-				}
+				for (Ref ref : repo.getAllRefs().values())
+					r.add(ref.getObjectId());
 				r.addAll(repo.getAdditionalHaves());
 			}
 		}
@@ -369,38 +331,25 @@ public class FileRepository extends Repository {
 	 *
 	 * @param pack
 	 *            path of the pack file to open.
+	 * @param idx
+	 *            path of the corresponding index file.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public void openPack(final File pack) throws IOException {
-		objectDatabase.openPack(pack);
-	}
-
-	@Override
-	public void scanForRepoChanges() throws IOException {
-		getAllRefs(); // This will look for changes to refs
-		detectIndexChanges();
+	public void openPack(final File pack, final File idx) throws IOException {
+		objectDatabase.openPack(pack, idx);
 	}
 
 	/**
-	 * Detect index changes.
+	 * Force a scan for changed refs.
+	 *
+	 * @throws IOException
 	 */
-	private void detectIndexChanges() {
-		if (isBare())
-			return;
-
-		File indexFile = getIndexFile();
-		if (snapshot == null)
-			snapshot = FileSnapshot.save(indexFile);
-		else if (snapshot.isModified(indexFile))
-			notifyIndexChanged();
-	}
-
-	@Override
-	public void notifyIndexChanged() {
-		snapshot = FileSnapshot.save(getIndexFile());
-		fireEvent(new IndexChangedEvent());
+	public void scanForRepoChanges() throws IOException {
+		getAllRefs(); // This will look for changes to refs
+		if (!isBare())
+			getIndex(); // This will detect changes in the index
 	}
 
 	/**

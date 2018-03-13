@@ -47,9 +47,9 @@ package org.eclipse.jgit.revwalk.filter;
 import java.io.IOException;
 import java.util.Collection;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -118,13 +118,9 @@ public abstract class OrRevFilter extends RevFilter {
 
 		private final RevFilter b;
 
-		private final boolean requiresCommitBody;
-
 		Binary(final RevFilter one, final RevFilter two) {
 			a = one;
 			b = two;
-			requiresCommitBody = a.requiresCommitBody()
-					|| b.requiresCommitBody();
 		}
 
 		@Override
@@ -135,16 +131,10 @@ public abstract class OrRevFilter extends RevFilter {
 		}
 
 		@Override
-		public boolean requiresCommitBody() {
-			return requiresCommitBody;
-		}
-
-		@Override
 		public RevFilter clone() {
 			return new Binary(a.clone(), b.clone());
 		}
 
-		@SuppressWarnings("nls")
 		@Override
 		public String toString() {
 			return "(" + a.toString() + " OR " + b.toString() + ")";
@@ -154,15 +144,8 @@ public abstract class OrRevFilter extends RevFilter {
 	private static class List extends OrRevFilter {
 		private final RevFilter[] subfilters;
 
-		private final boolean requiresCommitBody;
-
 		List(final RevFilter[] list) {
 			subfilters = list;
-
-			boolean rcb = false;
-			for (RevFilter filter : subfilters)
-				rcb |= filter.requiresCommitBody();
-			requiresCommitBody = rcb;
 		}
 
 		@Override
@@ -177,11 +160,6 @@ public abstract class OrRevFilter extends RevFilter {
 		}
 
 		@Override
-		public boolean requiresCommitBody() {
-			return requiresCommitBody;
-		}
-
-		@Override
 		public RevFilter clone() {
 			final RevFilter[] s = new RevFilter[subfilters.length];
 			for (int i = 0; i < s.length; i++)
@@ -192,13 +170,13 @@ public abstract class OrRevFilter extends RevFilter {
 		@Override
 		public String toString() {
 			final StringBuilder r = new StringBuilder();
-			r.append("("); //$NON-NLS-1$
+			r.append("(");
 			for (int i = 0; i < subfilters.length; i++) {
 				if (i > 0)
-					r.append(" OR "); //$NON-NLS-1$
+					r.append(" OR ");
 				r.append(subfilters[i].toString());
 			}
-			r.append(")"); //$NON-NLS-1$
+			r.append(")");
 			return r.toString();
 		}
 	}

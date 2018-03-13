@@ -52,12 +52,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.ReadableByteChannel;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Input/Output utilities
@@ -81,47 +78,6 @@ public class IO {
 	}
 
 	/**
-	 * Read at most limit bytes from the local file into memory as a byte array.
-	 *
-	 * @param path
-	 *            location of the file to read.
-	 * @param limit
-	 *            maximum number of bytes to read, if the file is larger than
-	 *            only the first limit number of bytes are returned
-	 * @return complete contents of the requested local file. If the contents
-	 *         exceeds the limit, then only the limit is returned.
-	 * @throws FileNotFoundException
-	 *             the file does not exist.
-	 * @throws IOException
-	 *             the file exists, but its contents cannot be read.
-	 */
-	public static final byte[] readSome(final File path, final int limit)
-			throws FileNotFoundException, IOException {
-		FileInputStream in = new FileInputStream(path);
-		try {
-			byte[] buf = new byte[limit];
-			int cnt = 0;
-			for (;;) {
-				int n = in.read(buf, cnt, buf.length - cnt);
-				if (n <= 0)
-					break;
-				cnt += n;
-			}
-			if (cnt == buf.length)
-				return buf;
-			byte[] res = new byte[cnt];
-			System.arraycopy(buf, 0, res, 0, cnt);
-			return res;
-		} finally {
-			try {
-				in.close();
-			} catch (IOException ignored) {
-				// do nothing
-			}
-		}
-	}
-
-	/**
 	 * Read an entire local file into memory as a byte array.
 	 *
 	 * @param path
@@ -139,38 +95,12 @@ public class IO {
 			throws FileNotFoundException, IOException {
 		final FileInputStream in = new FileInputStream(path);
 		try {
-			long sz = Math.max(path.length(), 1);
+			final long sz = in.getChannel().size();
 			if (sz > max)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
-
-			byte[] buf = new byte[(int) sz];
-			int valid = 0;
-			for (;;) {
-				if (buf.length == valid) {
-					if (buf.length == max) {
-						int next = in.read();
-						if (next < 0)
-							break;
-
-						throw new IOException(MessageFormat.format(
-								JGitText.get().fileIsTooLarge, path));
-					}
-
-					byte[] nb = new byte[Math.min(buf.length * 2, max)];
-					System.arraycopy(buf, 0, nb, 0, valid);
-					buf = nb;
-				}
-				int n = in.read(buf, valid, buf.length - valid);
-				if (n < 0)
-					break;
-				valid += n;
-			}
-			if (valid < buf.length) {
-				byte[] nb = new byte[valid];
-				System.arraycopy(buf, 0, nb, 0, valid);
-				buf = nb;
-			}
+			final byte[] buf = new byte[(int) sz];
+			IO.readFully(in, buf, 0, buf.length);
 			return buf;
 		} finally {
 			try {
@@ -216,7 +146,6 @@ public class IO {
 		if (last < 0)
 			return ByteBuffer.wrap(out, 0, pos);
 
-		@SuppressWarnings("resource" /* java 7 */)
 		TemporaryBuffer.Heap tmp = new TemporaryBuffer.Heap(Integer.MAX_VALUE);
 		tmp.write(out);
 		tmp.write(last);
@@ -252,62 +181,6 @@ public class IO {
 	}
 
 	/**
-	 * Read as much of the array as possible from a channel.
-	 *
-	 * @param channel
-	 *            channel to read data from.
-	 * @param dst
-	 *            buffer that must be fully populated, [off, off+len).
-	 * @param off
-	 *            position within the buffer to start writing to.
-	 * @param len
-	 *            number of bytes that should be read.
-	 * @return number of bytes actually read.
-	 * @throws IOException
-	 *             there was an error reading from the channel.
-	 */
-	public static int read(ReadableByteChannel channel, byte[] dst, int off,
-			int len) throws IOException {
-		if (len == 0)
-			return 0;
-		int cnt = 0;
-		while (0 < len) {
-			int r = channel.read(ByteBuffer.wrap(dst, off, len));
-			if (r <= 0)
-				break;
-			off += r;
-			len -= r;
-			cnt += r;
-		}
-		return cnt != 0 ? cnt : -1;
-	}
-
-	/**
-	 * Read the entire byte array into memory, unless input is shorter
-	 *
-	 * @param fd
-	 *            input stream to read the data from.
-	 * @param dst
-	 *            buffer that must be fully populated, [off, off+len).
-	 * @param off
-	 *            position within the buffer to start writing to.
-	 * @return number of bytes in buffer or stream, whichever is shortest
-	 * @throws IOException
-	 *             there was an error reading from the stream.
-	 */
-	public static int readFully(InputStream fd, byte[] dst, int off)
-			throws IOException {
-		int r;
-		int len = 0;
-		while ((r = fd.read(dst, off, dst.length - off)) >= 0
-				&& len < dst.length) {
-			off += r;
-			len += r;
-		}
-		return len;
-	}
-
-	/**
 	 * Skip an entire region of an input stream.
 	 * <p>
 	 * The input stream's position is moved forward by the number of requested
@@ -332,43 +205,6 @@ public class IO {
 				throw new EOFException(JGitText.get().shortSkipOfBlock);
 			toSkip -= r;
 		}
-	}
-
-	/**
-	 * Divides the given string into lines.
-	 *
-	 * @param s
-	 *            the string to read
-	 * @return the string divided into lines
-	 * @since 2.0
-	 */
-	public static List<String> readLines(final String s) {
-		List<String> l = new ArrayList<String>();
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < s.length(); i++) {
-			char c = s.charAt(i);
-			if (c == '\n') {
-				l.add(sb.toString());
-				sb.setLength(0);
-				continue;
-			}
-			if (c == '\r') {
-				if (i + 1 < s.length()) {
-					c = s.charAt(++i);
-					l.add(sb.toString());
-					sb.setLength(0);
-					if (c != '\n')
-						sb.append(c);
-					continue;
-				} else { // EOF
-					l.add(sb.toString());
-					break;
-				}
-			}
-			sb.append(c);
-		}
-		l.add(sb.toString());
-		return l;
 	}
 
 	private IO() {

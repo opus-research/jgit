@@ -48,7 +48,6 @@ import java.io.IOException;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /** Keeps track of a {@link PackFile}'s associated <code>.keep</code> file. */
 public class PackLock {
@@ -66,7 +65,7 @@ public class PackLock {
 	public PackLock(final File packFile, final FS fs) {
 		final File p = packFile.getParentFile();
 		final String n = packFile.getName();
-		keepFile = new File(p, n.substring(0, n.length() - 5) + ".keep"); //$NON-NLS-1$
+		keepFile = new File(p, n.substring(0, n.length() - 5) + ".keep");
 		this.fs = fs;
 	}
 
@@ -82,8 +81,8 @@ public class PackLock {
 	public boolean lock(String msg) throws IOException {
 		if (msg == null)
 			return false;
-		if (!msg.endsWith("\n")) //$NON-NLS-1$
-			msg += "\n"; //$NON-NLS-1$
+		if (!msg.endsWith("\n"))
+			msg += "\n";
 		final LockFile lf = new LockFile(keepFile, fs);
 		if (!lf.lock())
 			return false;
@@ -91,13 +90,8 @@ public class PackLock {
 		return lf.commit();
 	}
 
-	/**
-	 * Remove the <code>.keep</code> file that holds this pack in place.
-	 *
-	 * @throws IOException
-	 *             if deletion of .keep file failed
-	 */
-	public void unlock() throws IOException {
-		FileUtils.delete(keepFile);
+	/** Remove the <code>.keep</code> file that holds this pack in place. */
+	public void unlock() {
+		keepFile.delete();
 	}
 }

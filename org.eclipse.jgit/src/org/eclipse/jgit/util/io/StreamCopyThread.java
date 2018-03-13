@@ -69,7 +69,7 @@ public class StreamCopyThread extends Thread {
 	 *            closed when the thread terminates.
 	 */
 	public StreamCopyThread(final InputStream i, final OutputStream o) {
-		setName(Thread.currentThread().getName() + "-StreamCopy"); //$NON-NLS-1$
+		setName(Thread.currentThread().getName() + "-StreamCopy");
 		src = i;
 		dst = o;
 	}

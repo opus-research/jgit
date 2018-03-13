@@ -47,37 +47,24 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
-import org.eclipse.jgit.diff.HistogramDiff;
+import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.Sequence;
 import org.eclipse.jgit.diff.SequenceComparator;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 
 /**
  * Provides the merge algorithm which does a three-way merge on content provided
- * as RawText. By default {@link HistogramDiff} is used as diff algorithm.
+ * as RawText. Makes use of {@link MyersDiff} to compute the diffs.
  */
 public final class MergeAlgorithm {
-	private final DiffAlgorithm diffAlg;
 
 	/**
-	 * Creates a new MergeAlgorithm which uses {@link HistogramDiff} as diff
-	 * algorithm
+	 * Since this class provides only static methods I add a private default
+	 * constructor to prevent instantiation.
 	 */
-	public MergeAlgorithm() {
-		this(new HistogramDiff());
-	}
-
-	/**
-	 * Creates a new MergeAlgorithm
-	 *
-	 * @param diff
-	 *            the diff algorithm used by this merge
-	 */
-	public MergeAlgorithm(DiffAlgorithm diff) {
-		this.diffAlg = diff;
+	private MergeAlgorithm() {
 	}
 
 	// An special edit which acts as a sentinel value by marking the end the
@@ -96,47 +83,16 @@ public final class MergeAlgorithm {
 	 * @param theirs the second sequence to be merged
 	 * @return the resulting content
 	 */
-	public <S extends Sequence> MergeResult<S> merge(
+	public static <S extends Sequence> MergeResult<S> merge(
 			SequenceComparator<S> cmp, S base, S ours, S theirs) {
 		List<S> sequences = new ArrayList<S>(3);
 		sequences.add(base);
 		sequences.add(ours);
 		sequences.add(theirs);
-		MergeResult<S> result = new MergeResult<S>(sequences);
-
-		if (ours.size() == 0) {
-			if (theirs.size() != 0) {
-				EditList theirsEdits = diffAlg.diff(cmp, base, theirs);
-				if (!theirsEdits.isEmpty()) {
-					// we deleted, they modified -> Let their complete content
-					// conflict with empty text
-					result.add(1, 0, 0, ConflictState.FIRST_CONFLICTING_RANGE);
-					result.add(2, 0, theirs.size(),
-							ConflictState.NEXT_CONFLICTING_RANGE);
-				} else
-					// we deleted, they didn't modify -> Let our deletion win
-					result.add(1, 0, 0, ConflictState.NO_CONFLICT);
-			} else
-				// we and they deleted -> return a single chunk of nothing
-				result.add(1, 0, 0, ConflictState.NO_CONFLICT);
-			return result;
-		} else if (theirs.size() == 0) {
-			EditList oursEdits = diffAlg.diff(cmp, base, ours);
-			if (!oursEdits.isEmpty()) {
-				// we modified, they deleted -> Let our complete content
-				// conflict with empty text
-				result.add(1, 0, ours.size(),
-						ConflictState.FIRST_CONFLICTING_RANGE);
-				result.add(2, 0, 0, ConflictState.NEXT_CONFLICTING_RANGE);
-			} else
-				// they deleted, we didn't modify -> Let their deletion win
-				result.add(2, 0, 0, ConflictState.NO_CONFLICT);
-			return result;
-		}
-
-		EditList oursEdits = diffAlg.diff(cmp, base, ours);
+		MergeResult result = new MergeResult<S>(sequences);
+		EditList oursEdits = MyersDiff.INSTANCE.diff(cmp, base, ours);
 		Iterator<Edit> baseToOurs = oursEdits.iterator();
-		EditList theirsEdits = diffAlg.diff(cmp, base, theirs);
+		EditList theirsEdits = MyersDiff.INSTANCE.diff(cmp, base, theirs);
 		Iterator<Edit> baseToTheirs = theirsEdits.iterator();
 		int current = 0; // points to the next line (first line is 0) of base
 		                 // which was not handled yet
@@ -147,7 +103,7 @@ public final class MergeAlgorithm {
 		// leave the loop when there are no edits more for ours or for theirs
 		// (or both)
 		while (theirsEdit != END_EDIT || oursEdit != END_EDIT) {
-			if (oursEdit.getEndA() < theirsEdit.getBeginA()) {
+			if (oursEdit.getEndA() <= theirsEdit.getBeginA()) {
 				// something was changed in ours not overlapping with any change
 				// from theirs. First add the common part in front of the edit
 				// then the edit.
@@ -159,7 +115,7 @@ public final class MergeAlgorithm {
 						ConflictState.NO_CONFLICT);
 				current = oursEdit.getEndA();
 				oursEdit = nextEdit(baseToOurs);
-			} else if (theirsEdit.getEndA() < oursEdit.getBeginA()) {
+			} else if (theirsEdit.getEndA() <= oursEdit.getBeginA()) {
 				// something was changed in theirs not overlapping with any
 				// from ours. First add the common part in front of the edit
 				// then the edit.
@@ -223,10 +179,10 @@ public final class MergeAlgorithm {
 				Edit nextOursEdit = nextEdit(baseToOurs);
 				Edit nextTheirsEdit = nextEdit(baseToTheirs);
 				for (;;) {
-					if (oursEdit.getEndA() >= nextTheirsEdit.getBeginA()) {
+					if (oursEdit.getEndA() > nextTheirsEdit.getBeginA()) {
 						theirsEdit = nextTheirsEdit;
 						nextTheirsEdit = nextEdit(baseToTheirs);
-					} else if (theirsEdit.getEndA() >= nextOursEdit.getBeginA()) {
+					} else if (theirsEdit.getEndA() > nextOursEdit.getBeginA()) {
 						oursEdit = nextOursEdit;
 						nextOursEdit = nextEdit(baseToOurs);
 					} else {

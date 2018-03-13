@@ -43,21 +43,16 @@
 
 package org.eclipse.jgit.util;
 
-import static org.eclipse.jgit.junit.JGitTestUtil.getName;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import org.eclipse.jgit.junit.TestRng;
-import org.junit.Test;
+import java.util.Arrays;
 
-public class TemporaryBufferTest {
-	@Test
+import org.eclipse.jgit.junit.TestRng;
+
+import junit.framework.TestCase;
+
+public class TemporaryBufferTest extends TestCase {
 	public void testEmpty() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		try {
@@ -71,7 +66,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneByte() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte test = (byte) new TestRng(getName()).nextInt();
@@ -98,7 +92,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testOneBlock_BulkWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -114,7 +107,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -122,14 +115,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testOneBlockAndHalf_BulkWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -145,7 +137,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -153,14 +145,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testOneBlockAndHalf_SingleWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -174,7 +165,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -182,14 +173,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testOneBlockAndHalf_Copy() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -204,7 +194,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -212,14 +202,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testLarge_SingleWrite() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -232,7 +221,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -240,28 +229,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
-	public void testInCoreInputStream() throws IOException {
-		final int cnt = 256;
-		final byte[] test = new TestRng(getName()).nextBytes(cnt);
-		final TemporaryBuffer.Heap b = new TemporaryBuffer.Heap(cnt + 4);
-		b.write(test);
-		b.close();
-
-		InputStream in = b.openInputStream();
-		byte[] act = new byte[cnt];
-		IO.readFully(in, act, 0, cnt);
-		assertArrayEquals(test, act);
-	}
-
-	@Test
 	public void testInCoreLimit_SwitchOnAppendByte() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -275,7 +249,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -283,14 +257,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testInCoreLimit_SwitchBeforeAppendByte() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -304,7 +277,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -312,14 +285,13 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testInCoreLimit_SwitchOnCopy() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final byte[] test = new TestRng(getName())
@@ -336,7 +308,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -344,16 +316,14 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(test.length, r.length);
-				assertArrayEquals(test, r);
+				assertTrue(Arrays.equals(test, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testDestroyWhileOpen() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		try {
 			b.write(new TestRng(getName())
@@ -363,7 +333,6 @@ public class TemporaryBufferTest {
 		}
 	}
 
-	@Test
 	public void testRandomWrites() throws IOException {
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		final TestRng rng = new TestRng(getName());
@@ -395,7 +364,7 @@ public class TemporaryBufferTest {
 				final byte[] r = b.toByteArray();
 				assertNotNull(r);
 				assertEquals(expect.length, r.length);
-				assertArrayEquals(expect, r);
+				assertTrue(Arrays.equals(expect, r));
 			}
 			{
 				final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -403,16 +372,14 @@ public class TemporaryBufferTest {
 				o.close();
 				final byte[] r = o.toByteArray();
 				assertEquals(expect.length, r.length);
-				assertArrayEquals(expect, r);
+				assertTrue(Arrays.equals(expect, r));
 			}
 		} finally {
 			b.destroy();
 		}
 	}
 
-	@Test
 	public void testHeap() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
 		final TemporaryBuffer b = new TemporaryBuffer.Heap(2 * 8 * 1024);
 		final byte[] r = new byte[8 * 1024];
 		b.write(r);
