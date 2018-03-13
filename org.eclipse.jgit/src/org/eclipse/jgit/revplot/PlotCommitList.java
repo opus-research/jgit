@@ -121,6 +121,7 @@ public class PlotCommitList<L extends PlotLane> extends
 		final int nChildren = currCommit.getChildCount();
 		if (nChildren == 0) {
 			currCommit.lane = nextFreeLane();
+			activeLanes.add(currCommit.lane);
 			closeLane(currCommit.lane);
 			return;
 		}
@@ -134,6 +135,7 @@ public class PlotCommitList<L extends PlotLane> extends
 				// Hmmph. This child must be the first along this lane.
 				//
 				c.lane = nextFreeLane();
+				activeLanes.add(c.lane);
 			}
 			for (int r = index - 1; r >= 0; r--) {
 				final PlotCommit rObj = get(r);
@@ -173,6 +175,7 @@ public class PlotCommitList<L extends PlotLane> extends
 				// not already positioned.
 				if (c.lane == null) {
 					c.lane = nextFreeLane();
+					activeLanes.add(c.lane);
 					if (reservedLane != null)
 						closeLane(c.lane);
 					else
@@ -189,6 +192,7 @@ public class PlotCommitList<L extends PlotLane> extends
 				closeLane(reservedLane);
 
 			currCommit.lane = nextFreeLane();
+			activeLanes.add(currCommit.lane);
 
 			handleBlockedLanes(index, currCommit, nChildren);
 		}
@@ -223,7 +227,14 @@ public class PlotCommitList<L extends PlotLane> extends
 		}
 		// Now let's check whether we have to reposition the lane
 		if (blockedPositions.get(commit.lane.getPosition())) {
-			int newPos = getFreePosition(blockedPositions);
+			int newPos = -1;
+			for (Integer pos : freePositions)
+				if (!blockedPositions.get(pos.intValue())) {
+					newPos = pos.intValue();
+					break;
+				}
+			if (newPos == -1)
+				newPos = positionsAllocated++;
 			freePositions.add(Integer.valueOf(commit.lane.getPosition()));
 			commit.lane.position = newPos;
 			activeLanes.add(commit.lane);
@@ -244,37 +255,15 @@ public class PlotCommitList<L extends PlotLane> extends
 	}
 
 	private PlotLane nextFreeLane() {
-		return nextFreeLane(null);
-	}
-
-	private PlotLane nextFreeLane(BitSet blockedPositions) {
 		final PlotLane p = createLane();
-		p.position = getFreePosition(blockedPositions);
-		activeLanes.add(p);
-		return p;
-	}
-
-	/**
-	 * @param blockedPositions
-	 *            may be null
-	 * @return a free lane position
-	 */
-	private int getFreePosition(BitSet blockedPositions) {
-		if (freePositions.isEmpty())
-			return positionsAllocated++;
-
-		if (blockedPositions != null) {
-			for (Integer pos : freePositions)
-				if (!blockedPositions.get(pos.intValue())) {
-					freePositions.remove(pos);
-					return pos.intValue();
-				}
-			return positionsAllocated++;
+		if (freePositions.isEmpty()) {
+			p.position = positionsAllocated++;
 		} else {
 			final Integer min = freePositions.first();
+			p.position = min.intValue();
 			freePositions.remove(min);
-			return min.intValue();
 		}
+		return p;
 	}
 
 	/**
