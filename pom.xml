@@ -135,7 +135,6 @@
     <args4j-version>2.0.12</args4j-version>
     <servlet-api-version>2.5</servlet-api-version>
     <jetty-version>7.1.6.v20100715</jetty-version>
-    <h2-version>1.1.117</h2-version>
   </properties>
 
   <pluginRepositories>
@@ -337,12 +336,6 @@
         <artifactId>jetty-servlet</artifactId>
         <version>${jetty-version}</version>
       </dependency>
-
-      <dependency>
-        <groupId>com.h2database</groupId>
-        <artifactId>h2</artifactId>
-        <version>${h2-version}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -372,7 +365,6 @@
 
   <modules>
     <module>org.eclipse.jgit</module>
-    <module>org.eclipse.jgit.storage.dht</module>
     <module>org.eclipse.jgit.ui</module>
     <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.iplog</module>
@@ -382,6 +374,5 @@
 
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.http.test</module>
-    <module>org.eclipse.jgit.storage.dht.test</module>
   </modules>
 </project>
