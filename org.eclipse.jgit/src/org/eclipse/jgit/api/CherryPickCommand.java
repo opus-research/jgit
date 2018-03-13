@@ -88,8 +88,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 
 	private String ourCommitName = null;
 
-	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
-
 	/**
 	 * @param repo
 	 */
@@ -153,7 +151,8 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				String cherryPickName = srcCommit.getId().abbreviate(7).name()
 						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
-				ResolveMerger merger = (ResolveMerger) strategy.newMerger(repo);
+				ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
+						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
 				merger.setCommitNames(new String[] { "BASE", ourName,
@@ -257,18 +256,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 */
 	public CherryPickCommand setReflogPrefix(final String prefix) {
 		this.reflogPrefix = prefix;
-		return this;
-	}
-
-	/**
-	 * @param strategy
-	 *            The merge strategy to use in order to merge during the
-	 *            execution of this Cherry-pick.
-	 * @return {@code this}
-	 * @since 3.4
-	 */
-	public CherryPickCommand setStrategy(MergeStrategy strategy) {
-		this.strategy = strategy;
 		return this;
 	}
 
