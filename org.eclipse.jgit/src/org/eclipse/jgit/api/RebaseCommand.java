@@ -87,7 +87,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -320,7 +319,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						String ourCommitName = getOurCommitName();
 						CherryPickResult cherryPickResult = new Git(repo)
 								.cherryPick().include(commitToPick)
-								.setOurCommitName(ourCommitName).call();
+								.setOurCommitName(ourCommitName)
+								.setReflogPrefix("rebase:").call(); //$NON-NLS-1$
 						switch (cherryPickResult.getStatus()) {
 						case FAILED:
 							if (operation == Operation.BEGIN)
@@ -354,7 +354,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			if (newHead != null) {
 				String headName = rebaseState.readFile(HEAD_NAME);
-				updateHead(headName, newHead);
+				updateHead(headName, newHead, upstreamCommit);
 				FileUtils.delete(rebaseState.getDir(), FileUtils.RECURSIVE);
 				if (lastStepWasForward)
 					return RebaseResult.FAST_FORWARD_RESULT;
@@ -371,18 +371,20 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private String getOurCommitName() {
 		// If onto is different from upstream, this should say "onto", but
 		// RebaseCommand doesn't support a different "onto" at the moment.
-		String ourCommitName = "Upstream, based on "
+		String ourCommitName = "Upstream, based on " //$NON-NLS-1$
 				+ Repository.shortenRefName(upstreamCommitName);
 		return ourCommitName;
 	}
 
-	private void updateHead(String headName, RevCommit newHead)
+	private void updateHead(String headName, RevCommit newHead, RevCommit onto)
 			throws IOException {
 		// point the previous head (if any) to the new commit
 
 		if (headName.startsWith(Constants.R_REFS)) {
 			RefUpdate rup = repo.updateRef(headName);
 			rup.setNewObjectId(newHead);
+			rup.setRefLogMessage("rebase finished: " + headName + " onto " //$NON-NLS-1$ //$NON-NLS-2$
+					+ onto.getName(), false);
 			Result res = rup.forceUpdate();
 			switch (res) {
 			case FAST_FORWARD:
@@ -393,6 +395,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				throw new JGitInternalException("Updating HEAD failed");
 			}
 			rup = repo.updateRef(Constants.HEAD);
+			rup.setRefLogMessage("rebase finished: returning to " + headName, //$NON-NLS-1$
+					false);
 			res = rup.link(headName);
 			switch (res) {
 			case FAST_FORWARD:
@@ -615,7 +619,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		if (head.isSymbolic())
 			headName = head.getTarget().getName();
 		else
-			headName = "detached HEAD";
+			headName = head.getObjectId().getName();
 		ObjectId headId = head.getObjectId();
 		if (headId == null)
 			throw new RefNotFoundException(MessageFormat.format(
@@ -630,10 +634,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().resettingHead,
 					upstreamCommit.getShortMessage()), ProgressMonitor.UNKNOWN);
-			checkoutCommit(upstreamCommit);
+			checkoutCommit(headName, upstreamCommit);
 			monitor.endTask();
 
-			updateHead(headName, upstreamCommit);
+			updateHead(headName, upstreamCommit, upstream);
 			return RebaseResult.FAST_FORWARD_RESULT;
 		}
 
@@ -692,7 +696,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				upstreamCommit.getShortMessage()), ProgressMonitor.UNKNOWN);
 		boolean checkoutOk = false;
 		try {
-			checkoutOk = checkoutCommit(upstreamCommit);
+			checkoutOk = checkoutCommit(headName, upstreamCommit);
 		} finally {
 			if (!checkoutOk)
 				FileUtils.delete(rebaseState.getDir(), FileUtils.RECURSIVE);
@@ -733,7 +737,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		if (head.isSymbolic())
 			headName = head.getTarget().getName();
 		else
-			headName = "detached HEAD";
+			headName = head.getObjectId().getName();
 		return tryFastForward(headName, headCommit, newCommit);
 	}
 
@@ -844,6 +848,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 				// update the HEAD
 				RefUpdate refUpdate = repo.updateRef(Constants.HEAD, false);
+				refUpdate.setRefLogMessage("rebase: aborting", false); //$NON-NLS-1$
 				Result res = refUpdate.link(headName);
 				switch (res) {
 				case FAST_FORWARD:
@@ -865,7 +870,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private boolean checkoutCommit(RevCommit commit) throws IOException,
+	private boolean checkoutCommit(String headName, RevCommit commit)
+			throws IOException,
 			CheckoutConflictException {
 		try {
 			RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
@@ -881,6 +887,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, true);
 			refUpdate.setExpectedOldObjectId(head);
 			refUpdate.setNewObjectId(commit);
+			refUpdate.setRefLogMessage(
+					"checkout: moving from " //$NON-NLS-1$
+							+ Repository.shortenRefName(headName)
+							+ " to " + commit.getName(), false); //$NON-NLS-1$
 			Result res = refUpdate.forceUpdate();
 			switch (res) {
 			case FAST_FORWARD:
@@ -895,21 +905,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			monitor.endTask();
 		}
 		return true;
-	}
-
-	/**
-	 * @return a list of Steps from {@link RebaseCommand#GIT_REBASE_TODO}
-	 * @throws IOException
-	 *             exception occuring when trying to read the file
-	 * @throws WrongRepositoryStateException
-	 *             when not in rebase interactive state
-	 */
-	public List<Step> readSteps() throws IOException,
-			WrongRepositoryStateException {
-		if (repo.getRepositoryState() == RepositoryState.REBASING_INTERACTIVE)
-			return loadSteps();
-		throw new WrongRepositoryStateException(MessageFormat.format(JGitText
-				.get().wrongRepositoryState, repo.getRepositoryState().name()));
 	}
 
 	List<Step> loadSteps() throws IOException {
