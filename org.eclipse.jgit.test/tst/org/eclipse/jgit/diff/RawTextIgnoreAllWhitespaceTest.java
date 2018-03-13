@@ -69,9 +69,9 @@ public class RawTextIgnoreAllWhitespaceTest extends TestCase {
 
 	public void testEqualsWithWhitespace() {
 		final RawText a = new RawTextIgnoreAllWhitespace(Constants
-				.encodeASCII("foo-a\n         \n a b c\na      "));
+				.encodeASCII("foo-a\n         \n a b c\na      \nfoo\n"));
 		final RawText b = new RawTextIgnoreAllWhitespace(Constants
-				.encodeASCII("foo-a        b\n\nab  c\na"));
+				.encodeASCII("foo-a        b\n\nab  c\na\nf\n"));
 
 		// "foo-a" != "foo-a        b"
 		assertFalse(a.equals(0, b, 0));
@@ -88,5 +88,9 @@ public class RawTextIgnoreAllWhitespaceTest extends TestCase {
 		// "a      " == "a"
 		assertTrue(a.equals(3, b, 3));
 		assertTrue(b.equals(3, a, 3));
+
+		// "foo" != "f"
+		assertFalse(a.equals(4, b, 4));
+		assertFalse(b.equals(4, a, 4));
 	}
 }

@@ -105,7 +105,7 @@ public class RawTextIgnoreAllWhitespace extends RawText {
 			bs++;
 		}
 
-		return true;
+		return ae - as == be - bs;
 	}
 
 	private static int trimTrailingWhitespace(byte[] raw, int start, int end) {
