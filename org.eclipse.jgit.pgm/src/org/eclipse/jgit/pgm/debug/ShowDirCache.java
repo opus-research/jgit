@@ -71,7 +71,7 @@ class ShowDirCache extends TextBuiltin {
 			final int stage = ent.getStage();
 
 			outw.print(mode);
-			outw.format(" %6d", valueOf(len)); //$NON-NLS-1$
+			outw.format(" %6d", valueOf(len));
 			outw.print(' ');
 			outw.print(fmt.format(mtime));
 			outw.print(' ');

@@ -194,13 +194,13 @@ public class DfsBlockCacheConfig {
 					60, TimeUnit.SECONDS, // Idle threads wait this long before ending.
 					new ArrayBlockingQueue<Runnable>(1), // Do not queue deeply.
 					new ThreadFactory() {
-						private final String name = "JGit-DFS-ReadAhead"; //$NON-NLS-1$
+						private final String name = "JGit-DFS-ReadAhead";
 						private final AtomicInteger cnt = new AtomicInteger();
 						private final ThreadGroup group = new ThreadGroup(name);
 
 						public Thread newThread(Runnable body) {
 							int id = cnt.incrementAndGet();
-							Thread thread = new Thread(group, body, name + "-" + id); //$NON-NLS-1$
+							Thread thread = new Thread(group, body, name + "-" + id);
 							thread.setDaemon(true);
 							thread.setContextClassLoader(getClass().getClassLoader());
 							return thread;

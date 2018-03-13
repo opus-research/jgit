@@ -552,9 +552,4 @@ public class DirCacheTree {
 				return aPos;
 		return -1;
 	}
-
-	@Override
-	public String toString() {
-		return getNameString();
-	}
 }

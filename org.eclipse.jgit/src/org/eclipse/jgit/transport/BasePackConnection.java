@@ -141,7 +141,7 @@ abstract class BasePackConnection extends BaseConnection {
 		final int timeout = transport.getTimeout();
 		if (timeout > 0) {
 			final Thread caller = Thread.currentThread();
-			myTimer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
+			myTimer = new InterruptTimer(caller.getName() + "-Timer");
 			timeoutIn = new TimeoutInputStream(myIn, myTimer);
 			timeoutOut = new TimeoutOutputStream(myOut, myTimer);
 			timeoutIn.setTimeout(timeout * 1000);
@@ -201,7 +201,7 @@ abstract class BasePackConnection extends BaseConnection {
 			if (line == PacketLineIn.END)
 				break;
 
-			if (line.startsWith("ERR ")) { //$NON-NLS-1$
+			if (line.startsWith("ERR ")) {
 				// This is a customized remote service error.
 				// Users should be informed about it.
 				throw new RemoteRepositoryException(uri, line.substring(4));
@@ -212,23 +212,23 @@ abstract class BasePackConnection extends BaseConnection {
 				if (nul >= 0) {
 					// The first line (if any) may contain "hidden"
 					// capability values after a NUL byte.
-					for (String c : line.substring(nul + 1).split(" ")) //$NON-NLS-1$
+					for (String c : line.substring(nul + 1).split(" "))
 						remoteCapablities.add(c);
 					line = line.substring(0, nul);
 				}
 			}
 
 			String name = line.substring(41, line.length());
-			if (avail.isEmpty() && name.equals("capabilities^{}")) { //$NON-NLS-1$
+			if (avail.isEmpty() && name.equals("capabilities^{}")) {
 				// special line from git-receive-pack to show
 				// capabilities when there are no refs to advertise
 				continue;
 			}
 
 			final ObjectId id = ObjectId.fromString(line.substring(0, 40));
-			if (name.equals(".have")) { //$NON-NLS-1$
+			if (name.equals(".have")) {
 				additionalHaves.add(id);
-			} else if (name.endsWith("^{}")) { //$NON-NLS-1$
+			} else if (name.endsWith("^{}")) {
 				name = name.substring(0, name.length() - 3);
 				final Ref prior = avail.get(name);
 				if (prior == null)
@@ -236,7 +236,7 @@ abstract class BasePackConnection extends BaseConnection {
 							JGitText.get().advertisementCameBefore, name, name));
 
 				if (prior.getPeeledObjectId() != null)
-					throw duplicateAdvertisement(name + "^{}"); //$NON-NLS-1$
+					throw duplicateAdvertisement(name + "^{}");
 
 				avail.put(name, new ObjectIdRef.PeeledTag(
 						Ref.Storage.NETWORK, name, prior.getObjectId(), id));
