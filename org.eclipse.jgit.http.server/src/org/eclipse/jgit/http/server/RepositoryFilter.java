@@ -63,10 +63,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /**
  * Opens a repository named by the path info through {@link RepositoryResolver}.
@@ -82,7 +82,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
  * attribute when the request is complete.
  */
 public class RepositoryFilter implements Filter {
-	private final RepositoryResolver<HttpServletRequest> resolver;
+	private final RepositoryResolver resolver;
 
 	private ServletContext context;
 
@@ -94,7 +94,7 @@ public class RepositoryFilter implements Filter {
 	 *            component to the actual {@link Repository} instance for the
 	 *            current web request.
 	 */
-	public RepositoryFilter(final RepositoryResolver<HttpServletRequest> resolver) {
+	public RepositoryFilter(final RepositoryResolver resolver) {
 		this.resolver = resolver;
 	}
 

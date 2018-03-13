@@ -56,7 +56,6 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -538,7 +537,8 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private void createEmptyFolder() throws Exception {
 		File path = new File(db.getWorkTree(), FOLDER);
-		FileUtils.mkdir(path);
+		path.mkdir();
+		assertTrue(path.isDirectory());
 	}
 
 	private RevCommit createEmptyFolderAndCommit() throws Exception {
@@ -548,12 +548,14 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private void createEmptyFolderUntracked() throws Exception {
 		File path = new File(db.getWorkTree(), UNTRACKED_FOLDER);
-		FileUtils.mkdir(path);
+		path.mkdir();
+		assertTrue(path.isDirectory());
 	}
 
 	private void createEmptyFolderIgnored() throws Exception {
 		File path = new File(db.getWorkTree(), IGNORED_FOLDER);
-		FileUtils.mkdir(path);
+		path.mkdir();
+		assertTrue(path.isDirectory());
 		writeTrashFile(GITIGNORE, GITIGNORE + "\n" + IGNORED_FOLDER + "/");
 	}
 

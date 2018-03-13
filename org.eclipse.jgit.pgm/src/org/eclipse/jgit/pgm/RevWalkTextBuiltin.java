@@ -199,8 +199,10 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 	}
 
 	protected RevWalk createWalk() {
+		if (objects)
+			return new ObjectWalk(db);
 		if (argWalk == null)
-			argWalk = objects ? new ObjectWalk(db) : new RevWalk(db);
+			argWalk = new RevWalk(db);
 		return argWalk;
 	}
 

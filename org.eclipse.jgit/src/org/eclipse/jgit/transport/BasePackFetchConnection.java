@@ -434,13 +434,12 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		int havesSinceLastContinue = 0;
 		boolean receivedContinue = false;
 		boolean receivedAck = false;
-		boolean negotiate = true;
 
 		if (statelessRPC)
 			state.writeTo(out, null);
 
 		negotiateBegin();
-		SEND_HAVES: while (negotiate) {
+		SEND_HAVES: for (;;) {
 			final RevCommit c = walk.next();
 			if (c == null)
 				break SEND_HAVES;
@@ -506,8 +505,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					receivedAck = true;
 					receivedContinue = true;
 					havesSinceLastContinue = 0;
-					if (anr == AckNackResult.ACK_READY)
-						negotiate = false;
 					break;
 				}
 
@@ -601,11 +598,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					c.add(COMMON);
 				}
 				return !remoteKnowsIsCommon;
-			}
-
-			@Override
-			public boolean requiresCommitBody() {
-				return false;
 			}
 		});
 	}

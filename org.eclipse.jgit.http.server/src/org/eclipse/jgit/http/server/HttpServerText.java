@@ -73,6 +73,8 @@ public class HttpServerText extends TranslationBundle {
 	/***/ public String parameterNotSet;
 	/***/ public String pathForParamNotFound;
 	/***/ public String pathNotSupported;
+	/***/ public String serviceNotEnabled;
+	/***/ public String serviceNotPermitted;
 	/***/ public String servletAlreadyInitialized;
 	/***/ public String servletMustNotBeNull;
 	/***/ public String servletWasAlreadyBound;

@@ -50,18 +50,14 @@ import static org.eclipse.jgit.storage.pack.StoredObjectRepresentation.PACK_WHOL
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -83,7 +79,7 @@ import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -91,15 +87,10 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
-import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevTag;
-import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
-import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -142,20 +133,16 @@ public class PackWriter {
 	private final List<ObjectToPack> objectsLists[] = new List[Constants.OBJ_TAG + 1];
 	{
 		objectsLists[0] = Collections.<ObjectToPack> emptyList();
-		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TREE] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_BLOB] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TAG] = new ArrayList<ObjectToPack>();
 	}
 
-	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
+	private final ObjectIdSubclassMap<ObjectToPack> objectsMap = new ObjectIdSubclassMap<ObjectToPack>();
 
 	// edge objects for thin packs
-	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
-
-	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
-
-	private Set<ObjectId> tagTargets = Collections.emptySet();
+	private final ObjectIdSubclassMap<ObjectToPack> edgeObjects = new ObjectIdSubclassMap<ObjectToPack>();
 
 	private Deflater myDeflater;
 
@@ -166,8 +153,6 @@ public class PackWriter {
 
 	private final PackConfig config;
 
-	private final Statistics stats;
-
 	private List<ObjectToPack> sortedByName;
 
 	private byte packcsum[];
@@ -176,13 +161,7 @@ public class PackWriter {
 
 	private boolean reuseDeltas;
 
-	private boolean reuseDeltaCommits;
-
-	private boolean reuseValidate;
-
 	private boolean thin;
-
-	private boolean useCachedPacks;
 
 	private boolean ignoreMissingUninteresting = true;
 
@@ -248,8 +227,6 @@ public class PackWriter {
 
 		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
 		reuseDeltas = config.isReuseDeltas();
-		reuseValidate = true; // be paranoid by default
-		stats = new Statistics();
 	}
 
 	/**
@@ -281,50 +258,6 @@ public class PackWriter {
 		this.deltaBaseAsOffset = deltaBaseAsOffset;
 	}
 
-	/**
-	 * Check if the writer will reuse commits that are already stored as deltas.
-	 *
-	 * @return true if the writer would reuse commits stored as deltas, assuming
-	 *         delta reuse is already enabled.
-	 */
-	public boolean isReuseDeltaCommits() {
-		return reuseDeltaCommits;
-	}
-
-	/**
-	 * Set the writer to reuse existing delta versions of commits.
-	 *
-	 * @param reuse
-	 *            if true, the writer will reuse any commits stored as deltas.
-	 *            By default the writer does not reuse delta commits.
-	 */
-	public void setReuseDeltaCommits(boolean reuse) {
-		reuseDeltaCommits = reuse;
-	}
-
-	/**
-	 * Check if the writer validates objects before copying them.
-	 *
-	 * @return true if validation is enabled; false if the reader will handle
-	 *         object validation as a side-effect of it consuming the output.
-	 */
-	public boolean isReuseValidatingObjects() {
-		return reuseValidate;
-	}
-
-	/**
-	 * Enable (or disable) object validation during packing.
-	 *
-	 * @param validate
-	 *            if true the pack writer will validate an object before it is
-	 *            put into the output. This additional validation work may be
-	 *            necessary to avoid propagating corruption from one local pack
-	 *            file to another local pack file.
-	 */
-	public void setReuseValidatingObjects(boolean validate) {
-		reuseValidate = validate;
-	}
-
 	/** @return true if this writer is producing a thin pack. */
 	public boolean isThin() {
 		return thin;
@@ -340,24 +273,6 @@ public class PackWriter {
 	 */
 	public void setThin(final boolean packthin) {
 		thin = packthin;
-	}
-
-	/** @return true to reuse cached packs. If true index creation isn't available. */
-	public boolean isUseCachedPacks() {
-		return useCachedPacks;
-	}
-
-	/**
-	 * @param useCached
-	 *            if set to true and a cached pack is present, it will be
-	 *            appended onto the end of a thin-pack, reducing the amount of
-	 *            working set space and CPU used by PackWriter. Enabling this
-	 *            feature prevents PackWriter from creating an index for the
-	 *            newly created pack, so its only suitable for writing to a
-	 *            network client, where the client will make the index.
-	 */
-	public void setUseCachedPacks(boolean useCached) {
-		useCachedPacks = useCached;
 	}
 
 	/**
@@ -383,38 +298,12 @@ public class PackWriter {
 	}
 
 	/**
-	 * Set the tag targets that should be hoisted earlier during packing.
-	 * <p>
-	 * Callers may put objects into this set before invoking any of the
-	 * preparePack methods to influence where an annotated tag's target is
-	 * stored within the resulting pack. Typically these will be clustered
-	 * together, and hoisted earlier in the file even if they are ancient
-	 * revisions, allowing readers to find tag targets with better locality.
-	 *
-	 * @param objects
-	 *            objects that annotated tags point at.
-	 */
-	public void setTagTargets(Set<ObjectId> objects) {
-		tagTargets = objects;
-	}
-
-	/**
 	 * Returns objects number in a pack file that was created by this writer.
 	 *
 	 * @return number of objects in pack.
-	 * @throws IOException
-	 *             a cached pack cannot supply its object count.
 	 */
-	public long getObjectCount() throws IOException {
-		if (stats.totalObjects == 0) {
-			long objCnt = 0;
-			for (List<ObjectToPack> list : objectsLists)
-				objCnt += list.size();
-			for (CachedPack pack : cachedPacks)
-				objCnt += pack.getObjectCount();
-			return objCnt;
-		}
-		return stats.totalObjects;
+	public int getObjectsNumber() {
+		return objectsMap.size();
 	}
 
 	/**
@@ -428,15 +317,26 @@ public class PackWriter {
 	 * a caller side. Iterator must return each id of object to write exactly
 	 * once.
 	 * </p>
+	 * <p>
+	 * When iterator returns object that has {@link RevFlag#UNINTERESTING} flag,
+	 * this object won't be included in an output pack. Instead, it is recorded
+	 * as edge-object (known to remote repository) for thin-pack. In such a case
+	 * writer may pack objects with delta base object not within set of objects
+	 * to pack, but belonging to party repository - those marked with
+	 * {@link RevFlag#UNINTERESTING} flag. This type of pack is used only for
+	 * transport.
+	 * </p>
 	 *
 	 * @param objectsSource
 	 *            iterator of object to store in a pack; order of objects within
 	 *            each type is important, ordering by type is not needed;
 	 *            allowed types for objects are {@link Constants#OBJ_COMMIT},
 	 *            {@link Constants#OBJ_TREE}, {@link Constants#OBJ_BLOB} and
-	 *            {@link Constants#OBJ_TAG}; objects returned by iterator may be
-	 *            later reused by caller as object id and type are internally
-	 *            copied in each iteration.
+	 *            {@link Constants#OBJ_TAG}; objects returned by iterator may
+	 *            be later reused by caller as object id and type are internally
+	 *            copied in each iteration; if object returned by iterator has
+	 *            {@link RevFlag#UNINTERESTING} flag set, it won't be included
+	 *            in a pack, but is considered as edge-object for thin-pack.
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
@@ -461,38 +361,6 @@ public class PackWriter {
 	 *
 	 * @param countingMonitor
 	 *            progress during object enumeration.
-	 * @param want
-	 *            collection of objects to be marked as interesting (start
-	 *            points of graph traversal).
-	 * @param have
-	 *            collection of objects to be marked as uninteresting (end
-	 *            points of graph traversal).
-	 * @throws IOException
-	 *             when some I/O problem occur during reading objects.
-	 */
-	public void preparePack(ProgressMonitor countingMonitor,
-			final Collection<? extends ObjectId> want,
-			final Collection<? extends ObjectId> have) throws IOException {
-		ObjectWalk ow = new ObjectWalk(reader);
-		preparePack(countingMonitor, ow, want, have);
-	}
-
-	/**
-	 * Prepare the list of objects to be written to the pack stream.
-	 * <p>
-	 * Basing on these 2 sets, another set of objects to put in a pack file is
-	 * created: this set consists of all objects reachable (ancestors) from
-	 * interesting objects, except uninteresting objects and their ancestors.
-	 * This method uses class {@link ObjectWalk} extensively to find out that
-	 * appropriate set of output objects and their optimal order in output pack.
-	 * Order is consistent with general git in-pack rules: sort by object type,
-	 * recency, path and delta-base first.
-	 * </p>
-	 *
-	 * @param countingMonitor
-	 *            progress during object enumeration.
-	 * @param walk
-	 *            ObjectWalk to perform enumeration.
 	 * @param interestingObjects
 	 *            collection of objects to be marked as interesting (start
 	 *            points of graph traversal).
@@ -503,14 +371,14 @@ public class PackWriter {
 	 *             when some I/O problem occur during reading objects.
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
-			final ObjectWalk walk,
 			final Collection<? extends ObjectId> interestingObjects,
 			final Collection<? extends ObjectId> uninterestingObjects)
 			throws IOException {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
-		findObjectsToPack(countingMonitor, walk, interestingObjects,
+		ObjectWalk walker = setUpWalker(interestingObjects,
 				uninterestingObjects);
+		findObjectsToPack(countingMonitor, walker);
 	}
 
 	/**
@@ -519,21 +387,9 @@ public class PackWriter {
 	 * @param id
 	 *            the object to test the existence of.
 	 * @return true if the object will appear in the output pack file.
-	 * @throws IOException
-	 *             a cached pack cannot be examined.
 	 */
-	public boolean willInclude(final AnyObjectId id) throws IOException {
-		ObjectToPack obj = objectsMap.get(id);
-		if (obj != null && !obj.isEdge())
-			return true;
-
-		Set<ObjectId> toFind = Collections.singleton(id.toObjectId());
-		for (CachedPack pack : cachedPacks) {
-			if (pack.hasObject(toFind).contains(id))
-				return true;
-		}
-
-		return false;
+	public boolean willInclude(final AnyObjectId id) {
+		return get(id) != null;
 	}
 
 	/**
@@ -544,8 +400,7 @@ public class PackWriter {
 	 * @return the object we are packing, or null.
 	 */
 	public ObjectToPack get(AnyObjectId id) {
-		ObjectToPack obj = objectsMap.get(id);
-		return obj != null && !obj.isEdge() ? obj : null;
+		return objectsMap.get(id);
 	}
 
 	/**
@@ -579,9 +434,6 @@ public class PackWriter {
 	 *             the index data could not be written to the supplied stream.
 	 */
 	public void writeIndex(final OutputStream indexStream) throws IOException {
-		if (!cachedPacks.isEmpty())
-			throw new IOException(JGitText.get().cachedPacksPreventsIndexCreation);
-
 		final List<ObjectToPack> list = sortByName();
 		final PackIndexWriter iw;
 		int indexVersion = config.getIndexVersion();
@@ -594,12 +446,11 @@ public class PackWriter {
 
 	private List<ObjectToPack> sortByName() {
 		if (sortedByName == null) {
-			int cnt = 0;
-			for (List<ObjectToPack> list : objectsLists)
-				cnt += list.size();
-			sortedByName = new BlockList<ObjectToPack>(cnt);
-			for (List<ObjectToPack> list : objectsLists)
-				sortedByName.addAll(list);
+			sortedByName = new ArrayList<ObjectToPack>(objectsMap.size());
+			for (List<ObjectToPack> list : objectsLists) {
+				for (ObjectToPack otp : list)
+					sortedByName.add(otp);
+			}
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -645,44 +496,15 @@ public class PackWriter {
 		final PackOutputStream out = new PackOutputStream(writeMonitor,
 				packStream, this);
 
-		long objCnt = getObjectCount();
-		stats.totalObjects = objCnt;
-		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
-		long writeStart = System.currentTimeMillis();
-
-		long headerStart = out.length();
+		int objCnt = getObjectsNumber();
+		writeMonitor.beginTask(JGitText.get().writingObjects, objCnt);
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
 		out.flush();
-		long headerEnd = out.length();
-
 		writeObjects(out);
-		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty())
-			stats.thinPackBytes = out.length() - (headerEnd - headerStart);
-
-		for (CachedPack pack : cachedPacks) {
-			long deltaCnt = pack.getDeltaCount();
-			stats.reusedObjects += pack.getObjectCount();
-			stats.reusedDeltas += deltaCnt;
-			stats.totalDeltas += deltaCnt;
-			reuseSupport.copyPackAsIs(out, pack, reuseValidate);
-		}
 		writeChecksum(out);
-		out.flush();
-		stats.timeWriting = System.currentTimeMillis() - writeStart;
-		stats.totalBytes = out.length();
-		stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
 
 		reader.release();
 		writeMonitor.endTask();
-	}
-
-	/**
-	 * @return description of what this PackWriter did in order to create the
-	 *         final pack stream. The object is only available to callers after
-	 *         {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
-	 */
-	public Statistics getStatistics() {
-		return stats;
 	}
 
 	/** Release all resources used by this writer. */
@@ -695,15 +517,10 @@ public class PackWriter {
 	}
 
 	private void searchForReuse(ProgressMonitor monitor) throws IOException {
-		int cnt = 0;
-		for (List<ObjectToPack> list : objectsLists)
-			cnt += list.size();
-		long start = System.currentTimeMillis();
-		monitor.beginTask(JGitText.get().searchForReuse, cnt);
+		monitor.beginTask(JGitText.get().searchForReuse, getObjectsNumber());
 		for (List<ObjectToPack> list : objectsLists)
 			reuseSupport.selectObjectRepresentation(this, monitor, list);
 		monitor.endTask();
-		stats.timeSearchingForReuse = System.currentTimeMillis() - start;
 	}
 
 	private void searchForDeltas(ProgressMonitor monitor)
@@ -722,7 +539,6 @@ public class PackWriter {
 		cnt = findObjectsNeedingDelta(list, cnt, Constants.OBJ_BLOB);
 		if (cnt == 0)
 			return;
-		int nonEdgeCnt = cnt;
 
 		// Queue up any edge objects that we might delta against.  We won't
 		// be sending these as we assume the other side has them, but we need
@@ -740,8 +556,7 @@ public class PackWriter {
 		// search code to discover the missing object and skip over it, or
 		// abort with an exception if we actually had to have it.
 		//
-		final long sizingStart = System.currentTimeMillis();
-		monitor.beginTask(JGitText.get().searchForSizes, cnt);
+		monitor.beginTask(JGitText.get().compressingObjects, cnt);
 		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
 				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
 		try {
@@ -760,8 +575,8 @@ public class PackWriter {
 							continue;
 						}
 
-						otp = objectsMap.get(notFound.getObjectId());
-						if (otp != null && otp.isEdge()) {
+						otp = edgeObjects.get(notFound.getObjectId());
+						if (otp != null) {
 							otp.setDoNotDelta(true);
 							continue;
 						}
@@ -770,8 +585,11 @@ public class PackWriter {
 				}
 
 				ObjectToPack otp = sizeQueue.getCurrent();
-				if (otp == null)
+				if (otp == null) {
 					otp = objectsMap.get(sizeQueue.getObjectId());
+					if (otp == null)
+						otp = edgeObjects.get(sizeQueue.getObjectId());
+				}
 
 				long sz = sizeQueue.getSize();
 				if (limit <= sz || Integer.MAX_VALUE <= sz)
@@ -787,7 +605,6 @@ public class PackWriter {
 			sizeQueue.release();
 		}
 		monitor.endTask();
-		stats.timeSearchingForSizes = System.currentTimeMillis() - sizingStart;
 
 		// Sort the objects by path hash so like files are near each other,
 		// and then by size descending so that bigger files are first. This
@@ -813,41 +630,27 @@ public class PackWriter {
 				if (cmp != 0)
 					return cmp;
 
-				cmp = (a.isEdge() ? 0 : 1) - (b.isEdge() ? 0 : 1);
-				if (cmp != 0)
-					return cmp;
-
 				return b.getWeight() - a.getWeight();
 			}
 		});
 
 		// Above we stored the objects we cannot delta onto the end.
 		// Remove them from the list so we don't waste time on them.
-		while (0 < cnt && list[cnt - 1].isDoNotDelta()) {
-			if (!list[cnt - 1].isEdge())
-				nonEdgeCnt--;
+		while (0 < cnt && list[cnt - 1].isDoNotDelta())
 			cnt--;
-		}
 		if (cnt == 0)
 			return;
 
-		final long searchStart = System.currentTimeMillis();
-		monitor.beginTask(JGitText.get().compressingObjects, nonEdgeCnt);
+		monitor.beginTask(JGitText.get().compressingObjects, cnt);
 		searchForDeltas(monitor, list, cnt);
 		monitor.endTask();
-		stats.deltaSearchNonEdgeObjects = nonEdgeCnt;
-		stats.timeCompressing = System.currentTimeMillis() - searchStart;
-
-		for (int i = 0; i < cnt; i++)
-			if (!list[i].isEdge() && list[i].isDeltaRepresentation())
-				stats.deltasFound++;
 	}
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isReuseAsIs()) // already reusing a representation
-				continue;
 			if (otp.isDoNotDelta()) // delta is disabled for this path
+				continue;
+			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -1007,19 +810,14 @@ public class PackWriter {
 	}
 
 	private void writeObjects(PackOutputStream out) throws IOException {
-		writeObjects(out, objectsLists[Constants.OBJ_COMMIT]);
-		writeObjects(out, objectsLists[Constants.OBJ_TAG]);
-		writeObjects(out, objectsLists[Constants.OBJ_TREE]);
-		writeObjects(out, objectsLists[Constants.OBJ_BLOB]);
-	}
-
-	private void writeObjects(PackOutputStream out, List<ObjectToPack> list)
-			throws IOException {
 		if (reuseSupport != null) {
-			reuseSupport.writeObjects(out, list);
+			for (List<ObjectToPack> list : objectsLists)
+				reuseSupport.writeObjects(out, list);
 		} else {
-			for (ObjectToPack otp : list)
-				out.writeObject(otp);
+			for (List<ObjectToPack> list : objectsLists) {
+				for (ObjectToPack otp : list)
+					out.writeObject(otp);
+			}
 		}
 	}
 
@@ -1036,14 +834,9 @@ public class PackWriter {
 
 		while (otp.isReuseAsIs()) {
 			try {
-				reuseSupport.copyObjectAsIs(out, otp, reuseValidate);
+				reuseSupport.copyObjectAsIs(out, otp);
 				out.endObject();
 				otp.setCRC(out.getCRC32());
-				stats.reusedObjects++;
-				if (otp.isDeltaRepresentation()) {
-					stats.totalDeltas++;
-					stats.reusedDeltas++;
-				}
 				return;
 			} catch (StoredObjectRepresentationNotAvailableException gone) {
 				if (otp.getOffset() == out.length()) {
@@ -1138,7 +931,6 @@ public class PackWriter {
 		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
 		delta.writeTo(dst, null);
 		dst.finish();
-		stats.totalDeltas++;
 	}
 
 	private TemporaryBuffer.Heap delta(final ObjectToPack otp)
@@ -1180,75 +972,29 @@ public class PackWriter {
 		out.write(packcsum);
 	}
 
-	private void findObjectsToPack(final ProgressMonitor countingMonitor,
-			final ObjectWalk walker, final Collection<? extends ObjectId> want,
-			Collection<? extends ObjectId> have)
+	private ObjectWalk setUpWalker(
+			final Collection<? extends ObjectId> interestingObjects,
+			final Collection<? extends ObjectId> uninterestingObjects)
 			throws MissingObjectException, IOException,
 			IncorrectObjectTypeException {
-		final long countingStart = System.currentTimeMillis();
-		countingMonitor.beginTask(JGitText.get().countingObjects,
-				ProgressMonitor.UNKNOWN);
+		List<ObjectId> all = new ArrayList<ObjectId>(interestingObjects.size());
+		for (ObjectId id : interestingObjects)
+			all.add(id.copy());
 
-		if (have == null)
-			have = Collections.emptySet();
+		final Set<ObjectId> not;
+		if (uninterestingObjects != null && !uninterestingObjects.isEmpty()) {
+			not = new HashSet<ObjectId>();
+			for (ObjectId id : uninterestingObjects)
+				not.add(id.copy());
+			all.addAll(not);
+		} else
+			not = Collections.emptySet();
 
-		stats.interestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(want));
-		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(have));
-
-		List<ObjectId> all = new ArrayList<ObjectId>(want.size() + have.size());
-		all.addAll(want);
-		all.addAll(have);
-
-		final Map<ObjectId, CachedPack> tipToPack = new HashMap<ObjectId, CachedPack>();
-		final RevFlag inCachedPack = walker.newFlag("inCachedPack");
-		final RevFlag include = walker.newFlag("include");
-		final RevFlag added = walker.newFlag("added");
-
-		final RevFlagSet keepOnRestart = new RevFlagSet();
-		keepOnRestart.add(inCachedPack);
-
+		final ObjectWalk walker = new ObjectWalk(reader);
 		walker.setRetainBody(false);
-		walker.carry(include);
-
-		int haveEst = have.size();
-		if (have.isEmpty()) {
-			walker.sort(RevSort.COMMIT_TIME_DESC);
-			if (useCachedPacks && reuseSupport != null) {
-				Set<ObjectId> need = new HashSet<ObjectId>(want);
-				List<CachedPack> shortCircuit = new LinkedList<CachedPack>();
-
-				for (CachedPack pack : reuseSupport.getCachedPacks()) {
-					if (need.containsAll(pack.getTips())) {
-						need.removeAll(pack.getTips());
-						shortCircuit.add(pack);
-					}
-
-					for (ObjectId id : pack.getTips()) {
-						tipToPack.put(id, pack);
-						all.add(id);
-					}
-				}
-
-				if (need.isEmpty() && !shortCircuit.isEmpty()) {
-					cachedPacks.addAll(shortCircuit);
-					for (CachedPack pack : shortCircuit)
-						countingMonitor.update((int) pack.getObjectCount());
-					countingMonitor.endTask();
-					stats.timeCounting = System.currentTimeMillis() - countingStart;
-					return;
-				}
-
-				haveEst += tipToPack.size();
-			}
-		} else {
-			walker.sort(RevSort.TOPO);
-			if (thin)
-				walker.sort(RevSort.BOUNDARY, true);
-		}
-
-		List<RevObject> wantObjs = new ArrayList<RevObject>(want.size());
-		List<RevObject> haveObjs = new ArrayList<RevObject>(haveEst);
-		List<RevTag> wantTags = new ArrayList<RevTag>(want.size());
+		walker.sort(RevSort.TOPO);
+		if (thin && !not.isEmpty())
+			walker.sort(RevSort.BOUNDARY, true);
 
 		AsyncRevObjectQueue q = walker.parseAny(all, true);
 		try {
@@ -1257,21 +1003,13 @@ public class PackWriter {
 					RevObject o = q.next();
 					if (o == null)
 						break;
-
-					if (tipToPack.containsKey(o))
-						o.add(inCachedPack);
-
-					if (have.contains(o)) {
-						haveObjs.add(o);
-					} else if (want.contains(o)) {
-						o.add(include);
-						wantObjs.add(o);
-						if (o instanceof RevTag)
-							wantTags.add((RevTag) o);
-					}
+					if (not.contains(o.copy()))
+						walker.markUninteresting(o);
+					else
+						walker.markStart(o);
 				} catch (MissingObjectException e) {
 					if (ignoreMissingUninteresting
-							&& have.contains(e.getObjectId()))
+							&& not.contains(e.getObjectId()))
 						continue;
 					throw e;
 				}
@@ -1279,191 +1017,25 @@ public class PackWriter {
 		} finally {
 			q.release();
 		}
+		return walker;
+	}
 
-		if (!wantTags.isEmpty()) {
-			all = new ArrayList<ObjectId>(wantTags.size());
-			for (RevTag tag : wantTags)
-				all.add(tag.getObject());
-			q = walker.parseAny(all, true);
-			try {
-				while (q.next() != null) {
-					// Just need to pop the queue item to parse the object.
-				}
-			} finally {
-				q.release();
-			}
-		}
-
-		for (RevObject obj : wantObjs)
-			walker.markStart(obj);
-		for (RevObject obj : haveObjs)
-			walker.markUninteresting(obj);
-
-		int typesToPrune = 0;
-		final int maxBases = config.getDeltaSearchWindowSize();
-		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		BlockList<RevCommit> commits = new BlockList<RevCommit>();
-		RevCommit c;
-		while ((c = walker.next()) != null) {
-			if (c.has(inCachedPack)) {
-				CachedPack pack = tipToPack.get(c);
-				if (includesAllTips(pack, include, walker)) {
-					useCachedPack(walker, keepOnRestart, //
-							wantObjs, haveObjs, pack);
-					commits = new BlockList<RevCommit>();
-
-					countingMonitor.endTask();
-					countingMonitor.beginTask(JGitText.get().countingObjects,
-							ProgressMonitor.UNKNOWN);
-					continue;
-				}
-			}
-
-			if (c.has(RevFlag.UNINTERESTING)) {
-				if (baseTrees.size() <= maxBases)
-					baseTrees.add(c.getTree());
-				continue;
-			}
-
-			commits.add(c);
-			countingMonitor.update(1);
-		}
-
-		int commitCnt = 0;
-		boolean putTagTargets = false;
-		for (RevCommit cmit : commits) {
-			if (!cmit.has(added)) {
-				cmit.add(added);
-				addObject(cmit, 0);
-				commitCnt++;
-			}
-
-			for (int i = 0; i < cmit.getParentCount(); i++) {
-				RevCommit p = cmit.getParent(i);
-				if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)) {
-					p.add(added);
-					addObject(p, 0);
-					commitCnt++;
-				}
-			}
-
-			if (!putTagTargets && 4096 < commitCnt) {
-				for (ObjectId id : tagTargets) {
-					RevObject obj = walker.lookupOrNull(id);
-					if (obj instanceof RevCommit
-							&& obj.has(include)
-							&& !obj.has(RevFlag.UNINTERESTING)
-							&& !obj.has(added)) {
-						obj.add(added);
-						addObject(obj, 0);
-					}
-				}
-				putTagTargets = true;
-			}
-		}
-		commits = null;
-
-		for (CachedPack p : cachedPacks) {
-			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_COMMIT])) {
-				if (baseTrees.size() <= maxBases)
-					baseTrees.add(walker.lookupCommit(d).getTree());
-				objectsMap.get(d).setEdge();
-				typesToPrune |= 1 << Constants.OBJ_COMMIT;
-			}
-		}
-
-		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
-				objectsMap, edgeObjects, reader);
+	private void findObjectsToPack(final ProgressMonitor countingMonitor,
+			final ObjectWalk walker) throws MissingObjectException,
+			IncorrectObjectTypeException,			IOException {
+		countingMonitor.beginTask(JGitText.get().countingObjects,
+				ProgressMonitor.UNKNOWN);
 		RevObject o;
-		while ((o = walker.nextObject()) != null) {
-			if (o.has(RevFlag.UNINTERESTING))
-				continue;
 
-			int pathHash = walker.getPathHashCode();
-			byte[] pathBuf = walker.getPathBuffer();
-			int pathLen = walker.getPathLength();
-
-			bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-			addObject(o, pathHash);
+		while ((o = walker.next()) != null) {
+			addObject(o, 0);
 			countingMonitor.update(1);
 		}
-
-		for (CachedPack p : cachedPacks) {
-			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_TREE])) {
-				objectsMap.get(d).setEdge();
-				typesToPrune |= 1 << Constants.OBJ_TREE;
-			}
-			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_BLOB])) {
-				objectsMap.get(d).setEdge();
-				typesToPrune |= 1 << Constants.OBJ_BLOB;
-			}
-			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_TAG])) {
-				objectsMap.get(d).setEdge();
-				typesToPrune |= 1 << Constants.OBJ_TAG;
-			}
+		while ((o = walker.nextObject()) != null) {
+			addObject(o, walker.getPathHashCode());
+			countingMonitor.update(1);
 		}
-
-		if (typesToPrune != 0) {
-			pruneObjectList(typesToPrune, Constants.OBJ_COMMIT);
-			pruneObjectList(typesToPrune, Constants.OBJ_TREE);
-			pruneObjectList(typesToPrune, Constants.OBJ_BLOB);
-			pruneObjectList(typesToPrune, Constants.OBJ_TAG);
-		}
-
-		for (CachedPack pack : cachedPacks)
-			countingMonitor.update((int) pack.getObjectCount());
 		countingMonitor.endTask();
-		stats.timeCounting = System.currentTimeMillis() - countingStart;
-	}
-
-	private void pruneObjectList(int typesToPrune, int typeCode) {
-		if ((typesToPrune & (1 << typeCode)) == 0)
-			return;
-
-		final List<ObjectToPack> list = objectsLists[typeCode];
-		final int size = list.size();
-		int src = 0;
-		int dst = 0;
-
-		for (; src < size; src++) {
-			ObjectToPack obj = list.get(src);
-			if (obj.isEdge())
-				continue;
-			if (dst != src)
-				list.set(dst, obj);
-			dst++;
-		}
-
-		while (dst < list.size())
-			list.remove(list.size() - 1);
-	}
-
-	private void useCachedPack(ObjectWalk walker, RevFlagSet keepOnRestart,
-			List<RevObject> wantObj, List<RevObject> baseObj, CachedPack pack)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException {
-		cachedPacks.add(pack);
-		for (ObjectId id : pack.getTips())
-			baseObj.add(walker.lookupOrNull(id));
-
-		setThin(true);
-		walker.resetRetain(keepOnRestart);
-		walker.sort(RevSort.TOPO);
-		walker.sort(RevSort.BOUNDARY, true);
-
-		for (RevObject id : wantObj)
-			walker.markStart(id);
-		for (RevObject id : baseObj)
-			walker.markUninteresting(id);
-	}
-
-	private static boolean includesAllTips(CachedPack pack, RevFlag include,
-			ObjectWalk walker) {
-		for (ObjectId id : pack.getTips()) {
-			if (!walker.lookupOrNull(id).has(include))
-				return false;
-		}
-		return true;
 	}
 
 	/**
@@ -1485,6 +1057,20 @@ public class PackWriter {
 
 	private void addObject(final RevObject object, final int pathHashCode)
 			throws IncorrectObjectTypeException {
+		if (object.has(RevFlag.UNINTERESTING)) {
+			switch (object.getType()) {
+			case Constants.OBJ_TREE:
+			case Constants.OBJ_BLOB:
+				ObjectToPack otp = new ObjectToPack(object);
+				otp.setPathHash(pathHashCode);
+				otp.setEdge();
+				edgeObjects.add(otp);
+				thin = true;
+				break;
+			}
+			return;
+		}
+
 		final ObjectToPack otp;
 		if (reuseSupport != null)
 			otp = reuseSupport.newObjectToPack(object);
@@ -1535,14 +1121,14 @@ public class PackWriter {
 		} else
 			nWeight = next.getWeight();
 
-		if (nFmt == PACK_DELTA && reuseDeltas && reuseDeltaFor(otp)) {
+		if (nFmt == PACK_DELTA && reuseDeltas) {
 			ObjectId baseId = next.getDeltaBase();
 			ObjectToPack ptr = objectsMap.get(baseId);
-			if (ptr != null && !ptr.isEdge()) {
+			if (ptr != null) {
 				otp.setDeltaBase(ptr);
 				otp.setReuseAsIs();
 				otp.setWeight(nWeight);
-			} else if (thin && ptr != null && ptr.isEdge()) {
+			} else if (thin && edgeObjects.contains(baseId)) {
 				otp.setDeltaBase(baseId);
 				otp.setReuseAsIs();
 				otp.setWeight(nWeight);
@@ -1560,215 +1146,5 @@ public class PackWriter {
 		}
 
 		otp.select(next);
-	}
-
-	private boolean reuseDeltaFor(ObjectToPack otp) {
-		switch (otp.getType()) {
-		case Constants.OBJ_COMMIT:
-			return reuseDeltaCommits;
-		case Constants.OBJ_TREE:
-			return true;
-		case Constants.OBJ_BLOB:
-			return true;
-		case Constants.OBJ_TAG:
-			return false;
-		default:
-			return true;
-		}
-	}
-
-	/** Summary of how PackWriter created the pack. */
-	public static class Statistics {
-		Set<ObjectId> interestingObjects;
-
-		Set<ObjectId> uninterestingObjects;
-
-		Collection<CachedPack> reusedPacks;
-
-		int deltaSearchNonEdgeObjects;
-
-		int deltasFound;
-
-		long totalObjects;
-
-		long totalDeltas;
-
-		long reusedObjects;
-
-		long reusedDeltas;
-
-		long totalBytes;
-
-		long thinPackBytes;
-
-		long timeCounting;
-
-		long timeSearchingForReuse;
-
-		long timeSearchingForSizes;
-
-		long timeCompressing;
-
-		long timeWriting;
-
-		/**
-		 * @return unmodifiable collection of objects to be included in the
-		 *         pack. May be null if the pack was hand-crafted in a unit
-		 *         test.
-		 */
-		public Set<ObjectId> getInterestingObjects() {
-			return interestingObjects;
-		}
-
-		/**
-		 * @return unmodifiable collection of objects that should be excluded
-		 *         from the pack, as the peer that will receive the pack already
-		 *         has these objects.
-		 */
-		public Set<ObjectId> getUninterestingObjects() {
-			return uninterestingObjects;
-		}
-
-		/**
-		 * @return unmodifiable collection of the cached packs that were reused
-		 *         in the output, if any were selected for reuse.
-		 */
-		public Collection<CachedPack> getReusedPacks() {
-			return reusedPacks;
-		}
-
-		/**
-		 * @return number of objects in the output pack that went through the
-		 *         delta search process in order to find a potential delta base.
-		 */
-		public int getDeltaSearchNonEdgeObjects() {
-			return deltaSearchNonEdgeObjects;
-		}
-
-		/**
-		 * @return number of objects in the output pack that went through delta
-		 *         base search and found a suitable base. This is a subset of
-		 *         {@link #getDeltaSearchNonEdgeObjects()}.
-		 */
-		public int getDeltasFound() {
-			return deltasFound;
-		}
-
-		/**
-		 * @return total number of objects output. This total includes the value
-		 *         of {@link #getTotalDeltas()}.
-		 */
-		public long getTotalObjects() {
-			return totalObjects;
-		}
-
-		/**
-		 * @return total number of deltas output. This may be lower than the
-		 *         actual number of deltas if a cached pack was reused.
-		 */
-		public long getTotalDeltas() {
-			return totalDeltas;
-		}
-
-		/**
-		 * @return number of objects whose existing representation was reused in
-		 *         the output. This count includes {@link #getReusedDeltas()}.
-		 */
-		public long getReusedObjects() {
-			return reusedObjects;
-		}
-
-		/**
-		 * @return number of deltas whose existing representation was reused in
-		 *         the output, as their base object was also output or was
-		 *         assumed present for a thin pack. This may be lower than the
-		 *         actual number of reused deltas if a cached pack was reused.
-		 */
-		public long getReusedDeltas() {
-			return reusedDeltas;
-		}
-
-		/**
-		 * @return total number of bytes written. This size includes the pack
-		 *         header, trailer, thin pack, and reused cached pack(s).
-		 */
-		public long getTotalBytes() {
-			return totalBytes;
-		}
-
-		/**
-		 * @return size of the thin pack in bytes, if a thin pack was generated.
-		 *         A thin pack is created when the client already has objects
-		 *         and some deltas are created against those objects, or if a
-		 *         cached pack is being used and some deltas will reference
-		 *         objects in the cached pack. This size does not include the
-		 *         pack header or trailer.
-		 */
-		public long getThinPackBytes() {
-			return thinPackBytes;
-		}
-
-		/**
-		 * @return time in milliseconds spent enumerating the objects that need
-		 *         to be included in the output. This time includes any restarts
-		 *         that occur when a cached pack is selected for reuse.
-		 */
-		public long getTimeCounting() {
-			return timeCounting;
-		}
-
-		/**
-		 * @return time in milliseconds spent matching existing representations
-		 *         against objects that will be transmitted, or that the client
-		 *         can be assumed to already have.
-		 */
-		public long getTimeSearchingForReuse() {
-			return timeSearchingForReuse;
-		}
-
-		/**
-		 * @return time in milliseconds spent finding the sizes of all objects
-		 *         that will enter the delta compression search window. The
-		 *         sizes need to be known to better match similar objects
-		 *         together and improve delta compression ratios.
-		 */
-		public long getTimeSearchingForSizes() {
-			return timeSearchingForSizes;
-		}
-
-		/**
-		 * @return time in milliseconds spent on delta compression. This is
-		 *         observed wall-clock time and does not accurately track CPU
-		 *         time used when multiple threads were used to perform the
-		 *         delta compression.
-		 */
-		public long getTimeCompressing() {
-			return timeCompressing;
-		}
-
-		/**
-		 * @return time in milliseconds spent writing the pack output, from
-		 *         start of header until end of trailer. The transfer speed can
-		 *         be approximated by dividing {@link #getTotalBytes()} by this
-		 *         value.
-		 */
-		public long getTimeWriting() {
-			return timeWriting;
-		}
-
-		/**
-		 * @return get the average output speed in terms of bytes-per-second.
-		 *         {@code getTotalBytes() / (getTimeWriting() / 1000.0)}.
-		 */
-		public double getTransferRate() {
-			return getTotalBytes() / (getTimeWriting() / 1000.0);
-		}
-
-		/** @return formatted message string for display to clients. */
-		public String getMessage() {
-			return MessageFormat.format(JGitText.get().packWriterStatistics, //
-					totalObjects, totalDeltas, //
-					reusedObjects, reusedDeltas);
-		}
 	}
 }

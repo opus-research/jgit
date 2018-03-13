@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -77,7 +76,6 @@ import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
-import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
@@ -153,7 +151,7 @@ public abstract class PackParser {
 
 	private int entryCount;
 
-	private ObjectIdOwnerMap<DeltaChain> baseById;
+	private ObjectIdSubclassMap<DeltaChain> baseById;
 
 	/**
 	 * Objects referenced by their name from deltas, that aren't in this pack.
@@ -167,7 +165,7 @@ public abstract class PackParser {
 	private LongMap<UnresolvedDelta> baseByPos;
 
 	/** Blobs whose contents need to be double-checked after indexing. */
-	private BlockList<PackedObjectInfo> deferredCheckBlobs;
+	private List<PackedObjectInfo> deferredCheckBlobs;
 
 	private MessageDigest packDigest;
 
@@ -408,60 +406,33 @@ public abstract class PackParser {
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
 	 */
-	public final PackLock parse(ProgressMonitor progress) throws IOException {
-		return parse(progress, progress);
-	}
-
-	/**
-	 * Parse the pack stream.
-	 *
-	 * @param receiving
-	 *            receives progress feedback during the initial receiving
-	 *            objects phase. If null, {@link NullProgressMonitor} will be
-	 *            used.
-	 * @param resolving
-	 *            receives progress feedback during the resolving objects phase.
-	 * @return the pack lock, if one was requested by setting
-	 *         {@link #setLockMessage(String)}.
-	 * @throws IOException
-	 *             the stream is malformed, or contains corrupt objects.
-	 */
-	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
-			throws IOException {
-		if (receiving == null)
-			receiving = NullProgressMonitor.INSTANCE;
-		if (resolving == null)
-			resolving = NullProgressMonitor.INSTANCE;
-
-		if (receiving == resolving)
-			receiving.start(2 /* tasks */);
+	public PackLock parse(ProgressMonitor progress) throws IOException {
+		if (progress == null)
+			progress = NullProgressMonitor.INSTANCE;
+		progress.start(2 /* tasks */);
 		try {
 			readPackHeader();
 
 			entries = new PackedObjectInfo[(int) objectCount];
-			baseById = new ObjectIdOwnerMap<DeltaChain>();
+			baseById = new ObjectIdSubclassMap<DeltaChain>();
 			baseByPos = new LongMap<UnresolvedDelta>();
-			deferredCheckBlobs = new BlockList<PackedObjectInfo>();
+			deferredCheckBlobs = new ArrayList<PackedObjectInfo>();
 
-			receiving.beginTask(JGitText.get().receivingObjects,
+			progress.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
-			try {
-				for (int done = 0; done < objectCount; done++) {
-					indexOneObject();
-					receiving.update(1);
-					if (receiving.isCancelled())
-						throw new IOException(JGitText.get().downloadCancelled);
-				}
-				readPackFooter();
-				endInput();
-			} finally {
-				receiving.endTask();
+			for (int done = 0; done < objectCount; done++) {
+				indexOneObject();
+				progress.update(1);
+				if (progress.isCancelled())
+					throw new IOException(JGitText.get().downloadCancelled);
 			}
-
+			readPackFooter();
+			endInput();
 			if (!deferredCheckBlobs.isEmpty())
 				doDeferredCheckBlobs();
+			progress.endTask();
 			if (deltaCount > 0) {
-				resolveDeltas(resolving);
+				resolveDeltas(progress);
 				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
 						throw new IOException(MessageFormat.format(JGitText
@@ -469,7 +440,7 @@ public abstract class PackParser {
 								(objectCount - entryCount)));
 					}
 
-					resolveDeltasWithExternalBases(resolving);
+					resolveDeltasWithExternalBases(progress);
 
 					if (entryCount < objectCount) {
 						throw new IOException(MessageFormat.format(JGitText
@@ -496,6 +467,8 @@ public abstract class PackParser {
 				inflater = null;
 				objectDatabase.close();
 			}
+
+			progress.endTask();
 		}
 		return null; // By default there is no locking.
 	}
@@ -1370,7 +1343,7 @@ public abstract class PackParser {
 		return inflater;
 	}
 
-	private static class DeltaChain extends ObjectIdOwnerMap.Entry {
+	private static class DeltaChain extends ObjectId {
 		UnresolvedDelta head;
 
 		DeltaChain(final AnyObjectId id) {

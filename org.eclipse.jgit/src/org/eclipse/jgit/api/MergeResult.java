@@ -311,7 +311,7 @@ public class MergeResult {
 	 * 	}
 	 * }</pre>
 	 *
-	 * @return the conflicts or <code>null</code> if no conflict occurred
+	 * @return the conflicts or <code>null</code> if no conflict occured
 	 */
 	public Map<String, int[][]> getConflicts() {
 		return conflicts;

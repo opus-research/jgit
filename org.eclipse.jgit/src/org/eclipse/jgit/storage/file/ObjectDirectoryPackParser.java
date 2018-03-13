@@ -168,14 +168,13 @@ public class ObjectDirectoryPackParser extends PackParser {
 	}
 
 	@Override
-	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
-			throws IOException {
+	public PackLock parse(ProgressMonitor progress) throws IOException {
 		tmpPack = File.createTempFile("incoming_", ".pack", db.getDirectory());
 		tmpIdx = new File(db.getDirectory(), baseName(tmpPack) + ".idx");
 		try {
 			out = new RandomAccessFile(tmpPack, "rw");
 
-			super.parse(receiving, resolving);
+			super.parse(progress);
 
 			out.seek(packEnd);
 			out.write(packHash);
