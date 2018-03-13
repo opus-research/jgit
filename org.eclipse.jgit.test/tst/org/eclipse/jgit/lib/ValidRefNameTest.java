@@ -45,8 +45,6 @@ package org.eclipse.jgit.lib;
 
 import static org.eclipse.jgit.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.junit.MockSystemReader;
-import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 public class ValidRefNameTest {
@@ -193,26 +191,5 @@ public class ValidRefNameTest {
 	public void testRefLogQueryIsValidRef() {
 		assertValid(false, "refs/heads/master@{1}");
 		assertValid(false, "refs/heads/master@{1.hour.ago}");
-	}
-
-	@Test
-	public void testWindowsReservedNames() {
-		SystemReader original = SystemReader.getInstance();
-		try {
-			SystemReader.setInstance(new MockSystemReader() {
-				public boolean isWindows() {
-					return true;
-				}
-			});
-			// re-using code from DirCacheCheckoutTest, hence
-			// only testing for one of the special names.
-			assertValid(false, "refs/heads/con");
-			assertValid(false, "refs/con/x");
-			assertValid(false, "con/heads/x");
-			assertValid(true, "refs/heads/conx");
-			assertValid(true, "refs/heads/xcon");
-		} finally {
-			SystemReader.setInstance(original);
-		}
 	}
 }
