@@ -166,7 +166,7 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 	 */
 	public void addTree(byte[] pathPrefix, int stage, ObjectReader reader,
 			AnyObjectId tree) throws IOException {
-		CanonicalTreeParser p = createTreeParser(pathPrefix, reader, tree);
+		CanonicalTreeParser p = readTree(pathPrefix, reader, tree);
 		while (!p.eof()) {
 			if (isTree(p)) {
 				p = enterTree(p, reader);
@@ -179,8 +179,6 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 			p = p.next();
 			break;
 		}
-
-		// Rest of tree entries are correctly sorted; use fastAdd().
 		while (!p.eof()) {
 			if (isTree(p)) {
 				p = enterTree(p, reader);
@@ -191,7 +189,7 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 		}
 	}
 
-	private static CanonicalTreeParser createTreeParser(byte[] pathPrefix,
+	private static CanonicalTreeParser readTree(byte[] pathPrefix,
 			ObjectReader reader, AnyObjectId tree) throws IOException {
 		return new CanonicalTreeParser(pathPrefix, reader, tree);
 	}
