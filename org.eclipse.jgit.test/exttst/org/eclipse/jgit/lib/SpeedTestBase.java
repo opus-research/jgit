@@ -1,8 +1,7 @@
 /*
- * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,52 +45,72 @@
 
 package org.eclipse.jgit.lib;
 
-import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
 
-import org.eclipse.jgit.lib.Config.SectionParser;
+import junit.framework.TestCase;
 
 /**
- * This class keeps git repository core parameters.
+ * Base class for performance unit test.
  */
-public class CoreConfig {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
-		public CoreConfig parse(final Config cfg) {
-			return new CoreConfig(cfg);
+public abstract class SpeedTestBase extends TestCase {
+
+	/**
+	 * The time used by native git as this is our reference.
+	 */
+	protected long nativeTime;
+
+	/**
+	 * Reference to the location of the Linux kernel repo.
+	 */
+	protected String kernelrepo;
+
+	/**
+	 * Prepare test by running a test against the Linux kernel repo first.
+	 *
+	 * @param refcmd
+	 *            git command to execute
+	 *
+	 * @throws Exception
+	 */
+	protected void prepare(String[] refcmd) throws Exception {
+		try {
+			BufferedReader bufferedReader = new BufferedReader(new FileReader("kernel.ref"));
+			try {
+				kernelrepo = bufferedReader.readLine();
+			} finally {
+				bufferedReader.close();
+			}
+			timeNativeGit(kernelrepo, refcmd);
+			nativeTime = timeNativeGit(kernelrepo, refcmd);
+		} catch (Exception e) {
+			System.out.println("Create a file named kernel.ref and put the path to the Linux kernels repository there");
+			throw e;
 		}
-	};
-
-	private final int compression;
-
-	private final int packIndexVersion;
-
-	private final boolean logAllRefUpdates;
-
-	private CoreConfig(final Config rc) {
-		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt("pack", "indexversion", 2);
-		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
 	}
 
-	/**
-	 * @return The compression level to use when storing loose objects
-	 */
-	public int getCompression() {
-		return compression;
-	}
-
-	/**
-	 * @return the preferred pack index file format; 0 for oldest possible.
-	 * @see org.eclipse.jgit.transport.IndexPack
-	 */
-	public int getPackIndexVersion() {
-		return packIndexVersion;
-	}
-
-	/**
-	 * @return whether to log all refUpdates
-	 */
-	public boolean isLogAllRefUpdates() {
-		return logAllRefUpdates;
+	private static long timeNativeGit(String kernelrepo, String[] refcmd) throws IOException,
+			InterruptedException, Exception {
+		long start = System.currentTimeMillis();
+		Process p = Runtime.getRuntime().exec(refcmd, null, new File(kernelrepo,".."));
+		InputStream inputStream = p.getInputStream();
+		InputStream errorStream = p.getErrorStream();
+		byte[] buf=new byte[1024*1024];
+		for (;;)
+			if (inputStream.read(buf) < 0)
+				break;
+		if (p.waitFor()!=0) {
+			int c;
+			while ((c=errorStream.read())!=-1)
+				System.err.print((char)c);
+			throw new Exception("git log failed");
+		}
+		inputStream.close();
+		errorStream.close();
+		long stop = System.currentTimeMillis();
+		return stop - start;
 	}
 }
