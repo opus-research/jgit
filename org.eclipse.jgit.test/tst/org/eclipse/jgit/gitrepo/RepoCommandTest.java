@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2014, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.gitrepo;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
@@ -79,13 +80,14 @@ public class RepoCommandTest extends RepositoryTestCase {
 			.append("</manifest>");
 		writeTrashFile("manifest.xml", xmlContent.toString());
 		RepoCommand command = new RepoCommand(db);
-		command.setPath(db.getWorkTree() + "/manifest.xml")
+		command.setPath(db.getWorkTree().getAbsolutePath() + "/manifest.xml")
 			.setURI(remoteGit.getRepository().getDirectory().toURI().toString())
 			.call();
-		File hello = new File(db.getWorkTree() + "/foo/hello.txt");
-		assertTrue(hello.exists());
+		File hello = new File(db.getWorkTree(), "foo/hello.txt");
+		assertTrue("submodule was checked out", hello.exists());
 		BufferedReader reader = new BufferedReader(new FileReader(hello));
 		String content = reader.readLine();
-		assertTrue(content.startsWith("world"));
+		reader.close();
+		assertEquals("submodule content is as expected.", "world", content);
 	}
 }
