@@ -121,14 +121,14 @@ public class FileLfsServlet extends HttpServlet {
 			HttpServletResponse rsp) throws IOException {
 		String info = req.getPathInfo();
 		if (info.length() != 1 + Constants.LONG_OBJECT_ID_STRING_LENGTH) {
-			sendError(rsp, HttpStatus.SC_UNPROCESSABLE_ENTITY, MessageFormat
+			sendError(rsp, HttpStatus.SC_BAD_REQUEST, MessageFormat
 					.format(LfsServerText.get().invalidPathInfo, info));
 			return null;
 		}
 		try {
 			return LongObjectId.fromString(info.substring(1, 65));
 		} catch (InvalidLongObjectIdException e) {
-			sendError(rsp, HttpStatus.SC_UNPROCESSABLE_ENTITY, e.getMessage());
+			sendError(rsp, HttpStatus.SC_BAD_REQUEST, e.getMessage());
 			return null;
 		}
 	}
@@ -161,7 +161,7 @@ public class FileLfsServlet extends HttpServlet {
 			throws IOException {
 		rsp.setStatus(status);
 		// TODO return message in response body in json format as specified in
-		// https://github.com/github/git-lfs/blob/master/docs/api/v1/http-v1-batch.md
+		// https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md
 		rsp.flushBuffer();
 	}
 }
