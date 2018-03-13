@@ -70,6 +70,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 
 /**
@@ -78,11 +79,16 @@ import org.eclipse.jgit.transport.FetchResult;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-pull.html"
  *      >Git documentation about Pull</a>
  */
-public class PullCommand extends TransportCommand<PullCommand, PullResult> {
+public class PullCommand extends GitCommand<PullResult> {
+	private int timeout = 0;
 
 	private final static String DOT = ".";
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
+
+	private CredentialsProvider credentialsProvider;
+
+	private TransportConfigCallback transportConfigCallback;
 
 	/**
 	 * @param repo
@@ -92,12 +98,49 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	/**
+	 * @param timeout
+	 *            in seconds
+	 * @return this instance
+	 */
+	public PullCommand setTimeout(int timeout) {
+		this.timeout = timeout;
+		return this;
+	}
+
+	/**
 	 * @param monitor
 	 *            a progress monitor
 	 * @return this instance
 	 */
 	public PullCommand setProgressMonitor(ProgressMonitor monitor) {
 		this.monitor = monitor;
+		return this;
+	}
+
+	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return this instance
+	 */
+	public PullCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
+		checkCallable();
+		this.credentialsProvider = credentialsProvider;
+		return this;
+	}
+
+	/**
+	 * @param transportConfigCallback
+	 *            if set, the callback will be invoked after the Transport has
+	 *            created, but before the Transport is used. The callback can
+	 *            use this opportunity to set additional type-specific
+	 *            configuration on the Transport instance.
+	 * @return {@code this}
+	 */
+	public PullCommand setTransportConfigCallback(
+			TransportConfigCallback transportConfigCallback) {
+		checkCallable();
+		this.transportConfigCallback = transportConfigCallback;
 		return this;
 	}
 
@@ -186,7 +229,9 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			FetchCommand fetch = new FetchCommand(repo);
 			fetch.setRemote(remote);
 			fetch.setProgressMonitor(monitor);
-			configure(fetch);
+			fetch.setTimeout(this.timeout);
+			fetch.setCredentialsProvider(credentialsProvider);
+			fetch.setTransportConfigCallback(transportConfigCallback);
 
 			fetchRes = fetch.call();
 		} else {
