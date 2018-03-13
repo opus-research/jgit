@@ -50,7 +50,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NotSupportedException;
@@ -109,8 +108,12 @@ public class PushCommand extends
 	 * @return an iteration over {@link PushResult} objects
 	 * @throws InvalidRemoteException
 	 *             when called with an invalid remote uri
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}.
 	 */
-	public Iterable<PushResult> call() throws GitAPIException,
+	public Iterable<PushResult> call() throws JGitInternalException,
 			InvalidRemoteException {
 		checkCallable();
 
@@ -322,7 +325,7 @@ public class PushCommand extends
 	 * @throws JGitInternalException
 	 *             the reference name cannot be resolved.
 	 */
-	public PushCommand add(String nameOrSpec) {
+	public PushCommand add(String nameOrSpec) throws JGitInternalException {
 		if (0 <= nameOrSpec.indexOf(':')) {
 			refSpecs.add(new RefSpec(nameOrSpec));
 		} else {
