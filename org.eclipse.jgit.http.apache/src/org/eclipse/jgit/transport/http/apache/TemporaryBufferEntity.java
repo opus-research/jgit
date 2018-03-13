@@ -55,7 +55,8 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  *
  * @since 3.3
  */
-public class TemporaryBufferEntity extends AbstractHttpEntity {
+public class TemporaryBufferEntity extends AbstractHttpEntity
+		implements AutoCloseable {
 	private TemporaryBuffer buffer;
 
 	private Integer contentLength;
@@ -104,6 +105,18 @@ public class TemporaryBufferEntity extends AbstractHttpEntity {
 	 * @param contentLength
 	 */
 	public void setContentLength(int contentLength) {
-		this.contentLength = new Integer(contentLength);
+		this.contentLength = Integer.valueOf(contentLength);
+	}
+
+	/**
+	 * Close destroys the associated buffer used to buffer the entity
+	 *
+	 * @since 4.5
+	 */
+	@Override
+	public void close() {
+		if (buffer != null) {
+			buffer.destroy();
+		}
 	}
 }

@@ -545,8 +545,6 @@ public class RefDirectory extends RefDatabase {
 			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
 		else {
 			detachingSymbolicRef = detach && ref.isSymbolic();
-			if (detachingSymbolicRef)
-				ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
 		}
 		RefDirectoryUpdate refDirUpdate = new RefDirectoryUpdate(this, ref);
 		if (detachingSymbolicRef)
@@ -579,7 +577,7 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	void delete(RefDirectoryUpdate update) throws IOException {
-		Ref dst = update.getRef().getLeaf();
+		Ref dst = update.getRef();
 		String name = dst.getName();
 
 		// Write the packed-refs file using an atomic update. We might
@@ -688,7 +686,7 @@ public class RefDirectory extends RefDatabase {
 							newLoose = curLoose.remove(idx);
 						} while (!looseRefs.compareAndSet(curLoose, newLoose));
 						int levels = levelsIn(refName) - 2;
-						delete(fileFor(refName), levels);
+						delete(refFile, levels, rLck);
 					}
 				} finally {
 					rLck.unlock();
@@ -845,6 +843,11 @@ public class RefDirectory extends RefDatabase {
 			}
 
 			int sp = p.indexOf(' ');
+			if (sp < 0) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packedRefsCorruptionDetected,
+						packedRefsFile.getAbsolutePath()));
+			}
 			ObjectId id = ObjectId.fromString(p.substring(0, sp));
 			String name = copy(p, sp + 1, p.length());
 			ObjectIdRef cur;
@@ -1062,13 +1065,24 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	static void delete(final File file, final int depth) throws IOException {
-		if (!file.delete() && file.isFile())
-			throw new IOException(MessageFormat.format(JGitText.get().fileCannotBeDeleted, file));
+		delete(file, depth, null);
+	}
 
+	private static void delete(final File file, final int depth, LockFile rLck)
+			throws IOException {
+		if (!file.delete() && file.isFile()) {
+			throw new IOException(MessageFormat.format(
+					JGitText.get().fileCannotBeDeleted, file));
+		}
+
+		if (rLck != null) {
+			rLck.unlock(); // otherwise cannot delete dir below
+		}
 		File dir = file.getParentFile();
 		for (int i = 0; i < depth; ++i) {
-			if (!dir.delete())
+			if (!dir.delete()) {
 				break; // ignore problem here
+			}
 			dir = dir.getParentFile();
 		}
 	}

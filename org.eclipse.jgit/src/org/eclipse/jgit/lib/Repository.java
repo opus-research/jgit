@@ -52,6 +52,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -80,6 +81,7 @@ import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.events.RepositoryEvent;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.GC;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -93,7 +95,6 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,8 +107,7 @@ import org.slf4j.LoggerFactory;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
-	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
-
+	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -244,7 +244,6 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@NonNull
 	public abstract AttributesNodeProvider createAttributesNodeProvider();
-
 
 	/**
 	 * @return the used file system abstraction, or or {@code null} if
@@ -869,6 +868,7 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/** Decrement the use count, and maybe close resources. */
+	@Override
 	public void close() {
 		int newCount = useCnt.decrementAndGet();
 		if (newCount == 0) {
@@ -880,10 +880,11 @@ public abstract class Repository implements AutoCloseable {
 		} else if (newCount == -1) {
 			// should not happen, only log when useCnt became negative to
 			// minimize number of log entries
-			LOG.warn(JGitText.get().corruptUseCnt);
 			if (LOG.isDebugEnabled()) {
 				IllegalStateException e = new IllegalStateException();
-				LOG.debug("", e); //$NON-NLS-1$
+				LOG.debug(JGitText.get().corruptUseCnt, e);
+			} else {
+				LOG.warn(JGitText.get().corruptUseCnt);
 			}
 			if (RepositoryCache.isCached(this)) {
 				closedAt.set(System.currentTimeMillis());
@@ -901,8 +902,9 @@ public abstract class Repository implements AutoCloseable {
 		getRefDatabase().close();
 	}
 
-	@NonNull
 	@SuppressWarnings("nls")
+	@Override
+	@NonNull
 	public String toString() {
 		String desc;
 		File directory = getDirectory();
@@ -1174,21 +1176,12 @@ public abstract class Repository implements AutoCloseable {
 		// we want DirCache to inform us so that we can inform registered
 		// listeners about index changes
 		IndexChangedListener l = new IndexChangedListener() {
-
+			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				notifyIndexChanged();
 			}
 		};
 		return DirCache.lock(this, l);
-	}
-
-	static byte[] gitInternalSlash(byte[] bytes) {
-		if (File.separatorChar == '/')
-			return bytes;
-		for (int i=0; i<bytes.length; ++i)
-			if (bytes[i] == File.separatorChar)
-				bytes[i] = '/';
-		return bytes;
 	}
 
 	/**
@@ -1441,6 +1434,33 @@ public abstract class Repository implements AutoCloseable {
 				return remote;
 		}
 		return null;
+	}
+
+	/**
+	 * Read the {@code GIT_DIR/description} file for gitweb.
+	 *
+	 * @return description text; null if no description has been configured.
+	 * @throws IOException
+	 *             description cannot be accessed.
+	 * @since 4.6
+	 */
+	@Nullable
+	public String getGitwebDescription() throws IOException {
+		return null;
+	}
+
+	/**
+	 * Set the {@code GIT_DIR/description} file for gitweb.
+	 *
+	 * @param description
+	 *            new description; null to clear the description.
+	 * @throws IOException
+	 *             description cannot be persisted.
+	 * @since 4.6
+	 */
+	public void setGitwebDescription(@Nullable String description)
+			throws IOException {
+		throw new IOException(JGitText.get().unsupportedRepositoryDescription);
 	}
 
 	/**
@@ -1780,15 +1800,12 @@ public abstract class Repository implements AutoCloseable {
 			throws FileNotFoundException, IOException {
 		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
-			BufferedOutputStream bos = new SafeBufferedOutputStream(
-					new FileOutputStream(headsFile));
-			try {
+			try (OutputStream bos = new BufferedOutputStream(
+					new FileOutputStream(headsFile))) {
 				for (ObjectId id : heads) {
 					id.copyTo(bos);
 					bos.write('\n');
 				}
-			} finally {
-				bos.close();
 			}
 		} else {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
@@ -1843,5 +1860,23 @@ public abstract class Repository implements AutoCloseable {
 	public Set<String> getRemoteNames() {
 		return getConfig()
 				.getSubsections(ConfigConstants.CONFIG_REMOTE_SECTION);
+	}
+
+	/**
+	 * Check whether any housekeeping is required; if yes, run garbage
+	 * collection; if not, exit without performing any work. Some JGit commands
+	 * run autoGC after performing operations that could create many loose
+	 * objects.
+	 * <p/>
+	 * Currently this option is supported for repositories of type
+	 * {@code FileRepository} only. See {@link GC#setAuto(boolean)} for
+	 * configuration details.
+	 *
+	 * @param monitor
+	 *            to report progress
+	 * @since 4.6
+	 */
+	public void autoGC(ProgressMonitor monitor) {
+		// default does nothing
 	}
 }
