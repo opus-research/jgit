@@ -46,11 +46,9 @@ package org.eclipse.jgit.storage.dfs;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -158,9 +156,6 @@ public final class DfsBlockCache {
 	/** Cache of pack files, indexed by description. */
 	private final Map<DfsPackDescription, DfsPackFile> packCache;
 
-	/** View of pack files in the pack cache. */
-	private final Collection<DfsPackFile> packFiles;
-
 	/** Number of times a block was found in the cache. */
 	private final AtomicLong statHit;
 
@@ -208,9 +203,7 @@ public final class DfsBlockCache {
 		readAheadLimit = cfg.getReadAheadLimit();
 		readAheadService = cfg.getReadAheadService();
 
-		packCache = new ConcurrentHashMap<DfsPackDescription, DfsPackFile>(
-				16, 0.75f, 1);
-		packFiles = Collections.unmodifiableCollection(packCache.values());
+		packCache = new HashMap<DfsPackDescription, DfsPackFile>();
 
 		statHit = new AtomicLong();
 		statMiss = new AtomicLong();
@@ -239,16 +232,6 @@ public final class DfsBlockCache {
 	/** @return number of evictions performed due to cache being full. */
 	public long getEvictions() {
 		return statEvict;
-	}
-
-	/**
-	 * Get the pack files stored in this cache.
-	 *
-	 * @return a collection of pack files, some of which may not actually be
-	 *             present; the caller should check the pack's cached size.
-	 */
-	public Collection<DfsPackFile> getPackFiles() {
-		return packFiles;
 	}
 
 	DfsPackFile getOrCreate(DfsPackDescription dsc, DfsPackKey key) {
