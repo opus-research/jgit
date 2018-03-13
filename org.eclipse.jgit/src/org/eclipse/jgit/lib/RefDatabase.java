@@ -219,6 +219,5 @@ public abstract class RefDatabase {
 	 * Implementors should overwrite this method if they use any kind of caches.
 	 */
 	public void refresh() {
-		// nothing
 	}
 }
