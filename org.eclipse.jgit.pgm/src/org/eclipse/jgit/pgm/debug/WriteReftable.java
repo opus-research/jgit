@@ -89,6 +89,9 @@ class WriteReftable extends TextBuiltin {
 	@Option(name = "--restart-interval")
 	private int restartInterval;
 
+	@Option(name = "--index-levels")
+	private int indexLevels;
+
 	@Option(name = "--reflog-in")
 	private String reflogIn;
 
@@ -120,6 +123,9 @@ class WriteReftable extends TextBuiltin {
 			if (restartInterval > 0) {
 				cfg.setRestartInterval(restartInterval);
 			}
+			if (indexLevels > 0) {
+				cfg.setMaxIndexLevels(indexLevels);
+			}
 
 			ReftableWriter w = new ReftableWriter(cfg);
 			w.setMinUpdateIndex(min(logs)).setMaxUpdateIndex(max(logs));
@@ -146,11 +152,11 @@ class WriteReftable extends TextBuiltin {
 		printf("  restarts: %d", stats.restartInterval());
 		printf("  refs    : %d", stats.refCount());
 		printf("  blocks  : %d", stats.refBlockCount());
-		if (stats.refIndexKeys() > 0) {
+		if (stats.refIndexLevels() > 0) {
 			int idxSize = (int) Math.round(((double) stats.refIndexSize()) / KIB);
-			int avgIdx = stats.refIndexSize() / stats.refIndexKeys();
-			printf("  idx keys: %d", stats.refIndexKeys());
+			int avgIdx = stats.refIndexSize() / stats.refBlockCount();
 			printf("  idx sz  : %d KiB", idxSize);
+			printf("  idx lvl : %d", stats.refIndexLevels());
 			printf("  avg idx : %d bytes", avgIdx);
 		}
 		printf("  lookup  : %.1f", stats.diskSeeksPerRead());
@@ -170,6 +176,7 @@ class WriteReftable extends TextBuiltin {
 			if (stats.objIndexSize() > 0) {
 				int s = (int) Math.round(((double) stats.objIndexSize()) / KIB);
 				printf("  idx sz  : %d KiB", s);
+				printf("  idx lvl : %d", stats.objIndexLevels());
 			}
 			printf("  id len  : %d bytes (%d hex digits)", idLen, 2 * idLen);
 			printf("  avg obj : %d bytes", stats.objBytes() / stats.objCount());
