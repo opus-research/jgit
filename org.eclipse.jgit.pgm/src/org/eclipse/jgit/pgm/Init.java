@@ -72,7 +72,7 @@ class Init extends TextBuiltin {
 		if (gitdir != null)
 			command.setDirectory(new File(gitdir));
 		Repository repository = command.call().getRepository();
-		outw.println(MessageFormat.format(
+		out.println(MessageFormat.format(
 				CLIText.get().initializedEmptyGitRepositoryIn, repository
 						.getDirectory().getAbsolutePath()));
 	}
