@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,23 +41,20 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.http.server;
 
-import java.io.IOException;
+import org.eclipse.jgit.nls.NLS;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * An exception thrown when a gitlink entry is found and cannot be
- * handled.
- */
-public class GitlinksNotSupportedException extends IOException {
-	private static final long serialVersionUID = 1L;
+public class RootLocaleTest {
+	@Before
+	public void setUp() {
+		NLS.setLocale(NLS.ROOT_LOCALE);
+	}
 
-	/**
-	 * Construct a GitlinksNotSupportedException for the specified link
-	 *
-	 * @param s name of link in tree or workdir
-	 */
-	public GitlinksNotSupportedException(final String s) {
-		super(s);
+	@Test
+	public void testHttpServerText() {
+		NLS.getBundleFor(HttpServerText.class);
 	}
 }
