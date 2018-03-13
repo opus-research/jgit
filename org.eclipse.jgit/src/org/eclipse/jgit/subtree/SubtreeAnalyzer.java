@@ -77,7 +77,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 /**
  * Maps parents of commits to the subtrees they most likely belong to.
  */
-public class SubtreeAnalyzer {
+class SubtreeAnalyzer {
 
 	/**
 	 * Return entries that match across trees.
@@ -147,20 +147,14 @@ public class SubtreeAnalyzer {
 
 	private ObjectInserter inserter;
 
-	/**
-	 * @param db
-	 */
-	public SubtreeAnalyzer(Repository db) {
+	SubtreeAnalyzer(Repository db) {
 		repo = db;
 		reader = repo.newObjectReader();
 		inserter = repo.newObjectInserter();
 		tw = new TreeWalk(reader);
 	}
 
-	/**
-	 * Release any resources used by this SubtreeAnalyzer.
-	 */
-	public void release() {
+	void release() {
 		tw.release();
 		reader.release();
 		inserter.release();
@@ -175,7 +169,7 @@ public class SubtreeAnalyzer {
 	 * @return A map of subtree ids to parent commits.
 	 * @throws IOException
 	 */
-	public Map<String, RevCommit> getSubtreeParents(RevCommit cmit,
+	Map<String, RevCommit> getSubtreeParents(RevCommit cmit,
 			RevWalk walker) throws IOException {
 		Map<String, RevCommit> subtreeParents = null;
 
@@ -198,6 +192,7 @@ public class SubtreeAnalyzer {
 		if (subtreeParents == null) {
 			subtreeParents = analyzeSubtrees(cmit, walker);
 		}
+
 		subtreeCache.put(cmit, subtreeParents);
 
 		return subtreeParents;
@@ -246,9 +241,8 @@ public class SubtreeAnalyzer {
 					}
 
 					// Find the subtree's Tree object.
-					TreeWalk subWalk = TreeWalk.forPath(walker.getObjectReader(), curPath, cmit.getTree());
-					ObjectId subtree = subWalk != null ? subWalk.getObjectId(0)
-							: null;
+					ObjectId subtree = TreeWalk.findObject(cmit.getTree(),
+							curPath, walker.getObjectReader());
 
 					// Does the subtree Tree exist?
 					if (subtree == null) {
@@ -269,6 +263,7 @@ public class SubtreeAnalyzer {
 					subtreeParents.put(bestId, parent);
 				}
 			}
+
 		}
 		return subtreeParents;
 	}
@@ -315,46 +310,49 @@ public class SubtreeAnalyzer {
 	 */
 	private HashMap<String, RevCommit> parseNote(RevCommit cmit, RevWalk walker)
 			throws MissingObjectException, IOException {
-		if (noteMap == null) {
-			return null;
-		}
-		ObjectId note = noteMap.get(cmit);
-		if (note == null) {
-			return null;
-		}
-		RevObject object = walker.parseAny(note);
-		if (!(object instanceof RevBlob)) {
-			return null;
-		}
-		RevBlob noteBlob = (RevBlob) object;
+		if (noteMap != null) {
+			ObjectId note = noteMap.get(cmit);
+			if (note != null) {
+				RevObject object = walker.parseAny(note);
+				if (object instanceof RevBlob) {
+					RevBlob noteBlob = (RevBlob) object;
+					ObjectLoader loader = reader.open(noteBlob.getId(),
+							Constants.OBJ_BLOB);
+					String footers = new String(loader.getBytes());
 
-		ObjectLoader loader = reader.open(noteBlob.getId(), Constants.OBJ_BLOB);
-		String footers = new String(loader.getBytes());
+					String footerKey = SubtreeSplitter.SUBTREE_FOOTER_KEY
+							.getName();
+					int footerLen = footerKey.length();
 
-		String footerKey = SubtreeSplitter.SUBTREE_FOOTER_KEY.getName();
-		int footerLen = footerKey.length();
+					// Parse the note, line by line.
+					StringReader sr = new StringReader(footers.trim());
+					BufferedReader br = new BufferedReader(sr);
+					ArrayList<String> lines = new ArrayList<String>();
+					String line = null;
+					while ((line = br.readLine()) != null) {
 
-		// Parse the note, line by line.
-		StringReader sr = new StringReader(footers.trim());
-		BufferedReader br = new BufferedReader(sr);
-		ArrayList<String> lines = new ArrayList<String>();
-		String line = null;
-		while ((line = br.readLine()) != null) {
-			// Does the line start with the subtree footer?
-			if (line.startsWith(footerKey)) {
-				// trim the "Subtree:" prefix.
-				int idx = footerLen;
-				while (line.charAt(idx) != ':') {
-					idx++;
-				}
-				idx++;
-				if (idx < line.length()) {
-					lines.add(line.substring(idx).trim());
+						// Does the line start with the subtree footer?
+						if (line.startsWith(footerKey)) {
+
+							// trim the "Subtree:" prefix.
+							int idx = footerLen;
+							while (line.charAt(idx) != ':') {
+								idx++;
+							}
+							idx++;
+							if (idx < line.length()) {
+								lines.add(line.substring(idx).trim());
+							}
+						}
+					}
+
+					// Parse the footer lines.
+					return parseSubtreeFooters(repo, cmit, lines);
 				}
 			}
 		}
-		// Parse the footer lines.
-		return parseSubtreeFooters(repo, cmit, lines);
+
+		return null;
 	}
 
 	/**
@@ -435,8 +433,8 @@ public class SubtreeAnalyzer {
 			try {
 				commitId = ObjectId.fromString(sha1);
 			} catch (IllegalArgumentException iae) {
-				// Bad footer
-				return null;
+				throw new SubtreeFooterException("Can't parse ObjectId: "
+						+ sha1 + " in footer of " + commit.name());
 			}
 
 			// Make sure the sub tree is actually a parent of this commit
@@ -448,8 +446,9 @@ public class SubtreeAnalyzer {
 				}
 			}
 			if (parentRevCommit == null) {
-				// Specified subtree parent does not exist. Bad footer.
-				return null;
+				throw new SubtreeFooterException("Sub-Tree \""
+						+ commitId.name() + "\" is not a parent of \""
+						+ commit.name() + "\"");
 			}
 
 			// skip whitespace
@@ -459,19 +458,20 @@ public class SubtreeAnalyzer {
 
 			String subtreeId = line.substring(idx).trim();
 			if (subtreeId.isEmpty()) {
-				// Subtree id is not provided. Bad footer.
-				return null;
+				throw new SubtreeFooterException("Sub-Tree id not specified \""
+						+ line + "\" in footer of " + commit.name());
 			}
 
 			if (config == null
-					|| !config.getSubsections(SubtreeSplitter.SUBTREE_SECTION)
-							.contains(subtreeId)) {
-				// Specified subtree id does not exist in config file. Bad
-				// footer.
-				return null;
+					|| !config.getSubsections("subtree").contains(subtreeId)) {
+				throw new SubtreeFooterException("Sub-Tree \"" + subtreeId
+						+ "\" does not exist in .gitsubtree file for commit "
+						+ commit.name());
 			}
+
 			result.put(subtreeId, parentRevCommit);
 		}
+
 		return result;
 	}
 
@@ -486,7 +486,7 @@ public class SubtreeAnalyzer {
 	 *         old note map if no changes were made).
 	 * @throws IOException
 	 */
-	public ObjectId writeCache(RevWalk walker) throws IOException {
+	ObjectId flushCache(RevWalk walker) throws IOException {
 
 		for (int retryCount = 0; retryCount < 3; retryCount++) {
 
@@ -522,8 +522,10 @@ public class SubtreeAnalyzer {
 				// try again.
 				break;
 			}
+
 		}
 		return null;
+
 	}
 
 	/**
@@ -544,6 +546,7 @@ public class SubtreeAnalyzer {
 		if (noteMap == null) {
 			noteMap = NoteMap.newEmptyMap();
 		}
+
 		if (!noteMap.contains(cmit)) {
 			StringBuilder footers = new StringBuilder();
 			String footerKey = SubtreeSplitter.SUBTREE_FOOTER_KEY.getName();
@@ -552,7 +555,9 @@ public class SubtreeAnalyzer {
 				footers.append(footerKey).append(": ").append(sha1).append(" ")
 						.append(subtreeId).append('\n');
 			}
+
 			noteMap.set(cmit, footers.toString(), inserter);
+
 			return true;
 		} else {
 			return false;

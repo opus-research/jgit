@@ -74,7 +74,12 @@ import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
- * This class handles checking out one or two trees merging with the index.
+ * This class handles checking out one or two trees merging with the index. This
+ * class does similar things as {@code WorkDirCheckout} but uses
+ * {@link DirCache} instead of {@code GitIndex}
+ * <p>
+ * The initial implementation of this class was refactored from
+ * WorkDirCheckout}.
  */
 public class DirCacheCheckout {
 	private Repository repo;
@@ -295,69 +300,33 @@ public class DirCacheCheckout {
 	 * @param m the tree to merge
 	 * @param i the index
 	 * @param f the working tree
-	 * @throws IOException
 	 */
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
-			WorkingTreeIterator f) throws IOException {
+			WorkingTreeIterator f) {
 		if (m != null) {
-			// There is an entry in the merge commit. Means: we want to update
-			// what's currently in the index and working-tree to that one
-			if (i == null) {
-				// The index entry is missing
-				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
-						&& !f.isEntryIgnored()) {
-					// don't overwrite an untracked and not ignored file
-					conflicts.add(walk.getPathString());
-				} else
-					update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode());
-			} else if (f == null || !m.idEqual(i)) {
-				// The working tree file is missing or the merge content differs
-				// from index content
+			if (i == null || f == null || !m.idEqual(i)
+					|| (i.getDirCacheEntry() != null && (f.isModified(
+							i.getDirCacheEntry(), true) ||
+							i.getDirCacheEntry().getStage() != 0))) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
-			} else if (i.getDirCacheEntry() != null) {
-				// The index contains a file (and not a folder)
-				if (f.isModified(i.getDirCacheEntry(), true)
-						|| i.getDirCacheEntry().getStage() != 0)
-					// The working tree file is dirty or the index contains a
-					// conflict
-					update(m.getEntryPathString(), m.getEntryObjectId(),
-							m.getEntryFileMode());
-				else
-					keep(i.getDirCacheEntry());
 			} else
-				// The index contains a folder
 				keep(i.getDirCacheEntry());
 		} else {
-			// There is no entry in the merge commit. Means: we want to delete
-			// what's currently in the index and working tree
 			if (f != null) {
-				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
 					conflicts.add(walk.getPathString());
 				} else {
-					// No file/folder conflict exists. All entries are files or
-					// all entries are folders
 					if (i != null) {
-						// ... and the working tree contained a file or folder
-						// -> add it to the removed set and remove it from
+						// ... and the working dir contained a file or folder ->
+						// add it to the removed set and remove it from
 						// conflicts set
 						remove(i.getEntryPathString());
 						conflicts.remove(i.getEntryPathString());
-					} else {
-						// untracked file, neither contained in tree to merge
-						// nor in index
 					}
 				}
-			} else {
-				// There is no file/folder for that path in the working tree.
-				// The only entry we have is the index entry. If that entry is a
-				// conflict simply remove it. Otherwise keep that entry in the
-				// index
-				if (i.getDirCacheEntry().getStage() == 0)
-					keep(i.getDirCacheEntry());
-			}
+			} else if (i.getDirCacheEntry().getStage() == 0)
+				keep(i.getDirCacheEntry());
 		}
 	}
 
@@ -414,9 +383,8 @@ public class DirCacheCheckout {
 		for (String path : updated.keySet()) {
 			// ... create/overwrite this file ...
 			file = new File(repo.getWorkTree(), path);
-			if (!file.getParentFile().mkdirs()) {
-				// ignore
-			}
+			file.getParentFile().mkdirs();
+			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
 			checkoutEntry(repo, file, entry);
 		}
@@ -631,16 +599,6 @@ public class DirCacheCheckout {
 		}
 
 		if (i == null) {
-			// make sure not to overwrite untracked files
-			if (f != null) {
-				// a dirty worktree: the index is empty but we have a
-				// workingtree-file
-				if (mId == null || !mId.equals(f.getEntryObjectId())) {
-					conflict(name, null, h, m);
-					return;
-				}
-			}
-
 			/**
 			 * <pre>
 			 * 		    I (index)                H        M        Result

@@ -58,9 +58,7 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -79,7 +77,7 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
-	private final List<RefSpec> refSpecs;
+	private List<RefSpec> refSpecs;
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
@@ -92,8 +90,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 	private boolean thin = Transport.DEFAULT_PUSH_THIN;
 
 	private int timeout;
-
-	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
@@ -124,15 +120,11 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 		ArrayList<PushResult> pushResults = new ArrayList<PushResult>(3);
 
 		try {
-			if (refSpecs.isEmpty()) {
-				Ref head = repo.getRef(Constants.HEAD);
-				if (head != null && head.isSymbolic())
-					refSpecs.add(new RefSpec(head.getLeaf().getName()));
-			}
-
 			if (force) {
-				for (int i = 0; i < refSpecs.size(); i++)
-					refSpecs.set(i, refSpecs.get(i).setForceUpdate(true));
+				final List<RefSpec> orig = new ArrayList<RefSpec>(refSpecs);
+				refSpecs.clear();
+				for (final RefSpec spec : orig)
+					refSpecs.add(spec.setForceUpdate(true));
 			}
 
 			final List<Transport> transports;
@@ -144,8 +136,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 				if (receivePack != null)
 					transport.setOptionReceivePack(receivePack);
 				transport.setDryRun(dryRun);
-				if (credentialsProvider != null)
-					transport.setCredentialsProvider(credentialsProvider);
 
 				final Collection<RemoteRefUpdate> toPush = transport
 						.findRemoteRefUpdatesFor(refSpecs);
@@ -298,65 +288,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 	}
 
 	/**
-	 * Push all branches under refs/heads/*.
-	 *
-	 * @return {code this}
-	 */
-	public PushCommand setPushAll() {
-		refSpecs.add(Transport.REFSPEC_PUSH_ALL);
-		return this;
-	}
-
-	/**
-	 * Push all tags under refs/tags/*.
-	 *
-	 * @return {code this}
-	 */
-	public PushCommand setPushTags() {
-		refSpecs.add(Transport.REFSPEC_TAGS);
-		return this;
-	}
-
-	/**
-	 * Add a reference to push.
-	 *
-	 * @param ref
-	 *            the source reference. The remote name will match.
-	 * @return {@code this}.
-	 */
-	public PushCommand add(Ref ref) {
-		refSpecs.add(new RefSpec(ref.getLeaf().getName()));
-		return this;
-	}
-
-	/**
-	 * Add a reference to push.
-	 *
-	 * @param nameOrSpec
-	 *            any reference name, or a reference specification.
-	 * @return {@code this}.
-	 * @throws JGitInternalException
-	 *             the reference name cannot be resolved.
-	 */
-	public PushCommand add(String nameOrSpec) throws JGitInternalException {
-		if (0 <= nameOrSpec.indexOf(':')) {
-			refSpecs.add(new RefSpec(nameOrSpec));
-		} else {
-			Ref src;
-			try {
-				src = repo.getRef(nameOrSpec);
-			} catch (IOException e) {
-				throw new JGitInternalException(
-						JGitText.get().exceptionCaughtDuringExecutionOfPushCommand,
-						e);
-			}
-			if (src != null)
-				add(src);
-		}
-		return this;
-	}
-
-	/**
 	 * @return the dry run preference for the push operation
 	 */
 	public boolean isDryRun() {
@@ -415,15 +346,4 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 		return this;
 	}
 
-	/**
-	 * @param credentialsProvider
-	 *            the {@link CredentialsProvider} to use
-	 * @return {@code this}
-	 */
-	public PushCommand setCredentialsProvider(
-			CredentialsProvider credentialsProvider) {
-		checkCallable();
-		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
 }

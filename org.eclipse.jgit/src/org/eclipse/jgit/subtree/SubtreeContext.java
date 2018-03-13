@@ -56,22 +56,9 @@ import org.eclipse.jgit.revwalk.RevCommit;
  */
 public abstract class SubtreeContext {
 
-	/**
-	 * Marker object to indicate that no subtree commit was available for a
-	 * particular subtree id.
-	 */
-	public static final RevCommit NO_SUBTREE = new RevCommit(ObjectId.zeroId()) {
-		public String toString() {
-			return "NO_SUBTREE";
-		}
-	};
-
 	private Map<ObjectId, RevCommit> mNewParents = new HashMap<ObjectId, RevCommit>();
 
-	/**
-	 * The unique id of this subtree.
-	 */
-	protected String id;
+	String id;
 
 	SubtreeContext(String id) {
 		this.id = id;

@@ -45,13 +45,13 @@
 package org.eclipse.jgit.subtree;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -69,7 +69,7 @@ public class SubtreeRevFilter extends RevFilter {
 
 	private boolean includeBoundarySubtrees;
 
-	private Map<String, SubtreeContext> splitters;
+	private Collection<SubtreeContext> splitters;
 
 	private SubtreeAnalyzer analyzer;
 
@@ -82,7 +82,7 @@ public class SubtreeRevFilter extends RevFilter {
 		this.analyzer = new SubtreeAnalyzer(repo);
 	}
 
-	void setSplitters(Map<String, SubtreeContext> splitters) {
+	void setSplitters(Collection<SubtreeContext> splitters) {
 		this.splitters = splitters;
 	}
 
@@ -124,27 +124,21 @@ public class SubtreeRevFilter extends RevFilter {
 
 				// If splitters have been supplied, update them.
 				if (splitters != null) {
-
-					// Parse the subtree config for this commit, and add any
-					// subtree contexts that may be missing.
-					Config conf = SubtreeSplitter.loadSubtreeConfig(repo, cmit);
-					for (String name : conf
-							.getSubsections(SubtreeSplitter.SUBTREE_SECTION)) {
-						if (!splitters.containsKey(name)) {
-							splitters.put(name, new NameBasedSubtreeContext(
-									name));
+					for (SubtreeContext splitter : splitters) {
+						splitter.setSplitCommit(subtreeCommit,
+								SubtreeSplitter.NO_SUBTREE);
+					}
+					for (SubtreeContext splitter : splitters) {
+						if (splitter.getId().equals(subtreeName)) {
+							splitter.setSplitCommit(subtreeCommit,
+									subtreeCommit);
 						}
 					}
-
-					for (SubtreeContext splitter : splitters.values()) {
-						splitter.setSplitCommit(subtreeCommit,
-								SubtreeContext.NO_SUBTREE);
-					}
-					splitters.get(subtreeName).setSplitCommit(subtreeCommit,
-							subtreeCommit);
 				}
+
 			}
 		}
+
 		return true;
 	}
 
@@ -159,8 +153,8 @@ public class SubtreeRevFilter extends RevFilter {
 	 * @param walk
 	 * @throws IOException
 	 */
-	void writeCache(RevWalk walk) throws IOException {
-		analyzer.writeCache(walk);
+	void flushCache(RevWalk walk) throws IOException {
+		analyzer.flushCache(walk);
 	}
 
 	/**
@@ -178,13 +172,6 @@ public class SubtreeRevFilter extends RevFilter {
 	 */
 	public void release() {
 		analyzer.release();
-	}
-
-	/**
-	 * @return The subtree analyzer.
-	 */
-	public SubtreeAnalyzer getSubtreeAnalyzer() {
-		return analyzer;
 	}
 
 }

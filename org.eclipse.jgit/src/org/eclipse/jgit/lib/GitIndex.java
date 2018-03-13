@@ -72,7 +72,6 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.events.IndexChangedEvent;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -938,7 +937,7 @@ public class GitIndex {
 		ObjectLoader ol = db.open(e.sha1, Constants.OBJ_BLOB);
 		File file = new File(wd, e.getName());
 		file.delete();
-		FileUtils.mkdirs(file.getParentFile(), true);
+		file.getParentFile().mkdirs();
 		FileOutputStream dst = new FileOutputStream(file);
 		try {
 			ol.copyTo(dst);
@@ -1006,7 +1005,7 @@ public class GitIndex {
 					current = trees.peek();
 			}
 			inserter.flush();
-			return current.getId();
+			return current.getTreeId();
 		} finally {
 			inserter.release();
 		}
