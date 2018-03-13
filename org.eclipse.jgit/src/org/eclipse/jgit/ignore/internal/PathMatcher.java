@@ -251,8 +251,6 @@ public class PathMatcher extends AbstractMatcher {
 					} else if (dirOnly && !assumeDirectory) {
 						// Directory expectations not met
 						return false;
-					} else if (matcher + 1 == matchers.size() && path.endsWith("/") && !dirOnly) {
-						return false;
 					}
 				}
 				return match && matcher + 1 == matchers.size();
