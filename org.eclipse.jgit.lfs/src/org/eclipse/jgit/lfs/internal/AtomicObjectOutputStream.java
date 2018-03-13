@@ -48,7 +48,6 @@ import java.nio.file.Path;
 import java.security.DigestOutputStream;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
@@ -84,22 +83,6 @@ public class AtomicObjectOutputStream extends OutputStream {
 				Constants.newMessageDigest());
 	}
 
-	/**
-	 * @param path
-	 * @throws IOException
-	 */
-	public AtomicObjectOutputStream(Path path) throws IOException {
-		this(path, null);
-	}
-
-	/**
-	 * @return content hash of the object which was streamed through this
-	 *         stream. May return {@code null} if called before closing this stream.
-	 */
-	public @Nullable AnyLongObjectId getId() {
-		return id;
-	}
-
 	@Override
 	public void write(int b) throws IOException {
 		out.write(b);
@@ -119,11 +102,7 @@ public class AtomicObjectOutputStream extends OutputStream {
 	public void close() throws IOException {
 		out.close();
 		if (!aborted) {
-			if (id != null) {
-				verifyHash();
-			} else {
-				id = LongObjectId.fromRaw(out.getMessageDigest().digest());
-			}
+			verifyHash();
 			locked.commit();
 		}
 	}

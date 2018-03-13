@@ -46,6 +46,7 @@ import static org.junit.Assert.assertNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -217,7 +218,7 @@ public class CLIGitCommand extends Main {
 					inquote = !inquote;
 				continue;
 			case '\\':
-				if (inDblQuote || inquote || ip == commandLine.length())
+				if (inquote || ip == commandLine.length())
 					r.append(b); // literal within a quote
 				else
 					r.append(commandLine.charAt(ip++));
