@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2014, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -124,23 +124,8 @@ class Candidate {
 		return null;
 	}
 
-	/**
-	 * Add the flag, if not already present
-	 *
-	 * @param flag
-	 * @return true if the flag has been added, false if it was already set
-	 */
-	boolean add(RevFlag flag) {
-		if (sourceCommit.has(flag))
-			return false;
-		else {
-			sourceCommit.add(flag);
-			return true;
-		}
-	}
-
-	void remove(RevFlag flag) {
-		sourceCommit.remove(flag);
+	void add(RevFlag flag) {
+		sourceCommit.add(flag);
 	}
 
 	int getTime() {
@@ -385,14 +370,7 @@ class Candidate {
 		}
 
 		@Override
-		boolean add(RevFlag flag) {
-			// Pretend we added the flag, but actually
-			// do nothing, sourceCommit is null.
-			return true;
-		}
-
-		@Override
-		void remove(RevFlag flag) {
+		void add(RevFlag flag) {
 			// Do nothing, sourceCommit is null.
 		}
 
