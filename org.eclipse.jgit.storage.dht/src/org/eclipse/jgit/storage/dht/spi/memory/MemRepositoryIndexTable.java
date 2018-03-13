@@ -78,16 +78,4 @@ final class MemRepositoryIndexTable implements RepositoryIndexTable {
 			throw new DhtException(MessageFormat.format(
 					DhtText.get().repositoryAlreadyExists, name.asString()));
 	}
-
-	public void remove(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		boolean ok = table.compareAndSet(
-				name.asBytes(),
-				colId.name(),
-				key.asBytes(),
-				null);
-		if (!ok)
-			throw new DhtException(MessageFormat.format(
-					DhtText.get().repositoryAlreadyExists, name.asString()));
-	}
 }
