@@ -129,26 +129,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack"; //$NON-NLS-1$
 
-	/**
-	 * Accept-Encoding header in HTTP request that specifies content-encodings
-	 * that are acceptable in the response.
-	 *
-	 * @since 4.6
-	 */
-	public enum AcceptEncoding {
-		/**
-		 * Do not specify accept-encoding header, which means server MAY assume
-		 * that the client will accept any content encoding. Server will use
-		 * "identity" if it is available.
-		 */
-		UNSPECIFIED,
-
-		/**
-		 * Accept gzip content encoding
-		 */
-		GZIP
-	}
-
 	static final TransportProtocol PROTO_HTTP = new TransportProtocol() {
 		private final String[] schemeNames = { "http", "https" }; //$NON-NLS-1$ //$NON-NLS-2$
 
@@ -350,8 +330,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			// is not there) download HEAD by itself as a loose file and do
 			// the resolution by hand.
 			//
-			HttpConnection conn = httpOpen(METHOD_GET,
-					new URL(baseUrl, Constants.HEAD), AcceptEncoding.GZIP);
+			HttpConnection conn = httpOpen(new URL(baseUrl, Constants.HEAD));
 			int status = HttpSupport.response(conn);
 			switch (status) {
 			case HttpConnection.HTTP_OK: {
@@ -477,7 +456,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		Collection<Type> ignoreTypes = null;
 		for (;;) {
 			try {
-				final HttpConnection conn = httpOpen(METHOD_GET, u, AcceptEncoding.GZIP);
+				final HttpConnection conn = httpOpen(u);
 				if (useSmartHttp) {
 					String exp = "application/x-" + service + "-advertisement"; //$NON-NLS-1$ //$NON-NLS-2$
 					conn.setRequestProperty(HDR_ACCEPT, exp + ", */*"); //$NON-NLS-1$
@@ -551,37 +530,21 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	/**
-	 * Open an HTTP connection, setting the accept-encoding request header to gzip.
-	 *
-	 * @param method HTTP request method
-	 * @param u url of the HTTP connection
-	 * @return the HTTP connection
-	 * @throws IOException
-	 * @since 3.3
-	 * @deprecated use {@link #httpOpen(String, URL, AcceptEncoding)} instead.
-	 */
-	@Deprecated
-	protected HttpConnection httpOpen(String method, URL u) throws IOException {
-		return httpOpen(method, u, AcceptEncoding.GZIP);
+	final HttpConnection httpOpen(URL u) throws IOException {
+		return httpOpen(METHOD_GET, u);
 	}
 
 	/**
 	 * Open an HTTP connection.
 	 *
-	 * @param method HTTP request method
-	 * @param u url of the HTTP connection
-	 * @param acceptEncoding accept-encoding header option
-	 * @return the HTTP connection
+	 * @param method
+	 * @param u
+	 * @return the connection
 	 * @throws IOException
-	 * @since 4.6
+	 * @since 3.3
 	 */
-	protected HttpConnection httpOpen(String method, URL u,
-			AcceptEncoding acceptEncoding) throws IOException {
-		if (method == null || u == null || acceptEncoding == null) {
-			throw new NullPointerException();
-		}
-
+	protected HttpConnection httpOpen(String method, URL u)
+			throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpConnection conn = connectionFactory.create(u, proxy);
 
@@ -591,9 +554,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		conn.setRequestMethod(method);
 		conn.setUseCaches(false);
-		if (acceptEncoding == AcceptEncoding.GZIP) {
-			conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
-		}
+		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache"); //$NON-NLS-1$
 		if (UserAgent.get() != null) {
 			conn.setRequestProperty(HDR_USER_AGENT, UserAgent.get());
@@ -700,14 +661,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		@Override
-		BufferedReader openReader(String path) throws IOException {
-			// Line oriented readable content is likely to compress well.
-			// Request gzip encoding.
-			InputStream is = open(path, AcceptEncoding.GZIP).in;
-			return new BufferedReader(new InputStreamReader(is, Constants.CHARSET));
-		}
-
-		@Override
 		Collection<String> getPackNames() throws IOException {
 			final Collection<String> packs = new ArrayList<String>();
 			try {
@@ -732,14 +685,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		FileStream open(final String path) throws IOException {
-			return open(path, AcceptEncoding.UNSPECIFIED);
-		}
-
-		FileStream open(final String path, AcceptEncoding acceptEncoding)
-				throws IOException {
 			final URL base = httpObjectsUrl;
 			final URL u = new URL(base, path);
-			final HttpConnection c = httpOpen(METHOD_GET, u, acceptEncoding);
+			final HttpConnection c = httpOpen(u);
 			switch (HttpSupport.response(c)) {
 			case HttpConnection.HTTP_OK:
 				final InputStream in = openInputStream(c);
@@ -896,8 +844,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void openStream() throws IOException {
-			conn = httpOpen(METHOD_POST, new URL(baseUrl, serviceName),
-					AcceptEncoding.GZIP);
+			conn = httpOpen(METHOD_POST, new URL(baseUrl, serviceName));
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
 			conn.setRequestProperty(HDR_CONTENT_TYPE, requestType);
