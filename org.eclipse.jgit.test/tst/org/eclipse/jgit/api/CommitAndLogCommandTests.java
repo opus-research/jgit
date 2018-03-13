@@ -49,8 +49,7 @@ import org.eclipse.jgit.revwalk.RevCommit;
 
 public class CommitAndLogCommandTests extends RepositoryTestCase {
 	public void testSomeCommits() throws NoHeadException, NoMessageException,
-			UnmergedPathException, ConcurrentRefUpdateException,
-			JGitInternalException {
+			UnmergedPathException, ConcurrentRefUpdateException {
 
 		// do 4 commits
 		Git git = new Git(db);
@@ -83,8 +82,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	// try to do a commit without specifying a message. Should fail!
 	public void testWrongParams() throws UnmergedPathException,
-			NoHeadException, ConcurrentRefUpdateException,
-			JGitInternalException {
+			NoHeadException, ConcurrentRefUpdateException {
 		Git git = new Git(db);
 		try {
 			git.commit().setAuthor(author).call();
@@ -97,14 +95,14 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	// exceptions
 	public void testMultipleInvocations() throws NoHeadException,
 			ConcurrentRefUpdateException, NoMessageException,
-			UnmergedPathException, JGitInternalException {
+			UnmergedPathException {
 		Git git = new Git(db);
 		CommitCommand commitCmd = git.commit();
 		commitCmd.setMessage("initial commit").call();
 		try {
 			// check that setters can't be called after invocation
 			commitCmd.setAuthor(author);
-			fail("didn't caught the expected exception");
+			fail("didn't catch the expected exception");
 		} catch (IllegalStateException e) {
 		}
 		LogCommand logCmd = git.log();
@@ -112,7 +110,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		try {
 			// check that call can't be called twice
 			logCmd.call();
-			fail("didn't caught the expected exception");
+			fail("didn't catch the expected exception");
 		} catch (IllegalStateException e) {
 		}
 	}

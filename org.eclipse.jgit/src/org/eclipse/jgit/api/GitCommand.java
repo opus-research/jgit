@@ -38,6 +38,7 @@
 package org.eclipse.jgit.api;
 
 import java.util.concurrent.Callable;
+
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -47,15 +48,14 @@ import org.eclipse.jgit.lib.Repository;
  * It also has a property {@link #repo} holding a reference to the git
  * {@link Repository} this command should work with.
  * <p>
- * Finally this class stores a boolean value as state. A method
- * {@link #checkState()} is provided which will throw a
- * {@link IllegalStateException} when the state is {@code false}. This can be
- * used by subclasses to introduce for example the policy to allow only one call
- * to {@link #call()} per instance. Whenever the command was successfully
- * invoked the state is set to {@code false} with {@link #setState(boolean)}.
- * Each method in the subclass will then in the very beginning call
- * {@link #checkState()} leading to the desired behavior that when the state is
- * false no method can be successfully called.
+ * Finally this class stores a state telling whether it is allowed to call
+ * {@link #call()} on this instance. Instances of {@link GitCommand} can only be
+ * used for one single successful call to {@link #call()}. Afterwards this
+ * instance may not be used anymore to set/modify any properties or to call
+ * {@link #call()} again. This is achieved by setting the {@link #callable}
+ * property to false after the successful execution of {@link #call()} and to
+ * check the state (by calling {@link #checkCallable()}) before setting of
+ * properties and inside {@link #call()}.
  *
  * @param <T>
  *            the return type which is expected from {@link #call()}
@@ -65,10 +65,10 @@ public abstract class GitCommand<T> implements Callable<T> {
 	final protected Repository repo;
 
 	/**
-	 * a state which can be checked with {@link #checkState()} and set with
-	 * {@link #setState(boolean)}
+	 * a state which tells whether it is allowed to call {@link #call()} on this
+	 * instance.
 	 */
-	private boolean state = true;
+	private boolean callable = true;
 
 	/**
 	 * Creates a new command which interacts with a single repository
@@ -88,25 +88,28 @@ public abstract class GitCommand<T> implements Callable<T> {
 	}
 
 	/**
-	 * set's the state which can be checked with {@link #checkState()}
+	 * Set's the state which tells whether it is allowed to call {@link #call()}
+	 * on this instance. {@link #checkCallable()} will throw an exception when
+	 * called and this property is set to {@code false}
 	 *
-	 * @param state
-	 *            the new boolean value for the state
+	 * @param callable
+	 *            if <code>true</code> it is allowed to call {@link #call()} on
+	 *            this instance.
 	 */
-	protected void setState(boolean state) {
-		this.state = state;
+	protected void setCallable(boolean callable) {
+		this.callable = callable;
 	}
 
 	/**
-	 * Checks that the current {@link #state} is {@code true}. If not then an
-	 * {@link IllegalStateException} is thrown
+	 * Checks that the property {@link #callable} is {@code true}. If not then
+	 * an {@link IllegalStateException} is thrown
 	 *
 	 * @throws IllegalStateException
-	 *             when this method was called and the current {@link #state}
-	 *             was {@code false}
+	 *             when this method is called and the property {@link #callable}
+	 *             is {@code false}
 	 */
-	protected void checkState() {
-		if (!state)
+	protected void checkCallable() {
+		if (!callable)
 			throw new IllegalStateException("Command "
 					+ this.getClass().getName()
 					+ " was called in the wrong state");

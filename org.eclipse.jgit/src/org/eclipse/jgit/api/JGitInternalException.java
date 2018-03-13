@@ -56,7 +56,7 @@ package org.eclipse.jgit.api;
  * exceptions. Callers will always get access to the original exception (if
  * available) by calling {@code #getCause()}.
  */
-public class JGitInternalException extends GitAPIException {
+public class JGitInternalException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
 
 	JGitInternalException(String message, Throwable cause) {

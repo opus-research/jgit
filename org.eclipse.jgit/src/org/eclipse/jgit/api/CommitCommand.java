@@ -105,18 +105,17 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public RevCommit call() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException {
-		checkState();
+		checkCallable();
 		processOptions();
 
-		// determine the current HEAD and the commit it is referring to
-		Ref head;
-		ObjectId parentID;
 		try {
-			head = repo.getRef(Constants.HEAD);
+			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
 						"Commit on repo without HEAD currently not supported");
-			parentID = repo.resolve(Constants.HEAD + "^{commit}");
+
+			// determine the current HEAD and the commit it is referring to
+			ObjectId parentID = repo.resolve(Constants.HEAD + "^{commit}");
 
 			// lock the index
 			DirCache index = DirCache.lock(repo);
@@ -149,7 +148,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				switch (rc) {
 				case NEW:
 				case FAST_FORWARD:
-					setState(false);
+					setCallable(false);
 					return revCommit;
 				case REJECTED:
 				case LOCK_FAILURE:
@@ -202,7 +201,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setMessage(String message) {
-		checkState();
+		checkCallable();
 		this.message = message;
 		return this;
 	}
@@ -225,7 +224,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setCommitter(PersonIdent committer) {
-		checkState();
+		checkCallable();
 		this.committer = committer;
 		return this;
 	}
@@ -243,7 +242,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setCommitter(String name, String email) {
-		checkState();
+		checkCallable();
 		return setCommitter(new PersonIdent(name, email));
 	}
 
@@ -267,7 +266,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setAuthor(PersonIdent author) {
-		checkState();
+		checkCallable();
 		this.author = author;
 		return this;
 	}
@@ -284,7 +283,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setAuthor(String name, String email) {
-		checkState();
+		checkCallable();
 		return setAuthor(new PersonIdent(name, email));
 	}
 

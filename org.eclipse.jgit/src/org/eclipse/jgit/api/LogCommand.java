@@ -91,7 +91,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 */
 	public Iterable<RevCommit> call() throws NoHeadException,
 			JGitInternalException {
-		checkState();
+		checkCallable();
 		if (!startSpecified) {
 			try {
 				ObjectId headId = repo.resolve(Constants.HEAD);
@@ -107,7 +107,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 						e);
 			}
 		}
-		setState(false);
+		setCallable(false);
 		return walk;
 	}
 
@@ -201,7 +201,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	private LogCommand add(boolean include, AnyObjectId start)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			JGitInternalException {
-		checkState();
+		checkCallable();
 		try {
 			if (include) {
 				walk.markStart(walk.lookupCommit(start));
