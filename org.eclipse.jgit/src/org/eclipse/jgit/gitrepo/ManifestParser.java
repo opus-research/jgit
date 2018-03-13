@@ -287,13 +287,14 @@ public class ManifestParser extends DefaultHandler {
 			if (remoteUrl == null) {
 				String fetch = remotes.get(remote).fetch;
 				if (fetch == null) {
-					// We could also just assume fetch=="." ?
-					throw new SAXException("'fetch' attribute is mandatory.");
+					throw new SAXException(MessageFormat
+							.format(RepoText.get().errorNoFetch, remote));
 				}
 				remoteUrl = normalizeEmptyPath(baseUrl.resolve(fetch));
 				remoteUrls.put(remote, remoteUrl);
 			}
-			proj.setUrl(remoteUrl.resolve(proj.getName()).toString()).setDefaultRevision(revision);
+			proj.setUrl(remoteUrl.resolve(proj.getName()).toString())
+				.setDefaultRevision(revision);
 		}
 
 		filteredProjects.addAll(projects);
@@ -303,24 +304,20 @@ public class ManifestParser extends DefaultHandler {
 
 	static URI normalizeEmptyPath(URI u) {
 		// URI.create("scheme://host").resolve("a/b") => "scheme://hosta/b"
-		// That seems like a bug. We workaround this by special casing the
-		// empty path case.
+		// That seems like bug https://bugs.openjdk.java.net/browse/JDK-4666701.
+		// We workaround this by special casing the empty path case.
 		if (u.getHost() != null && !u.getHost().isEmpty() &&
 			(u.getPath() == null || u.getPath().isEmpty())) {
 			try {
 				return new URI(u.getScheme(),
 					u.getUserInfo(), u.getHost(), u.getPort(),
-					"/", u.getQuery(), u.getFragment());
+						"/", u.getQuery(), u.getFragment()); //$NON-NLS-1$
 			} catch (URISyntaxException x) {
 				throw new IllegalArgumentException(x.getMessage(), x);
 			}
 		}
 		return u;
 	}
-
-
-
-
 
 	/**
 	 * Getter for projects.
