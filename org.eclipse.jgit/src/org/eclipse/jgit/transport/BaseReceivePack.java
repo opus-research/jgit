@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
@@ -168,8 +167,7 @@ public abstract class BaseReceivePack {
 	private boolean allowCreates;
 
 	/** Should an incoming transfer permit delete requests? */
-	private boolean allowAnyDeletes;
-	private boolean allowBranchDeletes;
+	private boolean allowDeletes;
 
 	/** Should an incoming transfer permit non-fast-forward requests? */
 	private boolean allowNonFastForwards;
@@ -259,8 +257,7 @@ public abstract class BaseReceivePack {
 		final ReceiveConfig cfg = db.getConfig().get(ReceiveConfig.KEY);
 		objectChecker = cfg.newObjectChecker();
 		allowCreates = cfg.allowCreates;
-		allowAnyDeletes = true;
-		allowBranchDeletes = cfg.allowDeletes;
+		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
@@ -543,7 +540,7 @@ public abstract class BaseReceivePack {
 
 	/** @return true if the client can request refs to be deleted. */
 	public boolean isAllowDeletes() {
-		return allowAnyDeletes;
+		return allowDeletes;
 	}
 
 	/**
@@ -551,25 +548,7 @@ public abstract class BaseReceivePack {
 	 *            true to permit delete ref commands to be processed.
 	 */
 	public void setAllowDeletes(final boolean canDelete) {
-		allowAnyDeletes = canDelete;
-	}
-
-	/**
-	 * @return true if the client can delete from {@code refs/heads/}.
-	 * @since 3.6
-	 */
-	public boolean isAllowBranchDeletes() {
-		return allowBranchDeletes;
-	}
-
-	/**
-	 * @param canDelete
-	 *            true to permit deletion of branches from the
-	 *            {@code refs/heads/} namespace.
-	 * @since 3.6
-	 */
-	public void setAllowBranchDeletes(boolean canDelete) {
-		allowBranchDeletes = canDelete;
+		allowDeletes = canDelete;
 	}
 
 	/**
@@ -929,8 +908,6 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
-		if (db.getRefDatabase().performsAtomicTransactions())
-			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -1163,18 +1140,12 @@ public abstract class BaseReceivePack {
 			if (cmd.getResult() != Result.NOT_ATTEMPTED)
 				continue;
 
-			if (cmd.getType() == ReceiveCommand.Type.DELETE) {
-				if (!isAllowDeletes()) {
-					// Deletes are not supported on this repository.
-					cmd.setResult(Result.REJECTED_NODELETE);
-					continue;
-				}
-				if (!isAllowBranchDeletes()
-						&& ref.getName().startsWith(Constants.R_HEADS)) {
-					// Branches cannot be deleted, but other refs can.
-					cmd.setResult(Result.REJECTED_NODELETE);
-					continue;
-				}
+			if (cmd.getType() == ReceiveCommand.Type.DELETE
+					&& !isAllowDeletes()) {
+				// Deletes are not supported on this repository.
+				//
+				cmd.setResult(Result.REJECTED_NODELETE);
+				continue;
 			}
 
 			if (cmd.getType() == ReceiveCommand.Type.CREATE) {
@@ -1277,29 +1248,6 @@ public abstract class BaseReceivePack {
 					|| !Repository.isValidRefName(cmd.getRefName())) {
 				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().funnyRefname);
 			}
-		}
-	}
-
-	/**
-	 * @return if any commands have been rejected so far.
-	 * @since 3.6
-	 */
-	protected boolean anyRejects() {
-		for (ReceiveCommand cmd : commands) {
-			if (cmd.getResult() != Result.NOT_ATTEMPTED && cmd.getResult() != Result.OK)
-				return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Set the result to fail for any command that was not processed yet.
-	 * @since 3.6
-	 */
-	protected void failPendingCommands() {
-		for (ReceiveCommand cmd : commands) {
-			if (cmd.getResult() == Result.NOT_ATTEMPTED)
-				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().transactionAborted);
 		}
 	}
 

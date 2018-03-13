@@ -50,8 +50,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Repository;
+
 
 /**
  * Base FS for POSIX based systems
@@ -125,14 +125,29 @@ public abstract class FS_POSIX extends FS {
 		return proc;
 	}
 
-	/**
-	 * @since 3.7
-	 */
 	@Override
-	public ProcessResult runIfPresent(Repository repository, Hook hook,
-			String[] args, PrintStream outRedirect, PrintStream errRedirect,
-			String stdinArgs) throws JGitInternalException {
-		return internalRunIfPresent(repository, hook, args, outRedirect,
-				errRedirect, stdinArgs);
+	public boolean canRunHooks() {
+		return true;
+	}
+
+	@Override
+	public int runIfPresent(Repository repository, Hook hook, String[] args,
+			PrintStream outRedirect, PrintStream errRedirect)
+			throws UnsupportedOperationException {
+		final File hookFile = tryFindHook(repository, hook);
+		if (hookFile == null)
+			return 0;
+
+		final String hookPath = hookFile.getAbsolutePath();
+		final File runDirectory;
+		if (repository.isBare())
+			runDirectory = repository.getDirectory();
+		else
+			runDirectory = repository.getWorkTree();
+		final String cmd = FileUtils.relativize(runDirectory.getAbsolutePath(),
+				hookPath);
+		ProcessBuilder hookProcess = runInShell(cmd, args);
+		hookProcess.directory(runDirectory);
+		return runHook(hookProcess, outRedirect, errRedirect);
 	}
 }

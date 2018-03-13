@@ -51,8 +51,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Repository;
+
 
 /**
  * FS implementation for Cygwin on Windows
@@ -139,23 +139,30 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		return proc;
 	}
 
-	/**
-	 * @since 3.7
-	 */
 	@Override
-	public String relativize(String base, String other) {
-		final String relativized = super.relativize(base, other);
-		return relativized.replace(File.separatorChar, '/');
+	public boolean canRunHooks() {
+		return true;
 	}
 
-	/**
-	 * @since 3.7
-	 */
 	@Override
-	public ProcessResult runIfPresent(Repository repository, Hook hook,
-			String[] args, PrintStream outRedirect, PrintStream errRedirect,
-			String stdinArgs) throws JGitInternalException {
-		return internalRunIfPresent(repository, hook, args, outRedirect,
-				errRedirect, stdinArgs);
+	public int runIfPresent(Repository repository, Hook hook, String[] args,
+			PrintStream outRedirect, PrintStream errRedirect)
+			throws UnsupportedOperationException {
+		final File hookFile = tryFindHook(repository, hook);
+		if (hookFile == null)
+			return 0;
+
+		final String hookPath = hookFile.getAbsolutePath();
+		final File runDirectory;
+		if (repository.isBare())
+			runDirectory = repository.getDirectory();
+		else
+			runDirectory = repository.getWorkTree();
+		String cmd = FileUtils.relativize(runDirectory.getAbsolutePath(),
+				hookPath);
+		cmd = cmd.replace(File.separatorChar, '/');
+		ProcessBuilder hookProcess = runInShell(cmd, args);
+		hookProcess.directory(runDirectory);
+		return runHook(hookProcess, outRedirect, errRedirect);
 	}
 }

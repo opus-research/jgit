@@ -199,7 +199,7 @@ class Diff extends TextBuiltin {
 			} else if (newTree == null)
 				newTree = new FileTreeIterator(db);
 
-			TextProgressMonitor pm = new TextProgressMonitor(errw);
+			TextProgressMonitor pm = new TextProgressMonitor();
 			pm.setDelayStart(2, TimeUnit.SECONDS);
 			diffFmt.setProgressMonitor(pm);
 			diffFmt.setPathFilter(pathFilter);
