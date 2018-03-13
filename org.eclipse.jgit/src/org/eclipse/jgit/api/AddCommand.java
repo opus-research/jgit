@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
@@ -73,10 +72,6 @@ import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 public class AddCommand extends GitCommand<DirCache> {
 
 	private Collection<String> filepatterns;
-
-	private WorkingTreeIterator workingTreeIterator;
-
-	private boolean update = false;
 
 	/**
 	 *
@@ -102,16 +97,6 @@ public class AddCommand extends GitCommand<DirCache> {
 	}
 
 	/**
-	 * Allow clients to provide their own implementation of a FileTreeIterator
-	 * @param f
-	 * @return {@code this}
-	 */
-	public AddCommand setWorkingTreeIterator(WorkingTreeIterator f) {
-		workingTreeIterator = f;
-		return this;
-	}
-
-	/**
 	 * Executes the {@code Add} command. Each instance of this class should only
 	 * be used for one invocation of the command. Don't call this method twice
 	 * on an instance.
@@ -124,12 +109,9 @@ public class AddCommand extends GitCommand<DirCache> {
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
 		checkCallable();
 		DirCache dc = null;
-		boolean addAll = false;
-		if (filepatterns.contains("."))
-			addAll = true;
 
 		try {
-			dc = repo.lockDirCache();
+			dc = DirCache.lock(repo);
 			ObjectWriter ow = new ObjectWriter(repo);
 			DirCacheIterator c;
 
@@ -137,43 +119,36 @@ public class AddCommand extends GitCommand<DirCache> {
 			final TreeWalk tw = new TreeWalk(repo);
 			tw.reset();
 			tw.addTree(new DirCacheBuildIterator(builder));
-			if (workingTreeIterator == null)
-				workingTreeIterator = new FileTreeIterator(repo);
-			tw.addTree(workingTreeIterator);
+			FileTreeIterator fileTreeIterator = new FileTreeIterator(
+					repo.getWorkDir(), repo.getFS());
+			tw.addTree(fileTreeIterator);
 			tw.setRecursive(true);
-			if (!addAll)
-				tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
+			tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
 
 			String lastAddedFile = null;
 
 			while (tw.next()) {
 				String path = tw.getPathString();
 
-				final File file = new File(repo.getWorkTree(), path);
-				WorkingTreeIterator f = tw.getTree(1, WorkingTreeIterator.class);
-				if (tw.getTree(0, DirCacheIterator.class) == null &&
-						f != null && f.isEntryIgnored()) {
-					// file is not in index but is ignored, do nothing
-				}
+				final File file = new File(repo.getWorkDir(), path);
 				// In case of an existing merge conflict the
 				// DirCacheBuildIterator iterates over all stages of
 				// this path, we however want to add only one
 				// new DirCacheEntry per path.
-				else if (!(path.equals(lastAddedFile))) {
-					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
-						if (f != null) { // the file exists
-							DirCacheEntry entry = new DirCacheEntry(path);
-							entry.setLength((int)f.getEntryLength());
-							entry.setLastModified(f.getEntryLastModified());
-							entry.setFileMode(f.getEntryFileMode());
-							entry.setObjectId(ow.writeBlob(file));
+				if (!(path.equals(lastAddedFile))) {
+					 FileTreeIterator f = tw.getTree(1, FileTreeIterator.class);
+					 if (f != null) { // the file exists
+						DirCacheEntry entry = new DirCacheEntry(path);
+						entry.setLength((int)f.getEntryLength());
+						entry.setLastModified(f.getEntryLastModified());
+						entry.setFileMode(f.getEntryFileMode());
+						entry.setObjectId(ow.writeBlob(file));
 
-							builder.add(entry);
-							lastAddedFile = path;
-						} else if (!update){
-							c = tw.getTree(0, DirCacheIterator.class);
-							builder.add(c.getDirCacheEntry());
-						}
+						builder.add(entry);
+						lastAddedFile = path;
+					} else {
+						c = tw.getTree(0, DirCacheIterator.class);
+						builder.add(c.getDirCacheEntry());
 					}
 				}
 			}
@@ -190,29 +165,4 @@ public class AddCommand extends GitCommand<DirCache> {
 		return dc;
 	}
 
-	/**
-	 * @param update
-	 *            If set to true, the command only matches {@code filepattern}
-	 *            against already tracked files in the index rather than the
-	 *            working tree. That means that it will never stage new files,
-	 *            but that it will stage modified new contents of tracked files
-	 *            and that it will remove files from the index if the
-	 *            corresponding files in the working tree have been removed.
-	 *            In contrast to the git command line a {@code filepattern} must
-	 *            exist also if update is set to true as there is no
-	 *            concept of a working directory here.
-	 *
-	 * @return {@code this}
-	 */
-	public AddCommand setUpdate(boolean update) {
-		this.update = update;
-		return this;
-	}
-
-	/**
-	 * @return is the parameter update is set
-	 */
-	public boolean isUpdate() {
-		return update;
-	}
 }

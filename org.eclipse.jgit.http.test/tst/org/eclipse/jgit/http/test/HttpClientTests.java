@@ -66,13 +66,12 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
 
 public class HttpClientTests extends HttpTestCase {
-	private TestRepository<FileRepository> remoteRepository;
+	private TestRepository remoteRepository;
 
 	private URIish dumbAuthNoneURI;
 
@@ -96,7 +95,7 @@ public class HttpClientTests extends HttpTestCase {
 
 		server.setUp();
 
-		final String srcName = nameOf(remoteRepository.getRepository());
+		final String srcName = nameOf(remoteRepository);
 		dumbAuthNoneURI = toURIish(dNone, srcName);
 		dumbAuthBasicURI = toURIish(dBasic, srcName);
 
@@ -120,10 +119,10 @@ public class HttpClientTests extends HttpTestCase {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
-				final FileRepository db = remoteRepository.getRepository();
-				if (!name.equals(nameOf(db)))
+				if (!name.equals(nameOf(remoteRepository)))
 					throw new RepositoryNotFoundException(name);
 
+				final Repository db = remoteRepository.getRepository();
 				db.incrementOpen();
 				return db;
 			}
@@ -134,8 +133,8 @@ public class HttpClientTests extends HttpTestCase {
 		return ctx;
 	}
 
-	private static String nameOf(final FileRepository db) {
-		return db.getDirectory().getName();
+	private static String nameOf(final TestRepository db) {
+		return db.getRepository().getDirectory().getName();
 	}
 
 	public void testRepositoryNotFound_Dumb() throws Exception {
@@ -199,7 +198,7 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Dumb_NoHEAD() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		File headref = new File(src.getDirectory(), Constants.HEAD);
 		assertTrue("HEAD used to be present", headref.delete());
 		assertFalse("HEAD is gone", headref.exists());
@@ -307,7 +306,7 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Smart_UploadPackDisabled() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		src.getConfig().setBoolean("http", null, "uploadpack", false);
 		src.getConfig().save();
 

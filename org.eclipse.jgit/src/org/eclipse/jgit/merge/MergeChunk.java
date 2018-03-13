@@ -87,7 +87,7 @@ public class MergeChunk {
 	 *
 	 * @param sequenceIndex
 	 *            determines to which sequence this chunks belongs to. Same as
-	 *            in {@link org.eclipse.jgit.merge.MergeResult#add}
+	 *            in {@link MergeResult#add(int, int, int, ConflictState)}
 	 * @param begin
 	 *            the first element from the specified sequence which should be
 	 *            included in the merge result. Indexes start with 0.
@@ -109,7 +109,8 @@ public class MergeChunk {
 
 	/**
 	 * @return the index of the sequence to which sequence this chunks belongs
-	 *         to. Same as in {@link org.eclipse.jgit.merge.MergeResult#add}
+	 *         to. Same as in
+	 *         {@link MergeResult#add(int, int, int, ConflictState)}
 	 */
 	public int getSequenceIndex() {
 		return sequenceIndex;

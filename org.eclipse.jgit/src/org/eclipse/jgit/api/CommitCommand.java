@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.LinkedList;
@@ -53,13 +54,13 @@ import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -78,8 +79,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	private PersonIdent committer;
 
 	private String message;
-
-	private boolean all;
 
 	/**
 	 * parents this commit should have. The current HEAD will be in this list
@@ -129,18 +128,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		processOptions(state);
 
 		try {
-			if (all && !repo.isBare() && repo.getWorkTree() != null) {
-				Git git = new Git(repo);
-				try {
-					git.add()
-							.addFilepattern(".")
-							.setUpdate(true).call();
-				} catch (NoFilepatternException e) {
-					// should really not happen
-					throw new JGitInternalException(e.getMessage(), e);
-				}
-			}
-
 			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
@@ -152,64 +139,54 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				parents.add(0, headId);
 
 			// lock the index
-			DirCache index = repo.lockDirCache();
+			DirCache index = DirCache.lock(repo);
 			try {
-				ObjectInserter odi = repo.newObjectInserter();
-				try {
-					// Write the index as tree to the object database. This may
-					// fail for example when the index contains unmerged paths
-					// (unresolved conflicts)
-					ObjectId indexTreeId = index.writeTree(odi);
+				ObjectWriter repoWriter = new ObjectWriter(repo);
 
-					// Create a Commit object, populate it and write it
-					Commit commit = new Commit(repo);
-					commit.setCommitter(committer);
-					commit.setAuthor(author);
-					commit.setMessage(message);
+				// Write the index as tree to the object database. This may fail
+				// for example when the index contains unmerged pathes
+				// (unresolved conflicts)
+				ObjectId indexTreeId = index.writeTree(repoWriter);
 
-					commit.setParentIds(parents.toArray(new ObjectId[] {}));
-					commit.setTreeId(indexTreeId);
-					ObjectId commitId = odi.insert(Constants.OBJ_COMMIT, odi
-							.format(commit));
-					odi.flush();
+				// Create a Commit object, populate it and write it
+				Commit commit = new Commit(repo);
+				commit.setCommitter(committer);
+				commit.setAuthor(author);
+				commit.setMessage(message);
 
-					RevWalk revWalk = new RevWalk(repo);
-					try {
-						RevCommit revCommit = revWalk.parseCommit(commitId);
-						RefUpdate ru = repo.updateRef(Constants.HEAD);
-						ru.setNewObjectId(commitId);
-						ru.setRefLogMessage("commit : "
-								+ revCommit.getShortMessage(), false);
+				commit.setParentIds(parents.toArray(new ObjectId[]{}));
+				commit.setTreeId(indexTreeId);
+				ObjectId commitId = repoWriter.writeCommit(commit);
 
-						ru.setExpectedOldObjectId(headId);
-						Result rc = ru.update();
-						switch (rc) {
-						case NEW:
-						case FAST_FORWARD: {
-							setCallable(false);
-							if (state == RepositoryState.MERGING_RESOLVED) {
-								// Commit was successful. Now delete the files
-								// used for merge commits
-								repo.writeMergeCommitMsg(null);
-								repo.writeMergeHeads(null);
-							}
-							return revCommit;
-						}
-						case REJECTED:
-						case LOCK_FAILURE:
-							throw new ConcurrentRefUpdateException(JGitText
-									.get().couldNotLockHEAD, ru.getRef(), rc);
-						default:
-							throw new JGitInternalException(MessageFormat
-									.format(JGitText.get().updatingRefFailed,
-											Constants.HEAD,
-											commitId.toString(), rc));
-						}
-					} finally {
-						revWalk.release();
+				RevCommit revCommit = new RevWalk(repo).parseCommit(commitId);
+				RefUpdate ru = repo.updateRef(Constants.HEAD);
+				ru.setNewObjectId(commitId);
+				ru.setRefLogMessage("commit : " + revCommit.getShortMessage(),
+						false);
+
+				ru.setExpectedOldObjectId(headId);
+				Result rc = ru.update();
+				switch (rc) {
+				case NEW:
+				case FAST_FORWARD:
+					setCallable(false);
+					if (state == RepositoryState.MERGING_RESOLVED) {
+						// Commit was successful. Now delete the files
+						// used for merge commits
+						new File(repo.getDirectory(), Constants.MERGE_HEAD)
+								.delete();
+						new File(repo.getDirectory(), Constants.MERGE_MSG)
+								.delete();
 					}
-				} finally {
-					odi.release();
+					return revCommit;
+				case REJECTED:
+				case LOCK_FAILURE:
+					throw new ConcurrentRefUpdateException(
+							JGitText.get().couldNotLockHEAD, ru.getRef(), rc);
+				default:
+					throw new JGitInternalException(MessageFormat.format(
+							JGitText.get().updatingRefFailed
+							, Constants.HEAD, commitId.toString(), rc));
 				}
 			} finally {
 				index.unlock();
@@ -367,19 +344,4 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public PersonIdent getAuthor() {
 		return author;
 	}
-
-	/**
-	 * If set to true the Commit command automatically stages files that have
-	 * been modified and deleted, but new files you not known by the repository
-	 * are not affected. This corresponds to the parameter -a on the command
-	 * line.
-	 *
-	 * @param all
-	 * @return {@code this}
-	 */
-	public CommitCommand setAll(boolean all) {
-		this.all = all;
-		return this;
-	}
-
 }
