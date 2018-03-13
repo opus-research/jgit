@@ -92,6 +92,9 @@ class ReftableOutputStream extends OutputStream {
 
 	void setBlockSize(int bs) {
 		blockSize = bs;
+		if (blockSize > blockBuf.length) {
+			blockBuf = Arrays.copyOf(blockBuf, blockSize);
+		}
 	}
 
 	@Override

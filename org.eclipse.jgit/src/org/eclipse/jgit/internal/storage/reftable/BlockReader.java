@@ -49,6 +49,11 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_CHAINED;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_DATA;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_NONE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_COMMITTER;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_MESSAGE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
@@ -87,6 +92,7 @@ import org.eclipse.jgit.util.RawParseUtils;
 class BlockReader {
 	private byte blockType;
 	private long endPosition;
+	private boolean truncated;
 
 	private byte[] buf;
 	private int bufLen;
@@ -102,8 +108,16 @@ class BlockReader {
 	private int nameLen;
 	private int valueType;
 
+	private int logNewIdPtr;
+	private int logCommitterPtr;
+	private int logMessagePtr;
+
 	byte type() {
 		return blockType;
+	}
+
+	boolean truncated() {
+		return truncated;
 	}
 
 	long endPosition() {
@@ -147,11 +161,6 @@ class BlockReader {
 							nameBuf, 0, match.length) == 0;
 		}
 		return compare(match, 0, match.length, nameBuf, 0, len) == 0;
-	}
-
-	boolean matchAbbrevId(byte[] match) {
-		int n = Math.min(match.length, nameLen);
-		return compare(match, 0, n, nameBuf, 0, n) == 0;
 	}
 
 	long readPositionFromIndex() throws IOException {
@@ -222,14 +231,50 @@ class BlockReader {
 		return reverseUpdateIndex(NB.decodeUInt64(nameBuf, nameLen - 8));
 	}
 
+	@Nullable
 	ReflogEntry readLogEntry() {
-		ObjectId oldId = readValueId();
-		ObjectId newId = readValueId();
-		short tz = readInt16();
-		long ms = readVarint64() * 1000L;
-		String name = readValueString();
-		String email = readValueString();
-		String comment = readValueString();
+		if ((valueType & VALUE_TYPE_MASK) == LOG_NONE) {
+			return null;
+		}
+
+		ObjectId oldId;
+		ObjectId newId;
+		PersonIdent who;
+		String msg;
+
+		if ((valueType & VALUE_TYPE_MASK) == LOG_DATA) {
+			logNewIdPtr = ptr;
+			oldId = readValueId();
+			newId = readValueId();
+			long timeSecs = readVarint64();
+			logCommitterPtr = ptr;
+			who = readPersonIdent(timeSecs);
+			logMessagePtr = ptr;
+			msg = readValueString();
+		} else if ((valueType & LOG_CHAINED) == LOG_CHAINED) {
+			newId = ObjectId.fromRaw(buf, logNewIdPtr);
+			logNewIdPtr = ptr;
+			oldId = readValueId();
+			long timeSecs = readVarint64();
+			if ((valueType & LOG_SAME_COMMITTER) == LOG_SAME_COMMITTER) {
+				int savePtr = ptr;
+				ptr = logCommitterPtr;
+				who = readPersonIdent(timeSecs);
+				ptr = savePtr;
+			} else {
+				who = readPersonIdent(timeSecs);
+			}
+			if ((valueType & LOG_SAME_MESSAGE) == LOG_SAME_MESSAGE) {
+				int savePtr = ptr;
+				ptr = logMessagePtr;
+				msg = readValueString();
+				ptr = savePtr;
+			} else {
+				msg = readValueString();
+			}
+		} else {
+			throw new IllegalStateException();
+		}
 
 		return new ReflogEntry() {
 			@Override
@@ -244,12 +289,12 @@ class BlockReader {
 
 			@Override
 			public PersonIdent getWho() {
-				return new PersonIdent(name, email, ms, tz);
+				return who;
 			}
 
 			@Override
 			public String getComment() {
-				return comment;
+				return msg;
 			}
 
 			@Override
@@ -271,6 +316,14 @@ class BlockReader {
 		String s = RawParseUtils.decode(UTF_8, buf, ptr, end);
 		ptr = end;
 		return s;
+	}
+
+	private PersonIdent readPersonIdent(long timeSecs) {
+		long ms = timeSecs * 1000;
+		int tz = readInt16();
+		String name = readValueString();
+		String email = readValueString();
+		return new PersonIdent(name, email, ms, tz);
 	}
 
 	void readBlock(BlockSource src, long pos, int estBlockSize)
@@ -324,7 +377,10 @@ class BlockReader {
 			endPosition = pos + 4 + deflatedSize;
 		}
 		if (bufLen < blockLen) {
-			throw invalidBlock();
+			if (blockType != INDEX_BLOCK_TYPE) {
+				throw invalidBlock();
+			}
+			truncated = true;
 		} else if (bufLen > blockLen) {
 			bufLen = blockLen;
 		}
@@ -385,29 +441,12 @@ class BlockReader {
 	}
 
 	void verifyIndex() throws IOException {
-		if (blockType != INDEX_BLOCK_TYPE) {
+		if (blockType != INDEX_BLOCK_TYPE || truncated) {
 			throw invalidBlock();
 		}
 	}
 
 	int seekKey(byte[] key) {
-		return seek(key, true);
-	}
-
-	int seekAbbrevId(byte[] key) {
-		return seek(key, false);
-	}
-
-	private static int compareKey(boolean useKeyLen, byte[] a,
-			byte[] b, int bi, int bLen) {
-		if (useKeyLen) {
-			return compare(a, 0, a.length, b, bi, bLen);
-		}
-		int n = Math.min(bLen, a.length);
-		return compare(a, 0, n, b, bi, n);
-	}
-
-	private int seek(byte[] key, boolean useKeyLen) {
 		int low = 0;
 		int end = restartCnt;
 		for (;;) {
@@ -415,7 +454,7 @@ class BlockReader {
 			int p = NB.decodeUInt24(buf, restartTbl + mid * 3);
 			ptr = p + 1; // skip 0 prefix length
 			int n = readVarint32() >>> 3;
-			int cmp = compareKey(useKeyLen, key, buf, ptr, n);
+			int cmp = compare(key, 0, key.length, buf, ptr, n);
 			if (cmp < 0) {
 				end = mid;
 			} else if (cmp == 0) {
@@ -425,13 +464,12 @@ class BlockReader {
 				low = mid + 1;
 			}
 			if (low >= end) {
-				return seekToKey(key, useKeyLen, p, low, cmp);
+				return scanToKey(key, p, low, cmp);
 			}
 		}
 	}
 
-	private int seekToKey(byte[] key, boolean useKeyLen,
-			int rPtr, int rIdx, int rCmp) {
+	private int scanToKey(byte[] key, int rPtr, int rIdx, int rCmp) {
 		if (rCmp < 0) {
 			if (rIdx == 0) {
 				ptr = keysStart;
@@ -446,7 +484,7 @@ class BlockReader {
 		do {
 			int savePtr = ptr;
 			parseKey();
-			cmp = compareKey(useKeyLen, key, nameBuf, 0, nameLen);
+			cmp = compare(key, 0, key.length, nameBuf, 0, nameLen);
 			if (cmp <= 0) {
 				// cmp < 0, name should be in this block, but is not.
 				// cmp = 0, block is positioned at name.
@@ -492,12 +530,34 @@ class BlockReader {
 			return;
 
 		case LOG_BLOCK_TYPE:
-			ptr += 2 * OBJECT_ID_LENGTH + 2; // 2x id; tz
-			readVarint64(); // time
-			skipString(); // name
-			skipString(); // email
-			skipString(); // comment
-			return;
+			if ((valueType & VALUE_TYPE_MASK) == LOG_NONE) {
+				return;
+			} else if ((valueType & VALUE_TYPE_MASK) == LOG_DATA) {
+				logNewIdPtr = ptr;
+				ptr += 2 * OBJECT_ID_LENGTH; // oldId, newId
+				readVarint64(); // time
+				logCommitterPtr = ptr;
+				ptr += 2; // tz
+				skipString(); // name
+				skipString(); // email
+				logMessagePtr = ptr;
+				skipString(); // msg
+				return;
+			} else if ((valueType & LOG_CHAINED) == LOG_CHAINED) {
+				logNewIdPtr = ptr;
+				ptr += OBJECT_ID_LENGTH;
+				if ((valueType & LOG_SAME_COMMITTER) == 0) {
+					logCommitterPtr = ptr;
+					ptr += 2; // tz
+					skipString(); // name
+					skipString(); // email
+				}
+				if ((valueType & LOG_SAME_MESSAGE) == 0) {
+					logMessagePtr = ptr;
+					skipString();
+				}
+				return;
+			}
 		}
 
 		throw new IllegalStateException();
