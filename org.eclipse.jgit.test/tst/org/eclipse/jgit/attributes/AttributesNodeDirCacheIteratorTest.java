@@ -262,7 +262,7 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {
-					assertThat(entryAttributes.getAttributes(),
+					assertThat(entryAttributes.getAll(),
 							hasItem(attribute));
 				}
 			} else {

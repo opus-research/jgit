@@ -1182,9 +1182,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		}
 		// now after all attributes are collected - in the correct hierarchy
 		// order - remove all unspecified entries (the ! marker)
-		for (Attribute a : attributes.getAttributes()) {
+		for (Attribute a : attributes.getAll()) {
 			if (a.getState() == State.UNSPECIFIED)
-				attributes.removeAttribute(a.getKey());
+				attributes.remove(a.getKey());
 		}
 		return attributes;
 	}
@@ -1337,7 +1337,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			throws IOException {
 		Attributes attributes = getAttributes();
 
-		Attribute f = attributes.getAttribute(Constants.ATTR_FILTER);
+		Attribute f = attributes.get(Constants.ATTR_FILTER);
 		if (f == null) {
 			return null;
 		}

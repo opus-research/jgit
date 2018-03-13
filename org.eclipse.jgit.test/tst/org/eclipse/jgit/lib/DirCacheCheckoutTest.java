@@ -113,7 +113,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		return dco.getRemoved();
 	}
 
-	private Map<String, String> getUpdated() {
+	private Map<String, ObjectId> getUpdated() {
 		return dco.getUpdated();
 	}
 
@@ -268,6 +268,8 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testRules1thru3_NoIndexEntry() throws IOException {
 		ObjectId head = buildTree(mk("foo"));
+		TreeWalk tw = TreeWalk.forPath(db, "foo", head);
+		ObjectId objectId = tw.getObjectId(0);
 		ObjectId merge = db.newObjectInserter().insert(Constants.OBJ_TREE,
 				new byte[0]);
 
@@ -277,9 +279,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		prescanTwoTrees(merge, head);
 
-		assertTrue(getUpdated().containsKey("foo"));
+		assertEquals(objectId, getUpdated().get("foo"));
 
 		merge = buildTree(mkmap("foo", "a"));
+		tw = TreeWalk.forPath(db, "foo", merge);
 
 		prescanTwoTrees(head, merge);
 

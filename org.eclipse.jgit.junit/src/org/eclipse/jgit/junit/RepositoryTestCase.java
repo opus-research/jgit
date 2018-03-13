@@ -288,6 +288,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * @param str
 	 *            the string in which backslashes should be replaced
 	 * @return the resulting string with slashes
+         * @since 4.2
 	 */
 	public static String slashify(String str) {
 		str = str.replace('\\', '/');
