@@ -51,10 +51,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.util.Collections;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -256,8 +254,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		// Modify previously committed DirCacheEntry and write it back to disk
 		DirCacheEntry dce = db.readDirCache().getEntry("symlink");
 		dce.setFileMode(FileMode.SYMLINK);
-		DirCacheCheckout.checkoutEntry(db, f, dce,
-				Collections.<Attribute> emptySet());
+		DirCacheCheckout.checkoutEntry(db, f, dce);
 
 		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
 				.getConfig().get(WorkingTreeOptions.KEY));
