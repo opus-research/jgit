@@ -133,9 +133,6 @@ abstract class WalkRemoteObjectDatabase {
 	 * Callers such as {@link WalkFetchConnection} are prepared to handle this
 	 * by validating the content received, and assuming content that fails to
 	 * match its hash is an incorrectly phrased FileNotFoundException.
-	 * <p>
-	 * This method is recommended for already compressed file like loose object,
-	 * pack file. For uncompressed file, use {@link #openReader(String)} instead.
 	 *
 	 * @param path
 	 *            location of the file to read, relative to this objects
@@ -349,9 +346,8 @@ abstract class WalkRemoteObjectDatabase {
 	/**
 	 * Open a buffered reader around a file.
 	 * <p>
-	 * This method is suit for opening a reader for uncompressed line oriented file
-	 * like the <code>info/packs</code>, <code>info/refs</code>, alternates list,
-	 * etc.
+	 * This is shorthand for calling {@link #open(String)} and then wrapping it
+	 * in a reader suitable for line oriented files like the alternates list.
 	 *
 	 * @return a stream to read from the file. Never null.
 	 * @param path
