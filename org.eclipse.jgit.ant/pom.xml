@@ -55,19 +55,19 @@
 	<name>JGit - Ant Tasks</name>
 
 	<description>
-    Ant based user interface
-  </description>
+    Ant based user interface for Git
+    </description>
 
 	<properties>
 		<translate-qualifier />
 	</properties>
 
-  <repositories>
-    <repository>
-      <id>jgit-repository</id>
-      <url>http://download.eclipse.org/jgit/maven</url>
-    </repository>
-  </repositories>
+    <repositories>
+        <repository>
+            <id>jgit-repository</id>
+            <url>http://download.eclipse.org/jgit/maven</url>
+        </repository>
+    </repositories>
   
 	<dependencies>
 		<dependency>
@@ -115,39 +115,6 @@
 					<target>1.5</target>
 					<encoding>UTF-8</encoding>
 				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>findbugs-maven-plugin</artifactId>
-				<configuration>
-					<findbugsXmlOutput>true</findbugsXmlOutput>
-					<failOnError>false</failOnError>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-pmd-plugin</artifactId>
-				<configuration>
-					<sourceEncoding>utf-8</sourceEncoding>
-					<minimumTokens>100</minimumTokens>
-					<targetJdk>1.5</targetJdk>
-					<format>xml</format>
-					<failOnViolation>false</failOnViolation>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>cpd-check</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
 		</plugins>
 	</build>
