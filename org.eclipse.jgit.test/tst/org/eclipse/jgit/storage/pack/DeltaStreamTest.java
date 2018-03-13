@@ -46,6 +46,7 @@ package org.eclipse.jgit.storage.pack;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 
 import junit.framework.TestCase;
@@ -55,7 +56,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.io.SeekableInputStream;
 
 public class DeltaStreamTest extends TestCase {
 	private TestRng rng;
@@ -156,9 +156,23 @@ public class DeltaStreamTest extends TestCase {
 
 		// Skip should not open the base as we move past it, but it
 		// will open when we need to start copying data from it.
-		in = open();
+		final boolean[] opened = new boolean[1];
+		in = new DeltaStream(new ByteArrayInputStream(delta)) {
+			@Override
+			protected long getBaseSize() throws IOException {
+				return base.length;
+			}
+
+			@Override
+			protected InputStream openBase() throws IOException {
+				opened[0] = true;
+				return new ByteArrayInputStream(base);
+			}
+		};
 		IO.skipFully(in, 7);
+		assertFalse("not yet open", opened[0]);
 		assertEquals(data[7], in.read());
+		assertTrue("now open", opened[0]);
 	}
 
 	public void testIncorrectBaseSize() throws IOException {
@@ -166,17 +180,37 @@ public class DeltaStreamTest extends TestCase {
 		copy(0, 4);
 		assertValidState();
 
+		DeltaStream in = new DeltaStream(new ByteArrayInputStream(delta)) {
+			@Override
+			protected long getBaseSize() throws IOException {
+				return 128;
+			}
+
+			@Override
+			protected InputStream openBase() throws IOException {
+				return new ByteArrayInputStream(base);
+			}
+		};
 		try {
-			new DeltaStream(new ByteArrayInputStream(delta),
-					SeekableInputStream.open(new byte[128]));
+			in.read(new byte[4]);
 			fail("did not throw an exception");
 		} catch (CorruptObjectException e) {
 			assertEquals(JGitText.get().baseLengthIncorrect, e.getMessage());
 		}
 
+		in = new DeltaStream(new ByteArrayInputStream(delta)) {
+			@Override
+			protected long getBaseSize() throws IOException {
+				return 4;
+			}
+
+			@Override
+			protected InputStream openBase() throws IOException {
+				return new ByteArrayInputStream(new byte[0]);
+			}
+		};
 		try {
-			new DeltaStream(new ByteArrayInputStream(delta),
-					SeekableInputStream.open(new byte[3]));
+			in.read(new byte[4]);
 			fail("did not throw an exception");
 		} catch (CorruptObjectException e) {
 			assertEquals(JGitText.get().baseLengthIncorrect, e.getMessage());
@@ -241,7 +275,16 @@ public class DeltaStreamTest extends TestCase {
 	}
 
 	private DeltaStream open() throws IOException {
-		return new DeltaStream(new ByteArrayInputStream(delta),
-				SeekableInputStream.open(base));
+		return new DeltaStream(new ByteArrayInputStream(delta)) {
+			@Override
+			protected long getBaseSize() throws IOException {
+				return base.length;
+			}
+
+			@Override
+			protected InputStream openBase() throws IOException {
+				return new ByteArrayInputStream(base);
+			}
+		};
 	}
 }

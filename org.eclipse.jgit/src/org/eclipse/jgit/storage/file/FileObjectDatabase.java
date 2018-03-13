@@ -258,8 +258,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	abstract FileObjectDatabase newCachedFileObjectDatabase();
 
-	abstract File deltaBaseCacheEntry(ObjectId baseId);
-
 	static class AlternateHandle {
 		final FileObjectDatabase db;
 
