@@ -221,7 +221,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				}
 			}
 
-			Ref headRef = repo.exactRef(Constants.HEAD);
+			Ref headRef = repo.getRef(Constants.HEAD);
 			String shortHeadRef = getShortBranchName(headRef);
 			String refLogMessage = "checkout: moving from " + shortHeadRef; //$NON-NLS-1$
 			ObjectId branch;
@@ -234,7 +234,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 								JGitText.get().checkoutUnexpectedResult,
 								r.name()));
 					this.status = CheckoutResult.NOT_TRIED_RESULT;
-					return repo.exactRef(Constants.HEAD);
+					return repo.getRef(Constants.HEAD);
 				}
 				branch = getStartPointObjectId();
 			} else {
@@ -269,7 +269,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			} finally {
 				dc.unlock();
 			}
-			Ref ref = repo.findRef(name);
+			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
 				ref = null;
 			String toName = Repository.shortenRefName(name);
@@ -281,7 +281,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				updateResult = refUpdate.link(ref.getName());
 			else if (orphan) {
 				updateResult = refUpdate.link(getBranchName());
-				ref = repo.exactRef(Constants.HEAD);
+				ref = repo.getRef(Constants.HEAD);
 			} else {
 				refUpdate.setNewObjectId(newCommit);
 				updateResult = refUpdate.forceUpdate();
@@ -492,7 +492,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					.get().branchNameInvalid, name == null ? "<null>" : name)); //$NON-NLS-1$
 
 		if (orphan) {
-			Ref refToCheck = repo.exactRef(getBranchName());
+			Ref refToCheck = repo.getRef(getBranchName());
 			if (refToCheck != null)
 				throw new RefAlreadyExistsException(MessageFormat.format(
 						JGitText.get().refAlreadyExists, name));

@@ -114,13 +114,13 @@ class Merge extends TextBuiltin {
 		}
 
 		// determine the other revision we want to merge with HEAD
-		final Ref srcRef = db.findRef(ref);
+		final Ref srcRef = db.getRef(ref);
 		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
 		if (src == null)
 			throw die(MessageFormat.format(
 					CLIText.get().refDoesNotExistOrNoCommit, ref));
 
-		Ref oldHead = db.exactRef(Constants.HEAD);
+		Ref oldHead = db.getRef(Constants.HEAD);
 		MergeResult result;
 		try (Git git = new Git(db)) {
 			MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)

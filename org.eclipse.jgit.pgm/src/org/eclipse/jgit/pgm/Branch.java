@@ -119,7 +119,7 @@ class Branch extends TextBuiltin {
 			if (rename) {
 				String src, dst;
 				if (branches.size() == 1) {
-					final Ref head = db.exactRef(Constants.HEAD);
+					final Ref head = db.getRef(Constants.HEAD);
 					if (head != null && head.isSymbolic())
 						src = head.getLeaf().getName();
 					else
@@ -127,7 +127,7 @@ class Branch extends TextBuiltin {
 					dst = branches.get(0);
 				} else {
 					src = branches.get(0);
-					final Ref old = db.findRef(src);
+					final Ref old = db.getRef(src);
 					if (old == null)
 						throw die(MessageFormat.format(CLIText.get().doesNotExist, src));
 					if (!old.getName().startsWith(Constants.R_HEADS))
@@ -152,7 +152,7 @@ class Branch extends TextBuiltin {
 					startBranch = branches.get(1);
 				else
 					startBranch = Constants.HEAD;
-				Ref startRef = db.findRef(startBranch);
+				Ref startRef = db.getRef(startBranch);
 				ObjectId startAt = db.resolve(startBranch + "^0"); //$NON-NLS-1$
 				if (startRef != null)
 					startBranch = startRef.getName();
@@ -182,7 +182,7 @@ class Branch extends TextBuiltin {
 	}
 
 	private void list() throws Exception {
-		Ref head = db.exactRef(Constants.HEAD);
+		Ref head = db.getRef(Constants.HEAD);
 		// This can happen if HEAD is stillborn
 		if (head != null) {
 			String current = head.getLeaf().getName();

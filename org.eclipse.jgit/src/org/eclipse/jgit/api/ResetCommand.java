@@ -171,7 +171,7 @@ public class ResetCommand extends GitCommand<Ref> {
 				// reset [commit] -- paths
 				resetIndexForPaths(commitTree);
 				setCallable(false);
-				return repo.exactRef(Constants.HEAD);
+				return repo.getRef(Constants.HEAD);
 			}
 
 			final Ref result;
@@ -192,7 +192,7 @@ public class ResetCommand extends GitCommand<Ref> {
 					repo.writeOrigHead(origHead);
 				result = ru.getRef();
 			} else {
-				result = repo.exactRef(Constants.HEAD);
+				result = repo.getRef(Constants.HEAD);
 			}
 
 			if (mode == null)

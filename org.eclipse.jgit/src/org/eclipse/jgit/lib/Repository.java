@@ -393,7 +393,7 @@ public abstract class Repository implements AutoCloseable {
 		try (RevWalk rw = new RevWalk(this)) {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
-				final Ref ref = findRef((String)resolved);
+				final Ref ref = getRef((String)resolved);
 				return ref != null ? ref.getLeaf().getObjectId() : null;
 			} else {
 				return (ObjectId) resolved;
@@ -610,7 +610,7 @@ public abstract class Repository implements AutoCloseable {
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
 							throw new RevisionSyntaxException(revstr);
-						Ref ref = findRef(name);
+						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
 							return null;
@@ -660,7 +660,7 @@ public abstract class Repository implements AutoCloseable {
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
 							throw new RevisionSyntaxException(revstr);
-						Ref ref = findRef(name);
+						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
 							return null;
@@ -709,7 +709,7 @@ public abstract class Repository implements AutoCloseable {
 		name = revstr.substring(done);
 		if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
 			throw new RevisionSyntaxException(revstr);
-		if (findRef(name) != null)
+		if (getRef(name) != null)
 			return name;
 		return resolveSimple(name);
 	}
@@ -738,7 +738,7 @@ public abstract class Repository implements AutoCloseable {
 			return ObjectId.fromString(revstr);
 
 		if (Repository.isValidRefName("x/" + revstr)) { //$NON-NLS-1$
-			Ref r = getRefDatabase().findRef(revstr);
+			Ref r = getRefDatabase().getRef(revstr);
 			if (r != null)
 				return r.getObjectId();
 		}
@@ -854,7 +854,7 @@ public abstract class Repository implements AutoCloseable {
 	 * This is essentially the same as doing:
 	 *
 	 * <pre>
-	 * return exactRef(Constants.HEAD).getTarget().getName()
+	 * return getRef(Constants.HEAD).getTarget().getName()
 	 * </pre>
 	 *
 	 * Except when HEAD is detached, in which case this method returns the
@@ -866,7 +866,7 @@ public abstract class Repository implements AutoCloseable {
 	 * @throws IOException
 	 */
 	public String getFullBranch() throws IOException {
-		Ref head = exactRef(Constants.HEAD);
+		Ref head = getRef(Constants.HEAD);
 		if (head == null)
 			return null;
 		if (head.isSymbolic())
@@ -918,42 +918,9 @@ public abstract class Repository implements AutoCloseable {
 	 *            "refs/heads/master" if "refs/heads/master" already exists.
 	 * @return the Ref with the given name, or null if it does not exist
 	 * @throws IOException
-	 * @deprecated Use {@link #exactRef(String)} or {@link #findRef(String)}
-	 * instead.
 	 */
-	@Deprecated
 	public Ref getRef(final String name) throws IOException {
-		return getRefDatabase().findRef(name);
-	}
-
-	/**
-	 * Get a ref by name.
-	 *
-	 * @param name
-	 *            the name of the ref to lookup. Must not be a short-hand
-	 *            form; e.g., "master" is not automatically expanded to
-	 *            "refs/heads/master".
-	 * @return the Ref with the given name, or null if it does not exist
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public Ref exactRef(String name) throws IOException {
-		return getRefDatabase().exactRef(name);
-	}
-
-	/**
-	 * Search for a ref by (possibly abbreviated) name.
-	 *
-	 * @param name
-	 *            the name of the ref to lookup. May be a short-hand form, e.g.
-	 *            "master" which is is automatically expanded to
-	 *            "refs/heads/master" if "refs/heads/master" already exists.
-	 * @return the Ref with the given name, or null if it does not exist
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public Ref findRef(String name) throws IOException {
-		return getRefDatabase().findRef(name);
+		return getRefDatabase().getRef(name);
 	}
 
 	/**
@@ -1354,9 +1321,8 @@ public abstract class Repository implements AutoCloseable {
 
 	/**
 	 * @param refName
-	 * @return a {@link ReflogReader} for the supplied refname (resolved using
-	 *         {@link RefDatabase#SEARCH_PATH}), or null if the named ref does
-	 *         not exist.
+	 * @return a {@link ReflogReader} for the supplied refname, or null if the
+	 *         named ref does not exist.
 	 * @throws IOException
 	 *             the ref could not be accessed.
 	 * @since 3.0
