@@ -77,8 +77,23 @@ class SideBandOutputStream extends OutputStream {
 	 */
 	private int cnt;
 
+	/**
+	 * Create a new stream to write side band packets.
+	 *
+	 * @param chan
+	 *            channel number to prefix all packets with, so the remote side
+	 *            can demultiplex the stream and get back the original data.
+	 *            Must be in the range [0, 255].
+	 * @param sz
+	 *            maximum size of a data packet within the stream. The remote
+	 *            side needs to agree to the packet size to prevent buffer
+	 *            overflows. Must be in the range [HDR_SIZE + 1, MAX_BUF).
+	 * @param os
+	 *            stream that the packets are written onto. This stream should
+	 *            be attached to a SideBandInputStream on the remote side.
+	 */
 	SideBandOutputStream(final int chan, final int sz, final OutputStream os) {
-		if (chan <= 0 || 255 < chan)
+		if (chan <= 0 || chan > 255)
 			throw new IllegalArgumentException("channel " + chan
 					+ " must be in range [0, 255]");
 		if (sz <= HDR_SIZE)
