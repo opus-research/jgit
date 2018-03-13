@@ -74,7 +74,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		super.setUp();
 		repo = createWorkRepository();
 		tr = new TestRepository<FileRepository>((repo));
-		gc = new GC(repo, null);
+		gc = new GC(repo, null, TWO_WEEKS_MILLIS);
 	}
 
 	@After
@@ -89,7 +89,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(4, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(TWO_WEEKS_MILLIS);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.nrOfLooseObjects);
 		assertEquals(4, stats.nrOfPackedObjects);
@@ -102,7 +102,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(4, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(TWO_WEEKS_MILLIS);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(4, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
@@ -118,7 +118,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(8, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(TWO_WEEKS_MILLIS);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.nrOfLooseObjects);
 		assertEquals(8, stats.nrOfPackedObjects);
@@ -135,7 +135,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(8, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(TWO_WEEKS_MILLIS);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.nrOfLooseObjects);
 		assertEquals(8, stats.nrOfPackedObjects);
@@ -158,7 +158,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		FileUtils.delete(
 				new File(repo.getDirectory(), "logs/refs/heads/master"),
 				FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		gc.gc(TWO_WEEKS_MILLIS);
+		gc.gc();
 
 		stats = gc.getStatistics();
 		assertEquals(4, stats.nrOfLooseObjects);
@@ -176,7 +176,8 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(8, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(0);
+		gc.setExpireAgeMillis(0);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.nrOfLooseObjects);
 		assertEquals(8, stats.nrOfPackedObjects);
@@ -200,7 +201,8 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		FileUtils.delete(
 				new File(repo.getDirectory(), "logs/refs/heads/master"),
 				FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		gc.gc(0);
+		gc.setExpireAgeMillis(0);
+		gc.gc();
 
 		stats = gc.getStatistics();
 		assertEquals(0, stats.nrOfLooseObjects);
@@ -217,7 +219,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(9, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(TWO_WEEKS_MILLIS);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(1, stats.nrOfLooseObjects);
 		assertEquals(8, stats.nrOfPackedObjects);
@@ -233,7 +235,8 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		stats = gc.getStatistics();
 		assertEquals(9, stats.nrOfLooseObjects);
 		assertEquals(0, stats.nrOfPackedObjects);
-		gc.gc(0);
+		gc.setExpireAgeMillis(0);
+		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.nrOfLooseObjects);
 		assertEquals(8, stats.nrOfPackedObjects);
@@ -247,13 +250,14 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		bb.commit().add("A", "A2").add("B", "B2").create();
 		stats = gc.getStatistics();
 		assertEquals(8, stats.nrOfLooseObjects);
-		gc.prune(Collections.<ObjectId> emptySet(), 0);
+		gc.setExpireAgeMillis(0);
+		gc.prune(Collections.<ObjectId> emptySet());
 		stats = gc.getStatistics();
 		assertEquals(8, stats.nrOfLooseObjects);
 		tr.blob("x");
 		stats = gc.getStatistics();
 		assertEquals(9, stats.nrOfLooseObjects);
-		gc.prune(Collections.<ObjectId> emptySet(), 0);
+		gc.prune(Collections.<ObjectId> emptySet());
 		stats = gc.getStatistics();
 		assertEquals(8, stats.nrOfLooseObjects);
 	}

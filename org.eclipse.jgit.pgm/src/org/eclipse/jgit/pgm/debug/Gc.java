@@ -53,7 +53,8 @@ class Gc extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		GC gc = new GC((FileRepository) db, new TextProgressMonitor());
-		gc.gc(TWO_WEEKS_MILLIS);
+		GC gc = new GC((FileRepository) db, new TextProgressMonitor(),
+				TWO_WEEKS_MILLIS);
+		gc.gc();
 	}
 }
