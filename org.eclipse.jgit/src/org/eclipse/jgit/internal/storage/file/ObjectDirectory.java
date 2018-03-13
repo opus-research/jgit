@@ -52,8 +52,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,8 +64,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -76,7 +72,6 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
@@ -332,7 +327,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 				try {
 					p.resolve(matches, id, RESOLVE_ABBREV_LIMIT);
 				} catch (IOException e) {
-					handlePackError(e, p);
+					// Assume the pack is corrupted.
+					//
+					removePack(p);
 				}
 				if (matches.size() > RESOLVE_ABBREV_LIMIT)
 					return;
@@ -419,7 +416,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 						if (searchPacksAgain(pList))
 							continue SEARCH;
 					} catch (IOException e) {
-						handlePackError(e, p);
+						// Assume the pack is corrupted.
+						removePack(p);
 					}
 				}
 				break SEARCH;
@@ -499,7 +497,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 						if (searchPacksAgain(pList))
 							continue SEARCH;
 					} catch (IOException e) {
-						handlePackError(e, p);
+						// Assume the pack is corrupted.
+						removePack(p);
 					}
 				}
 				break SEARCH;
@@ -540,7 +539,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 					pList = scanPacks(pList);
 					continue SEARCH;
 				} catch (IOException e) {
-					handlePackError(e, p);
+					// Assume the pack is corrupted.
+					//
+					removePack(p);
 				}
 			}
 			break SEARCH;
@@ -548,31 +549,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 		for (AlternateHandle h : myAlternates())
 			h.db.selectObjectRepresentation(packer, otp, curs);
-	}
-
-	private void handlePackError(IOException e, PackFile p) {
-		String tmpl;
-		if ((e instanceof CorruptObjectException)
-				|| (e instanceof PackInvalidException)) {
-			tmpl = JGitText.get().corruptPack;
-			// Assume the pack is corrupted, and remove it from the list.
-			removePack(p);
-		} else if (e instanceof FileNotFoundException) {
-			tmpl = JGitText.get().packWasDeleted;
-			removePack(p);
-		} else {
-			tmpl = JGitText.get().exceptionWhileReadingPack;
-			// Don't remove the pack from the list, as the error may be
-			// transient.
-		}
-		StringBuilder buf = new StringBuilder(MessageFormat.format(tmpl,
-				p.getPackFile().getAbsolutePath()));
-		StringWriter sw = new StringWriter();
-		e.printStackTrace(new PrintWriter(sw));
-		buf.append('\n');
-		buf.append(sw.toString());
-		// TODO instead of syserr we should use a logging framework
-		System.err.println(buf.toString());
 	}
 
 	@Override
@@ -630,18 +606,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	private boolean searchPacksAgain(PackList old) {
-		// Whether to trust the pack folder's modification time. If set
-		// to false we will always scan the .git/objects/pack folder to
-		// check for new pack files. If set to true (default) we use the
-		// lastmodified attribute of the folder and assume that no new
-		// pack files can be in this folder if his modification time has
-		// not changed.
-		boolean trustFolderStat = config.getBoolean(
-				ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_TRUSTFOLDERSTAT, true);
-
-		return ((!trustFolderStat) || old.snapshot.isModified(packDirectory))
-				&& old != scanPacks(old);
+		return old.snapshot.isModified(packDirectory) && old != scanPacks(old);
 	}
 
 	Config getConfig() {

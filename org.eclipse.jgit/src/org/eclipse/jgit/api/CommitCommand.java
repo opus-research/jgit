@@ -64,7 +64,7 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.RejectCommitException;
+import org.eclipse.jgit.api.errors.RejectedCommitException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -95,7 +95,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.Hook;
-import org.eclipse.jgit.util.ProcessResult;
 
 /**
  * A class used to execute a {@code Commit} command. It has setters for all
@@ -133,17 +132,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Setting this option bypasses the {@link Hook#PRE_COMMIT pre-commit} and
-	 * {@link Hook#COMMIT_MSG commit-msg} hooks.
+	 * {@link Hook#COMMIT_MSG} hooks.
 	 */
 	private boolean noVerify;
-
-	private PrintStream hookOutRedirect;
-
-	/**
-	 * If set, this will be called when the execution of a non-rejecting hook
-	 * (such as post-commit) fails.
-	 */
-	private HookFailureHandler hookFailureHandler;
 
 	/**
 	 * Setting this option bypasses the {@link Hook#POST_REWRITE post-rewrite}
@@ -156,7 +147,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	protected CommitCommand(Repository repo) {
 		super(repo);
-		hookOutRedirect = System.out;
 	}
 
 	/**
@@ -177,14 +167,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
-	 * @throws RejectCommitException
-	 *             if there are either pre-commit or commit-msg hooks present in
-	 *             the repository and at least one of them rejects the commit.
 	 */
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException, WrongRepositoryStateException,
-			RejectCommitException {
+			ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		checkCallable();
 		Collections.sort(only);
 
@@ -197,15 +184,25 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						JGitText.get().cannotCommitOnARepoWithState,
 						state.name()));
 
-			executePreCommitHookIfVerifyOn();
+			if (!noVerify) {
+				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
+				final PrintStream hookErrRedirect = new PrintStream(
+						errorByteArray);
+				int preCommitHookResult = FS.DETECTED.runIfPresent(repo,
+						Hook.PRE_COMMIT, new String[0], System.out,
+						hookErrRedirect, null);
+				final String errorDetails = errorByteArray.toString();
+				if (preCommitHookResult != 0) {
+					commitRejectedByHook(Hook.PRE_COMMIT, errorDetails);
+				}
+			}
 
 			processOptions(state, rw);
 
 			if (all && !repo.isBare() && repo.getWorkTree() != null) {
 				Git git = new Git(repo);
 				try {
-					git.add()
-							.addFilepattern(".") //$NON-NLS-1$
+					git.add().addFilepattern(".") //$NON-NLS-1$
 							.setUpdate(true).call();
 				} catch (NoFilepatternException e) {
 					// should really not happen
@@ -235,7 +232,33 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					parents.add(0, headId);
 				}
 
-			executeCommitMsgHookIfVerifyOn();
+			if (!noVerify) {
+				// FIXME this message should have been saved beforehand, since
+				// the prepare-commit-msg hook also works on it
+				exportPreparedMessage(message);
+				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
+				final PrintStream hookErrRedirect = new PrintStream(
+						errorByteArray);
+				String messageFilePath = getMessageFile(false)
+						.getAbsolutePath();
+				// We know the hooks can only run on unix or windows-cygwin...
+				// both of which need their argument in unix format ('/' as path
+				// separator, not '\'). Windows generally accepts '/' as a path
+				// separator... so having this conversion here shouldn't be an
+				// issue, but might hurt if we wish to somehow add support for
+				// git hooks on windows without cygwin and this new support
+				// doesn't accept '/' as a path separator.
+				messageFilePath = messageFilePath.replace(File.separatorChar,
+						'/');
+				int commitMsgHookResult = FS.DETECTED.runIfPresent(repo,
+						Hook.COMMIT_MSG, new String[] { messageFilePath, },
+						System.out, hookErrRedirect, null);
+				final String errorDetails = errorByteArray.toString();
+				if (commitMsgHookResult != 0) {
+					commitRejectedByHook(Hook.COMMIT_MSG, errorDetails);
+				}
+				message = readPreparedMessage();
+			}
 
 			// lock the index
 			RevCommit revCommit = null;
@@ -319,10 +342,28 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				index.unlock();
 			}
 
-			executePostCommitHookWithFailureHandler();
+			int postCommitHookResult = FS.DETECTED.runIfPresent(repo,
+					Hook.POST_COMMIT, new String[0]);
+			if (postCommitHookResult != 0) {
+				// TODO do we wish to log? If so, how? The post-commit hook
+				// cannot reject a commit, but the user might want to be told
+				// his hook failed...
+			}
 
-			executePostRewriteCommitHookWithFailureHandler(headId, revCommit);
-
+			if (amend && headId != null && !noPostRewrite) {
+				final ObjectId oldId = headId;
+				final ObjectId newId = revCommit.getId();
+				final String rewritten = oldId.getName() + ' '
+						+ newId.getName() + '\n';
+				int postRewriteHookResult = FS.DETECTED.runIfPresent(repo,
+						Hook.POST_REWRITE, new String[] { "amend" }, //$NON-NLS-1$
+						System.out, System.err, rewritten);
+				if (postRewriteHookResult != 0) {
+					// TODO as for the post-commit, this hook's return value
+					// holds no meaning, but the user might want to be told that
+					// his hook failed somehow.
+				}
+			}
 			return revCommit;
 		} catch (UnmergedPathException e) {
 			throw new UnmergedPathsException(e);
@@ -332,115 +373,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		} finally {
 			rw.dispose();
 		}
-	}
-
-	private void executePreCommitHookIfVerifyOn() throws RejectCommitException {
-		if (noVerify) {
-			return;
-		}
-
-		final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
-		final PrintStream hookErrRedirect = new PrintStream(errorByteArray);
-		ProcessResult preCommitHookResult = FS.DETECTED.runIfPresent(repo,
-				Hook.PRE_COMMIT, new String[0], hookOutRedirect,
-				hookErrRedirect, null);
-		if (preCommitHookResult.isExecutedWithError()) {
-			String errorMessage = MessageFormat.format(
-					JGitText.get().commitRejectedByHook,
-					Hook.PRE_COMMIT.getName(), errorByteArray.toString());
-			throw new RejectCommitException(errorMessage);
-		}
-	}
-
-	private void executeCommitMsgHookIfVerifyOn() throws IOException,
-			RejectCommitException {
-		if (noVerify || FS.DETECTED.findHook(repo, Hook.COMMIT_MSG) == null) {
-			return;
-		}
-
-		exportPreparedMessage(message);
-
-		final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
-		final PrintStream hookErrRedirect = new PrintStream(errorByteArray);
-
-		// We know the hooks can only run on unix or windows-cygwin...
-		// both of which need their argument in unix format ('/' as path
-		// separator, not '\'). Windows generally accepts '/' as a path
-		// separator... so having this conversion here shouldn't be an
-		// issue, but might hurt if we wish to somehow add support for
-		// git hooks on windows without cygwin and this new support
-		// doesn't accept '/' as a path separator.
-
-		final String messageFilePath = getMessageFile(false).getAbsolutePath()
-				.replace(File.separatorChar, '/');
-		ProcessResult commitMsgHookResult = FS.DETECTED.runIfPresent(repo,
-				Hook.COMMIT_MSG, new String[] { messageFilePath, },
-				hookOutRedirect, hookErrRedirect, null);
-		final String errorDetails = errorByteArray.toString();
-		if (commitMsgHookResult.isExecutedWithError()) {
-			String errorMessage = MessageFormat.format(
-					JGitText.get().commitRejectedByHook,
-					Hook.COMMIT_MSG.getName(), errorDetails);
-			throw new RejectCommitException(errorMessage);
-		}
-
-		message = readPreparedMessage();
-	}
-
-	private void executePostCommitHookWithFailureHandler() {
-		if (hookFailureHandler == null) {
-			executePostCommitHook(System.err);
-		} else {
-			final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
-			final PrintStream hookErrRedirect = new PrintStream(errorByteArray);
-
-			ProcessResult postCommitHookResult = executePostCommitHook(hookErrRedirect);
-
-			if (postCommitHookResult.isExecutedWithError()) {
-				hookFailureHandler.hookExecutionFailed(Hook.POST_COMMIT,
-						postCommitHookResult, errorByteArray.toString());
-			}
-		}
-	}
-
-	private ProcessResult executePostCommitHook(PrintStream errorStream) {
-		ProcessResult postCommitHookResult = FS.DETECTED.runIfPresent(repo,
-				Hook.POST_COMMIT, new String[0], hookOutRedirect, errorStream,
-				null);
-		return postCommitHookResult;
-	}
-
-	private void executePostRewriteCommitHookWithFailureHandler(ObjectId oldId,
-			RevCommit revCommit) {
-		if (!amend || oldId == null || noPostRewrite) {
-			return;
-		}
-
-		final ObjectId newId = revCommit.getId();
-		final String rewritten = oldId.getName() + ' ' + newId.getName() + '\n';
-
-		if (hookFailureHandler == null) {
-			executePostRewriteCommitHook(rewritten, System.err);
-		} else {
-			final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
-			final PrintStream hookErrRedirect = new PrintStream(errorByteArray);
-
-			ProcessResult postRewriteHookResult = executePostRewriteCommitHook(
-					rewritten, hookErrRedirect);
-
-			if (postRewriteHookResult.isExecutedWithError()) {
-				hookFailureHandler.hookExecutionFailed(Hook.POST_REWRITE,
-						postRewriteHookResult, errorByteArray.toString());
-			}
-		}
-	}
-
-	private ProcessResult executePostRewriteCommitHook(String stdinArgs,
-			PrintStream errorStream) {
-		ProcessResult result = FS.DETECTED.runIfPresent(repo,
-				Hook.POST_REWRITE, new String[] { "amend" }, hookOutRedirect, //$NON-NLS-1$
-				errorStream, stdinArgs);
-		return result;
 	}
 
 	private void insertChangeId(ObjectId treeId) throws IOException {
@@ -892,17 +824,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	/**
 	 * Sets the {@link #noVerify} option on this commit command.
-	 * <p>
-	 * Both the {@link Hook#PRE_COMMIT pre-commit} and {@link Hook#COMMIT_MSG
-	 * commit-msg} hooks can block a commit by their return value; setting this
-	 * option to <code>true</code> will bypass these two hooks.
-	 * </p>
 	 *
 	 * @param noVerify
-	 *            Whether this commit should be verified by the pre-commit and
-	 *            commit-msg hooks.
+	 *            Whether this commit should be verified.
 	 * @return {@code this}
-	 * @since 3.7
 	 */
 	public CommitCommand setNoVerify(boolean noVerify) {
 		this.noVerify = noVerify;
@@ -910,16 +835,15 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set the output stream for hook scripts executed by this command. If not
-	 * set it defaults to {@code System.out}.
+	 * Sets the {@link #noPostRewrite} option on this commit command.
 	 *
-	 * @param hookStdOut
-	 *            the output stream for hook scripts executed by this command
+	 * @param noPostRewrite
+	 *            Whether this commit should bypass the
+	 *            {@link Hook#POST_REWRITE post-rewrite} hook.
 	 * @return {@code this}
-	 * @since 3.7
 	 */
-	public CommitCommand setHookOutputStream(PrintStream hookStdOut) {
-		this.hookOutRedirect = hookStdOut;
+	public CommitCommand setNoPostRewrite(boolean noPostRewrite) {
+		this.noPostRewrite = noPostRewrite;
 		return this;
 	}
 
@@ -986,30 +910,12 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		return messageFile;
 	}
 
-	/**
-	 * Sets the handler that should be called back if hooks that don't reject
-	 * operations (such as post-commit) fail.
-	 *
-	 * @param hookFailureHandler
-	 *            The hook failure callback.
-	 * @return {@code this}
-	 */
-	public CommitCommand setHookErrorHandler(
-			HookFailureHandler hookFailureHandler) {
-		this.hookFailureHandler = hookFailureHandler;
-		return this;
-	}
-
-	/**
-	 * Sets the {@link #noPostRewrite} option on this commit command.
-	 *
-	 * @param noPostRewrite
-	 *            Whether this commit should bypass the
-	 *            {@link Hook#POST_REWRITE post-rewrite} hook.
-	 * @return {@code this}
-	 */
-	public CommitCommand setNoPostRewrite(boolean noPostRewrite) {
-		this.noPostRewrite = noPostRewrite;
-		return this;
+	private void commitRejectedByHook(Hook cause, String errorDetails)
+			throws RejectedCommitException {
+		String errorMessage = MessageFormat.format(
+				JGitText.get().commitRejectedByHook, cause.getName());
+		if (errorDetails.length() > 0)
+			errorMessage += '\n' + errorDetails;
+		throw new RejectedCommitException(errorMessage);
 	}
 }

@@ -47,7 +47,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -100,14 +99,12 @@ import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.Hook;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.ProcessResult;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -253,14 +250,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private List<String> rewritePending = new ArrayList<String>();
 
 	/**
-	 * If set, this will be called when the execution of a non-rejecting hook
-	 * (such as post-rewrite) fails.
-	 */
-	private HookFailureHandler hookFailureHandler;
-
-	private PrintStream hookOutRedirect;
-
-	/**
 	 * @param repo
 	 */
 	protected RebaseCommand(Repository repo) {
@@ -319,7 +308,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 								walk.parseCommit(repo.resolve(Constants.HEAD)),
 								upstreamCommit)) {
 					org.eclipse.jgit.api.Status status = Git.wrap(repo)
-							.status().setIgnoreSubmodules(IgnoreSubmoduleMode.ALL).call();
+							.status().call();
 					if (status.hasUncommittedChanges()) {
 						List<String> list = new ArrayList<String>();
 						list.addAll(status.getUncommittedChanges());
@@ -734,23 +723,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private RebaseResult finishRebase(RevCommit finalHead,
 			boolean lastStepIsForward) throws IOException, GitAPIException {
 		if (rewrittenList.length() > 0) {
-			if (hookFailureHandler != null) {
-				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
-				final PrintStream hookErrRedirect = new PrintStream(
-						errorByteArray);
-				ProcessResult postRewriteHookResult = FS.DETECTED.runIfPresent(
-						repo, Hook.POST_REWRITE, new String[] { "rebase" }, //$NON-NLS-1$
-						hookOutRedirect, hookErrRedirect,
-						rewrittenList.toString());
-
-				if (postRewriteHookResult.isExecutedWithError()) {
-					hookFailureHandler.hookExecutionFailed(Hook.POST_REWRITE,
-							postRewriteHookResult, errorByteArray.toString());
-				}
-			} else {
-				FS.DETECTED.runIfPresent(repo, Hook.POST_REWRITE,
-						new String[] { "rebase" }, hookOutRedirect, System.err, //$NON-NLS-1$
-						rewrittenList.toString());
+			int postRewriteHookResult = FS.DETECTED.runIfPresent(repo,
+					Hook.POST_REWRITE, new String[] { "rebase" }, //$NON-NLS-1$
+					System.out, System.err, rewrittenList.toString());
+			if (postRewriteHookResult != 0) {
+				// TODO This hook's return value holds no meaning, but the
+				// user might want to be told that his hook failed somehow.
 			}
 			rewrittenList = null;
 		}
@@ -1612,35 +1590,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 */
 	public RebaseCommand setPreserveMerges(boolean preserve) {
 		this.preserveMerges = preserve;
-		return this;
-	}
-
-	/**
-	 * Sets the handler that should be called back if hooks that don't reject
-	 * operations (such as post-rewrite) fail.
-	 *
-	 * @param hookFailureHandler
-	 *            The hook failure callback.
-	 * @return {@code this}
-	 * @since 4.0
-	 */
-	public RebaseCommand setHookErrorHandler(
-			HookFailureHandler hookFailureHandler) {
-		this.hookFailureHandler = hookFailureHandler;
-		return this;
-	}
-
-	/**
-	 * Set the output stream for hook scripts executed by this command. If not
-	 * set it defaults to {@code System.out}.
-	 *
-	 * @param hookStdOut
-	 *            the output stream for hook scripts executed by this command
-	 * @return {@code this}
-	 * @since 4.0
-	 */
-	public RebaseCommand setHookOutputStream(PrintStream hookStdOut) {
-		this.hookOutRedirect = hookStdOut;
 		return this;
 	}
 
