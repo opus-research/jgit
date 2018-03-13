@@ -229,7 +229,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 								new ObjectId[] {
 										headCommit.getId(), srcCommit.getId() },
 								MergeStatus.FAILED, mergeStrategy,
-								lowLevelResults, failingPaths, null);
+								lowLevelResults, null);
 					} else
 						return new MergeResult(null,
 								merger.getBaseCommit(0, 1),
