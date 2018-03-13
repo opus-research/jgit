@@ -44,15 +44,19 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.internal.storage.reftable.BlockWriter.compare;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_LEN_SPECIFIED;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
@@ -75,14 +79,14 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.SymbolicRef;
+import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /** Reads a single block for {@link ReftableReader}. */
 class BlockReader {
-	private long blockStartPosition;
-	private long blockEndPosition;
 	private byte blockType;
+	private long endPosition;
 
 	private byte[] buf;
 	private int bufLen;
@@ -95,22 +99,24 @@ class BlockReader {
 
 	private byte[] nameBuf = new byte[256];
 	private int nameLen;
+	private int valueType;
 
 	byte type() {
 		return blockType;
 	}
 
-	long blockEndPosition() {
-		return blockEndPosition;
+	long endPosition() {
+		return endPosition;
 	}
 
 	boolean next() {
 		return ptr < keysEnd;
 	}
 
-	void parseEntryName() {
+	void parseKey() {
 		int pfx = readVarint32();
-		int sfx = readVarint32();
+		valueType = readVarint32();
+		int sfx = valueType >>> 3;
 		if (pfx + sfx > nameBuf.length) {
 			int n = Math.max(pfx + sfx, nameBuf.length * 2);
 			nameBuf = Arrays.copyOf(nameBuf, n);
@@ -128,20 +134,23 @@ class BlockReader {
 		return RawParseUtils.decode(UTF_8, nameBuf, 0, len);
 	}
 
-	boolean checkNameMatches(byte[] match) {
+	boolean match(byte[] match, boolean matchIsPrefix) {
 		int len = nameLen;
 		if (blockType == LOG_BLOCK_TYPE) {
 			len -= 9;
 		}
-		if (len < match.length) {
-			return false;
+		if (matchIsPrefix) {
+			return len >= match.length
+					&& compare(
+							match, 0, match.length,
+							nameBuf, 0, match.length) == 0;
 		}
+		return compare(match, 0, match.length, nameBuf, 0, len) == 0;
+	}
 
-		boolean isPrefixMatch = match[match.length - 1] == '/';
-		if (isPrefixMatch) {
-			return compare(match, nameBuf, 0, match.length) == 0;
-		}
-		return len == match.length && compare(match, nameBuf, 0, len) == 0;
+	boolean matchAbbrevId(byte[] match) {
+		int n = Math.min(match.length, nameLen);
+		return compare(match, 0, n, nameBuf, 0, n) == 0;
 	}
 
 	long readIndex() throws IOException {
@@ -150,14 +159,14 @@ class BlockReader {
 		}
 
 		readVarint32(); // skip prefix length
-		int n = readVarint32();
+		int n = readVarint32() >>> 3;
 		ptr += n; // skip name
 		return readVarint64();
 	}
 
 	Ref readRef() throws IOException {
 		String name = RawParseUtils.decode(UTF_8, nameBuf, 0, nameLen);
-		switch (readVarint32()) {
+		switch (valueType & VALUE_TYPE_MASK) {
 		case VALUE_NONE: // delete
 			return newRef(name);
 
@@ -173,9 +182,24 @@ class BlockReader {
 		case VALUE_SYMREF:
 			return new SymbolicRef(name, newRef(readValueString()));
 
+		case VALUE_LEN_SPECIFIED:
 		default:
 			throw invalidBlock();
 		}
+	}
+
+	IntList readBlockList() {
+		int n = valueType & VALUE_TYPE_MASK;
+		if (n == VALUE_TYPE_MASK) {
+			n += readVarint32();
+		}
+		IntList b = new IntList(n);
+		b.add(readVarint32());
+		for (int j = 1; j < n; j++) {
+			int prior = b.get(j - 1);
+			b.add(prior + readVarint32());
+		}
+		return b;
 	}
 
 	long readLogTimeUsec() {
@@ -233,17 +257,15 @@ class BlockReader {
 		return s;
 	}
 
-	void readFrom(BlockSource src, long pos, int estBlockSize)
+	void readBlock(BlockSource src, long pos, int estBlockSize)
 			throws IOException {
-		blockStartPosition = pos;
-		blockEndPosition = pos + estBlockSize;
-		loadBlockIntoBuf(src, estBlockSize);
-		parseBlockStart();
+		readBlockIntoBuf(src, pos, estBlockSize);
+		parseBlockStart(pos);
 	}
 
-	private void loadBlockIntoBuf(BlockSource src, int size)
+	private void readBlockIntoBuf(BlockSource src, long pos, int size)
 			throws IOException {
-		ByteBuffer b = src.read(blockStartPosition, size);
+		ByteBuffer b = src.read(pos, size);
 		bufLen = b.position();
 		if (bufLen <= 0) {
 			throw invalidBlock();
@@ -255,11 +277,12 @@ class BlockReader {
 			b.flip();
 			b.get(buf);
 		}
+		endPosition = pos + bufLen;
 	}
 
-	private void parseBlockStart() throws IOException {
+	private void parseBlockStart(long pos) throws IOException {
 		ptr = 0;
-		if (blockStartPosition == 0) {
+		if (pos == 0) {
 			if (bufLen == FILE_HEADER_LEN) {
 				setupEmptyFileBlock();
 				return;
@@ -275,13 +298,14 @@ class BlockReader {
 		if ((blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE) {
 			// Index blocks are allowed to grow up to 31-bit blockSize.
 			blockType = INDEX_BLOCK_TYPE;
-			blockLen = typeAndSize & 0x7fffffff;
+			blockLen = decodeIndexSize(typeAndSize);
 		} else {
 			blockLen = typeAndSize & 0xffffff;
 		}
 		if (blockType == LOG_BLOCK_TYPE) {
 			// Log blocks must be inflated after the header.
-			inflateBuf(blockLen);
+			long deflatedSize = inflateBuf(blockLen);
+			endPosition = pos + 4 + deflatedSize;
 		}
 		if (bufLen < blockLen) {
 			throw invalidBlock();
@@ -299,19 +323,23 @@ class BlockReader {
 		}
 	}
 
-	private void inflateBuf(int blockLen) throws IOException {
-		byte[] tmp = new byte[4 + blockLen];
-		System.arraycopy(buf, 0, tmp, 0, 4);
+	static int decodeIndexSize(int typeAndSize) {
+		return typeAndSize & 0x7fffffff;
+	}
 
+	private long inflateBuf(int blockLen) throws IOException {
+		byte[] dst = new byte[4 + blockLen];
+		System.arraycopy(buf, 0, dst, 0, 4);
+
+		long deflatedSize = 0;
 		Inflater inf = InflaterCache.get();
 		try {
 			inf.setInput(buf, ptr, bufLen - ptr);
 			for (int o = 4;;) {
-				int n = inf.inflate(tmp, o, tmp.length - o);
+				int n = inf.inflate(dst, o, dst.length - o);
 				o += n;
 				if (inf.finished()) {
-					long blockSize = 4 + inf.getBytesRead();
-					blockEndPosition = blockStartPosition + blockSize;
+					deflatedSize = inf.getBytesRead();
 					break;
 				} else if (n <= 0) {
 					throw invalidBlock();
@@ -323,8 +351,9 @@ class BlockReader {
 			InflaterCache.release(inf);
 		}
 
-		buf = tmp;
-		bufLen = tmp.length;
+		buf = dst;
+		bufLen = dst.length;
+		return deflatedSize;
 	}
 
 	private void setupEmptyFileBlock() {
@@ -343,15 +372,32 @@ class BlockReader {
 		}
 	}
 
-	int seek(byte[] name) {
+	int seekKey(byte[] key) {
+		return seek(key, true);
+	}
+
+	int seekAbbrevId(byte[] key) {
+		return seek(key, false);
+	}
+
+	private static int compareKey(boolean useKeyLen, byte[] a,
+			byte[] b, int bi, int bLen) {
+		if (useKeyLen) {
+			return compare(a, 0, a.length, b, bi, bLen);
+		}
+		int n = Math.min(bLen, a.length);
+		return compare(a, 0, n, b, bi, n);
+	}
+
+	private int seek(byte[] key, boolean useKeyLen) {
 		int low = 0;
 		int end = restartCount;
 		for (;;) {
 			int mid = (low + end) >>> 1;
 			int p = NB.decodeInt32(buf, restartIdx + mid * 4);
 			ptr = p + 1; // skip 0 prefix length
-			int len = readVarint32();
-			int cmp = compare(name, buf, ptr, len);
+			int n = readVarint32() >>> 3;
+			int cmp = compareKey(useKeyLen, key, buf, ptr, n);
 			if (cmp < 0) {
 				end = mid;
 			} else if (cmp == 0) {
@@ -361,12 +407,13 @@ class BlockReader {
 				low = mid + 1;
 			}
 			if (low >= end) {
-				return seekToKey(name, p, low, cmp);
+				return seekToKey(key, useKeyLen, p, low, cmp);
 			}
 		}
 	}
 
-	private int seekToKey(byte[] name, int rPtr, int rIdx, int rCmp) {
+	private int seekToKey(byte[] key, boolean useKeyLen,
+			int rPtr, int rIdx, int rCmp) {
 		if (rCmp < 0) {
 			if (rIdx == 0) {
 				ptr = keysStart;
@@ -380,8 +427,8 @@ class BlockReader {
 		int cmp;
 		do {
 			int savePtr = ptr;
-			parseEntryName();
-			cmp = compare(name, nameBuf, 0, nameLen);
+			parseKey();
+			cmp = compareKey(useKeyLen, key, nameBuf, 0, nameLen);
 			if (cmp <= 0) {
 				// cmp < 0, name should be in this block, but is not.
 				// cmp = 0, block is positioned at name.
@@ -396,7 +443,7 @@ class BlockReader {
 	void skipValue() {
 		switch (blockType) {
 		case REF_BLOCK_TYPE:
-			switch (readVarint32()) {
+			switch (valueType & VALUE_TYPE_MASK) {
 			case VALUE_NONE:
 				return;
 			case VALUE_1ID:
@@ -406,10 +453,22 @@ class BlockReader {
 				ptr += 2 * OBJECT_ID_LENGTH;
 				return;
 			case VALUE_SYMREF:
+			case VALUE_LEN_SPECIFIED:
 				skipString();
 				return;
 			}
 			break;
+
+		case OBJ_BLOCK_TYPE: {
+			int n = valueType & VALUE_TYPE_MASK;
+			if (n == VALUE_TYPE_MASK) {
+				n += readVarint32();
+			}
+			while (n-- > 0) {
+				readVarint32();
+			}
+			return;
+		}
 
 		case INDEX_BLOCK_TYPE:
 			readVarint32();
@@ -461,17 +520,6 @@ class BlockReader {
 
 	private static Ref newRef(String name) {
 		return new ObjectIdRef.Unpeeled(NEW, name, null);
-	}
-
-	private static int compare(byte[] a, byte[] b, int bi, int bLen) {
-		int bEnd = bi + bLen;
-		for (int ai = 0; ai < a.length && bi < bEnd; ai++, bi++) {
-			int c = (a[ai] & 0xff) - (b[bi] & 0xff);
-			if (c != 0) {
-				return c;
-			}
-		}
-		return a.length - bLen;
 	}
 
 	private static IOException invalidBlock() {

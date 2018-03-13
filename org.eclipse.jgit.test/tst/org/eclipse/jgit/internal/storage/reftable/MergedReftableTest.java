@@ -74,29 +74,29 @@ public class MergedReftableTest {
 	@Test
 	public void oneEmptyTable() throws IOException {
 		MergedReftable mr = merge(write());
-
-		mr.seekToFirstRef();
-		assertFalse(mr.next());
-
-		mr.seek(HEAD);
-		assertFalse(mr.next());
-
-		mr.seek(R_HEADS);
-		assertFalse(mr.next());
+		try (RefCursor rc = mr.allRefs()) {
+			assertFalse(rc.next());
+		}
+		try (RefCursor rc = mr.seek(HEAD)) {
+			assertFalse(rc.next());
+		}
+		try (RefCursor rc = mr.seek(R_HEADS)) {
+			assertFalse(rc.next());
+		}
 	}
 
 	@Test
 	public void twoEmptyTables() throws IOException {
 		MergedReftable mr = merge(write(), write());
-
-		mr.seekToFirstRef();
-		assertFalse(mr.next());
-
-		mr.seek(HEAD);
-		assertFalse(mr.next());
-
-		mr.seek(R_HEADS);
-		assertFalse(mr.next());
+		try (RefCursor rc = mr.allRefs()) {
+			assertFalse(rc.next());
+		}
+		try (RefCursor rc = mr.seek(HEAD)) {
+			assertFalse(rc.next());
+		}
+		try (RefCursor rc = mr.seek(R_HEADS)) {
+			assertFalse(rc.next());
+		}
 	}
 
 	@SuppressWarnings("boxing")
@@ -108,14 +108,63 @@ public class MergedReftableTest {
 		}
 
 		MergedReftable mr = merge(write(refs));
-		mr.seekToFirstRef();
-		for (Ref exp : refs) {
-			assertTrue("has " + exp.getName(), mr.next());
-			Ref act = mr.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
+		try (RefCursor rc = mr.allRefs()) {
+			for (Ref exp : refs) {
+				assertTrue("has " + exp.getName(), rc.next());
+				Ref act = rc.getRef();
+				assertEquals(exp.getName(), act.getName());
+				assertEquals(exp.getObjectId(), act.getObjectId());
+			}
+			assertFalse(rc.next());
 		}
-		assertFalse(mr.next());
+	}
+
+	@Test
+	public void deleteIsHidden() throws IOException {
+		List<Ref> delta1 = Arrays.asList(
+				ref("refs/heads/apple", 1),
+				ref("refs/heads/master", 2));
+		List<Ref> delta2 = Arrays.asList(delete("refs/heads/apple"));
+
+		MergedReftable mr = merge(write(delta1), write(delta2));
+		try (RefCursor rc = mr.allRefs()) {
+			assertTrue(rc.next());
+			assertEquals("refs/heads/master", rc.getRef().getName());
+			assertEquals(id(2), rc.getRef().getObjectId());
+			assertFalse(rc.next());
+		}
+	}
+
+	@Test
+	public void twoTableSeek() throws IOException {
+		List<Ref> delta1 = Arrays.asList(
+				ref("refs/heads/apple", 1),
+				ref("refs/heads/master", 2));
+		List<Ref> delta2 = Arrays.asList(ref("refs/heads/banana", 3));
+
+		MergedReftable mr = merge(write(delta1), write(delta2));
+		try (RefCursor rc = mr.seek("refs/heads/master")) {
+			assertTrue(rc.next());
+			assertEquals("refs/heads/master", rc.getRef().getName());
+			assertEquals(id(2), rc.getRef().getObjectId());
+			assertFalse(rc.next());
+		}
+	}
+
+	@Test
+	public void twoTableById() throws IOException {
+		List<Ref> delta1 = Arrays.asList(
+				ref("refs/heads/apple", 1),
+				ref("refs/heads/master", 2));
+		List<Ref> delta2 = Arrays.asList(ref("refs/heads/banana", 3));
+
+		MergedReftable mr = merge(write(delta1), write(delta2));
+		try (RefCursor rc = mr.byObjectId(id(2))) {
+			assertTrue(rc.next());
+			assertEquals("refs/heads/master", rc.getRef().getName());
+			assertEquals(id(2), rc.getRef().getObjectId());
+			assertFalse(rc.next());
+		}
 	}
 
 	@SuppressWarnings("boxing")
@@ -143,14 +192,15 @@ public class MergedReftableTest {
 				write(delta1),
 				write(delta2),
 				write(delta3));
-		mr.seekToFirstRef();
-		for (Ref exp : expected) {
-			assertTrue("has " + exp.getName(), mr.next());
-			Ref act = mr.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
+		try (RefCursor rc = mr.allRefs()) {
+			for (Ref exp : expected) {
+				assertTrue("has " + exp.getName(), rc.next());
+				Ref act = rc.getRef();
+				assertEquals(exp.getName(), act.getName());
+				assertEquals(exp.getObjectId(), act.getObjectId());
+			}
+			assertFalse(rc.next());
 		}
-		assertFalse(mr.next());
 	}
 
 	@Test
@@ -161,20 +211,20 @@ public class MergedReftableTest {
 
 		MergedReftable mr = merge(write(delta1), write(delta2), write(delta3));
 		mr.setIncludeDeletes(true);
-		mr.seekToFirstRef();
+		try (RefCursor rc = mr.allRefs()) {
+			assertTrue(rc.next());
+			Ref r = rc.getRef();
+			assertEquals("refs/heads/master", r.getName());
+			assertEquals(id(8), r.getObjectId());
 
-		assertTrue(mr.next());
-		Ref r = mr.getRef();
-		assertEquals("refs/heads/master", r.getName());
-		assertEquals(id(8), r.getObjectId());
+			assertTrue(rc.next());
+			r = rc.getRef();
+			assertEquals("refs/heads/next", r.getName());
+			assertEquals(NEW, r.getStorage());
+			assertNull(r.getObjectId());
 
-		assertTrue(mr.next());
-		r = mr.getRef();
-		assertEquals("refs/heads/next", r.getName());
-		assertEquals(NEW, r.getStorage());
-		assertNull(r.getObjectId());
-
-		assertFalse(mr.next());
+			assertFalse(rc.next());
+		}
 	}
 
 	@SuppressWarnings("boxing")
@@ -187,13 +237,14 @@ public class MergedReftableTest {
 
 		MergedReftable mr = merge(write(refs));
 		for (Ref exp : refs) {
-			mr.seek(exp.getName());
-			assertTrue("has " + exp.getName(), mr.next());
-			Ref act = mr.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
+			try (RefCursor rc = mr.seek(exp.getName())) {
+				assertTrue("has " + exp.getName(), rc.next());
+				Ref act = rc.getRef();
+				assertEquals(exp.getName(), act.getName());
+				assertEquals(exp.getObjectId(), act.getObjectId());
+				assertFalse(rc.next());
+			}
 		}
-		assertFalse(mr.next());
 	}
 
 	@Test
@@ -204,27 +255,27 @@ public class MergedReftableTest {
 		List<Ref> delta2 = Arrays.asList(delete("refs/heads/next"));
 		List<Ref> delta3 = Arrays.asList(ref("refs/heads/master", 8));
 
-		ReftableCompactor rc = new ReftableCompactor();
-		rc.addAll(Arrays.asList(
+		ReftableCompactor compactor = new ReftableCompactor();
+		compactor.addAll(Arrays.asList(
 				read(write(delta1)),
 				read(write(delta2)),
 				read(write(delta3))));
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		rc.compact(out);
+		compactor.compact(out);
 		byte[] table = out.toByteArray();
 
-		ReftableReader rr = read(table);
-		rr.seekToFirstRef();
-		assertTrue(rr.next());
-		Ref r = rr.getRef();
-		assertEquals("refs/heads/master", r.getName());
-		assertEquals(id(8), r.getObjectId());
-
-		assertFalse(rr.next());
+		ReftableReader reader = read(table);
+		try (RefCursor rc = reader.allRefs()) {
+			assertTrue(rc.next());
+			Ref r = rc.getRef();
+			assertEquals("refs/heads/master", r.getName());
+			assertEquals(id(8), r.getObjectId());
+			assertFalse(rc.next());
+		}
 	}
 
 	private static MergedReftable merge(byte[]... table) {
-		List<RefCursor> stack = new ArrayList<>(table.length);
+		List<Reftable> stack = new ArrayList<>(table.length);
 		for (byte[] b : table) {
 			stack.add(read(b));
 		}
