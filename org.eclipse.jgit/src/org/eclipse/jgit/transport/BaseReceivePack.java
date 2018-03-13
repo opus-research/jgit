@@ -1152,6 +1152,7 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		if (allowPushOptions) {
 			adv.advertiseCapability(CAPABILITY_PUSH_OPTIONS);
+			pushOptions = new ArrayList<>();
 		}
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -1271,9 +1272,6 @@ public abstract class BaseReceivePack {
 		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
 		usePushOptions = allowPushOptions
 				&& isCapabilityEnabled(CAPABILITY_PUSH_OPTIONS);
-		if (usePushOptions) {
-			pushOptions = new ArrayList<>();
-		}
 		if (sideBand) {
 			OutputStream out = rawOut;
 
