@@ -672,13 +672,17 @@ public class DirCache {
 
 		if (writeTree) {
 			TemporaryBuffer bb = new TemporaryBuffer.LocalFile(dir, 5 << 20);
-			tree.write(tmp, bb);
-			bb.close();
+			try {
+				tree.write(tmp, bb);
+				bb.close();
 
-			NB.encodeInt32(tmp, 0, EXT_TREE);
-			NB.encodeInt32(tmp, 4, (int) bb.length());
-			dos.write(tmp, 0, 8);
-			bb.writeTo(dos, null);
+				NB.encodeInt32(tmp, 0, EXT_TREE);
+				NB.encodeInt32(tmp, 4, (int) bb.length());
+				dos.write(tmp, 0, 8);
+				bb.writeTo(dos, null);
+			} finally {
+				bb.destroy();
+			}
 		}
 		writeIndexChecksum = foot.digest();
 		os.write(writeIndexChecksum);
