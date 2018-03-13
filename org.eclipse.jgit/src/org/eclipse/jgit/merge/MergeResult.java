@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -73,7 +73,7 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 
 	private final IntList chunks = new IntList();
 
-	private int conflictCount = 0;
+	private boolean containsConflicts = false;
 
 	/**
 	 * Creates a new empty MergeResult
@@ -88,10 +88,14 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 		/*
 		 * FIXME an "empty" sequence means a conflict on file modes or a binary
 		 * conflict. In such "non textual" cases, we still need the "API"
-		 * MergeResult to know there are conflicts.
+		 * MergeResult to know there are conflicts (see
+		 * org.eclipse.jgit.api.MergeResult.addConflict(String, MergeResult<?>)
+		 * which considers that there is no conflict if "containsConflict" is
+		 * false... even though the ResolveMerger simply uses an empty list for
+		 * the sequences when the conflict is not "textual").
 		 */
 		if (sequences.isEmpty())
-			conflictCount = 1;
+			containsConflicts = true;
 	}
 
 	/**
@@ -121,7 +125,7 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 		chunks.add(begin);
 		chunks.add(end);
 		if (conflictState != ConflictState.NO_CONFLICT)
-			conflictCount++;
+			containsConflicts = true;
 	}
 
 	/**
@@ -164,16 +168,9 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 	}
 
 	/**
-	 * @return The number of conflicts detected during this merge.
-	 */
-	public int getConflictCount() {
-		return conflictCount;
-	}
-
-	/**
 	 * @return true if this merge result contains conflicts
 	 */
 	public boolean containsConflicts() {
-		return conflictCount > 0;
+		return containsConflicts;
 	}
 }

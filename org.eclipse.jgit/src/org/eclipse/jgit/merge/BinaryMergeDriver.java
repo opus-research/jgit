@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,39 +42,31 @@
  *******************************************************************************/
 package org.eclipse.jgit.merge;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Config;
 
 /**
  * This merge driver should be used for binary files instead of the textual
  * merge driver. Its only action is to take the local version of the file,
- * whatever the changes that happened.
+ * whatever changes happened.
  */
 public class BinaryMergeDriver implements MergeDriver {
-	/**
-	 * {@inheritDoc}
-	 *
-	 * @see org.eclipse.jgit.merge.MergeDriver#merge(org.eclipse.jgit.lib.Repository,
-	 *      java.io.File, java.io.File, java.io.File, java.lang.String[])
-	 */
-	public boolean merge(Repository repository, File ours, File theirs,
-			File base,
-			String[] commitNames)
-			throws IOException {
-		/*
-		 * No need for any explicit action. The local file will be kept and
-		 * marked as conflictual without any pre-merging.
-		 */
+	public boolean merge(Config configuration, InputStream ours,
+			InputStream theirs, InputStream base, OutputStream output,
+			String[] commitNames) throws IOException {
+		// Keep local file without pre-merging
+		byte[] buffer = new byte[8192];
+		int read = ours.read(buffer);
+		while (read > 0) {
+			output.write(buffer, 0, read);
+			read = ours.read(buffer);
+		}
 		return false;
 	}
 
-	/**
-	 * {@inheritDoc}
-	 *
-	 * @see org.eclipse.jgit.merge.MergeDriver#getName()
-	 */
 	public String getName() {
 		return "Binary"; //$NON-NLS-1$
 	}

@@ -2,7 +2,7 @@
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
  * Copyright (C) 2010-2012, Matthias Sohn <matthias.sohn@sap.com>
  * Copyright (C) 2012, Research In Motion Limited
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,20 +45,20 @@
  *******************************************************************************/
 package org.eclipse.jgit.merge;
 
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.IO;
 
 /**
  * This merge driver can be used on any file. It will merge the files using
@@ -69,15 +69,10 @@ public class TextMergeDriver implements MergeDriver {
 	/** Low level result of the merge. */
 	private MergeResult<RawText> lowLevelResults;
 
-	/**
-	 * {@inheritDoc}
-	 *
-	 * @see org.eclipse.jgit.merge.MergeDriver#merge(org.eclipse.jgit.lib.Repository,
-	 *      java.io.File, java.io.File, java.io.File, java.lang.String[])
-	 */
-	public boolean merge(Repository repository, File ours, File theirs,
-			File base, String[] commitNames) throws IOException {
-		final SupportedAlgorithm diffAlg = repository.getConfig().getEnum(
+	public boolean merge(Config configuration, InputStream ours,
+			InputStream theirs, InputStream base, OutputStream output,
+			String[] commitNames) throws IOException {
+		final SupportedAlgorithm diffAlg = configuration.getEnum(
 				ConfigConstants.CONFIG_DIFF_SECTION, null,
 				ConfigConstants.CONFIG_KEY_ALGORITHM,
 				SupportedAlgorithm.HISTOGRAM);
@@ -85,16 +80,11 @@ public class TextMergeDriver implements MergeDriver {
 				DiffAlgorithm.getAlgorithm(diffAlg));
 
 		lowLevelResults = contentMerge(mergeAlgorithm, base, ours, theirs);
-		writeMergedContent(ours, lowLevelResults, commitNames);
+		writeMergedContent(output, lowLevelResults, commitNames);
 
 		return !lowLevelResults.containsConflicts();
 	}
 
-	/**
-	 * {@inheritDoc}
-	 *
-	 * @see org.eclipse.jgit.merge.MergeDriver#getName()
-	 */
 	public String getName() {
 		return "Text"; //$NON-NLS-1$
 	}
@@ -110,10 +100,10 @@ public class TextMergeDriver implements MergeDriver {
 	}
 
 	/**
-	 * Write merged file content in the given file.
+	 * Output the merged content into the given stream.
 	 *
-	 * @param file
-	 *            The file we are to overwrite.
+	 * @param output
+	 *            The stream in which we are to write the merge result.
 	 * @param result
 	 *            Result of the content merge.
 	 * @param commitNames
@@ -121,39 +111,33 @@ public class TextMergeDriver implements MergeDriver {
 	 *            the conflict markers.
 	 * @throws IOException
 	 */
-	private static void writeMergedContent(File file,
+	private static void writeMergedContent(OutputStream output,
 			MergeResult<RawText> result, String[] commitNames)
 			throws IOException {
 		MergeFormatter fmt = new MergeFormatter();
-		OutputStream stream = null;
-		try {
-			stream = new BufferedOutputStream(new FileOutputStream(file));
-			fmt.formatMerge(stream, result, Arrays.asList(commitNames),
-					Constants.CHARACTER_ENCODING);
-		} finally {
-			if (stream != null)
-				stream.close();
-		}
+		fmt.formatMerge(output, result, Arrays.asList(commitNames),
+				Constants.CHARACTER_ENCODING);
 	}
 
 	/**
-	 * Does the content merge. If any of the files is <code>null</code>, an
+	 * Does the content merge. If any of the streams is <code>null</code>, an
 	 * empty text will be used instead.
 	 *
 	 * @param mergeAlgorithm
 	 *            The algorithm to use for this merge.
 	 * @param base
-	 *            Content of the common ancestor of ours and theirs.
+	 *            Stream of the content of the common ancestor of ours and
+	 *            theirs.
 	 * @param ours
-	 *            Content of our file.
+	 *            Stream of the content of our file.
 	 * @param theirs
-	 *            Content of their file.
+	 *            Stream of the content of their file.
 	 * @return The result of the content merge.
 	 * @throws IOException
 	 */
 	private static MergeResult<RawText> contentMerge(
-			MergeAlgorithm mergeAlgorithm, File base, File ours, File theirs)
-			throws IOException {
+			MergeAlgorithm mergeAlgorithm, InputStream base, InputStream ours,
+			InputStream theirs) throws IOException {
 		RawText baseText = getRawText(base);
 		RawText ourText = getRawText(ours);
 		RawText theirsText = getRawText(theirs);
@@ -161,10 +145,14 @@ public class TextMergeDriver implements MergeDriver {
 				ourText, theirsText);
 	}
 
-	private static RawText getRawText(File file)
-			throws IOException {
-		if (file == null)
+	private static RawText getRawText(InputStream stream) throws IOException {
+		if (stream == null)
 			return RawText.EMPTY_TEXT;
-		return new RawText(file);
+		final int bufferSize = 8192;
+		final ByteBuffer content = IO.readWholeStream(stream, bufferSize);
+		final byte[] raw = content.array();
+		final byte[] trimmed = new byte[content.limit()];
+		System.arraycopy(raw, 0, trimmed, 0, trimmed.length);
+		return new RawText(trimmed);
 	}
 }

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,6 +42,7 @@
  *******************************************************************************/
 package org.eclipse.jgit.merge;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -49,7 +50,7 @@ import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.PathMatcher;
 
 /**
- * This will hold all registered merger drivers.
+ * Registry of all merge drivers.
  */
 public class MergeDriverRegistry {
 	/**
@@ -71,7 +72,7 @@ public class MergeDriverRegistry {
 	 *
 	 * @see #associate(String, String)
 	 */
-	private static final Map<String, String> DRIVER_ASSOCIATION = new ConcurrentHashMap<String, String>();
+	private static final Map<String, String> DRIVER_ASSOCIATION = new LinkedHashMap<String, String>();
 
 	private MergeDriverRegistry() {
 		// prevents instantiation
@@ -103,7 +104,7 @@ public class MergeDriverRegistry {
 	 * <li><code>?</code> : matches exactly one character.</li>
 	 * </ul>
 	 * </p>
-	 * 
+	 *
 	 * @param globPattern
 	 *            Pattern for the file names to associate with this driver.
 	 * @param driverName
@@ -116,8 +117,20 @@ public class MergeDriverRegistry {
 	}
 
 	/**
-	 * This will be called by the merge strategy in order to determine which
-	 * merge driver needs to be called for a given path.
+	 * This will return the merge driver associated with a glob matching the
+	 * given path.
+	 * <p>
+	 * This will return the <b>last</b> corresponding merge driver. For example,
+	 * if <code>path</code> is "abc" and we have associated, in this order :
+	 * <ol>
+	 * <li>a* => merge driver A</li>
+	 * <li>abc => merge driver B</li>
+	 * <li>*c => merge driver C</li>
+	 * <li>abc? => merge driver D</li>
+	 * </ol>
+	 * Then the returned driver will be C, since D does not match "abc" and C is
+	 * the last that matches.
+	 * </p>
 	 *
 	 * @param path
 	 *            Path of the file we need a merger for.
@@ -129,6 +142,7 @@ public class MergeDriverRegistry {
 		if (separatorIndex >= 0)
 			fileName = path.substring(separatorIndex + 1);
 
+		MergeDriver lastMatch = null;
 		for (Map.Entry<String, String> association : DRIVER_ASSOCIATION
 				.entrySet()) {
 			// Should we keep the matcher around?
@@ -138,10 +152,10 @@ public class MergeDriverRegistry {
 				final MergeDriver driver = REGISTERED_DRIVERS.get(association
 						.getValue());
 				if (driver != null)
-					return driver;
+					lastMatch = driver;
 			}
 		}
-		return null;
+		return lastMatch;
 	}
 
 	/**

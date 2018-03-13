@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +42,52 @@
  *******************************************************************************/
 package org.eclipse.jgit.merge;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Config;
 
 /**
  * This interface describes the general contract expected out of a merge driver
  * as can be registered against JGit.
- * <p>
- * Merge driver are expected to be able to determine whether they can handle a
- * given entry within a TreeWalk. The ResolveMerger will then select the highest
- * ranked merge driver that can handle that particular entry.
- * </p>
  */
 public interface MergeDriver {
 	/**
-	 * This will be called by the merger strategy on every file it processes
-	 * that needs a non-trivial merge (both ours and theirs have changed since
-	 * their common ancestor).
+	 * This will be called by the merge strategy on every file it processes that
+	 * needs a non-trivial merge (both ours and theirs have changed since their
+	 * common ancestor).
 	 * <p>
-	 * Merge drivers are expected to leave the result of the merge in
-	 * {@code ours}, overwriting it as necessary.
+	 * Merge drivers are not expected to close the streams they are passed.
 	 * </p>
-	 *
-	 * @param repository
-	 *            Repository in which we are merging files.
+	 * 
+	 * @param configuration
+	 *            Configuration of the repository in which we're merging files.
 	 * @param ours
-	 *            A temporary file containing "ours" version of the file to
-	 *            merge.
+	 *            An input stream providing access to "ours" version of the file
+	 *            to merge.
 	 * @param theirs
-	 *            A temporary file containing "theirs" version of the file to
-	 *            merge.
+	 *            An input stream providing access to "theirs" version of the
+	 *            file to merge.
 	 * @param base
-	 *            A temporary file containing the base (common ancestor of ours
-	 *            and theirs) version of the file to merge.
+	 *            An input stream providing access to the base (common ancestor
+	 *            of ours and theirs) version of the file to merge.
+	 * @param output
+	 *            Stream in which this is expected to output the result of the
+	 *            merge operation.
 	 * @param commitNames
-	 *            names
+	 *            Names of the commits we're currently merging.
 	 * @return <code>true</code> if the merge ended successfully,
 	 *         <code>false</code> in case of conflicts or merge errors.
 	 * @throws IOException
 	 */
-	boolean merge(Repository repository, File ours, File theirs, File base,
-			String[] commitNames)
+	boolean merge(Config configuration, InputStream ours, InputStream theirs,
+			InputStream base, OutputStream output, String[] commitNames)
 			throws IOException;
 
 	/**
-	 * @return The human-readable name of this merge driver. Take note that this
-	 *         will be used as an identifier by the
+	 * @return The human-readable name of this merge driver. Note that this will
+	 *         be used as an identifier by the
 	 *         {@link org.eclipse.jgit.merge.MergeDriverRegistry merge driver
 	 *         registry}
 	 */

@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008-2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2014 Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,34 +40,70 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport.http.apache;
 
-package org.eclipse.jgit.junit;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import java.io.File;
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.AbstractHttpEntity;
+import org.eclipse.jgit.util.TemporaryBuffer;
 
+/**
+ * A {@link HttpEntity} which takes it's content from a {@link TemporaryBuffer}
+ *
+ * @since 3.3
+ */
+public class TemporaryBufferEntity extends AbstractHttpEntity {
+	private TemporaryBuffer buffer;
 
-/** Test case which includes C Git generated pack files for testing. */
-public abstract class SampleDataRepositoryTestCase extends RepositoryTestCase {
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+	private Integer contentLength;
 
-		final String[] packs = {
-				"pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f",
-				"pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371",
-				"pack-9fb5b411fe6dfa89cc2e6b89d2bd8e5de02b5745",
-				"pack-546ff360fe3488adb20860ce3436a2d6373d2796",
-				"pack-cbdeda40019ae0e6e789088ea0f51f164f489d14",
-				"pack-e6d07037cbcf13376308a0a995d1fa48f8f76aaa",
-				"pack-3280af9c07ee18a87705ef50b0cc4cd20266cf12"
-		};
-		final File packDir = new File(db.getObjectDatabase().getDirectory(), "pack");
-		for (String n : packs) {
-			copyFile(JGitTestUtil.getTestResourceFile(n + ".pack"), new File(packDir, n + ".pack"));
-			copyFile(JGitTestUtil.getTestResourceFile(n + ".idx"), new File(packDir, n + ".idx"));
-		}
+	/**
+	 * Construct a new {@link HttpEntity} which will contain the content stored
+	 * in the specified buffer
+	 *
+	 * @param buffer
+	 */
+	public TemporaryBufferEntity(TemporaryBuffer buffer) {
+		this.buffer = buffer;
+	}
 
-		copyFile(JGitTestUtil.getTestResourceFile("packed-refs"), new File(db
-				.getDirectory(), "packed-refs"));
+	/**
+	 * @return buffer containing the content
+	 */
+	public TemporaryBuffer getBuffer() {
+		return buffer;
+	}
+
+	public boolean isRepeatable() {
+		return true;
+	}
+
+	public long getContentLength() {
+		if (contentLength != null)
+			return contentLength.intValue();
+		return buffer.length();
+	}
+
+	public InputStream getContent() throws IOException, IllegalStateException {
+		return buffer.openInputStream();
+	}
+
+	public void writeTo(OutputStream outstream) throws IOException {
+		// TODO: dont we need a progressmonitor
+		buffer.writeTo(outstream, null);
+	}
+
+	public boolean isStreaming() {
+		return false;
+	}
+
+	/**
+	 * @param contentLength
+	 */
+	public void setContentLength(int contentLength) {
+		this.contentLength = new Integer(contentLength);
 	}
 }
