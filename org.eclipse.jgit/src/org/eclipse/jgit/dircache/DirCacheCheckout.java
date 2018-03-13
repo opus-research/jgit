@@ -58,12 +58,12 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -962,9 +962,8 @@ public class DirCacheCheckout {
 			}
 		}
 		entry.setLastModified(f.lastModified());
-		if (channel instanceof AutoCRLFOutputStream)
-			entry.setLength(((AutoCRLFOutputStream) channel)
-					.getDestinationLength());
+		if (opt.getAutoCRLF() != AutoCRLF.FALSE)
+			entry.setLength(f.length()); // AutoCRLF wants on-disk-size
 		else
 			entry.setLength((int) ol.getSize());
 	}

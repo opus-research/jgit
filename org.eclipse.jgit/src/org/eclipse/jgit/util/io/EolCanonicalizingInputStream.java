@@ -69,10 +69,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 
 	private boolean modeDetected;
 
-	private long srcBytes = 0;
-
-	private long dstBytes = 0;
-
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
 	 *
@@ -124,33 +120,12 @@ public class EolCanonicalizingInputStream extends InputStream {
 				bs[off++] = '\r';
 		}
 
-		if (startOff == off)
-			return -1;
-
-		int read = off - startOff;
-		dstBytes += read;
-		return read;
+		return startOff == off ? -1 : off - startOff;
 	}
 
 	@Override
 	public void close() throws IOException {
 		in.close();
-	}
-
-	/**
-	 * @return number of bytes sent to this stream
-	 *         <em>This counter is not reliable until the stream has been closed or flushed</emA>
-	 */
-	public long getSourceLength() {
-		return srcBytes;
-	}
-
-	/**
-	 * @return number of bytes sent to the underlying stream.
-	 *         <em>This counter is not reliable until the stream has been closed or flused</emA>
-	 */
-	public long getDestinationLength() {
-		return dstBytes;
 	}
 
 	private boolean fillBuffer() throws IOException {
@@ -161,7 +136,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 			isBinary = RawText.isBinary(buf, cnt);
 			modeDetected = true;
 		}
-		srcBytes += cnt;
 		ptr = 0;
 		return true;
 	}
