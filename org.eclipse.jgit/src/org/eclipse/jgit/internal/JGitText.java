@@ -303,7 +303,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String improperlyPaddedBase64Input;
 	/***/ public String incorrectHashFor;
 	/***/ public String incorrectOBJECT_ID_LENGTH;
-	/***/ public String indexFileCorrupted;
 	/***/ public String indexFileIsInUse;
 	/***/ public String indexFileIsTooLargeForJgit;
 	/***/ public String indexSignatureIsInvalid;

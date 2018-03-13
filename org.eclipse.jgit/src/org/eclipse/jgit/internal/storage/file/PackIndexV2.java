@@ -113,8 +113,7 @@ class PackIndexV2 extends PackIndex {
 				offset32[k] = NO_BYTES;
 				crc32[k] = NO_BYTES;
 				continue;
-			} else if (bucketCnt < 0)
-				throw new IOException(JGitText.get().indexFileCorrupted);
+			}
 
 			final long nameLen = bucketCnt * Constants.OBJECT_ID_LENGTH;
 			if (nameLen > Integer.MAX_VALUE - 8) // see http://stackoverflow.com/a/8381338
