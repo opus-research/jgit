@@ -47,13 +47,13 @@ package org.eclipse.jgit.storage.pack;
 import java.util.concurrent.Executor;
 import java.util.zip.Deflater;
 
+import org.eclipse.jgit.internal.storage.file.PackIndexWriter;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.PackIndexWriter;
 
 /**
- * Configuration used by a {@link PackWriter} when constructing the stream.
- *
+ * Configuration used by a pack writer when constructing the stream.
+ * 
  * A configuration may be modified once created, but should not be modified
  * while it is being used by a PackWriter. If a configuration is not modified it
  * is safe to share the same configuration instance between multiple concurrent
@@ -130,6 +130,13 @@ public class PackConfig {
 	 */
 	public static final int DEFAULT_INDEX_VERSION = 2;
 
+	/**
+	 * Default value of the build bitmaps option: {@value}
+	 *
+	 * @see #setBuildBitmaps(boolean)
+	 */
+	public static final boolean DEFAULT_BUILD_BITMAPS = true;
+
 
 	private int compressionLevel = Deflater.DEFAULT_COMPRESSION;
 
@@ -158,6 +165,8 @@ public class PackConfig {
 	private Executor executor;
 
 	private int indexVersion = DEFAULT_INDEX_VERSION;
+
+	private boolean buildBitmaps = DEFAULT_BUILD_BITMAPS;
 
 
 	/** Create a default configuration. */
@@ -210,6 +219,7 @@ public class PackConfig {
 		this.threads = cfg.threads;
 		this.executor = cfg.executor;
 		this.indexVersion = cfg.indexVersion;
+		this.buildBitmaps = cfg.buildBitmaps;
 	}
 
 	/**
@@ -615,6 +625,33 @@ public class PackConfig {
 	}
 
 	/**
+	 * True if writer is allowed to build bitmaps for indexes.
+	 *
+	 * Default setting: {@value #DEFAULT_BUILD_BITMAPS}
+	 *
+	 * @return true if delta base is the writer can choose to output an index
+	 *         with bitmaps.
+	 */
+	public boolean isBuildBitmaps() {
+		return buildBitmaps;
+	}
+
+	/**
+	 * Set writer to allow building bitmaps for supported pack files.
+	 *
+	 * Index files can include bitmaps to speed up future ObjectWalks.
+	 *
+	 * Default setting: {@value #DEFAULT_BUILD_BITMAPS}
+	 *
+	 * @param buildBitmaps
+	 *            boolean indicating whether bitmaps may be included in the
+	 *            index.
+	 */
+	public void setBuildBitmaps(boolean buildBitmaps) {
+		this.buildBitmaps = buildBitmaps;
+	}
+
+	/**
 	 * Update properties by setting fields from the configuration.
 	 *
 	 * If a property's corresponding variable is not defined in the supplied
@@ -646,5 +683,24 @@ public class PackConfig {
 		setReuseObjects(rc.getBoolean("pack", "reuseobjects", isReuseObjects())); //$NON-NLS-1$ //$NON-NLS-2$
 		setDeltaCompress(rc.getBoolean(
 				"pack", "deltacompression", isDeltaCompress())); //$NON-NLS-1$ //$NON-NLS-2$
+		setBuildBitmaps(rc.getBoolean("pack", "buildbitmaps", isBuildBitmaps())); //$NON-NLS-1$ //$NON-NLS-2$
+	}
+
+	public String toString() {
+		final StringBuilder b = new StringBuilder();
+		b.append("maxDeltaDepth=").append(getMaxDeltaDepth()); //$NON-NLS-1$
+		b.append(", deltaSearchWindowSize=").append(getDeltaSearchWindowSize()); //$NON-NLS-1$
+		b.append(", deltaSearchMemoryLimit=").append(getDeltaSearchMemoryLimit()); //$NON-NLS-1$
+		b.append(", deltaCacheSize=").append(getDeltaCacheSize()); //$NON-NLS-1$
+		b.append(", deltaCacheLimit=").append(getDeltaCacheLimit()); //$NON-NLS-1$
+		b.append(", compressionLevel=").append(getCompressionLevel()); //$NON-NLS-1$
+		b.append(", indexVersion=").append(getIndexVersion()); //$NON-NLS-1$
+		b.append(", bigFileThreshold=").append(getBigFileThreshold()); //$NON-NLS-1$
+		b.append(", threads=").append(getThreads()); //$NON-NLS-1$
+		b.append(", reuseDeltas=").append(isReuseDeltas()); //$NON-NLS-1$
+		b.append(", reuseObjects=").append(isReuseObjects()); //$NON-NLS-1$
+		b.append(", deltaCompress=").append(isDeltaCompress()); //$NON-NLS-1$
+		b.append(", buildBitmaps=").append(isBuildBitmaps()); //$NON-NLS-1$
+		return b.toString();
 	}
 }
