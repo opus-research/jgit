@@ -214,8 +214,10 @@ public class PlotCommitList<L extends PlotLane> extends
 				if (--remaining == 0)
 					break;
 			}
-			addBlockedPosition(blockedPositions, rObj);
 			if (rObj != null) {
+				PlotLane lane = rObj.getLane();
+				if (lane != null)
+					blockedPositions.set(lane.getPosition());
 				rObj.addPassingLane(commit.lane);
 			}
 		}
@@ -228,19 +230,9 @@ public class PlotCommitList<L extends PlotLane> extends
 		}
 	}
 
-	private static void addBlockedPosition(BitSet blockedPositions,
-			final PlotCommit rObj) {
-		if (rObj != null) {
-			PlotLane lane = rObj.getLane();
-			// Positions may be blocked by a commit on a lane.
-			if (lane != null)
-				blockedPositions.set(lane.getPosition());
-		}
-	}
-
 	private void closeLane(PlotLane lane) {
+		recycleLane((L) lane);
 		if (activeLanes.remove(lane)) {
-			recycleLane((L) lane);
 			freePositions.add(Integer.valueOf(lane.getPosition()));
 		}
 	}
