@@ -47,7 +47,6 @@ import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.internal.storage.file.GC;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 
-@Command(common = true, usage = "usage_Gc")
 class Gc extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
