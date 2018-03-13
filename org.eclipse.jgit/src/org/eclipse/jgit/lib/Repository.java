@@ -73,7 +73,7 @@ import org.eclipse.jgit.util.FS;
  * Represents a Git repository.
  * <p>
  * A repository holds all objects and refs used for managing source code (could
- * by any type of file, but source code is what SCM's are typically used for).
+ * be any type of file, but source code is what SCM's are typically used for).
  * <p>
  * This class is thread-safe.
  */
@@ -124,11 +124,6 @@ public abstract class Repository {
 	 * @return the object database which stores this repository's data.
 	 */
 	public abstract ObjectDatabase getObjectDatabase();
-
-	/** @return a new inserter to create objects in {@link #getObjectDatabase()} */
-	public ObjectInserter newObjectInserter() {
-		return getObjectDatabase().newInserter();
-	}
 
 	/** @return the reference database which stores the reference namespace. */
 	public abstract RefDatabase getRefDatabase();
