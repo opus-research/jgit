@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <git@sdiz.net>
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <j16sdiz+freenet@gmail.com>
- * Copyright (C) 2015 Thomas Meyer <thomas@m3y3r.de>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.RemoteConfig;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+/**
+ * Used to remove an existing remote.
+ *
+ * This class has setters for all supported options and arguments of this
+ * command and a {@link #call()} method to finally execute the command.
+ *
+ * @see <a href=
+ *      "http://www.kernel.org/pub/software/scm/git/docs/git-remote.html" > Git
+ *      documentation about Remote</a>
+ *
+ * @since 4.2
+ */
+public class RemoteRemoveCommand extends GitCommand<RemoteConfig> {
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;;
+	private String name;
 
-@Command(usage = "usage_RevParse")
-class RevParse extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_RevParseAll")
-	boolean all;
-
-	@Option(name = "--verify", usage = "usage_RevParseVerify")
-	boolean verify;
-
-	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<ObjectId> commits = new ArrayList<ObjectId>();
-
-	@Override
-	protected void run() throws Exception {
-		if (all) {
-			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
-			for (final Ref r : allRefs.values()) {
-				ObjectId objectId = r.getObjectId();
-				// getRefs skips dangling symrefs, so objectId should never be
-				// null.
-				if (objectId == null) {
-					throw new NullPointerException();
-				}
-				outw.println(objectId.name());
-			}
-		} else {
-			if (verify && commits.size() > 1) {
-				throw new CmdLineException(CLIText.get().needSingleRevision);
-			}
-
-			for (final ObjectId o : commits) {
-				outw.println(o.name());
-			}
-		}
+	/**
+	 * @param repo
+	 */
+	protected RemoteRemoveCommand(Repository repo) {
+		super(repo);
 	}
+
+	/**
+	 * The name of the remote to remove.
+	 *
+	 * @param name
+	 *            a remote name
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	/**
+	 * Executes the {@code remote} command with all the options and parameters
+	 * collected by the setter methods of this class.
+	 *
+	 * @return the {@link RemoteConfig} object of the removed remote
+	 */
+	@Override
+	public RemoteConfig call() throws GitAPIException {
+		checkCallable();
+
+		try {
+			StoredConfig config = repo.getConfig();
+			RemoteConfig remote = new RemoteConfig(config, name);
+			config.unsetSection(ConfigConstants.CONFIG_KEY_REMOTE, name);
+			config.save();
+			return remote;
+		} catch (IOException | URISyntaxException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
+
+	}
+
 }

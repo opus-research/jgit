@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <git@sdiz.net>
- * Copyright (C) 2009, Daniel Cheng (aka SDiZ) <j16sdiz+freenet@gmail.com>
- * Copyright (C) 2015 Thomas Meyer <thomas@m3y3r.de>
+ * Copyright (C) 2015, Kaloyan Raev <kaloyan.r@zend.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertEquals;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;;
+public class AbstractRemoteCommandTest extends RepositoryTestCase {
 
-@Command(usage = "usage_RevParse")
-class RevParse extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_RevParseAll")
-	boolean all;
+	protected static final String REMOTE_NAME = "test";
 
-	@Option(name = "--verify", usage = "usage_RevParseVerify")
-	boolean verify;
+	protected RemoteConfig setupRemote()
+			throws IOException, URISyntaxException {
+		// create another repository
+		Repository remoteRepository = createWorkRepository();
 
-	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<ObjectId> commits = new ArrayList<ObjectId>();
+		// set it up as a remote to this repository
+		final StoredConfig config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, REMOTE_NAME);
 
-	@Override
-	protected void run() throws Exception {
-		if (all) {
-			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
-			for (final Ref r : allRefs.values()) {
-				ObjectId objectId = r.getObjectId();
-				// getRefs skips dangling symrefs, so objectId should never be
-				// null.
-				if (objectId == null) {
-					throw new NullPointerException();
-				}
-				outw.println(objectId.name());
-			}
-		} else {
-			if (verify && commits.size() > 1) {
-				throw new CmdLineException(CLIText.get().needSingleRevision);
-			}
+		RefSpec refSpec = new RefSpec();
+		refSpec = refSpec.setForceUpdate(true);
+		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*",
+				Constants.R_REMOTES + REMOTE_NAME + "/*");
+		remoteConfig.addFetchRefSpec(refSpec);
 
-			for (final ObjectId o : commits) {
-				outw.println(o.name());
-			}
-		}
+		URIish uri = new URIish(
+				remoteRepository.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+
+		remoteConfig.update(config);
+		config.save();
+
+		return remoteConfig;
 	}
+
+	protected void assertRemoteConfigEquals(RemoteConfig expected,
+			RemoteConfig actual) {
+		assertEquals(expected.getName(), actual.getName());
+		assertEquals(expected.getURIs(), actual.getURIs());
+		assertEquals(expected.getPushURIs(), actual.getPushURIs());
+		assertEquals(expected.getFetchRefSpecs(), actual.getFetchRefSpecs());
+		assertEquals(expected.getPushRefSpecs(), actual.getPushRefSpecs());
+	}
+
 }
