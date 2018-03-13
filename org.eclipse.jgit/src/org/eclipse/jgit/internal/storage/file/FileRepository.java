@@ -53,9 +53,14 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.text.ParseException;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.errors.ConfigInvalidException;
@@ -63,15 +68,16 @@ import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateRepository;
+import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -79,8 +85,11 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.StringUtils;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -110,16 +119,13 @@ import org.eclipse.jgit.util.SystemReader;
  *
  */
 public class FileRepository extends Repository {
+	private static final String UNNAMED = "Unnamed repository; edit this file to name it for gitweb."; //$NON-NLS-1$
+
 	private final FileBasedConfig systemConfig;
-
 	private final FileBasedConfig userConfig;
-
 	private final FileBasedConfig repoConfig;
-
 	private final RefDatabase refs;
-
 	private final ObjectDirectory objectDatabase;
-
 	private FileSnapshot snapshot;
 
 	/**
@@ -177,10 +183,12 @@ public class FileRepository extends Repository {
 					getFS());
 		else
 			systemConfig = new FileBasedConfig(null, FS.DETECTED) {
+				@Override
 				public void load() {
 					// empty, do not load
 				}
 
+				@Override
 				public boolean isOutdated() {
 					// regular class would bomb here
 					return false;
@@ -197,6 +205,7 @@ public class FileRepository extends Repository {
 		loadRepoConfig();
 
 		repoConfig.addChangeListener(new ConfigChangedListener() {
+			@Override
 			public void onConfigChanged(ConfigChangedEvent event) {
 				fireEvent(event);
 			}
@@ -279,6 +288,7 @@ public class FileRepository extends Repository {
 	 * @throws IOException
 	 *             in case of IO problem
 	 */
+	@Override
 	public void create(boolean bare) throws IOException {
 		final FileBasedConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
@@ -333,7 +343,7 @@ public class FileRepository extends Repository {
 		if (symLinks != null)
 			cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,
 					ConfigConstants.CONFIG_KEY_SYMLINKS, symLinks.name()
-							.toLowerCase());
+							.toLowerCase(Locale.ROOT));
 		cfg.setInt(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
@@ -376,21 +386,20 @@ public class FileRepository extends Repository {
 		return objectDatabase.getDirectory();
 	}
 
-	/**
-	 * @return the object database which stores this repository's data.
-	 */
+	/** @return the object database storing this repository's data. */
+	@Override
 	public ObjectDirectory getObjectDatabase() {
 		return objectDatabase;
 	}
 
 	/** @return the reference database which stores the reference namespace. */
+	@Override
 	public RefDatabase getRefDatabase() {
 		return refs;
 	}
 
-	/**
-	 * @return the configuration of this repository
-	 */
+	/** @return the configuration of this repository. */
+	@Override
 	public FileBasedConfig getConfig() {
 		if (systemConfig.isOutdated()) {
 			try {
@@ -416,6 +425,59 @@ public class FileRepository extends Repository {
 		return repoConfig;
 	}
 
+	@Override
+	@Nullable
+	public String getGitwebDescription() throws IOException {
+		String d;
+		try {
+			d = RawParseUtils.decode(IO.readFully(descriptionFile()));
+		} catch (FileNotFoundException err) {
+			return null;
+		}
+		if (d != null) {
+			d = d.trim();
+			if (d.isEmpty() || UNNAMED.equals(d)) {
+				return null;
+			}
+		}
+		return d;
+	}
+
+	@Override
+	public void setGitwebDescription(@Nullable String description)
+			throws IOException {
+		String old = getGitwebDescription();
+		if (Objects.equals(old, description)) {
+			return;
+		}
+
+		File path = descriptionFile();
+		LockFile lock = new LockFile(path);
+		if (!lock.lock()) {
+			throw new IOException(MessageFormat.format(JGitText.get().lockError,
+					path.getAbsolutePath()));
+		}
+		try {
+			String d = description;
+			if (d != null) {
+				d = d.trim();
+				if (!d.isEmpty()) {
+					d += '\n';
+				}
+			} else {
+				d = ""; //$NON-NLS-1$
+			}
+			lock.write(Constants.encode(d));
+			lock.commit();
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	private File descriptionFile() {
+		return new File(getDirectory(), "description"); //$NON-NLS-1$
+	}
+
 	/**
 	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
 	 * <p>
@@ -426,8 +488,9 @@ public class FileRepository extends Repository {
 	 *
 	 * @return unmodifiable collection of other known objects.
 	 */
+	@Override
 	public Set<ObjectId> getAdditionalHaves() {
-		HashSet<ObjectId> r = new HashSet<ObjectId>();
+		HashSet<ObjectId> r = new HashSet<>();
 		for (AlternateHandle d : objectDatabase.myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;
@@ -464,9 +527,7 @@ public class FileRepository extends Repository {
 		detectIndexChanges();
 	}
 
-	/**
-	 * Detect index changes.
-	 */
+	/** Detect index changes. */
 	private void detectIndexChanges() {
 		if (isBare())
 			return;
@@ -490,6 +551,7 @@ public class FileRepository extends Repository {
 	 *         named ref does not exist.
 	 * @throws IOException the ref could not be accessed.
 	 */
+	@Override
 	public ReflogReader getReflogReader(String refName) throws IOException {
 		Ref ref = findRef(refName);
 		if (ref != null)
@@ -527,6 +589,7 @@ public class FileRepository extends Repository {
 			globalAttributesNode = new GlobalAttributesNode(repo);
 		}
 
+		@Override
 		public AttributesNode getInfoAttributesNode() throws IOException {
 			if (infoAttributesNode instanceof InfoAttributesNode)
 				infoAttributesNode = ((InfoAttributesNode) infoAttributesNode)
@@ -534,6 +597,7 @@ public class FileRepository extends Repository {
 			return infoAttributesNode;
 		}
 
+		@Override
 		public AttributesNode getGlobalAttributesNode() throws IOException {
 			if (globalAttributesNode instanceof GlobalAttributesNode)
 				globalAttributesNode = ((GlobalAttributesNode) globalAttributesNode)
@@ -555,4 +619,16 @@ public class FileRepository extends Repository {
 
 	}
 
+	@Override
+	public void autoGC(ProgressMonitor monitor) {
+		GC gc = new GC(this);
+		gc.setPackConfig(new PackConfig(this));
+		gc.setProgressMonitor(monitor);
+		gc.setAuto(true);
+		try {
+			gc.gc();
+		} catch (ParseException | IOException e) {
+			throw new JGitInternalException(JGitText.get().gcFailed, e);
+		}
+	}
 }
