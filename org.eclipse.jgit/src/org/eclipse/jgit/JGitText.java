@@ -275,7 +275,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
 	/***/ public String illegalCombinationOfArguments;
-	/***/ public String illegalPackingPhase;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
 	/***/ public String inMemoryBufferLimitExceeded;
@@ -412,7 +411,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String problemWithResolvingPushRefSpecsLocally;
 	/***/ public String progressMonUploading;
 	/***/ public String propertyIsAlreadyNonNull;
-	/***/ public String pullOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;
 	/***/ public String pushIsNotSupportedForBundleTransport;
@@ -420,8 +418,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
 	/***/ public String readTimedOut;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
-	/***/ public String receivePackObjectTooLarge1;
-	/***/ public String receivePackObjectTooLarge2;
 	/***/ public String receivingObjects;
 	/***/ public String refAlreadyExists;
 	/***/ public String refNotResolved;
