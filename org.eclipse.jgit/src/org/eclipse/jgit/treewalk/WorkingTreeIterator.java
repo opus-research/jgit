@@ -67,15 +67,12 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
@@ -124,9 +121,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
-
-	/** Repository that is the root level being iterated over */
-	protected Repository repository;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -183,7 +177,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            the repository.
 	 */
 	protected void initRootIterator(Repository repo) {
-		repository = repo;
 		Entry entry;
 		if (ignoreNode instanceof PerDirectoryIgnoreNode)
 			entry = ((PerDirectoryIgnoreNode) ignoreNode).entry;
@@ -246,59 +239,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			//
 			return zeroid;
 		case FileMode.TYPE_GITLINK:
-			final byte[] subId = idSubmodule(entries[ptr]);
-			if (subId != zeroid) {
-				contentIdFromPtr = ptr;
-				contentId = subId;
-			}
-			return subId;
-		}
-		return zeroid;
-	}
-
-	/**
-	 * Get submodule id for given entry.
-	 *
-	 * @param e
-	 * @return non-null submodule id
-	 */
-	protected byte[] idSubmodule(Entry e) {
-		if( repository == null)
+			// TODO: Support obtaining current HEAD SHA-1 from nested repository
+			//
 			return zeroid;
-		File directory;
-		try {
-			directory = repository.getWorkTree();
-		} catch (NoWorkTreeException nwte) {
-			return zeroid;
-		}
-		return idSubmodule(directory, e);
-	}
-
-	/**
-	 * Get submodule id using the repository at the location of the entry
-	 * relative to the directory.
-	 *
-	 * @param directory
-	 * @param e
-	 * @return non-null submodule id
-	 */
-	protected byte[] idSubmodule(File directory, Entry e) {
-		final String gitDirPath = e.getName() + "/" + Constants.DOT_GIT;
-		final File submoduleGitDir = new File(directory, gitDirPath);
-		if (submoduleGitDir.isDirectory()) {
-			final ObjectId head;
-			try {
-				head = new RepositoryBuilder().setFS(FS.DETECTED)
-						.setMustExist(true).setGitDir(submoduleGitDir).build()
-						.resolve(Constants.HEAD);
-			} catch (IOException exception) {
-				return zeroid;
-			}
-			if (head != null) {
-				final byte[] id = new byte[Constants.OBJECT_ID_LENGTH];
-				head.copyRawTo(id, 0);
-				return id;
-			}
 		}
 		return zeroid;
 	}
