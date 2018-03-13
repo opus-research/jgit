@@ -227,10 +227,6 @@ public class InMemoryRepository extends DfsRepository {
 		public int blockSize() {
 			return 0;
 		}
-
-		public void setReadAheadBuffer(int b) {
-			// Unnecessary on a byte array.
-		}
 	}
 
 	private class MemRefDatabase extends DfsRefDatabase {
