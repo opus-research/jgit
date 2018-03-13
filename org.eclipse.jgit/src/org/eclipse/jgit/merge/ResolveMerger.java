@@ -368,7 +368,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeB = tw.getRawMode(T_BASE);
 
 		if (modeO == 0 && modeT == 0 && modeB == 0)
-			// Untracked file
+			// File is either untracked or new, staged but uncommitted
 			return true;
 
 		if (isIndexDirty())
@@ -391,13 +391,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 
 		if (modeB == modeO && tw.idEqual(T_BASE, T_OURS)) {
-			// Either OURS was not changed compared to base, or OURS and BASE
-			// are MISSING. All changes (change can also be an addition or
-			// deletion) must be in THEIRS. THEIRS is chosen.
-
-			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty())
-				return false;
+			// OURS was not changed compared to BASE. All changes must be in
+			// THEIRS. THEIRS is chosen.
 			if (nonTree(modeT)) {
 				DirCacheEntry e = add(tw.getRawPath(), theirs,
 						DirCacheEntry.STAGE_0);
