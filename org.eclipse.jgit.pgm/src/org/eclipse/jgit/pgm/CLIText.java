@@ -210,8 +210,12 @@ public class CLIText extends TranslationBundle {
 	/***/ public String statusModified;
 	/***/ public String statusNewFile;
 	/***/ public String statusRemoved;
-	/***/ public String switchedToNewBranch;
-	/***/ public String switchedToBranch;
+
+	/***/
+	public String switchedToNewBranch;
+
+	/***/
+	public String switchedToBranch;
 	/***/ public String tagLabel;
 	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
