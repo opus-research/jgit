@@ -59,11 +59,9 @@ import java.util.TreeMap;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.lib.Ref.Storage;
 
 import com.jcraft.jsch.Channel;
@@ -391,20 +389,21 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				throw new TransportException("Empty ref: " + name);
 
 			if (line.startsWith("ref: ")) {
-				final String target = line.substring("ref: ".length());
-				Ref r = avail.get(target);
+				final String p = line.substring("ref: ".length());
+				Ref r = readRef(avail, ROOT_DIR + p, p);
 				if (r == null)
-					r = readRef(avail, ROOT_DIR + target, target);
-				if (r == null)
-					r = new ObjectIdRef(Ref.Storage.NEW, target, null);
-				r = new SymbolicRef(r, name);
-				avail.put(r.getName(), r);
+					r = avail.get(p);
+				if (r != null) {
+					r = new Ref(loose(r), name, r.getObjectId(), r
+							.getPeeledObjectId(), true);
+					avail.put(name, r);
+				}
 				return r;
 			}
 
 			if (ObjectId.isId(line)) {
-				final Ref r = new ObjectIdRef(loose(avail.get(name)), name,
-						ObjectId.fromString(line));
+				final Ref r = new Ref(loose(avail.get(name)), name, ObjectId
+						.fromString(line));
 				avail.put(r.getName(), r);
 				return r;
 			}

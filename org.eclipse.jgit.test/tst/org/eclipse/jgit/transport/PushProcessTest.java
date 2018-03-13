@@ -51,7 +51,6 @@ import java.util.Map;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -89,7 +88,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		testOneUpdateStatus(rru, ref, Status.OK, true);
 	}
@@ -104,7 +103,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("0000000000000000000000000000000000000001"));
 		testOneUpdateStatus(rru, ref, Status.REJECTED_NONFASTFORWARD, null);
 	}
@@ -119,7 +118,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
 		testOneUpdateStatus(rru, ref, Status.REJECTED_NONFASTFORWARD, null);
 	}
@@ -133,7 +132,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
 				"refs/heads/master", true, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
 		testOneUpdateStatus(rru, ref, Status.OK, false);
 	}
@@ -158,7 +157,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	public void testUpdateDelete() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db, null,
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
 		testOneUpdateStatus(rru, ref, Status.OK, true);
 	}
@@ -184,7 +183,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
 		testOneUpdateStatus(rru, ref, Status.UP_TO_DATE, null);
 	}
@@ -199,7 +198,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, ObjectId
 						.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		testOneUpdateStatus(rru, ref, Status.OK, true);
 	}
@@ -215,7 +214,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, ObjectId
 						.fromString("0000000000000000000000000000000000000001"));
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		testOneUpdateStatus(rru, ref, Status.REJECTED_REMOTE_CHANGED, null);
 	}
@@ -232,7 +231,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", true, null, ObjectId
 						.fromString("0000000000000000000000000000000000000001"));
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		testOneUpdateStatus(rru, ref, Status.REJECTED_REMOTE_CHANGED, null);
 	}
@@ -247,7 +246,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		testOneUpdateStatus(rru, ref, Status.REJECTED_OTHER_REASON, null);
 	}
@@ -261,7 +260,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	public void testUpdateMixedCases() throws IOException {
 		final RemoteRefUpdate rruOk = new RemoteRefUpdate(db, null,
 				"refs/heads/master", false, null, null);
-		final Ref refToChange = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref refToChange = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
 		final RemoteRefUpdate rruReject = new RemoteRefUpdate(db, null,
 				"refs/heads/nonexisting", false, null, null);
@@ -283,7 +282,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, "refs/remotes/test/master", null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		refUpdates.add(rru);
 		advertisedRefs.add(ref);
@@ -304,7 +303,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		refUpdates.add(rru);
 		advertisedRefs.add(ref);
@@ -321,7 +320,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
 				"refs/heads/master", false, null, null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
 		final PushResult result = testOneUpdateStatus(rru, ref,
 				Status.REJECTED_NONFASTFORWARD, null);
@@ -337,7 +336,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
 				"refs/heads/master", false, "refs/remotes/test/master", null);
-		final Ref ref = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master",
+		final Ref ref = new Ref(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		refUpdates.add(rru);
 		advertisedRefs.add(ref);
