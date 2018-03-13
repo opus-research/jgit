@@ -52,7 +52,6 @@ import org.junit.Test;
 /**
  * Tests ignore pattern matches
  */
-@SuppressWarnings("deprecation")
 public class IgnoreMatcherTest {
 
 	@Test
@@ -384,12 +383,12 @@ public class IgnoreMatcherTest {
 	/**
 	 * Check for a match. If target ends with "/", match will assume that the
 	 * target is meant to be a directory.
-	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitignore file
+	 * 			  Pattern as it would appear in a .gitignore file
 	 * @param target
-	 *            Target file path relative to repository's GIT_DIR
-	 * @return Result of {@link FastIgnoreRule#isMatch(String, boolean)}
+	 * 			  Target file path relative to repository's GIT_DIR
+	 * @return
+	 * 			  Result of {@link IgnoreRule#isMatch(String, boolean)}
 	 */
 	private static boolean match(String pattern, String target) {
 		IgnoreRule r = new IgnoreRule(pattern);

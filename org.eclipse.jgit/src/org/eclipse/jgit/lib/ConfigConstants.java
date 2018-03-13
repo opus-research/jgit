@@ -214,11 +214,31 @@ public class ConfigConstants {
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
 
+	/**
+	 * The "hidedotfiles" key
+	 * @since 3.5
+	 */
+	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
+
 	/** The "precomposeunicode" key */
 	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
 
 	/** The "pruneexpire" key */
 	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
+
+	/**
+	 * The "aggressiveDepth" key
+	 *
+	 * @since 3.6
+	 */
+	public static final String CONFIG_KEY_AGGRESSIVE_DEPTH = "aggressiveDepth";
+
+	/**
+	 * The "aggressiveWindow" key
+	 *
+	 * @since 3.6
+	 */
+	public static final String CONFIG_KEY_AGGRESSIVE_WINDOW = "aggressiveWindow";
 
 	/** The "mergeoptions" key */
 	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
