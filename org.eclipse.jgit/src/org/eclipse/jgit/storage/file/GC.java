@@ -57,6 +57,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -66,6 +67,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -642,8 +644,22 @@ public class GC {
 			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
 			List<ObjectIdSet> excludeObjects) throws IOException {
 		File tmpPack = null;
-		Map<PackExt, File> tmpExts = new HashMap<PackExt, File>(
-				PackExt.values().length);
+		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
+				new Comparator<PackExt>() {
+					public int compare(PackExt o1, PackExt o2) {
+						// INDEX entries must be returned last, so the pack
+						// scanner does pick up the new pack until all the
+						// PackExt entries have been written.
+						if (o1 == o2)
+							return 0;
+						if (o1 == PackExt.INDEX)
+							return 1;
+						if (o2 == PackExt.INDEX)
+							return -1;
+						return Integer.signum(o1.hashCode() - o2.hashCode());
+					}
+
+				});
 		PackWriter pw = new PackWriter(repo);
 		try {
 			// prepare the PackWriter
