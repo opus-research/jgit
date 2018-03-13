@@ -42,25 +42,7 @@
  */
 package org.eclipse.jgit.lfs.server;
 
-/**
- * LFS object.
- *
- */
-public class LfsObject {
+class LfsObject {
 	String oid;
 	long size;
-
-	/**
-	 * @return the object ID.
-	 */
-	public String getOid() {
-		return oid;
-	}
-
-	/**
-	 * @return the object size.
-	 */
-	public long getSize() {
-		return size;
-	}
 }

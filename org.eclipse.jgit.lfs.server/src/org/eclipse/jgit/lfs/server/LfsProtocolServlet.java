@@ -117,15 +117,6 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		public String getOperation() {
 			return operation;
 		}
-
-		/**
-		 * Get the LFS objects.
-		 *
-		 * @return the objects
-		 */
-		public List<LfsObject> getObjects() {
-			return objects;
-		}
 	}
 
 	@Override
