@@ -48,18 +48,14 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
@@ -325,7 +321,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 		db.getIndexFile().setLastModified(indexTime - 5000);
 
 		write(file1, "content4");
-		assertTrue(file1.setLastModified(file1.lastModified() + 2500));
+		assertTrue(file1.setLastModified(file1.lastModified() + 1000));
 		assertNotNull(git.commit().setMessage("edit file").setOnly("file1.txt")
 				.call());
 
@@ -423,52 +419,5 @@ public class CommitCommandTest extends RepositoryTestCase {
 				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
 		assertEquals("commit: Squashed commit of the following:", db
 				.getReflogReader(db.getBranch()).getLastEntry().getComment());
-	}
-
-	@Test(expected = WrongRepositoryStateException.class)
-	public void commitAmendOnInitialShouldFail() throws Exception {
-		Git git = new Git(db);
-		git.commit().setAmend(true).setMessage("initial commit").call();
-	}
-
-	@Test
-	public void commitAmendWithoutAuthorShouldSetOriginalAuthorAndAuthorTime()
-			throws Exception {
-		Git git = new Git(db);
-
-		writeTrashFile("file1", "file1");
-		git.add().addFilepattern("file1").call();
-
-		final String authorName = "First Author";
-		final String authorEmail = "author@example.org";
-		final Date authorDate = new Date(1349621117000L);
-		PersonIdent firstAuthor = new PersonIdent(authorName, authorEmail,
-				authorDate, TimeZone.getTimeZone("UTC"));
-		git.commit().setMessage("initial commit").setAuthor(firstAuthor).call();
-
-		RevCommit amended = git.commit().setAmend(true)
-				.setMessage("amend commit").call();
-
-		PersonIdent amendedAuthor = amended.getAuthorIdent();
-		assertEquals(authorName, amendedAuthor.getName());
-		assertEquals(authorEmail, amendedAuthor.getEmailAddress());
-		assertEquals(authorDate.getTime(), amendedAuthor.getWhen().getTime());
-	}
-
-	@Test
-	public void commitAmendWithAuthorShouldUseIt() throws Exception {
-		Git git = new Git(db);
-
-		writeTrashFile("file1", "file1");
-		git.add().addFilepattern("file1").call();
-		git.commit().setMessage("initial commit").call();
-
-		RevCommit amended = git.commit().setAmend(true)
-				.setAuthor("New Author", "newauthor@example.org")
-				.setMessage("amend commit").call();
-
-		PersonIdent amendedAuthor = amended.getAuthorIdent();
-		assertEquals("New Author", amendedAuthor.getName());
-		assertEquals("newauthor@example.org", amendedAuthor.getEmailAddress());
 	}
 }

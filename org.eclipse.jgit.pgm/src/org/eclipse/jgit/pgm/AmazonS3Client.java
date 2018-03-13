@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.lang.Integer.valueOf;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -93,9 +91,7 @@ class AmazonS3Client extends TextBuiltin {
 				while (len > 0) {
 					final int n = in.read(tmp);
 					if (n < 0)
-						throw new EOFException(MessageFormat.format(
-								CLIText.get().expectedNumberOfbytes,
-								valueOf(len)));
+						throw new EOFException(MessageFormat.format(CLIText.get().expectedNumberOfbytes, len));
 					outs.write(tmp, 0, n);
 					len -= n;
 				}

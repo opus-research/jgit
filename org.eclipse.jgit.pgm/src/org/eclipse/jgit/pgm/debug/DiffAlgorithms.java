@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static java.lang.Integer.valueOf;
-import static java.lang.Long.valueOf;
-
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
@@ -251,10 +248,8 @@ class DiffAlgorithms extends TextBuiltin {
 			outw.println(name + ": start at " + startId.name());
 		}
 
-		outw.format("  %12d files,     %8d commits\n", valueOf(files),
-				valueOf(commits));
-		outw.format("  N=%10d min lines, %8d max lines\n", valueOf(minN),
-				valueOf(maxN));
+		outw.format("  %12d files,     %8d commits\n", files, commits);
+		outw.format("  N=%10d min lines, %8d max lines\n", minN, maxN);
 
 		outw.format("%-25s %12s ( %12s  %12s )\n", //
 				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
@@ -266,9 +261,9 @@ class DiffAlgorithms extends TextBuiltin {
 		for (Test test : all) {
 			outw.format("%-25s %12d ( %12d  %12d )", //
 					test.algorithm.name, //
-					valueOf(test.runningTimeNanos), //
-					valueOf(test.minN.runningTimeNanos), //
-					valueOf(test.maxN.runningTimeNanos));
+					test.runningTimeNanos, //
+					test.minN.runningTimeNanos, //
+					test.maxN.runningTimeNanos);
 			outw.println();
 		}
 		outw.println();

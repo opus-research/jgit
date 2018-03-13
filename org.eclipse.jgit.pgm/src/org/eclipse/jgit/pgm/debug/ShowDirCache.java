@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static java.lang.Integer.valueOf;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -71,7 +69,7 @@ class ShowDirCache extends TextBuiltin {
 			final int stage = ent.getStage();
 
 			outw.print(mode);
-			outw.format(" %6d", valueOf(len));
+			outw.format(" %6d", len);
 			outw.print(' ');
 			outw.print(fmt.format(mtime));
 			outw.print(' ');

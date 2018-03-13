@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.lang.Character.valueOf;
-
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -252,7 +250,7 @@ class Push extends TextBuiltin {
 	private void printUpdateLine(final char flag, final String summary,
 			final String srcRef, final String destRef, final String message)
 			throws IOException {
-		outw.format(" %c %-17s", valueOf(flag), summary);
+		outw.format(" %c %-17s", flag, summary);
 
 		if (srcRef != null)
 			outw.format(" %s ->", abbreviateRef(srcRef, true));
