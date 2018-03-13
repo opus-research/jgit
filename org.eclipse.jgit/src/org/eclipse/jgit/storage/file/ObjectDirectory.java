@@ -455,33 +455,23 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId id,
-			boolean createDuplicate) {
-		// If the object is already in the repository, remove temporary file.
-		//
-		if (unpackedObjectCache.isUnpacked(id)) {
+	boolean insertUnpackedObject(File tmp, ObjectId id, boolean force) {
+		if (!force && has(id)) {
+			// Object is already in the repository, remove temporary file.
+			//
 			tmp.delete();
-			return InsertLooseObjectResult.EXISTS_LOOSE;
+			return true;
 		}
-		if (!createDuplicate && has(id)) {
-			tmp.delete();
-			return InsertLooseObjectResult.EXISTS_PACKED;
-		}
-
 		tmp.setReadOnly();
 
 		final File dst = fileFor(id);
-		if (dst.exists()) {
-			// We want to be extra careful and avoid replacing an object
-			// that already exists. We can't be sure renameTo() would
-			// fail on all platforms if dst exists, so we check first.
-			//
+		if (force && dst.exists()) {
 			tmp.delete();
-			return InsertLooseObjectResult.EXISTS_LOOSE;
+			return true;
 		}
 		if (tmp.renameTo(dst)) {
 			unpackedObjectCache.add(id);
-			return InsertLooseObjectResult.INSERTED;
+			return true;
 		}
 
 		// Maybe the directory doesn't exist yet as the object
@@ -491,12 +481,12 @@ public class ObjectDirectory extends FileObjectDatabase {
 		dst.getParentFile().mkdir();
 		if (tmp.renameTo(dst)) {
 			unpackedObjectCache.add(id);
-			return InsertLooseObjectResult.INSERTED;
+			return true;
 		}
 
-		if (!createDuplicate && has(id)) {
+		if (!force && has(id)) {
 			tmp.delete();
-			return InsertLooseObjectResult.EXISTS_PACKED;
+			return true;
 		}
 
 		// The object failed to be renamed into its proper
@@ -505,7 +495,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// fail.
 		//
 		tmp.delete();
-		return InsertLooseObjectResult.FAILURE;
+		return false;
 	}
 
 	boolean tryAgain1() {

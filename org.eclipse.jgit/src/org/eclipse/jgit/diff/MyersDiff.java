@@ -110,64 +110,41 @@ public class MyersDiff<S extends Sequence> {
 	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
 		public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
 				C cmp, S a, S b) {
-			Edit region = new Edit(0, a.size(), 0, b.size());
-			region = cmp.reduceCommonStartEnd(a, b, region);
-
-			switch (region.getType()) {
-			case INSERT:
-			case DELETE: {
-				EditList r = new EditList();
-				r.add(region);
-				return r;
-			}
-
-			case REPLACE:
-				return new MyersDiff<S>(cmp, a, b, region).getEdits();
-
-			case EMPTY:
-				return new EditList();
-
-			default:
-				throw new IllegalStateException();
-			}
+			return new MyersDiff<S>(cmp, a, b).getEdits();
 		}
 	};
 
 	/**
-	 * The list of edits found during the last call to {@link #calculateEdits()}
+	 * The list of edits found during the last call to {@link #calculateEdits(Edit)}
 	 */
 	protected EditList edits;
 
 	/** Comparison function for sequences. */
-	protected HashedSequenceComparator<Subsequence<S>> cmp;
+	protected HashedSequenceComparator<S> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected HashedSequence<Subsequence<S>> a;
+	protected HashedSequence<S> a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected HashedSequence<Subsequence<S>> b;
+	protected HashedSequence<S> b;
 
-	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b, Edit region) {
-		Subsequence<S> as = Subsequence.a(a, region);
-		Subsequence<S> bs = Subsequence.b(b, region);
-
-		HashedSequencePair<Subsequence<S>> pair = new HashedSequencePair<Subsequence<S>>(
-				new SubsequenceComparator<S>(cmp), as, bs);
+	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b) {
+		Edit region = new Edit(0, a.size(), 0, b.size());
+		HashedSequencePair<S> pair;
+		pair = new HashedSequencePair<S>(cmp, a, b, region);
 
 		this.cmp = pair.getComparator();
 		this.a = pair.getA();
 		this.b = pair.getB();
-
-		calculateEdits();
-		Subsequence.toBase(edits, as, bs);
+		calculateEdits(region);
 	}
 
 	/**
-	 * @return the list of edits found during the last call to {@link #calculateEdits()}
+	 * @return the list of edits found during the last call to {@link #calculateEdits(Edit)}
 	 */
 	public EditList getEdits() {
 		return edits;
@@ -179,11 +156,12 @@ public class MyersDiff<S extends Sequence> {
 	/**
 	 * Entrypoint into the algorithm this class is all about. This method triggers that the
 	 * differences between A and B are calculated in form of a list of edits.
+	 * @param r defines the range of elements in A and B that are compared.
 	 */
-	protected void calculateEdits() {
+	protected void calculateEdits(Edit r) {
 		edits = new EditList();
 
-		middle.initialize(0, a.size(), 0, b.size());
+		middle.initialize(r.beginA, r.endA, r.beginB, r.endB);
 		if (middle.beginA >= middle.endA &&
 				middle.beginB >= middle.endB)
 			return;
@@ -565,8 +543,8 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			EditList res = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
-			System.out.println(res.toString());
+			MyersDiff diff = new MyersDiff(RawTextComparator.DEFAULT, a, b);
+			System.out.println(diff.getEdits().toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

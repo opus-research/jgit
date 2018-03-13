@@ -60,9 +60,12 @@ public final class HashedSequence<S extends Sequence> extends Sequence {
 
 	final int[] hashes;
 
-	HashedSequence(S base, int[] hashes) {
+	final int begin;
+
+	HashedSequence(S base, int[] hashes, int begin) {
 		this.base = base;
 		this.hashes = hashes;
+		this.begin = begin;
 	}
 
 	@Override

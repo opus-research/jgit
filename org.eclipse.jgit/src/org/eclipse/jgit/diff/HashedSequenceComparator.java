@@ -46,8 +46,8 @@ package org.eclipse.jgit.diff;
 /**
  * Wrap another comparator for use with {@link HashedSequence}.
  *
- * This comparator acts as a proxy for the real comparator, evaluating the
- * cached hash code before testing the underlying comparator's equality.
+ * This comparator acts as a proxy for the real comparator, translating element
+ * indexes on the fly by adding the subsequence's begin offset to them.
  * Comparators of this type must be used with a {@link HashedSequence}.
  *
  * To construct an instance of this type use {@link HashedSequencePair}.
@@ -66,12 +66,12 @@ public final class HashedSequenceComparator<S extends Sequence> extends
 	@Override
 	public boolean equals(HashedSequence<S> a, int ai, //
 			HashedSequence<S> b, int bi) {
-		return a.hashes[ai] == b.hashes[bi]
+		return a.hashes[ai - a.begin] == b.hashes[bi - b.begin]
 				&& cmp.equals(a.base, ai, b.base, bi);
 	}
 
 	@Override
 	public int hash(HashedSequence<S> seq, int ptr) {
-		return seq.hashes[ptr];
+		return seq.hashes[ptr - seq.begin];
 	}
 }
