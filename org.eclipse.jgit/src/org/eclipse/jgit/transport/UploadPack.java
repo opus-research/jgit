@@ -1322,6 +1322,7 @@ public class UploadPack {
 	private static void checkNotAdvertisedWantsUsingBitmap(ObjectReader reader,
 			BitmapIndex bitmapIndex, List<ObjectId> notAdvertisedWants,
 			Set<ObjectId> reachableFrom) throws IOException {
+
 		BitmapWalker bitmapWalker = new BitmapWalker(new ObjectWalk(reader), bitmapIndex, null);
 		BitmapBuilder reachables = bitmapWalker.findObjects(reachableFrom, null, false);
 		for (ObjectId oid : notAdvertisedWants) {
@@ -1347,10 +1348,10 @@ public class UploadPack {
 				RevObject obj;
 				while ((obj = q.next()) != null) {
 					if (!(obj instanceof RevCommit)) {
-						// If unadvertized non-commits are requested, use
-						// bitmaps. If there are no bitmaps, instead of
-						// incurring the expense of a manual walk, reject
-						// the request.
+						// At least one non-commit needs to be checked, so
+						// use bitmaps if possible. (Bitmaps are not used
+						// when only commits are checked in order to avoid
+						// the overhead of loading them.)
 						BitmapIndex bitmapIndex = reader.getBitmapIndex();
 						if (bitmapIndex != null) {
 							checkNotAdvertisedWantsUsingBitmap(

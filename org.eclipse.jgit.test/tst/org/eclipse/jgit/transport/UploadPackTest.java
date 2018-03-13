@@ -2,6 +2,7 @@ package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.Collections;
 import org.eclipse.jgit.errors.TransportException;
@@ -17,20 +18,14 @@ import org.eclipse.jgit.transport.UploadPack.RequestPolicy;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
-import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 /**
  * Tests for server upload-pack utilities.
  */
 public class UploadPackTest {
-	@Rule
-	public ExpectedException thrown = ExpectedException.none();
-
 	private URIish uri;
 
 	private TestProtocol<Object> testProtocol;
@@ -58,25 +53,6 @@ public class UploadPackTest {
 
 	private static InMemoryRepository newRepo(String name) {
 		return new InMemoryRepository(new DfsRepositoryDescription(name));
-	}
-
-	private void generateBitmaps(InMemoryRepository repo) throws Exception {
-		new DfsGarbageCollector(repo).pack(null);
-		repo.scanForRepoChanges();
-	}
-
-	private static TestProtocol<Object> generateReachableCommitUploadPackProtocol() {
-		return new TestProtocol<>(
-				new UploadPackFactory<Object>() {
-					@Override
-					public UploadPack create(Object req, Repository db)
-							throws ServiceNotEnabledException,
-							ServiceNotAuthorizedException {
-						UploadPack up = new UploadPack(db);
-						up.setRequestPolicy(RequestPolicy.REACHABLE_COMMIT);
-						return up;
-					}
-				}, null);
 	}
 
 	@Test
@@ -112,23 +88,38 @@ public class UploadPackTest {
 		}
 	}
 
+	private void generateBitmaps(InMemoryRepository repo) throws Exception {
+		new DfsGarbageCollector(repo).pack(null);
+		repo.scanForRepoChanges();
+	}
+
 	@Test
 	public void testFetchUnreachableBlobWithBitmap() throws Exception {
 		RevBlob blob = remote.blob("foo");
-		remote.commit(remote.tree(remote.file("foo", blob)));
+		RevCommit commit = remote.commit(remote.tree(remote.file("foo", blob)));
 		generateBitmaps(server);
 
-		testProtocol = generateReachableCommitUploadPackProtocol();
+		testProtocol = new TestProtocol<>(
+				new UploadPackFactory<Object>() {
+					@Override
+					public UploadPack create(Object req, Repository db)
+							throws ServiceNotEnabledException,
+							ServiceNotAuthorizedException {
+						UploadPack up = new UploadPack(db);
+						up.setRequestPolicy(RequestPolicy.REACHABLE_COMMIT);
+						return up;
+					}
+				}, null);
 		uri = testProtocol.register(ctx, server);
 
 		assertFalse(client.hasObject(blob.toObjectId()));
 
 		try (Transport tn = testProtocol.open(uri, client, "server")) {
-			thrown.expect(TransportException.class);
-			thrown.expectMessage(Matchers.containsString(
-						"want " + blob.name() + " not valid"));
 			tn.fetch(NullProgressMonitor.INSTANCE,
 					Collections.singletonList(new RefSpec(blob.name())));
+			fail("expected TransportException");
+		} catch (TransportException exception) {
+			assertTrue(exception.getMessage().contains("want " + blob.name() + " not valid"));
 		}
 	}
 
@@ -139,7 +130,17 @@ public class UploadPackTest {
 		remote.update("master", commit);
 		generateBitmaps(server);
 
-		testProtocol = generateReachableCommitUploadPackProtocol();
+		testProtocol = new TestProtocol<>(
+				new UploadPackFactory<Object>() {
+					@Override
+					public UploadPack create(Object req, Repository db)
+							throws ServiceNotEnabledException,
+							ServiceNotAuthorizedException {
+						UploadPack up = new UploadPack(db);
+						up.setRequestPolicy(RequestPolicy.REACHABLE_COMMIT);
+						return up;
+					}
+				}, null);
 		uri = testProtocol.register(ctx, server);
 
 		assertFalse(client.hasObject(blob.toObjectId()));
@@ -157,17 +158,27 @@ public class UploadPackTest {
 		RevCommit commit = remote.commit(remote.tree(remote.file("foo", blob)));
 		remote.update("master", commit);
 
-		testProtocol = generateReachableCommitUploadPackProtocol();
+		testProtocol = new TestProtocol<>(
+				new UploadPackFactory<Object>() {
+					@Override
+					public UploadPack create(Object req, Repository db)
+							throws ServiceNotEnabledException,
+							ServiceNotAuthorizedException {
+						UploadPack up = new UploadPack(db);
+						up.setRequestPolicy(RequestPolicy.REACHABLE_COMMIT);
+						return up;
+					}
+				}, null);
 		uri = testProtocol.register(ctx, server);
 
 		assertFalse(client.hasObject(blob.toObjectId()));
 
 		try (Transport tn = testProtocol.open(uri, client, "server")) {
-			thrown.expect(TransportException.class);
-			thrown.expectMessage(Matchers.containsString(
-						"want " + blob.name() + " not valid"));
 			tn.fetch(NullProgressMonitor.INSTANCE,
 					Collections.singletonList(new RefSpec(blob.name())));
+			fail("expected TransportException");
+		} catch (TransportException exception) {
+			assertTrue(exception.getMessage().contains("want " + blob.name() + " not valid"));
 		}
 	}
 }
