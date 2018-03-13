@@ -181,10 +181,6 @@ class Merge extends TextBuiltin {
 					outw.println(CLIText.get().cannotDeleteFile);
 					outw.println("        " + entry.getKey()); //$NON-NLS-1$
 					break;
-				case SUBMODULE_CONFLICT:
-					outw.println(CLIText.get().submoduleConflict);
-					outw.println("        " + entry.getKey()); //$NON-NLS-1$
-					break;
 				}
 			break;
 		case MERGED:
