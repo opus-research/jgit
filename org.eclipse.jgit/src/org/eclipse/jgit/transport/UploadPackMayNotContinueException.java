@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,14 +45,14 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 
-/** Indicates a transport service may not continue execution. */
-public class ServiceMayNotContinueException extends IOException {
+/** Indicates UploadPack may not continue execution. */
+public class UploadPackMayNotContinueException extends IOException {
 	private static final long serialVersionUID = 1L;
 
 	private boolean output;
 
 	/** Initialize with no message. */
-	public ServiceMayNotContinueException() {
+	public UploadPackMayNotContinueException() {
 		// Do not set a message.
 	}
 
@@ -61,7 +61,7 @@ public class ServiceMayNotContinueException extends IOException {
 	 *            a message explaining why it cannot continue. This message may
 	 *            be shown to an end-user.
 	 */
-	public ServiceMayNotContinueException(String msg) {
+	public UploadPackMayNotContinueException(String msg) {
 		super(msg);
 	}
 

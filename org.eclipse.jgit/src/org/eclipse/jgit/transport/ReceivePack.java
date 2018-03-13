@@ -134,8 +134,8 @@ public class ReceivePack implements ReceiveSession {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
-	/** Hook used while advertising the refs to the client. */
-	private AdvertiseRefsHook advertiseRefsHook;
+	/** Filter used while advertising the refs to the client. */
+	private RefFilter refFilter;
 
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
@@ -211,7 +211,7 @@ public class ReceivePack implements ReceiveSession {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
-		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
 		advertisedHaves = new HashSet<ObjectId>();
@@ -256,27 +256,19 @@ public class ReceivePack implements ReceiveSession {
 
 	public final Map<String, Ref> getAdvertisedRefs() {
 		if (refs == null) {
-			setAdvertisedRefs(null, null);
+			refs = refFilter.filter(db.getAllRefs());
+
+			Ref head = refs.get(Constants.HEAD);
+			if (head != null && head.isSymbolic())
+				refs.remove(Constants.HEAD);
+
+			for (Ref ref : refs.values()) {
+				if (ref.getObjectId() != null)
+					advertisedHaves.add(ref.getObjectId());
+			}
+			advertisedHaves.addAll(db.getAdditionalHaves());
 		}
 		return refs;
-	}
-
-	public void setAdvertisedRefs(Map<String, Ref> allRefs,
-			Set<ObjectId> additionalHaves) {
-		refs = allRefs != null ? allRefs : db.getAllRefs();
-
-		Ref head = refs.get(Constants.HEAD);
-		if (head != null && head.isSymbolic())
-			refs.remove(Constants.HEAD);
-
-		for (Ref ref : refs.values()) {
-			if (ref.getObjectId() != null)
-				advertisedHaves.add(ref.getObjectId());
-		}
-		if (additionalHaves != null)
-			advertisedHaves.addAll(additionalHaves);
-		else
-			advertisedHaves.addAll(db.getAdditionalHaves());
 	}
 
 	public final Set<ObjectId> getAdvertisedObjects() {
@@ -293,12 +285,13 @@ public class ReceivePack implements ReceiveSession {
 	 * <p>
 	 * If enabled, this instance will verify that references to objects not
 	 * contained within the received pack are already reachable through at least
-	 * one other reference displayed as part of {@link #getAdvertisedRefs()}.
+	 * one other reference selected by the {@link #getRefFilter()} and displayed
+	 * as part of {@link #getAdvertisedRefs()}.
 	 * <p>
 	 * This feature is useful when the application doesn't trust the client to
 	 * not provide a forged SHA-1 reference to an object, in an attempt to
 	 * access parts of the DAG that they aren't allowed to see and which have
-	 * been hidden from them via the configured {@link AdvertiseRefsHook}.
+	 * been hidden from them via the configured {@link RefFilter}.
 	 * <p>
 	 * Enabling this feature may imply at least some, if not all, of the same
 	 * functionality performed by {@link #setCheckReceivedObjects(boolean)}.
@@ -398,31 +391,25 @@ public class ReceivePack implements ReceiveSession {
 		refLogIdent = pi;
 	}
 
-	/** @return the hook used while advertising the refs to the client */
-	public AdvertiseRefsHook getAdvertisedRefsHook() {
-		return advertiseRefsHook;
+	public RefFilter getRefFilter() {
+		return refFilter;
 	}
 
 	/**
-	 * Set the hook used while advertising the refs to the client.
+	 * Set the filter used while advertising the refs to the client.
 	 * <p>
-	 * If the {@link AdvertiseRefsHook} chooses to call
-	 * {@link #setAdvertisedRefs(Map,Set)}, only refs set by this filter will be
-	 * shown to the client. Clients may still attempt to create or update a
-	 * reference not advertised by the configured {@link AdvertiseRefsHook}. These
-	 * attempts should be rejected by a matching {@link PreReceiveHook}.
+	 * Only refs allowed by this filter will be shown to the client.
+	 * Clients may still attempt to create or update a reference hidden
+	 * by the configured {@link RefFilter}. These attempts should be
+	 * rejected by a matching {@link PreReceiveHook}.
 	 *
-	 * @param advertiseRefsHook
-	 *            the hook; may be null to show all refs.
+	 * @param refFilter
+	 *            the filter; may be null to show all refs.
 	 */
-	public void setAdvertiseRefsHook(final AdvertiseRefsHook advertiseRefsHook) {
-		if (advertiseRefsHook != null)
-			this.advertiseRefsHook = advertiseRefsHook;
-		else
-			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+	public void setRefFilter(final RefFilter refFilter) {
+		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
- 	/** @return get the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -528,7 +515,7 @@ public class ReceivePack implements ReceiveSession {
 		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
 	}
 
-  /**
+	/**
 	 * Execute the receive task on the socket.
 	 *
 	 * @param input
@@ -691,24 +678,11 @@ public class ReceivePack implements ReceiveSession {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
-	 * @throws ServiceMayNotContinueException
-	 *             the hook denied advertisement.
 	 */
-	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
-			 ServiceMayNotContinueException {
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
 		if (advertiseError != null) {
 			adv.writeOne("ERR " + advertiseError);
 			return;
-		}
-
-		try {
-			advertiseRefsHook.advertiseRefs(this);
-		} catch (ServiceMayNotContinueException fail) {
-			if (fail.getMessage() != null) {
-				adv.writeOne("ERR " + fail.getMessage());
-				fail.setOutput();
-			}
-			throw fail;
 		}
 
 		adv.init(db);
