@@ -75,7 +75,6 @@ import org.junit.Test;
 
 public class ReftableTest {
 	private static final String MASTER = "refs/heads/master";
-	private static final String NEXT = "refs/heads/next";
 	private static final String V1_0 = "refs/tags/v1.0";
 
 	private Stats stats;
@@ -124,7 +123,7 @@ public class ReftableTest {
 	@Test
 	public void estimateCurrentBytes() throws IOException {
 		Ref exp = ref(MASTER, 1);
-		int expBytes = 24 + 4 + 3 + MASTER.length() + 20 + 5 + 68;
+		int expBytes = 24 + 4 + 5 + 3 + MASTER.length() + 20 + 68;
 
 		byte[] table;
 		ReftableConfig cfg = new ReftableConfig();
@@ -145,7 +144,7 @@ public class ReftableTest {
 	public void oneIdRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 3 + MASTER.length() + 20 + 5 + 68, table.length);
+		assertEquals(24 + 4 + 5 + 3 + MASTER.length() + 20 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -174,7 +173,7 @@ public class ReftableTest {
 	public void oneTagRef() throws IOException {
 		Ref exp = tag(V1_0, 1, 2);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 2 + V1_0.length() + 40 + 5 + 68, table.length);
+		assertEquals(24 + 4 + 5 + 2 + V1_0.length() + 40 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -195,7 +194,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				24 + 4 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 5 + 68,
+				24 + 4 + 5 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -222,7 +221,7 @@ public class ReftableTest {
 		byte[] table = buffer.toByteArray();
 
 		assertEquals(
-				24 + 4 + 2 + "MERGE_HEAD".length() + 1 + 82 + 5 + 68,
+				24 + 4 + 5 + 2 + "MERGE_HEAD".length() + 1 + 82 + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -246,7 +245,7 @@ public class ReftableTest {
 		byte[] table = buffer.toByteArray();
 
 		assertEquals(
-				24 + 4 + 2 + "SAVE".length() + 1 + "content".length() + 5 + 68,
+				24 + 4 + 5 + 2 + "SAVE".length() + 1 + "content".length() + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -270,7 +269,7 @@ public class ReftableTest {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 2 + name.length() + 5 + 68, table.length);
+		assertEquals(24 + 4 + 5 + 2 + name.length() + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -298,41 +297,6 @@ public class ReftableTest {
 			assertFalse(rc.next());
 		}
 		try (RefCursor rc = t.seek("refs/heads/n")) {
-			assertFalse(rc.next());
-		}
-	}
-
-	@Test
-	public void namespaceNotFound() throws IOException {
-		Ref exp = ref(MASTER, 1);
-		ReftableReader t = read(write(exp));
-		try (RefCursor rc = t.seek("refs/changes/")) {
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = t.seek("refs/tags/")) {
-			assertFalse(rc.next());
-		}
-	}
-
-	@Test
-	public void namespaceHeads() throws IOException {
-		Ref master = ref(MASTER, 1);
-		Ref next = ref(NEXT, 2);
-		Ref v1 = tag(V1_0, 3, 4);
-
-		ReftableReader t = read(write(master, next, v1));
-		try (RefCursor rc = t.seek("refs/tags/")) {
-			assertTrue(rc.next());
-			assertEquals(V1_0, rc.getRef().getName());
-			assertFalse(rc.next());
-		}
-		try (RefCursor rc = t.seek("refs/heads/")) {
-			assertTrue(rc.next());
-			assertEquals(MASTER, rc.getRef().getName());
-
-			assertTrue(rc.next());
-			assertEquals(NEXT, rc.getRef().getName());
-
 			assertFalse(rc.next());
 		}
 	}
