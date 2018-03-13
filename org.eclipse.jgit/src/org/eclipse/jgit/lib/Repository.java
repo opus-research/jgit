@@ -51,7 +51,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1159,8 +1158,15 @@ public abstract class Repository {
 		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
-		byte[] raw = readGitDirectoryFile(Constants.MERGE_HEAD);
-		if (raw == null)
+		File mergeHeadFile = new File(getDirectory(), Constants.MERGE_HEAD);
+		byte[] raw;
+		try {
+			raw = IO.readFully(mergeHeadFile);
+		} catch (FileNotFoundException notFound) {
+			return null;
+		}
+
+		if (raw.length == 0)
 			return null;
 
 		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
@@ -1184,7 +1190,21 @@ public abstract class Repository {
 	 * @throws IOException
 	 */
 	public void writeMergeHeads(List<ObjectId> heads) throws IOException {
-		writeHeadsFile(heads, Constants.MERGE_HEAD);
+		File mergeHeadFile = new File(gitDir, Constants.MERGE_HEAD);
+		if (heads != null) {
+			BufferedOutputStream bos = new BufferedOutputStream(
+					new FileOutputStream(mergeHeadFile));
+			try {
+				for (ObjectId id : heads) {
+					id.copyTo(bos);
+					bos.write('\n');
+				}
+			} finally {
+				bos.close();
+			}
+		} else {
+			FileUtils.delete(mergeHeadFile);
+		}
 	}
 
 	/**
@@ -1203,8 +1223,16 @@ public abstract class Repository {
 		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
-		byte[] raw = readGitDirectoryFile(Constants.CHERRY_PICK_HEAD);
-		if (raw == null)
+		File mergeHeadFile = new File(getDirectory(),
+				Constants.CHERRY_PICK_HEAD);
+		byte[] raw;
+		try {
+			raw = IO.readFully(mergeHeadFile);
+		} catch (FileNotFoundException notFound) {
+			return null;
+		}
+
+		if (raw.length == 0)
 			return null;
 
 		return ObjectId.fromString(raw, 0);
@@ -1220,58 +1248,18 @@ public abstract class Repository {
 	 * @throws IOException
 	 */
 	public void writeCherryPickHead(ObjectId head) throws IOException {
-		List<ObjectId> heads = (head == null) ? null : Arrays.asList(head);
-		writeHeadsFile(heads, Constants.CHERRY_PICK_HEAD);
-	}
-
-	/**
-	 * Read a file from the git directory.
-	 *
-	 * @param filename
-	 * @return the raw contents or null if the file doesn't exist or is empty
-	 * @throws IOException
-	 */
-	private byte[] readGitDirectoryFile(String filename) throws IOException {
-		File file = new File(getDirectory(), filename);
-		byte[] raw;
-		try {
-			raw = IO.readFully(file);
-		} catch (FileNotFoundException notFound) {
-			return null;
-		}
-
-		if (raw.length == 0)
-			return null;
-
-		return raw;
-	}
-
-	/**
-	 * Write the given heads to a file in the git directory.
-	 *
-	 * @param heads
-	 *            a list of object ids to write or null if the file should be
-	 *            deleted.
-	 * @param filename
-	 * @throws FileNotFoundException
-	 * @throws IOException
-	 */
-	private void writeHeadsFile(List<ObjectId> heads, String filename)
-			throws FileNotFoundException, IOException {
-		File headsFile = new File(getDirectory(), filename);
-		if (heads != null) {
+		File cherryPickHeadFile = new File(gitDir, Constants.CHERRY_PICK_HEAD);
+		if (head != null) {
 			BufferedOutputStream bos = new BufferedOutputStream(
-					new FileOutputStream(headsFile));
+					new FileOutputStream(cherryPickHeadFile));
 			try {
-				for (ObjectId id : heads) {
-					id.copyTo(bos);
-					bos.write('\n');
-				}
+				head.copyTo(bos);
+				bos.write('\n');
 			} finally {
 				bos.close();
 			}
 		} else {
-			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
+			FileUtils.delete(cherryPickHeadFile, FileUtils.SKIP_MISSING);
 		}
 	}
 }
