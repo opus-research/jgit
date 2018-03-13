@@ -150,7 +150,7 @@ public class MyersDiff<S extends Sequence> {
 	/**
 	 * Entrypoint into the algorithm this class is all about. This method triggers that the
 	 * differences between A and B are calculated in form of a list of edits.
-	 * @param r portion of the sequences to examine. 
+	 * @param r portion of the sequences to examine.
 	 */
 	private void calculateEdits(Edit r) {
 		middle.initialize(r.beginA, r.endA, r.beginB, r.endB);
