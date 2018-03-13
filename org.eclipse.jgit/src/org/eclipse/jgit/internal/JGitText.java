@@ -392,7 +392,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidCharacterInBase64Data;
 	/***/ public String invalidCommitParentNumber;
 	/***/ public String invalidEncryption;
-	/***/ public String invalidExpandWildcard;
 	/***/ public String invalidGitdirRef;
 	/***/ public String invalidGitType;
 	/***/ public String invalidId;
@@ -558,6 +557,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pushCertificateInvalidSignature;
 	/***/ public String pushIsNotSupportedForBundleTransport;
 	/***/ public String pushNotPermitted;
+	/***/ public String pushOptionsNotSupported;
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String readTimedOut;
