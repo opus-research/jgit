@@ -253,18 +253,20 @@ public abstract class BaseReceivePack {
 	private Long packSize;
 
 	private PushCertificateParser pushCertificateParser;
+	private SignedPushConfig signedPushConfig;
 
 	/**
 	 * Get the push certificate used to verify the pusher's identity.
 	 * <p>
 	 * Only valid after commands are read from the wire.
 	 *
-	 * @return the parsed certificate, or null if push certificates are disabled.
+	 * @return the parsed certificate, or null if push certificates are disabled
+	 *         or no cert was presented by the client.
 	 * @throws IOException if the certificate was present but invalid.
 	 * @since 4.1
 	 */
 	public PushCertificate getPushCertificate() throws IOException {
-		return pushCertificateParser.build();
+		return getPushCertificateParser().build();
 	}
 
 	/**
@@ -288,7 +290,7 @@ public abstract class BaseReceivePack {
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
 		clientShallowCommits = new HashSet<ObjectId>();
-		pushCertificateParser = new PushCertificateParser(db, cfg);
+		signedPushConfig = cfg.signedPush;
 	}
 
 	/** Configuration for receive operations. */
@@ -310,8 +312,7 @@ public abstract class BaseReceivePack {
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
 
-		final String certNonceSeed;
-		final int certNonceSlopLimit;
+		final SignedPushConfig signedPush;
 
 		ReceiveConfig(final Config config) {
 			checkReceivedObjects = config.getBoolean(
@@ -332,8 +333,7 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$
-			certNonceSlopLimit = config.getInt("receive", "certnonceslop", 0); //$NON-NLS-1$ //$NON-NLS-2$
+			signedPush = SignedPushConfig.KEY.parse(config);
 		}
 
 		ObjectChecker newObjectChecker() {
@@ -790,6 +790,26 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
+	 * Set the configuration for push certificate verification.
+	 *
+	 * @param cfg
+	 *            new configuration; if this object is null or its {@link
+	 *            SignedPushConfig#getCertNonceSeed()} is null, push certificate
+	 *            verification will be disabled.
+	 * @since 4.1
+	 */
+	public void setSignedPushConfig(SignedPushConfig cfg) {
+		signedPushConfig = cfg;
+	}
+
+	private PushCertificateParser getPushCertificateParser() {
+		if (pushCertificateParser == null) {
+			pushCertificateParser = new PushCertificateParser(db, signedPushConfig);
+		}
+		return pushCertificateParser;
+	}
+
+	/**
 	 * Get the user agent of the client.
 	 * <p>
 	 * If the client is new enough to use {@code agent=} capability that value
@@ -1020,7 +1040,7 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowQuiet)
 			adv.advertiseCapability(CAPABILITY_QUIET);
-		String nonce = pushCertificateParser.getAdvertiseNonce();
+		String nonce = getPushCertificateParser().getAdvertiseNonce();
 		if (nonce != null) {
 			adv.advertiseCapability(nonce);
 		}
@@ -1043,6 +1063,8 @@ public abstract class BaseReceivePack {
 	 * @throws IOException
 	 */
 	protected void recvCommands() throws IOException {
+		PushCertificateParser certParser = getPushCertificateParser();
+		FirstLine firstLine = null;
 		for (;;) {
 			String rawLine;
 			try {
@@ -1062,18 +1084,20 @@ public abstract class BaseReceivePack {
 				continue;
 			}
 
-			if (commands.isEmpty()) {
-				final FirstLine firstLine = new FirstLine(line);
+			if (firstLine == null) {
+				firstLine = new FirstLine(line);
 				enabledCapabilities = firstLine.getCapabilities();
 				line = firstLine.getLine();
 
-				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT))
-					pushCertificateParser.receiveHeader(pckIn,
-							!isBiDirectionalPipe());
+				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
+					certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
+					continue;
+				}
 			}
 
-			if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
-				pushCertificateParser.receiveSignature(pckIn);
+			if (rawLine.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
+				certParser.receiveSignature(pckIn);
+				continue;
 			}
 
 			if (line.length() < 83) {
@@ -1089,10 +1113,10 @@ public abstract class BaseReceivePack {
 				cmd.setRef(refs.get(cmd.getRefName()));
 			}
 			commands.add(cmd);
-			if (pushCertificateParser.enabled()) {
+			if (certParser.enabled()) {
 				// Must use raw line with optional newline so signed payload can be
 				// reconstructed.
-				pushCertificateParser.addCommand(cmd, rawLine);
+				certParser.addCommand(cmd, rawLine);
 			}
 		}
 	}
@@ -1456,6 +1480,7 @@ public abstract class BaseReceivePack {
 		batch.setRefLogMessage("push", true); //$NON-NLS-1$
 		batch.addCommand(toApply);
 		try {
+			batch.setPushCertificate(getPushCertificate());
 			batch.execute(walk, updating);
 		} catch (IOException err) {
 			for (ReceiveCommand cmd : toApply) {
