@@ -49,7 +49,6 @@ import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -57,7 +56,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 /**
@@ -114,10 +112,6 @@ class Candidate {
 		sourceCommit = commit;
 		sourcePath = path;
 		recursivePath = path.shouldBeRecursive();
-	}
-
-	void beginResult(RevWalk rw) throws MissingObjectException, IOException {
-		rw.parseBody(sourceCommit);
 	}
 
 	int getParentCount() {
@@ -409,11 +403,6 @@ class Candidate {
 		BlobCandidate(String name, PathFilter path) {
 			super(null, path);
 			description = name;
-		}
-
-		@Override
-		void beginResult(RevWalk rw) {
-			// Blob candidates have nothing to prepare.
 		}
 
 		@Override

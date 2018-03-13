@@ -519,7 +519,8 @@ public class BlameGenerator {
 	}
 
 	private boolean result(Candidate n) throws IOException {
-		n.beginResult(revPool);
+		if (n.sourceCommit != null)
+			revPool.parseBody(n.sourceCommit);
 		outCandidate = n;
 		outRegion = n.regionList;
 		return true;
