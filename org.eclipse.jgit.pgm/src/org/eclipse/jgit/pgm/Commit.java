@@ -48,7 +48,6 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.kohsuke.args4j.Argument;
@@ -110,7 +109,7 @@ class Commit extends TextBuiltin {
 			if (branchName.startsWith(Constants.R_HEADS))
 				branchName = branchName.substring(Constants.R_HEADS.length());
 		}
-		outw.println("[" + branchName + " " + commit.name() + "] " //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		outw.println("[" + branchName + " " + commit.name() + "] "
 				+ commit.getShortMessage());
 	}
 }

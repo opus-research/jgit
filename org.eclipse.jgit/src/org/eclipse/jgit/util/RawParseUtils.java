@@ -70,7 +70,7 @@ public final class RawParseUtils {
 	 *
 	 * @since 2.2
 	 */
-	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8"); //$NON-NLS-1$
+	public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
 	private static final byte[] digits10;
 
@@ -82,7 +82,7 @@ public final class RawParseUtils {
 
 	static {
 		encodingAliases = new HashMap<String, Charset>();
-		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1")); //$NON-NLS-1$ //$NON-NLS-2$
+		encodingAliases.put("latin-1", Charset.forName("ISO-8859-1"));
 
 		digits10 = new byte['9' + 1];
 		Arrays.fill(digits10, (byte) -1);
@@ -779,7 +779,7 @@ public final class RawParseUtils {
 		if (emailE < stop) {
 			email = decode(raw, emailB, emailE - 1);
 		} else {
-			email = "invalid"; //$NON-NLS-1$
+			email = "invalid";
 		}
 		if (emailB < stop)
 			name = decode(raw, nameB, emailB - 2);
@@ -1058,7 +1058,7 @@ public final class RawParseUtils {
 	/**
 	 * Locate the end of a paragraph.
 	 * <p>
-	 * A paragraph is ended by two consecutive LF bytes or CRLF pairs
+	 * A paragraph is ended by two consecutive LF bytes.
 	 *
 	 * @param b
 	 *            buffer to scan.
@@ -1072,11 +1072,9 @@ public final class RawParseUtils {
 	public static final int endOfParagraph(final byte[] b, final int start) {
 		int ptr = start;
 		final int sz = b.length;
-		while (ptr < sz && (b[ptr] != '\n' && b[ptr] != '\r'))
+		while (ptr < sz && b[ptr] != '\n')
 			ptr = nextLF(b, ptr);
-		if (ptr > start && b[ptr - 1] == '\n')
-			ptr--;
-		if (ptr > start && b[ptr - 1] == '\r')
+		while (0 < ptr && start < ptr && b[ptr - 1] == '\n')
 			ptr--;
 		return ptr;
 	}

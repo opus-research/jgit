@@ -637,7 +637,6 @@ public class DirCacheEntry {
 	/**
 	 * Use for debugging only !
 	 */
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return getFileMode() + " " + getLength() + " " + getLastModified()
