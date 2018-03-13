@@ -222,12 +222,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			}
 
 			Ref headRef = repo.getRef(Constants.HEAD);
-			if (headRef == null) {
-				// TODO Git CLI supports checkout from unborn branch, we should
-				// also allow this
-				throw new UnsupportedOperationException(
-						JGitText.get().cannotCheckoutFromUnbornBranch);
-			}
 			String shortHeadRef = getShortBranchName(headRef);
 			String refLogMessage = "checkout: moving from " + shortHeadRef; //$NON-NLS-1$
 			ObjectId branch;
@@ -463,7 +457,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		try {
-			DirCacheCheckout.checkoutEntry(repo, entry, reader, true);
+			DirCacheCheckout.checkoutEntry(repo, entry, reader);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,

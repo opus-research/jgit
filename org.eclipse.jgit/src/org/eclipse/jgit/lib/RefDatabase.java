@@ -47,12 +47,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.eclipse.jgit.annotations.NonNull;
-import org.eclipse.jgit.annotations.Nullable;
 
 /**
  * Abstraction of name to {@link ObjectId} mapping.
@@ -135,7 +131,6 @@ public abstract class RefDatabase {
 	 * @since 2.3
 	 * @see #isNameConflicting(String)
 	 */
-	@NonNull
 	public Collection<String> getConflictingNames(String name)
 			throws IOException {
 		Map<String, Ref> allRefs = getRefs(ALL);
@@ -173,7 +168,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract RefUpdate newUpdate(String name, boolean detach)
 			throws IOException;
 
@@ -188,7 +182,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract RefRename newRename(String fromName, String toName)
 			throws IOException;
 
@@ -199,7 +192,6 @@ public abstract class RefDatabase {
 	 *
 	 * @return a new batch update object.
 	 */
-	@NonNull
 	public BatchRefUpdate newBatchUpdate() {
 		return new BatchRefUpdate(this);
 	}
@@ -230,7 +222,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@Nullable
 	public abstract Ref getRef(String name) throws IOException;
 
 	/**
@@ -246,60 +237,17 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	@Nullable
 	public Ref exactRef(String name) throws IOException {
-		Ref ref = getRef(name);
-		if (ref == null || !name.equals(ref.getName())) {
-			return null;
+		int slash = name.lastIndexOf('/');
+		String prefix = name.substring(0, slash + 1);
+		String rest = name.substring(slash + 1);
+		Ref result = getRefs(prefix).get(rest);
+		if (result != null || slash != -1) {
+			return result;
 		}
-		return ref;
-	}
 
-	/**
-	 * Read the specified references.
-	 * <p>
-	 * This method expects a list of unshortened reference names and returns
-	 * a map from reference names to refs.  Any named references that do not
-	 * exist will not be included in the returned map.
-	 *
-	 * @param refs
-	 *             the unabbreviated names of references to look up.
-	 * @return modifiable map describing any refs that exist among the ref
-	 *         ref names supplied. The map can be an unsorted map.
-	 * @throws IOException
-	 *             the reference space cannot be accessed.
-	 * @since 4.1
-	 */
-	@NonNull
-	public Map<String, Ref> exactRef(String... refs) throws IOException {
-		Map<String, Ref> result = new HashMap<>(refs.length);
-		for (String name : refs) {
-			Ref ref = exactRef(name);
-			if (ref != null) {
-				result.put(name, ref);
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Find the first named reference.
-	 * <p>
-	 * This method expects a list of unshortened reference names and returns
-	 * the first that exists.
-	 *
-	 * @param refs
-	 *             the unabbreviated names of references to look up.
-	 * @return the first named reference that exists (if any); else {@code null}.
-	 * @throws IOException
-	 *             the reference space cannot be accessed.
-	 * @since 4.1
-	 */
-	@Nullable
-	public Ref firstExactRef(String... refs) throws IOException {
-		for (String name : refs) {
-			Ref ref = exactRef(name);
-			if (ref != null) {
+		for (Ref ref : getAdditionalRefs()) {
+			if (name.equals(ref.getName())) {
 				return ref;
 			}
 		}
@@ -319,7 +267,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract Map<String, Ref> getRefs(String prefix) throws IOException;
 
 	/**
@@ -328,13 +275,12 @@ public abstract class RefDatabase {
 	 * The result list includes non-ref items such as MERGE_HEAD and
 	 * FETCH_RESULT cast to be refs. The names of these refs are not returned by
 	 * <code>getRefs(ALL)</code> but are accepted by {@link #getRef(String)}
-	 * and {@link #exactRef(String)}.
+	 * and {@link exactRef(String)}.
 	 *
 	 * @return a list of additional refs
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract List<Ref> getAdditionalRefs() throws IOException;
 
 	/**
@@ -351,11 +297,10 @@ public abstract class RefDatabase {
 	 * @return {@code ref} if {@code ref.isPeeled()} is true; otherwise a new
 	 *         Ref object representing the same data as Ref, but isPeeled() will
 	 *         be true and getPeeledObjectId() will contain the peeled object
-	 *         (or {@code null}).
+	 *         (or null).
 	 * @throws IOException
 	 *             the reference space or object space cannot be accessed.
 	 */
-	@NonNull
 	public abstract Ref peel(Ref ref) throws IOException;
 
 	/**
@@ -379,10 +324,9 @@ public abstract class RefDatabase {
 	 * @param name
 	 *            short name of ref to find, e.g. "master" to find
 	 *            "refs/heads/master" in map.
-	 * @return The first ref matching the name, or {@code null} if not found.
+	 * @return The first ref matching the name, or null if not found.
 	 * @since 3.4
 	 */
-	@Nullable
 	public static Ref findRef(Map<String, Ref> map, String name) {
 		for (String prefix : SEARCH_PATH) {
 			String fullname = prefix + name;

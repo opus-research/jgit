@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.transport;
 
-import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -86,16 +85,12 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 	public synchronized String createNonce(Repository repo, long timestamp)
 			throws IllegalStateException {
 		String path;
-		if (repo instanceof DfsRepository) {
+		if (repo instanceof DfsRepository)
 			path = ((DfsRepository) repo).getDescription().getRepositoryName();
-		} else {
-			File directory = repo.getDirectory();
-			if (directory != null) {
-				path = directory.getPath();
-			} else {
-				throw new IllegalStateException();
-			}
-		}
+		else if (repo.getDirectory() != null)
+			path = repo.getDirectory().getPath();
+		else
+			throw new IllegalStateException();
 
 		String input = path + ":" + String.valueOf(timestamp); //$NON-NLS-1$
 		byte[] rawHmac;
@@ -110,42 +105,36 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 	@Override
 	public NonceStatus verify(String received, String sent,
 			Repository db, boolean allowSlop, int slop) {
-		if (received.isEmpty()) {
+		if (received.isEmpty())
 			return NonceStatus.MISSING;
-		} else if (sent.isEmpty()) {
+		else if (sent.isEmpty())
 			return NonceStatus.UNSOLICITED;
-		} else if (received.equals(sent)) {
+		else if (received.equals(sent))
 			return NonceStatus.OK;
-		}
 
-		if (!allowSlop) {
+		if (!allowSlop)
 			return NonceStatus.BAD;
-		}
 
 		/* nonce is concat(<seconds-since-epoch>, "-", <hmac>) */
 		int idxSent = sent.indexOf('-');
 		int idxRecv = received.indexOf('-');
-		if (idxSent == -1 || idxRecv == -1) {
+		if (idxSent == -1 || idxRecv == -1)
 			return NonceStatus.BAD;
-		}
 
-		String signedStampStr = received.substring(0, idxRecv);
-		String advertisedStampStr = sent.substring(0, idxSent);
 		long signedStamp;
 		long advertisedStamp;
 		try {
-			signedStamp = Long.parseLong(signedStampStr);
-			advertisedStamp = Long.parseLong(advertisedStampStr);
-		} catch (IllegalArgumentException e) {
+			signedStamp = Long.parseLong(received.substring(0, idxRecv));
+			advertisedStamp = Long.parseLong(sent.substring(0, idxSent));
+		} catch (Exception e) {
 			return NonceStatus.BAD;
 		}
 
 		// what we would have signed earlier
 		String expect = createNonce(db, signedStamp);
 
-		if (!expect.equals(received)) {
+		if (!expect.equals(received))
 			return NonceStatus.BAD;
-		}
 
 		long nonceStampSlop = Math.abs(advertisedStamp - signedStamp);
 
