@@ -52,6 +52,8 @@ import java.lang.reflect.Method;
 
 /**
  * FS implementation for POSIX systems using Java6
+ *
+ * @since 3.0
  */
 public class FS_POSIX_Java6 extends FS_POSIX {
 	private static final Method canExecute;

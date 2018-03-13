@@ -48,6 +48,8 @@ import java.io.File;
 
 /**
  * FS implementaton for Java5
+ *
+ * @since 3.0
  */
 public class FS_POSIX_Java5 extends FS_POSIX {
 	/**
