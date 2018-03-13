@@ -100,11 +100,11 @@ public class RenameDetector {
 		}
 	};
 
-	private List<DiffEntry> entries;
+	private List<DiffEntry> entries = new ArrayList<DiffEntry>();
 
-	private List<DiffEntry> deleted;
+	private List<DiffEntry> deleted = new ArrayList<DiffEntry>();
 
-	private List<DiffEntry> added;
+	private List<DiffEntry> added = new ArrayList<DiffEntry>();
 
 	private boolean done;
 
@@ -137,8 +137,6 @@ public class RenameDetector {
 
 		DiffConfig cfg = repo.getConfig().get(DiffConfig.KEY);
 		renameLimit = cfg.getRenameLimit();
-
-		reset();
 	}
 
 	/**
@@ -307,39 +305,19 @@ public class RenameDetector {
 	 */
 	public List<DiffEntry> compute(ProgressMonitor pm) throws IOException {
 		if (!done) {
-			ObjectReader reader = repo.newObjectReader();
-			try {
-				return compute(reader, pm);
-			} finally {
-				reader.release();
-			}
-		}
-		return Collections.unmodifiableList(entries);
-	}
-
-	/**
-	 * Detect renames in the current file set.
-	 *
-	 * @param reader
-	 *            reader to obtain objects from the repository with.
-	 * @param pm
-	 *            report progress during the detection phases.
-	 * @return an unmodifiable list of {@link DiffEntry}s representing all files
-	 *         that have been changed.
-	 * @throws IOException
-	 *             file contents cannot be read from the repository.
-	 */
-	public List<DiffEntry> compute(ObjectReader reader, ProgressMonitor pm)
-			throws IOException {
-		if (!done) {
 			done = true;
 
 			if (pm == null)
 				pm = NullProgressMonitor.INSTANCE;
+			ObjectReader reader = repo.newObjectReader();
+			try {
 				breakModifies(reader, pm);
 				findExactRenames(pm);
 				findContentRenames(reader, pm);
 				rejoinModifies(pm);
+			} finally {
+				reader.release();
+			}
 
 			entries.addAll(added);
 			added = null;
@@ -350,14 +328,6 @@ public class RenameDetector {
 			Collections.sort(entries, DIFF_COMPARATOR);
 		}
 		return Collections.unmodifiableList(entries);
-	}
-
-	/** Reset this rename detector for another rename detection pass. */
-	public void reset() {
-		entries = new ArrayList<DiffEntry>();
-		deleted = new ArrayList<DiffEntry>();
-		added = new ArrayList<DiffEntry>();
-		done = false;
 	}
 
 	private void breakModifies(ObjectReader reader, ProgressMonitor pm)

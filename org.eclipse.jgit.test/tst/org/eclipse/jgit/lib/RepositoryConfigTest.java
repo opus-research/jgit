@@ -4,7 +4,6 @@
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,7 +47,6 @@
 
 package org.eclipse.jgit.lib;
 
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Set;
@@ -63,7 +61,7 @@ import org.eclipse.jgit.util.SystemReader;
 /**
  * Test reading of git config
  */
-public class ConfigTest extends TestCase {
+public class RepositoryConfigTest extends TestCase {
 	public void test001_ReadBareKey() throws ConfigInvalidException {
 		final Config c = parse("[foo]\nbar\n");
 		assertEquals(true, c.getBoolean("foo", null, "bar", false));
@@ -351,28 +349,6 @@ public class ConfigTest extends TestCase {
 		assertEquals("Subsection size", 2, names.size());
 		assertTrue("Subsection should contain \"a\"", names.contains("a"));
 		assertTrue("Subsection should contain \"b\"", names.contains("b"));
-	}
-
-	public void testQuotingForSubSectionNames() {
-		String resultPattern = "[testsection \"{0}\"]\n\ttestname = testvalue\n";
-		String result;
-
-		Config config = new Config();
-		config.setString("testsection", "testsubsection", "testname",
-				"testvalue");
-
-		result = MessageFormat.format(resultPattern, "testsubsection");
-		assertEquals(result, config.toText());
-		config.clear();
-
-		config.setString("testsection", "#quotable", "testname", "testvalue");
-		result = MessageFormat.format(resultPattern, "#quotable");
-		assertEquals(result, config.toText());
-		config.clear();
-
-		config.setString("testsection", "with\"quote", "testname", "testvalue");
-		result = MessageFormat.format(resultPattern, "with\\\"quote");
-		assertEquals(result, config.toText());
 	}
 
 	private void assertReadLong(long exp) throws ConfigInvalidException {

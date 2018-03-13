@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,30 +42,70 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.diff;
 
-import java.io.UnsupportedEncodingException;
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
-import junit.framework.TestCase;
+/**
+ * A version of {@link RawText} that ignores trailing whitespace.
+ */
+public class RawTextIgnoreTrailingWhitespace extends RawText {
+	/** Creates RawText that ignores only trailing whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreTrailingWhitespace(input);
+		}
+	};
 
-public class RawParseUtils_FormatTest extends TestCase {
-	public void testFormatBase10() throws UnsupportedEncodingException {
-		byte[] b = new byte[64];
-		int p;
+	/**
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
+	 *
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
+	 */
+	public RawTextIgnoreTrailingWhitespace(byte[] input) {
+		super(input);
+	}
 
-		p = RawParseUtils.formatBase10(b, b.length, 0);
-		assertEquals("0", new String(b, p, b.length - p, "UTF-8"));
+	@Override
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
 
-		p = RawParseUtils.formatBase10(b, b.length, 42);
-		assertEquals("42", new String(b, p, b.length - p, "UTF-8"));
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes.get(ai) != b.hashes.get(bi))
+			return false;
 
-		p = RawParseUtils.formatBase10(b, b.length, 1234);
-		assertEquals("1234", new String(b, p, b.length - p, "UTF-8"));
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
 
-		p = RawParseUtils.formatBase10(b, b.length, -9876);
-		assertEquals("-9876", new String(b, p, b.length - p, "UTF-8"));
+		ae = trimTrailingWhitespace(a.content, as, ae);
+		be = trimTrailingWhitespace(b.content, bs, be);
 
-		p = RawParseUtils.formatBase10(b, b.length, 123456789);
-		assertEquals("123456789", new String(b, p, b.length - p, "UTF-8"));
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		end = trimTrailingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
 	}
 }

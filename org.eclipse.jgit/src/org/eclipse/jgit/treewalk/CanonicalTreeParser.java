@@ -244,12 +244,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	}
 
 	@Override
-	public void reset() {
-		if (!first())
-			reset(raw);
-	}
-
-	@Override
 	public boolean first() {
 		return currPtr == 0;
 	}

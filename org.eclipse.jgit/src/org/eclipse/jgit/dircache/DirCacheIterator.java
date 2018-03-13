@@ -160,15 +160,6 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	}
 
 	@Override
-	public void reset() {
-		if (!first()) {
-			ptr = treeStart;
-			if (!eof())
-				parseEntry();
-		}
-	}
-
-	@Override
 	public boolean first() {
 		return ptr == treeStart;
 	}
