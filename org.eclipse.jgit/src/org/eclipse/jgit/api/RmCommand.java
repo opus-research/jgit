@@ -136,7 +136,6 @@ public class RmCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Rm
 	 */
-	@Override
 	public DirCache call() throws GitAPIException,
 			NoFilepatternException {
 

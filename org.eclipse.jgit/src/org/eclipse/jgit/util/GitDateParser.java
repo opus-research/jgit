@@ -75,7 +75,6 @@ public class GitDateParser {
 	private static ThreadLocal<Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>> formatCache =
 			new ThreadLocal<Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>>() {
 
-		@Override
 		protected Map<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>> initialValue() {
 			return new HashMap<Locale, Map<ParseableSimpleDateFormat, SimpleDateFormat>>();
 		}

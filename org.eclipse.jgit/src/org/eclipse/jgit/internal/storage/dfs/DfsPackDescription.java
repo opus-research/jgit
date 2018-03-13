@@ -81,6 +81,8 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private int indexVersion;
 
+	private long estimatedPackSize;
+
 	/**
 	 * Initialize a description by pack name and repository.
 	 * <p>
@@ -189,6 +191,25 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		return size == null ? 0 : size.longValue();
 	}
 
+	/**
+	 * @param estimatedPackSize
+	 *            estimated size of the .pack file in bytes. If 0 the pack file
+	 *            size is unknown.
+	 * @return {@code this}
+	 */
+	public DfsPackDescription setEstimatedPackSize(long estimatedPackSize) {
+		this.estimatedPackSize = Math.max(0, estimatedPackSize);
+		return this;
+	}
+
+	/**
+	 * @return estimated size of the .pack file in bytes. If 0 the pack file
+	 *         size is unknown.
+	 */
+	public long getEstimatedPackSize() {
+		return estimatedPackSize;
+	}
+
 	/** @return number of objects in the pack. */
 	public long getObjectCount() {
 		return objectCount;
@@ -288,7 +309,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @param b
 	 *            the other pack.
 	 */
-	@Override
 	public int compareTo(DfsPackDescription b) {
 		// Cluster by PackSource, pushing UNREACHABLE_GARBAGE to the end.
 		PackSource as = getPackSource();
@@ -297,6 +317,17 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 			int cmp = as.category - bs.category;
 			if (cmp != 0)
 				return cmp;
+		}
+
+		// Tie break GC type packs by smallest first. There should be at most
+		// one of each source, but when multiple exist concurrent GCs may have
+		// run. Preferring the smaller file selects higher quality delta
+		// compression, placing less demand on the DfsBlockCache.
+		if (as != null && as == bs && isGC(as)) {
+			int cmp = Long.signum(getFileSize(PACK) - b.getFileSize(PACK));
+			if (cmp != 0) {
+				return cmp;
+			}
 		}
 
 		// Newer packs should sort first.
@@ -308,6 +339,17 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		// the object they care about in the smaller index. This also pushes
 		// big historical packs to the end of the list, due to more objects.
 		return Long.signum(getObjectCount() - b.getObjectCount());
+	}
+
+	static boolean isGC(PackSource s) {
+		switch (s) {
+		case GC:
+		case GC_REST:
+		case GC_TXN:
+			return true;
+		default:
+			return false;
+		}
 	}
 
 	@Override

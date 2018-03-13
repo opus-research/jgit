@@ -59,7 +59,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -410,7 +409,6 @@ public abstract class FS {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getProperty("user.home"); //$NON-NLS-1$
 					}
@@ -1012,16 +1010,13 @@ public abstract class FS {
 		IOException ioException = null;
 		try {
 			process = processBuilder.start();
-			final Callable<Void> errorGobbler = new StreamGobbler(
-					process.getErrorStream(), errRedirect);
-			final Callable<Void> outputGobbler = new StreamGobbler(
-					process.getInputStream(), outRedirect);
-			executor.submit(errorGobbler);
-			executor.submit(outputGobbler);
+			executor.execute(
+					new StreamGobbler(process.getErrorStream(), errRedirect));
+			executor.execute(
+					new StreamGobbler(process.getInputStream(), outRedirect));
 			OutputStream outputStream = process.getOutputStream();
 			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream)
-						.call();
+				new StreamGobbler(inRedirect, outputStream).copy();
 			}
 			try {
 				outputStream.close();
@@ -1337,7 +1332,7 @@ public abstract class FS {
 	 * streams.
 	 * </p>
 	 */
-	private static class StreamGobbler implements Callable<Void> {
+	private static class StreamGobbler implements Runnable {
 		private InputStream in;
 
 		private OutputStream out;
@@ -1347,8 +1342,15 @@ public abstract class FS {
 			this.out = output;
 		}
 
-		@Override
-		public Void call() throws IOException {
+		public void run() {
+			try {
+				copy();
+			} catch (IOException e) {
+				// Do nothing on read failure; leave streams open.
+			}
+		}
+
+		void copy() throws IOException {
 			boolean writeFailure = false;
 			byte buffer[] = new byte[4096];
 			int readBytes;
@@ -1365,7 +1367,6 @@ public abstract class FS {
 					}
 				}
 			}
-			return null;
 		}
 	}
 }

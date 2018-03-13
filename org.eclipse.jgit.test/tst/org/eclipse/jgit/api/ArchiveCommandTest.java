@@ -57,6 +57,7 @@ import java.util.Map;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.StringUtils;
@@ -78,7 +79,6 @@ public class ArchiveCommandTest extends RepositoryTestCase {
 		ArchiveCommand.registerFormat(format.SUFFIXES.get(0), format);
 	}
 
-	@Override
 	@After
 	public void tearDown() {
 		ArchiveCommand.unregisterFormat(format.SUFFIXES.get(0));
@@ -229,6 +229,11 @@ public class ArchiveCommandTest extends RepositoryTestCase {
 
 		@Override
 		public void putEntry(MockOutputStream out, String path, FileMode mode, ObjectLoader loader) {
+			putEntry(out, null, path, mode, loader);
+		}
+
+		@Override
+		public void putEntry(MockOutputStream out, ObjectId tree, String path, FileMode mode, ObjectLoader loader) {
 			String content = mode != FileMode.TREE ? new String(loader.getBytes()) : null;
 			entries.put(path, content);
 		}

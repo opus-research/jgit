@@ -63,7 +63,6 @@ public class InMemoryRepository extends DfsRepository {
 	 *
 	 * @param repoDesc
 	 *            description of the repository.
-	 * @since 2.0
 	 */
 	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
 		this(new Builder().setRepositoryDescription(repoDesc));
@@ -226,7 +225,6 @@ public class InMemoryRepository extends DfsRepository {
 			data = buf;
 		}
 
-		@Override
 		public int read(ByteBuffer dst) {
 			int n = Math.min(dst.remaining(), data.length - position);
 			if (n == 0)
@@ -236,37 +234,30 @@ public class InMemoryRepository extends DfsRepository {
 			return n;
 		}
 
-		@Override
 		public void close() {
 			open = false;
 		}
 
-		@Override
 		public boolean isOpen() {
 			return open;
 		}
 
-		@Override
 		public long position() {
 			return position;
 		}
 
-		@Override
 		public void position(long newPosition) {
 			position = (int) newPosition;
 		}
 
-		@Override
 		public long size() {
 			return data.length;
 		}
 
-		@Override
 		public int blockSize() {
 			return 0;
 		}
 
-		@Override
 		public void setReadAheadBytes(int b) {
 			// Unnecessary on a byte array.
 		}

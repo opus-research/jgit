@@ -52,6 +52,7 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
+import static org.eclipse.jgit.util.HttpSupport.HDR_LOCATION;
 import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_WWW_AUTHENTICATE;
@@ -156,74 +157,61 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				.unmodifiableSet(new LinkedHashSet<String>(Arrays
 						.asList(schemeNames)));
 
-		@Override
 		public String getName() {
 			return JGitText.get().transportProtoHTTP;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return schemeSet;
 		}
 
-		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
-		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
-		@Override
 		public int getDefaultPort() {
 			return 80;
 		}
 
-		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
 		}
 
-		@Override
 		public Transport open(URIish uri) throws NotSupportedException {
 			return new TransportHttp(uri);
 		}
 	};
 
 	static final TransportProtocol PROTO_FTP = new TransportProtocol() {
-		@Override
 		public String getName() {
 			return JGitText.get().transportProtoFTP;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("ftp"); //$NON-NLS-1$
 		}
 
-		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
-		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
-		@Override
 		public int getDefaultPort() {
 			return 21;
 		}
 
-		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
@@ -231,7 +219,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	};
 
 	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
-		@Override
 		public HttpConfig parse(final Config cfg) {
 			return new HttpConfig(cfg);
 		}
@@ -876,7 +863,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			readAdvertisedRefs();
 		}
 
-		@Override
 		protected void doPush(final ProgressMonitor monitor,
 				final Map<String, RemoteRefUpdate> refUpdates,
 				OutputStream outputStream) throws TransportException {
@@ -913,9 +899,13 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void openStream() throws IOException {
+			openStream(null);
+		}
+
+		void openStream(final String redirectUrl) throws IOException {
 			conn = httpOpen(
 					METHOD_POST,
-					new URL(baseUrl, serviceName),
+					redirectUrl == null ? new URL(baseUrl, serviceName) : new URL(redirectUrl),
 					AcceptEncoding.GZIP);
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
@@ -924,6 +914,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void sendRequest() throws IOException {
+			sendRequest(null);
+		}
+
+		void sendRequest(final String redirectUrl) throws IOException {
 			// Try to compress the content, but only if that is smaller.
 			TemporaryBuffer buf = new TemporaryBuffer.Heap(http.postBuffer);
 			try {
@@ -938,7 +932,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				buf = out;
 			}
 
-			openStream();
+			openStream(redirectUrl);
 			if (buf != out)
 				conn.setRequestProperty(HDR_CONTENT_ENCODING, ENCODING_GZIP);
 			conn.setFixedLengthStreamingMode((int) buf.length());
@@ -947,6 +941,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				buf.writeTo(httpOut, null);
 			} finally {
 				httpOut.close();
+			}
+
+			final int status = HttpSupport.response(conn);
+			if (status == HttpConnection.HTTP_MOVED_PERM) {
+				String locationHeader = HttpSupport.responseHeader(conn, HDR_LOCATION);
+				sendRequest(locationHeader);
 			}
 		}
 
@@ -975,19 +975,16 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		abstract void execute() throws IOException;
 
 		class HttpExecuteStream extends InputStream {
-			@Override
 			public int read() throws IOException {
 				execute();
 				return -1;
 			}
 
-			@Override
 			public int read(byte[] b, int off, int len) throws IOException {
 				execute();
 				return -1;
 			}
 
-			@Override
 			public long skip(long n) throws IOException {
 				execute();
 				return 0;
