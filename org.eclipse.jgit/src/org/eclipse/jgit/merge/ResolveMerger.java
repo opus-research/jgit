@@ -73,7 +73,6 @@ import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.diff.RawTextHelper;
 import org.eclipse.jgit.diff.Sequence;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
@@ -88,12 +87,14 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
@@ -657,8 +658,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				return true;
 			}
 
-			MergeResult<RawText> result = contentMerge(base, ours, theirs,
-					attributes);
+			MergeResult<RawText> result = contentMerge(base, ours, theirs);
 			if (ignoreConflicts) {
 				result.setContainsConflicts(false);
 			}
@@ -670,8 +670,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// OURS or THEIRS has been deleted
 			if (((modeO != 0 && !tw.idEqual(T_BASE, T_OURS)) || (modeT != 0 && !tw
 					.idEqual(T_BASE, T_THEIRS)))) {
-				MergeResult<RawText> result = contentMerge(base, ours, theirs,
-						attributes);
+				MergeResult<RawText> result = contentMerge(base, ours, theirs);
 
 				add(tw.getRawPath(), base, DirCacheEntry.STAGE_1, 0, 0);
 				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2, 0, 0);
@@ -706,14 +705,12 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @param base
 	 * @param ours
 	 * @param theirs
-	 * @param attributes
 	 *
 	 * @return the result of the content merge
 	 * @throws IOException
 	 */
 	private MergeResult<RawText> contentMerge(CanonicalTreeParser base,
-			CanonicalTreeParser ours, CanonicalTreeParser theirs,
-			Attributes attributes)
+			CanonicalTreeParser ours, CanonicalTreeParser theirs)
 			throws IOException {
 		RawText baseText;
 		RawText ourText;
@@ -721,11 +718,11 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		try {
 			baseText = base == null ? RawText.EMPTY_TEXT : getRawText(
-							base.getEntryObjectId(), attributes);
+				base.getEntryObjectId(), reader);
 			ourText = ours == null ? RawText.EMPTY_TEXT : getRawText(
-							ours.getEntryObjectId(), attributes);
+				ours.getEntryObjectId(), reader);
 			theirsText = theirs == null ? RawText.EMPTY_TEXT : getRawText(
-							theirs.getEntryObjectId(), attributes);
+				theirs.getEntryObjectId(), reader);
 		} catch (BinaryBlobException e) {
 			MergeResult<RawText> r = new MergeResult<>(Collections.<RawText>emptyList());
 			r.setContainsConflicts(true);
@@ -906,11 +903,14 @@ public class ResolveMerger extends ThreeWayMerger {
 		return FileMode.MISSING.getBits();
 	}
 
-	private RawText getRawText(ObjectId id,
-			Attributes attributes)
+	private static RawText getRawText(ObjectId id, ObjectReader reader)
 			throws IOException, BinaryBlobException {
-		return RawTextHelper.getRawText(nonNullRepo(), id, reader,
-				attributes.get(Constants.ATTR_MERGE));
+		if (id.equals(ObjectId.zeroId()))
+			return new RawText(new byte[] {});
+
+		ObjectLoader loader = reader.open(id, OBJ_BLOB);
+		int threshold = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
+		return RawText.load(loader, threshold);
 	}
 
 	private static boolean nonTree(final int mode) {
