@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,75 +40,67 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+package org.eclipse.jgit.internal.storage.file;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class AddTest extends CLIRepositoryTestCase {
-	private Git git;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.MutableObjectId;
+import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSet;
+
+/** Lazily loads a set of ObjectIds, one per line. */
+public class LazyObjectIdSetFile implements ObjectIdSet {
+	private final File src;
+	private ObjectIdOwnerMap<Entry> set;
+
+	/**
+	 * Create a new lazy set from a file.
+	 *
+	 * @param src
+	 *            the source file.
+	 */
+	public LazyObjectIdSetFile(File src) {
+		this.src = src;
+	}
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-	}
-
-	@Test
-	public void testAddNothing() throws Exception {
-		try {
-			execute("git add");
-			fail("Must die");
-		} catch (Die e) {
-			// expected, requires argument
+	public boolean contains(AnyObjectId objectId) {
+		if (set == null) {
+			set = load();
 		}
+		return set.contains(objectId);
 	}
 
-	@Test
-	public void testAddUsage() throws Exception {
-		execute("git add --help");
+	private ObjectIdOwnerMap<Entry> load() {
+		ObjectIdOwnerMap<Entry> r = new ObjectIdOwnerMap<>();
+		try (FileInputStream fin = new FileInputStream(src);
+				Reader rin = new InputStreamReader(fin, UTF_8);
+				BufferedReader br = new BufferedReader(rin)) {
+			MutableObjectId id = new MutableObjectId();
+			for (String line; (line = br.readLine()) != null;) {
+				id.fromString(line);
+				if (!r.contains(id)) {
+					r.add(new Entry(id));
+				}
+			}
+		} catch (IOException e) {
+			// Ignore IO errors accessing the lazy set.
+		}
+		return r;
 	}
 
-	@Test
-	public void testAddAFile() throws Exception {
-		writeTrashFile("greeting", "Hello, world!");
-		assertArrayEquals(new String[] { "" }, //
-				execute("git add greeting"));
-
-		DirCache cache = db.readDirCache();
-		assertNotNull(cache.getEntry("greeting"));
-		assertEquals(1, cache.getEntryCount());
-	}
-
-	@Test
-	public void testAddFileTwice() throws Exception {
-		writeTrashFile("greeting", "Hello, world!");
-		assertArrayEquals(new String[] { "" }, //
-				execute("git add greeting greeting"));
-
-		DirCache cache = db.readDirCache();
-		assertNotNull(cache.getEntry("greeting"));
-		assertEquals(1, cache.getEntryCount());
-	}
-
-	@Test
-	public void testAddAlreadyAdded() throws Exception {
-		writeTrashFile("greeting", "Hello, world!");
-		git.add().addFilepattern("greeting").call();
-		assertArrayEquals(new String[] { "" }, //
-				execute("git add greeting"));
-
-		DirCache cache = db.readDirCache();
-		assertNotNull(cache.getEntry("greeting"));
-		assertEquals(1, cache.getEntryCount());
+	static class Entry extends ObjectIdOwnerMap.Entry {
+		Entry(AnyObjectId id) {
+			super(id);
+		}
 	}
 }
