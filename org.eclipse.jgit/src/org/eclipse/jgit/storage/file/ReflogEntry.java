@@ -44,9 +44,7 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.io.Serializable;
-
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -55,9 +53,7 @@ import org.eclipse.jgit.util.RawParseUtils;
 /**
  * Parsed reflog entry
  */
-public class ReflogEntry implements Serializable {
-	private static final long serialVersionUID = 1L;
-
+public class ReflogEntry {
 	private ObjectId oldId;
 
 	private ObjectId newId;
@@ -103,7 +99,7 @@ public class ReflogEntry implements Serializable {
 	}
 
 	/**
-	 * @return user performing the change
+	 * @return user performin the change
 	 */
 	public PersonIdent getWho() {
 		return who;
@@ -120,16 +116,5 @@ public class ReflogEntry implements Serializable {
 	public String toString() {
 		return "Entry[" + oldId.name() + ", " + newId.name() + ", " + getWho() + ", "
 				+ getComment() + "]";
-	}
-
-	/**
-	 * @return a {@link CheckoutEntry} with parsed information about a branch
-	 *         switch, or null if the entry is not a checkout
-	 */
-	public CheckoutEntry parseCheckout() {
-		if (getComment().startsWith(CheckoutEntry.CHECKOUT_MOVING_FROM))
-			return new CheckoutEntry(this);
-		else
-			return null;
 	}
 }

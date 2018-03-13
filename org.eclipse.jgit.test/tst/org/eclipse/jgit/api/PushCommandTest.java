@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,24 +46,21 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.TrackingRefUpdate;
 import org.eclipse.jgit.transport.URIish;
 import org.junit.Test;
@@ -88,7 +85,7 @@ public class PushCommandTest extends RepositoryTestCase {
 		Git git1 = new Git(db);
 		// create some refs via commits and tag
 		RevCommit commit = git1.commit().setMessage("initial commit").call();
-		Ref tagRef = git1.tag().setName("tag").call();
+		RevTag tag = git1.tag().setName("tag").call();
 
 		try {
 			db2.resolve(commit.getId().getName() + "^{commit}");
@@ -103,8 +100,7 @@ public class PushCommandTest extends RepositoryTestCase {
 
 		assertEquals(commit.getId(),
 				db2.resolve(commit.getId().getName() + "^{commit}"));
-		assertEquals(tagRef.getObjectId(),
-				db2.resolve(tagRef.getObjectId().getName()));
+		assertEquals(tag.getId(), db2.resolve(tag.getId().getName()));
 	}
 
 	@Test
@@ -269,47 +265,6 @@ public class PushCommandTest extends RepositoryTestCase {
 		assertEquals(null, git2.getRepository()
 				.resolve("refs/heads/not-pushed"));
 		assertEquals(null, git2.getRepository().resolve("refs/heads/master"));
-	}
 
-	/**
-	 * Check that updating the current branch in a non-bare repository fails.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testPushToCurrentBranch() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("f", "content of f");
-		git.add().addFilepattern("f").call();
-		git.commit().setMessage("adding f").call();
-
-		final StoredConfig config = git.getRepository().getConfig();
-		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_BARE, false);
-		config.save();
-
-		File directory = createTempDirectory("testPushToCurrentBranch");
-		Git git2 = Git
-				.cloneRepository()
-				.setURI("file://" + git.getRepository().getWorkTree().getPath())
-				.setDirectory(directory).call();
-		assertNotNull(git2);
-		addRepoToClose(git2.getRepository());
-
-		File f = new File(git2.getRepository().getWorkTree(), "f");
-		write(f, "updated content of f");
-		git2.add().addFilepattern("f").call();
-		git2.commit().setMessage("updating f").call();
-
-		// TODO: this fails in CGit:
-		// "! [remote rejected] master -> master (branch is currently checked out)"
-		Iterable<PushResult> resultIterable = git2.push().call();
-
-		PushResult result = resultIterable.iterator().next();
-		RemoteRefUpdate remoteUpdate = result
-				.getRemoteUpdate("refs/heads/master");
-		assertEquals(
-				org.eclipse.jgit.transport.RemoteRefUpdate.Status.REJECTED_OTHER_REASON,
-				remoteUpdate.getStatus());
 	}
 }

@@ -47,16 +47,17 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.TagOpt;
@@ -70,7 +71,7 @@ import org.eclipse.jgit.transport.Transport;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-fetch.html"
  *      >Git documentation about Fetch</a>
  */
-public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
+public class FetchCommand extends GitCommand<FetchResult> {
 
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
@@ -85,6 +86,10 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	private boolean dryRun;
 
 	private boolean thin = Transport.DEFAULT_FETCH_THIN;
+
+	private int timeout;
+
+	private CredentialsProvider credentialsProvider;
 
 	private TagOpt tagOption;
 
@@ -120,11 +125,13 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			try {
 				transport.setCheckFetchedObjects(checkFetchedObjects);
 				transport.setRemoveDeletedRefs(removeDeletedRefs);
+				transport.setTimeout(timeout);
 				transport.setDryRun(dryRun);
 				if (tagOption != null)
 					transport.setTagOpt(tagOption);
 				transport.setFetchThin(thin);
-				configure(transport);
+				if (credentialsProvider != null)
+					transport.setCredentialsProvider(credentialsProvider);
 
 				FetchResult result = transport.fetch(monitor, refSpecs);
 				return result;
@@ -169,6 +176,17 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 */
 	public String getRemote() {
 		return remote;
+	}
+
+	/**
+	 * @param timeout
+	 *            the timeout used for the fetch operation
+	 * @return {@code this}
+	 */
+	public FetchCommand setTimeout(int timeout) {
+		checkCallable();
+		this.timeout = timeout;
+		return this;
 	}
 
 	/**
@@ -309,6 +327,18 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	public FetchCommand setThin(boolean thin) {
 		checkCallable();
 		this.thin = thin;
+		return this;
+	}
+
+	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return {@code this}
+	 */
+	public FetchCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
+		checkCallable();
+		this.credentialsProvider = credentialsProvider;
 		return this;
 	}
 

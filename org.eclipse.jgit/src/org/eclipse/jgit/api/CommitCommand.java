@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -63,10 +64,8 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -113,8 +112,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * and also all commits mentioned in .git/MERGE_HEAD
 	 */
 	private List<ObjectId> parents = new LinkedList<ObjectId>();
-
-	private String reflogComment;
 
 	/**
 	 * @param repo
@@ -220,18 +217,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						RevCommit revCommit = revWalk.parseCommit(commitId);
 						RefUpdate ru = repo.updateRef(Constants.HEAD);
 						ru.setNewObjectId(commitId);
-						if (reflogComment != null) {
-							ru.setRefLogMessage(reflogComment, false);
-						} else {
-							String prefix = amend ? "commit (amend): "
-									: "commit: ";
-							ru.setRefLogMessage(
-									prefix + revCommit.getShortMessage(), false);
-						}
-						if (headId != null)
-							ru.setExpectedOldObjectId(headId);
-						else
-							ru.setExpectedOldObjectId(ObjectId.zeroId());
+						String prefix = amend ? "commit (amend): " : "commit: ";
+						ru.setRefLogMessage(
+								prefix + revCommit.getShortMessage(), false);
+
+						ru.setExpectedOldObjectId(headId);
 						Result rc = ru.forceUpdate();
 						switch (rc) {
 						case NEW:
@@ -343,7 +333,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					long entryLength = fTree.getEntryLength();
 					dcEntry.setLength(entryLength);
 					dcEntry.setLastModified(fTree.getEntryLastModified());
-					dcEntry.setFileMode(fTree.getIndexFileMode(dcTree));
+					dcEntry.setFileMode(fTree.getEntryFileMode());
 
 					boolean objectExists = (dcTree != null && fTree
 							.idEqual(dcTree))
@@ -351,21 +341,17 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					if (objectExists) {
 						dcEntry.setObjectId(fTree.getEntryObjectId());
 					} else {
-						if (FileMode.GITLINK.equals(dcEntry.getFileMode()))
-							dcEntry.setObjectId(fTree.getEntryObjectId());
-						else {
-							// insert object
-							if (inserter == null)
-								inserter = repo.newObjectInserter();
-							long contentLength = fTree.getEntryContentLength();
-							InputStream inputStream = fTree.openEntryStream();
-							try {
-								dcEntry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, contentLength,
-										inputStream));
-							} finally {
-								inputStream.close();
-							}
+						// insert object
+						if (inserter == null)
+							inserter = repo.newObjectInserter();
+
+						InputStream inputStream = fTree.openEntryStream();
+						try {
+							dcEntry.setObjectId(inserter.insert(
+									Constants.OBJ_BLOB, entryLength,
+									inputStream));
+						} finally {
+							inputStream.close();
 						}
 					}
 
@@ -379,10 +365,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					// add to temporary in-core index
 					dcBuilder.add(dcEntry);
 
-					if (emptyCommit
-							&& (hTree == null || !hTree.idEqual(fTree) || hTree
-									.getEntryRawMode() != fTree
-									.getEntryRawMode()))
+					if (emptyCommit && (hTree == null || !hTree.idEqual(fTree)))
 						// this is a change
 						emptyCommit = false;
 				} else {
@@ -673,17 +656,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public CommitCommand setInsertChangeId(boolean insertChangeId) {
 		checkCallable();
 		this.insertChangeId = insertChangeId;
-		return this;
-	}
-
-	/**
-	 * Override the message written to the reflog
-	 *
-	 * @param reflogComment
-	 * @return {@code this}
-	 */
-	public CommitCommand setReflogComment(String reflogComment) {
-		this.reflogComment = reflogComment;
 		return this;
 	}
 
