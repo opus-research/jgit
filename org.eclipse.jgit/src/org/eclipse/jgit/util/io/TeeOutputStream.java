@@ -41,40 +41,51 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.util.io;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.transport.PackParser;
+/** Output stream that copies data written to another output stream. */
+public class TeeOutputStream extends OutputStream {
+	private final OutputStream dst1;
 
-final class DfsInserter extends ObjectInserter {
-	private final DfsObjDatabase db;
+	private final OutputStream dst2;
 
-	DfsInserter(DfsObjDatabase db) {
-		this.db = db;
+	/**
+	 * Initialize a tee output stream.
+	 *
+	 * @param dst1
+	 *            destination to write to first.
+	 * @param dst2
+	 *            destination to write to second.
+	 */
+	public TeeOutputStream(OutputStream dst1, OutputStream dst2) {
+		this.dst1 = dst1;
+		this.dst2 = dst2;
 	}
 
 	@Override
-	public ObjectId insert(int objectType, long length, InputStream in)
-			throws IOException {
-		throw new IOException("Single object insert not yet implemented");
+	public void write(byte[] buf, int pos, int len) throws IOException {
+		dst1.write(buf, pos, len);
+		dst2.write(buf, pos, len);
+	}
+
+	@Override
+	public void write(int val) throws IOException {
+		dst1.write(val);
+		dst2.write(val);
 	}
 
 	@Override
 	public void flush() throws IOException {
-		// TODO This is a no-op until insert() is implemented.
+		dst1.flush();
+		dst2.flush();
 	}
 
 	@Override
-	public PackParser newPackParser(InputStream in) throws IOException {
-		return new DfsPackParser(db, in);
-	}
-
-	@Override
-	public void release() {
-		// Nothing to clean up.
+	public void close() throws IOException {
+		dst1.close();
+		dst2.close();
 	}
 }

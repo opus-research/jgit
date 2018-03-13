@@ -80,6 +80,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
+import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -98,6 +99,7 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -155,6 +157,10 @@ public class PackWriter {
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
 
 	private Set<ObjectId> tagTargets = Collections.emptySet();
+
+	private PackIndex[] excludeInPacks;
+
+	private PackIndex excludeInPackLast;
 
 	private Deflater myDeflater;
 
@@ -425,6 +431,25 @@ public class PackWriter {
 	}
 
 	/**
+	 * Add a pack index whose contents should be excluded from the result.
+	 *
+	 * @param idx
+	 *            objects in this index will not be in the output pack.
+	 */
+	public void excludeObjects(PackIndex idx) {
+		if (excludeInPacks == null) {
+			excludeInPacks = new PackIndex[] { idx };
+			excludeInPackLast = idx;
+		} else {
+			int cnt = excludeInPacks.length;
+			PackIndex[] newList = new PackIndex[cnt + 1];
+			System.arraycopy(excludeInPacks, 0, newList, 0, cnt);
+			newList[cnt] = idx;
+			excludeInPacks = newList;
+		}
+	}
+
+	/**
 	 * Prepare the list of objects to be written to the pack stream.
 	 * <p>
 	 * Iterator <b>exactly</b> determines which objects are included in a pack
@@ -640,10 +665,24 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		if (reuseSupport != null && (
+		excludeInPacks = null;
+		excludeInPackLast = null;
+
+		boolean needSearchForReuse = reuseSupport != null && (
 				   reuseDeltas
 				|| config.isReuseObjects()
-				|| !cachedPacks.isEmpty()))
+				|| !cachedPacks.isEmpty());
+
+		if (compressMonitor instanceof BatchingProgressMonitor) {
+			long delay = 1000;
+			if (needSearchForReuse && config.isDeltaCompress())
+				delay = 500;
+			((BatchingProgressMonitor) compressMonitor).setDelayStart(
+					delay,
+					TimeUnit.MILLISECONDS);
+		}
+
+		if (needSearchForReuse)
 			searchForReuse(compressMonitor);
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
@@ -897,9 +936,9 @@ public class PackWriter {
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isReuseAsIs()) // already reusing a representation
-				continue;
 			if (otp.isDoNotDelta()) // delta is disabled for this path
+				continue;
+			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -1073,13 +1112,7 @@ public class PackWriter {
 		typeStats = stats.objectTypes[list.get(0).getType()];
 		long beginOffset = out.length();
 
-		if (list.get(0).getType() == Constants.OBJ_BLOB) {
-			for (ObjectToPack otp : list) {
-				if (otp.isWritten() || otp.getDeltaBase() != null)
-					continue;
-				writeObjectAndDeltaChildren(out, otp);
-			}
-		} else if (reuseSupport != null) {
+		if (reuseSupport != null) {
 			reuseSupport.writeObjects(out, list);
 		} else {
 			for (ObjectToPack otp : list)
@@ -1088,17 +1121,6 @@ public class PackWriter {
 
 		typeStats.bytes += out.length() - beginOffset;
 		typeStats.cntObjects = list.size();
-	}
-
-	private void writeObjectAndDeltaChildren(PackOutputStream out,
-			ObjectToPack otp) throws IOException {
-		writeObject(out, otp);
-
-		ObjectToPack child = otp.deltaChild;
-		while (child != null) {
-			writeObjectAndDeltaChildren(out, child);
-			child = child.deltaNext;
-		}
 	}
 
 	void writeObject(PackOutputStream out, ObjectToPack otp) throws IOException {
@@ -1384,6 +1406,8 @@ public class PackWriter {
 		BlockList<RevCommit> commits = new BlockList<RevCommit>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
+			if (exclude(c))
+				continue;
 			if (c.has(inCachedPack)) {
 				CachedPack pack = tipToPack.get(c);
 				if (includesAllTips(pack, include, walker)) {
@@ -1442,20 +1466,33 @@ public class PackWriter {
 		}
 		commits = null;
 
-		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
-				objectsMap, edgeObjects, reader);
-		RevObject o;
-		while ((o = walker.nextObject()) != null) {
-			if (o.has(RevFlag.UNINTERESTING))
-				continue;
+		if (thin && !baseTrees.isEmpty()) {
+			BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
+					objectsMap, edgeObjects, reader);
+			RevObject o;
+			while ((o = walker.nextObject()) != null) {
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
+				if (exclude(o))
+					continue;
 
-			int pathHash = walker.getPathHashCode();
-			byte[] pathBuf = walker.getPathBuffer();
-			int pathLen = walker.getPathLength();
-
-			bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-			addObject(o, pathHash);
-			countingMonitor.update(1);
+				int pathHash = walker.getPathHashCode();
+				byte[] pathBuf = walker.getPathBuffer();
+				int pathLen = walker.getPathLength();
+				bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
+				addObject(o, pathHash);
+				countingMonitor.update(1);
+			}
+		} else {
+			RevObject o;
+			while ((o = walker.nextObject()) != null) {
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
+				if (exclude(o))
+					continue;
+				addObject(o, walker.getPathHashCode());
+				countingMonitor.update(1);
+			}
 		}
 
 		for (CachedPack pack : cachedPacks)
@@ -1524,7 +1561,8 @@ public class PackWriter {
 	 */
 	public void addObject(final RevObject object)
 			throws IncorrectObjectTypeException {
-		addObject(object, 0);
+		if (!exclude(object))
+			addObject(object, 0);
 	}
 
 	private void addObject(final RevObject object, final int pathHashCode) {
@@ -1536,6 +1574,20 @@ public class PackWriter {
 		otp.setPathHash(pathHashCode);
 		objectsLists[object.getType()].add(otp);
 		objectsMap.add(otp);
+	}
+
+	private boolean exclude(AnyObjectId objectId) {
+		if (excludeInPacks == null)
+			return false;
+		if (excludeInPackLast.hasObject(objectId))
+			return true;
+		for (PackIndex idx : excludeInPacks) {
+			if (idx.hasObject(objectId)) {
+				excludeInPackLast = idx;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
