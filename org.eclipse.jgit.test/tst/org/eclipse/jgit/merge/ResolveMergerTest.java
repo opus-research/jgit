@@ -54,8 +54,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
@@ -696,6 +694,13 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		}
 	}
 
+
+	/**
+	 * Merging a change involving large binary files should short-circuit reads.
+	 *
+	 * @param strategy
+	 * @throws Exception
+	 */
 	@Theory
 	public void checkContentMergeLargeBinaries(MergeStrategy strategy) throws Exception {
 		Git git = Git.wrap(db);
@@ -714,7 +719,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		RevCommit first = git.commit().setMessage("added file").call();
 
 		// Generate an edit in a single line.
-        	int idx = LINELEN * 1200 + 1;
+		int idx = LINELEN * 1200 + 1;
 		byte save = binary[idx];
 		binary[idx] = '@';
 		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
@@ -738,6 +743,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				protected ObjectInserter delegate() {
 					return ins;
 				}
+
 				@Override
 				public ObjectReader newReader() {
 					return new BigReadForbiddenReader(super.newReader(), 8000);
@@ -752,42 +758,11 @@ public class ResolveMergerTest extends RepositoryTestCase {
 	}
 
 	/**
-	 * Delegation for ObjectLoader.
-	 */
-	abstract class ObjectLoaderFilter extends ObjectLoader {
-		protected abstract ObjectLoader delegate();
-
-		@Override
-		public int getType() {
-			return delegate().getType();
-		}
-
-		@Override
-		public long getSize() {
-			return delegate().getSize();
-		}
-
-		@Override
-		public boolean isLarge() {
-			return delegate().isLarge();
-		}
-
-		@Override
-		public byte[] getCachedBytes() {
-			return delegate().getCachedBytes();
-		}
-
-		@Override
-		public ObjectStream openStream() throws IOException {
-			return delegate().openStream();
-		}
-	}
-
-	/**
 	 * Throws an exception if reading beyond limit.
 	 */
 	class BigReadForbiddenStream extends ObjectStream.Filter {
 		int limit;
+
 		BigReadForbiddenStream(ObjectStream orig, int limit) {
 			super(orig.getType(), orig.getSize(), orig);
 			this.limit = limit;
@@ -806,7 +781,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		@Override
 		public int read() throws IOException {
 			int r = super.read();
-			limit --;
+			limit--;
 			if (limit < 0) {
 				throw new IllegalStateException();
 			}
@@ -841,7 +816,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		@Override
 		public ObjectLoader open(AnyObjectId objectId, int typeHint) throws IOException {
 			ObjectLoader orig = super.open(objectId, typeHint);
-			return new ObjectLoaderFilter() {
+			return new ObjectLoader.Filter() {
 				@Override
 				protected ObjectLoader delegate() {
 					return orig;

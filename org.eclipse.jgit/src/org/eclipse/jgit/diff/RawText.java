@@ -93,24 +93,7 @@ public class RawText extends Sequence {
 	 */
 	public RawText(final byte[] input) {
 		content = input;
-		IntList map;
-		try {
-			map = RawParseUtils.lineMap(content, 0, content.length);
-		} catch (BinaryBlobException e) {
-			map = new IntList(3);
-			map.add(Integer.MIN_VALUE);
-			map.add(0);
-			map.add(content.length);
-		}
-		lines = map;
-	}
-
-	/**
-	 * Construct a new RawText if the line map is already known.
-	 */
-	private RawText(final byte[] data, IntList lineMap) {
-		content = data;
-		lines = lineMap;
+		lines = RawParseUtils.lineMap(content, 0, content.length);
 	}
 
 	/**
@@ -328,6 +311,7 @@ public class RawText extends Sequence {
 	 * @since 4.10
 	 * @return the RawText representing the blob.
 	 * @throws BinaryBlobException if the blob contains binary data.
+	 * @throws IOException if the input could not be read.
 	 */
 	public static RawText load(ObjectLoader ldr, int threshold) throws IOException, BinaryBlobException {
 		long sz = ldr.getSize();
@@ -353,13 +337,15 @@ public class RawText extends Sequence {
 				if (n < 0) {
 					throw new EOFException();
 				}
-
 				left -= n;
-				off += n;
-			}
 
-			if (isBinary(head)) {
-				throw new BinaryBlobException();
+				while (n > 0) {
+					if (head[off] == '\0') {
+						throw new BinaryBlobException();
+					}
+					off++;
+					n--;
+				}
 			}
 
 			byte data[];
@@ -371,8 +357,7 @@ public class RawText extends Sequence {
 
 			System.arraycopy(head, 0, data, 0, head.length);
 			IO.readFully(stream, data, off, (int) (sz-off));
-			IntList lineMap = RawParseUtils.lineMap(data, 0, data.length);
-			return new RawText(data, lineMap);
+			return new RawText(data);
 		}
 	}
 }
