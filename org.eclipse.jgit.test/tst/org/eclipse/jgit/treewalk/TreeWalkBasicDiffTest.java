@@ -46,7 +46,9 @@ package org.eclipse.jgit.treewalk;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
 import static org.eclipse.jgit.lib.Constants.encode;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;

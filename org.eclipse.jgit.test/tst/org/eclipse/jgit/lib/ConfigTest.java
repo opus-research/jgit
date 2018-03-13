@@ -48,7 +48,13 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.text.MessageFormat;
 import java.util.Arrays;
@@ -128,7 +134,8 @@ public class ConfigTest {
 		final MockSystemReader mockSystemReader = new MockSystemReader();
 		SystemReader.setInstance(mockSystemReader);
 		final String hostname = mockSystemReader.getHostname();
-		final Config userGitConfig = mockSystemReader.openUserConfig(FS.DETECTED);
+		final Config userGitConfig = mockSystemReader.openUserConfig(null,
+				FS.DETECTED);
 		final Config localConfig = new Config(userGitConfig);
 		mockSystemReader.clearProperties();
 

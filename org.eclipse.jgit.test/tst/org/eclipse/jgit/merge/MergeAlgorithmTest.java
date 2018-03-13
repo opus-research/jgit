@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

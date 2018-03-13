@@ -43,9 +43,8 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import static org.junit.Assert.*;
-
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
+import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.util.LinkedList;

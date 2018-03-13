@@ -43,7 +43,9 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileTreeEntry;
