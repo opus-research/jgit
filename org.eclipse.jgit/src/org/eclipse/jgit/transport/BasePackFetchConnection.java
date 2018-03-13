@@ -199,12 +199,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	public static final String OPTION_ALLOW_REACHABLE_SHA1_IN_WANT = GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
 
-	/**
-	 * The client does not want blobs larger than the given size.
-	 * @since 4.10
-	 */
-	public static final String OPTION_BLOB_MAX_BYTES = GitProtocolConstants.OPTION_BLOB_MAX_BYTES;
-
 	private final RevWalk walk;
 
 	/** All commits that are immediately reachable by a local ref. */
@@ -245,9 +239,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private PacketLineOut pckState;
 
-	/** If not -1, the maximum blob size to be sent to the server. */
-	private final long blobMaxBytes;
-
 	/**
 	 * Create a new connection to fetch using the native git transport.
 	 *
@@ -265,7 +256,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		}
 		includeTags = transport.getTagOpt() != TagOpt.NO_TAGS;
 		thinPack = transport.isFetchThin();
-		blobMaxBytes = transport.getBlobMaxBytes();
 
 		if (local != null) {
 			walk = new RevWalk(local);
@@ -501,8 +491,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		}
 		if (first)
 			return false;
-		if (blobMaxBytes >= 0)
-			p.writeString(OPTION_BLOB_MAX_BYTES + " " + blobMaxBytes);
 		p.end();
 		outNeedsEnd = false;
 		return true;
@@ -541,10 +529,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			throw new PackProtocolException(uri, MessageFormat.format(
 					JGitText.get().statelessRPCRequiresOptionToBeEnabled,
 					OPTION_MULTI_ACK_DETAILED));
-		}
-
-		if (blobMaxBytes >= 0) {
-			wantCapability(line, OPTION_BLOB_MAX_BYTES);
 		}
 
 		addUserAgentCapability(line);
