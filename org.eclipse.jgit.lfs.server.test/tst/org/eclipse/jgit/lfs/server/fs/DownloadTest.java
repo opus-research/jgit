@@ -72,15 +72,14 @@ public class DownloadTest extends LfsServerTest {
 	public void testDownloadInvalidPathInfo()
 			throws ClientProtocolException, IOException {
 		String TEXT = "test";
-		String id = putContent(TEXT).name().substring(0, 60);
+		AnyLongObjectId id = putContent(TEXT);
 		Path f = Paths.get(getTempDirectory().toString(), "download");
 		try {
-			getContent(id, f);
+			getContent(id.name().substring(0, 60), f);
 			fail("expected RuntimeException");
 		} catch (RuntimeException e) {
-			String error = String.format(
-					"Invalid pathInfo '/%s' does not match '/{SHA-256}'", id);
-			assertEquals(formatErrorMessage(422, error), e.getMessage());
+			assertEquals("Status: 400 Bad Request",
+					e.getMessage());
 		}
 	}
 
@@ -88,14 +87,14 @@ public class DownloadTest extends LfsServerTest {
 	public void testDownloadInvalidId()
 			throws ClientProtocolException, IOException {
 		String TEXT = "test";
-		String id = putContent(TEXT).name().replace('f', 'z');
+		AnyLongObjectId id = putContent(TEXT);
 		Path f = Paths.get(getTempDirectory().toString(), "download");
 		try {
-			getContent(id, f);
+			getContent(id.name().replace('f', 'z'), f);
 			fail("expected RuntimeException");
 		} catch (RuntimeException e) {
-			String error = String.format("Invalid id: : %s", id);
-			assertEquals(formatErrorMessage(422, error), e.getMessage());
+			assertEquals("Status: 400 Bad Request",
+					e.getMessage());
 		}
 	}
 
@@ -109,8 +108,8 @@ public class DownloadTest extends LfsServerTest {
 			getContent(id, f);
 			fail("expected RuntimeException");
 		} catch (RuntimeException e) {
-			String error = String.format("Object '%s' not found", id.getName());
-			assertEquals(formatErrorMessage(404, error), e.getMessage());
+			assertEquals("Status: 404 Not Found",
+					e.getMessage());
 		}
 	}
 
@@ -129,11 +128,5 @@ public class DownloadTest extends LfsServerTest {
 		assertEquals(expectedLen, len);
 		FileUtils.delete(f.toFile(), FileUtils.RETRY);
 
-	}
-
-	@SuppressWarnings("boxing")
-	private String formatErrorMessage(int status, String message) {
-		return String.format("Status: %d {\n  \"message\": \"%s\"\n}", status,
-				message);
 	}
 }
