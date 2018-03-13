@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,29 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api.errors;
 
-package org.eclipse.jgit.transport;
+import java.text.MessageFormat;
+import java.util.List;
+
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.patch.FormatError;
 
 /**
- * Indicates UploadPack may not continue execution.
- *
- * @deprecated use {@link ServiceMayNotContinueException} instead.
+ * Exception thrown when applying a patch fails due to an invalid format
+ * 
+ * @since 2.0
+ * 
  */
-@Deprecated
-public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+public class PatchFormatException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
 
-	/** Initialize with no message. */
-	public UploadPackMayNotContinueException() {
-		// Do not set a message.
+	private List<FormatError> errors;
+
+	/**
+	 * @param errors
+	 */
+	public PatchFormatException(List<FormatError> errors) {
+		super(MessageFormat.format(JGitText.get().patchFormatException, errors));
+		this.errors = errors;
 	}
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * @return all the errors where unresolved conflicts have been detected
 	 */
-	public UploadPackMayNotContinueException(String msg) {
-		super(msg);
+	public List<FormatError> getErrors() {
+		return errors;
 	}
+
 }
