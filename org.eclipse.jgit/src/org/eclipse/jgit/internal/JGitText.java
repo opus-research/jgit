@@ -246,7 +246,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorEncodingFromFile;
 	/***/ public String errorInBase64CodeReadingStream;
 	/***/ public String errorInPackedRefs;
-	/***/ public String errorInvalidPushCert;
 	/***/ public String errorInvalidProtocolWantedOldNewRef;
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
