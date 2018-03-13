@@ -237,7 +237,7 @@ public class ReftableCompactor {
 	private void mergeRefs(MergedReftable mr) throws IOException {
 		try (RefCursor rc = mr.allRefs()) {
 			while (rc.next()) {
-				writer.writeRef(rc.getRef());
+				writer.writeRef(rc.getRef(), rc.getUpdateIndex());
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.ignore.internal;
+
+package org.eclipse.jgit.lib;
+
+import org.eclipse.jgit.errors.CorruptObjectException;
 
 /**
- * Wildmatch matcher for "double star" (<code>**</code>) pattern only. This
- * matcher matches any path.
+ * Verifies that a blob object is a valid object.
  * <p>
- * This class is immutable and thread safe.
+ * Unlike trees, commits and tags, there's no validity of blobs. Implementers
+ * can optionally implement this blob checker to reject certain blobs.
+ *
+ * @since 4.9
  */
-public final class WildMatcher extends AbstractMatcher {
+public interface BlobObjectChecker {
+	/** No-op implementation of {@link BlobObjectChecker}. */
+	public static final BlobObjectChecker NULL_CHECKER =
+			new BlobObjectChecker() {
+				@Override
+				public void update(byte[] in, int p, int len) {
+					// Empty implementation.
+				}
 
-	static final String WILDMATCH = "**"; //$NON-NLS-1$
+				@Override
+				public void endBlob(AnyObjectId id) {
+					// Empty implementation.
+				}
+			};
 
-	// double star for the beginning of pattern
-	static final String WILDMATCH2 = "/**"; //$NON-NLS-1$
+	/**
+	 * Check a new fragment of the blob.
+	 *
+	 * @param in
+	 *            input array of bytes.
+	 * @param offset
+	 *            offset to start at from {@code in}.
+	 * @param len
+	 *            length of the fragment to check.
+	 */
+	void update(byte[] in, int offset, int len);
 
-	static final WildMatcher INSTANCE = new WildMatcher();
-
-	private WildMatcher() {
-		super(WILDMATCH, false);
-	}
-
-	@Override
-	public final boolean matches(String path, boolean assumeDirectory,
-			boolean pathMatch) {
-		return true;
-	}
-
-	@Override
-	public final boolean matches(String segment, int startIncl, int endExcl,
-			boolean assumeDirectory) {
-		return true;
-	}
-
+	/**
+	 * Finalize the blob checking.
+	 *
+	 * @param id
+	 *            identity of the object being checked.
+	 * @throws CorruptObjectException
+	 *             if any error was detected.
+	 */
+	void endBlob(AnyObjectId id) throws CorruptObjectException;
 }
