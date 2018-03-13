@@ -125,7 +125,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			String refLogMessage = "checkout: moving from "
 					+ headRef.getTarget().getName();
 			ObjectId branch = repo.resolve(name);
-
+			Ref ref = repo.getRef(name);
 			if (branch == null)
 				throw new RefNotFoundException(MessageFormat.format(JGitText
 						.get().refNotResolved, name));
@@ -142,22 +142,11 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						.getConflicts());
 				throw e;
 			}
-			Ref ref;
-			if (name.startsWith(Constants.R_HEADS))
-				ref = repo.getRef(name);
-			else
-				ref = null;
-			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, ref == null);
+			RefUpdate refUpdate = repo.updateRef(Constants.HEAD);
 			refUpdate.setForceUpdate(force);
 			refUpdate.setRefLogMessage(refLogMessage + "to "
 					+ newCommit.getName(), false);
-			Result updateResult;
-			if (ref != null)
-				updateResult = refUpdate.link(ref.getName());
-			else {
-				refUpdate.setNewObjectId(newCommit);
-				updateResult = refUpdate.forceUpdate();
-			}
+			Result updateResult = refUpdate.link(ref.getName());
 
 			setCallable(false);
 
@@ -179,12 +168,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
+			Ref result = repo.getRef(name);
+
 			if (!dco.getToBeDeleted().isEmpty())
 				status = new CheckoutResult(Status.NONDELETED, dco
 						.getToBeDeleted());
 			else
 				status = CheckoutResult.OK_RESULT;
-			return ref;
+			return result;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		} finally {
