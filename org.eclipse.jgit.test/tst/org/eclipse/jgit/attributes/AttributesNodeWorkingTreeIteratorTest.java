@@ -226,7 +226,7 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		else {
 
 			Attributes entryAttributes = new Attributes();
-			attributesNode.getAttributes(new NullMacroExpander(), pathName,
+			attributesNode.getAttributes(pathName,
 					false, entryAttributes);
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
