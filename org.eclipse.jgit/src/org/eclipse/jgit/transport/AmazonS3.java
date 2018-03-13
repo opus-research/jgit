@@ -175,7 +175,7 @@ public class AmazonS3 {
 	private final String acl;
 
 	/** Maximum number of times to try an operation. */
-	final int maxAttempts;
+	private final int maxAttempts;
 
 	/** Encryption algorithm, may be a null instance that provides pass-through. */
 	private final WalkEncryption encryption;
@@ -483,7 +483,7 @@ public class AmazonS3 {
 		return encryption.encrypt(new DigestOutputStream(buffer, md5));
 	}
 
-	void putImpl(final String bucket, final String key,
+	private void putImpl(final String bucket, final String key,
 			final byte[] csum, final TemporaryBuffer buf,
 			ProgressMonitor monitor, String monitorTask) throws IOException {
 		if (monitor == null)
@@ -522,7 +522,7 @@ public class AmazonS3 {
 		throw maxAttempts(JGitText.get().s3ActionWriting, key);
 	}
 
-	IOException error(final String action, final String key,
+	private IOException error(final String action, final String key,
 			final HttpURLConnection c) throws IOException {
 		final IOException err = new IOException(MessageFormat.format(
 				JGitText.get().amazonS3ActionFailed, action, key,
@@ -547,7 +547,7 @@ public class AmazonS3 {
 		return err;
 	}
 
-	IOException maxAttempts(final String action, final String key) {
+	private IOException maxAttempts(final String action, final String key) {
 		return new IOException(MessageFormat.format(
 				JGitText.get().amazonS3ActionFailedGivingUp, action, key,
 				Integer.valueOf(maxAttempts)));
@@ -559,7 +559,7 @@ public class AmazonS3 {
 		return open(method, bucket, key, noArgs);
 	}
 
-	HttpURLConnection open(final String method, final String bucket,
+	private HttpURLConnection open(final String method, final String bucket,
 			final String key, final Map<String, String> args)
 			throws IOException {
 		final StringBuilder urlstr = new StringBuilder();
@@ -596,7 +596,7 @@ public class AmazonS3 {
 		return c;
 	}
 
-	void authorize(final HttpURLConnection c) throws IOException {
+	private void authorize(final HttpURLConnection c) throws IOException {
 		final Map<String, List<String>> reqHdr = c.getRequestProperties();
 		final SortedMap<String, String> sigHdr = new TreeMap<String, String>();
 		for (final Map.Entry<String, List<String>> entry : reqHdr.entrySet()) {
