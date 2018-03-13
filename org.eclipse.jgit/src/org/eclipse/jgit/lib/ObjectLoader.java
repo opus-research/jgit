@@ -166,7 +166,6 @@ public abstract class ObjectLoader {
 		if (isLarge()) {
 			ObjectStream in = openStream();
 			try {
-				final long sz = in.getSize();
 				byte[] tmp = new byte[1024];
 				long copied = 0;
 				for (;;) {
@@ -176,7 +175,7 @@ public abstract class ObjectLoader {
 					out.write(tmp, 0, n);
 					copied += n;
 				}
-				if (copied != sz)
+				if (copied != getSize())
 					throw new EOFException();
 			} finally {
 				in.close();
