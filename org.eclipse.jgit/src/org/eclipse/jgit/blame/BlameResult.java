@@ -290,10 +290,6 @@ public class BlameResult {
 		BlameGenerator gen = generator;
 		if (gen == null)
 			return;
-		if (start == 0 && end == resultContents.size()) {
-			computeAll();
-			return;
-		}
 
 		while (start < end) {
 			if (hasSourceData(start, end))
