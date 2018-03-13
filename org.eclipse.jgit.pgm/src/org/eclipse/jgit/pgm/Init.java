@@ -47,7 +47,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.File;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.api.Git;
@@ -69,7 +68,7 @@ class Init extends TextBuiltin {
 	protected void run() throws Exception {
 		InitCommand command = Git.init();
 		command.setBare(bare);
-		command.setDirectory(new File(gitdir));
+		command.setDirectory(gitdir);
 		Repository repository = command.call().getRepository();
 		out.println(MessageFormat.format(
 				CLIText.get().initializedEmptyGitRepositoryIn, repository
