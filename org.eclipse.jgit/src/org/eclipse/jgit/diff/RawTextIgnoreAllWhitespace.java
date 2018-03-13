@@ -45,6 +45,8 @@
 package org.eclipse.jgit.diff;
 
 import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
+import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
 /**
  * A version of {@link RawText} that ignores all whitespace.
@@ -106,20 +108,6 @@ public class RawTextIgnoreAllWhitespace extends RawText {
 		}
 
 		return ae - as == be - bs;
-	}
-
-	private static int trimTrailingWhitespace(byte[] raw, int start, int end) {
-		while (end > start && isWhitespace(raw[end - 1]))
-			end--;
-
-		return end;
-	}
-
-	private static int trimLeadingWhitespace(byte[] raw, int start, int end) {
-		while (start < end && isWhitespace(raw[start]))
-			start++;
-
-		return start;
 	}
 
 	@Override

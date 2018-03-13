@@ -68,4 +68,44 @@ public class RawCharUtil {
 	public static boolean isWhitespace(byte c) {
 		return WHITESPACE[c];
 	}
+
+	/**
+	 * Returns the new end point for the byte array passed in after trimming any
+	 * trailing whitespace characters, as determined by the isWhitespace()
+	 * function.
+	 *
+	 * @param raw
+	 *            the byte array containing the portion to trim whitespace for
+	 * @param start
+	 *            the start of the section of bytes
+	 * @param end
+	 *            the end of the section of bytes
+	 * @return the new end point
+	 */
+	public static int trimTrailingWhitespace(byte[] raw, int start, int end) {
+		while (end > start && isWhitespace(raw[end - 1]))
+			end--;
+
+		return end;
+	}
+
+	/**
+	 * Returns the new start point for the byte array passed in after trimming
+	 * any leading whitespace characters, as determined by the isWhitespace()
+	 * function.
+	 *
+	 * @param raw
+	 *            the byte array containing the portion to trim whitespace for
+	 * @param start
+	 *            the start of the section of bytes
+	 * @param end
+	 *            the end of the section of bytes
+	 * @return the new start point
+	 */
+	public static int trimLeadingWhitespace(byte[] raw, int start, int end) {
+		while (start < end && isWhitespace(raw[start]))
+			start++;
+
+		return start;
+	}
 }
