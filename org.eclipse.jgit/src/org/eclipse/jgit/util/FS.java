@@ -252,7 +252,4 @@ public abstract class FS {
 		}
 		return null;
 	}
-
-	/** @return the $prefix directory C Git would use. */
-	public abstract File gitPrefix();
 }
