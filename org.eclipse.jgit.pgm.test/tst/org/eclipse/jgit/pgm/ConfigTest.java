@@ -42,15 +42,13 @@
  */
 package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.Before;
 import org.junit.Test;
@@ -77,12 +75,8 @@ public class ConfigTest extends CLIRepositoryTestCase {
 		if (isMac)
 			expect.add("core.precomposeunicode=true");
 		expect.add("core.repositoryformatversion=0");
-		if (!FS.DETECTED.supportsSymlinks())
-			expect.add("core.symlinks=false");
 		expect.add(""); // ends with LF (last line empty)
-		assertEquals("expected default configuration",
-				Arrays.asList(expect.toArray()).toString(),
-				Arrays.asList(output).toString());
+		assertArrayEquals("expected default configuration", expect.toArray(),
+				output);
 	}
-
 }

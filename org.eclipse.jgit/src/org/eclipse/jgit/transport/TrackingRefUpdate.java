@@ -58,7 +58,6 @@ public class TrackingRefUpdate {
 	private ObjectId newObjectId;
 
 	private RefUpdate.Result result;
-	private ReceiveCommand cmd;
 
 	TrackingRefUpdate(
 			boolean canForceUpdate,
@@ -131,14 +130,8 @@ public class TrackingRefUpdate {
 		this.result = result;
 	}
 
-	/**
-	 * @return this update wrapped by a ReceiveCommand.
-	 * @since 3.4
-	 */
-	public ReceiveCommand asReceiveCommand() {
-		if (cmd == null)
-			cmd = new Command();
-		return cmd;
+	ReceiveCommand asReceiveCommand() {
+		return new Command();
 	}
 
 	final class Command extends ReceiveCommand {

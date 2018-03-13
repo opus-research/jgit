@@ -45,7 +45,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import java.util.Arrays;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
+import javaewah.EWAHCompressedBitmap;
 
 /**
  * A random access BitSet to supports efficient conversions to
