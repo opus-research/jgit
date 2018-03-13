@@ -246,6 +246,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				newHead = tryFastForward(commitToPick);
 				lastStepWasForward = newHead != null;
 				if (!lastStepWasForward)
+					// TODO if the content of this commit is already merged here
+					// we should skip this step in order to avoid confusing
+					// pseudo-changed
 					newHead = new Git(repo).cherryPick().include(commitToPick)
 							.call();
 				monitor.endTask();
