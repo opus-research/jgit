@@ -80,8 +80,9 @@ public class ListNotesCommand extends GitCommand<List<Note>> {
 	public List<Note> call() throws GitAPIException {
 		checkCallable();
 		List<Note> notes = new ArrayList<Note>();
+		RevWalk walk = new RevWalk(repo);
 		NoteMap map = NoteMap.newEmptyMap();
-		try (RevWalk walk = new RevWalk(repo)) {
+		try {
 			Ref ref = repo.getRef(notesRef);
 			// if we have a notes ref, use it
 			if (ref != null) {
@@ -94,6 +95,8 @@ public class ListNotesCommand extends GitCommand<List<Note>> {
 				notes.add(i.next());
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			walk.release();
 		}
 
 		return notes;

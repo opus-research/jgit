@@ -126,7 +126,8 @@ public class RevertCommand extends GitCommand<RevCommit> {
 		RevCommit newHead = null;
 		checkCallable();
 
-		try (RevWalk revWalk = new RevWalk(repo)) {
+		RevWalk revWalk = new RevWalk(repo);
+		try {
 
 			// get the head commit
 			Ref headRef = repo.getRef(Constants.HEAD);
@@ -181,11 +182,9 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					try (Git git = new Git(getRepository())) {
-						newHead = git.commit().setMessage(newMessage)
-								.setReflogComment("revert: " + shortMessage) //$NON-NLS-1$
-								.call();
-					}
+					newHead = new Git(getRepository()).commit()
+							.setMessage(newMessage)
+							.setReflogComment("revert: " + shortMessage).call(); //$NON-NLS-1$
 					revertedRefs.add(src);
 					headCommit = newHead;
 				} else {
@@ -221,6 +220,8 @@ public class RevertCommand extends GitCommand<RevCommit> {
 					MessageFormat.format(
 									JGitText.get().exceptionCaughtDuringExecutionOfRevertCommand,
 							e), e);
+		} finally {
+			revWalk.release();
 		}
 		return newHead;
 	}

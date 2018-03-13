@@ -114,14 +114,13 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 	private void checkoutCommit(RevCommit commit) throws IllegalStateException,
 			IOException {
-		RevCommit head;
-		try (RevWalk walk = new RevWalk(db)) {
-			head = walk.parseCommit(db.resolve(Constants.HEAD));
-			DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree(),
-					db.lockDirCache(), commit.getTree());
-			dco.setFailOnConflict(true);
-			dco.checkout();
-		}
+		RevWalk walk = new RevWalk(db);
+		RevCommit head = walk.parseCommit(db.resolve(Constants.HEAD));
+		DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree(), db
+				.lockDirCache(), commit.getTree());
+		dco.setFailOnConflict(true);
+		dco.checkout();
+		walk.release();
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD, true);
 		refUpdate.setNewObjectId(commit);
@@ -473,12 +472,11 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	}
 
 	private String readFile(String path, RevCommit commit) throws IOException {
-		try (TreeWalk walk = TreeWalk.forPath(db, path, commit.getTree())) {
-			ObjectLoader loader = db.open(walk.getObjectId(0),
-					Constants.OBJ_BLOB);
-			String result = RawParseUtils.decode(loader.getCachedBytes());
-			return result;
-		}
+		TreeWalk walk = TreeWalk.forPath(db, path, commit.getTree());
+		ObjectLoader loader = db.open(walk.getObjectId(0), Constants.OBJ_BLOB);
+		String result = RawParseUtils.decode(loader.getCachedBytes());
+		walk.release();
+		return result;
 	}
 
 	@Test
@@ -2075,11 +2073,14 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	private List<DiffEntry> diffWorkingAgainstHead(final RevCommit commit,
 			RevWalk revWalk)
 			throws IOException {
+		TreeWalk walk = createTreeWalk();
 		RevCommit parentCommit = revWalk.parseCommit(commit.getParent(0));
-		try (TreeWalk walk = createTreeWalk()) {
+		try {
 			walk.addTree(parentCommit.getTree());
 			walk.addTree(commit.getTree());
 			return DiffEntry.scan(walk);
+		} finally {
+			walk.release();
 		}
 	}
 

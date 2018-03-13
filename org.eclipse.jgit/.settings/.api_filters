@@ -1,37 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <component id="org.eclipse.jgit" version="2">
-    <resource path="src/org/eclipse/jgit/transport/PushCertificate.java" type="org.eclipse.jgit.transport.PushCertificate">
-        <filter comment="PushCertificate wasn't really usable in 4.0" id="338722907">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.transport.PushCertificate"/>
-                <message_argument value="PushCertificate()"/>
-            </message_arguments>
-        </filter>
-        <filter comment="PushCertificate wasn't really usable in 4.0" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.transport.PushCertificate"/>
-                <message_argument value="getCommandList()"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/transport/PushCertificateParser.java" type="org.eclipse.jgit.transport.PushCertificateParser">
-        <filter comment="PushCertificates haven't been really usable in 4.0" id="338849923">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.transport.PushCertificateParser"/>
-            </message_arguments>
-        </filter>
-    </resource>
     <resource path="src/org/eclipse/jgit/util/FileUtil.java" type="org.eclipse.jgit.util.FileUtil">
-        <filter id="338792546">
+        <filter comment="moved into another bundle keeping original package" id="1110441988">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.util.FileUtil"/>
-                <message_argument value="createSymLink(File, String)"/>
-            </message_arguments>
-        </filter>
-        <filter id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.util.FileUtil"/>
-                <message_argument value="readSymlink(File)"/>
             </message_arguments>
         </filter>
     </resource>

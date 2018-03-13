@@ -221,7 +221,6 @@ public class WindowCacheConfig {
 	 *
 	 * @since 3.0
 	 */
-	@SuppressWarnings("deprecation")
 	public void install() {
 		WindowCache.reconfigure(this);
 	}

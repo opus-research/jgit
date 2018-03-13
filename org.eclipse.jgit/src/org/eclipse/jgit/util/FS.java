@@ -53,13 +53,10 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
-import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -67,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -156,7 +154,7 @@ public abstract class FS {
 
 	private volatile Holder<File> userHome;
 
-	private volatile Holder<File> gitSystemConfig;
+	private volatile Holder<File> gitPrefix;
 
 	/**
 	 * Constructs a file system abstraction.
@@ -173,7 +171,7 @@ public abstract class FS {
 	 */
 	protected FS(FS src) {
 		userHome = src.userHome;
-		gitSystemConfig = src.gitSystemConfig;
+		gitPrefix = src.gitPrefix;
 	}
 
 	/** @return a new instance of the same type of FS. */
@@ -405,45 +403,49 @@ public abstract class FS {
 	 * @param command
 	 *            as component array
 	 * @param encoding
-	 *            to be used to parse the command's output
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
-		return readPipe(dir, command, encoding, null);
-	}
-
-	/**
-	 * Execute a command and return a single line of output as a String
-	 *
-	 * @param dir
-	 *            Working directory for the command
-	 * @param command
-	 *            as component array
-	 * @param encoding
-	 *            to be used to parse the command's output
-	 * @param env
-	 *            Map of environment variables to be merged with those of the
-	 *            current process
-	 * @return the one-line output of the command
-	 * @since 4.0
-	 */
-	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
 		try {
 			if (debug) {
 				LOG.debug("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
 			}
-			ProcessBuilder pb = new ProcessBuilder(command);
-			pb.directory(dir);
-			if (env != null) {
-				pb.environment().putAll(env);
-			}
-			Process p = pb.start();
-			BufferedReader lineRead = new BufferedReader(
+			final Process p = Runtime.getRuntime().exec(command, null, dir);
+			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
-			GobblerThread gobbler = new GobblerThread(p, command, dir);
+			final AtomicBoolean gooblerFail = new AtomicBoolean(false);
+			Thread gobbler = new Thread() {
+				public void run() {
+					InputStream is = p.getErrorStream();
+					try {
+						int ch;
+						if (debug)
+							while ((ch = is.read()) != -1)
+								System.err.print((char) ch);
+						else
+							while (is.read() != -1) {
+								// ignore
+							}
+					} catch (IOException e) {
+						// Just print on stderr for debugging
+						if (debug)
+							e.printStackTrace(System.err);
+						gooblerFail.set(true);
+					}
+					try {
+						is.close();
+					} catch (IOException e) {
+						// Just print on stderr for debugging
+						if (debug) {
+							LOG.debug("Caught exception in gobbler thread", e); //$NON-NLS-1$
+						}
+						gooblerFail.set(true);
+					}
+				}
+			};
 			gobbler.start();
 			String r = null;
 			try {
@@ -468,7 +470,7 @@ public abstract class FS {
 					int rc = p.waitFor();
 					gobbler.join();
 					if (rc == 0 && r != null && r.length() > 0
-							&& !gobbler.fail.get())
+							&& !gooblerFail.get())
 						return r;
 					if (debug) {
 						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
@@ -487,130 +489,34 @@ public abstract class FS {
 		return null;
 	}
 
-	private static class GobblerThread extends Thread {
-		private final Process p;
-		private final String desc;
-		private final String dir;
-		private final boolean debug = LOG.isDebugEnabled();
-		private final AtomicBoolean fail = new AtomicBoolean();
-
-		private GobblerThread(Process p, String[] command, File dir) {
-			this.p = p;
-			if (debug) {
-				this.desc = Arrays.asList(command).toString();
-				this.dir = dir.toString();
-			} else {
-				this.desc = null;
-				this.dir = null;
-			}
+	/** @return the $prefix directory C Git would use. */
+	public File gitPrefix() {
+		Holder<File> p = gitPrefix;
+		if (p == null) {
+			String overrideGitPrefix = SystemReader.getInstance().getProperty(
+					"jgit.gitprefix"); //$NON-NLS-1$
+			if (overrideGitPrefix != null)
+				p = new Holder<File>(new File(overrideGitPrefix));
+			else
+				p = new Holder<File>(discoverGitPrefix());
+			gitPrefix = p;
 		}
-
-		public void run() {
-			InputStream is = p.getErrorStream();
-			try {
-				int ch;
-				if (debug) {
-					while ((ch = is.read()) != -1) {
-						System.err.print((char) ch);
-					}
-				} else {
-					while (is.read() != -1) {
-						// ignore
-					}
-				}
-			} catch (IOException e) {
-				logError(e);
-				fail.set(true);
-			}
-			try {
-				is.close();
-			} catch (IOException e) {
-				logError(e);
-				fail.set(true);
-			}
-		}
-
-		private void logError(Throwable t) {
-			if (!debug) {
-				return;
-			}
-			String msg = MessageFormat.format(
-					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
-			LOG.debug(msg, t);
-		}
+		return p.value;
 	}
 
-	/**
-	 * @return the path to the Git executable or {@code null} if it cannot be
-	 *         determined.
-	 * @since 4.0
-	 */
-	protected abstract File discoverGitExe();
+	/** @return the $prefix directory C Git would use. */
+	protected abstract File discoverGitPrefix();
 
 	/**
-	 * @return the path to the system-wide Git configuration file or
-	 *         {@code null} if it cannot be determined.
-	 * @since 4.0
-	 */
-	protected File discoverGitSystemConfig() {
-		File gitExe = discoverGitExe();
-		if (gitExe == null) {
-			return null;
-		}
-
-		// Trick Git into printing the path to the config file by using "echo"
-		// as the editor.
-		Map<String, String> env = new HashMap<>();
-		env.put("GIT_EDITOR", "echo"); //$NON-NLS-1$ //$NON-NLS-2$
-
-		String w = readPipe(gitExe.getParentFile(),
-				new String[] { "git", "config", "--system", "--edit" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-				Charset.defaultCharset().name(), env);
-		if (StringUtils.isEmptyOrNull(w)) {
-			return null;
-		}
-
-		return new File(w);
-	}
-
-	/**
-	 * @return the currently used path to the system-wide Git configuration
-	 *         file or {@code null} if none has been set.
-	 * @since 4.0
-	 */
-	public File getGitSystemConfig() {
-		if (gitSystemConfig == null) {
-			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
-		}
-		return gitSystemConfig.value;
-	}
-
-	/**
-	 * Set the path to the system-wide Git configuration file to use.
+	 * Set the $prefix directory C Git uses.
 	 *
-	 * @param configFile
-	 *            the path to the config file.
+	 * @param path
+	 *            the directory. Null if C Git is not installed.
 	 * @return {@code this}
-	 * @since 4.0
 	 */
-	public FS setGitSystemConfig(File configFile) {
-		gitSystemConfig = new Holder<File>(configFile);
+	public FS setGitPrefix(File path) {
+		gitPrefix = new Holder<File>(path);
 		return this;
-	}
-
-	/**
-	 * @param grandchild
-	 * @return the parent directory of this file's parent directory or
-	 *         {@code null} in case there's no grandparent directory
-	 * @since 4.0
-	 */
-	protected static File resolveGrandparentFile(File grandchild) {
-		if (grandchild != null) {
-			File parent = grandchild.getParentFile();
-			if (parent != null)
-				return parent.getParentFile();
-		}
-		return null;
 	}
 
 	/**
@@ -622,7 +528,8 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
-		return FileUtils.readSymLink(path);
+		throw new SymlinksNotSupportedException(
+				JGitText.get().errorSymlinksNotSupported);
 	}
 
 	/**
@@ -693,7 +600,7 @@ public abstract class FS {
 	public void setHidden(File path, boolean hidden) throws IOException {
 		if (!path.getName().startsWith(".")) //$NON-NLS-1$
 			throw new IllegalArgumentException(
-					JGitText.get().hiddenFilesStartWithDot);
+					"Hiding only allowed for names that start with a period");
 	}
 
 	/**
@@ -705,7 +612,8 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
-		FileUtils.createSymLink(path, target);
+		throw new SymlinksNotSupportedException(
+				JGitText.get().errorSymlinksNotSupported);
 	}
 
 	/**
@@ -863,10 +771,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public File findHook(Repository repository, final String hookName) {
-		File gitDir = repository.getDirectory();
-		if (gitDir == null)
-			return null;
-		final File hookFile = new File(new File(gitDir,
+		final File hookFile = new File(new File(repository.getDirectory(),
 				Constants.HOOKS), hookName);
 		return hookFile.isFile() ? hookFile : null;
 	}
@@ -996,7 +901,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Initialize a ProcessBuilder to run a command using the system shell.
+	 * Initialize a ProcesssBuilder to run a command using the system shell.
 	 *
 	 * @param cmd
 	 *            command to execute. This string should originate from the
@@ -1067,28 +972,28 @@ public abstract class FS {
 			return lastModifiedTime;
 		}
 
-		private final boolean isDirectory;
+		private boolean isDirectory;
 
-		private final boolean isSymbolicLink;
+		private boolean isSymbolicLink;
 
-		private final boolean isRegularFile;
+		private boolean isRegularFile;
 
-		private final long creationTime;
+		private long creationTime;
 
-		private final long lastModifiedTime;
+		private long lastModifiedTime;
 
-		private final boolean isExecutable;
+		private boolean isExecutable;
 
-		private final File file;
+		private File file;
 
-		private final boolean exists;
+		private boolean exists;
 
 		/**
 		 * file length
 		 */
 		protected long length = -1;
 
-		final FS fs;
+		FS fs;
 
 		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
 				boolean isExecutable, boolean isSymbolicLink,
@@ -1107,14 +1012,14 @@ public abstract class FS {
 		}
 
 		/**
-		 * Constructor when there are issues with reading. All attributes except
-		 * given will be set to the default values.
+		 * Constructor when there are issues with reading
 		 *
 		 * @param fs
 		 * @param path
 		 */
 		public Attributes(File path, FS fs) {
-			this(fs, path, false, false, false, false, false, 0L, 0L, 0L);
+			this.file = path;
+			this.fs = fs;
 		}
 
 		/**
