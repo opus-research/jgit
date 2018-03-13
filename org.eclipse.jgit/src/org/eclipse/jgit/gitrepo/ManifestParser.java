@@ -60,8 +60,6 @@ import java.util.Set;
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
-import org.eclipse.jgit.gitrepo.RepoProject.LinkFile;
-import org.eclipse.jgit.gitrepo.RepoProject.ReferenceFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
@@ -80,7 +78,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
  */
 public class ManifestParser extends DefaultHandler {
 	private final String filename;
-	private final String baseUrl;
+	private final URI baseUrl;
 	private final String defaultBranch;
 	private final Repository rootRepo;
 	private final Map<String, Remote> remotes;
@@ -128,11 +126,11 @@ public class ManifestParser extends DefaultHandler {
 		this.defaultBranch = defaultBranch;
 		this.rootRepo = rootRepo;
 
-		// Strip trailing /s to match repo behavior.
-		int lastIndex = baseUrl.length() - 1;
-		while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-			lastIndex--;
-		this.baseUrl = baseUrl.substring(0, lastIndex + 1);
+		// Strip trailing '/' to match repo behavior.
+		while (baseUrl.endsWith("/")) { //$NON-NLS-1$
+			baseUrl = baseUrl.substring(0, baseUrl.length()-1);
+		}
+		this.baseUrl = URI.create(baseUrl);
 
 		plusGroups = new HashSet<>();
 		minusGroups = new HashSet<>();
@@ -216,15 +214,6 @@ public class ManifestParser extends DefaultHandler {
 						currentProject.getPath(),
 						attributes.getValue("src"), //$NON-NLS-1$
 						attributes.getValue("dest"))); //$NON-NLS-1$
-		} else if ("linkfile".equals(qName)) { //$NON-NLS-1$
-			if (currentProject == null) {
-				throw new SAXException(RepoText.get().invalidManifest);
-			}
-			currentProject.addLinkFile(new LinkFile(
-						rootRepo,
-						currentProject.getPath(),
-						attributes.getValue("src"), //$NON-NLS-1$
-						attributes.getValue("dest"))); //$NON-NLS-1$
 		} else if ("include".equals(qName)) { //$NON-NLS-1$
 			String name = attributes.getValue("name"); //$NON-NLS-1$
 			if (includedReader != null) {
@@ -270,12 +259,6 @@ public class ManifestParser extends DefaultHandler {
 
 		// Only do the following after we finished reading everything.
 		Map<String, String> remoteUrls = new HashMap<>();
-		URI baseUri;
-		try {
-			baseUri = new URI(baseUrl);
-		} catch (URISyntaxException e) {
-			throw new SAXException(e);
-		}
 		if (defaultRevision == null && defaultRemote != null) {
 			Remote remote = remotes.get(defaultRemote);
 			if (remote != null) {
@@ -307,8 +290,7 @@ public class ManifestParser extends DefaultHandler {
 			}
 			String remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				remoteUrl =
-						baseUri.resolve(remotes.get(remote).fetch).toString();
+				remoteUrl = baseUrl.resolve(remotes.get(remote).fetch).toString();
 				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
 					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
 				remoteUrls.put(remote, remoteUrl);
@@ -362,23 +344,17 @@ public class ManifestParser extends DefaultHandler {
 			else
 				last = p;
 		}
-		removeNestedCopyAndLinkfiles();
+		removeNestedCopyfiles();
 	}
 
-	private void removeNestedCopyAndLinkfiles() {
+	/** Remove copyfiles that sit in a subdirectory of any other project. */
+	void removeNestedCopyfiles() {
 		for (RepoProject proj : filteredProjects) {
 			List<CopyFile> copyfiles = new ArrayList<>(proj.getCopyFiles());
 			proj.clearCopyFiles();
 			for (CopyFile copyfile : copyfiles) {
-				if (!isNestedReferencefile(copyfile)) {
+				if (!isNestedCopyfile(copyfile)) {
 					proj.addCopyFile(copyfile);
-				}
-			}
-			List<LinkFile> linkfiles = new ArrayList<>(proj.getLinkFiles());
-			proj.clearLinkFiles();
-			for (LinkFile linkfile : linkfiles) {
-				if (!isNestedReferencefile(linkfile)) {
-					proj.addLinkFile(linkfile);
 				}
 			}
 		}
@@ -402,18 +378,18 @@ public class ManifestParser extends DefaultHandler {
 		return false;
 	}
 
-	private boolean isNestedReferencefile(ReferenceFile referencefile) {
-		if (referencefile.dest.indexOf('/') == -1) {
-			// If the referencefile is at root level then it won't be nested.
+	private boolean isNestedCopyfile(CopyFile copyfile) {
+		if (copyfile.dest.indexOf('/') == -1) {
+			// If the copyfile is at root level then it won't be nested.
 			return false;
 		}
 		for (RepoProject proj : filteredProjects) {
-			if (proj.getPath().compareTo(referencefile.dest) > 0) {
+			if (proj.getPath().compareTo(copyfile.dest) > 0) {
 				// Early return as remaining projects can't be ancestor of this
-				// referencefile config (filteredProjects is sorted).
+				// copyfile config (filteredProjects is sorted).
 				return false;
 			}
-			if (proj.isAncestorOf(referencefile.dest)) {
+			if (proj.isAncestorOf(copyfile.dest)) {
 				return true;
 			}
 		}
