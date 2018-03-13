@@ -79,6 +79,7 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
@@ -227,23 +228,28 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void checkout() throws NoWorkTreeException, IOException {
-		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
-				.entrySet()) {
-			File f = new File(db.getWorkTree(), entry.getKey());
-			createDir(f.getParentFile());
-			DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), reader);
-			modifiedFiles.add(entry.getKey());
-		}
-		// Iterate in reverse so that "folder/file" is deleted before
-		// "folder". Otherwise this could result in a failing path because
-		// of a non-empty directory, for which delete() would fail.
-		for (int i = toBeDeleted.size() - 1; i >= 0; i--) {
-			String fileName = toBeDeleted.get(i);
-			File f = new File(db.getWorkTree(), fileName);
-			if (!f.delete())
-				failingPaths.put(fileName,
-						MergeFailureReason.COULD_NOT_DELETE);
-			modifiedFiles.add(fileName);
+		ObjectReader r = db.getObjectDatabase().newReader();
+		try {
+			for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
+					.entrySet()) {
+				File f = new File(db.getWorkTree(), entry.getKey());
+				createDir(f.getParentFile());
+				DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), r);
+				modifiedFiles.add(entry.getKey());
+			}
+			// Iterate in reverse so that "folder/file" is deleted before
+			// "folder". Otherwise this could result in a failing path because
+			// of a non-empty directory, for which delete() would fail.
+			for (int i = toBeDeleted.size() - 1; i >= 0; i--) {
+				String fileName = toBeDeleted.get(i);
+				File f = new File(db.getWorkTree(), fileName);
+				if (!f.delete())
+					failingPaths.put(fileName,
+							MergeFailureReason.COULD_NOT_DELETE);
+				modifiedFiles.add(fileName);
+			}
+		} finally {
+			r.release();
 		}
 	}
 
@@ -278,6 +284,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 
 		DirCache dc = db.readDirCache();
+		ObjectReader or = db.getObjectDatabase().newReader();
 		Iterator<String> mpathsIt=modifiedFiles.iterator();
 		while(mpathsIt.hasNext()) {
 			String mpath=mpathsIt.next();
@@ -287,7 +294,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			FileOutputStream fos = new FileOutputStream(new File(
 					db.getWorkTree(), mpath));
 			try {
-				reader.open(entry.getObjectId()).copyTo(fos);
+				or.open(entry.getObjectId()).copyTo(fos);
 			} finally {
 				fos.close();
 			}

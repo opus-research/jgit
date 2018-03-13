@@ -136,9 +136,7 @@ public class RenameDetector {
 	 *            the repository to use for rename detection
 	 */
 	public RenameDetector(Repository repo) {
-		objectReader = repo.newObjectReader();
-		renameLimit = repo.getConfig().get(DiffConfig.KEY).getRenameLimit();
-		reset();
+		this(repo.newObjectReader(), repo.getConfig().get(DiffConfig.KEY));
 	}
 
 	/**
@@ -148,6 +146,7 @@ public class RenameDetector {
 	 *            reader to obtain objects from the repository with.
 	 * @param cfg
 	 *            diff config specifying rename detection options.
+	 * @since 3.0
 	 */
 	public RenameDetector(ObjectReader reader, DiffConfig cfg) {
 		objectReader = reader.newReader();

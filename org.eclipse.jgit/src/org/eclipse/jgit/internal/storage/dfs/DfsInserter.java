@@ -45,6 +45,8 @@ package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
+import static org.eclipse.jgit.lib.Constants.OBJ_OFS_DELTA;
+import static org.eclipse.jgit.lib.Constants.OBJ_REF_DELTA;
 
 import java.io.BufferedInputStream;
 import java.io.EOFException;
@@ -426,19 +428,11 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private class Reader extends ObjectReader {
-		private boolean avoidUnreachable;
 		private ObjectReader delegate;
 
 		@Override
 		public ObjectReader newReader() {
-			ObjectReader r = db.newReader();
-			r.setAvoidUnreachableObjects(avoidUnreachable);
-			return r;
-		}
-
-		@Override
-		public void setAvoidUnreachableObjects(boolean avoid) {
-			avoidUnreachable = avoid;
+			return db.newReader();
 		}
 
 		@Override
@@ -499,11 +493,11 @@ public class DfsInserter extends ObjectInserter {
 			if (c < 0)
 					throw new IllegalStateException(DfsText.get().unexpectedEofInPack);
 			type = (c >> 4) & 7;
-			if (type == Constants.OBJ_OFS_DELTA || type == Constants.OBJ_REF_DELTA)
+			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
 				throw new IllegalStateException(MessageFormat.format(
 						DfsText.get().readBackDelta, Integer.toString(type)));
 
-			long sz = c & 15;
+			long sz = c & 0x0f;
 			int shift = 4;
 			while ((c & 0x80) != 0) {
 				c = in.read();
@@ -523,6 +517,11 @@ public class DfsInserter extends ObjectInserter {
 		@Override
 		public long getSize() {
 			return size;
+		}
+
+		@Override
+		public boolean isLarge() {
+			return true;
 		}
 
 		@Override
