@@ -43,9 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -61,11 +58,9 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
 
 public class AddCommandTest extends RepositoryTestCase {
 
-	@Test
 	public void testAddNothing() {
 		Git git = new Git(db);
 
@@ -78,7 +73,6 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testAddNonExistingSingleFile() throws NoFilepatternException {
 		Git git = new Git(db);
 
@@ -87,7 +81,6 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testAddExistingSingleFile() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		file.createNewFile();
@@ -104,11 +97,10 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddExistingSingleFileInSubDir() throws IOException, NoFilepatternException {
-		new File(db.getWorkTree(), "sub").mkdir();
+		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		assertTrue(file.createNewFile());
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
@@ -122,7 +114,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddExistingSingleFileTwice() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		file.createNewFile();
@@ -146,7 +137,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddExistingSingleFileTwiceWithCommit() throws Exception {
 		File file = new File(db.getWorkTree(), "a.txt");
 		file.createNewFile();
@@ -172,7 +162,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddRemovedFile() throws Exception {
 		File file = new File(db.getWorkTree(), "a.txt");
 		file.createNewFile();
@@ -194,7 +183,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddRemovedCommittedFile() throws Exception {
 		File file = new File(db.getWorkTree(), "a.txt");
 		file.createNewFile();
@@ -218,7 +206,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddWithConflicts() throws Exception {
 		// prepare conflict
 
@@ -272,7 +259,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddTwoFiles() throws Exception  {
 		File file = new File(db.getWorkTree(), "a.txt");
 		file.createNewFile();
@@ -294,17 +280,16 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddFolder() throws Exception  {
-		new File(db.getWorkTree(), "sub").mkdir();
+		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		assertTrue(file.createNewFile());
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		assertTrue(file2.createNewFile());
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -317,23 +302,22 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddIgnoredFile() throws Exception  {
-		new File(db.getWorkTree(), "sub").mkdir();
+		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		assertTrue(file.createNewFile());
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File ignoreFile = new File(db.getWorkTree(), ".gitignore");
-		ignoreFile.createNewFile();
+		assertTrue(ignoreFile.createNewFile());
 		writer = new PrintWriter(ignoreFile);
 		writer.print("sub/b.txt");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		assertTrue(file2.createNewFile());
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -346,17 +330,16 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAddWholeRepo() throws Exception  {
-		new File(db.getWorkTree(), "sub").mkdir();
+		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
 		File file = new File(db.getWorkTree(), "sub/a.txt");
-		file.createNewFile();
+		assertTrue(file.createNewFile());
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();
 
 		File file2 = new File(db.getWorkTree(), "sub/b.txt");
-		file2.createNewFile();
+		assertTrue(file2.createNewFile());
 		writer = new PrintWriter(file2);
 		writer.print("content b");
 		writer.close();
@@ -373,9 +356,8 @@ public class AddCommandTest extends RepositoryTestCase {
 	// file a exists in workdir and in index -> added
 	// file b exists not in workdir but in index -> unchanged
 	// file c exists in workdir but not in index -> added
-	@Test
 	public void testAddWithoutParameterUpdate() throws Exception {
-		new File(db.getWorkTree(), "sub").mkdir();
+		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		file.createNewFile();
 		PrintWriter writer = new PrintWriter(file);
@@ -427,9 +409,8 @@ public class AddCommandTest extends RepositoryTestCase {
 	// file a exists in workdir and in index -> added
 	// file b exists not in workdir but in index -> deleted
 	// file c exists in workdir but not in index -> unchanged
-	@Test
 	public void testAddWithParameterUpdate() throws Exception {
-		new File(db.getWorkTree(), "sub").mkdir();
+		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		file.createNewFile();
 		PrintWriter writer = new PrintWriter(file);
@@ -476,7 +457,6 @@ public class AddCommandTest extends RepositoryTestCase {
 				indexState(CONTENT));
 	}
 
-	@Test
 	public void testAssumeUnchanged() throws Exception {
 		Git git = new Git(db);
 		String path = "a.txt";

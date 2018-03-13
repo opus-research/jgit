@@ -43,19 +43,12 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class ThreadSafeProgressMonitorTest {
-	@Test
+public class ThreadSafeProgressMonitorTest extends TestCase {
 	public void testFailsMethodsOnBackgroundThread()
 			throws InterruptedException {
 		final MockProgressMonitor mock = new MockProgressMonitor();
@@ -91,7 +84,6 @@ public class ThreadSafeProgressMonitorTest {
 		assertEquals(0, mock.value);
 	}
 
-	@Test
 	public void testMethodsOkOnMainThread() {
 		final MockProgressMonitor mock = new MockProgressMonitor();
 		final ThreadSafeProgressMonitor pm = new ThreadSafeProgressMonitor(mock);
@@ -114,7 +106,6 @@ public class ThreadSafeProgressMonitorTest {
 		assertEquals(0, mock.value);
 	}
 
-	@Test
 	public void testUpdateOnBackgroundThreads() throws InterruptedException {
 		final MockProgressMonitor mock = new MockProgressMonitor();
 		final ThreadSafeProgressMonitor pm = new ThreadSafeProgressMonitor(mock);

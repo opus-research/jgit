@@ -42,19 +42,15 @@
  */
 package org.eclipse.jgit.ignore;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import org.junit.Test;
+import junit.framework.Assert;
+import junit.framework.TestCase;
 
 
 /**
  * Tests ignore pattern matches
  */
-public class IgnoreMatcherTest {
+public class IgnoreMatcherTest  extends TestCase{
 
-	@Test
 	public void testBasic() {
 		String pattern = "/test.stp";
 		assertMatched(pattern, "/test.stp");
@@ -63,7 +59,6 @@ public class IgnoreMatcherTest {
 		assertNotMatched(pattern, "/test.stp");
 	}
 
-	@Test
 	public void testFileNameWildcards() {
 		//Test basic * and ? for any pattern + any character
 		String pattern = "*.st?";
@@ -123,7 +118,6 @@ public class IgnoreMatcherTest {
 		assertNotMatched(pattern, "/src/new.c");
 	}
 
-	@Test
 	public void testTargetWithoutLeadingSlash() {
 		//Test basic * and ? for any pattern + any character
 		String pattern = "/*.st?";
@@ -183,7 +177,6 @@ public class IgnoreMatcherTest {
 		assertNotMatched(pattern, "src/new.c");
 	}
 
-	@Test
 	public void testParentDirectoryGitIgnores() {
 		//Contains git ignore patterns such as might be seen in a parent directory
 
@@ -217,7 +210,6 @@ public class IgnoreMatcherTest {
 		assertNotMatched(pattern, "/src/new/a/file.c");
 	}
 
-	@Test
 	public void testTrailingSlash() {
 		String pattern = "/src/";
 		assertMatched(pattern, "/src/");
@@ -228,7 +220,6 @@ public class IgnoreMatcherTest {
 		assertNotMatched(pattern, "/srcA/");
 	}
 
-	@Test
 	public void testNameOnlyMatches() {
 		/*
 		 * Name-only matches do not contain any path separators
@@ -242,21 +233,11 @@ public class IgnoreMatcherTest {
 
 		//Test matches for name-only, applies to file name or folder name
 		pattern = "src";
-		assertMatched(pattern, "/src");
-		assertMatched(pattern, "/src/");
 		assertMatched(pattern, "/src/a.c");
 		assertMatched(pattern, "/src/new/a.c");
 		assertMatched(pattern, "/new/src/a.c");
 		assertMatched(pattern, "/file/src");
-
-		//Test matches for name-only, applies only to folder names
-		pattern = "src/";
 		assertMatched(pattern, "/src/");
-		assertMatched(pattern, "/src/a.c");
-		assertMatched(pattern, "/src/new/a.c");
-		assertMatched(pattern, "/new/src/a.c");
-		assertNotMatched(pattern, "/src");
-		assertNotMatched(pattern, "/file/src");
 
 		//Test matches for name-only, applies to file name or folder name
 		//With a small wildcard
@@ -289,13 +270,11 @@ public class IgnoreMatcherTest {
 		assertNotMatched(pattern, "/cr3");
 	}
 
-	@Test
 	public void testNegation() {
 		String pattern = "!/test.stp";
 		assertMatched(pattern, "/test.stp");
 	}
 
-	@Test
 	public void testGetters() {
 		IgnoreRule r = new IgnoreRule("/pattern/");
 		assertFalse(r.getNameOnly());
@@ -350,8 +329,7 @@ public class IgnoreMatcherTest {
 	 */
 	public void assertMatched(String pattern, String target) {
 		boolean value = match(pattern, target);
-		assertTrue("Expected a match for: " + pattern + " with: " + target,
-				value);
+		Assert.assertTrue("Expected a match for: " + pattern + " with: " + target, value);
 	}
 
 	/**
@@ -364,8 +342,7 @@ public class IgnoreMatcherTest {
 	 */
 	public void assertNotMatched(String pattern, String target) {
 		boolean value = match(pattern, target);
-		assertFalse("Expected no match for: " + pattern + " with: " + target,
-				value);
+		Assert.assertFalse("Expected no match for: " + pattern + " with: " + target, value);
 	}
 
 	/**

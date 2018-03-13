@@ -44,11 +44,6 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -58,8 +53,6 @@ import java.lang.reflect.Method;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.GitIndex.Entry;
 import org.eclipse.jgit.util.FS;
-import org.junit.Before;
-import org.junit.Test;
 
 public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 
@@ -120,14 +113,12 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 	private File trash;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
 		trash = db.getWorkTree();
 	}
 
-	@Test
 	public void testCreateEmptyIndex() throws Exception {
 		GitIndex index = new GitIndex(db);
 		index.write();
@@ -139,14 +130,12 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 		assertEquals(0, indexr.getMembers().length);
 	}
 
-	@Test
 	public void testReadWithNoIndex() throws Exception {
 		GitIndex index = new GitIndex(db);
 		index.read();
 		assertEquals(0, index.getMembers().length);
 	}
 
-	@Test
 	public void testCreateSimpleSortTestIndex() throws Exception {
 		GitIndex index = new GitIndex(db);
 		writeTrashFile("a/b", "data:a/b");
@@ -174,7 +163,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 			assertEquals(0, system(trash, "git status"));
 	}
 
-	@Test
 	public void testUpdateSimpleSortTestIndex() throws Exception {
 		GitIndex index = new GitIndex(db);
 		writeTrashFile("a/b", "data:a/b");
@@ -190,7 +178,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 			assertEquals(0, system(trash, "git status"));
 	}
 
-	@Test
 	public void testWriteTree() throws Exception {
 		GitIndex index = new GitIndex(db);
 		writeTrashFile("a/b", "data:a/b");
@@ -211,7 +198,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 			assertEquals(0, system(trash, "git status"));
 	}
 
-	@Test
 	public void testReadTree() throws Exception {
 		// Prepare tree
 		GitIndex index = new GitIndex(db);
@@ -250,7 +236,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 			assertEquals(0, system(trash, "git status"));
 	}
 
-	@Test
 	public void testReadTree2() throws Exception {
 		// Prepare a larger tree to test some odd cases in tree writing
 		GitIndex index = new GitIndex(db);
@@ -296,7 +281,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 		assertEquals("a:b", membersr[5].getName());
 	}
 
-	@Test
 	public void testDelete() throws Exception {
 		GitIndex index = new GitIndex(db);
 		writeTrashFile("a/b", "data:a/b");
@@ -321,7 +305,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 			assertEquals(0, system(trash, "git status"));
 	}
 
-	@Test
 	public void testCheckout() throws Exception {
 		// Prepare tree, remote it and checkout
 		GitIndex index = new GitIndex(db);
@@ -353,7 +336,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 			assertEquals(0, system(trash, "git status"));
 	}
 
-	@Test
 	public void test030_executeBit_coreModeTrue() throws IllegalArgumentException, IllegalAccessException, InvocationTargetException, Error, Exception {
 		if (!FS.DETECTED.supportsExecute()) {
 			System.err.println("Test ignored since platform FS does not support the execute permission");
@@ -409,7 +391,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void test031_executeBit_coreModeFalse() throws IllegalArgumentException, IllegalAccessException, InvocationTargetException, Error, Exception {
 		if (!FS.DETECTED.supportsExecute()) {
 			System.err.println("Test ignored since platform FS does not support the execute permission");

@@ -59,7 +59,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -157,11 +156,10 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 						String shortenedName = fullName
 								.substring(Constants.R_HEADS.length());
 						// remove upstream configuration if any
-						final StoredConfig cfg = repo.getConfig();
-						cfg.unsetSection(
+						repo.getConfig().unsetSection(
 								ConfigConstants.CONFIG_BRANCH_SECTION,
 								shortenedName);
-						cfg.save();
+						repo.getConfig().save();
 					}
 				} else
 					throw new JGitInternalException(MessageFormat.format(

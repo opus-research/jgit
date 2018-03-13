@@ -43,18 +43,14 @@
 
 package org.eclipse.jgit.notes;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-
 import java.io.IOException;
+
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.MutableObjectId;
-import org.junit.Test;
 
-public class LeafBucketTest {
-	@Test
+public class LeafBucketTest extends TestCase {
 	public void testEmpty() {
 		LeafBucket b = new LeafBucket(0);
 		assertNull(b.get(id(0x00), null));
@@ -62,7 +58,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0xfe), null));
 	}
 
-	@Test
 	public void testParseFive() {
 		LeafBucket b = new LeafBucket(0);
 
@@ -81,7 +76,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testSetFive_InOrder() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -100,7 +94,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testSetFive_ReverseOrder() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -119,7 +112,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testSetFive_MixedOrder() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -139,7 +131,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testSet_Replace() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -150,7 +141,6 @@ public class LeafBucketTest {
 		assertEquals(id(0x01), b.get(id(0x11), null));
 	}
 
-	@Test
 	public void testRemoveMissingNote() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 		assertNull(b.get(id(0x11), null));
@@ -158,7 +148,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x11), null));
 	}
 
-	@Test
 	public void testRemoveFirst() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -179,7 +168,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testRemoveMiddle() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -200,7 +188,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testRemoveLast() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
@@ -221,7 +208,6 @@ public class LeafBucketTest {
 		assertNull(b.get(id(0x66), null));
 	}
 
-	@Test
 	public void testRemoveMakesEmpty() throws IOException {
 		LeafBucket b = new LeafBucket(0);
 
