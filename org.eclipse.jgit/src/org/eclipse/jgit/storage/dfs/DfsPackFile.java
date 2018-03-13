@@ -165,7 +165,7 @@ public final class DfsPackFile {
 		this.packDesc = desc;
 		this.key = key;
 
-		length = desc.getFileSize(PACK_EXT);
+		length = desc.getPackSize();
 		if (length <= 0)
 			length = -1;
 	}
