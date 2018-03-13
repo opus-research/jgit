@@ -56,7 +56,6 @@ import java.io.IOException;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileRepository;
@@ -99,8 +98,6 @@ public class PullCommandTest extends RepositoryTestCase {
 		assertEquals(res.getMergeResult().getMergeStatus(),
 				MergeStatus.FAST_FORWARD);
 		assertFileContentsEqual(targetFile, "Another change");
-		assertEquals(RepositoryState.SAFE, target.getRepository()
-				.getRepositoryState());
 	}
 
 	@Test
@@ -135,8 +132,6 @@ public class PullCommandTest extends RepositoryTestCase {
 		String result = "<<<<<<< HEAD\nTarget change\n=======\n"
 				+ sourceChangeString + "\n";
 		assertFileContentsEqual(targetFile, result);
-		assertEquals(RepositoryState.MERGING, target.getRepository()
-				.getRepositoryState());
 	}
 
 	@Test
@@ -178,8 +173,6 @@ public class PullCommandTest extends RepositoryTestCase {
 		String result = "<<<<<<< HEAD\nSlave change\n=======\n"
 				+ sourceChangeString + "\n";
 		assertFileContentsEqual(targetFile, result);
-		assertEquals(RepositoryState.MERGING, target.getRepository()
-				.getRepositoryState());
 	}
 
 	@Override
