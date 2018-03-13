@@ -86,8 +86,6 @@ public class RebaseResult {
 		},
 		/**
 		 * Stopped for editing in the context of an interactive rebase
-		 *
-		 * @since 3.2
 		 */
 		EDIT {
 			@Override
@@ -146,7 +144,6 @@ public class RebaseResult {
 
 		/**
 		 * Interactive rebase has been prepared
-		 * @since 3.2
 		 */
 		INTERACTIVE_PREPARED {
 			@Override
