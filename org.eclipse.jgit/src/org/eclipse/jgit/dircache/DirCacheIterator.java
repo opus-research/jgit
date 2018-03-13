@@ -81,9 +81,6 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	/** Special buffer to hold the ObjectId of {@link #currentSubtree}. */
 	private final byte[] subtreeId;
 
-	/** Indicates whether entries with 'skipWorkTree' flag should be bypassed. */
-	private final boolean honorSkipWorkTree;
-
 	/** Index of entry within {@link #cache}. */
 	protected int ptr;
 
@@ -107,29 +104,11 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	 *            the cache to walk. It must be already loaded into memory.
 	 */
 	public DirCacheIterator(final DirCache dc) {
-		this(dc, true);
-	}
-
-	/**
-	 * Create a new iterator for an already loaded DirCache instance.
-	 * <p>
-	 * The iterator implementation may copy part of the cache's data during
-	 * construction, so the cache must be read in prior to creating the
-	 * iterator.
-	 *
-	 * @param dc
-	 *            the cache to walk. It must be already loaded into memory.
-	 * @param honorSkipWorkTree
-	 *            use true to signal isSkipped() for entries which have
-	 *            'skipWorkTree' flag set.
-	 */
-	public DirCacheIterator(final DirCache dc, boolean honorSkipWorkTree) {
 		cache = dc;
 		tree = dc.getCacheTree(true);
 		treeStart = 0;
 		treeEnd = tree.getEntrySpan();
 		subtreeId = new byte[Constants.OBJECT_ID_LENGTH];
-		this.honorSkipWorkTree = honorSkipWorkTree;
 		if (!eof())
 			parseEntry();
 	}
@@ -141,7 +120,6 @@ public class DirCacheIterator extends AbstractTreeIterator {
 		treeStart = p.ptr;
 		treeEnd = treeStart + tree.getEntrySpan();
 		subtreeId = p.subtreeId;
-		honorSkipWorkTree = p.honorSkipWorkTree;
 		ptr = p.ptr;
 		parseEntry();
 	}
@@ -189,12 +167,6 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	@Override
 	public boolean eof() {
 		return ptr == treeEnd;
-	}
-
-	@Override
-	public boolean isSkipped() {
-		return currentSubtree == null && currentEntry != null
-				&& currentEntry.isSkipWorkTree();
 	}
 
 	@Override

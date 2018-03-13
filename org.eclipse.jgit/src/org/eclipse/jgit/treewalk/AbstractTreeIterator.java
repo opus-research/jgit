@@ -519,18 +519,6 @@ public abstract class AbstractTreeIterator {
 	public abstract boolean eof();
 
 	/**
-	 * Should the current entry be skipped?
-	 * <p>
-	 * If one iterator decides to skip an entry, the TreeWalk
-	 * will bypass this entry. 
-	 *
-	 * @return true if the entry should be skipped.
-	 */
-	public boolean isSkipped() {
-		return false;
-	}
-
-	/**
 	 * Move to next entry, populating this iterator with the entry data.
 	 * <p>
 	 * The delta indicates how many moves forward should occur. The most common
