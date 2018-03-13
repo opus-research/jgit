@@ -96,6 +96,7 @@ public class DfsInserter extends ObjectInserter {
 	private static final int INDEX_VERSION = 2;
 
 	private final DfsObjDatabase db;
+	private int compression = Deflater.BEST_COMPRESSION;
 
 	private List<PackedObjectInfo> objectList;
 	private ObjectIdOwnerMap<PackedObjectInfo> objectMap;
@@ -114,6 +115,10 @@ public class DfsInserter extends ObjectInserter {
 	 */
 	protected DfsInserter(DfsObjDatabase db) {
 		this.db = db;
+	}
+
+	void setCompressionLevel(int compression) {
+		this.compression = compression;
 	}
 
 	@Override
@@ -240,7 +245,6 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private long beginObject(int type, long len) throws IOException {
-		// Reader below only supports whole (non-delta) encoding.
 		if (packOut == null)
 			beginPack();
 		long offset = packOut.getCount();
@@ -335,7 +339,7 @@ public class DfsInserter extends ObjectInserter {
 			hdrBuf = new byte[32];
 			md = Constants.newMessageDigest();
 			crc32 = new CRC32();
-			deflater = new Deflater(Deflater.BEST_COMPRESSION);
+			deflater = new Deflater(compression);
 			compress = new DeflaterOutputStream(this, deflater, 8192);
 
 			int size = out.blockSize();
@@ -628,33 +632,16 @@ public class DfsInserter extends ObjectInserter {
 					// Post DfsInserter.flush() use the normal code path.
 					// The newly created pack is registered in the cache.
 					return ctx.open(id, type).openStream();
-				}finally {
+				} finally {
 					ctx.release();
 				}
 			}
 
 			int bufsz = 8192;
 			final Inflater inf = ctx.inflater();
-			return new ObjectStream.Filter(type, size, new BufferedInputStream(
-					new InflaterInputStream(new InputStream() {
-						private long p = pos;
-
-						@Override
-						public int read() throws IOException {
-							byte[] b = new byte[1];
-							int n = read(b);
-							return n == 1 ? b[0] & 0xff : -1;
-						}
-
-						@Override
-						public int read(byte[] buf, int ptr, int len)
-								throws IOException {
-							int n = packOut.read(p, buf, ptr, len);
-							if (n > 0)
-								p += n;
-							return n;
-						}
-					}, inf, bufsz), bufsz)) {
+			return new ObjectStream.Filter(type,
+					size, new BufferedInputStream(new InflaterInputStream(
+							new ReadBackStream(pos), inf, bufsz), bufsz)) {
 				@Override
 				public void close() throws IOException {
 					ctx.release();
@@ -682,6 +669,30 @@ public class DfsInserter extends ObjectInserter {
 		public byte[] getCachedBytes() throws LargeObjectException {
 			throw new LargeObjectException.ExceedsLimit(
 					db.getReaderOptions().getStreamFileThreshold(), size);
+		}
+	}
+
+	private final class ReadBackStream extends InputStream {
+		private long pos;
+
+		ReadBackStream(long offset) {
+			pos = offset;
+		}
+
+		@Override
+		public int read() throws IOException {
+			byte[] b = new byte[1];
+			int n = read(b);
+			return n == 1 ? b[0] & 0xff : -1;
+		}
+
+		@Override
+		public int read(byte[] buf, int ptr, int len) throws IOException {
+			int n = packOut.read(pos, buf, ptr, len);
+			if (n > 0) {
+				pos += n;
+			}
+			return n;
 		}
 	}
 }
