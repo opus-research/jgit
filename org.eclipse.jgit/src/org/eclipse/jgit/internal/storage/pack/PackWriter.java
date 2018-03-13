@@ -1407,13 +1407,9 @@ public class PackWriter implements AutoCloseable {
 	private static void runTasks(ExecutorService pool,
 			ThreadSafeProgressMonitor pm,
 			DeltaTask.Block tb, List<Throwable> errors) throws IOException {
-		List<Future<?>> futures;
-		synchronized(tb) {
-			futures = new ArrayList<Future<?>>(tb.tasks.size());
-			for (DeltaTask task : tb.tasks) {
-				futures.add(pool.submit(task));
-			}
-		}
+		List<Future<?>> futures = new ArrayList<Future<?>>(tb.tasks.size());
+		for (DeltaTask task : tb.tasks)
+			futures.add(pool.submit(task));
 
 		try {
 			pm.waitForCompletion();
