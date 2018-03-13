@@ -58,6 +58,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -124,11 +125,9 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 
 	/**
 	 * Test constructor for exceptions, default settings, initialization.
-	 *
-	 * @throws IOException
 	 */
 	@Test
-	public void testContructor() throws IOException {
+	public void testContructor() {
 		writer = new PackWriter(config, db.newObjectReader());
 		assertEquals(false, writer.isDeltaBaseAsOffset());
 		assertEquals(true, config.isReuseDeltas());
@@ -178,7 +177,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testWriteEmptyPack2() throws IOException {
-		createVerifyOpenPack(EMPTY_LIST_REVS);
+		createVerifyOpenPack(EMPTY_LIST_REVS.iterator());
 
 		assertEquals(0, writer.getObjectsNumber());
 		assertEquals(0, pack.getObjectCount());
@@ -321,7 +320,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		for (int i = 0; i < forcedOrder.length; i++)
 			forcedOrderRevs[i] = parser.parseAny(forcedOrder[i]);
 
-		createVerifyOpenPack(Arrays.asList(forcedOrderRevs));
+		createVerifyOpenPack(Arrays.asList(forcedOrderRevs).iterator());
 
 		assertEquals(forcedOrder.length, writer.getObjectsNumber());
 		verifyObjectsOrder(forcedOrder);
@@ -545,12 +544,11 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		verifyOpenPack(thin);
 	}
 
-	private void createVerifyOpenPack(final List<RevObject> objectSource)
+	private void createVerifyOpenPack(final Iterator<RevObject> objectSource)
 			throws MissingObjectException, IOException {
 		NullProgressMonitor m = NullProgressMonitor.INSTANCE;
 		writer = new PackWriter(config, db.newObjectReader());
-		writer.preparePack(objectSource.iterator());
-		assertEquals(objectSource.size(), writer.getObjectsNumber());
+		writer.preparePack(objectSource);
 		writer.writePack(m, m, os);
 		writer.release();
 		verifyOpenPack(false);

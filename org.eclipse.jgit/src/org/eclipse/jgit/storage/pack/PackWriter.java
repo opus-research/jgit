@@ -83,7 +83,7 @@ import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -148,7 +148,7 @@ public class PackWriter {
 		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
 	}
 
-	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
+	private final ObjectIdSubclassMap<ObjectToPack> objectsMap = new ObjectIdSubclassMap<ObjectToPack>();
 
 	// edge objects for thin packs
 	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
@@ -402,18 +402,8 @@ public class PackWriter {
 	 * Returns objects number in a pack file that was created by this writer.
 	 *
 	 * @return number of objects in pack.
-	 * @throws IOException
-	 *             a cached pack cannot supply its object count.
 	 */
-	public long getObjectsNumber() throws IOException {
-		if (stats.totalObjects == 0) {
-			long objCnt = 0;
-			for (List<ObjectToPack> list : objectsLists)
-				objCnt += list.size();
-			for (CachedPack pack : cachedPacks)
-				objCnt += pack.getObjectCount();
-			return objCnt;
-		}
+	public long getObjectsNumber() {
 		return stats.totalObjects;
 	}
 
@@ -645,8 +635,13 @@ public class PackWriter {
 		final PackOutputStream out = new PackOutputStream(writeMonitor,
 				packStream, this);
 
-		long objCnt = getObjectsNumber();
+		long objCnt = 0;
+		for (List<ObjectToPack> list : objectsLists)
+			objCnt += list.size();
+		for (CachedPack pack : cachedPacks)
+			objCnt += pack.getObjectCount();
 		stats.totalObjects = objCnt;
+
 		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
