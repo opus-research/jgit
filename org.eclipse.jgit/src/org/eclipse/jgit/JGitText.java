@@ -159,7 +159,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectNotree;
 	/***/ public String corruptObjectPackfileChecksumIncorrect;
 	/***/ public String corruptionDetectedReReadingAt;
-	/***/ public String couldNotCheckOutBecauseOfConflicts;
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
 	/***/ public String couldNotLockHEAD;
@@ -197,7 +196,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
 	/***/ public String expectedACKNAKFoundEOF;
 	/***/ public String expectedACKNAKGot;
@@ -275,7 +273,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String lockOnNotHeld;
 	/***/ public String malformedpersonIdentString;
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
-	/***/ public String mergeUsingStrategyResultedInDescription;
 	/***/ public String missingAccesskey;
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
@@ -312,7 +309,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String objectIsNotA;
 	/***/ public String objectNotFoundIn;
 	/***/ public String offsetWrittenDeltaBaseForObjectNotFoundInAPack;
-	/***/ public String onlyAlreadyUpToDateAndFastForwardMergesAreAvailable;
 	/***/ public String onlyOneFetchSupported;
 	/***/ public String onlyOneOperationCallPerConnectionIsSupported;
 	/***/ public String openFilesMustBeAtLeast1;
