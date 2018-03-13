@@ -294,6 +294,8 @@ public class RefDirectory extends RefDatabase {
 				ref = readRef(prefix + needle, packed);
 				if (ref != null) {
 					ref = resolve(ref, 0, null, null, packed);
+				}
+				if (ref != null) {
 					break;
 				}
 			} catch (IOException e) {
@@ -786,6 +788,9 @@ public class RefDirectory extends RefDatabase {
 						new DigestInputStream(new FileInputStream(packedRefsFile),
 								digest), CHARSET));
 			} catch (FileNotFoundException noPackedRefs) {
+				if (packedRefsFile.exists()) {
+					throw noPackedRefs;
+				}
 				// Ignore it and leave the new list empty.
 				return PackedRefList.NO_PACKED_REFS;
 			}
@@ -942,7 +947,10 @@ public class RefDirectory extends RefDatabase {
 		try {
 			buf = IO.readSome(path, limit);
 		} catch (FileNotFoundException noFile) {
-			return null; // doesn't exist; not a reference.
+			if (path.exists() && path.isFile()) {
+				throw noFile;
+			}
+			return null; // doesn't exist or no file; not a reference.
 		}
 
 		int n = buf.length;

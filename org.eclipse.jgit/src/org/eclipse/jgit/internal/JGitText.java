@@ -411,7 +411,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
-	/***/ public String invalidRepositoryStateNoHead;
 	/***/ public String invalidWindowSize;
 	/***/ public String isAStaticFlagAndHasNorevWalkInstance;
 	/***/ public String JRELacksMD5Implementation;
@@ -511,6 +510,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileIsTruncatedNoParam;
 	/***/ public String packHandleIsStale;
 	/***/ public String packHasUnresolvedDeltas;
+	/***/ public String packInaccessible;
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
 	/***/ public String packRefs;

@@ -154,14 +154,10 @@ class Branch extends TextBuiltin {
 					startBranch = Constants.HEAD;
 				Ref startRef = db.getRef(startBranch);
 				ObjectId startAt = db.resolve(startBranch + "^0"); //$NON-NLS-1$
-				if (startRef != null) {
+				if (startRef != null)
 					startBranch = startRef.getName();
-				} else if (startAt != null) {
+				else
 					startBranch = startAt.name();
-				} else {
-					throw die(MessageFormat.format(
-							CLIText.get().notAValidCommitName, startBranch));
-				}
 				startBranch = Repository.shortenRefName(startBranch);
 				String newRefName = newHead;
 				if (!newRefName.startsWith(Constants.R_HEADS))
@@ -253,7 +249,7 @@ class Branch extends TextBuiltin {
 		String current = db.getBranch();
 		ObjectId head = db.resolve(Constants.HEAD);
 		for (String branch : branches) {
-			if (branch.equals(current)) {
+			if (current.equals(branch)) {
 				throw die(MessageFormat.format(CLIText.get().cannotDeleteTheBranchWhichYouAreCurrentlyOn, branch));
 			}
 			RefUpdate update = db.updateRef((remote ? Constants.R_REMOTES
