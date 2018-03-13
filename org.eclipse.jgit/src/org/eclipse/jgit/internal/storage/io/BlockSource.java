@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.internal.storage.io;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -49,7 +49,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 /**
- * Provides content blocks of a reftable to {@link ReftableReader}.
+ * Provides content blocks of file.
  * <p>
  * {@code BlockSource} implementations must decide if they will be thread-safe,
  * or not.
@@ -112,8 +112,8 @@ public abstract class BlockSource implements AutoCloseable {
 	 * Read a block from the file.
 	 * <p>
 	 * To reduce copying, the returned ByteBuffer should have an accessible
-	 * array. {@link ReftableReader} will discard the ByteBuffer and directly
-	 * use the backing array.
+	 * array and {@code arrayOffset() == 0}. The caller will discard the
+	 * ByteBuffer and directly use the backing array.
 	 *
 	 * @param position
 	 *            position of the block in the file, specified in bytes from the
