@@ -41,16 +41,39 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport.resolver;
+package org.eclipse.jgit.http.server.resolver;
 
-import org.eclipse.jgit.JGitText;
+import javax.servlet.http.HttpServletRequest;
 
-/** Indicates the request service is not authorized for current user. */
-public class ServiceNotAuthorizedException extends Exception {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.ReceivePack;
 
-	/** Indicates the request service is not available. */
-	public ServiceNotAuthorizedException() {
-		super(JGitText.get().serviceNotPermittedNoName);
-	}
+/** Create and configure {@link ReceivePack} service instance. */
+public interface ReceivePackFactory {
+	/** A factory disabling the ReceivePack service for all repositories. */
+	public static final ReceivePackFactory DISABLED = new ReceivePackFactory() {
+		public ReceivePack create(HttpServletRequest req, Repository db)
+				throws ServiceNotEnabledException {
+			throw new ServiceNotEnabledException();
+		}
+	};
+
+	/**
+	 * Create and configure a new ReceivePack instance for a repository.
+	 *
+	 * @param req
+	 *            current HTTP request, in case information from the request may
+	 *            help configure the ReceivePack instance.
+	 * @param db
+	 *            the repository the receive would write into.
+	 * @return the newly configured ReceivePack instance, must not be null.
+	 * @throws ServiceNotEnabledException
+	 *             this factory refuses to create the instance because it is not
+	 *             allowed on the target repository, by any user.
+	 * @throws ServiceNotAuthorizedException
+	 *             this factory refuses to create the instance for this HTTP
+	 *             request and repository, such as due to a permission error.
+	 */
+	ReceivePack create(HttpServletRequest req, Repository db)
+			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
 }

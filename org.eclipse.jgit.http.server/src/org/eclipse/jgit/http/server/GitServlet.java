@@ -48,7 +48,6 @@ import java.text.MessageFormat;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.glue.ErrorServlet;
@@ -57,14 +56,14 @@ import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
+import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.resolver.FileResolver;
-import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.eclipse.jgit.util.StringUtils;
 
 /**
@@ -106,13 +105,13 @@ public class GitServlet extends MetaServlet {
 
 	private volatile boolean initialized;
 
-	private RepositoryResolver<HttpServletRequest> resolver;
+	private RepositoryResolver resolver;
 
 	private AsIsFileService asIs = new AsIsFileService();
 
-	private UploadPackFactory<HttpServletRequest> uploadPackFactory = new DefaultUploadPackFactory();
+	private UploadPackFactory uploadPackFactory = new DefaultUploadPackFactory();
 
-	private ReceivePackFactory<HttpServletRequest> receivePackFactory = new DefaultReceivePackFactory();
+	private ReceivePackFactory receivePackFactory = new DefaultReceivePackFactory();
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -133,7 +132,7 @@ public class GitServlet extends MetaServlet {
 	 *            parameter table during init, which usually comes from the
 	 *            {@code web.xml} file of the web application.
 	 */
-	public void setRepositoryResolver(RepositoryResolver<HttpServletRequest> resolver) {
+	public void setRepositoryResolver(RepositoryResolver resolver) {
 		assertNotInitialized();
 		this.resolver = resolver;
 	}
@@ -154,10 +153,9 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure an {@link UploadPack}
 	 *            session when a fetch or clone is requested by a client.
 	 */
-	@SuppressWarnings("unchecked")
-	public void setUploadPackFactory(UploadPackFactory<HttpServletRequest> f) {
+	public void setUploadPackFactory(UploadPackFactory f) {
 		assertNotInitialized();
-		this.uploadPackFactory = f != null ? f : (UploadPackFactory<HttpServletRequest>)UploadPackFactory.DISABLED;
+		this.uploadPackFactory = f != null ? f : UploadPackFactory.DISABLED;
 	}
 
 	/**
@@ -165,10 +163,9 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure a {@link ReceivePack}
 	 *            session when a push is requested by a client.
 	 */
-	@SuppressWarnings("unchecked")
-	public void setReceivePackFactory(ReceivePackFactory<HttpServletRequest> f) {
+	public void setReceivePackFactory(ReceivePackFactory f) {
 		assertNotInitialized();
-		this.receivePackFactory = f != null ? f : (ReceivePackFactory<HttpServletRequest>)ReceivePackFactory.DISABLED;
+		this.receivePackFactory = f != null ? f : ReceivePackFactory.DISABLED;
 	}
 
 	private void assertNotInitialized() {
@@ -183,7 +180,7 @@ public class GitServlet extends MetaServlet {
 		if (resolver == null) {
 			final File root = getFile("base-path");
 			final boolean exportAll = getBoolean("export-all");
-			setRepositoryResolver(new FileResolver<HttpServletRequest>(root, exportAll));
+			setRepositoryResolver(new FileResolver(root, exportAll));
 		}
 
 		initialized = true;

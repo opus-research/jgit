@@ -41,40 +41,24 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport.resolver;
+package org.eclipse.jgit.http.server.resolver;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.util.FS;
 
-/**
- * Default resolver serving from the local filesystem.
- *
- * @param <C>
- *            type of connection
- */
-public class FileResolver<C> implements RepositoryResolver<C> {
-	private volatile boolean exportAll;
+/** Default resolver serving from a single root path in local filesystem. */
+public class FileResolver implements RepositoryResolver {
+	private final File basePath;
 
-	private final Map<String, Repository> exports;
-
-	private final Collection<File> exportBase;
-
-	/** Initialize an empty file based resolver. */
-	public FileResolver() {
-		exports = new ConcurrentHashMap<String, Repository>();
-		exportBase = new CopyOnWriteArrayList<File>();
-	}
+	private final boolean exportAll;
 
 	/**
 	 * Create a new resolver for the given path.
@@ -86,121 +70,54 @@ public class FileResolver<C> implements RepositoryResolver<C> {
 	 *            {@code git-daemon-export-ok} files.
 	 */
 	public FileResolver(final File basePath, final boolean exportAll) {
-		this();
-		exportDirectory(basePath);
-		setExportAll(exportAll);
+		this.basePath = basePath;
+		this.exportAll = exportAll;
 	}
 
-	public Repository open(final C req, final String name)
-			throws RepositoryNotFoundException, ServiceNotEnabledException {
-		if (isUnreasonableName(name))
-			throw new RepositoryNotFoundException(name);
+	public Repository open(final HttpServletRequest req,
+			final String repositoryName) throws RepositoryNotFoundException,
+			ServiceNotEnabledException {
+		if (isUnreasonableName(repositoryName))
+			throw new RepositoryNotFoundException(repositoryName);
 
-		Repository db = exports.get(nameWithDotGit(name));
-		if (db != null) {
-			db.incrementOpen();
-			return db;
+		final Repository db;
+		try {
+			final File gitdir = new File(basePath, repositoryName);
+			db = RepositoryCache.open(FileKey.lenient(gitdir, FS.DETECTED), true);
+		} catch (IOException e) {
+			throw new RepositoryNotFoundException(repositoryName, e);
 		}
 
-		for (File base : exportBase) {
-			File dir = FileKey.resolve(new File(base, name), FS.DETECTED);
-			if (dir == null)
-				continue;
+		try {
+			if (isExportOk(req, repositoryName, db)) {
+				// We have to leak the open count to the caller, they
+				// are responsible for closing the repository if we
+				// complete successfully.
+				return db;
+			} else
+				throw new ServiceNotEnabledException();
 
-			try {
-				FileKey key = FileKey.exact(dir, FS.DETECTED);
-				db = RepositoryCache.open(key, true);
-			} catch (IOException e) {
-				throw new RepositoryNotFoundException(name, e);
-			}
+		} catch (RuntimeException e) {
+			db.close();
+			throw new RepositoryNotFoundException(repositoryName, e);
 
-			try {
-				if (isExportOk(req, name, db)) {
-					// We have to leak the open count to the caller, they
-					// are responsible for closing the repository if we
-					// complete successfully.
-					return db;
-				} else
-					throw new ServiceNotEnabledException();
+		} catch (IOException e) {
+			db.close();
+			throw new RepositoryNotFoundException(repositoryName, e);
 
-			} catch (RuntimeException e) {
-				db.close();
-				throw new RepositoryNotFoundException(name, e);
-
-			} catch (IOException e) {
-				db.close();
-				throw new RepositoryNotFoundException(name, e);
-
-			} catch (ServiceNotEnabledException e) {
-				db.close();
-				throw e;
-			}
+		} catch (ServiceNotEnabledException e) {
+			db.close();
+			throw e;
 		}
-
-		if (exportBase.size() == 1) {
-			File dir = new File(exportBase.iterator().next(), name);
-			throw new RepositoryNotFoundException(name,
-					new RepositoryNotFoundException(dir));
-		}
-
-		throw new RepositoryNotFoundException(name);
 	}
 
-	/**
-	 * @return false if <code>git-daemon-export-ok</code> is required to export
-	 *         a repository; true if <code>git-daemon-export-ok</code> is
-	 *         ignored.
-	 * @see #setExportAll(boolean)
-	 */
-	public boolean isExportAll() {
+	/** @return {@code true} if all repositories are to be exported. */
+	protected boolean isExportAll() {
 		return exportAll;
 	}
 
 	/**
-	 * Set whether or not to export all repositories.
-	 * <p>
-	 * If false (the default), repositories must have a
-	 * <code>git-daemon-export-ok</code> file to be accessed through this
-	 * daemon.
-	 * <p>
-	 * If true, all repositories are available through the daemon, whether or
-	 * not <code>git-daemon-export-ok</code> exists.
-	 *
-	 * @param export
-	 */
-	public void setExportAll(final boolean export) {
-		exportAll = export;
-	}
-
-	/**
-	 * Add a single repository to the set that is exported by this daemon.
-	 * <p>
-	 * The existence (or lack-thereof) of <code>git-daemon-export-ok</code> is
-	 * ignored by this method. The repository is always published.
-	 *
-	 * @param name
-	 *            name the repository will be published under.
-	 * @param db
-	 *            the repository instance.
-	 */
-	public void exportRepository(String name, Repository db) {
-		exports.put(nameWithDotGit(name), db);
-	}
-
-	/**
-	 * Recursively export all Git repositories within a directory.
-	 *
-	 * @param dir
-	 *            the directory to export. This directory must not itself be a
-	 *            git repository, but any directory below it which has a file
-	 *            named <code>git-daemon-export-ok</code> will be published.
-	 */
-	public void exportDirectory(final File dir) {
-		exportBase.add(dir);
-	}
-
-	/**
-	 * Check if this repository can be served.
+	 * Check if this repository can be served over HTTP.
 	 * <p>
 	 * The default implementation of this method returns true only if either
 	 * {@link #isExportAll()} is true, or the {@code git-daemon-export-ok} file
@@ -217,20 +134,14 @@ public class FileResolver<C> implements RepositoryResolver<C> {
 	 *             the repository could not be accessed, the caller will claim
 	 *             the repository does not exist.
 	 */
-	protected boolean isExportOk(C req, String repositoryName, Repository db)
-			throws IOException {
+	protected boolean isExportOk(HttpServletRequest req, String repositoryName,
+			Repository db) throws IOException {
 		if (isExportAll())
 			return true;
 		else if (db.getDirectory() != null)
 			return new File(db.getDirectory(), "git-daemon-export-ok").exists();
 		else
 			return false;
-	}
-
-	private static String nameWithDotGit(String name) {
-		if (name.endsWith(Constants.DOT_GIT_EXT))
-			return name;
-		return name + Constants.DOT_GIT_EXT;
 	}
 
 	private static boolean isUnreasonableName(final String name) {
