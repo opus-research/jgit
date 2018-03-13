@@ -69,7 +69,7 @@ public class FileNameMatcherTest {
 			final boolean appendCanMatchExpected)
 			throws InvalidPatternException {
 		final FileNameMatcher matcher = new FileNameMatcher(pattern,
-				Character.valueOf(excludedCharacter));
+				new Character(excludedCharacter));
 		matcher.append(input);
 		assertEquals(matchExpected, matcher.isMatch());
 		assertEquals(appendCanMatchExpected, matcher.canAppendMatch());

@@ -90,7 +90,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String badObjectType;
 	/***/ public String badRef;
 	/***/ public String badSectionEntry;
-	/***/ public String badShallowLine;
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
@@ -99,7 +98,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
-	/***/ public String blockSizeNotPowerOf2;
 	/***/ public String branchNameInvalid;
 	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
@@ -176,7 +174,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String checkoutUnexpectedResult;
 	/***/ public String classCastNotA;
 	/***/ public String cloneNonEmptyDirectory;
-	/***/ public String closed;
 	/***/ public String collisionOn;
 	/***/ public String commandRejectedByHook;
 	/***/ public String commandWasCalledInTheWrongState;
@@ -267,14 +264,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String createBranchFailedUnknownReason;
 	/***/ public String createBranchUnexpectedResult;
 	/***/ public String createNewFileFailed;
-	/***/ public String createRequiresZeroOldId;
 	/***/ public String credentialPassword;
 	/***/ public String credentialUsername;
 	/***/ public String daemonAlreadyRunning;
 	/***/ public String daysAgo;
 	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deleteFileFailed;
-	/***/ public String deleteRequiresZeroNewId;
 	/***/ public String deleteTagUnexpectedResult;
 	/***/ public String deletingNotSupported;
 	/***/ public String destinationIsNotAWildcard;
@@ -303,7 +298,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String encryptionOnlyPBE;
 	/***/ public String endOfFileInEscape;
 	/***/ public String entryNotFoundByPath;
-	/***/ public String enumValueNotSupported0;
 	/***/ public String enumValueNotSupported2;
 	/***/ public String enumValueNotSupported3;
 	/***/ public String enumValuesNotAvailable;
@@ -344,7 +338,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String expectedPktLineWithService;
 	/***/ public String expectedReceivedContentType;
 	/***/ public String expectedReportForRefNotReceived;
-	/***/ public String failedToDetermineFilterDefinition;
 	/***/ public String failedUpdatingRefs;
 	/***/ public String failureDueToOneOfTheFollowing;
 	/***/ public String failureUpdatingFETCH_HEAD;
@@ -361,8 +354,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String flagsAlreadyCreated;
 	/***/ public String funnyRefname;
 	/***/ public String gcFailed;
-	/***/ public String gcLogExists;
-	/***/ public String gcTooManyUnpruned;
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
@@ -424,21 +415,15 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidPathPeriodAtEndWindows;
 	/***/ public String invalidPathSpaceAtEndWindows;
 	/***/ public String invalidPathReservedOnWindows;
-	/***/ public String invalidRedirectLocation;
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
-	/***/ public String invalidReftableBlock;
-	/***/ public String invalidReftableCRC;
-	/***/ public String invalidReftableFile;
 	/***/ public String invalidRemote;
 	/***/ public String invalidShallowObject;
 	/***/ public String invalidStageForPath;
-	/***/ public String invalidSystemProperty;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
 	/***/ public String invalidTimeUnitValue2;
 	/***/ public String invalidTimeUnitValue3;
-	/***/ public String invalidTreeZeroLengthName;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
@@ -473,11 +458,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeRecursiveTooManyMergeBasesFor;
 	/***/ public String messageAndTaggerNotAllowedInUnannotatedTags;
 	/***/ public String minutesAgo;
-	/***/ public String mismatchOffset;
-	/***/ public String mismatchCRC;
 	/***/ public String missingAccesskey;
 	/***/ public String missingConfigurationForKey;
-	/***/ public String missingCRC;
 	/***/ public String missingDeltaBase;
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
@@ -495,7 +477,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String needPackOut;
 	/***/ public String needsAtLeastOneEntry;
 	/***/ public String needsWorkdir;
-	/***/ public String newIdMustNotBeNull;
 	/***/ public String newlineInQuotesNotAllowed;
 	/***/ public String noApplyInDelete;
 	/***/ public String noClosingBracket;
@@ -504,7 +485,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noHMACsupport;
 	/***/ public String noMergeBase;
 	/***/ public String noMergeHeadSpecified;
-	/***/ public String nonBareLinkFilesNotSupported;
 	/***/ public String noSuchRef;
 	/***/ public String notABoolean;
 	/***/ public String notABundle;
@@ -529,7 +509,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String objectNotFoundIn;
 	/***/ public String obtainingCommitsForCherryPick;
 	/***/ public String offsetWrittenDeltaBaseForObjectNotFoundInAPack;
-	/***/ public String oldIdMustNotBeNull;
 	/***/ public String onlyAlreadyUpToDateAndFastForwardMergesAreAvailable;
 	/***/ public String onlyOneFetchSupported;
 	/***/ public String onlyOneOperationCallPerConnectionIsSupported;
@@ -537,14 +516,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String openingConnection;
 	/***/ public String operationCanceled;
 	/***/ public String outputHasAlreadyBeenStarted;
-	/***/ public String overflowedReftableBlock;
 	/***/ public String packChecksumMismatch;
 	/***/ public String packCorruptedWhileWritingToFilesystem;
 	/***/ public String packDoesNotMatchIndex;
 	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
-	/***/ public String packedRefsCorruptionDetected;
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packFileInvalid;
 	/***/ public String packfileIsTruncated;
@@ -565,7 +542,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pathIsNotInWorkingDir;
 	/***/ public String pathNotConfigured;
 	/***/ public String peeledLineBeforeRef;
-	/***/ public String peeledRefIsRequired;
 	/***/ public String peerDidNotSupplyACompleteObjectGraph;
 	/***/ public String personIdentEmailNonNull;
 	/***/ public String personIdentNameNonNull;
@@ -594,11 +570,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String receivePackInvalidLimit;
 	/***/ public String receivePackTooLarge;
 	/***/ public String receivingObjects;
-	/***/ public String redirectBlocked;
-	/***/ public String redirectHttp;
-	/***/ public String redirectLimitExceeded;
-	/***/ public String redirectLocationMissing;
-	/***/ public String redirectsOff;
 	/***/ public String refAlreadyExists;
 	/***/ public String refAlreadyExists1;
 	/***/ public String reflogEntryNotFound;
@@ -620,7 +591,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String renamesRejoiningModifies;
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
-	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
 	/***/ public String repositoryState_bare;
@@ -647,7 +617,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
-	/***/ public String sha1CollisionDetected1;
 	/***/ public String shallowCommitsAlreadyInitialized;
 	/***/ public String shallowPacksRequireDepthWalk;
 	/***/ public String shortCompressedStreamAt;
@@ -692,9 +661,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
-	/***/ public String timeIsUncertain;
 	/***/ public String timerAlreadyTerminated;
-	/***/ public String tooManyCommands;
 	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
 	/***/ public String transportExceptionBadRef;
@@ -727,7 +694,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unauthorized;
-	/***/ public String underflowedReftableBlock;
 	/***/ public String unencodeableFile;
 	/***/ public String unexpectedCompareResult;
 	/***/ public String unexpectedEndOfConfigFile;
@@ -742,7 +708,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;
 	/***/ public String unknownObject;
-	/***/ public String unknownObjectInIndex;
 	/***/ public String unknownObjectType;
 	/***/ public String unknownObjectType2;
 	/***/ public String unknownRepositoryFormat;
@@ -764,9 +729,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
-	/***/ public String unsupportedReftableVersion;
-	/***/ public String unsupportedRepositoryDescription;
-	/***/ public String updateRequiresOldIdAndNewId;
 	/***/ public String updatingHeadFailed;
 	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;

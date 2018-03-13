@@ -109,7 +109,6 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		HttpTransport.setConnectionFactory(cf);
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -213,7 +212,7 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<>(remoteRepository).packAndPrune();
+		new TestRepository<Repository>(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));

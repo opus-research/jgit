@@ -55,8 +55,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.FileSnapshot;
 import org.eclipse.jgit.internal.storage.file.LockFile;
@@ -185,7 +185,6 @@ public class FileBasedConfig extends StoredConfig {
 	 * @throws IOException
 	 *             the file could not be written.
 	 */
-	@Override
 	public void save() throws IOException {
 		final byte[] out;
 		final String text = toText();

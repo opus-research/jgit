@@ -44,7 +44,6 @@
 package org.eclipse.jgit.util;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -184,16 +183,6 @@ public class IntListTest {
 		i.set(1, 2);
 		assertEquals(2, i.size());
 		assertEquals(2, i.get(1));
-	}
-
-	@Test
-	public void testContains() {
-		IntList i = new IntList();
-		i.add(1);
-		i.add(4);
-		assertTrue(i.contains(1));
-		assertTrue(i.contains(4));
-		assertFalse(i.contains(2));
 	}
 
 	@Test

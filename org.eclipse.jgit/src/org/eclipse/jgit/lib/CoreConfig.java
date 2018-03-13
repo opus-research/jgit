@@ -57,7 +57,11 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  */
 public class CoreConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<CoreConfig> KEY = CoreConfig::new;
+	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
+		public CoreConfig parse(final Config cfg) {
+			return new CoreConfig(cfg);
+		}
+	};
 
 	/** Permissible values for {@code core.autocrlf}. */
 	public static enum AutoCRLF {
