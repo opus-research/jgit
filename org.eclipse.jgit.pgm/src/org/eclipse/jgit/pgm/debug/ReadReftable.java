@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Google Inc.
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +41,57 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.pgm.debug;
 
-import static org.junit.Assert.assertEquals;
+import java.io.FileInputStream;
+import java.io.IOException;
 
-import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.internal.storage.reftable.BlockSource;
+import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.kohsuke.args4j.Argument;
 
-public final class StrictWorkMonitor implements ProgressMonitor {
-	private int lastWork, totalWork;
+@Command
+class ReadReftable extends TextBuiltin {
+	@Argument(index = 0)
+	private String input;
+
+	@Argument(index = 1, required = false)
+	private String ref;
 
 	@Override
-	public void start(int totalTasks) {
-		// empty
+	protected void run() throws Exception {
+		try (FileInputStream in = new FileInputStream(input);
+				BlockSource src = BlockSource.from(in);
+				ReftableReader reader = new ReftableReader(src)) {
+			if (ref != null) {
+				reader.seek(ref);
+			} else {
+				reader.seekToFirstRef();
+			}
+			while (reader.next()) {
+				write(reader.getRef());
+			}
+		}
 	}
 
-	@Override
-	public void beginTask(String title, int total) {
-		this.totalWork = total;
-		lastWork = 0;
-	}
+	private void write(Ref r) throws IOException {
+		if (r.isSymbolic()) {
+			outw.println(r.getTarget().getName() + '\t' + r.getName());
+			return;
+		}
 
-	@Override
-	public void update(int completed) {
-		lastWork += completed;
-	}
+		ObjectId id1 = r.getObjectId();
+		if (id1 != null) {
+			outw.println(id1.name() + '\t' + r.getName());
+		}
 
-	@Override
-	public void endTask() {
-		assertEquals("Units of work recorded", totalWork, lastWork);
-	}
-
-	@Override
-	public boolean isCancelled() {
-		return false;
+		ObjectId id2 = r.getPeeledObjectId();
+		if (id2 != null) {
+			outw.println('^' + id2.name());
+		}
 	}
 }
