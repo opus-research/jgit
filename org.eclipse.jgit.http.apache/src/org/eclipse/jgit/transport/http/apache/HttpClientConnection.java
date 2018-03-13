@@ -89,7 +89,6 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.X509HostnameVerifier;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -158,9 +157,7 @@ public class HttpClientConnection implements HttpConnection {
 				clientBuilder.setSSLSocketFactory(sslConnectionFactory);
 				Registry<ConnectionSocketFactory> registry = RegistryBuilder
 						.<ConnectionSocketFactory> create()
-						.register("https", sslConnectionFactory)
-						.register("http", PlainConnectionSocketFactory.INSTANCE)
-						.build();
+						.register("https", sslConnectionFactory).build();
 				clientBuilder.setConnectionManager(
 						new BasicHttpClientConnectionManager(registry));
 			}
