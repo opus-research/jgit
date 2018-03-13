@@ -165,10 +165,7 @@ public final class RevWalkUtils {
 		final int SKEW = 24*3600; // one day clock skew
 
 		for (Ref ref : refs) {
-			RevObject maybehead = revWalk.parseAny(ref.getObjectId());
-			if (!(maybehead instanceof RevCommit))
-				continue;
-			RevCommit headCommit = (RevCommit) maybehead;
+			RevCommit headCommit = revWalk.parseCommit(ref.getObjectId());
 
 			// if commit is in the ref branch, then the tip of ref should be
 			// newer than the commit we are looking for. Allow for a large
