@@ -60,7 +60,7 @@ import org.eclipse.jgit.merge.MergeChunk.ConflictState;
  * as RawText. By default {@link MyersDiff} is used as diff algorithm.
  */
 public final class MergeAlgorithm {
-	private final DiffAlgorithm diffAlg;
+	private DiffAlgorithm diffAlg;
 
 	/**
 	 * Creates a new MergeAlgorithm which uses {@link MyersDiff} as diff
@@ -283,7 +283,7 @@ public final class MergeAlgorithm {
 	 * @return the next edit from the iterator or END_EDIT if there no more
 	 *         edits
 	 */
-	private static Edit nextEdit(Iterator<Edit> it) {
+	private Edit nextEdit(Iterator<Edit> it) {
 		return (it.hasNext() ? it.next() : END_EDIT);
 	}
 }

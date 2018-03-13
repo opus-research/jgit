@@ -58,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
@@ -150,8 +149,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		SupportedAlgorithm diffAlg = local.getConfig().getEnum(
 				ConfigConstants.CONFIG_DIFF_SECTION, null,
 				ConfigConstants.CONFIG_KEY_ALGORITHM,
-				SupportedAlgorithm.HISTOGRAM);
-		mergeAlgorithm = new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
+				SupportedAlgorithm.histogram);
+		mergeAlgorithm = new MergeAlgorithm(diffAlg.algorithm);
 		commitNames = new String[] { "BASE", "OURS", "THEIRS" };
 		oi = getObjectInserter();
 		this.inCore = inCore;

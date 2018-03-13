@@ -53,7 +53,6 @@ import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.List;
 
-import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
@@ -102,7 +101,7 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--algorithm", metaVar = "metaVar_diffAlg", usage = "usage_diffAlgorithm")
 	void setAlgorithm(SupportedAlgorithm s) {
-		diffFmt.setDiffAlgorithm(DiffAlgorithm.getAlgorithm(s));
+		diffFmt.setDiffAlgorithm(s.algorithm);
 	}
 
 	@Option(name = "-l", usage = "usage_renameLimit")

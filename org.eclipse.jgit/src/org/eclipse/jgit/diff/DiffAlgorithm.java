@@ -60,30 +60,22 @@ public abstract class DiffAlgorithm {
 		/**
 		 * Myers diff algorithm
 		 */
-		MYERS,
+		myers(MyersDiff.INSTANCE),
 
 		/**
 		 * Histogram diff algorithm
 		 */
-		HISTOGRAM
-	}
+		histogram(new HistogramDiff());
 
-	/**
-	 * @param alg
-	 *            the diff algorithm for which an implementation should be
-	 *            returned
-	 * @return an implementation of the specified diff algorithm
-	 */
-	public static DiffAlgorithm getAlgorithm(SupportedAlgorithm alg) {
-		switch (alg) {
-		case MYERS:
-			return MyersDiff.INSTANCE;
-		case HISTOGRAM:
-			return new HistogramDiff();
-		default:
-			throw new IllegalArgumentException();
+		/**
+		 * Diff algorithm
+		 */
+		public DiffAlgorithm algorithm;
+
+		SupportedAlgorithm(DiffAlgorithm a) {
+			algorithm = a;
 		}
-	}
+	};
 
 	/**
 	 * Compare two sequences and identify a list of edits between them.
