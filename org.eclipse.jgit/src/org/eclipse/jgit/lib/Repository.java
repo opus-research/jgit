@@ -63,7 +63,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -94,8 +93,6 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents a Git repository.
@@ -106,8 +103,6 @@ import org.slf4j.LoggerFactory;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
-	private final static Logger LOG = LoggerFactory.getLogger(Repository.class);
-
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -117,8 +112,6 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Use counter */
 	final AtomicInteger useCnt = new AtomicInteger(1);
-
-	private AtomicLong lastUsed = new AtomicLong();
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -866,21 +859,11 @@ public abstract class Repository implements AutoCloseable {
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
 	public void incrementOpen() {
 		useCnt.incrementAndGet();
-		lastUsed.set(System.currentTimeMillis());
 	}
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		lastUsed.set(System.currentTimeMillis());
-		useCnt.decrementAndGet();
-	}
-
-	void evict(long maxAge) {
-		LOG.debug("Called evict() for {}, ttl: {}", getDirectory(),
-				maxAge - (System.currentTimeMillis() - lastUsed.get()));
-		if (useCnt.get() == 0
-				&& (System.currentTimeMillis() - lastUsed.get() > maxAge)) {
-			LOG.debug("evict()!");
+		if (useCnt.decrementAndGet() == 0) {
 			doClose();
 			RepositoryCache.unregister(this);
 		}
