@@ -912,11 +912,6 @@ public class DiffFormatter {
 			editList = new EditList();
 			type = PatchType.UNIFIED;
 
-		} else if (ent.getOldId() == null || ent.getNewId() == null) {
-			// Content not changed (e.g. only mode, pure rename)
-			editList = new EditList();
-			type = PatchType.UNIFIED;
-
 		} else {
 			assertHaveRepository();
 
@@ -1111,7 +1106,7 @@ public class DiffFormatter {
 			o.write('\n');
 		}
 
-		if (ent.getOldId() != null && !ent.getOldId().equals(ent.getNewId())) {
+		if (!ent.getOldId().equals(ent.getNewId())) {
 			formatIndexLine(o, ent);
 		}
 	}
