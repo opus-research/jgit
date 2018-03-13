@@ -107,7 +107,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 * {@link #not(AnyObjectId)}, ..) of this class. Each instance of this class
 	 * should only be used for one invocation of the command. Don't call this
 	 * method twice on an instance.
-	 *
+	 * 
 	 * @return an iteration over RevCommits
 	 * @throws NoHeadException
 	 *             of the references ref cannot be resolved
@@ -168,7 +168,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand add(AnyObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException {
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(true, start);
 	}
 
@@ -196,7 +196,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand not(AnyObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException {
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(false, start);
 	}
 
@@ -225,7 +225,8 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand addRange(AnyObjectId since, AnyObjectId until)
-			throws MissingObjectException, IncorrectObjectTypeException {
+			throws MissingObjectException, IncorrectObjectTypeException,
+			JGitInternalException {
 		return not(since).add(until);
 	}
 
