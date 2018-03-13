@@ -313,7 +313,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	private Config config;
 
-	private Set<String> registeredCommands;
+	private Set<String> filterCommands;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -359,7 +359,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		if (repo != null) {
 			config = repo.getConfig();
 			attributesNodeProvider = repo.createAttributesNodeProvider();
-			registeredCommands = Repository.getRegisteredCommands();
+			filterCommands = Repository.getRegisteredFilterCommands();
 		} else {
 			config = null;
 			attributesNodeProvider = null;
@@ -1378,8 +1378,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			String builtinFilterCommand = Constants.BUILTIN_FILTER_PREFIX
 					+ filterDriverName
 					+ "/" + filterCommandType;
-			if (registeredCommands != null
-					&& registeredCommands.contains(builtinFilterCommand)) {
+			if (filterCommands != null
+					&& filterCommands.contains(builtinFilterCommand)) {
 				filterCommand = builtinFilterCommand;
 			}
 		}

@@ -111,7 +111,7 @@ public class LfsPointer {
 		try (PrintStream ps = new PrintStream(out)) {
 			ps.print("version "); //$NON-NLS-1$
 			ps.println(VERSION);
-			ps.print("oid " + HASH_FUNCTION_NAME + ":"); //$NON-NLS-1$
+			ps.print("oid " + HASH_FUNCTION_NAME + ":"); //$NON-NLS-1$ //$NON-NLS-2$
 			ps.println(LongObjectId.toString(oid));
 			ps.print("size "); //$NON-NLS-1$
 			ps.println(size);
@@ -133,7 +133,7 @@ public class LfsPointer {
 			throws IOException {
 		boolean versionLine = false;
 		LongObjectId id = null;
-		long si = -1;
+		long sz = -1;
 
 		try (BufferedReader br = new BufferedReader(
 				new InputStreamReader(in))) {
@@ -143,18 +143,25 @@ public class LfsPointer {
 				} else if (s.startsWith("version") && s.length() > 8 //$NON-NLS-1$
 						&& s.substring(8).trim().equals(VERSION)) {
 					versionLine = true;
-				} else if (s.startsWith("oid sha256:")) {
+				} else if (s.startsWith("oid sha256:")) { //$NON-NLS-1$
 					id = LongObjectId.fromString(s.substring(11).trim());
 				} else if (s.startsWith("size") && s.length() > 5) { //$NON-NLS-1$
-					si = Long.parseLong(s.substring(5).trim());
+					sz = Long.parseLong(s.substring(5).trim());
 				} else {
 					return null;
 				}
 			}
-			if (versionLine && id != null && si > -1) {
-				return new LfsPointer(id, si);
+			if (versionLine && id != null && sz > -1) {
+				return new LfsPointer(id, sz);
 			}
 		}
 		return null;
 	}
+
+	@Override
+	public String toString() {
+		return "LfsPointer: oid=" + LongObjectId.toString(oid) + ", size=" //$NON-NLS-1$ //$NON-NLS-2$
+				+ size;
+	}
 }
+

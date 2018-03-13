@@ -139,7 +139,7 @@ public abstract class Repository implements AutoCloseable {
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
-	private static ConcurrentHashMap<String, FilterCommandFactory> commandRegistry = new ConcurrentHashMap<>();
+	private static ConcurrentHashMap<String, FilterCommandFactory> filterCommandRegistry = new ConcurrentHashMap<>();
 
 	/**
 	 * Registers a {@link FilterCommandFactory} responsible for creating
@@ -148,9 +148,9 @@ public abstract class Repository implements AutoCloseable {
 	 * <code>getCommand("jgit://builtin/x", ...)</code> will call
 	 * <code>f1(...)</code> to create a new instance of {@link FilterCommand}
 	 *
-	 * @param commandName
+	 * @param filterCommandName
 	 *            the name for which this factory is registered
-	 * @param fact
+	 * @param factory
 	 *            the factory responsible for creating {@link FilterCommand}s
 	 *            for the specified name. <code>null</code> can be specified to
 	 *            unregister a factory
@@ -158,47 +158,42 @@ public abstract class Repository implements AutoCloseable {
 	 *         <tt>null</tt> if there was no mapping for <tt>commandName</tt>
 	 * @since 4.5
 	 */
-	public static FilterCommandFactory registerCommand(String commandName,
-			FilterCommandFactory fact) {
-		if (fact == null)
-			return commandRegistry.remove(commandName);
+	public static FilterCommandFactory registerFilterCommand(String filterCommandName,
+			FilterCommandFactory factory) {
+		if (factory == null)
+			return filterCommandRegistry.remove(filterCommandName);
 		else
-			return commandRegistry.put(commandName, fact);
+			return filterCommandRegistry.put(filterCommandName, factory);
 	}
 
 	/**
 	 * Checks whether any {@link FilterCommandFactory} is registered for a
 	 * certain command name
 	 *
-	 * @param commandName
+	 * @param filterCommandName
 	 *            the name for which the registry should be checked
 	 * @return <code>true</code> if any factory was registered for the name
 	 * @since 4.5
 	 */
-	public static boolean isRegistered(String commandName) {
-		return commandRegistry.containsKey(commandName);
+	public static boolean isRegistered(String filterCommandName) {
+		return filterCommandRegistry.containsKey(filterCommandName);
 	}
 
 	/**
-<<<<<<< Upstream, based on origin/master
-	 * Creates a new {@link FilterCommand} for the given name. A factory must be
-	 * registered for the name in advance.
-=======
 	 * @return Set of commandNames for which a {@link FilterCommandFactory} is
 	 *         registered
 	 *
 	 * @since 4.5
 	 */
-	public static Set<String> getRegisteredCommands() {
-		return commandRegistry.keySet();
+	public static Set<String> getRegisteredFilterCommands() {
+		return filterCommandRegistry.keySet();
 	}
 
 	/**
-	 * Creates a new {@link FilterCommand} for the given name. A factory has to
-	 * be registered for the name in advance.
->>>>>>> ba1a1b3 Add configuration parameter to enable builtin hooks/filters
+	 * Creates a new {@link FilterCommand} for the given name. A factory must be
+	 * registered for the name in advance.
 	 *
-	 * @param commandName
+	 * @param filterCommandName
 	 *            The name for which a new {@link FilterCommand} should be
 	 *            created
 	 * @param db
@@ -214,9 +209,10 @@ public abstract class Repository implements AutoCloseable {
 	 * @throws IOException
 	 * @since 4.5
 	 */
-	public static FilterCommand getCommand(String commandName, Repository db,
-			InputStream in, OutputStream out) throws IOException {
-		FilterCommandFactory cf = commandRegistry.get(commandName);
+	public static FilterCommand getFilterCommand(String filterCommandName,
+		Repository db, InputStream in, OutputStream out)
+		throws IOException {
+		FilterCommandFactory cf = filterCommandRegistry.get(filterCommandName);
 		return (cf == null) ? null : cf.create(db, in, out);
 	}
 

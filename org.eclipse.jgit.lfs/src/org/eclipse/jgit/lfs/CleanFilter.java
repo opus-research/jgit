@@ -74,11 +74,10 @@ import org.eclipse.jgit.util.FilterCommandFactory;
  */
 public class CleanFilter extends FilterCommand {
 	/**
-	 * The factory is responsible for creating instances of {@link CleanFilter}.
-	 * This factory can be registered using
-	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
+	 * The factory is responsible for creating instances of {@link CleanFilter}
 	 */
 	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
+
 		@Override
 		public FilterCommand create(Repository db, InputStream in,
 				OutputStream out) throws IOException {
@@ -88,25 +87,26 @@ public class CleanFilter extends FilterCommand {
 
 	/**
 	 * Registers this filter by calling
-	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
+	 * {@link Repository#registerFilterCommand(String, FilterCommandFactory)}
 	 */
 	public final static void register() {
-		Repository.registerCommand(
+		Repository.registerFilterCommand(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
-						+ "lfs/clean",
+						+ "lfs/clean", //$NON-NLS-1$
 				FACTORY);
-	};
+	}
+
+	// The OutputStream to a temporary file which will be renamed to mediafile
+	// when the operation succeeds
+	private OutputStream tmpOut;
 
 	// Used to compute the hash for the original content
 	private DigestOutputStream dOut;
 
-	// The outputstream into which the filtered content should be copied
-	private OutputStream out;
-
-	private LfsUtil lfsUtil;
+	private Lfs lfsUtil;
 
 	// the size of the original content
-	private long size = 0;
+	private long size;
 
 	// a temporary file into which the original content is written. When no
 	// errors occur this file will be renamed to the mediafile
@@ -128,39 +128,48 @@ public class CleanFilter extends FilterCommand {
 	public CleanFilter(Repository db, InputStream in, OutputStream out)
 			throws IOException {
 		super(in, out);
-		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
+		lfsUtil = new Lfs(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
 		Files.createDirectories(lfsUtil.getLfsTmpDir());
 		tmpFile = lfsUtil.createTmpFile();
-		this.out = out;
+		tmpOut = Files.newOutputStream(tmpFile,
+				StandardOpenOption.CREATE);
 		this.dOut = new DigestOutputStream(
-				Files.newOutputStream(tmpFile, StandardOpenOption.CREATE),
+				tmpOut,
 				Constants.newMessageDigest());
 	}
 
 	public int run() throws IOException {
-		int b = in.read();
-		if (b != -1) {
-			dOut.write(b);
-			size++;
-			return 1;
-		} else {
-			dOut.close();
-			LongObjectId loid = LongObjectId
-					.fromRaw(dOut.getMessageDigest().digest());
-			Path mediaFile = lfsUtil.getMediaFile(loid);
-			if (Files.isRegularFile(mediaFile)) {
-				long fsSize = Files.size(mediaFile);
-				if (fsSize != size) {
-					throw new CorruptMediaFile(mediaFile, size, fsSize);
-				}
+		try {
+			int b = in.read();
+			if (b != -1) {
+				dOut.write(b);
+				size++;
+				return 1;
 			} else {
-				FileUtils.mkdirs(mediaFile.getParent().toFile(), true);
-				FileUtils.rename(tmpFile.toFile(), mediaFile.toFile());
+				dOut.close();
+				tmpOut.close();
+				LongObjectId loid = LongObjectId
+						.fromRaw(dOut.getMessageDigest().digest());
+				Path mediaFile = lfsUtil.getMediaFile(loid);
+				if (Files.isRegularFile(mediaFile)) {
+					long fsSize = Files.size(mediaFile);
+					if (fsSize != size) {
+						throw new CorruptMediaFile(mediaFile, size, fsSize);
+					}
+				} else {
+					FileUtils.mkdirs(mediaFile.getParent().toFile(), true);
+					FileUtils.rename(tmpFile.toFile(), mediaFile.toFile());
+				}
+				LfsPointer lfsPointer = new LfsPointer(loid, size);
+				lfsPointer.encode(out);
+				out.close();
+				return -1;
 			}
-			LfsPointer lfsPointer = new LfsPointer(loid, size);
-			lfsPointer.encode(out);
+		} catch (IOException e) {
 			out.close();
-			return -1;
+			dOut.close();
+			tmpOut.close();
+			throw e;
 		}
 	}
 }
