@@ -44,7 +44,6 @@
 package org.eclipse.jgit.notes;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -53,7 +52,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -68,7 +66,7 @@ import org.eclipse.jgit.revwalk.RevTree;
  * is not released by this class. The caller should arrange for releasing the
  * shared {@code ObjectReader} at the proper times.
  */
-public class NoteMap implements Iterable<Note> {
+public class NoteMap {
 	/**
 	 * Construct a new empty note map.
 	 *
@@ -165,18 +163,6 @@ public class NoteMap implements Iterable<Note> {
 
 	private NoteMap(ObjectReader reader) {
 		this.reader = reader;
-	}
-
-	/**
-	 * @return an iterator that iterates over notes of this NoteMap. Non note
-	 *         entries are ignored by this iterator.
-	 */
-	public Iterator<Note> iterator() {
-		try {
-			return root.iterator(new MutableObjectId(), reader);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
 	}
 
 	/**
