@@ -49,6 +49,7 @@ class ReftableConstants {
 
 	static final int FILE_HEADER_LEN = 8;
 	static final int FILE_FOOTER_LEN = 52;
+	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
 
 	static final byte FILE_BLOCK_TYPE = '\1';
 	static final byte REF_BLOCK_TYPE = 'r';
