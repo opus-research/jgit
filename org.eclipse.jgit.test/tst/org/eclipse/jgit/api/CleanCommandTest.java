@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Stefan Lay <stefan.lay@.com>
+ * Copyright (C) 2011, Abhishek Bhatnagar <abhatnag@redhat.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,49 +40,77 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.diff;
+package org.eclipse.jgit.api;
+
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.security.DigestOutputStream;
-import java.security.MessageDigest;
+import java.util.Set;
+import java.util.TreeSet;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.util.io.NullOutputStream;
+import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
- * A DiffFormatter used to calculate the patch-id of the diff.
+ * Tests for CleanCommand
  */
-public class PatchIdDiffFormatter extends DiffFormatter {
+public class CleanCommandTest extends RepositoryTestCase {
+	private Git git;
 
-	private final MessageDigest digest;
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
 
-	/** Initialize a formatter to compute a patch id. */
-	public PatchIdDiffFormatter() {
-		super(new DigestOutputStream(NullOutputStream.INSTANCE,
-				Constants.newMessageDigest()));
-		digest = ((DigestOutputStream) getOutputStream()).getMessageDigest();
+		// create test files
+		writeTrashFile("File1.txt", "Hello world");
+		writeTrashFile("File2.txt", "Delete Me");
+		writeTrashFile("File3.txt", "Delete Me");
+
+		// add and commit first file
+		git.add().addFilepattern("File1.txt").call();
+		git.commit().setMessage("Initial commit").call();
 	}
 
-	/**
-	 * Should be called after having called one of the format methods
-	 *
-	 * @return the patch id calculated for the provided diff.
-	 */
-	public ObjectId getCalulatedPatchId() {
-		return ObjectId.fromRaw(digest.digest());
+	@Test
+	public void testClean() throws NoWorkTreeException, IOException {
+		// create status
+		StatusCommand command = git.status();
+		Status status = command.call();
+		Set<String> files = status.getUntracked();
+		assertTrue(files.size() > 0);
+
+		// run clean
+		Set<String> cleanedFiles = git.clean().call();
+
+		status = git.status().call();
+		files = status.getUntracked();
+
+		assertTrue(files.size() == 0);
+		assertTrue(cleanedFiles.contains("File2.txt"));
+		assertTrue(cleanedFiles.contains("File3.txt"));
 	}
 
-	@Override
-	protected void writeHunkHeader(int aStartLine, int aEndLine,
-			int bStartLine, int bEndLine) throws IOException {
-		// The hunk header is not taken into account for patch id calculation
+	@Test
+	public void testCleanWithPaths() throws NoWorkTreeException, IOException {
+		// create status
+		StatusCommand command = git.status();
+		Status status = command.call();
+		Set<String> files = status.getUntracked();
+		assertTrue(files.size() > 0);
+
+		// run clean with setPaths
+		Set<String> paths = new TreeSet<String>();
+		paths.add("File3.txt");
+		Set<String> cleanedFiles = git.clean().setPaths(paths).call();
+
+		status = git.status().call();
+		files = status.getUntracked();
+		assertTrue(files.size() == 1);
+		assertTrue(cleanedFiles.contains("File3.txt"));
+		assertTrue(!cleanedFiles.contains("File2.txt"));
 	}
 
-	@Override
-	protected void formatIndexLine(OutputStream o, DiffEntry ent)
-			throws IOException {
-		// The index line is not taken into account for patch id calculation
-	}
 }

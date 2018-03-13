@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011, Stefan Lay <stefan.lay@.com>
+ * Copyright (C) 2011, Chris Aniszczyk <zx@redhat.com>
+ * Copyright (C) 2011, Abhishek Bhatnagar <abhatnag@redhat.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,35 +41,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.api;
 
-import java.io.OutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
- * An OutputStream which ignores everything written to it.
+ * Remove untracked files from the working tree
+ *
+ * @see <a
+ *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
+ *      >Git documentation about Clean</a>
  */
-public class NullOutputStream extends OutputStream {
+public class CleanCommand extends GitCommand<Set<String>> {
 
-	/** The canonical instance. */
-	public static final NullOutputStream INSTANCE = new NullOutputStream();
+	private Set<String> paths = Collections.emptySet();
 
-	private NullOutputStream() {
-		// Do nothing, but we want to hide our constructor to prevent
-		// more than one instance from being created.
+	/**
+	 * @param repo
+	 */
+	protected CleanCommand(Repository repo) {
+		super(repo);
 	}
 
-	@Override
-	public void write(int b) {
-		// Discard.
+	/**
+	 * Executes the {@code clean} command with all the options and parameters
+	 * collected by the setter methods of this class. Each instance of this
+	 * class should only be used for one invocation of the command (means: one
+	 * call to {@link #call()})
+	 *
+	 * @return a set of strings representing each file cleaned.
+	 */
+	public Set<String> call() {
+		Set<String> files = new TreeSet<String>();
+		try {
+			StatusCommand command = new StatusCommand(repo);
+			Status status = command.call();
+			for (String file : status.getUntracked()) {
+				if (paths.isEmpty() || paths.contains(file)) {
+					FileUtils.delete(new File(repo.getWorkTree(), file));
+					files.add(file);
+				}
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
+		return files;
 	}
 
-	@Override
-	public void write(byte[] buf) {
-		// Discard.
+	/**
+	 * If paths are set, only these paths are affected by the cleaning.
+	 *
+	 * @param paths
+	 *            the paths to set
+	 * @return {@code this}
+	 */
+	public CleanCommand setPaths(Set<String> paths) {
+		this.paths = paths;
+		return this;
 	}
 
-	@Override
-	public void write(byte[] buf, int pos, int cnt) {
-		// Discard.
-	}
 }
