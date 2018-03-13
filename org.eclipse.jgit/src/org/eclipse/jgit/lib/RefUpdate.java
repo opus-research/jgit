@@ -598,8 +598,7 @@ public abstract class RefUpdate {
 		RevObject newObj;
 		RevObject oldObj;
 
-		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(true))
