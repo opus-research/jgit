@@ -48,6 +48,8 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
@@ -63,7 +65,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 		Git git = new Git(db);
-		git.commit().setMessage("initial commit").setAllowEmpty(true).call();
+		git.commit().setMessage("initial commit").call();
 		writeTrashFile("Test.txt", "Hello world");
 		git.add().addFilepattern("Test.txt").call();
 		git.commit().setMessage("Initial commit").call();
@@ -84,7 +86,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testWrap() {
+	public void testWrap() throws JGitInternalException, GitAPIException {
 		Git git = Git.wrap(db);
 		assertEquals(1, git.branchList().call().size());
 
@@ -101,7 +103,8 @@ public class GitConstructionTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testOpen() throws IOException {
+	public void testOpen() throws IOException, JGitInternalException,
+			GitAPIException {
 		Git git = Git.open(db.getDirectory());
 		assertEquals(1, git.branchList().call().size());
 

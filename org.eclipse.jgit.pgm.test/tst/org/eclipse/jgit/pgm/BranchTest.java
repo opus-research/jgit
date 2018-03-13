@@ -54,13 +54,18 @@ public class BranchTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
 	public void testList() throws Exception {
 		assertEquals("* master 6fd41be initial commit",
 				execute("git branch -v")[0]);
+	}
+
+	@Test
+	public void testExistingBranch() throws Exception {
+		assertEquals("A branch named 'master' already exists.",
+				execute("git branch master")[0]);
 	}
 }
