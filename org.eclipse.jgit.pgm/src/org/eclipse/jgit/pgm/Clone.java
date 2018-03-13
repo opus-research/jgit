@@ -50,7 +50,6 @@ import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.SystemReader;
@@ -85,11 +84,7 @@ class Clone extends AbstractFetchCommand {
 	@Override
 	protected void run() throws Exception {
 		if (localName != null && gitdir != null)
-			// DiffPlug makes it hard for gitdir to be null
-			// it's easier to resolve this conflict by just
-			// forcing it to null for now
-			// throw die(CLIText.get().conflictingUsageOf_git_dir_andArguments);
-			gitdir = null;
+			throw die(CLIText.get().conflictingUsageOf_git_dir_andArguments);
 
 		final URIish uri = new URIish(sourceUri);
 		File localNameF;
@@ -114,7 +109,6 @@ class Clone extends AbstractFetchCommand {
 
 		command.setGitDir(gitdir == null ? null : new File(gitdir));
 		command.setDirectory(localNameF);
-		command.setProgressMonitor(new TextProgressMonitor(outw));
 		outw.println(MessageFormat.format(CLIText.get().cloningInto, localName));
 		try {
 			db = command.call().getRepository();

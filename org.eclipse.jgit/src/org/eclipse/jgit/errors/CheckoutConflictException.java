@@ -56,8 +56,6 @@ import org.eclipse.jgit.internal.JGitText;
 public class CheckoutConflictException extends IOException {
 	private static final long serialVersionUID = 1L;
 
-	private final String[] conflictedFiles;
-
 	/**
 	 * Construct a CheckoutConflictException for the specified file
 	 *
@@ -65,7 +63,6 @@ public class CheckoutConflictException extends IOException {
 	 */
 	public CheckoutConflictException(String file) {
 		super(MessageFormat.format(JGitText.get().checkoutConflictWithFile, file));
-		conflictedFiles = new String[] { file };
 	}
 
 	/**
@@ -75,15 +72,6 @@ public class CheckoutConflictException extends IOException {
 	 */
 	public CheckoutConflictException(String[] files) {
 		super(MessageFormat.format(JGitText.get().checkoutConflictWithFiles, buildList(files)));
-		conflictedFiles = files;
-	}
-
-	/**
-	 * @return the relative paths of the conflicting files (relative to the
-	 *         working directory root).
-	 */
-	public String[] getConflictedFiles() {
-		return conflictedFiles;
 	}
 
 	private static String buildList(String[] files) {
