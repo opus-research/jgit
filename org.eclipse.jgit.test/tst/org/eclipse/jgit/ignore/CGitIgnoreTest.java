@@ -115,12 +115,17 @@ public class CGitIgnoreTest extends RepositoryTestCase {
 
 	private String[] cgitIgnored() throws Exception {
 		FS fs = db.getFS();
-		ProcessBuilder builder = fs.runInShell("git", new String[] {"ls-files", "--ignored", "--exclude-standard", "-o"});
+		ProcessBuilder builder = fs.runInShell("git", new String[] { "ls-files",
+				"--ignored", "--exclude-standard", "-o" });
 		builder.directory(db.getWorkTree());
-		ExecutionResult result = fs.execute(builder, new ByteArrayInputStream(new byte[0]));
+		ExecutionResult result = fs.execute(builder,
+				new ByteArrayInputStream(new byte[0]));
 		assertEquals("External git failed", 0, result.getRc());
-		assertEquals("External git reported errors", "", toString(result.getStderr()));
-		try (BufferedReader r = new BufferedReader(new InputStreamReader(new BufferedInputStream(result.getStdout().openInputStream()), Constants.CHARSET))) {
+		assertEquals("External git reported errors", "",
+				toString(result.getStderr()));
+		try (BufferedReader r = new BufferedReader(new InputStreamReader(
+				new BufferedInputStream(result.getStdout().openInputStream()),
+				Constants.CHARSET))) {
 			return r.lines().toArray(String[]::new);
 		}
 	}
@@ -211,41 +216,4 @@ public class CGitIgnoreTest extends RepositoryTestCase {
 		writeTrashFile(".gitignore", "**/src/new/");
 		assertSameAsCGit();
 	}
-
-	@Test
-	public void testDirectoryMatchSubRecursiveBacktrack() throws Exception {
-		createFiles("src/new/foo.txt", "src/src/new/foo.txt");
-		writeTrashFile(".gitignore", "**/src/new/");
-		assertSameAsCGit();
-	}
-
-	@Test
-	public void testDirectoryMatchSubRecursiveBacktrack2() throws Exception {
-		createFiles("src/new/foo.txt", "src/src/new/foo.txt");
-		writeTrashFile(".gitignore", "**/**/src/new/");
-		assertSameAsCGit();
-	}
-
-	@Test
-	public void testDirectoryMatchSubRecursiveBacktrack3() throws Exception {
-		createFiles("x/a/a/b/foo.txt");
-		writeTrashFile(".gitignore", "**/*/a/b/");
-		assertSameAsCGit();
-	}
-
-	@Test
-	public void testDirectoryMatchSubRecursiveBacktrack4() throws Exception {
-		createFiles("x/a/a/b/foo.txt", "x/y/z/b/a/b/foo.txt",
-				"x/y/a/a/a/a/b/foo.txt", "x/y/a/a/a/a/b/a/b/foo.txt");
-		writeTrashFile(".gitignore", "**/*/a/b bar\n");
-		assertSameAsCGit();
-	}
-
-	@Test
-	public void testDirectoryMatchSubRecursiveBacktrack5() throws Exception {
-		createFiles("x/a/a/b/foo.txt", "x/y/a/b/a/b/foo.txt");
-		writeTrashFile(".gitignore", "**/*/**/a/b bar\n");
-		assertSameAsCGit();
-	}
-
 }
