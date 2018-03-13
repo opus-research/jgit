@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2014, Sven Selberg <sven.selberg@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.util.SystemReader;
-import org.junit.Before;
 import org.junit.Test;
 
-public class ConfigTest extends CLIRepositoryTestCase {
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
-	}
+public class RevWalkMergedIntoTest extends RevWalkTestCase {
 
 	@Test
-	public void testListConfig() throws Exception {
-		boolean isWindows = SystemReader.getInstance().getProperty("os.name")
-				.startsWith("Windows");
-		boolean isMac = SystemReader.getInstance().getProperty("os.name")
-				.equals("Mac OS X");
-
-		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<String>();
-		expect.add("core.filemode=" + !isWindows);
-		expect.add("core.logallrefupdates=true");
-		if (isMac)
-			expect.add("core.precomposeunicode=true");
-		expect.add("core.repositoryformatversion=0");
-		if (SystemReader.getInstance().isWindows() && osVersion() < 6
-				|| javaVersion() < 1.7) {
-			expect.add("core.symlinks=false");
-		}
-		expect.add(""); // ends with LF (last line empty)
-		assertArrayEquals("expected default configuration", expect.toArray(),
-				output);
-	}
-
-	private static float javaVersion() {
-		String versionString = System.getProperty("java.version");
-		Matcher matcher = Pattern.compile("(\\d+\\.\\d+).*").matcher(
-				versionString);
-		matcher.matches();
-		return Float.parseFloat(matcher.group(1));
-	}
-
-	private static float osVersion() {
-		String versionString = System.getProperty("os.version");
-		Matcher matcher = Pattern.compile("(\\d+\\.\\d+).*").matcher(
-				versionString);
-		matcher.matches();
-		return Float.parseFloat(matcher.group(1));
+	public void testOldCommitWalk() throws Exception {
+		/*
+		 * Sometimes a merge is performed on a machine with faulty time.
+		 * This makes the traversal of the graph, when trying to find out if B
+		 * is merged into T, complex since the algorithm uses the time stamps
+		 * of commits to find the best route.
+		 * When for example O(ld) has a very old time stamp compared to one of the
+		 * commits (N(ew)) on the upper route between T and F(alse base), the route
+		 * to False is deemed the better option even though the alternate route leeds
+		 * to B(ase) which was the commit we were after.
+		 *
+		 *             o---o---o---o---N
+		 *            /                 \
+		 *           /   o---o---o---O---T
+		 *          /   /
+		 *      ---F---B
+		 *
+		 * This test is asserting that isMergedInto(B, T) returns true even
+		 * under those circumstances.
+		 */
+		final int threeDaysInSecs = 3 * 24 * 60 * 60;
+		final RevCommit f = commit();
+		final RevCommit b = commit(f);
+		final RevCommit o = commit(-threeDaysInSecs, commit(commit(commit(b))));
+		final RevCommit n = commit(commit(commit(commit(commit(f)))));
+		final RevCommit t = commit(n, o);
+		assertTrue(rw.isMergedInto(b, t));
 	}
 }
