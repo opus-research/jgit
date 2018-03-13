@@ -126,9 +126,6 @@ public class ReceivePack {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
-	/** Filter used while advertising the refs to the client. */
-	private RefFilter refFilter;
-
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
 
@@ -187,7 +184,6 @@ public class ReceivePack {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
-		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
 	}
@@ -337,25 +333,6 @@ public class ReceivePack {
 	 */
 	public void setRefLogIdent(final PersonIdent pi) {
 		refLogIdent = pi;
-	}
-
-	/** @return the filter used while advertising the refs to the client */
-	public RefFilter getRefFilter() {
-		return refFilter;
-	}
-
-	/**
-	 * Set the filter used while advertising the refs to the client.
-	 * <p>
-	 * Only refs allowed by this filter will be sent to the client. This
-	 * can be used by the client to verify that the user using this receive
-	 * pack is only shown refs that he has access to.
-	 *
-	 * @param refFilter
-	 *            the filter; may be null to show all refs.
-	 */
-	public void setRefFilter(final RefFilter refFilter) {
-		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
 	/** @return get the hook invoked before updates occur. */
@@ -544,7 +521,7 @@ public class ReceivePack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
-			refs = getFilteredRefs();
+			refs = db.getAllRefs();
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -597,14 +574,6 @@ public class ReceivePack {
 		}
 	}
 
-	private Map<String, Ref> getFilteredRefs() {
-		Map<String, Ref> r = db.getAllRefs();
-		for (String name : r.keySet())
-			if (!refFilter.show(r.get(name)))
-				r.remove(name);
-		return r;
-	}
-
 	/**
 	 * Generate an advertisement of available refs and capabilities.
 	 *
@@ -620,7 +589,7 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = getFilteredRefs();
+		refs = db.getAllRefs();
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
