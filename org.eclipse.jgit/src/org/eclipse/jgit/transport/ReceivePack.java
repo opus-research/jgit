@@ -76,6 +76,7 @@ import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
+import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
@@ -95,6 +96,19 @@ public class ReceivePack {
 
 	/** Revision traversal support over {@link #db}. */
 	private final RevWalk walk;
+
+	/**
+	 * Is the client connection a bi-directional socket or pipe?
+	 * <p>
+	 * If true, this class assumes it can perform multiple read and write cycles
+	 * with the client over the input and output streams. This matches the
+	 * functionality available with a standard TCP/IP connection, or a local
+	 * operating system or in-memory pipe.
+	 * <p>
+	 * If false, this class runs in a read everything then output results mode,
+	 * making it suitable for single round-trip systems RPCs such as HTTP.
+	 */
+	private boolean biDirectionalPipe = true;
 
 	/** Should an incoming transfer validate objects? */
 	private boolean checkReceivedObjects;
@@ -217,6 +231,27 @@ public class ReceivePack {
 	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		return refs;
+	}
+
+	/**
+	 * @return true if this class expects a bi-directional pipe opened between
+	 *         the client and itself. The default is true.
+	 */
+	public boolean isBiDirectionalPipe() {
+		return biDirectionalPipe;
+	}
+
+	/**
+	 * @param twoWay
+	 *            if true, this class will assume the socket is a fully
+	 *            bidirectional pipe between the two peers and takes advantage
+	 *            of that by first transmitting the known refs, then waiting to
+	 *            read commands. If false, this class assumes it must read the
+	 *            commands before writing output and does not perform the
+	 *            initial advertising.
+	 */
+	public void setBiDirectionalPipe(final boolean twoWay) {
+		biDirectionalPipe = twoWay;
 	}
 
 	/**
@@ -484,7 +519,10 @@ public class ReceivePack {
 	}
 
 	private void service() throws IOException {
-		sendAdvertisedRefs();
+		if (biDirectionalPipe)
+			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
+		else
+			refs = db.getAllRefs();
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -537,9 +575,17 @@ public class ReceivePack {
 		}
 	}
 
-	private void sendAdvertisedRefs() throws IOException {
+	/**
+	 * Generate an advertisement of available refs and capabilities.
+	 *
+	 * @param adv
+	 *            the advertisement formatter.
+	 * @throws IOException
+	 *             the formatter failed to write an advertisement.
+	 */
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
 		final RevFlag advertised = walk.newFlag("ADVERTISED");
-		final RefAdvertiser adv = new RefAdvertiser(pckOut, walk, advertised);
+		adv.init(walk, advertised);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
@@ -552,7 +598,7 @@ public class ReceivePack {
 		adv.includeAdditionalHaves();
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}");
-		pckOut.end();
+		adv.end();
 	}
 
 	private void recvCommands() throws IOException {
@@ -587,7 +633,11 @@ public class ReceivePack {
 			final ObjectId newId = ObjectId.fromString(line.substring(41, 81));
 			final String name = line.substring(82);
 			final ReceiveCommand cmd = new ReceiveCommand(oldId, newId, name);
-			cmd.setRef(refs.get(cmd.getRefName()));
+			if (name.equals(Constants.HEAD)) {
+				cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
+			} else {
+				cmd.setRef(refs.get(cmd.getRefName()));
+			}
 			commands.add(cmd);
 		}
 	}
