@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.ignore2.FastIgnoreRule;
 import org.eclipse.jgit.lib.Constants;
 
 /**
@@ -72,11 +71,11 @@ public class IgnoreNode {
 	}
 
 	/** The rules that have been parsed into this node. */
-	private final List<FastIgnoreRule> rules;
+	private final List<IgnoreRule> rules;
 
 	/** Create an empty ignore node with no rules. */
 	public IgnoreNode() {
-		rules = new ArrayList<FastIgnoreRule>();
+		rules = new ArrayList<IgnoreRule>();
 	}
 
 	/**
@@ -85,7 +84,7 @@ public class IgnoreNode {
 	 * @param rules
 	 *            list of rules.
 	 **/
-	public IgnoreNode(List<FastIgnoreRule> rules) {
+	public IgnoreNode(List<IgnoreRule> rules) {
 		this.rules = rules;
 	}
 
@@ -104,7 +103,7 @@ public class IgnoreNode {
 		while ((txt = br.readLine()) != null) {
 			txt = txt.trim();
 			if (txt.length() > 0 && !txt.startsWith("#") && !txt.equals("/")) //$NON-NLS-1$ //$NON-NLS-2$
-				rules.add(new FastIgnoreRule(txt));
+				rules.add(new IgnoreRule(txt));
 		}
 	}
 
@@ -113,7 +112,7 @@ public class IgnoreNode {
 	}
 
 	/** @return list of all ignore rules held by this node. */
-	public List<FastIgnoreRule> getRules() {
+	public List<IgnoreRule> getRules() {
 		return Collections.unmodifiableList(rules);
 	}
 
@@ -134,7 +133,7 @@ public class IgnoreNode {
 
 		// Parse rules in the reverse order that they were read
 		for (int i = rules.size() - 1; i > -1; i--) {
-			FastIgnoreRule rule = rules.get(i);
+			IgnoreRule rule = rules.get(i);
 			if (rule.isMatch(entryPath, isDirectory)) {
 				if (rule.getResult())
 					return MatchResult.IGNORED;
