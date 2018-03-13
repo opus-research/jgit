@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, GitHub Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertEquals;
+
+import java.util.Arrays;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.LockFailedException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Unit tests of {@link LockFile}
+ * Test construction of squash message by {@link SquashMessageFormatterTest}.
  */
-public class LockFileTest extends RepositoryTestCase {
+public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
+	private GitDateFormatter dateFormatter;
+	private SquashMessageFormatter msgFormatter;
+	private RevCommit revCommit;
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+		msgFormatter = new SquashMessageFormatter();
+	}
 
 	@Test
-	public void lockFailedExceptionRecovery() throws Exception {
+	public void testCommit() throws Exception {
 		Git git = new Git(db);
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		RevCommit commit1 = git.commit().setMessage("create file").call();
+		revCommit = git.commit().setMessage("squash_me").call();
 
-		assertNotNull(commit1);
-		writeTrashFile("file.txt", "content2");
-		git.add().addFilepattern("file.txt").call();
-		assertNotNull(git.commit().setMessage("edit file").call());
-
-		LockFile lf = new LockFile(db.getIndexFile(), db.getFS());
-		assertTrue(lf.lock());
-		try {
-			git.checkout().setName(commit1.name()).call();
-			fail("JGitInternalException not thrown");
-		} catch (JGitInternalException e) {
-			assertTrue(e.getCause() instanceof LockFailedException);
-			lf.unlock();
-			git.checkout().setName(commit1.name()).call();
-		}
+		Ref master = db.getRef("refs/heads/master");
+		String message = msgFormatter.format(Arrays.asList(revCommit), master);
+		assertEquals(
+				"Squashed commit of the following:\n\ncommit "
+						+ revCommit.getName() + "\nAuthor: "
+						+ revCommit.getAuthorIdent().getName() + " <"
+						+ revCommit.getAuthorIdent().getEmailAddress()
+						+ ">\nDate:   " + dateFormatter.formatDate(author)
+						+ "\n\n\tsquash_me\n", message);
 	}
 }

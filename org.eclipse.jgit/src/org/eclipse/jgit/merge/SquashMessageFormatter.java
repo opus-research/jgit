@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, GitHub Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,67 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import java.util.List;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.LockFailedException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.junit.Test;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
 
 /**
- * Unit tests of {@link LockFile}
+ * Formatter for constructing the commit message for a squashed commit.
+ * <p>
+ * The format should be the same as C Git does it, for compatibility.
  */
-public class LockFileTest extends RepositoryTestCase {
+public class SquashMessageFormatter {
 
-	@Test
-	public void lockFailedExceptionRecovery() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		RevCommit commit1 = git.commit().setMessage("create file").call();
+	private GitDateFormatter dateFormatter;
 
-		assertNotNull(commit1);
-		writeTrashFile("file.txt", "content2");
-		git.add().addFilepattern("file.txt").call();
-		assertNotNull(git.commit().setMessage("edit file").call());
-
-		LockFile lf = new LockFile(db.getIndexFile(), db.getFS());
-		assertTrue(lf.lock());
-		try {
-			git.checkout().setName(commit1.name()).call();
-			fail("JGitInternalException not thrown");
-		} catch (JGitInternalException e) {
-			assertTrue(e.getCause() instanceof LockFailedException);
-			lf.unlock();
-			git.checkout().setName(commit1.name()).call();
+	/**
+	 * Create a new squash message formatter.
+	 */
+	public SquashMessageFormatter() {
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+	}
+	/**
+	 * Construct the squashed commit message.
+	 *
+	 * @param squashedCommits
+	 *            the squashed commits
+	 * @param target
+	 *            the target branch
+	 * @return squashed commit message
+	 */
+	public String format(List<RevCommit> squashedCommits, Ref target) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("Squashed commit of the following:\n");
+		for (RevCommit c : squashedCommits) {
+			sb.append("\ncommit ");
+			sb.append(c.getName());
+			sb.append("\n");
+			sb.append(toString(c.getAuthorIdent()));
+			sb.append("\n\t");
+			sb.append(c.getShortMessage());
+			sb.append("\n");
 		}
+		return sb.toString();
+	}
+
+	private String toString(PersonIdent author) {
+		final StringBuilder a = new StringBuilder();
+
+		a.append("Author: ");
+		a.append(author.getName());
+		a.append(" <");
+		a.append(author.getEmailAddress());
+		a.append(">\n");
+		a.append("Date:   ");
+		a.append(dateFormatter.formatDate(author));
+		a.append("\n");
+
+		return a.toString();
 	}
 }
