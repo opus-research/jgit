@@ -227,9 +227,9 @@ public class ResetCommand extends GitCommand<Ref> {
 			setCallable(false);
 			return result;
 		} catch (IOException e) {
-			throw new JGitInternalException(
+			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().exceptionCaughtDuringExecutionOfResetCommand,
-					e);
+					e.getMessage()), e);
 		}
 	}
 
@@ -276,7 +276,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		if (!filepaths.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$ //$NON-NLS-2$
+					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$
 		this.mode = mode;
 		return this;
 	}
@@ -290,7 +290,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	public ResetCommand addPath(String path) {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "<paths>...", //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "<paths>...",
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
 		filepaths.add(path);
 		return this;
