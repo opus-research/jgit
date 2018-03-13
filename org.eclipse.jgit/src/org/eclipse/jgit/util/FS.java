@@ -67,6 +67,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -622,7 +623,8 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
-		return FileUtils.readSymLink(path);
+		throw new SymlinksNotSupportedException(
+				JGitText.get().errorSymlinksNotSupported);
 	}
 
 	/**
@@ -705,7 +707,8 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
-		FileUtils.createSymLink(path, target);
+		throw new SymlinksNotSupportedException(
+				JGitText.get().errorSymlinksNotSupported);
 	}
 
 	/**
@@ -863,10 +866,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public File findHook(Repository repository, final String hookName) {
-		File gitDir = repository.getDirectory();
-		if (gitDir == null)
-			return null;
-		final File hookFile = new File(new File(gitDir,
+		final File hookFile = new File(new File(repository.getDirectory(),
 				Constants.HOOKS), hookName);
 		return hookFile.isFile() ? hookFile : null;
 	}
