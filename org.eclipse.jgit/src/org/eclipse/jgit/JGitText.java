@@ -95,6 +95,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
+	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
@@ -182,6 +183,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotGetAdvertisedRef;
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
+	/***/ public String couldNotReadObjectWhileParsingCommit;
 	/***/ public String couldNotRenameDeleteOldIndex;
 	/***/ public String couldNotRenameTemporaryFile;
 	/***/ public String couldNotRenameTemporaryIndexFileToIndex;
@@ -190,6 +192,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String countingObjects;
 	/***/ public String createBranchFailedUnknownReason;
 	/***/ public String createBranchUnexpectedResult;
+	/***/ public String createNewFileFailed;
 	/***/ public String credentialPassword;
 	/***/ public String credentialUsername;
 	/***/ public String daemonAlreadyRunning;
@@ -387,6 +390,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packfileIsTruncated;
 	/***/ public String packingCancelledDuringObjectsWriting;
+	/***/ public String packWriterStatistics;
 	/***/ public String pathIsNotInWorkingDir;
 	/***/ public String peeledLineBeforeRef;
 	/***/ public String peerDidNotSupplyACompleteObjectGraph;
@@ -438,6 +442,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String resultLengthIncorrect;
 	/***/ public String rewinding;
 	/***/ public String searchForReuse;
+	/***/ public String searchForSizes;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shortCompressedStreamAt;

@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -63,6 +64,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackOutputStream;
@@ -147,10 +149,15 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		src.pack.copyAsIs(out, src, this);
 	}
 
-	public void writeObjects(PackOutputStream out, Iterable<ObjectToPack> list)
+	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
 			throws IOException {
 		for (ObjectToPack otp : list)
 			out.writeObject(otp);
+	}
+
+	@SuppressWarnings("unchecked")
+	public Collection<CachedPack> getCachedPacks() throws IOException {
+		return (Collection<CachedPack>) db.getCachedPacks();
 	}
 
 	/**
@@ -187,6 +194,24 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			need -= r;
 		}
 		return cnt - need;
+	}
+
+	public void copyPackAsIs(PackOutputStream out, CachedPack pack)
+			throws IOException {
+		((LocalCachedPack) pack).copyAsIs(out, this);
+	}
+
+	void copyPackAsIs(final PackFile pack, final PackOutputStream out,
+			long position, long cnt) throws IOException {
+		while (0 < cnt) {
+			pin(pack, position);
+
+			int ptr = (int) (position - window.start);
+			int n = (int) Math.min(window.size() - ptr, cnt);
+			window.write(out, position, n);
+			position += n;
+			cnt -= n;
+		}
 	}
 
 	/**

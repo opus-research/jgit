@@ -57,6 +57,7 @@ import java.util.Set;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -151,8 +152,8 @@ public class UploadPack {
 	/** null if {@link #commonBase} should be examined again. */
 	private Boolean okToGiveUp;
 
-	/** Marked on objects we sent in our advertisement list. */
-	private final RevFlag ADVERTISED;
+	/** Objects we sent in our advertisement list, clients can ask for these. */
+	private Set<ObjectId> advertised;
 
 	/** Marked on objects the client has asked us to give them. */
 	private final RevFlag WANT;
@@ -181,7 +182,6 @@ public class UploadPack {
 		walk = new RevWalk(db);
 		walk.setRetainBody(false);
 
-		ADVERTISED = walk.newFlag("ADVERTISED");
 		WANT = walk.newFlag("WANT");
 		PEER_HAS = walk.newFlag("PEER_HAS");
 		COMMON = walk.newFlag("COMMON");
@@ -189,7 +189,6 @@ public class UploadPack {
 		walk.carry(PEER_HAS);
 
 		SAVE = new RevFlagSet();
-		SAVE.add(ADVERTISED);
 		SAVE.add(WANT);
 		SAVE.add(PEER_HAS);
 		refFilter = RefFilter.DEFAULT;
@@ -327,13 +326,11 @@ public class UploadPack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else {
+			advertised = new HashSet<ObjectId>();
 			refs = refFilter.filter(db.getAllRefs());
-			for (Ref r : refs.values()) {
-				try {
-					walk.parseAny(r.getObjectId()).add(ADVERTISED);
-				} catch (IOException e) {
-					// Skip missing/corrupt objects
-				}
+			for (Ref ref : refs.values()) {
+				if (ref.getObjectId() != null)
+					advertised.add(ref.getObjectId());
 			}
 		}
 
@@ -361,7 +358,7 @@ public class UploadPack {
 	 *             the formatter failed to write an advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
-		adv.init(walk, ADVERTISED);
+		adv.init(db);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK_DETAILED);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
@@ -372,7 +369,7 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
 		adv.setDerefTags(true);
 		refs = refFilter.filter(db.getAllRefs());
-		adv.send(refs);
+		advertised = adv.send(refs);
 		adv.end();
 	}
 
@@ -425,7 +422,7 @@ public class UploadPack {
 				if (o.has(WANT)) {
 					// Already processed, the client repeated itself.
 
-				} else if (o.has(ADVERTISED)) {
+				} else if (advertised.contains(o)) {
 					o.add(WANT);
 					wantAll.add(o);
 
@@ -618,6 +615,7 @@ public class UploadPack {
 
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
+		SideBandOutputStream msgOut = null;
 
 		if (sideband) {
 			int bufsz = SideBandOutputStream.SMALL_BUF;
@@ -626,9 +624,11 @@ public class UploadPack {
 
 			packOut = new SideBandOutputStream(SideBandOutputStream.CH_DATA,
 					bufsz, rawOut);
-			if (!options.contains(OPTION_NO_PROGRESS))
-				pm = new SideBandProgressMonitor(new SideBandOutputStream(
-						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut));
+			if (!options.contains(OPTION_NO_PROGRESS)) {
+				msgOut = new SideBandOutputStream(
+						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut);
+				pm = new SideBandProgressMonitor(msgOut);
+			}
 		}
 
 		PackConfig cfg = packConfig;
@@ -636,6 +636,7 @@ public class UploadPack {
 			cfg = new PackConfig(db);
 		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
 		try {
+			pw.setUseCachedPacks(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
 			pw.preparePack(pm, wantAll, commonBase);
@@ -654,11 +655,19 @@ public class UploadPack {
 						pw.addObject(t);
 				}
 			}
+
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
+			packOut.flush();
+
+			if (msgOut != null) {
+				String msg = pw.getStatistics().getMessage() + '\n';
+				msgOut.write(Constants.encode(msg));
+				msgOut.flush();
+			}
+
 		} finally {
 			pw.release();
 		}
-		packOut.flush();
 
 		if (sideband)
 			pckOut.end();
