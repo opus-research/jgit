@@ -45,7 +45,8 @@
 
 package org.eclipse.jgit.errors;
 
-import java.io.UnsupportedEncodingException;
+import static java.nio.charset.StandardCharsets.US_ASCII;
+
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -67,21 +68,12 @@ public class InvalidObjectIdException extends IllegalArgumentException {
 		super(msg(bytes, offset, length));
 	}
 
-	/**
-	 * @param id the invalid id.
-	 *
-	 * @since 4.1
-	 */
-	public InvalidObjectIdException(String id) {
-		super(MessageFormat.format(JGitText.get().invalidId, id));
-	}
-
 	private static String msg(byte[] bytes, int offset, int length) {
 		try {
 			return MessageFormat.format(
 					JGitText.get().invalidId,
-					new String(bytes, offset, length, "US-ASCII")); //$NON-NLS-1$
-		} catch (UnsupportedEncodingException | StringIndexOutOfBoundsException e) {
+					new String(bytes, offset, length, US_ASCII));
+		} catch (StringIndexOutOfBoundsException e) {
 			return JGitText.get().invalidId0;
 		}
 	}
