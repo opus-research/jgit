@@ -249,6 +249,36 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 	}
 
 	/**
+	 * Check that we search in the working tree for attributes although the file
+	 * we are currently inspecting does not exist anymore in the working tree.
+	 *
+	 * @throws IOException
+	 * @throws NoFilepatternException
+	 * @throws GitAPIException
+	 */
+	@Test
+	public void testIndexOnly2()
+			throws IOException, NoFilepatternException, GitAPIException {
+		File l2 = writeTrashFile("level1/level2/l2.txt", "");
+		writeTrashFile("level1/level2/l1.txt", "");
+
+		git.add().addFilepattern(".").call();
+
+		writeAttributesFile(".gitattributes", "*.txt custom=root");
+		assertTrue(l2.delete());
+
+		beginWalk();
+
+		assertEntry(F, ".gitattributes");
+		assertEntry(D, "level1");
+		assertEntry(D, "level1/level2");
+		assertEntry(F, "level1/level2/l1.txt", asSet(CUSTOM_ROOT));
+		assertEntry(M, "level1/level2/l2.txt", asSet(CUSTOM_ROOT));
+
+		endWalk();
+	}
+
+	/**
 	 * Basic test for git attributes.
 	 * <p>
 	 * In this use case files are present in both the working tree and the index
