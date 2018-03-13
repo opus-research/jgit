@@ -398,8 +398,10 @@ public class FileUtils {
 	 * Create a symbolic link
 	 *
 	 * @param path
+	 *            the path of the symbolic link to create
 	 * @param target
-	 * @return path to the created link
+	 *            the target of the symbolic link
+	 * @return the path to the symbolic link
 	 * @throws IOException
 	 * @since 4.2
 	 */
@@ -407,7 +409,9 @@ public class FileUtils {
 			throws IOException {
 		Path nioPath = path.toPath();
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
-			if (Files.isRegularFile(nioPath)) {
+			BasicFileAttributes attrs = Files.readAttributes(nioPath,
+					BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+			if (attrs.isRegularFile() || attrs.isSymbolicLink()) {
 				delete(path);
 			} else {
 				delete(path, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
@@ -735,4 +739,29 @@ public class FileUtils {
 		}
 		return name;
 	}
+
+	/**
+	 * Best-effort variation of {@link File#getCanonicalFile()} returning the
+	 * input file if the file cannot be canonicalized instead of throwing
+	 * {@link IOException}.
+	 *
+	 * @param file
+	 *            to be canonicalized; may be {@code null}
+	 * @return canonicalized file, or the unchanged input file if
+	 *         canonicalization failed or if {@code file == null}
+	 * @throws SecurityException
+	 *             if {@link File#getCanonicalFile()} throws one
+	 * @since 4.2
+	 */
+	public static File canonicalize(File file) {
+		if (file == null) {
+			return null;
+		}
+		try {
+			return file.getCanonicalFile();
+		} catch (IOException e) {
+			return file;
+		}
+	}
+
 }

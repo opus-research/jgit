@@ -99,6 +99,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -161,18 +162,6 @@ import org.eclipse.jgit.util.TemporaryBuffer;
 public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
 
-	/** A collection of object ids. */
-	public interface ObjectIdSet {
-		/**
-		 * Returns true if the objectId is contained within the collection.
-		 *
-		 * @param objectId
-		 *            the objectId to find
-		 * @return whether the collection contains the objectId.
-		 */
-		boolean contains(AnyObjectId objectId);
-	}
-
 	private static final Map<WeakReference<PackWriter>, Boolean> instances =
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
 
@@ -218,7 +207,7 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	@SuppressWarnings("unchecked")
-	private BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
+	BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
 	{
 		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
 		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
@@ -249,7 +238,7 @@ public class PackWriter implements AutoCloseable {
 	/** {@link #reader} recast to the reuse interface, if it supports it. */
 	private final ObjectReuseAsIs reuseSupport;
 
-	private final PackConfig config;
+	final PackConfig config;
 
 	private final PackStatistics.Accumulator stats;
 
@@ -1306,8 +1295,7 @@ public class PackWriter implements AutoCloseable {
 		long totalWeight = 0;
 		for (int i = 0; i < cnt; i++) {
 			ObjectToPack o = list[i];
-			if (!o.isEdge() && !o.doNotAttemptDelta())
-				totalWeight += o.getWeight();
+			totalWeight += DeltaTask.getAdjustedWeight(o);
 		}
 
 		long bytesPerUnit = 1;
@@ -1552,6 +1540,8 @@ public class PackWriter implements AutoCloseable {
 			if (zbuf != null) {
 				out.writeHeader(otp, otp.getCachedSize());
 				out.write(zbuf);
+				typeStats.cntDeltas++;
+				typeStats.deltaBytes += out.length() - otp.getOffset();
 				return;
 			}
 		}
@@ -2015,13 +2005,10 @@ public class PackWriter implements AutoCloseable {
 		byName = null;
 
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
-				reader, writeBitmaps, pm, stats.interestingObjects);
+				reader, writeBitmaps, pm, stats.interestingObjects, config);
 
-		int commitRange = config.getBitmapCommitRange();
-		if (commitRange < 0)
-			commitRange = numCommits; // select from all commits
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
-				bitmapPreparer.doCommitSelection(commitRange);
+				bitmapPreparer.selectCommits(numCommits);
 
 		beginPhase(PackingPhase.BUILDING_BITMAPS, pm, selectedCommits.size());
 
