@@ -184,7 +184,6 @@ public class FileLfsServlet extends HttpServlet {
 	 *            error message
 	 * @throws IOException
 	 *             on failure to send the response
-	 * @since 4.6
 	 */
 	protected static void sendError(HttpServletResponse rsp, int status, String message)
 			throws IOException {
