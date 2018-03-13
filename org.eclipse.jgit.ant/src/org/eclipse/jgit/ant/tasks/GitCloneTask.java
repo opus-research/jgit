@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Kevin Sawicki <kevin@github.com>
+ * Copyright (C) 2011, Ketan Padegaonkar <KetanPadegaonkar@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,95 +40,78 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.ant.tasks;
 
-import java.io.IOException;
+import java.io.File;
 
+import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.Task;
+import org.eclipse.jgit.api.CloneCommand;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.blame.RevisionBuilder;
-import org.eclipse.jgit.blame.RevisionContainer;
-import org.eclipse.jgit.diff.DiffAlgorithm;
-import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.transport.URIish;
 
 /**
- * Annotate command for building a {@link RevisionContainer} for a file path.
+ * Clone a repository into a new directory.
+ * 
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
+ *      >git-clone(1)</a>
  */
-public class LineHistoryCommand extends GitCommand<RevisionContainer> {
+public class GitCloneTask extends Task {
 
-	private String path;
-
-	private DiffAlgorithm diffAlgorithm;
-
-	private RawTextComparator textComparator;
-
-	private ObjectId startCommit;
+	private String uri;
+	private File destination;
+	private boolean bare;
+	private String branch = Constants.HEAD;
 
 	/**
-	 * @param repo
+	 * @param uri
+	 *            the uri to clone from
 	 */
-	public LineHistoryCommand(Repository repo) {
-		super(repo);
+	public void setUri(String uri) {
+		this.uri = uri;
 	}
 
 	/**
-	 * Set file path
-	 *
-	 * @param filePath
-	 * @return this command
+	 * The optional directory associated with the clone operation. If the
+	 * directory isn't set, a name associated with the source uri will be used.
+	 * 
+	 * @see URIish#getHumanishName()
+	 * 
+	 * @param destination
+	 *            the directory to clone to
 	 */
-	public LineHistoryCommand setFilePath(String filePath) {
-		this.path = filePath;
-		return this;
+	public void setDest(File destination) {
+		this.destination = destination;
 	}
 
 	/**
-	 * Set diff algorithm
-	 *
-	 * @param diffAlgorithm
-	 * @return this command
+	 * @param bare
+	 *            whether the cloned repository is bare or not
 	 */
-	public LineHistoryCommand setDiffAlgorithm(DiffAlgorithm diffAlgorithm) {
-		this.diffAlgorithm = diffAlgorithm;
-		return this;
+	public void setBare(boolean bare) {
+		this.bare = bare;
 	}
 
 	/**
-	 * Set raw text comparator
-	 *
-	 * @param textComparator
-	 * @return this command
+	 * @param branch
+	 *            the initial branch to check out when cloning the repository
 	 */
-	public LineHistoryCommand setTextComparator(RawTextComparator textComparator) {
-		this.textComparator = textComparator;
-		return this;
+	public void setBranch(String branch) {
+		this.branch = branch;
 	}
 
-	/**
-	 * Set start commit id
-	 *
-	 * @param startCommit
-	 * @return this command
-	 */
-	public LineHistoryCommand setStartCommit(ObjectId startCommit) {
-		this.startCommit = startCommit;
-		return this;
-	}
-
-	/**
-	 * @see java.util.concurrent.Callable#call()
-	 */
-	public RevisionContainer call() throws JGitInternalException {
-		checkCallable();
-		RevisionBuilder builder = new RevisionBuilder(repo, path);
+	@Override
+	public void execute() throws BuildException {
+		log("Cloning repository " + uri);
+		
+		CloneCommand clone = Git.cloneRepository();
+		clone.setURI(uri).setDirectory(destination).setBranch(branch).setBare(bare);
 		try {
-			builder.setDiffAlgorithm(diffAlgorithm);
-			builder.setTextComparator(textComparator);
-			builder.setStart(startCommit);
-			return builder.build();
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
+			clone.call();
+		} catch (JGitInternalException e) {
+			throw new BuildException("Could not clone repository: " + e.getMessage(), e);
 		}
 	}
 }
