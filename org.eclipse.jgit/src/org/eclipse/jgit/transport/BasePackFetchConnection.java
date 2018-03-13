@@ -47,7 +47,6 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
@@ -60,13 +59,13 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -266,14 +265,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
-		fetch(monitor, want, have, null);
-	}
-
-	public final void fetch(final ProgressMonitor monitor,
-			final Collection<Ref> want, final Set<ObjectId> have,
-			OutputStream outputStream) throws TransportException {
 		markStartedOperation();
-		doFetch(monitor, want, have, outputStream);
+		doFetch(monitor, want, have);
 	}
 
 	public boolean didFetchIncludeTags() {
@@ -305,14 +298,12 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 *            additional objects to assume that already exist locally. This
 	 *            will be added to the set of objects reachable from the
 	 *            destination repository's references.
-	 * @param outputStream
-	 *            ouputStream to write sideband messages to
 	 * @throws TransportException
 	 *             if any exception occurs.
 	 */
 	protected void doFetch(final ProgressMonitor monitor,
-			final Collection<Ref> want, final Set<ObjectId> have,
-			OutputStream outputStream) throws TransportException {
+			final Collection<Ref> want, final Set<ObjectId> have)
+			throws TransportException {
 		try {
 			markRefsAdvertised();
 			markReachable(have, maxTimeWanted(want));
@@ -330,7 +321,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 				state = null;
 				pckState = null;
 
-				receivePack(monitor, outputStream);
+				receivePack(monitor);
 			}
 		} catch (CancelledException ce) {
 			close();
@@ -711,13 +702,11 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			((RevCommit) obj).carry(COMMON);
 	}
 
-	private void receivePack(final ProgressMonitor monitor,
-			OutputStream outputStream) throws IOException {
+	private void receivePack(final ProgressMonitor monitor) throws IOException {
 		onReceivePack();
 		InputStream input = in;
 		if (sideband)
-			input = new SideBandInputStream(input, monitor, getMessageWriter(),
-					outputStream);
+			input = new SideBandInputStream(input, monitor, getMessageWriter());
 
 		ObjectInserter ins = local.newObjectInserter();
 		try {
