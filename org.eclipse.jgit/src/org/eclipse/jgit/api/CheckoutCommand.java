@@ -47,10 +47,8 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.api.CheckoutResult.Status;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
@@ -68,7 +66,6 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -177,8 +174,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	private List<String> paths;
 
 	private boolean checkoutAllPaths;
-
-	private Set<String> actuallyModifiedPaths;
 
 	/**
 	 * @param repo
@@ -415,8 +410,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
-	 * Checkout paths into index and working directory, firing a
-	 * {@link WorkingTreeModifiedEvent} if the working tree was modified.
+	 * Checkout paths into index and working directory
 	 *
 	 * @return this instance
 	 * @throws IOException
@@ -424,7 +418,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 */
 	protected CheckoutCommand checkoutPaths() throws IOException,
 			RefNotFoundException {
-		actuallyModifiedPaths = new HashSet<>();
 		DirCache dc = repo.lockDirCache();
 		try (RevWalk revWalk = new RevWalk(repo);
 				TreeWalk treeWalk = new TreeWalk(repo,
@@ -439,16 +432,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				checkoutPathsFromCommit(treeWalk, dc, commit);
 			}
 		} finally {
-			try {
-				dc.unlock();
-			} finally {
-				WorkingTreeModifiedEvent event = new WorkingTreeModifiedEvent(
-						actuallyModifiedPaths, null);
-				actuallyModifiedPaths = null;
-				if (!event.isEmpty()) {
-					repo.fireEvent(event);
-				}
-			}
+			dc.unlock();
 		}
 		return this;
 	}
@@ -477,11 +461,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					int stage = ent.getStage();
 					if (stage > DirCacheEntry.STAGE_0) {
 						if (checkoutStage != null) {
-							if (stage == checkoutStage.number) {
+							if (stage == checkoutStage.number)
 								checkoutPath(ent, r, new CheckoutMetadata(
 										eolStreamType, filterCommand));
-								actuallyModifiedPaths.add(path);
-							}
 						} else {
 							UnmergedPathException e = new UnmergedPathException(
 									ent);
@@ -490,7 +472,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					} else {
 						checkoutPath(ent, r, new CheckoutMetadata(eolStreamType,
 								filterCommand));
-						actuallyModifiedPaths.add(path);
 					}
 				}
 			});
@@ -511,15 +492,13 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
 			final String filterCommand = treeWalk
 					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
-			final String path = treeWalk.getPathString();
-			editor.add(new PathEdit(path) {
+			editor.add(new PathEdit(treeWalk.getPathString()) {
 				@Override
 				public void apply(DirCacheEntry ent) {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);
 					checkoutPath(ent, r,
 							new CheckoutMetadata(eolStreamType, filterCommand));
-					actuallyModifiedPaths.add(path);
 				}
 			});
 		}

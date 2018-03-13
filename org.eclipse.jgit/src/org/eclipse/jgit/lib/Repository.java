@@ -106,13 +106,7 @@ import org.slf4j.LoggerFactory;
  * A repository holds all objects and refs used for managing source code (could
  * be any type of file, but source code is what SCM's are typically used for).
  * <p>
- * The thread-safety of a {@link Repository} very much depends on the concrete
- * implementation. Applications working with a generic {@code Repository} type
- * must not assume the instance is thread-safe.
- * <ul>
- * <li>{@code FileRepository} is thread-safe.
- * <li>{@code DfsRepository} thread-safety is determined by its subclass.
- * </ul>
+ * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
 	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
