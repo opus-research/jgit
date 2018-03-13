@@ -43,20 +43,12 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class PatchErrorTest {
-	@Test
+public class PatchErrorTest extends TestCase {
 	public void testError_DisconnectedHunk() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -64,7 +56,7 @@ public class PatchErrorTest {
 			final FileHeader fh = p.getFiles().get(0);
 			assertEquals(
 					"org.eclipse.jgit/src/org/spearce/jgit/lib/RepositoryConfig.java",
-					fh.getNewPath());
+					fh.getNewName());
 			assertEquals(1, fh.getHunks().size());
 		}
 
@@ -76,7 +68,6 @@ public class PatchErrorTest {
 		assertTrue(e.getLineText().startsWith("@@ -109,4 +109,11 @@ assert"));
 	}
 
-	@Test
 	public void testError_TruncatedOld() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -90,7 +81,6 @@ public class PatchErrorTest {
 		assertTrue(e.getLineText().startsWith("@@ -236,9 +236,9 @@ protected "));
 	}
 
-	@Test
 	public void testError_TruncatedNew() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -104,7 +94,6 @@ public class PatchErrorTest {
 		assertTrue(e.getLineText().startsWith("@@ -236,9 +236,9 @@ protected "));
 	}
 
-	@Test
 	public void testError_BodyTooLong() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -118,7 +107,6 @@ public class PatchErrorTest {
 		assertTrue(e.getLineText().startsWith("@@ -109,4 +109,11 @@ assert"));
 	}
 
-	@Test
 	public void testError_GarbageBetweenFiles() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(2, p.getFiles().size());
@@ -126,14 +114,14 @@ public class PatchErrorTest {
 			final FileHeader fh = p.getFiles().get(0);
 			assertEquals(
 					"org.eclipse.jgit.test/tst/org/spearce/jgit/lib/RepositoryConfigTest.java",
-					fh.getNewPath());
+					fh.getNewName());
 			assertEquals(1, fh.getHunks().size());
 		}
 		{
 			final FileHeader fh = p.getFiles().get(1);
 			assertEquals(
 					"org.eclipse.jgit/src/org/spearce/jgit/lib/RepositoryConfig.java",
-					fh.getNewPath());
+					fh.getNewName());
 			assertEquals(1, fh.getHunks().size());
 		}
 
@@ -145,14 +133,13 @@ public class PatchErrorTest {
 		assertEquals("I AM NOT HERE\n", e.getLineText());
 	}
 
-	@Test
 	public void testError_GitBinaryNoForwardHunk() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(2, p.getFiles().size());
 		{
 			final FileHeader fh = p.getFiles().get(0);
 			assertEquals("org.spearce.egit.ui/icons/toolbar/fetchd.png", fh
-					.getNewPath());
+					.getNewName());
 			assertSame(FileHeader.PatchType.GIT_BINARY, fh.getPatchType());
 			assertTrue(fh.getHunks().isEmpty());
 			assertNull(fh.getForwardBinaryHunk());
@@ -160,7 +147,7 @@ public class PatchErrorTest {
 		{
 			final FileHeader fh = p.getFiles().get(1);
 			assertEquals("org.spearce.egit.ui/icons/toolbar/fetche.png", fh
-					.getNewPath());
+					.getNewName());
 			assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
 			assertTrue(fh.getHunks().isEmpty());
 			assertNull(fh.getForwardBinaryHunk());
@@ -176,7 +163,7 @@ public class PatchErrorTest {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = JGitTestUtil.getName() + ".patch";
+		final String patchFile = getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

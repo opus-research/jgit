@@ -53,15 +53,9 @@ import java.net.ProxySelector;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 /** Extra utilities to support usage of HTTP. */
 public class HttpSupport {
-	/** The {@code GET} HTTP method. */
-	public static final String METHOD_GET = "GET";
-
 	/** The {@code POST} HTTP method. */
 	public static final String METHOD_POST = "POST";
 
@@ -125,12 +119,6 @@ public class HttpSupport {
 	/** The standard {@code text/plain} MIME type. */
 	public static final String TEXT_PLAIN = "text/plain";
 
-	/** The {@code Authorization} header. */
-	public static final String HDR_AUTHORIZATION = "Authorization";
-
-	/** The {@code WWW-Authenticate} header. */
-	public static final String HDR_WWW_AUTHENTICATE = "WWW-Authenticate";
-
 	/**
 	 * URL encode a value string into an output buffer.
 	 *
@@ -145,7 +133,7 @@ public class HttpSupport {
 		try {
 			urlstr.append(URLEncoder.encode(key, "UTF-8"));
 		} catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(JGitText.get().couldNotURLEncodeToUTF8, e);
+			throw new RuntimeException("Could not URL encode to UTF-8", e);
 		}
 	}
 
@@ -170,7 +158,7 @@ public class HttpSupport {
 			// The standard J2SE error message is not very useful.
 			//
 			if ("Connection timed out: connect".equals(ce.getMessage()))
-				throw new ConnectException(MessageFormat.format(JGitText.get().connectionTimeOut, host));
+				throw new ConnectException("Connection time out: " + host);
 			throw new ConnectException(ce.getMessage() + " " + host);
 		}
 	}
@@ -193,7 +181,7 @@ public class HttpSupport {
 			return proxySelector.select(u.toURI()).get(0);
 		} catch (URISyntaxException e) {
 			final ConnectException err;
-			err = new ConnectException(MessageFormat.format(JGitText.get().cannotDetermineProxyFor, u));
+			err = new ConnectException("Cannot determine proxy for " + u);
 			err.initCause(e);
 			throw err;
 		}

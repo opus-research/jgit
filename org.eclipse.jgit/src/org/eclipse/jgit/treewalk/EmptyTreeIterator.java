@@ -50,7 +50,7 @@ import java.io.IOException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
 
 /** Iterator over an empty tree (a directory with no files). */
 public class EmptyTreeIterator extends AbstractTreeIterator {
@@ -87,14 +87,9 @@ public class EmptyTreeIterator extends AbstractTreeIterator {
 	}
 
 	@Override
-	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
+	public AbstractTreeIterator createSubtreeIterator(final Repository repo)
 			throws IncorrectObjectTypeException, IOException {
 		return new EmptyTreeIterator(this);
-	}
-
-	@Override
-	public boolean hasId() {
-		return false;
 	}
 
 	@Override
@@ -110,11 +105,6 @@ public class EmptyTreeIterator extends AbstractTreeIterator {
 	@Override
 	public int idOffset() {
 		return 0;
-	}
-
-	@Override
-	public void reset() {
-		// Do nothing.
 	}
 
 	@Override

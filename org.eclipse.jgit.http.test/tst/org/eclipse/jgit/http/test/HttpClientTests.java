@@ -43,13 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.net.URI;
 import java.util.List;
@@ -59,31 +52,26 @@ import javax.servlet.http.HttpServletRequest;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.http.server.GitServlet;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.http.test.util.AccessEvent;
+import org.eclipse.jgit.http.test.util.HttpTestCase;
 import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.junit.http.AccessEvent;
-import org.eclipse.jgit.junit.http.AppServer;
-import org.eclipse.jgit.junit.http.HttpTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 public class HttpClientTests extends HttpTestCase {
-	private TestRepository<FileRepository> remoteRepository;
+	private TestRepository remoteRepository;
 
 	private URIish dumbAuthNoneURI;
 
@@ -93,7 +81,7 @@ public class HttpClientTests extends HttpTestCase {
 
 	private URIish smartAuthBasicURI;
 
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		remoteRepository = createTestRepository();
@@ -107,7 +95,7 @@ public class HttpClientTests extends HttpTestCase {
 
 		server.setUp();
 
-		final String srcName = nameOf(remoteRepository.getRepository());
+		final String srcName = nameOf(remoteRepository);
 		dumbAuthNoneURI = toURIish(dNone, srcName);
 		dumbAuthBasicURI = toURIish(dBasic, srcName);
 
@@ -127,14 +115,14 @@ public class HttpClientTests extends HttpTestCase {
 
 	private ServletContextHandler smart(final String path) {
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
+		gs.setRepositoryResolver(new RepositoryResolver() {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
-				final FileRepository db = remoteRepository.getRepository();
-				if (!name.equals(nameOf(db)))
+				if (!name.equals(nameOf(remoteRepository)))
 					throw new RepositoryNotFoundException(name);
 
+				final Repository db = remoteRepository.getRepository();
 				db.incrementOpen();
 				return db;
 			}
@@ -145,8 +133,8 @@ public class HttpClientTests extends HttpTestCase {
 		return ctx;
 	}
 
-	private static String nameOf(final FileRepository db) {
-		return db.getDirectory().getName();
+	private static String nameOf(final TestRepository db) {
+		return db.getRepository().getDirectory().getName();
 	}
 
 	public void testRepositoryNotFound_Dumb() throws Exception {
@@ -210,7 +198,7 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Dumb_NoHEAD() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		File headref = new File(src.getDirectory(), Constants.HEAD);
 		assertTrue("HEAD used to be present", headref.delete());
 		assertFalse("HEAD is gone", headref.exists());
@@ -291,35 +279,10 @@ public class HttpClientTests extends HttpTestCase {
 				t.openFetch();
 				fail("connection opened even info/refs needs auth basic");
 			} catch (TransportException err) {
-				String exp = dumbAuthBasicURI + ": "
-						+ JGitText.get().notAuthorized;
+				String status = "401 Unauthorized";
+				String exp = dumbAuthBasicURI + ": " + status;
 				assertEquals(exp, err.getMessage());
 			}
-		} finally {
-			t.close();
-		}
-	}
-
-	public void testListRemote_Dumb_Auth() throws Exception {
-		Repository dst = createBareRepository();
-		Transport t = Transport.open(dst, dumbAuthBasicURI);
-		t.setCredentialsProvider(new UsernamePasswordCredentialsProvider(
-				AppServer.username, AppServer.password));
-		try {
-			t.openFetch();
-		} finally {
-			t.close();
-		}
-		t = Transport.open(dst, dumbAuthBasicURI);
-		t.setCredentialsProvider(new UsernamePasswordCredentialsProvider(
-				AppServer.username, ""));
-		try {
-			t.openFetch();
-			fail("connection opened even info/refs needs auth basic and we provide wrong password");
-		} catch (TransportException err) {
-			String exp = dumbAuthBasicURI + ": "
-					+ JGitText.get().notAuthorized;
-			assertEquals(exp, err.getMessage());
 		} finally {
 			t.close();
 		}
@@ -333,8 +296,8 @@ public class HttpClientTests extends HttpTestCase {
 				t.openFetch();
 				fail("connection opened even though service disabled");
 			} catch (TransportException err) {
-				String exp = smartAuthBasicURI + ": "
-						+ JGitText.get().notAuthorized;
+				String status = "401 Unauthorized";
+				String exp = smartAuthBasicURI + ": " + status;
 				assertEquals(exp, err.getMessage());
 			}
 		} finally {
@@ -343,10 +306,9 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Smart_UploadPackDisabled() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
-		final FileBasedConfig cfg = src.getConfig();
-		cfg.setBoolean("http", null, "uploadpack", false);
-		cfg.save();
+		Repository src = remoteRepository.getRepository();
+		src.getConfig().setBoolean("http", null, "uploadpack", false);
+		src.getConfig().save();
 
 		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, smartAuthNoneURI);

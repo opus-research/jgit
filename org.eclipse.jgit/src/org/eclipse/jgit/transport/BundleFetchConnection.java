@@ -50,7 +50,6 @@ package org.eclipse.jgit.transport;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -60,23 +59,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.PackLock;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -98,14 +94,14 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	BundleFetchConnection(Transport transportBundle, final InputStream src) throws TransportException {
 		transport = transportBundle;
-		bin = new BufferedInputStream(src);
+		bin = new BufferedInputStream(src, IndexPack.BUFFER_SIZE);
 		try {
 			switch (readSignature()) {
 			case 2:
 				readBundleV2();
 				break;
 			default:
-				throw new TransportException(transport.uri, JGitText.get().notABundle);
+				throw new TransportException(transport.uri, "not a bundle");
 			}
 		} catch (TransportException err) {
 			close();
@@ -123,7 +119,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 		final String rev = readLine(new byte[1024]);
 		if (TransportBundle.V2_BUNDLE_SIGNATURE.equals(rev))
 			return 2;
-		throw new TransportException(transport.uri, JGitText.get().notABundle);
+		throw new TransportException(transport.uri, "not a bundle");
 	}
 
 	private void readBundleV2() throws IOException {
@@ -155,7 +151,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	private PackProtocolException duplicateAdvertisement(final String name) {
 		return new PackProtocolException(transport.uri,
-				MessageFormat.format(JGitText.get().duplicateAdvertisementsOf, name));
+				"duplicate advertisements of " + name);
 	}
 
 	private String readLine(final byte[] hdrbuf) throws IOException {
@@ -181,17 +177,9 @@ class BundleFetchConnection extends BaseFetchConnection {
 			throws TransportException {
 		verifyPrerequisites();
 		try {
-			ObjectInserter ins = transport.local.newObjectInserter();
-			try {
-				PackParser parser = ins.newPackParser(bin);
-				parser.setAllowThin(true);
-				parser.setObjectChecking(transport.isCheckFetchedObjects());
-				parser.setLockMessage(lockMessage);
-				packLock = parser.parse(NullProgressMonitor.INSTANCE);
-				ins.flush();
-			} finally {
-				ins.release();
-			}
+			final IndexPack ip = newIndexPack();
+			ip.index(monitor);
+			packLock = ip.renameAndOpenPack(lockMessage);
 		} catch (IOException err) {
 			close();
 			throw new TransportException(transport.uri, err.getMessage(), err);
@@ -211,70 +199,69 @@ class BundleFetchConnection extends BaseFetchConnection {
 		return Collections.<PackLock> emptyList();
 	}
 
+	private IndexPack newIndexPack() throws IOException {
+		final IndexPack ip = IndexPack.create(transport.local, bin);
+		ip.setFixThin(true);
+		ip.setObjectChecking(transport.isCheckFetchedObjects());
+		return ip;
+	}
+
 	private void verifyPrerequisites() throws TransportException {
 		if (prereqs.isEmpty())
 			return;
 
 		final RevWalk rw = new RevWalk(transport.local);
-		try {
-			final RevFlag PREREQ = rw.newFlag("PREREQ");
-			final RevFlag SEEN = rw.newFlag("SEEN");
+		final RevFlag PREREQ = rw.newFlag("PREREQ");
+		final RevFlag SEEN = rw.newFlag("SEEN");
 
-			final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
-			final List<RevObject> commits = new ArrayList<RevObject>();
-			for (final Map.Entry<ObjectId, String> e : prereqs.entrySet()) {
-				ObjectId p = e.getKey();
-				try {
-					final RevCommit c = rw.parseCommit(p);
-					if (!c.has(PREREQ)) {
-						c.add(PREREQ);
-						commits.add(c);
-					}
-				} catch (MissingObjectException notFound) {
-					missing.put(p, e.getValue());
-				} catch (IOException err) {
-					throw new TransportException(transport.uri, MessageFormat
-							.format(JGitText.get().cannotReadCommit, p.name()),
-							err);
-				}
-			}
-			if (!missing.isEmpty())
-				throw new MissingBundlePrerequisiteException(transport.uri,
-						missing);
-
-			for (final Ref r : transport.local.getAllRefs().values()) {
-				try {
-					rw.markStart(rw.parseCommit(r.getObjectId()));
-				} catch (IOException readError) {
-					// If we cannot read the value of the ref skip it.
-				}
-			}
-
-			int remaining = commits.size();
+		final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
+		final List<RevObject> commits = new ArrayList<RevObject>();
+		for (final Map.Entry<ObjectId, String> e : prereqs.entrySet()) {
+			ObjectId p = e.getKey();
 			try {
-				RevCommit c;
-				while ((c = rw.next()) != null) {
-					if (c.has(PREREQ)) {
-						c.add(SEEN);
-						if (--remaining == 0)
-							break;
-					}
+				final RevCommit c = rw.parseCommit(p);
+				if (!c.has(PREREQ)) {
+					c.add(PREREQ);
+					commits.add(c);
 				}
+			} catch (MissingObjectException notFound) {
+				missing.put(p, e.getValue());
 			} catch (IOException err) {
-				throw new TransportException(transport.uri,
-						JGitText.get().cannotReadObject, err);
+				throw new TransportException(transport.uri, "Cannot read commit "
+						+ p.name(), err);
 			}
+		}
+		if (!missing.isEmpty())
+			throw new MissingBundlePrerequisiteException(transport.uri, missing);
 
-			if (remaining > 0) {
-				for (final RevObject o : commits) {
-					if (!o.has(SEEN))
-						missing.put(o, prereqs.get(o));
-				}
-				throw new MissingBundlePrerequisiteException(transport.uri,
-						missing);
+		for (final Ref r : transport.local.getAllRefs().values()) {
+			try {
+				rw.markStart(rw.parseCommit(r.getObjectId()));
+			} catch (IOException readError) {
+				// If we cannot read the value of the ref skip it.
 			}
-		} finally {
-			rw.release();
+		}
+
+		int remaining = commits.size();
+		try {
+			RevCommit c;
+			while ((c = rw.next()) != null) {
+				if (c.has(PREREQ)) {
+					c.add(SEEN);
+					if (--remaining == 0)
+						break;
+				}
+			}
+		} catch (IOException err) {
+			throw new TransportException(transport.uri, "Cannot read object", err);
+		}
+
+		if (remaining > 0) {
+			for (final RevObject o : commits) {
+				if (!o.has(SEEN))
+					missing.put(o, prereqs.get(o));
+			}
+			throw new MissingBundlePrerequisiteException(transport.uri, missing);
 		}
 	}
 

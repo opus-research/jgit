@@ -45,192 +45,51 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
 import java.text.DateFormat;
-import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.diff.RenameDetector;
-import org.eclipse.jgit.errors.LargeObjectException;
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.notes.NoteMap;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTree;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.revwalk.RevWalk;
 
-@Command(common = true, usage = "usage_viewCommitHistory")
+@Command(common = true, usage = "View commit history")
 class Log extends RevWalkTextBuiltin {
 	private final TimeZone myTZ = TimeZone.getDefault();
 
 	private final DateFormat fmt;
 
-	private final DiffFormatter diffFmt = new DiffFormatter( //
-			new BufferedOutputStream(System.out));
-
 	private Map<AnyObjectId, Set<Ref>> allRefsByPeeledObjectId;
 
-	private Map<String, NoteMap> noteMaps;
-
-	@Option(name="--decorate", usage="usage_showRefNamesMatchingCommits")
+	@Option(name="--decorate", usage="Show ref names matching commits")
 	private boolean decorate;
-
-	@Option(name = "--no-standard-notes", usage = "usage_noShowStandardNotes")
-	private boolean noStandardNotes;
-
-	private List<String> additionalNoteRefs = new ArrayList<String>();
-
-	@Option(name = "--show-notes", usage = "usage_showNotes", metaVar = "metaVar_ref")
-	void addAdditionalNoteRef(String notesRef) {
-		additionalNoteRefs.add(notesRef);
-	}
-
-	// BEGIN -- Options shared with Diff
-	@Option(name = "-p", usage = "usage_showPatch")
-	boolean showPatch;
-
-	@Option(name = "-M", usage = "usage_detectRenames")
-	private Boolean detectRenames;
-
-	@Option(name = "--no-renames", usage = "usage_noRenames")
-	void noRenames(@SuppressWarnings("unused") boolean on) {
-		detectRenames = Boolean.FALSE;
-	}
-
-	@Option(name = "-l", usage = "usage_renameLimit")
-	private Integer renameLimit;
-
-	@Option(name = "--name-status", usage = "usage_nameStatus")
-	private boolean showNameAndStatusOnly;
-
-	@Option(name = "--ignore-space-at-eol")
-	void ignoreSpaceAtEol(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_TRAILING);
-	}
-
-	@Option(name = "--ignore-leading-space")
-	void ignoreLeadingSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_LEADING);
-	}
-
-	@Option(name = "-b", aliases = { "--ignore-space-change" })
-	void ignoreSpaceChange(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_CHANGE);
-	}
-
-	@Option(name = "-w", aliases = { "--ignore-all-space" })
-	void ignoreAllSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setDiffComparator(RawTextComparator.WS_IGNORE_ALL);
-	}
-
-	@Option(name = "-U", aliases = { "--unified" }, metaVar = "metaVar_linesOfContext")
-	void unified(int lines) {
-		diffFmt.setContext(lines);
-	}
-
-	@Option(name = "--abbrev", metaVar = "metaVar_n")
-	void abbrev(int lines) {
-		diffFmt.setAbbreviationLength(lines);
-	}
-
-	@Option(name = "--full-index")
-	void abbrev(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setAbbreviationLength(Constants.OBJECT_ID_STRING_LENGTH);
-	}
-
-	@Option(name = "--src-prefix", usage = "usage_srcPrefix")
-	void sourcePrefix(String path) {
-		diffFmt.setOldPrefix(path);
-	}
-
-	@Option(name = "--dst-prefix", usage = "usage_dstPrefix")
-	void dstPrefix(String path) {
-		diffFmt.setNewPrefix(path);
-	}
-
-	@Option(name = "--no-prefix", usage = "usage_noPrefix")
-	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix("");
-		diffFmt.setNewPrefix("");
-	}
-
-	// END -- Options shared with Diff
-
 
 	Log() {
 		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US);
 	}
 
 	@Override
-	protected void run() throws Exception {
-		diffFmt.setRepository(db);
-		try {
-			diffFmt.setPathFilter(pathFilter);
-			if (detectRenames != null)
-				diffFmt.setDetectRenames(detectRenames.booleanValue());
-			if (renameLimit != null && diffFmt.isDetectRenames()) {
-				RenameDetector rd = diffFmt.getRenameDetector();
-				rd.setRenameLimit(renameLimit.intValue());
-			}
-
-			if (!noStandardNotes || !additionalNoteRefs.isEmpty()) {
-				createWalk();
-				noteMaps = new LinkedHashMap<String, NoteMap>();
-				if (!noStandardNotes) {
-					addNoteMap(Constants.R_NOTES_COMMITS);
-				}
-				if (!additionalNoteRefs.isEmpty()) {
-					for (String notesRef : additionalNoteRefs) {
-						if (!notesRef.startsWith(Constants.R_NOTES)) {
-							notesRef = Constants.R_NOTES + notesRef;
-						}
-						addNoteMap(notesRef);
-					}
-				}
-			}
-
-			if (decorate)
-				allRefsByPeeledObjectId = getRepository()
-						.getAllRefsByPeeledObjectId();
-
-			super.run();
-		} finally {
-			diffFmt.release();
-		}
-	}
-
-	private void addNoteMap(String notesRef) throws IOException {
-		Ref notes = db.getRef(notesRef);
-		if (notes == null)
-			return;
-		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());
-		noteMaps.put(notesRef,
-				NoteMap.read(argWalk.getObjectReader(), notesCommit));
+	protected RevWalk createWalk() {
+		RevWalk ret = super.createWalk();
+		if (decorate)
+			allRefsByPeeledObjectId = getRepository().getAllRefsByPeeledObjectId();
+		return ret;
 	}
 
 	@Override
 	protected void show(final RevCommit c) throws Exception {
-		out.print(CLIText.get().commitLabel);
-		out.print(" ");
+		out.print("commit ");
 		c.getId().copyTo(outbuffer, out);
 		if (decorate) {
-			Collection<Ref> list = allRefsByPeeledObjectId.get(c);
+			Collection<Ref> list = allRefsByPeeledObjectId.get(c.copy());
 			if (list != null) {
 				out.print(" (");
 				for (Iterator<Ref> i = list.iterator(); i.hasNext(); ) {
@@ -244,11 +103,18 @@ class Log extends RevWalkTextBuiltin {
 		out.println();
 
 		final PersonIdent author = c.getAuthorIdent();
-		out.println(MessageFormat.format(CLIText.get().authorInfo, author.getName(), author.getEmailAddress()));
+		out.print("Author: ");
+		out.print(author.getName());
+		out.print(" <");
+		out.print(author.getEmailAddress());
+		out.print(">");
+		out.println();
 
 		final TimeZone authorTZ = author.getTimeZone();
 		fmt.setTimeZone(authorTZ != null ? authorTZ : myTZ);
-		out.println(MessageFormat.format(CLIText.get().dateInfo, fmt.format(author.getWhen())));
+		out.print("Date:   ");
+		out.print(fmt.format(author.getWhen()));
+		out.println();
 
 		out.println();
 		final String[] lines = c.getFullMessage().split("\n");
@@ -259,92 +125,6 @@ class Log extends RevWalkTextBuiltin {
 		}
 
 		out.println();
-		if (showNotes(c))
-			out.println();
-
-		if (c.getParentCount() == 1 && (showNameAndStatusOnly || showPatch))
-			showDiff(c);
 		out.flush();
-	}
-
-	/**
-	 * @param c
-	 * @return <code>true</code> if at least one note was printed,
-	 *         <code>false</code> otherwise
-	 * @throws IOException
-	 */
-	private boolean showNotes(RevCommit c) throws IOException {
-		if (noteMaps == null)
-			return false;
-
-		boolean printEmptyLine = false;
-		boolean atLeastOnePrinted = false;
-		for (Map.Entry<String, NoteMap> e : noteMaps.entrySet()) {
-			String label = null;
-			String notesRef = e.getKey();
-			if (! notesRef.equals(Constants.R_NOTES_COMMITS)) {
-				if (notesRef.startsWith(Constants.R_NOTES))
-					label = notesRef.substring(Constants.R_NOTES.length());
-				else
-					label = notesRef;
-			}
-			boolean printedNote = showNotes(c, e.getValue(), label,
-					printEmptyLine);
-			atLeastOnePrinted |= printedNote;
-			printEmptyLine = printedNote;
-		}
-		return atLeastOnePrinted;
-	}
-
-	/**
-	 * @param c
-	 * @param map
-	 * @param label
-	 * @param emptyLine
-	 * @return <code>true</code> if note was printed, <code>false</code>
-	 *         otherwise
-	 * @throws IOException
-	 */
-	private boolean showNotes(RevCommit c, NoteMap map, String label,
-			boolean emptyLine)
-			throws IOException {
-		ObjectId blobId = map.get(c);
-		if (blobId == null)
-			return false;
-		if (emptyLine)
-			out.println();
-		out.print("Notes");
-		if (label != null) {
-			out.print(" (");
-			out.print(label);
-			out.print(")");
-		}
-		out.println(":");
-		try {
-			RawText rawText = new RawText(argWalk.getObjectReader()
-					.open(blobId).getCachedBytes(Integer.MAX_VALUE));
-			for (int i = 0; i < rawText.size(); i++) {
-				out.print("    ");
-				out.println(rawText.getString(i));
-			}
-		} catch (LargeObjectException e) {
-			out.println(MessageFormat.format(
-					CLIText.get().noteObjectTooLargeToPrint, blobId.name()));
-		}
-		return true;
-	}
-
-	private void showDiff(RevCommit c) throws IOException {
-		final RevTree a = c.getParent(0).getTree();
-		final RevTree b = c.getTree();
-
-		if (showNameAndStatusOnly)
-			Diff.nameStatus(out, diffFmt.scan(a, b));
-		else {
-			out.flush();
-			diffFmt.format(a, b);
-			diffFmt.flush();
-		}
-		out.println();
 	}
 }

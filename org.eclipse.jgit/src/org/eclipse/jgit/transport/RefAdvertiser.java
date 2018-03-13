@@ -44,18 +44,22 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 
+import org.eclipse.jgit.lib.AlternateRepositoryDatabase;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevFlag;
+import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.RefMap;
 
 /** Support for the start of {@link UploadPack} and {@link ReceivePack}. */
@@ -85,28 +89,33 @@ public abstract class RefAdvertiser {
 		}
 	}
 
+	private RevWalk walk;
+
+	private RevFlag ADVERTISED;
+
 	private final StringBuilder tmpLine = new StringBuilder(100);
 
 	private final char[] tmpId = new char[Constants.OBJECT_ID_STRING_LENGTH];
 
 	private final Set<String> capablities = new LinkedHashSet<String>();
 
-	private final Set<ObjectId> sent = new HashSet<ObjectId>();
-
-	private Repository repository;
-
 	private boolean derefTags;
 
 	private boolean first = true;
 
 	/**
-	 * Initialize this advertiser with a repository for peeling tags.
+	 * Initialize a new advertisement formatter.
 	 *
-	 * @param src
-	 *            the repository to read from.
+	 * @param protoWalk
+	 *            the RevWalk used to parse objects that are advertised.
+	 * @param advertisedFlag
+	 *            flag marked on any advertised objects parsed out of the
+	 *            {@code protoWalk}'s object pool, permitting the caller to
+	 *            later quickly determine if an object was advertised (or not).
 	 */
-	public void init(Repository src) {
-		repository = src;
+	public void init(final RevWalk protoWalk, final RevFlag advertisedFlag) {
+		walk = protoWalk;
+		ADVERTISED = advertisedFlag;
 	}
 
 	/**
@@ -116,6 +125,8 @@ public abstract class RefAdvertiser {
 	 * This method must be invoked prior to any of the following:
 	 * <ul>
 	 * <li>{@link #send(Map)}
+	 * <li>{@link #advertiseHave(AnyObjectId)}
+	 * <li>{@link #includeAdditionalHaves()}
 	 * </ul>
 	 *
 	 * @param deref
@@ -133,7 +144,7 @@ public abstract class RefAdvertiser {
 	 * <ul>
 	 * <li>{@link #send(Map)}
 	 * <li>{@link #advertiseHave(AnyObjectId)}
-	 * <li>{@link #includeAdditionalHaves(Repository)}
+	 * <li>{@link #includeAdditionalHaves()}
 	 * </ul>
 	 *
 	 * @param name
@@ -153,31 +164,19 @@ public abstract class RefAdvertiser {
 	 *            zero or more refs to format for the client. The collection is
 	 *            sorted before display if necessary, and therefore may appear
 	 *            in any order.
-	 * @return set of ObjectIds that were advertised to the client.
 	 * @throws IOException
 	 *             the underlying output stream failed to write out an
 	 *             advertisement record.
 	 */
-	public Set<ObjectId> send(Map<String, Ref> refs) throws IOException {
-		for (Ref ref : getSortedRefs(refs)) {
-			if (ref.getObjectId() == null)
-				continue;
-
-			advertiseAny(ref.getObjectId(), ref.getName());
-
-			if (!derefTags)
-				continue;
-
-			if (!ref.isPeeled()) {
-				if (repository == null)
-					continue;
-				ref = repository.peel(ref);
+	public void send(final Map<String, Ref> refs) throws IOException {
+		for (final Ref r : getSortedRefs(refs)) {
+			final RevObject obj = parseAnyOrNull(r.getObjectId());
+			if (obj != null) {
+				advertiseAny(obj, r.getName());
+				if (derefTags && obj instanceof RevTag)
+					advertiseTag((RevTag) obj, r.getName() + "^{}");
 			}
-
-			if (ref.getPeeledObjectId() != null)
-				advertiseAny(ref.getPeeledObjectId(), ref.getName() + "^{}");
 		}
-		return sent;
 	}
 
 	private Iterable<Ref> getSortedRefs(Map<String, Ref> all) {
@@ -202,21 +201,35 @@ public abstract class RefAdvertiser {
 	 *             advertisement record.
 	 */
 	public void advertiseHave(AnyObjectId id) throws IOException {
-		advertiseAnyOnce(id, ".have");
+		RevObject obj = parseAnyOrNull(id);
+		if (obj != null) {
+			advertiseAnyOnce(obj, ".have");
+			if (obj instanceof RevTag)
+				advertiseAnyOnce(((RevTag) obj).getObject(), ".have");
+		}
 	}
 
 	/**
 	 * Include references of alternate repositories as {@code .have} lines.
 	 *
-	 * @param src
-	 *            repository to get the additional reachable objects from.
 	 * @throws IOException
 	 *             the underlying output stream failed to write out an
 	 *             advertisement record.
 	 */
-	public void includeAdditionalHaves(Repository src) throws IOException {
-		for (ObjectId id : src.getAdditionalHaves())
-			advertiseHave(id);
+	public void includeAdditionalHaves() throws IOException {
+		additionalHaves(walk.getRepository().getObjectDatabase());
+	}
+
+	private void additionalHaves(final ObjectDatabase db) throws IOException {
+		if (db instanceof AlternateRepositoryDatabase)
+			additionalHaves(((AlternateRepositoryDatabase) db).getRepository());
+		for (ObjectDatabase alt : db.getAlternates())
+			additionalHaves(alt);
+	}
+
+	private void additionalHaves(final Repository alt) throws IOException {
+		for (final Ref r : alt.getAllRefs().values())
+			advertiseHave(r.getObjectId());
 	}
 
 	/** @return true if no advertisements have been sent yet. */
@@ -224,16 +237,43 @@ public abstract class RefAdvertiser {
 		return first;
 	}
 
-	private void advertiseAnyOnce(AnyObjectId obj, final String refName)
+	private RevObject parseAnyOrNull(final AnyObjectId id) {
+		if (id == null)
+			return null;
+		try {
+			return walk.parseAny(id);
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	private void advertiseAnyOnce(final RevObject obj, final String refName)
 			throws IOException {
-		if (!sent.contains(obj))
+		if (!obj.has(ADVERTISED))
 			advertiseAny(obj, refName);
 	}
 
-	private void advertiseAny(AnyObjectId obj, final String refName)
+	private void advertiseAny(final RevObject obj, final String refName)
 			throws IOException {
-		sent.add(obj.toObjectId());
+		obj.add(ADVERTISED);
 		advertiseId(obj, refName);
+	}
+
+	private void advertiseTag(final RevTag tag, final String refName)
+			throws IOException {
+		RevObject o = tag;
+		do {
+			// Fully unwrap here so later on we have these already parsed.
+			final RevObject target = ((RevTag) o).getObject();
+			try {
+				walk.parseHeaders(target);
+			} catch (IOException err) {
+				return;
+			}
+			target.add(ADVERTISED);
+			o = target;
+		} while (o instanceof RevTag);
+		advertiseAny(tag.getObject(), refName);
 	}
 
 	/**

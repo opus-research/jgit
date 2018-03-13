@@ -43,86 +43,26 @@
 
 package org.eclipse.jgit.util;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
-	/** The auto-detected implementation selected for this operating system and JRE. */
-	public static final FS DETECTED = detect();
+	/** The implementation selected for this operating system and JRE. */
+	public static final FS INSTANCE;
 
-	/**
-	 * Auto-detect the appropriate file system abstraction.
-	 *
-	 * @return detected file system abstraction
-	 */
-	public static FS detect() {
-		return detect(null);
-	}
-
-	/**
-	 * Auto-detect the appropriate file system abstraction, taking into account
-	 * the presence of a Cygwin installation on the system. Using jgit in
-	 * combination with Cygwin requires a more elaborate (and possibly slower)
-	 * resolution of file system paths.
-	 *
-	 * @param cygwinUsed
-	 *            <ul>
-	 *            <li><code>Boolean.TRUE</code> to assume that Cygwin is used in
-	 *            combination with jgit</li>
-	 *            <li><code>Boolean.FALSE</code> to assume that Cygwin is
-	 *            <b>not</b> used with jgit</li>
-	 *            <li><code>null</code> to auto-detect whether a Cygwin
-	 *            installation is present on the system and in this case assume
-	 *            that Cygwin is used</li>
-	 *            </ul>
-	 *
-	 *            Note: this parameter is only relevant on Windows.
-	 *
-	 * @return detected file system abstraction
-	 */
-	public static FS detect(Boolean cygwinUsed) {
-		if (FS_Win32.isWin32()) {
-			if (cygwinUsed == null)
-				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
-			if (cygwinUsed.booleanValue())
-				return new FS_Win32_Cygwin();
+	static {
+		if (FS_Win32.detect()) {
+			if (FS_Win32_Cygwin.detect())
+				INSTANCE = new FS_Win32_Cygwin();
 			else
-				return new FS_Win32();
-		} else if (FS_POSIX_Java6.hasExecute())
-			return new FS_POSIX_Java6();
+				INSTANCE = new FS_Win32();
+		} else if (FS_POSIX_Java6.detect())
+			INSTANCE = new FS_POSIX_Java6();
 		else
-			return new FS_POSIX_Java5();
+			INSTANCE = new FS_POSIX_Java5();
 	}
-
-	private volatile Holder<File> userHome;
-
-	private volatile Holder<File> gitPrefix;
-
-	/**
-	 * Constructs a file system abstraction.
-	 */
-	protected FS() {
-		// Do nothing by default.
-	}
-
-	/**
-	 * Initialize this FS using another's current settings.
-	 *
-	 * @param src
-	 *            the source FS to copy from.
-	 */
-	protected FS(FS src) {
-		userHome = src.userHome;
-		gitPrefix = src.gitPrefix;
-	}
-
-	/** @return a new instance of the same type of FS. */
-	public abstract FS newInstance();
 
 	/**
 	 * Does this operating system and JRE support the execute flag on files?
@@ -177,7 +117,29 @@ public abstract class FS {
 	 * @return the translated path. <code>new File(dir,name)</code> if this
 	 *         platform does not require path name translation.
 	 */
-	public File resolve(final File dir, final String name) {
+	public static File resolve(final File dir, final String name) {
+		return INSTANCE.resolveImpl(dir, name);
+	}
+
+	/**
+	 * Resolve this file to its actual path name that the JRE can use.
+	 * <p>
+	 * This method can be relatively expensive. Computing a translation may
+	 * require forking an external process per path name translated. Callers
+	 * should try to minimize the number of translations necessary by caching
+	 * the results.
+	 * <p>
+	 * Not all platforms and JREs require path name translation. Currently only
+	 * Cygwin on Win32 require translation for Cygwin based paths.
+	 *
+	 * @param dir
+	 *            directory relative to which the path name is.
+	 * @param name
+	 *            path name to translate.
+	 * @return the translated path. <code>new File(dir,name)</code> if this
+	 *         platform does not require path name translation.
+	 */
+	protected File resolveImpl(final File dir, final String name) {
 		final File abspn = new File(name);
 		if (abspn.isAbsolute())
 			return abspn;
@@ -195,34 +157,13 @@ public abstract class FS {
 	 *
 	 * @return the user's home directory; null if the user does not have one.
 	 */
-	public File userHome() {
-		Holder<File> p = userHome;
-		if (p == null) {
-			p = new Holder<File>(userHomeImpl());
-			userHome = p;
-		}
-		return p.value;
+	public static File userHome() {
+		return USER_HOME.home;
 	}
 
-	/**
-	 * Set the user's home directory location.
-	 *
-	 * @param path
-	 *            the location of the user's preferences; null if there is no
-	 *            home directory for the current user.
-	 * @return {@code this}.
-	 */
-	public FS setUserHome(File path) {
-		userHome = new Holder<File>(path);
-		return this;
+	private static class USER_HOME {
+		static final File home = INSTANCE.userHomeImpl();
 	}
-
-	/**
-	 * Does this file system have problems with atomic renames?
-	 *
-	 * @return true if the caller should retry a failed rename of a lock file.
-	 */
-	public abstract boolean retryFailedLockFileCommit();
 
 	/**
 	 * Determine the user's home directory (location where preferences are).
@@ -239,102 +180,5 @@ public abstract class FS {
 		if (home == null || home.length() == 0)
 			return null;
 		return new File(home).getAbsoluteFile();
-	}
-
-	static File searchPath(final String path, final String... lookFor) {
-		for (final String p : path.split(File.pathSeparator)) {
-			for (String command : lookFor) {
-				final File e = new File(p, command);
-				if (e.isFile())
-					return e.getAbsoluteFile();
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Execute a command and return a single line of output as a String
-	 *
-	 * @param dir
-	 *            Working directory for the command
-	 * @param command
-	 *            as component array
-	 * @param encoding
-	 * @return the one-line output of the command
-	 */
-	protected static String readPipe(File dir, String[] command, String encoding) {
-		try {
-			final Process p = Runtime.getRuntime().exec(command, null, dir);
-			final BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), encoding));
-			String r = null;
-			try {
-				r = lineRead.readLine();
-			} finally {
-				p.getOutputStream().close();
-				p.getErrorStream().close();
-				lineRead.close();
-			}
-
-			for (;;) {
-				try {
-					if (p.waitFor() == 0 && r != null && r.length() > 0)
-						return r;
-					break;
-				} catch (InterruptedException ie) {
-					// Stop bothering me, I have a zombie to reap.
-				}
-			}
-		} catch (IOException e) {
-			// ignore
-		}
-		return null;
-	}
-
-	/** @return the $prefix directory C Git would use. */
-	public File gitPrefix() {
-		Holder<File> p = gitPrefix;
-		if (p == null) {
-			p = new Holder<File>(discoverGitPrefix());
-			gitPrefix = p;
-		}
-		return p.value;
-	}
-
-	/** @return the $prefix directory C Git would use. */
-	protected abstract File discoverGitPrefix();
-
-	/**
-	 * Set the $prefix directory C Git uses.
-	 *
-	 * @param path
-	 *            the directory. Null if C Git is not installed.
-	 * @return {@code this}
-	 */
-	public FS setGitPrefix(File path) {
-		gitPrefix = new Holder<File>(path);
-		return this;
-	}
-
-	/**
-	 * Initialize a ProcesssBuilder to run a command using the system shell.
-	 *
-	 * @param cmd
-	 *            command to execute. This string should originate from the
-	 *            end-user, and thus is platform specific.
-	 * @param args
-	 *            arguments to pass to command. These should be protected from
-	 *            shell evaluation.
-	 * @return a partially completed process builder. Caller should finish
-	 *         populating directory, environment, and then start the process.
-	 */
-	public abstract ProcessBuilder runInShell(String cmd, String[] args);
-
-	private static class Holder<V> {
-		final V value;
-
-		Holder(V value) {
-			this.value = value;
-		}
 	}
 }

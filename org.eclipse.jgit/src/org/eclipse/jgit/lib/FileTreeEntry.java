@@ -48,14 +48,7 @@ import java.io.IOException;
 
 /**
  * A representation of a file (blob) object in a {@link Tree}.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
  */
-@Deprecated
 public class FileTreeEntry extends TreeEntry {
 	private FileMode mode;
 
@@ -100,11 +93,20 @@ public class FileTreeEntry extends TreeEntry {
 	 * @throws IOException
 	 */
 	public ObjectLoader openReader() throws IOException {
-		return getRepository().open(getId(), Constants.OBJ_BLOB);
+		return getRepository().openBlob(getId());
+	}
+
+	public void accept(final TreeVisitor tv, final int flags)
+			throws IOException {
+		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
+			return;
+		}
+
+		tv.visitFile(this);
 	}
 
 	public String toString() {
-		final StringBuilder r = new StringBuilder();
+		final StringBuffer r = new StringBuffer();
 		r.append(ObjectId.toString(getId()));
 		r.append(' ');
 		r.append(isExecutable() ? 'X' : 'F');

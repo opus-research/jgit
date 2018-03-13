@@ -44,24 +44,29 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import java.text.MessageFormat;
-
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheTree;
-import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
 
 class MakeCacheTree extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
-		final DirCache cache = db.readDirCache();
+		final DirCache cache = DirCache.read(db);
 		final DirCacheTree tree = cache.getCacheTree(true);
 		show(tree);
 	}
 
 	private void show(final DirCacheTree tree) {
-		out.println(MessageFormat.format(CLIText.get().cacheTreePathInfo
-				, tree.getPathString(), tree.getEntrySpan(), tree.getChildCount()));
+		out.print("\"");
+		out.print(tree.getPathString());
+		out.print("\"");
+		out.print(":  ");
+		out.print(tree.getEntrySpan());
+		out.print(" entries");
+		out.print(", ");
+		out.print(tree.getChildCount());
+		out.print(" children");
+		out.println();
 
 		for (int i = 0; i < tree.getChildCount(); i++)
 			show(tree.getChild(i));

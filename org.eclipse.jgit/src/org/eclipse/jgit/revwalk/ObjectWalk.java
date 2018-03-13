@@ -44,18 +44,13 @@
 package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 
@@ -85,21 +80,13 @@ public class ObjectWalk extends RevWalk {
 	 */
 	private static final int IN_PENDING = RevWalk.REWRITE;
 
-	private static final byte[] EMPTY_PATH = {};
-
 	private CanonicalTreeParser treeWalk;
-
-	private List<RevObject> rootObjects;
 
 	private BlockObjQueue pendingObjects;
 
 	private RevTree currentTree;
 
 	private RevObject last;
-
-	private RevCommit firstCommit;
-
-	private RevCommit lastCommit;
 
 	/**
 	 * Create a new revision and object walker for a given repository.
@@ -108,20 +95,7 @@ public class ObjectWalk extends RevWalk {
 	 *            the repository the walker will obtain data from.
 	 */
 	public ObjectWalk(final Repository repo) {
-		this(repo.newObjectReader());
-	}
-
-	/**
-	 * Create a new revision and object walker for a given repository.
-	 *
-	 * @param or
-	 *            the reader the walker will obtain data from. The reader should
-	 *            be released by the caller when the walker is no longer
-	 *            required.
-	 */
-	public ObjectWalk(ObjectReader or) {
-		super(or);
-		rootObjects = new ArrayList<RevObject>();
+		super(repo);
 		pendingObjects = new BlockObjQueue();
 		treeWalk = new CanonicalTreeParser();
 	}
@@ -240,13 +214,12 @@ public class ObjectWalk extends RevWalk {
 				return null;
 			if ((r.flags & UNINTERESTING) != 0) {
 				markTreeUninteresting(r.getTree());
-				if (hasRevSort(RevSort.BOUNDARY))
+				if (hasRevSort(RevSort.BOUNDARY)) {
+					pendingObjects.add(r.getTree());
 					return r;
+				}
 				continue;
 			}
-			if (firstCommit == null)
-				firstCommit = r;
-			lastCommit = r;
 			pendingObjects.add(r.getTree());
 			return r;
 		}
@@ -300,26 +273,20 @@ public class ObjectWalk extends RevWalk {
 				if (FileMode.GITLINK.equals(mode))
 					break;
 				treeWalk.getEntryObjectId(idBuffer);
-				throw new CorruptObjectException(MessageFormat.format(JGitText.get().corruptObjectInvalidMode3
-						, mode , idBuffer.name() , treeWalk.getEntryPathString() , currentTree.name()));
+				throw new CorruptObjectException("Invalid mode " + mode
+						+ " for " + idBuffer.name() + " '"
+						+ treeWalk.getEntryPathString() + "' in "
+						+ currentTree.name() + ".");
 			}
 
 			treeWalk = treeWalk.next();
 		}
 
-		if (firstCommit != null) {
-			reader.walkAdviceBeginTrees(this, firstCommit, lastCommit);
-			firstCommit = null;
-			lastCommit = null;
-		}
-
 		last = null;
 		for (;;) {
 			final RevObject o = pendingObjects.next();
-			if (o == null) {
-				reader.walkAdviceEnd();
+			if (o == null)
 				return null;
-			}
 			if ((o.flags & SEEN) != 0)
 				continue;
 			o.flags |= SEEN;
@@ -327,14 +294,14 @@ public class ObjectWalk extends RevWalk {
 				continue;
 			if (o instanceof RevTree) {
 				currentTree = (RevTree) o;
-				treeWalk = treeWalk.resetRoot(reader, currentTree);
+				treeWalk = treeWalk.resetRoot(db, currentTree, curs);
 			}
 			return o;
 		}
 	}
 
 	private CanonicalTreeParser enter(RevObject tree) throws IOException {
-		CanonicalTreeParser p = treeWalk.createSubtreeIterator0(reader, tree);
+		CanonicalTreeParser p = treeWalk.createSubtreeIterator0(db, tree, curs);
 		if (p.eof()) {
 			// We can't tolerate the subtree being an empty tree, as
 			// that will break us out early before we visit all names.
@@ -382,7 +349,7 @@ public class ObjectWalk extends RevWalk {
 			final RevObject o = nextObject();
 			if (o == null)
 				break;
-			if (o instanceof RevBlob && !reader.has(o))
+			if (o instanceof RevBlob && !db.hasObject(o))
 				throw new MissingObjectException(o, Constants.TYPE_BLOB);
 		}
 	}
@@ -404,28 +371,6 @@ public class ObjectWalk extends RevWalk {
 		return last != null ? treeWalk.getEntryPathString() : null;
 	}
 
-	/**
-	 * Get the current object's path hash code.
-	 * <p>
-	 * This method computes a hash code on the fly for this path, the hash is
-	 * suitable to cluster objects that may have similar paths together.
-	 *
-	 * @return path hash code; any integer may be returned.
-	 */
-	public int getPathHashCode() {
-		return last != null ? treeWalk.getEntryPathHashCode() : 0;
-	}
-
-	/** @return the internal buffer holding the current path. */
-	public byte[] getPathBuffer() {
-		return last != null ? treeWalk.getEntryPathBuffer() : EMPTY_PATH;
-	}
-
-	/** @return length of the path in {@link #getPathBuffer()}. */
-	public int getPathLength() {
-		return last != null ? treeWalk.getEntryPathLength() : 0;
-	}
-
 	@Override
 	public void dispose() {
 		super.dispose();
@@ -433,30 +378,20 @@ public class ObjectWalk extends RevWalk {
 		treeWalk = new CanonicalTreeParser();
 		currentTree = null;
 		last = null;
-		firstCommit = null;
-		lastCommit = null;
 	}
 
 	@Override
 	protected void reset(final int retainFlags) {
 		super.reset(retainFlags);
-
-		for (RevObject obj : rootObjects)
-			obj.flags &= ~IN_PENDING;
-
-		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
 		treeWalk = new CanonicalTreeParser();
 		currentTree = null;
 		last = null;
-		firstCommit = null;
-		lastCommit = null;
 	}
 
 	private void addObject(final RevObject o) {
 		if ((o.flags & IN_PENDING) == 0) {
 			o.flags |= IN_PENDING;
-			rootObjects.add(o);
 			pendingObjects.add(o);
 		}
 	}
@@ -468,7 +403,7 @@ public class ObjectWalk extends RevWalk {
 			return;
 		tree.flags |= UNINTERESTING;
 
-		treeWalk = treeWalk.resetRoot(reader, tree);
+		treeWalk = treeWalk.resetRoot(db, tree, curs);
 		while (!treeWalk.eof()) {
 			final FileMode mode = treeWalk.getEntryFileMode();
 			final int sType = mode.getObjectType();
@@ -484,7 +419,7 @@ public class ObjectWalk extends RevWalk {
 				final RevTree t = lookupTree(idBuffer);
 				if ((t.flags & UNINTERESTING) == 0) {
 					t.flags |= UNINTERESTING;
-					treeWalk = treeWalk.createSubtreeIterator0(reader, t);
+					treeWalk = treeWalk.createSubtreeIterator0(db, t, curs);
 					continue;
 				}
 				break;
@@ -493,8 +428,9 @@ public class ObjectWalk extends RevWalk {
 				if (FileMode.GITLINK.equals(mode))
 					break;
 				treeWalk.getEntryObjectId(idBuffer);
-				throw new CorruptObjectException(MessageFormat.format(JGitText.get().corruptObjectInvalidMode3
-						, mode , idBuffer.name() , treeWalk.getEntryPathString() , tree));
+				throw new CorruptObjectException("Invalid mode " + mode
+						+ " for " + idBuffer.name() + " "
+						+ treeWalk.getEntryPathString() + " in " + tree + ".");
 			}
 
 			treeWalk = treeWalk.next();

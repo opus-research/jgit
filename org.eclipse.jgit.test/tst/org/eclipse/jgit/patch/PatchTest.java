@@ -43,31 +43,21 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.junit.JGitTestUtil;
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
 
-public class PatchTest {
-	@Test
+public class PatchTest extends TestCase {
 	public void testEmpty() {
 		final Patch p = new Patch();
 		assertTrue(p.getFiles().isEmpty());
 		assertTrue(p.getErrors().isEmpty());
 	}
 
-	@Test
 	public void testParse_ConfigCaseInsensitive() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(2, p.getFiles().size());
@@ -78,11 +68,11 @@ public class PatchTest {
 
 		assertEquals(
 				"org.eclipse.jgit.test/tst/org/spearce/jgit/lib/RepositoryConfigTest.java",
-				fRepositoryConfigTest.getNewPath());
+				fRepositoryConfigTest.getNewName());
 
 		assertEquals(
 				"org.eclipse.jgit/src/org/spearce/jgit/lib/RepositoryConfig.java",
-				fRepositoryConfig.getNewPath());
+				fRepositoryConfig.getNewName());
 
 		assertEquals(572, fRepositoryConfigTest.startOffset);
 		assertEquals(1490, fRepositoryConfig.startOffset);
@@ -165,7 +155,6 @@ public class PatchTest {
 		}
 	}
 
-	@Test
 	public void testParse_NoBinary() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(5, p.getFiles().size());
@@ -179,7 +168,7 @@ public class PatchTest {
 			assertEquals("0000000", fh.getOldId().name());
 			assertSame(FileMode.MISSING, fh.getOldMode());
 			assertSame(FileMode.REGULAR_FILE, fh.getNewMode());
-			assertTrue(fh.getNewPath().startsWith(
+			assertTrue(fh.getNewName().startsWith(
 					"org.spearce.egit.ui/icons/toolbar/"));
 			assertSame(FileHeader.PatchType.BINARY, fh.getPatchType());
 			assertTrue(fh.getHunks().isEmpty());
@@ -190,7 +179,7 @@ public class PatchTest {
 		}
 
 		final FileHeader fh = p.getFiles().get(4);
-		assertEquals("org.spearce.egit.ui/plugin.xml", fh.getNewPath());
+		assertEquals("org.spearce.egit.ui/plugin.xml", fh.getNewName());
 		assertSame(FileHeader.ChangeType.MODIFY, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
 		assertFalse(fh.hasMetaDataChanges());
@@ -201,7 +190,6 @@ public class PatchTest {
 		assertEquals(272, fh.getHunks().get(0).getOldImage().getStartLine());
 	}
 
-	@Test
 	public void testParse_GitBinaryLiteral() throws IOException {
 		final Patch p = parseTestPatchFile();
 		final int[] binsizes = { 359, 393, 372, 404 };
@@ -215,7 +203,7 @@ public class PatchTest {
 			assertNotNull(fh.getNewId());
 			assertEquals(ObjectId.zeroId().name(), fh.getOldId().name());
 			assertSame(FileMode.REGULAR_FILE, fh.getNewMode());
-			assertTrue(fh.getNewPath().startsWith(
+			assertTrue(fh.getNewName().startsWith(
 					"org.spearce.egit.ui/icons/toolbar/"));
 			assertSame(FileHeader.PatchType.GIT_BINARY, fh.getPatchType());
 			assertTrue(fh.getHunks().isEmpty());
@@ -236,7 +224,7 @@ public class PatchTest {
 		}
 
 		final FileHeader fh = p.getFiles().get(4);
-		assertEquals("org.spearce.egit.ui/plugin.xml", fh.getNewPath());
+		assertEquals("org.spearce.egit.ui/plugin.xml", fh.getNewName());
 		assertSame(FileHeader.ChangeType.MODIFY, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
 		assertFalse(fh.hasMetaDataChanges());
@@ -247,14 +235,13 @@ public class PatchTest {
 		assertEquals(272, fh.getHunks().get(0).getOldImage().getStartLine());
 	}
 
-	@Test
 	public void testParse_GitBinaryDelta() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
 		assertTrue(p.getErrors().isEmpty());
 
 		final FileHeader fh = p.getFiles().get(0);
-		assertTrue(fh.getNewPath().startsWith("zero.bin"));
+		assertTrue(fh.getNewName().startsWith("zero.bin"));
 		assertSame(FileHeader.ChangeType.MODIFY, fh.getChangeType());
 		assertSame(FileHeader.PatchType.GIT_BINARY, fh.getPatchType());
 		assertSame(FileMode.REGULAR_FILE, fh.getNewMode());
@@ -285,7 +272,6 @@ public class PatchTest {
 		assertEquals(496, fh.endOffset);
 	}
 
-	@Test
 	public void testParse_FixNoNewline() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -293,7 +279,7 @@ public class PatchTest {
 
 		final FileHeader f = p.getFiles().get(0);
 
-		assertEquals("a", f.getNewPath());
+		assertEquals("a", f.getNewName());
 		assertEquals(252, f.startOffset);
 
 		assertEquals("2e65efe", f.getOldId().name());
@@ -320,7 +306,6 @@ public class PatchTest {
 		}
 	}
 
-	@Test
 	public void testParse_AddNoNewline() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -328,7 +313,7 @@ public class PatchTest {
 
 		final FileHeader f = p.getFiles().get(0);
 
-		assertEquals("a", f.getNewPath());
+		assertEquals("a", f.getNewName());
 		assertEquals(256, f.startOffset);
 
 		assertEquals("f2ad6c7", f.getOldId().name());
@@ -356,7 +341,7 @@ public class PatchTest {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = JGitTestUtil.getName() + ".patch";
+		final String patchFile = getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

@@ -46,26 +46,16 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.EntryExistsException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A representation of a Git tree entry. A Tree is a directory in Git.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
  */
-@Deprecated
-public class Tree extends TreeEntry {
+public class Tree extends TreeEntry implements Treeish {
 	private static final TreeEntry[] EMPTY_TREE = {};
 
 	/**
@@ -235,6 +225,14 @@ public class Tree extends TreeEntry {
 		return db;
 	}
 
+	public final ObjectId getTreeId() {
+		return getId();
+	}
+
+	public final Tree getTree() {
+		return this;
+	}
+
 	/**
 	 * @return true of the data of this Tree is loaded
 	 */
@@ -247,7 +245,7 @@ public class Tree extends TreeEntry {
 	 */
 	public void unload() {
 		if (isModified())
-			throw new IllegalStateException(JGitText.get().cannotUnloadAModifiedTree);
+			throw new IllegalStateException("Cannot unload a modified tree.");
 		contents = null;
 	}
 
@@ -501,10 +499,39 @@ public class Tree extends TreeEntry {
 		return findMember(s,(byte)'/');
 	}
 
+	public void accept(final TreeVisitor tv, final int flags)
+			throws IOException {
+		final TreeEntry[] c;
+
+		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified())
+			return;
+
+		if ((LOADED_ONLY & flags) == LOADED_ONLY && !isLoaded()) {
+			tv.startVisitTree(this);
+			tv.endVisitTree(this);
+			return;
+		}
+
+		ensureLoaded();
+		tv.startVisitTree(this);
+
+		if ((CONCURRENT_MODIFICATION & flags) == CONCURRENT_MODIFICATION)
+			c = members();
+		else
+			c = contents;
+
+		for (int k = 0; k < c.length; k++)
+			c[k].accept(tv, flags);
+
+		tv.endVisitTree(this);
+	}
+
 	private void ensureLoaded() throws IOException, MissingObjectException {
 		if (!isLoaded()) {
-			ObjectLoader ldr = db.open(getId(), Constants.OBJ_TREE);
-			readTree(ldr.getCachedBytes());
+			final ObjectLoader or = db.openTree(getId());
+			if (or == null)
+				throw new MissingObjectException(getId(), Constants.TYPE_TREE);
+			readTree(or.getBytes());
 		}
 	}
 
@@ -528,14 +555,14 @@ public class Tree extends TreeEntry {
 		while (rawPtr < rawSize) {
 			int c = raw[rawPtr++];
 			if (c < '0' || c > '7')
-				throw new CorruptObjectException(getId(), JGitText.get().corruptObjectInvalidEntryMode);
+				throw new CorruptObjectException(getId(), "invalid entry mode");
 			int mode = c - '0';
 			for (;;) {
 				c = raw[rawPtr++];
 				if (' ' == c)
 					break;
 				else if (c < '0' || c > '7')
-					throw new CorruptObjectException(getId(), JGitText.get().corruptObjectInvalidMode);
+					throw new CorruptObjectException(getId(), "invalid mode");
 				mode <<= 3;
 				mode += c - '0';
 			}
@@ -562,36 +589,16 @@ public class Tree extends TreeEntry {
 			else if (FileMode.GITLINK.equals(mode))
 				ent = new GitlinkTreeEntry(this, id, name);
 			else
-				throw new CorruptObjectException(getId(), MessageFormat.format(
-						JGitText.get().corruptObjectInvalidMode2, Integer.toOctalString(mode)));
+				throw new CorruptObjectException(getId(), "Invalid mode: "
+						+ Integer.toOctalString(mode));
 			temp[nextIndex++] = ent;
 		}
 
 		contents = temp;
 	}
 
-	/**
-	 * Format this Tree in canonical format.
-	 *
-	 * @return canonical encoding of the tree object.
-	 * @throws IOException
-	 *             the tree cannot be loaded, or its not in a writable state.
-	 */
-	public byte[] format() throws IOException {
-		TreeFormatter fmt = new TreeFormatter();
-		for (TreeEntry e : members()) {
-			ObjectId id = e.getId();
-			if (id == null)
-				throw new ObjectWritingException(MessageFormat.format(JGitText
-						.get().objectAtPathDoesNotHaveId, e.getFullName()));
-
-			fmt.append(e.getNameUTF8(), e.getMode(), id);
-		}
-		return fmt.toByteArray();
-	}
-
 	public String toString() {
-		final StringBuilder r = new StringBuilder();
+		final StringBuffer r = new StringBuffer();
 		r.append(ObjectId.toString(getId()));
 		r.append(" T ");
 		r.append(getFullName());

@@ -45,9 +45,7 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -167,27 +165,7 @@ public abstract class RefUpdate {
 
 	private final Ref ref;
 
-	/**
-	 * Is this RefUpdate detaching a symbolic ref?
-	 *
-	 * We need this info since this.ref will normally be peeled of in case of
-	 * detaching a symbolic ref (HEAD for example).
-	 *
-	 * Without this flag we cannot decide whether the ref has to be updated or
-	 * not in case when it was a symbolic ref and the newValue == oldValue.
-	 */
-	private boolean detachingSymbolicRef;
-
-	/**
-	 * Construct a new update operation for the reference.
-	 * <p>
-	 * {@code ref.getObjectId()} will be used to seed {@link #getOldObjectId()},
-	 * which callers can use as part of their own update logic.
-	 *
-	 * @param ref
-	 *            the reference that will be updated by this operation.
-	 */
-	protected RefUpdate(final Ref ref) {
+	RefUpdate(final Ref ref) {
 		this.ref = ref;
 		oldValue = ref.getObjectId();
 		refLogMessage = "";
@@ -262,13 +240,6 @@ public abstract class RefUpdate {
 	 */
 	public ObjectId getNewObjectId() {
 		return newValue;
-	}
-
-	/**
-	 * Tells this RefUpdate that it is actually detaching a symbolic ref.
-	 */
-	public void setDetachingSymbolicRef() {
-		detachingSymbolicRef = true;
 	}
 
 	/**
@@ -424,7 +395,7 @@ public abstract class RefUpdate {
 
 	private void requireCanDoUpdate() {
 		if (newValue == null)
-			throw new IllegalStateException(JGitText.get().aNewObjectIdIsRequired);
+			throw new IllegalStateException("A NewObjectId is required.");
 	}
 
 	/**
@@ -458,12 +429,7 @@ public abstract class RefUpdate {
 	 *             an unexpected IO error occurred while writing changes.
 	 */
 	public Result update() throws IOException {
-		RevWalk rw = new RevWalk(getRepository());
-		try {
-			return update(rw);
-		} finally {
-			rw.release();
-		}
+		return update(new RevWalk(getRepository()));
 	}
 
 	/**
@@ -508,12 +474,7 @@ public abstract class RefUpdate {
 	 * @throws IOException
 	 */
 	public Result delete() throws IOException {
-		RevWalk rw = new RevWalk(getRepository());
-		try {
-			return delete(rw);
-		} finally {
-			rw.release();
-		}
+		return delete(new RevWalk(getRepository()));
 	}
 
 	/**
@@ -563,7 +524,7 @@ public abstract class RefUpdate {
 	 */
 	public Result link(String target) throws IOException {
 		if (!target.startsWith(Constants.R_REFS))
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().illegalArgumentNotA, Constants.R_REFS));
+			throw new IllegalArgumentException("Not " + Constants.R_REFS);
 		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
@@ -614,7 +575,7 @@ public abstract class RefUpdate {
 
 			newObj = safeParse(walk, newValue);
 			oldObj = safeParse(walk, oldValue);
-			if (newObj == oldObj && !detachingSymbolicRef)
+			if (newObj == oldObj)
 				return store.execute(Result.NO_CHANGE);
 
 			if (newObj instanceof RevCommit && oldObj instanceof RevCommit) {

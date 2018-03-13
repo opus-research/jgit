@@ -56,12 +56,12 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 
 /** Server side implementation of smart fetch over HTTP. */
 class UploadPackServlet extends HttpServlet {
@@ -83,12 +83,7 @@ class UploadPackServlet extends HttpServlet {
 		protected void advertise(HttpServletRequest req, Repository db,
 				PacketLineOutRefAdvertiser pck) throws IOException,
 				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			UploadPack up = uploadPackFactory.create(req, db);
-			try {
-				up.sendAdvertisedRefs(pck);
-			} finally {
-				up.getRevWalk().release();
-			}
+			uploadPackFactory.create(req, db).sendAdvertisedRefs(pck);
 		}
 	}
 
@@ -111,15 +106,7 @@ class UploadPackServlet extends HttpServlet {
 			final UploadPack up = uploadPackFactory.create(req, db);
 			up.setBiDirectionalPipe(false);
 			rsp.setContentType(RSP_TYPE);
-
-			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
-				@Override
-				public void flush() throws IOException {
-					doFlush();
-				}
-			};
-			up.upload(getInputStream(req), out, null);
-			out.close();
+			up.upload(getInputStream(req), rsp.getOutputStream(), null);
 
 		} catch (ServiceNotAuthorizedException e) {
 			rsp.reset();
@@ -132,7 +119,7 @@ class UploadPackServlet extends HttpServlet {
 			return;
 
 		} catch (IOException e) {
-			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
+			getServletContext().log("Internal error during upload-pack", e);
 			rsp.reset();
 			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;

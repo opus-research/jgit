@@ -43,30 +43,20 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Test;
 
 public class DirCacheTreeTest extends RepositoryTestCase {
-	@Test
 	public void testEmptyCache_NoCacheTree() throws Exception {
-		final DirCache dc = db.readDirCache();
+		final DirCache dc = DirCache.read(db);
 		assertNull(dc.getCacheTree(false));
 	}
 
-	@Test
 	public void testEmptyCache_CreateEmptyCacheTree() throws Exception {
-		final DirCache dc = db.readDirCache();
+		final DirCache dc = DirCache.read(db);
 		final DirCacheTree tree = dc.getCacheTree(true);
 		assertNotNull(tree);
 		assertSame(tree, dc.getCacheTree(false));
@@ -78,9 +68,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 		assertFalse(tree.isValid());
 	}
 
-	@Test
 	public void testEmptyCache_Clear_NoCacheTree() throws Exception {
-		final DirCache dc = db.readDirCache();
+		final DirCache dc = DirCache.read(db);
 		final DirCacheTree tree = dc.getCacheTree(true);
 		assertNotNull(tree);
 		dc.clear();
@@ -88,9 +77,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 		assertNotSame(tree, dc.getCacheTree(true));
 	}
 
-	@Test
 	public void testSingleSubtree() throws Exception {
-		final DirCache dc = db.readDirCache();
+		final DirCache dc = DirCache.read(db);
 
 		final String[] paths = { "a.", "a/b", "a/c", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
@@ -126,9 +114,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 		assertFalse(aTree.isValid());
 	}
 
-	@Test
 	public void testTwoLevelSubtree() throws Exception {
-		final DirCache dc = db.readDirCache();
+		final DirCache dc = DirCache.read(db);
 
 		final String[] paths = { "a.", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
@@ -184,9 +171,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 	 * @throws CorruptObjectException
 	 * @throws IOException
 	 */
-	@Test
 	public void testWriteReadTree() throws CorruptObjectException, IOException {
-		final DirCache dc = db.lockDirCache();
+		final DirCache dc = DirCache.lock(db);
 
 		final String A = String.format("a%2000s", "a");
 		final String B = String.format("b%2000s", "b");
@@ -202,7 +188,7 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 			b.add(ents[i]);
 
 		b.commit();
-		DirCache read = db.readDirCache();
+		DirCache read = DirCache.read(db);
 
 		assertEquals(paths.length, read.getEntryCount());
 		assertEquals(1, read.getCacheTree(true).getChildCount());

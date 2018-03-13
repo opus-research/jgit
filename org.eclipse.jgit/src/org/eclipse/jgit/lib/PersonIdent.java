@@ -75,7 +75,7 @@ public class PersonIdent {
 	 * @param repo
 	 */
 	public PersonIdent(final Repository repo) {
-		final UserConfig config = repo.getConfig().get(UserConfig.KEY);
+		final RepositoryConfig config = repo.getConfig();
 		name = config.getCommitterName();
 		emailAddress = config.getCommitterEmail();
 		when = SystemReader.getInstance().getCurrentTime();
@@ -188,6 +188,45 @@ public class PersonIdent {
 	}
 
 	/**
+	 * Construct a PersonIdent from a string with full name, email, time time
+	 * zone string. The input string must be valid.
+	 *
+	 * @param in
+	 *            a Git internal format author/committer string.
+	 */
+	public PersonIdent(final String in) {
+		final int lt = in.indexOf('<');
+		if (lt == -1) {
+			throw new IllegalArgumentException("Malformed PersonIdent string"
+					+ " (no < was found): " + in);
+		}
+		final int gt = in.indexOf('>', lt);
+		if (gt == -1) {
+			throw new IllegalArgumentException("Malformed PersonIdent string"
+					+ " (no > was found): " + in);
+		}
+		final int sp = in.indexOf(' ', gt + 2);
+		if (sp == -1) {
+			when = 0;
+			tzOffset = -1;
+		} else {
+			final String tzHoursStr = in.substring(sp + 1, sp + 4).trim();
+			final int tzHours;
+			if (tzHoursStr.charAt(0) == '+') {
+				tzHours = Integer.parseInt(tzHoursStr.substring(1));
+			} else {
+				tzHours = Integer.parseInt(tzHoursStr);
+			}
+			final int tzMins = Integer.parseInt(in.substring(sp + 4).trim());
+			when = Long.parseLong(in.substring(gt + 1, sp).trim()) * 1000;
+			tzOffset = tzHours * 60 + tzMins;
+		}
+
+		name = in.substring(0, lt).trim();
+		emailAddress = in.substring(lt + 1, gt).trim();
+	}
+
+	/**
 	 * @return Name of person
 	 */
 	public String getName() {
@@ -212,7 +251,7 @@ public class PersonIdent {
 	 * @return this person's declared time zone; null if time zone is unknown.
 	 */
 	public TimeZone getTimeZone() {
-		StringBuilder tzId = new StringBuilder(8);
+		StringBuffer tzId = new StringBuffer(8);
 		tzId.append("GMT");
 		appendTimezone(tzId);
 		return TimeZone.getTimeZone(tzId.toString());
@@ -227,10 +266,7 @@ public class PersonIdent {
 	}
 
 	public int hashCode() {
-		int hc = getEmailAddress().hashCode();
-		hc *= 31;
-		hc += (int) (when / 1000L);
-		return hc;
+		return getEmailAddress().hashCode() ^ (int) when;
 	}
 
 	public boolean equals(final Object o) {
@@ -238,7 +274,7 @@ public class PersonIdent {
 			final PersonIdent p = (PersonIdent) o;
 			return getName().equals(p.getName())
 					&& getEmailAddress().equals(p.getEmailAddress())
-					&& when / 1000L == p.when / 1000L;
+					&& when == p.when;
 		}
 		return false;
 	}
@@ -249,7 +285,7 @@ public class PersonIdent {
 	 * @return a string in the git author format
 	 */
 	public String toExternalString() {
-		final StringBuilder r = new StringBuilder();
+		final StringBuffer r = new StringBuffer();
 		r.append(getName());
 		r.append(" <");
 		r.append(getEmailAddress());
@@ -260,7 +296,7 @@ public class PersonIdent {
 		return r.toString();
 	}
 
-	private void appendTimezone(final StringBuilder r) {
+	private void appendTimezone(final StringBuffer r) {
 		int offset = tzOffset;
 		final char sign;
 		final int offsetHours;
@@ -288,7 +324,7 @@ public class PersonIdent {
 	}
 
 	public String toString() {
-		final StringBuilder r = new StringBuilder();
+		final StringBuffer r = new StringBuffer();
 		final SimpleDateFormat dtfmt;
 		dtfmt = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.US);
 		dtfmt.setTimeZone(getTimeZone());

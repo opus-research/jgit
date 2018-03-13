@@ -46,7 +46,6 @@ package org.eclipse.jgit.pgm.opt;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.MessageFormat;
 
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -59,13 +58,10 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.treewalk.WorkingTreeOptions;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Custom argument handler {@link AbstractTreeIterator} from string values.
@@ -97,19 +93,16 @@ public class AbstractTreeIteratorHandler extends
 		final String name = params.getParameter(0);
 
 		if (new File(name).isDirectory()) {
-			setter.addValue(new FileTreeIterator(
-				new File(name),
-				FS.DETECTED,
-				clp.getRepository().getConfig().get(WorkingTreeOptions.KEY)));
+			setter.addValue(new FileTreeIterator(new File(name)));
 			return 1;
 		}
 
 		if (new File(name).isFile()) {
 			final DirCache dirc;
 			try {
-				dirc = DirCache.read(new File(name), FS.DETECTED);
+				dirc = DirCache.read(new File(name));
 			} catch (IOException e) {
-				throw new CmdLineException(MessageFormat.format(CLIText.get().notAnIndexFile, name), e);
+				throw new CmdLineException(name + " is not an index file", e);
 			}
 			setter.addValue(new DirCacheIterator(dirc));
 			return 1;
@@ -122,18 +115,19 @@ public class AbstractTreeIteratorHandler extends
 			throw new CmdLineException(e.getMessage());
 		}
 		if (id == null)
-			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
+			throw new CmdLineException(name + " is not a tree");
 
 		final CanonicalTreeParser p = new CanonicalTreeParser();
-		final ObjectReader curs = clp.getRepository().newObjectReader();
+		final WindowCursor curs = new WindowCursor();
 		try {
-			p.reset(curs, clp.getRevWalk().parseTree(id));
+			p.reset(clp.getRepository(), clp.getRevWalk().parseTree(id), curs);
 		} catch (MissingObjectException e) {
-			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
+			throw new CmdLineException(name + " is not a tree");
 		} catch (IncorrectObjectTypeException e) {
-			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
+			throw new CmdLineException(name + " is not a tree");
 		} catch (IOException e) {
-			throw new CmdLineException(MessageFormat.format(CLIText.get().cannotReadBecause, name, e.getMessage()));
+			throw new CmdLineException("cannot read " + name + ": "
+					+ e.getMessage());
 		} finally {
 			curs.release();
 		}
@@ -144,6 +138,6 @@ public class AbstractTreeIteratorHandler extends
 
 	@Override
 	public String getDefaultMetaVariable() {
-		return CLIText.get().metaVar_treeish;
+		return "tree-ish";
 	}
 }

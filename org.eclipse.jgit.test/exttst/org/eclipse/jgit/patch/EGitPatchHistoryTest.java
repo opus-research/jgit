@@ -43,11 +43,6 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -55,14 +50,14 @@ import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
-import org.junit.Test;
 
-public class EGitPatchHistoryTest {
-	@Test
+public class EGitPatchHistoryTest extends TestCase {
 	public void testParseHistory() throws Exception {
 		final NumStatReader numstat = new NumStatReader();
 		numstat.read();
@@ -113,9 +108,9 @@ public class EGitPatchHistoryTest {
 			for (final FileHeader fh : p.getFiles()) {
 				final String fileName;
 				if (fh.getChangeType() != FileHeader.ChangeType.DELETE)
-					fileName = fh.getNewPath();
+					fileName = fh.getNewName();
 				else
-					fileName = fh.getOldPath();
+					fileName = fh.getOldName();
 				final StatInfo s = files.remove(fileName);
 				final String nid = fileName + " in " + cid;
 				assertNotNull("No " + nid, s);

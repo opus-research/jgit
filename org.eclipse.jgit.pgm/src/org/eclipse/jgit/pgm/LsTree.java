@@ -53,15 +53,16 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
 class LsTree extends TextBuiltin {
-	@Option(name = "--recursive", usage = "usage_recurseIntoSubtrees", aliases = { "-r" })
+	@Option(name = "--recursive", usage = "recurse into subtrees", aliases = { "-r" })
 	private boolean recursive;
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_treeish")
+	@Argument(index = 0, required = true, metaVar = "tree-ish")
 	private AbstractTreeIterator tree;
 
 	@Override
 	protected void run() throws Exception {
 		final TreeWalk walk = new TreeWalk(db);
+		walk.reset(); // drop the first empty tree, which we do not need here
 		walk.setRecursive(recursive);
 		walk.addTree(tree);
 

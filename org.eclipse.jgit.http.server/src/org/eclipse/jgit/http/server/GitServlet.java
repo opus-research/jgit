@@ -44,11 +44,9 @@
 package org.eclipse.jgit.http.server;
 
 import java.io.File;
-import java.text.MessageFormat;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.glue.ErrorServlet;
@@ -57,14 +55,14 @@ import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
+import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.resolver.FileResolver;
-import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.eclipse.jgit.util.StringUtils;
 
 /**
@@ -106,13 +104,13 @@ public class GitServlet extends MetaServlet {
 
 	private volatile boolean initialized;
 
-	private RepositoryResolver<HttpServletRequest> resolver;
+	private RepositoryResolver resolver;
 
 	private AsIsFileService asIs = new AsIsFileService();
 
-	private UploadPackFactory<HttpServletRequest> uploadPackFactory = new DefaultUploadPackFactory();
+	private UploadPackFactory uploadPackFactory = new DefaultUploadPackFactory();
 
-	private ReceivePackFactory<HttpServletRequest> receivePackFactory = new DefaultReceivePackFactory();
+	private ReceivePackFactory receivePackFactory = new DefaultReceivePackFactory();
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -133,7 +131,7 @@ public class GitServlet extends MetaServlet {
 	 *            parameter table during init, which usually comes from the
 	 *            {@code web.xml} file of the web application.
 	 */
-	public void setRepositoryResolver(RepositoryResolver<HttpServletRequest> resolver) {
+	public void setRepositoryResolver(RepositoryResolver resolver) {
 		assertNotInitialized();
 		this.resolver = resolver;
 	}
@@ -154,10 +152,9 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure an {@link UploadPack}
 	 *            session when a fetch or clone is requested by a client.
 	 */
-	@SuppressWarnings("unchecked")
-	public void setUploadPackFactory(UploadPackFactory<HttpServletRequest> f) {
+	public void setUploadPackFactory(UploadPackFactory f) {
 		assertNotInitialized();
-		this.uploadPackFactory = f != null ? f : (UploadPackFactory<HttpServletRequest>)UploadPackFactory.DISABLED;
+		this.uploadPackFactory = f != null ? f : UploadPackFactory.DISABLED;
 	}
 
 	/**
@@ -165,15 +162,14 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure a {@link ReceivePack}
 	 *            session when a push is requested by a client.
 	 */
-	@SuppressWarnings("unchecked")
-	public void setReceivePackFactory(ReceivePackFactory<HttpServletRequest> f) {
+	public void setReceivePackFactory(ReceivePackFactory f) {
 		assertNotInitialized();
-		this.receivePackFactory = f != null ? f : (ReceivePackFactory<HttpServletRequest>)ReceivePackFactory.DISABLED;
+		this.receivePackFactory = f != null ? f : ReceivePackFactory.DISABLED;
 	}
 
 	private void assertNotInitialized() {
 		if (initialized)
-			throw new IllegalStateException(HttpServerText.get().alreadyInitializedByContainer);
+			throw new IllegalStateException("Already initialized by container");
 	}
 
 	@Override
@@ -183,12 +179,12 @@ public class GitServlet extends MetaServlet {
 		if (resolver == null) {
 			final File root = getFile("base-path");
 			final boolean exportAll = getBoolean("export-all");
-			setRepositoryResolver(new FileResolver<HttpServletRequest>(root, exportAll));
+			setRepositoryResolver(new FileResolver(root, exportAll));
 		}
 
 		initialized = true;
 
-		if (uploadPackFactory != UploadPackFactory.DISABLED) {
+		if (uploadPackFactory != ReceivePackFactory.DISABLED) {
 			serve("*/git-upload-pack")//
 					.with(new UploadPackServlet(uploadPackFactory));
 		}
@@ -263,11 +259,11 @@ public class GitServlet extends MetaServlet {
 	private File getFile(final String param) throws ServletException {
 		String n = getInitParameter(param);
 		if (n == null || "".equals(n))
-			throw new ServletException(MessageFormat.format(HttpServerText.get().parameterNotSet, param));
+			throw new ServletException("Parameter " + param + " not set");
 
 		File path = new File(n);
 		if (!path.exists())
-			throw new ServletException(MessageFormat.format(HttpServerText.get().pathForParamNotFound, path, param));
+			throw new ServletException(path + " (for " + param + ") not found");
 		return path;
 	}
 
@@ -278,14 +274,14 @@ public class GitServlet extends MetaServlet {
 		try {
 			return StringUtils.toBoolean(n);
 		} catch (IllegalArgumentException err) {
-			throw new ServletException(MessageFormat.format(HttpServerText.get().invalidBoolean, param, n));
+			throw new ServletException("Invalid boolean " + param + " = " + n);
 		}
 	}
 
 	@Override
 	protected ServletBinder register(ServletBinder binder) {
 		if (resolver == null)
-			throw new IllegalStateException(HttpServerText.get().noResolverAvailable);
+			throw new IllegalStateException("No resolver available");
 		binder = binder.through(new NoCacheFilter());
 		binder = binder.through(new RepositoryFilter(resolver));
 		return binder;

@@ -43,21 +43,13 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import junit.framework.TestCase;
 
-import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
 
-public class FileHeaderTest {
-	@Test
+public class FileHeaderTest extends TestCase {
 	public void testParseGitFileName_Empty() {
 		final FileHeader fh = data("");
 		assertEquals(-1, fh.parseGitFileName(0, fh.buf.length));
@@ -66,102 +58,91 @@ public class FileHeaderTest {
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_NoLF() {
 		final FileHeader fh = data("a/ b/");
 		assertEquals(-1, fh.parseGitFileName(0, fh.buf.length));
 	}
 
-	@Test
 	public void testParseGitFileName_NoSecondLine() {
 		final FileHeader fh = data("\n");
 		assertEquals(-1, fh.parseGitFileName(0, fh.buf.length));
 	}
 
-	@Test
 	public void testParseGitFileName_EmptyHeader() {
 		final FileHeader fh = data("\n\n");
 		assertEquals(1, fh.parseGitFileName(0, fh.buf.length));
 	}
 
-	@Test
 	public void testParseGitFileName_Foo() {
 		final String name = "foo";
 		final FileHeader fh = header(name);
 		assertEquals(gitLine(name).length(), fh.parseGitFileName(0,
 				fh.buf.length));
-		assertEquals(name, fh.getOldPath());
-		assertSame(fh.getOldPath(), fh.getNewPath());
+		assertEquals(name, fh.getOldName());
+		assertSame(fh.getOldName(), fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_FailFooBar() {
 		final FileHeader fh = data("a/foo b/bar\n-");
 		assertTrue(fh.parseGitFileName(0, fh.buf.length) > 0);
-		assertNull(fh.getOldPath());
-		assertNull(fh.getNewPath());
+		assertNull(fh.getOldName());
+		assertNull(fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_FooSpBar() {
 		final String name = "foo bar";
 		final FileHeader fh = header(name);
 		assertEquals(gitLine(name).length(), fh.parseGitFileName(0,
 				fh.buf.length));
-		assertEquals(name, fh.getOldPath());
-		assertSame(fh.getOldPath(), fh.getNewPath());
+		assertEquals(name, fh.getOldName());
+		assertSame(fh.getOldName(), fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_DqFooTabBar() {
 		final String name = "foo\tbar";
 		final String dqName = "foo\\tbar";
 		final FileHeader fh = dqHeader(dqName);
 		assertEquals(dqGitLine(dqName).length(), fh.parseGitFileName(0,
 				fh.buf.length));
-		assertEquals(name, fh.getOldPath());
-		assertSame(fh.getOldPath(), fh.getNewPath());
+		assertEquals(name, fh.getOldName());
+		assertSame(fh.getOldName(), fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_DqFooSpLfNulBar() {
 		final String name = "foo \n\0bar";
 		final String dqName = "foo \\n\\0bar";
 		final FileHeader fh = dqHeader(dqName);
 		assertEquals(dqGitLine(dqName).length(), fh.parseGitFileName(0,
 				fh.buf.length));
-		assertEquals(name, fh.getOldPath());
-		assertSame(fh.getOldPath(), fh.getNewPath());
+		assertEquals(name, fh.getOldName());
+		assertSame(fh.getOldName(), fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_SrcFooC() {
 		final String name = "src/foo/bar/argh/code.c";
 		final FileHeader fh = header(name);
 		assertEquals(gitLine(name).length(), fh.parseGitFileName(0,
 				fh.buf.length));
-		assertEquals(name, fh.getOldPath());
-		assertSame(fh.getOldPath(), fh.getNewPath());
+		assertEquals(name, fh.getOldName());
+		assertSame(fh.getOldName(), fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseGitFileName_SrcFooCNonStandardPrefix() {
 		final String name = "src/foo/bar/argh/code.c";
 		final String header = "project-v-1.0/" + name + " mydev/" + name + "\n";
 		final FileHeader fh = data(header + "-");
 		assertEquals(header.length(), fh.parseGitFileName(0, fh.buf.length));
-		assertEquals(name, fh.getOldPath());
-		assertSame(fh.getOldPath(), fh.getNewPath());
+		assertEquals(name, fh.getOldName());
+		assertSame(fh.getOldName(), fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 	}
 
-	@Test
 	public void testParseUnicodeName_NewFile() {
 		final FileHeader fh = data("diff --git \"a/\\303\\205ngstr\\303\\266m\" \"b/\\303\\205ngstr\\303\\266m\"\n"
 				+ "new file mode 100644\n"
@@ -171,9 +152,9 @@ public class FileHeaderTest {
 				+ "@@ -0,0 +1 @@\n" + "+a\n");
 		assertParse(fh);
 
-		assertEquals("/dev/null", fh.getOldPath());
-		assertSame(DiffEntry.DEV_NULL, fh.getOldPath());
-		assertEquals("\u00c5ngstr\u00f6m", fh.getNewPath());
+		assertEquals("/dev/null", fh.getOldName());
+		assertSame(FileHeader.DEV_NULL, fh.getOldName());
+		assertEquals("\u00c5ngstr\u00f6m", fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.ADD, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
@@ -187,7 +168,6 @@ public class FileHeaderTest {
 		assertEquals(0, fh.getScore());
 	}
 
-	@Test
 	public void testParseUnicodeName_DeleteFile() {
 		final FileHeader fh = data("diff --git \"a/\\303\\205ngstr\\303\\266m\" \"b/\\303\\205ngstr\\303\\266m\"\n"
 				+ "deleted file mode 100644\n"
@@ -197,9 +177,9 @@ public class FileHeaderTest {
 				+ "@@ -1 +0,0 @@\n" + "-a\n");
 		assertParse(fh);
 
-		assertEquals("\u00c5ngstr\u00f6m", fh.getOldPath());
-		assertEquals("/dev/null", fh.getNewPath());
-		assertSame(DiffEntry.DEV_NULL, fh.getNewPath());
+		assertEquals("\u00c5ngstr\u00f6m", fh.getOldName());
+		assertEquals("/dev/null", fh.getNewName());
+		assertSame(FileHeader.DEV_NULL, fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.DELETE, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
@@ -213,13 +193,12 @@ public class FileHeaderTest {
 		assertEquals(0, fh.getScore());
 	}
 
-	@Test
 	public void testParseModeChange() {
 		final FileHeader fh = data("diff --git a/a b b/a b\n"
 				+ "old mode 100644\n" + "new mode 100755\n");
 		assertParse(fh);
-		assertEquals("a b", fh.getOldPath());
-		assertEquals("a b", fh.getNewPath());
+		assertEquals("a b", fh.getOldName());
+		assertEquals("a b", fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.MODIFY, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
@@ -233,7 +212,6 @@ public class FileHeaderTest {
 		assertEquals(0, fh.getScore());
 	}
 
-	@Test
 	public void testParseRename100_NewStyle() {
 		final FileHeader fh = data("diff --git a/a b/ c/\\303\\205ngstr\\303\\266m\n"
 				+ "similarity index 100%\n"
@@ -241,14 +219,14 @@ public class FileHeaderTest {
 				+ "rename to \" c/\\303\\205ngstr\\303\\266m\"\n");
 		int ptr = fh.parseGitFileName(0, fh.buf.length);
 		assertTrue(ptr > 0);
-		assertNull(fh.getOldPath()); // can't parse names on a rename
-		assertNull(fh.getNewPath());
+		assertNull(fh.getOldName()); // can't parse names on a rename
+		assertNull(fh.getNewName());
 
 		ptr = fh.parseGitHeaders(ptr, fh.buf.length);
 		assertTrue(ptr > 0);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals(" c/\u00c5ngstr\u00f6m", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals(" c/\u00c5ngstr\u00f6m", fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.RENAME, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
@@ -263,7 +241,6 @@ public class FileHeaderTest {
 		assertEquals(100, fh.getScore());
 	}
 
-	@Test
 	public void testParseRename100_OldStyle() {
 		final FileHeader fh = data("diff --git a/a b/ c/\\303\\205ngstr\\303\\266m\n"
 				+ "similarity index 100%\n"
@@ -271,14 +248,14 @@ public class FileHeaderTest {
 				+ "rename new \" c/\\303\\205ngstr\\303\\266m\"\n");
 		int ptr = fh.parseGitFileName(0, fh.buf.length);
 		assertTrue(ptr > 0);
-		assertNull(fh.getOldPath()); // can't parse names on a rename
-		assertNull(fh.getNewPath());
+		assertNull(fh.getOldName()); // can't parse names on a rename
+		assertNull(fh.getNewName());
 
 		ptr = fh.parseGitHeaders(ptr, fh.buf.length);
 		assertTrue(ptr > 0);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals(" c/\u00c5ngstr\u00f6m", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals(" c/\u00c5ngstr\u00f6m", fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.RENAME, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
@@ -293,7 +270,6 @@ public class FileHeaderTest {
 		assertEquals(100, fh.getScore());
 	}
 
-	@Test
 	public void testParseCopy100() {
 		final FileHeader fh = data("diff --git a/a b/ c/\\303\\205ngstr\\303\\266m\n"
 				+ "similarity index 100%\n"
@@ -301,14 +277,14 @@ public class FileHeaderTest {
 				+ "copy to \" c/\\303\\205ngstr\\303\\266m\"\n");
 		int ptr = fh.parseGitFileName(0, fh.buf.length);
 		assertTrue(ptr > 0);
-		assertNull(fh.getOldPath()); // can't parse names on a copy
-		assertNull(fh.getNewPath());
+		assertNull(fh.getOldName()); // can't parse names on a copy
+		assertNull(fh.getNewName());
 
 		ptr = fh.parseGitHeaders(ptr, fh.buf.length);
 		assertTrue(ptr > 0);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals(" c/\u00c5ngstr\u00f6m", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals(" c/\u00c5ngstr\u00f6m", fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.COPY, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());
@@ -323,7 +299,6 @@ public class FileHeaderTest {
 		assertEquals(100, fh.getScore());
 	}
 
-	@Test
 	public void testParseFullIndexLine_WithMode() {
 		final String oid = "78981922613b2afb6025042ff6bd878ac1994e85";
 		final String nid = "61780798228d17af2d34fce4cfbdf35556832472";
@@ -331,8 +306,8 @@ public class FileHeaderTest {
 				+ ".." + nid + " 100644\n" + "--- a/a\n" + "+++ b/a\n");
 		assertParse(fh);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals("a", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals("a", fh.getNewName());
 
 		assertSame(FileMode.REGULAR_FILE, fh.getOldMode());
 		assertSame(FileMode.REGULAR_FILE, fh.getNewMode());
@@ -348,7 +323,6 @@ public class FileHeaderTest {
 		assertEquals(ObjectId.fromString(nid), fh.getNewId().toObjectId());
 	}
 
-	@Test
 	public void testParseFullIndexLine_NoMode() {
 		final String oid = "78981922613b2afb6025042ff6bd878ac1994e85";
 		final String nid = "61780798228d17af2d34fce4cfbdf35556832472";
@@ -356,8 +330,8 @@ public class FileHeaderTest {
 				+ ".." + nid + "\n" + "--- a/a\n" + "+++ b/a\n");
 		assertParse(fh);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals("a", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals("a", fh.getNewName());
 		assertFalse(fh.hasMetaDataChanges());
 
 		assertNull(fh.getOldMode());
@@ -373,7 +347,6 @@ public class FileHeaderTest {
 		assertEquals(ObjectId.fromString(nid), fh.getNewId().toObjectId());
 	}
 
-	@Test
 	public void testParseAbbrIndexLine_WithMode() {
 		final int a = 7;
 		final String oid = "78981922613b2afb6025042ff6bd878ac1994e85";
@@ -383,8 +356,8 @@ public class FileHeaderTest {
 				+ " 100644\n" + "--- a/a\n" + "+++ b/a\n");
 		assertParse(fh);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals("a", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals("a", fh.getNewName());
 
 		assertSame(FileMode.REGULAR_FILE, fh.getOldMode());
 		assertSame(FileMode.REGULAR_FILE, fh.getNewMode());
@@ -403,7 +376,6 @@ public class FileHeaderTest {
 		assertTrue(ObjectId.fromString(nid).startsWith(fh.getNewId()));
 	}
 
-	@Test
 	public void testParseAbbrIndexLine_NoMode() {
 		final int a = 7;
 		final String oid = "78981922613b2afb6025042ff6bd878ac1994e85";
@@ -413,8 +385,8 @@ public class FileHeaderTest {
 				+ "\n" + "--- a/a\n" + "+++ b/a\n");
 		assertParse(fh);
 
-		assertEquals("a", fh.getOldPath());
-		assertEquals("a", fh.getNewPath());
+		assertEquals("a", fh.getOldName());
+		assertEquals("a", fh.getNewName());
 
 		assertNull(fh.getOldMode());
 		assertNull(fh.getNewMode());

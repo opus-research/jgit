@@ -48,26 +48,18 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.io.InterruptedIOException;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
-import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.QuotedString;
-import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.MessageWriter;
-import org.eclipse.jgit.util.io.StreamCopyThread;
-import org.eclipse.jgit.util.FS;
+
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSchException;
 
 /**
  * Transport through an SSH tunnel.
@@ -81,65 +73,25 @@ import org.eclipse.jgit.util.FS;
  * enumeration, save file modification and hook execution.
  */
 public class TransportGitSsh extends SshTransport implements PackTransport {
-	static final TransportProtocol PROTO_SSH = new TransportProtocol() {
-		private final String[] schemeNames = { "ssh", "ssh+git", "git+ssh" }; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+	static boolean canHandle(final URIish uri) {
+		if (!uri.isRemote())
+			return false;
+		final String scheme = uri.getScheme();
+		if ("ssh".equals(scheme))
+			return true;
+		if ("ssh+git".equals(scheme))
+			return true;
+		if ("git+ssh".equals(scheme))
+			return true;
+		if (scheme == null && uri.getHost() != null && uri.getPath() != null)
+			return true;
+		return false;
+	}
 
-		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<String>(Arrays
-						.asList(schemeNames)));
-
-		public String getName() {
-			return JGitText.get().transportProtoSSH;
-		}
-
-		public Set<String> getSchemes() {
-			return schemeSet;
-		}
-
-		public Set<URIishField> getRequiredFields() {
-			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
-					URIishField.PATH));
-		}
-
-		public Set<URIishField> getOptionalFields() {
-			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
-					URIishField.PASS, URIishField.PORT));
-		}
-
-		public int getDefaultPort() {
-			return 22;
-		}
-
-		@Override
-		public boolean canHandle(URIish uri, Repository local, String remoteName) {
-			if (uri.getScheme() == null) {
-				// scp-style URI "host:path" does not have scheme.
-				return uri.getHost() != null
-					&& uri.getPath() != null
-					&& uri.getHost().length() != 0
-					&& uri.getPath().length() != 0;
-			}
-			return super.canHandle(uri, local, remoteName);
-		}
-
-		public Transport open(URIish uri, Repository local, String remoteName)
-				throws NotSupportedException {
-			return new TransportGitSsh(local, uri);
-		}
-	};
+	OutputStream errStream;
 
 	TransportGitSsh(final Repository local, final URIish uri) {
 		super(local, uri);
-		if (useExtSession()) {
-			setSshSessionFactory(new SshSessionFactory() {
-				@Override
-				public RemoteSession getSession(URIish uri2,
-						CredentialsProvider credentialsProvider, FS fs, int tms)
-						throws TransportException {
-					return new ExtSession();
-				}
-			});
-		}
 	}
 
 	@Override
@@ -152,31 +104,109 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new SshPushConnection();
 	}
 
-	String commandFor(final String exe) {
+	private static void sqMinimal(final StringBuilder cmd, final String val) {
+		if (val.matches("^[a-zA-Z0-9._/-]*$")) {
+			// If the string matches only generally safe characters
+			// that the shell is not going to evaluate specially we
+			// should leave the string unquoted. Not all systems
+			// actually run a shell and over-quoting confuses them
+			// when it comes to the command name.
+			//
+			cmd.append(val);
+		} else {
+			sq(cmd, val);
+		}
+	}
+
+	private static void sqAlways(final StringBuilder cmd, final String val) {
+		sq(cmd, val);
+	}
+
+	private static void sq(final StringBuilder cmd, final String val) {
+		if (val.length() > 0)
+			cmd.append(QuotedString.BOURNE.quote(val));
+	}
+
+	private String commandFor(final String exe) {
 		String path = uri.getPath();
 		if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
 			path = (uri.getPath().substring(1));
 
 		final StringBuilder cmd = new StringBuilder();
-		cmd.append(exe);
+		final int gitspace = exe.indexOf("git ");
+		if (gitspace >= 0) {
+			sqMinimal(cmd, exe.substring(0, gitspace + 3));
+			cmd.append(' ');
+			sqMinimal(cmd, exe.substring(gitspace + 4));
+		} else
+			sqMinimal(cmd, exe);
 		cmd.append(' ');
-		cmd.append(QuotedString.BOURNE.quote(path));
+		sqAlways(cmd, path);
 		return cmd.toString();
 	}
 
-	void checkExecFailure(int status, String exe, String why)
-			throws TransportException {
-		if (status == 127) {
-			IOException cause = null;
-			if (why != null && why.length() > 0)
-				cause = new IOException(why);
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().cannotExecute, commandFor(exe)), cause);
+	ChannelExec exec(final String exe) throws TransportException {
+		initSession();
+
+		final int tms = getTimeout() > 0 ? getTimeout() * 1000 : 0;
+		try {
+			final ChannelExec channel = (ChannelExec) sock.openChannel("exec");
+			channel.setCommand(commandFor(exe));
+			errStream = createErrorStream();
+			channel.setErrStream(errStream, true);
+			channel.connect(tms);
+			return channel;
+		} catch (JSchException je) {
+			throw new TransportException(uri, je.getMessage(), je);
 		}
 	}
 
-	NoRemoteRepositoryException cleanNotFound(NoRemoteRepositoryException nf,
-			String why) {
+	void checkExecFailure(int status, String exe) throws TransportException {
+		if (status == 127) {
+			String why = errStream.toString();
+			IOException cause = null;
+			if (why != null && why.length() > 0)
+				cause = new IOException(why);
+			throw new TransportException(uri, "cannot execute: "
+					+ commandFor(exe), cause);
+		}
+	}
+
+	/**
+	 * @return the error stream for the channel, the stream is used to detect
+	 *         specific error reasons for exceptions.
+	 */
+	private static OutputStream createErrorStream() {
+		return new OutputStream() {
+			private StringBuilder all = new StringBuilder();
+
+			private StringBuilder sb = new StringBuilder();
+
+			public String toString() {
+				String r = all.toString();
+				while (r.endsWith("\n"))
+					r = r.substring(0, r.length() - 1);
+				return r;
+			}
+
+			@Override
+			public void write(final int b) throws IOException {
+				if (b == '\r') {
+					return;
+				}
+
+				sb.append((char) b);
+
+				if (b == '\n') {
+					all.append(sb);
+					sb.setLength(0);
+				}
+			}
+		};
+	}
+
+	NoRemoteRepositoryException cleanNotFound(NoRemoteRepositoryException nf) {
+		String why = errStream.toString();
 		if (why == null || why.length() == 0)
 			return nf;
 
@@ -186,7 +216,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 		final StringBuilder pfx = new StringBuilder();
 		pfx.append("fatal: ");
-		pfx.append(QuotedString.BOURNE.quote(path));
+		sqAlways(pfx, path);
 		pfx.append(": ");
 		if (why.startsWith(pfx.toString()))
 			why = why.substring(pfx.length());
@@ -194,67 +224,112 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new NoRemoteRepositoryException(uri, why);
 	}
 
-	private static boolean useExtSession() {
-		return SystemReader.getInstance().getenv("GIT_SSH") != null;
+	// JSch won't let us interrupt writes when we use our InterruptTimer to
+	// break out of a long-running write operation. To work around that we
+	// spawn a background thread to shuttle data through a pipe, as we can
+	// issue an interrupted write out of that. Its slower, so we only use
+	// this route if there is a timeout.
+	//
+	private OutputStream outputStream(ChannelExec channel) throws IOException {
+		final OutputStream out = channel.getOutputStream();
+		if (getTimeout() <= 0)
+			return out;
+		final PipedInputStream pipeIn = new PipedInputStream();
+		final CopyThread copyThread = new CopyThread(pipeIn, out);
+		final PipedOutputStream pipeOut = new PipedOutputStream(pipeIn) {
+			@Override
+			public void flush() throws IOException {
+				super.flush();
+				copyThread.flush();
+			}
+
+			@Override
+			public void close() throws IOException {
+				super.close();
+				try {
+					copyThread.join(getTimeout() * 1000);
+				} catch (InterruptedException e) {
+					// Just wake early, the thread will terminate anyway.
+				}
+			}
+		};
+		copyThread.start();
+		return pipeOut;
 	}
 
-	private class ExtSession implements RemoteSession {
-		public Process exec(String command, int timeout)
-				throws TransportException {
-			String ssh = SystemReader.getInstance().getenv("GIT_SSH");
-			boolean putty = ssh.toLowerCase().contains("plink");
+	private static class CopyThread extends Thread {
+		private final InputStream src;
 
-			List<String> args = new ArrayList<String>();
-			args.add(ssh);
-			if (putty && !ssh.toLowerCase().contains("tortoiseplink"))
-				args.add("-batch");
-			if (0 < getURI().getPort()) {
-				args.add(putty ? "-P" : "-p");
-				args.add(String.valueOf(getURI().getPort()));
-			}
-			if (getURI().getUser() != null)
-				args.add(getURI().getUser() + "@" + getURI().getHost());
-			else
-				args.add(getURI().getHost());
-			args.add(command);
+		private final OutputStream dst;
 
-			ProcessBuilder pb = new ProcessBuilder();
-			pb.command(args);
+		private volatile boolean doFlush;
 
-			if (local.getDirectory() != null)
-				pb.environment().put(Constants.GIT_DIR_KEY,
-						local.getDirectory().getPath());
+		CopyThread(final InputStream i, final OutputStream o) {
+			setName(Thread.currentThread().getName() + "-Output");
+			src = i;
+			dst = o;
+		}
 
-			try {
-				return pb.start();
-			} catch (IOException err) {
-				throw new TransportException(err.getMessage(), err);
+		void flush() {
+			if (!doFlush) {
+				doFlush = true;
+				interrupt();
 			}
 		}
 
-		public void disconnect() {
-			// Nothing to do
+		@Override
+		public void run() {
+			try {
+				final byte[] buf = new byte[1024];
+				for (;;) {
+					try {
+						if (doFlush) {
+							doFlush = false;
+							dst.flush();
+						}
+
+						final int n;
+						try {
+							n = src.read(buf);
+						} catch (InterruptedIOException wakey) {
+							continue;
+						}
+						if (n < 0)
+							break;
+						dst.write(buf, 0, n);
+					} catch (IOException e) {
+						break;
+					}
+				}
+			} finally {
+				try {
+					src.close();
+				} catch (IOException e) {
+					// Ignore IO errors on close
+				}
+				try {
+					dst.close();
+				} catch (IOException e) {
+					// Ignore IO errors on close
+				}
+			}
 		}
 	}
 
 	class SshFetchConnection extends BasePackFetchConnection {
-		private final Process process;
+		private ChannelExec channel;
 
-		private StreamCopyThread errorThread;
+		private int exitStatus;
 
 		SshFetchConnection() throws TransportException {
 			super(TransportGitSsh.this);
 			try {
-				process = getSession().exec(commandFor(getOptionUploadPack()),
-						getTimeout());
-				final MessageWriter msg = new MessageWriter();
-				setMessageWriter(msg);
+				channel = exec(getOptionUploadPack());
 
-				final InputStream upErr = process.getErrorStream();
-				errorThread = new StreamCopyThread(upErr, msg.getRawStream());
-				errorThread.start();
-
-				init(process.getInputStream(), process.getOutputStream());
+				if (channel.isConnected())
+					init(channel.getInputStream(), outputStream(channel));
+				else
+					throw new TransportException(uri, errStream.toString());
 
 			} catch (TransportException err) {
 				close();
@@ -262,57 +337,48 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 
 			try {
 				readAdvertisedRefs();
 			} catch (NoRemoteRepositoryException notFound) {
-				final String msgs = getMessages();
-				checkExecFailure(process.exitValue(), getOptionUploadPack(),
-						msgs);
-				throw cleanNotFound(notFound, msgs);
+				close();
+				checkExecFailure(exitStatus, getOptionUploadPack());
+				throw cleanNotFound(notFound);
 			}
 		}
 
 		@Override
 		public void close() {
-			endOut();
+			super.close();
 
-			if (errorThread != null) {
+			if (channel != null) {
 				try {
-					errorThread.halt();
-				} catch (InterruptedException e) {
-					// Stop waiting and return anyway.
+					exitStatus = channel.getExitStatus();
+					if (channel.isConnected())
+						channel.disconnect();
 				} finally {
-					errorThread = null;
+					channel = null;
 				}
 			}
-
-			super.close();
-			if (process != null)
-				process.destroy();
 		}
 	}
 
 	class SshPushConnection extends BasePackPushConnection {
-		private final Process process;
+		private ChannelExec channel;
 
-		private StreamCopyThread errorThread;
+		private int exitStatus;
 
 		SshPushConnection() throws TransportException {
 			super(TransportGitSsh.this);
 			try {
-				process = getSession().exec(commandFor(getOptionReceivePack()),
-						getTimeout());
-				final MessageWriter msg = new MessageWriter();
-				setMessageWriter(msg);
+				channel = exec(getOptionReceivePack());
 
-				final InputStream rpErr = process.getErrorStream();
-				errorThread = new StreamCopyThread(rpErr, msg.getRawStream());
-				errorThread.start();
-
-				init(process.getInputStream(), process.getOutputStream());
+				if (channel.isConnected())
+					init(channel.getInputStream(), outputStream(channel));
+				else
+					throw new TransportException(uri, errStream.toString());
 
 			} catch (TransportException err) {
 				close();
@@ -320,36 +386,31 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
-						JGitText.get().remoteHungUpUnexpectedly, err);
+						"remote hung up unexpectedly", err);
 			}
 
 			try {
 				readAdvertisedRefs();
 			} catch (NoRemoteRepositoryException notFound) {
-				final String msgs = getMessages();
-				checkExecFailure(process.exitValue(), getOptionReceivePack(),
-						msgs);
-				throw cleanNotFound(notFound, msgs);
+				close();
+				checkExecFailure(exitStatus, getOptionReceivePack());
+				throw cleanNotFound(notFound);
 			}
 		}
 
 		@Override
 		public void close() {
-			endOut();
+			super.close();
 
-			if (errorThread != null) {
+			if (channel != null) {
 				try {
-					errorThread.halt();
-				} catch (InterruptedException e) {
-					// Stop waiting and return anyway.
+					exitStatus = channel.getExitStatus();
+					if (channel.isConnected())
+						channel.disconnect();
 				} finally {
-					errorThread = null;
+					channel = null;
 				}
 			}
-
-			super.close();
-			if (process != null)
-				process.destroy();
 		}
 	}
 }

@@ -2,7 +2,6 @@
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -58,15 +57,14 @@ class ShowDirCache extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		final SimpleDateFormat fmt;
-		fmt = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS");
+		fmt = new SimpleDateFormat("yyyyMMdd,HHmmss.SSS");
 
-		final DirCache cache = db.readDirCache();
+		final DirCache cache = DirCache.read(db);
 		for (int i = 0; i < cache.getEntryCount(); i++) {
 			final DirCacheEntry ent = cache.getEntry(i);
 			final FileMode mode = FileMode.fromBits(ent.getRawMode());
 			final int len = ent.getLength();
 			final Date mtime = new Date(ent.getLastModified());
-			final int stage = ent.getStage();
 
 			out.print(mode);
 			out.format(" %6d", len);
@@ -74,8 +72,6 @@ class ShowDirCache extends TextBuiltin {
 			out.print(fmt.format(mtime));
 			out.print(' ');
 			out.print(ent.getObjectId().name());
-			out.print(' ');
-			out.print(stage);
 			out.print('\t');
 			out.print(ent.getPathString());
 			out.println();
