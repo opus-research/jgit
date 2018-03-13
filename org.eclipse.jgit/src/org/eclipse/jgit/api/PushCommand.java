@@ -94,7 +94,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 	private int timeout;
 
 	private CredentialsProvider credentialsProvider;
-	private TransportConfigCallback transportConfigCallback;
 
 	/**
 	 * @param repo
@@ -152,8 +151,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 				transport.setDryRun(dryRun);
 				if (credentialsProvider != null)
 					transport.setCredentialsProvider(credentialsProvider);
-				if (transportConfigCallback != null)
-					transportConfigCallback.configure(transport);
 
 				final Collection<RemoteRefUpdate> toPush = transport
 						.findRemoteRefUpdatesFor(refSpecs);
@@ -432,13 +429,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 			CredentialsProvider credentialsProvider) {
 		checkCallable();
 		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
-
-	public PushCommand setTransportConfigCallback(
-			TransportConfigCallback transportConfigCallback) {
-		checkCallable();
-		this.transportConfigCallback = transportConfigCallback;
 		return this;
 	}
 }

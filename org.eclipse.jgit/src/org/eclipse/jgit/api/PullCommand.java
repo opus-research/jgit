@@ -87,7 +87,6 @@ public class PullCommand extends GitCommand<PullResult> {
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private CredentialsProvider credentialsProvider;
-	private TransportConfigCallback transportConfigCallback;
 
 	/**
 	 * @param repo
@@ -125,13 +124,6 @@ public class PullCommand extends GitCommand<PullResult> {
 			CredentialsProvider credentialsProvider) {
 		checkCallable();
 		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
-
-	public PullCommand setTransportConfigCallback(
-			TransportConfigCallback transportConfigCallback) {
-		checkCallable();
-		this.transportConfigCallback = transportConfigCallback;
 		return this;
 	}
 
@@ -222,7 +214,6 @@ public class PullCommand extends GitCommand<PullResult> {
 			fetch.setProgressMonitor(monitor);
 			fetch.setTimeout(this.timeout);
 			fetch.setCredentialsProvider(credentialsProvider);
-			fetch.setTransportConfigCallback(transportConfigCallback);
 
 			fetchRes = fetch.call();
 		} else {

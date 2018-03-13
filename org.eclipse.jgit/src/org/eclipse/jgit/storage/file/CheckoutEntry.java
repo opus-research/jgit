@@ -1,9 +1,5 @@
-package org.eclipse.jgit.api;
-
-import org.eclipse.jgit.transport.Transport;
-
 /*
- * Copyright (C) 2011, Roberto Tyley <roberto.tyley@gmail.com>
+ * Copyright (C) 2011, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,6 +41,38 @@ import org.eclipse.jgit.transport.Transport;
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-public interface TransportConfigCallback {
-	public void configure(Transport transport);
+package org.eclipse.jgit.storage.file;
+
+/**
+ * Parsed information about a checkout.
+ */
+public class CheckoutEntry {
+	static final String CHECKOUT_MOVING_FROM = "checkout: moving from ";
+
+	private String from;
+
+	private String to;
+
+	CheckoutEntry(ReflogEntry reflogEntry) {
+		String comment = reflogEntry.getComment();
+		int p1 = CHECKOUT_MOVING_FROM.length();
+		int p2 = comment.indexOf(" to ", p1);
+		int p3 = comment.length();
+		from = comment.substring(p1,p2);
+		to = comment.substring(p2 + " to ".length(), p3);
+	}
+
+	/**
+	 * @return the name of the branch before checkout
+	 */
+	public String getFromBranch() {
+		return from;
+	}
+
+	/**
+	 * @return the name of the branch after checkout
+	 */
+	public String getToBranch() {
+		return to;
+	}
 }
