@@ -664,7 +664,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 
 		// Create new Repository instance, to reread caches and make sure our
 		// assumptions are persistent.
-		Repository ndb = new FileRepository(db.getDirectory());
+		Repository ndb = new Repository(db.getDirectory());
 		assertEquals(rb2, ndb.resolve("refs/heads/new/name"));
 		assertNull(ndb.resolve("refs/heads/b"));
 	}
@@ -834,7 +834,6 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 			String msg, String refName) throws IOException {
 		RefDirectory refs = (RefDirectory) db.getRefDatabase();
 		RefDirectoryUpdate update = refs.newUpdate(refName, true);
-		update.setOldObjectId(oldId);
 		update.setNewObjectId(newId);
 		refs.log(update, msg, true);
 	}
