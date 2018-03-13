@@ -57,14 +57,11 @@ import static org.junit.Assert.fail;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
@@ -75,8 +72,6 @@ import org.junit.Test;
 public class ReftableTest {
 	private static final String MASTER = "refs/heads/master";
 	private static final String V1_0 = "refs/tags/v1.0";
-
-	private Stats stats;
 
 	@Test
 	public void emptyTable() throws IOException {
@@ -111,7 +106,7 @@ public class ReftableTest {
 	public void oneIdRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + MASTER.length() + 20 + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + MASTER.length() + 1 + 20 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		assertTrue(r.next());
@@ -138,7 +133,7 @@ public class ReftableTest {
 	public void oneTagRef() throws IOException {
 		Ref exp = tag(V1_0, 1, 2);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + V1_0.length() + 40 + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + V1_0.length() + 1 + 40 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		assertTrue(r.next());
@@ -157,7 +152,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				8 + 4 + 2 + HEAD.length() + 1 + MASTER.length() + 6 + 36,
+				8 + 4 + 2 + HEAD.length() + 2 + MASTER.length() + 6 + 36,
 				table.length);
 
 		ReftableReader r = seekToFirstRef(table);
@@ -176,7 +171,7 @@ public class ReftableTest {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + name.length() + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + name.length() + 1 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		r.setIncludeDeletes(true);
@@ -198,98 +193,6 @@ public class ReftableTest {
 
 		r.seek("refs/heads/n");
 		assertFalse(r.next());
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void indexScan() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 5670; i++) {
-			refs.add(ref(String.format("refs/heads/%04d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertTrue(stats.refIndexKeys() > 0);
-		assertTrue(stats.refIndexSize() > 0);
-
-		ReftableReader r = read(table);
-		r.seekToFirstRef();
-		for (Ref exp : refs) {
-			assertTrue("has " + exp.getName(), r.next());
-			Ref act = r.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
-		}
-		assertFalse(r.next());
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void indexSeek() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 5670; i++) {
-			refs.add(ref(String.format("refs/heads/%04d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertTrue(stats.refIndexKeys() > 0);
-		assertTrue(stats.refIndexSize() > 0);
-
-		for (Ref exp : refs) {
-			ReftableReader r = seek(table, exp.getName());
-			assertTrue("has " + exp.getName(), r.next());
-			Ref act = r.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
-			assertFalse(r.next());
-		}
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void noIndexScan() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 567; i++) {
-			refs.add(ref(String.format("refs/heads/%03d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertEquals(0, stats.refIndexKeys());
-		assertEquals(0, stats.refIndexSize());
-		assertEquals(4, stats.refBlockCount());
-		assertEquals(table.length, stats.totalBytes());
-
-		ReftableReader r = read(table);
-		r.seekToFirstRef();
-		for (Ref exp : refs) {
-			assertTrue("has " + exp.getName(), r.next());
-			Ref act = r.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
-		}
-		assertFalse(r.next());
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void noIndexSeek() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 567; i++) {
-			refs.add(ref(String.format("refs/heads/%03d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertEquals(0, stats.refIndexKeys());
-		assertEquals(4, stats.refBlockCount());
-
-		for (Ref exp : refs) {
-			ReftableReader r = seek(table, exp.getName());
-			assertTrue("has " + exp.getName(), r.next());
-			Ref act = r.getRef();
-			assertEquals(exp.getName(), act.getName());
-			assertEquals(exp.getObjectId(), act.getObjectId());
-			assertFalse(r.next());
-		}
 	}
 
 	public void unpeeledDoesNotWrite() {
@@ -365,18 +268,17 @@ public class ReftableTest {
 		return new ReftableReader(BlockSource.from(table));
 	}
 
-	private byte[] write(Ref... refs) throws IOException {
+	private static byte[] write(Ref... refs) throws IOException {
 		return write(Arrays.asList(refs));
 	}
 
-	private byte[] write(Collection<Ref> refs) throws IOException {
+	private static byte[] write(Collection<Ref> refs) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		ReftableWriter writer = new ReftableWriter().begin(buffer);
 		for (Ref r : RefComparator.sort(refs)) {
 			writer.writeRef(r);
 		}
 		writer.finish();
-		stats = writer.getStats();
 		return buffer.toByteArray();
 	}
 }
