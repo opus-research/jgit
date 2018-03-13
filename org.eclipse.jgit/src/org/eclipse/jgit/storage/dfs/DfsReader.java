@@ -75,8 +75,6 @@ import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
-import org.eclipse.jgit.lib.BitmapIndex;
-import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
@@ -85,9 +83,8 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.BitmapIndexImpl;
-import org.eclipse.jgit.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
@@ -141,27 +138,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public ObjectReader newReader() {
 		return new DfsReader(db);
-	}
-
-	@Override
-	public BitmapIndex getBitmapIndex() throws IOException {
-		for (DfsPackFile pack : db.getPacks()) {
-			PackBitmapIndex bitmapIndex = pack.getPackBitmapIndex(this);
-			if (bitmapIndex != null)
-				return new BitmapIndexImpl(bitmapIndex);
-		}
-		return null;
-	}
-
-	public Collection<CachedPack> getCachedPacksAndUpdate(
-		BitmapBuilder needBitmap) throws IOException {
-		for (DfsPackFile pack : db.getPacks()) {
-			PackBitmapIndex bitmapIndex = pack.getPackBitmapIndex(this);
-			if (needBitmap.removeAllOrNone(bitmapIndex))
-				return Collections.<CachedPack> singletonList(
-						new DfsCachedPack(pack));
-		}
-		return Collections.emptyList();
 	}
 
 	@Override
@@ -457,8 +433,8 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
-	public DfsObjectToPack newObjectToPack(AnyObjectId objectId, int type) {
-		return new DfsObjectToPack(objectId, type);
+	public DfsObjectToPack newObjectToPack(RevObject obj) {
+		return new DfsObjectToPack(obj);
 	}
 
 	private static final Comparator<DfsObjectRepresentation> REPRESENTATION_SORT = new Comparator<DfsObjectRepresentation>() {
