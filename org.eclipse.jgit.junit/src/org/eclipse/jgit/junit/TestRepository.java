@@ -866,7 +866,7 @@ public class TestRepository<R extends Repository> {
 				Set<ObjectId> all = new HashSet<ObjectId>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
-				pw.preparePack(m, all, PackWriter.NONE);
+				pw.preparePack(m, all, Collections.<ObjectId> emptySet());
 
 				final ObjectId name = pw.computeName();
 
@@ -1155,7 +1155,8 @@ public class TestRepository<R extends Repository> {
 			return self;
 		}
 
-		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c) {
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
+				throws IOException {
 			if (changeId == null)
 				return;
 			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");

@@ -53,7 +53,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Before;
 import org.junit.Test;
@@ -63,18 +62,7 @@ public class BranchTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("initial commit").call();
-		}
-	}
-
-	@Test
-	public void testHelpAfterDelete() throws Exception {
-		String err = toString(executeUnchecked("git branch -d"));
-		String help = toString(executeUnchecked("git branch -h"));
-		String errAndHelp = toString(executeUnchecked("git branch -d -h"));
-		assertEquals(CLIText.fatalError(CLIText.get().branchNameRequired), err);
-		assertEquals(toString(err, help), errAndHelp);
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
@@ -97,15 +85,13 @@ public class BranchTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testListContains() throws Exception {
-		try (Git git = new Git(db)) {
-			git.branchCreate().setName("initial").call();
-			RevCommit second = git.commit().setMessage("second commit")
-					.call();
-			assertEquals(toString("  initial", "* master"),
-					toString(execute("git branch --contains 6fd41be")));
-			assertEquals("* master",
-					toString(execute("git branch --contains " + second.name())));
-		}
+		new Git(db).branchCreate().setName("initial").call();
+		RevCommit second = new Git(db).commit().setMessage("second commit")
+				.call();
+		assertEquals(toString("  initial", "* master"),
+				toString(execute("git branch --contains 6fd41be")));
+		assertEquals("* master",
+				toString(execute("git branch --contains " + second.name())));
 	}
 
 	@Test

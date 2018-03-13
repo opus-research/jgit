@@ -44,17 +44,18 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC;
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_TXN;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -62,7 +63,6 @@ import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeNames;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackStatistics;
@@ -79,7 +78,9 @@ import org.eclipse.jgit.util.io.CountingOutputStream;
 /** Repack and garbage collect a repository. */
 public class DfsGarbageCollector {
 	private final DfsRepository repo;
-	private final RefDatabase refdb;
+
+	private final DfsRefDatabase refdb;
+
 	private final DfsObjDatabase objdb;
 
 	private final List<DfsPackDescription> newPackDesc;
@@ -94,11 +95,14 @@ public class DfsGarbageCollector {
 
 	private long coalesceGarbageLimit = 50 << 20;
 
+	private Map<String, Ref> refsBefore;
+
 	private List<DfsPackFile> packsBefore;
 
 	private Set<ObjectId> allHeads;
+
 	private Set<ObjectId> nonHeads;
-	private Set<ObjectId> txnHeads;
+
 	private Set<ObjectId> tagTargets;
 
 	/**
@@ -191,25 +195,22 @@ public class DfsGarbageCollector {
 
 		ctx = (DfsReader) objdb.newReader();
 		try {
-			refdb.refresh();
+			refdb.clearCache();
 			objdb.clearCache();
 
-			Collection<Ref> refsBefore = RefTreeNames.allRefs(refdb);
+			refsBefore = refdb.getRefs(ALL);
 			packsBefore = packsToRebuild();
 			if (packsBefore.isEmpty())
 				return true;
 
 			allHeads = new HashSet<ObjectId>();
 			nonHeads = new HashSet<ObjectId>();
-			txnHeads = new HashSet<ObjectId>();
 			tagTargets = new HashSet<ObjectId>();
-			for (Ref ref : refsBefore) {
+			for (Ref ref : refsBefore.values()) {
 				if (ref.isSymbolic() || ref.getObjectId() == null)
 					continue;
 				if (isHead(ref))
 					allHeads.add(ref.getObjectId());
-				else if (RefTreeNames.isRefTree(refdb, ref.getName()))
-					txnHeads.add(ref.getObjectId());
 				else
 					nonHeads.add(ref.getObjectId());
 				if (ref.getPeeledObjectId() != null)
@@ -221,7 +222,6 @@ public class DfsGarbageCollector {
 			try {
 				packHeads(pm);
 				packRest(pm);
-				packRefTreeGraph(pm);
 				packGarbage(pm);
 				objdb.commitPack(newPackDesc, toPrune());
 				rollback = false;
@@ -277,11 +277,12 @@ public class DfsGarbageCollector {
 
 		try (PackWriter pw = newPackWriter()) {
 			pw.setTagTargets(tagTargets);
-			pw.preparePack(pm, allHeads, PackWriter.NONE);
+			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
 		}
 	}
+
 	private void packRest(ProgressMonitor pm) throws IOException {
 		if (nonHeads.isEmpty())
 			return;
@@ -292,19 +293,6 @@ public class DfsGarbageCollector {
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
-		}
-	}
-
-	private void packRefTreeGraph(ProgressMonitor pm) throws IOException {
-		if (txnHeads.isEmpty())
-			return;
-
-		try (PackWriter pw = newPackWriter()) {
-			for (ObjectIdSet packedObjs : newPackObj)
-				pw.excludeObjects(packedObjs);
-			pw.preparePack(pm, txnHeads, PackWriter.NONE);
-			if (0 < pw.getObjectCount())
-				writePack(GC_TXN, pw, pm);
 		}
 	}
 

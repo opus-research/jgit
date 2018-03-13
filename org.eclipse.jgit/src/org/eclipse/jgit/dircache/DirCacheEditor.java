@@ -57,7 +57,6 @@ import java.util.List;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.util.Paths;
 
 /**
  * Updates a {@link DirCache} by supplying discrete edit commands.
@@ -216,7 +215,7 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 		}
 
 		DirCacheEntry next = cache.getEntry(eIdx);
-		if (Paths.compare(next.path, 0, next.path.length, 0,
+		if (pathCompare(next.path, 0, next.path.length, 0,
 				entPath, 0, entLen, TYPE_TREE) < 0) {
 			// Next DirCacheEntry sorts before new entry as tree. Defer a
 			// DeleteTree command to delete any entries if they exist. This

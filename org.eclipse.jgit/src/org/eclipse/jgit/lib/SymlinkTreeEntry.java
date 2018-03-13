@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,56 +44,42 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+/**
+ * A tree entry representing a symbolic link.
+ *
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class SymlinkTreeEntry extends TreeEntry {
 
-import java.util.Date;
-import java.util.TimeZone;
-
-import org.junit.Test;
-
-public class T0001_PersonIdentTest {
-
-	@Test
-	public void test001_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
-				p.toExternalString());
+	/**
+	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
+	 *
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
+	 */
+	public SymlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
 	}
 
-	@Test
-	public void test002_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
-				p.toExternalString());
+	public FileMode getMode() {
+		return FileMode.SYMLINK;
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void nullForNameShouldThrowIllegalArgumentException() {
-		new PersonIdent(null, "author@example.com");
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" S "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
 	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void nullForEmailShouldThrowIllegalArgumentException() {
-		new PersonIdent("A U Thor", null);
-	}
-
-	@Test
-	public void testToExternalStringTrimsNameAndEmail() throws Exception {
-		PersonIdent personIdent = new PersonIdent("  A U Thor  ",
-				"  author@example.com  ");
-
-		String externalString = personIdent.toExternalString();
-
-		assertTrue(externalString.startsWith("A U Thor <author@example.com>"));
-	}
-
 }

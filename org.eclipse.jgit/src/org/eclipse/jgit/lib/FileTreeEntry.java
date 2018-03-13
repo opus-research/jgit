@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,56 +44,72 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import java.io.IOException;
 
-import java.util.Date;
-import java.util.TimeZone;
+/**
+ * A representation of a file (blob) object in a {@link Tree}.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class FileTreeEntry extends TreeEntry {
+	private FileMode mode;
 
-import org.junit.Test;
-
-public class T0001_PersonIdentTest {
-
-	@Test
-	public void test001_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
-				p.toExternalString());
+	/**
+	 * Constructor for a File (blob) object.
+	 *
+	 * @param parent
+	 *            The {@link Tree} holding this object (or null)
+	 * @param id
+	 *            the SHA-1 of the blob (or null for a yet unhashed file)
+	 * @param nameUTF8
+	 *            raw object name in the parent tree
+	 * @param execute
+	 *            true if the executable flag is set
+	 */
+	public FileTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8, final boolean execute) {
+		super(parent, id, nameUTF8);
+		setExecutable(execute);
 	}
 
-	@Test
-	public void test002_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
-				p.toExternalString());
+	public FileMode getMode() {
+		return mode;
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void nullForNameShouldThrowIllegalArgumentException() {
-		new PersonIdent(null, "author@example.com");
+	/**
+	 * @return true if this file is executable
+	 */
+	public boolean isExecutable() {
+		return getMode().equals(FileMode.EXECUTABLE_FILE);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void nullForEmailShouldThrowIllegalArgumentException() {
-		new PersonIdent("A U Thor", null);
+	/**
+	 * @param execute set/reset the executable flag
+	 */
+	public void setExecutable(final boolean execute) {
+		mode = execute ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
 	}
 
-	@Test
-	public void testToExternalStringTrimsNameAndEmail() throws Exception {
-		PersonIdent personIdent = new PersonIdent("  A U Thor  ",
-				"  author@example.com  ");
-
-		String externalString = personIdent.toExternalString();
-
-		assertTrue(externalString.startsWith("A U Thor <author@example.com>"));
+	/**
+	 * @return an {@link ObjectLoader} that will return the data
+	 * @throws IOException
+	 */
+	public ObjectLoader openReader() throws IOException {
+		return getRepository().open(getId(), Constants.OBJ_BLOB);
 	}
 
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(' ');
+		r.append(isExecutable() ? 'X' : 'F');
+		r.append(' ');
+		r.append(getFullName());
+		return r.toString();
+	}
 }
