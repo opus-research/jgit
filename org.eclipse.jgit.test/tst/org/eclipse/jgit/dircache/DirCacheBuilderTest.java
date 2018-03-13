@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -62,20 +62,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		{
 			final DirCache dc = DirCache.read(db);
 			assertEquals(0, dc.getEntryCount());
-		}
-	}
-
-	public void testBuildRejectsUnsetFileMode() throws Exception {
-		final DirCache dc = DirCache.newInCore();
-		final DirCacheBuilder b = dc.builder();
-		assertNotNull(b);
-
-		final DirCacheEntry e = new DirCacheEntry("a");
-		assertEquals(0, e.getRawMode());
-		try {
-			b.add(e);
-		} catch (IllegalArgumentException err) {
-			assertEquals("FileMode not set for path a", err.getMessage());
 		}
 	}
 
@@ -182,7 +168,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		assertNotNull(b);
 
 		final DirCacheEntry entOrig = new DirCacheEntry(path);
-		entOrig.setFileMode(FileMode.REGULAR_FILE);
 		assertNotSame(path, entOrig.getPathString());
 		assertEquals(path, entOrig.getPathString());
 		b.add(entOrig);
@@ -206,10 +191,8 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 
 		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
+		for (int i = 0; i < paths.length; i++)
 			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(FileMode.REGULAR_FILE);
-		}
 
 		final DirCacheBuilder b = dc.builder();
 		for (int i = 0; i < ents.length; i++)
@@ -230,10 +213,8 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 
 		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
+		for (int i = 0; i < paths.length; i++)
 			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(FileMode.REGULAR_FILE);
-		}
 
 		final DirCacheBuilder b = dc.builder();
 		for (int i = ents.length - 1; i >= 0; i--)
@@ -254,10 +235,8 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 
 		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
+		for (int i = 0; i < paths.length; i++)
 			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(FileMode.REGULAR_FILE);
-		}
 		{
 			final DirCacheBuilder b = dc.builder();
 			for (int i = 0; i < ents.length; i++)
