@@ -320,7 +320,20 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final byte[] decompress(final long position, final int sz,
 			final WindowCursor curs) throws IOException, DataFormatException {
-		byte[] dstbuf = new byte[sz];
+		byte[] dstbuf;
+		try {
+			dstbuf = new byte[sz];
+		} catch (OutOfMemoryError noMemory) {
+			// The size may be larger than our heap allows, return null to
+			// let the caller know allocation isn't possible and it should
+			// use the large object streaming approach instead.
+			//
+			// For example, this can occur when sz is 640 MB, and JRE
+			// maximum heap size is only 256 MB. Even if the JRE has
+			// 200 MB free, it cannot allocate a 640 MB byte array.
+			return null;
+		}
+
 		if (curs.inflate(this, position, dstbuf, 0) != sz)
 			throw new EOFException(MessageFormat.format(
 					JGitText.get().shortCompressedStreamAt,
@@ -714,7 +727,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				case Constants.OBJ_TREE:
 				case Constants.OBJ_BLOB:
 				case Constants.OBJ_TAG: {
-					if (sz < curs.getStreamFileThreshold() || delta != null)
+					if (sz < curs.getStreamFileThreshold())
 						data = decompress(pos + p, (int) sz, curs);
 
 					if (delta != null) {
@@ -796,8 +809,23 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 				final byte[] cmds = decompress(pos + delta.hdrLen,
 						delta.deltaSize, curs);
+				if (cmds == null) {
+					data = null; // Discard base in case of OutOfMemoryError
+					return delta.large(this, curs);
+				}
+
 				final long sz = BinaryDelta.getResultSize(cmds);
-				final byte[] result = new byte[(int)sz];
+				if (Integer.MAX_VALUE <= sz)
+					return delta.large(this, curs);
+
+				final byte[] result;
+				try {
+					result = new byte[(int) sz];
+				} catch (OutOfMemoryError tooBig) {
+					data = null; // Discard base in case of OutOfMemoryError
+					return delta.large(this, curs);
+				}
+
 				BinaryDelta.apply(data, cmds, result);
 				data = result;
 				delta = delta.next;
