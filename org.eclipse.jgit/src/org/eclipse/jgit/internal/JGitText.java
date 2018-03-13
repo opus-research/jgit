@@ -370,7 +370,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
-	/***/ public String mergeRecursiveConflictsWhenMergingCommonAncestors;
 	/***/ public String mergeRecursiveReturnedNoCommit;
 	/***/ public String mergeRecursiveTooManyMergeBasesFor;
 	/***/ public String messageAndTaggerNotAllowedInUnannotatedTags;
