@@ -44,8 +44,9 @@
 package org.eclipse.jgit.util.sha1;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 import static org.junit.Assume.assumeTrue;
 
 import java.io.IOException;
@@ -80,13 +81,8 @@ public class SHA1Test {
 		s.update(new byte[] {});
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
-		s.reset();
-		s.update(new byte[] {});
-		ObjectId s2 = s.toObjectId();
-
 		assertEquals(m1, s1);
 		assertEquals(exp, s1);
-		assertEquals(exp, s2);
 	}
 
 	@Test
@@ -102,13 +98,8 @@ public class SHA1Test {
 		s.update(TEST1.getBytes(StandardCharsets.UTF_8));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
-		s.reset();
-		s.update(TEST1.getBytes(StandardCharsets.UTF_8));
-		ObjectId s2 = s.toObjectId();
-
 		assertEquals(m1, s1);
 		assertEquals(exp, s1);
-		assertEquals(exp, s2);
 	}
 
 	@Test
@@ -124,13 +115,8 @@ public class SHA1Test {
 		s.update(TEST2.getBytes(StandardCharsets.UTF_8));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
-		s.reset();
-		s.update(TEST2.getBytes(StandardCharsets.UTF_8));
-		ObjectId s2 = s.toObjectId();
-
 		assertEquals(m1, s1);
 		assertEquals(exp, s1);
-		assertEquals(exp, s2);
 	}
 
 	@Test
@@ -180,6 +166,27 @@ public class SHA1Test {
 			assertEquals(e.getMessage(),
 					"SHA-1 collision detected on " + bad.name());
 		}
+
+		// SHA1 with safeHash produces different hash values.
+		s = SHA1.newInstance().setDetectCollision(true).setSafeHash(true);
+		s.update(pdf1);
+		ObjectId safe1 = s.toObjectId();
+
+		s = SHA1.newInstance().setDetectCollision(true).setSafeHash(true);
+		s.update(pdf2);
+		ObjectId safe2 = s.toObjectId();
+
+		assertNotEquals("safe hashes not same", safe1, safe2);
+		assertNotEquals("safe hash changed", bad, safe1);
+		assertNotEquals("safe hash changed", bad, safe2);
+		assertEquals(
+				"shattered-1 matches sha1dc",
+				ObjectId.fromString("16e96b70000dd1e7c85b8368ee197754400e58ec"),
+				safe1);
+		assertEquals(
+				"shattered-2 matches sha1dc",
+				ObjectId.fromString("e1761773e6a35916d99f891b77663e6405313587"),
+				safe2);
 	}
 
 	@Test

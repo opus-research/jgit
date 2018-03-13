@@ -60,7 +60,7 @@ public class Sha1CollisionException extends RuntimeException {
 	 * Initialize with default message.
 	 *
 	 * @param id
-	 *            object whose contents are a hash collision.
+	 *            object whose contents produce a hash collision.s
 	 */
 	public Sha1CollisionException(ObjectId id) {
 		super(MessageFormat.format(
