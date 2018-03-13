@@ -144,10 +144,7 @@ public class HttpSupport {
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_GZIP = "gzip"; //$NON-NLS-1$
 
-	/**
-	 * The {@code x-gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}.
-	 * @since 4.6
-	 */
+	/** The {@code x-gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_X_GZIP = "x-gzip"; //$NON-NLS-1$
 
 	/** The standard {@code text/plain} MIME type. */
