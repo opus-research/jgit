@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,17 +48,25 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_WWW_AUTHENTICATE;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
+import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.Base64;
+import org.eclipse.jgit.util.GSSManagerFactory;
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.ietf.jgss.Oid;
 
 /**
  * Support class to populate user authentication data on a connection.
@@ -67,8 +75,74 @@ import org.eclipse.jgit.util.Base64;
  * may need to maintain per-connection state information.
  */
 abstract class HttpAuthMethod {
-	/** No authentication is configured. */
-	static final HttpAuthMethod NONE = new None();
+	/**
+	 * Enum listing the http authentication method types supported by jgit. They
+	 * are sorted by priority order!!!
+	 */
+	public enum Type {
+		NONE {
+			@Override
+			public HttpAuthMethod method(String hdr) {
+				return None.INSTANCE;
+			}
+
+			@Override
+			public String getSchemeName() {
+				return "None"; //$NON-NLS-1$
+			}
+		},
+		BASIC {
+			@Override
+			public HttpAuthMethod method(String hdr) {
+				return new Basic();
+			}
+
+			@Override
+			public String getSchemeName() {
+				return "Basic"; //$NON-NLS-1$
+			}
+		},
+		DIGEST {
+			@Override
+			public HttpAuthMethod method(String hdr) {
+				return new Digest(hdr);
+			}
+
+			@Override
+			public String getSchemeName() {
+				return "Digest"; //$NON-NLS-1$
+			}
+		},
+		NEGOTIATE {
+			@Override
+			public HttpAuthMethod method(String hdr) {
+				return new Negotiate(hdr);
+			}
+
+			@Override
+			public String getSchemeName() {
+				return "Negotiate"; //$NON-NLS-1$
+			}
+		};
+		/**
+		 * Creates a HttpAuthMethod instance configured with the provided HTTP
+		 * WWW-Authenticate header.
+		 *
+		 * @param hdr the http header
+		 * @return a configured HttpAuthMethod instance
+		 */
+		public abstract HttpAuthMethod method(String hdr);
+
+		/**
+		 * @return the name of the authentication scheme in the form to be used
+		 *         in HTTP authentication headers as specified in RFC2617 and
+		 *         RFC4559
+		 */
+		public abstract String getSchemeName();
+	}
+
+	static final String EMPTY_STRING = ""; //$NON-NLS-1$
+	static final String SCHEMA_NAME_SEPARATOR = " "; //$NON-NLS-1$
 
 	/**
 	 * Handle an authentication failure and possibly return a new response.
@@ -77,22 +151,49 @@ abstract class HttpAuthMethod {
 	 *            the connection that failed.
 	 * @return new authentication method to try.
 	 */
-	static HttpAuthMethod scanResponse(HttpURLConnection conn) {
-		String hdr = conn.getHeaderField(HDR_WWW_AUTHENTICATE);
-		if (hdr == null || hdr.length() == 0)
-			return NONE;
+	static HttpAuthMethod scanResponse(final HttpConnection conn) {
+		final Map<String, List<String>> headers = conn.getHeaderFields();
+		HttpAuthMethod authentication = Type.NONE.method(EMPTY_STRING);
 
-		int sp = hdr.indexOf(' ');
-		if (sp < 0)
-			return NONE;
+		for (final Entry<String, List<String>> entry : headers.entrySet()) {
+			if (HDR_WWW_AUTHENTICATE.equalsIgnoreCase(entry.getKey())) {
+				if (entry.getValue() != null) {
+					for (final String value : entry.getValue()) {
+						if (value != null && value.length() != 0) {
+							final String[] valuePart = value.split(
+									SCHEMA_NAME_SEPARATOR, 2);
 
-		String type = hdr.substring(0, sp);
-		if (Basic.NAME.equalsIgnoreCase(type))
-			return new Basic();
-		else if (Digest.NAME.equalsIgnoreCase(type))
-			return new Digest(hdr.substring(sp + 1));
-		else
-			return NONE;
+							try {
+								Type methodType = Type.valueOf(valuePart[0].toUpperCase());
+								if (authentication.getType().compareTo(methodType) >= 0) {
+									continue;
+								}
+
+								final String param;
+								if (valuePart.length == 1)
+									param = EMPTY_STRING;
+								else
+									param = valuePart[1];
+
+								authentication = methodType
+										.method(param);
+							} catch (IllegalArgumentException e) {
+								// This auth method is not supported
+							}
+						}
+					}
+				}
+				break;
+			}
+		}
+
+		return authentication;
+	}
+
+	protected final Type type;
+
+	protected HttpAuthMethod(Type type) {
+		this.type = type;
 	}
 
 	/**
@@ -147,28 +248,44 @@ abstract class HttpAuthMethod {
 	 * @param conn
 	 * @throws IOException
 	 */
-	abstract void configureRequest(HttpURLConnection conn) throws IOException;
+	abstract void configureRequest(HttpConnection conn) throws IOException;
+
+	/**
+	 * Gives the method type associated to this http auth method
+	 *
+	 * @return the method type
+	 */
+	public Type getType() {
+		return type;
+	}
 
 	/** Performs no user authentication. */
 	private static class None extends HttpAuthMethod {
+		static final None INSTANCE = new None();
+		public None() {
+			super(Type.NONE);
+		}
+
 		@Override
 		void authorize(String user, String pass) {
 			// Do nothing when no authentication is enabled.
 		}
 
 		@Override
-		void configureRequest(HttpURLConnection conn) throws IOException {
+		void configureRequest(HttpConnection conn) throws IOException {
 			// Do nothing when no authentication is enabled.
 		}
 	}
 
 	/** Performs HTTP basic authentication (plaintext username/password). */
 	private static class Basic extends HttpAuthMethod {
-		static final String NAME = "Basic"; //$NON-NLS-1$
-
 		private String user;
 
 		private String pass;
+
+		public Basic() {
+			super(Type.BASIC);
+		}
 
 		@Override
 		void authorize(final String username, final String password) {
@@ -177,17 +294,16 @@ abstract class HttpAuthMethod {
 		}
 
 		@Override
-		void configureRequest(final HttpURLConnection conn) throws IOException {
+		void configureRequest(final HttpConnection conn) throws IOException {
 			String ident = user + ":" + pass; //$NON-NLS-1$
 			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
-			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc); //$NON-NLS-1$
+			conn.setRequestProperty(HDR_AUTHORIZATION, type.getSchemeName()
+					+ " " + enc); //$NON-NLS-1$
 		}
 	}
 
 	/** Performs HTTP digest authentication. */
 	private static class Digest extends HttpAuthMethod {
-		static final String NAME = "Digest"; //$NON-NLS-1$
-
 		private static final Random PRNG = new Random();
 
 		private final Map<String, String> params;
@@ -199,6 +315,7 @@ abstract class HttpAuthMethod {
 		private String pass;
 
 		Digest(String hdr) {
+			super(Type.DIGEST);
 			params = parse(hdr);
 
 			final String qop = params.get("qop"); //$NON-NLS-1$
@@ -217,7 +334,7 @@ abstract class HttpAuthMethod {
 
 		@SuppressWarnings("boxing")
 		@Override
-		void configureRequest(final HttpURLConnection conn) throws IOException {
+		void configureRequest(final HttpConnection conn) throws IOException {
 			final Map<String, String> r = new LinkedHashMap<String, String>();
 
 			final String realm = params.get("realm"); //$NON-NLS-1$
@@ -267,7 +384,8 @@ abstract class HttpAuthMethod {
 				v.append(e.getValue());
 				v.append('"');
 			}
-			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + v); //$NON-NLS-1$
+			conn.setRequestProperty(HDR_AUTHORIZATION, type.getSchemeName()
+					+ " " + v); //$NON-NLS-1$
 		}
 
 		private static String uri(URL u) {
@@ -377,6 +495,59 @@ abstract class HttpAuthMethod {
 				p.put(name, value);
 			}
 			return p;
+		}
+	}
+
+	private static class Negotiate extends HttpAuthMethod {
+		private static final GSSManagerFactory GSS_MANAGER_FACTORY = GSSManagerFactory
+				.detect();
+
+		private static final Oid OID;
+		static {
+			try {
+				// OID for SPNEGO
+				OID = new Oid("1.3.6.1.5.5.2"); //$NON-NLS-1$
+			} catch (GSSException e) {
+				throw new Error("Cannot create NEGOTIATE oid.", e); //$NON-NLS-1$
+			}
+		}
+
+		private final byte[] prevToken;
+
+		public Negotiate(String hdr) {
+			super(Type.NEGOTIATE);
+			prevToken = Base64.decode(hdr);
+		}
+
+		@Override
+		void authorize(String user, String pass) {
+			// not used
+		}
+
+		@Override
+		void configureRequest(HttpConnection conn) throws IOException {
+			GSSManager gssManager = GSS_MANAGER_FACTORY.newInstance(conn
+					.getURL());
+			String host = conn.getURL().getHost();
+			String peerName = "HTTP@" + host.toLowerCase(); //$NON-NLS-1$
+			try {
+				GSSName gssName = gssManager.createName(peerName,
+						GSSName.NT_HOSTBASED_SERVICE);
+				GSSContext context = gssManager.createContext(gssName, OID,
+						null, GSSContext.DEFAULT_LIFETIME);
+				// Respect delegation policy in HTTP/SPNEGO.
+				context.requestCredDeleg(true);
+
+				byte[] token = context.initSecContext(prevToken, 0,
+						prevToken.length);
+
+				conn.setRequestProperty(HDR_AUTHORIZATION, getType().getSchemeName()
+						+ " " + Base64.encodeBytes(token)); //$NON-NLS-1$
+			} catch (GSSException e) {
+				IOException ioe = new IOException();
+				ioe.initCause(e);
+				throw ioe;
+			}
 		}
 	}
 }

@@ -110,23 +110,40 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 					pass, host, port, hc);
 
 			int retries = 0;
-			while (!session.isConnected() && retries < 3) {
+			while (!session.isConnected()) {
 				try {
 					retries++;
 					session.connect(tms);
 				} catch (JSchException e) {
 					session.disconnect();
 					session = null;
-					// if authentication failed maybe credentials changed at the
-					// remote end therefore reset credentials and retry
-					if (credentialsProvider != null && e.getCause() == null
-							&& e.getMessage().equals("Auth fail") //$NON-NLS-1$
-							&& retries < 3) {
-						credentialsProvider.reset(uri);
-						session = createSession(credentialsProvider, fs, user,
-								pass, host, port, hc);
-					} else {
+					// Make sure our known_hosts is not outdated
+					knownHosts(getJSch(hc, fs), fs);
+
+					if (isAuthenticationCanceled(e)) {
 						throw e;
+					} else if (isAuthenticationFailed(e)
+							&& credentialsProvider != null) {
+						// if authentication failed maybe credentials changed at
+						// the remote end therefore reset credentials and retry
+						if (retries < 3) {
+							credentialsProvider.reset(uri);
+							session = createSession(credentialsProvider, fs,
+									user, pass, host, port, hc);
+						} else
+							throw e;
+					} else if (retries >= hc.getConnectionAttempts()) {
+						throw e;
+					} else {
+						try {
+							Thread.sleep(1000);
+							session = createSession(credentialsProvider, fs,
+									user, pass, host, port, hc);
+						} catch (InterruptedException e1) {
+							throw new TransportException(
+									JGitText.get().transportSSHRetryInterrupt,
+									e1);
+						}
 					}
 				}
 			}
@@ -144,10 +161,21 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 	}
 
+	private static boolean isAuthenticationFailed(JSchException e) {
+		return e.getCause() == null && e.getMessage().equals("Auth fail"); //$NON-NLS-1$
+	}
+
+	private static boolean isAuthenticationCanceled(JSchException e) {
+		return e.getCause() == null && e.getMessage().equals("Auth cancel"); //$NON-NLS-1$
+	}
+
 	private Session createSession(CredentialsProvider credentialsProvider,
 			FS fs, String user, final String pass, String host, int port,
 			final OpenSshConfig.Host hc) throws JSchException {
 		final Session session = createSession(hc, user, host, port, fs);
+		// We retry already in getSession() method. JSch must not retry
+		// on its own.
+		session.setConfig("MaxAuthTries", "1"); //$NON-NLS-1$ //$NON-NLS-2$
 		if (pass != null)
 			session.setPassword(pass);
 		final String strictHostKeyCheckingPolicy = hc
