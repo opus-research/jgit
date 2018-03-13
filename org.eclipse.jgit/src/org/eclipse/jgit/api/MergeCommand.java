@@ -95,7 +95,7 @@ import org.eclipse.jgit.util.StringUtils;
  */
 public class MergeCommand extends GitCommand<MergeResult> {
 
-	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
+	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
 
 	private List<Ref> commits = new LinkedList<Ref>();
 
