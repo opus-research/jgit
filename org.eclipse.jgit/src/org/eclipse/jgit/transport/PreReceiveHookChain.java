@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertArrayEquals;
+package org.eclipse.jgit.transport;
 
-import org.junit.Test;
+import java.util.Collection;
+import java.util.List;
 
-public class ReadLinesTest {
-	@Test
-	public void testReadLines_singleLine() {
-		assertArrayEquals(new String[] { "[0]" }, IO.readLines("[0]"));
+/**
+ * {@link PreReceiveHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor.
+ */
+public class PreReceiveHookChain implements PreReceiveHook {
+	private final PreReceiveHook[] hooks;
+	private final int count;
+
+	/**
+	 * Create a new hook chaining the given hooks together.
+	 *
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
+	 */
+	public static PreReceiveHook newChain(List<? extends PreReceiveHook> hooks) {
+		PreReceiveHook[] newHooks = new PreReceiveHook[hooks.size()];
+		int i = 0;
+		for (PreReceiveHook hook : hooks)
+			if (hook != PreReceiveHook.NULL)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return PreReceiveHook.NULL;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new PreReceiveHookChain(newHooks, i);
 	}
 
-	@Test
-	public void testReadLines_LF() {
-		String[] lines = IO.readLines("[0]\n[1]");
-		assertArrayEquals(new String[] { "[0]", "[1]" }, lines);
+	public void onPreReceive(ReceivePack rp,
+			Collection<ReceiveCommand> commands) {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPreReceive(rp, commands);
 	}
 
-	@Test
-	public void testReadLines_CRLF() {
-		String[] lines = IO.readLines("[0]\r\n[1]");
-		assertArrayEquals(new String[] { "[0]", "[1]" }, lines);
-	}
-
-	@Test
-	public void testReadLines_endLF() {
-		String[] lines = IO.readLines("[0]\n");
-		assertArrayEquals(new String[] { "[0]", "" }, lines);
-	}
-
-	@Test
-	public void testReadLines_endCRLF() {
-		String[] lines = IO.readLines("[0]\r\n");
-		assertArrayEquals(new String[] { "[0]", "" }, lines);
-	}
-
-	@Test
-	public void testReadLines_mixed() {
-		String[] lines = IO.readLines("[0]\r\n[1]\n[2]");
-		assertArrayEquals(new String[] { "[0]", "[1]", "[2]" }, lines);
+	private PreReceiveHookChain(PreReceiveHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
 	}
 }

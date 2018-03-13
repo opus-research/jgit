@@ -63,7 +63,6 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.pgm.CLIGitCommand;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepository;
@@ -399,9 +398,5 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
 		refUpdate.link(branchName);
-	}
-
-	protected String[] execute(String command) throws Exception {
-		return CLIGitCommand.execute(command, db);
 	}
 }

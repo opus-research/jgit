@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.util.ArrayList;
+package org.eclipse.jgit.transport;
+
 import java.util.List;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.opt.CmdLineParser;
-import org.eclipse.jgit.pgm.opt.SubcommandHandler;
-import org.eclipse.jgit.util.IO;
-import org.kohsuke.args4j.Argument;
+import org.eclipse.jgit.storage.pack.PackWriter;
 
-public class CLIGitCommand {
-	@Argument(index = 0, metaVar = "metaVar_command", required = true, handler = SubcommandHandler.class)
-	private TextBuiltin subcommand;
+/**
+ * {@link UploadPackLogger} that delegates to a list of other loggers.
+ * <p>
+ * loggers are run in the order passed to the constructor.
+ */
+public class UploadPackLoggerChain implements UploadPackLogger {
+	private final UploadPackLogger[] loggers;
+	private final int count;
 
-	@Argument(index = 1, metaVar = "metaVar_arg")
-	private List<String> arguments = new ArrayList<String>();
-
-	public TextBuiltin getSubcommand() {
-		return subcommand;
-	}
-
-	public List<String> getArguments() {
-		return arguments;
-	}
-
-	public static String[] execute(String str, Repository db) throws Exception {
-		String[] args = str.split(" ");
-		String[] argv = new String[args.length - 1];
-		System.arraycopy(args, 1, argv, 0, args.length - 1);
-
-		CLIGitCommand bean = new CLIGitCommand();
-		final CmdLineParser clp = new CmdLineParser(bean);
-		clp.parseArgument(argv);
-
-		final TextBuiltin cmd = bean.getSubcommand();
-		if (cmd.requiresRepository())
-			cmd.init(db, null);
+	/**
+	 * Create a new logger chaining the given loggers together.
+	 *
+	 * @param loggers
+	 *            loggers to execute, in order.
+	 * @return a new logger chain of the given loggers.
+	 */
+	public static UploadPackLogger newChain(
+			List<? extends UploadPackLogger> loggers) {
+		UploadPackLogger[] newLoggers = new UploadPackLogger[loggers.size()];
+		int i = 0;
+		for (UploadPackLogger logger : loggers)
+			if (logger != UploadPackLogger.NULL)
+				newLoggers[i++] = logger;
+		if (i == 0)
+			return UploadPackLogger.NULL;
+		else if (i == 1)
+			return newLoggers[0];
 		else
-			cmd.init(null, null);
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		cmd.out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(
-				baos)));
-		try {
-			cmd.execute(bean.getArguments().toArray(
-					new String[bean.getArguments().size()]));
-		} finally {
-			if (cmd.out != null)
-				cmd.out.flush();
-		}
-		return IO.readLines(baos.toString());
+			return new UploadPackLoggerChain(newLoggers, i);
+	}
+
+	public void onPackStatistics(PackWriter.Statistics stats) {
+		for (int i = 0; i < count; i++)
+			loggers[i].onPackStatistics(stats);
+	}
+
+	private UploadPackLoggerChain(UploadPackLogger[] loggers, int count) {
+		this.loggers = loggers;
+		this.count = count;
 	}
 }
