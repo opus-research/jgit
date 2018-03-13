@@ -91,20 +91,16 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 
 		final File dst = db.fileFor(id);
-		if (tmp.renameTo(dst)) {
-			db.addUnpackedObject(id);
+		if (tmp.renameTo(dst))
 			return id;
-		}
 
 		// Maybe the directory doesn't exist yet as the object
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
 		dst.getParentFile().mkdir();
-		if (tmp.renameTo(dst)) {
-			db.addUnpackedObject(id);
+		if (tmp.renameTo(dst))
 			return id;
-		}
 
 		if (db.has(id)) {
 			tmp.delete();
