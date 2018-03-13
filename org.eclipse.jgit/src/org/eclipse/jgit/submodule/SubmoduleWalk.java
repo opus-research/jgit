@@ -45,6 +45,7 @@ package org.eclipse.jgit.submodule;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -622,8 +623,7 @@ public class SubmoduleWalk implements AutoCloseable {
 
 	/**
 	 * Get the configured remote URL for current entry. This will be the value
-	 * from the repository's config, or if not set there the value from
-	 * .gitmodules.
+	 * from the repository's config.
 	 *
 	 * @return configured URL
 	 * @throws ConfigInvalidException
@@ -634,14 +634,8 @@ public class SubmoduleWalk implements AutoCloseable {
 		// submodules.*.update values from .gitattributes to the config, and
 		// does so using the path defined in .gitattributes as the subsection
 		// name. So no path-to-name translation is necessary here.
-		String configuredUrl = repoConfig.getString(
-				ConfigConstants.CONFIG_SUBMODULE_SECTION,
+		return repoConfig.getString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
 				path, ConfigConstants.CONFIG_KEY_URL);
-		if (configuredUrl == null) {
-			// Fall back to the resolved url from .gitmodules
-			configuredUrl = getRemoteUrl();
-		}
-		return configuredUrl;
 	}
 
 	/**
@@ -660,21 +654,15 @@ public class SubmoduleWalk implements AutoCloseable {
 
 	/**
 	 * Get the configured update field for current entry. This will be the value
-	 * from the repository's config, or if not set there the value from
-	 * .gitmodules.
+	 * from the repository's config.
 	 *
 	 * @return update value
 	 * @throws ConfigInvalidException
 	 * @throws IOException
 	 */
 	public String getConfigUpdate() throws IOException, ConfigInvalidException {
-		String configuredUpdate = repoConfig.getString(
-				ConfigConstants.CONFIG_SUBMODULE_SECTION,
+		return repoConfig.getString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
 				path, ConfigConstants.CONFIG_KEY_UPDATE);
-		if (configuredUpdate == null) {
-			configuredUpdate = getModulesUpdate();
-		}
-		return configuredUpdate;
 	}
 
 	/**
@@ -703,9 +691,13 @@ public class SubmoduleWalk implements AutoCloseable {
 	public IgnoreSubmoduleMode getModulesIgnore() throws IOException,
 			ConfigInvalidException {
 		lazyLoadModulesConfig();
-		return modulesConfig.getEnum(IgnoreSubmoduleMode.values(),
+		String name = modulesConfig.getString(
 				ConfigConstants.CONFIG_SUBMODULE_SECTION, getModuleName(path),
-				ConfigConstants.CONFIG_KEY_IGNORE, IgnoreSubmoduleMode.NONE);
+				ConfigConstants.CONFIG_KEY_IGNORE);
+		if (name == null)
+			return null;
+		return IgnoreSubmoduleMode
+				.valueOf(name.trim().toUpperCase(Locale.ROOT));
 	}
 
 	/**
