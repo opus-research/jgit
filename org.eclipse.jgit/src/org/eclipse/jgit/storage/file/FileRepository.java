@@ -244,7 +244,6 @@ public class FileRepository extends Repository {
 		objectDatabase.create();
 
 		FileUtils.mkdir(new File(getDirectory(), "branches"));
-		FileUtils.mkdir(new File(getDirectory(), "hooks"));
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
