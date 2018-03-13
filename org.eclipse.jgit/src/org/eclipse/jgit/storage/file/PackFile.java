@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackConstants.PACK_INDEX_EXT;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -94,6 +92,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 	};
 
+	private final File idxFile;
+
 	private final File packFile;
 
 	private File keepFile;
@@ -135,10 +135,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Construct a reader for an existing, pre-indexed packfile.
 	 *
+	 * @param idxFile
+	 *            path of the <code>.idx</code> file listing the contents.
 	 * @param packFile
 	 *            path of the <code>.pack</code> file holding the data.
 	 */
-	public PackFile(final File packFile) {
+	public PackFile(final File idxFile, final File packFile) {
+		this.idxFile = idxFile;
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
 
@@ -155,7 +158,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				throw new PackInvalidException(packFile);
 
 			try {
-				final PackIndex idx = PackIndex.open(extFile(PACK_INDEX_EXT));
+				final PackIndex idx = PackIndex.open(idxFile);
 
 				if (packChecksum == null)
 					packChecksum = idx.packChecksum;
@@ -1076,12 +1079,5 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		synchronized (list) {
 			list.add(offset);
 		}
-	}
-
-	private File extFile(String ext) {
-		String p = packFile.getName();
-		int dot = p.lastIndexOf('.');
-		String b = (dot < 0) ? p : p.substring(0, dot);
-		return new File(packFile.getParentFile(), b + '.' + ext);
 	}
 }
