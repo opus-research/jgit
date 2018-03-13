@@ -146,7 +146,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setGitDir(new File(directory, ".git"));
 		command.setURI(fileUri());
 		Git git2 = command.call();
-		addRepoToClose(git2.getRepository());
 		assertEquals(directory, git2.getRepository().getWorkTree());
 		assertEquals(new File(directory, ".git"), git2.getRepository()
 				.getDirectory());
@@ -162,7 +161,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setGitDir(gDir);
 		command.setURI(fileUri());
 		Git git2 = command.call();
-		addRepoToClose(git2.getRepository());
 		assertEquals(directory, git2.getRepository().getWorkTree());
 		assertEquals(gDir, git2.getRepository()
 				.getDirectory());
@@ -179,7 +177,6 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setGitDir(gDir);
 		command.setURI(fileUri());
 		Git git2 = command.call();
-		addRepoToClose(git2.getRepository());
 		try {
 			assertNull(null, git2.getRepository().getWorkTree());
 			fail("Expected NoWorkTreeException");
