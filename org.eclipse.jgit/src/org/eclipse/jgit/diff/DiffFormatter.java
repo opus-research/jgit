@@ -67,7 +67,6 @@ import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
@@ -90,7 +89,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
@@ -393,14 +391,11 @@ public class DiffFormatter {
 	 * returned. Callers may choose to format these paths themselves, or convert
 	 * them into {@link FileHeader} instances with a complete edit list by
 	 * calling {@link #toFileHeader(DiffEntry)}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @return the paths that are different.
 	 * @throws IOException
 	 *             trees cannot be read or file contents cannot be read.
@@ -410,9 +405,7 @@ public class DiffFormatter {
 		assertHaveRepository();
 
 		RevWalk rw = new RevWalk(reader);
-		RevTree aTree = a != null ? rw.parseTree(a) : null;
-		RevTree bTree = b != null ? rw.parseTree(b) : null;
-		return scan(aTree, bTree);
+		return scan(rw.parseTree(a), rw.parseTree(b));
 	}
 
 	/**
@@ -422,14 +415,11 @@ public class DiffFormatter {
 	 * returned. Callers may choose to format these paths themselves, or convert
 	 * them into {@link FileHeader} instances with a complete edit list by
 	 * calling {@link #toFileHeader(DiffEntry)}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @return the paths that are different.
 	 * @throws IOException
 	 *             trees cannot be read or file contents cannot be read.
@@ -437,19 +427,13 @@ public class DiffFormatter {
 	public List<DiffEntry> scan(RevTree a, RevTree b) throws IOException {
 		assertHaveRepository();
 
-		AbstractTreeIterator aIterator = makeIteratorFromTreeOrNull(a);
-		AbstractTreeIterator bIterator = makeIteratorFromTreeOrNull(b);
-		return scan(aIterator, bIterator);
-	}
+		CanonicalTreeParser aParser = new CanonicalTreeParser();
+		CanonicalTreeParser bParser = new CanonicalTreeParser();
 
-	private AbstractTreeIterator makeIteratorFromTreeOrNull(RevTree tree)
-			throws IncorrectObjectTypeException, IOException {
-		if (tree != null) {
-			CanonicalTreeParser parser = new CanonicalTreeParser();
-			parser.reset(reader, tree);
-			return parser;
-		} else
-			return new EmptyTreeIterator();
+		aParser.reset(reader, a);
+		bParser.reset(reader, b);
+
+		return scan(aParser, bParser);
 	}
 
 	/**
@@ -569,14 +553,11 @@ public class DiffFormatter {
 	 *
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -591,14 +572,10 @@ public class DiffFormatter {
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
 	 *
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
-	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
@@ -612,14 +589,11 @@ public class DiffFormatter {
 	 *
 	 * The patch is expressed as instructions to modify {@code a} to make it
 	 * {@code b}.
-	 * <p>
-	 * Either side may be null to indicate that the tree has beed added or
-	 * removed. The diff will be computed against nothing.
 	 *
 	 * @param a
-	 *            the old (or previous) side or null
+	 *            the old (or previous) side.
 	 * @param b
-	 *            the new (or updated) side or null
+	 *            the new (or updated) side.
 	 * @throws IOException
 	 *             trees cannot be read, file contents cannot be read, or the
 	 *             patch cannot be output.
