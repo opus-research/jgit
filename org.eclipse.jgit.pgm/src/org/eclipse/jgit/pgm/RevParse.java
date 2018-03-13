@@ -53,7 +53,6 @@ import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 
-@Command(usage = "usage_RevParse")
 class RevParse extends TextBuiltin {
 	@Option(name = "--all")
 	boolean all = false;
