@@ -171,26 +171,13 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 * The meta directory stores the objects, references, and meta files like
 	 * {@code MERGE_HEAD}, or the index file. If {@code null} the path is
 	 * assumed to be {@code workTree/.git}.
-	 * <p>
-	 * This function will honor a .git file which is a symRef to the real
-	 * git directory.
 	 *
 	 * @param gitDir
 	 *            {@code GIT_DIR}, the repository meta directory.
 	 * @return {@code this} (for chaining calls).
-	 * @throws IOException
-	 *             the repository could not be accessed to configure the rest of
-	 *             the builder's parameters.
 	 */
-	public B setGitDir(File gitDir) throws IOException {
-		if (gitDir == null || !gitDir.isFile()) {
-			this.gitDir = gitDir;
-		} else {
-			// We were given a gitfile so we need to resolve the
-			// symRef to find the real gitDir.
-			File workTree = gitDir.getParentFile();
-			this.gitDir = getSymRef(workTree, gitDir, safeFS());
-		}
+	public B setGitDir(File gitDir) {
+		this.gitDir = gitDir;
 		this.config = null;
 		return self();
 	}
@@ -368,11 +355,8 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 * already set in this builder.
 	 *
 	 * @return {@code this} (for chaining calls).
-	 * @throws IOException
-	 *             the repository could not be accessed to configure the rest of
-	 *             the builder's parameters.
 	 */
-	public B readEnvironment() throws IOException {
+	public B readEnvironment() {
 		return readEnvironment(SystemReader.getInstance());
 	}
 
@@ -387,11 +371,8 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 * @param sr
 	 *            the SystemReader abstraction to access the environment.
 	 * @return {@code this} (for chaining calls).
-	 * @throws IOException
-	 *             the repository could not be accessed to configure the rest of
-	 *             the builder's parameters.
 	 */
-	public B readEnvironment(SystemReader sr) throws IOException {
+	public B readEnvironment(SystemReader sr) {
 		if (getGitDir() == null) {
 			String val = sr.getenv(GIT_DIR_KEY);
 			if (val != null)
@@ -531,16 +512,19 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			FS tryFS = safeFS();
 			while (current != null) {
 				File dir = new File(current, DOT_GIT);
-				try {
-					if (FileKey.isGitRepository(dir, tryFS) || dir.isFile()) {
-						setGitDir(dir);
+				if (FileKey.isGitRepository(dir, tryFS)) {
+					setGitDir(dir);
+					break;
+				} else if (dir.isFile()) {
+					try {
+						setGitDir(getSymRef(current, dir, tryFS));
 						break;
-					} else if (FileKey.isGitRepository(current, tryFS)) {
-						setGitDir(current);
-						break;
+					} catch (IOException ignored) {
+						// Continue searching if gitdir ref isn't found
 					}
-				} catch (IOException ignored) {
-					// Continue searching if gitdir ref isn't found
+				} else if (FileKey.isGitRepository(current, tryFS)) {
+					setGitDir(current);
+					break;
 				}
 
 				current = current.getParentFile();
@@ -617,7 +601,10 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 		// location
 		if (getGitDir() == null && getWorkTree() != null) {
 			File dotGit = new File(getWorkTree(), DOT_GIT);
-			setGitDir(dotGit);
+			if (!dotGit.isFile())
+				setGitDir(dotGit);
+			else
+				setGitDir(getSymRef(getWorkTree(), dotGit, safeFS()));
 		}
 	}
 
