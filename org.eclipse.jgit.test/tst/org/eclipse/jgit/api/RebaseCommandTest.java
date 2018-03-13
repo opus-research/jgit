@@ -63,7 +63,6 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -411,8 +410,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				"change file1 in topic", "1topic", "2", "3", "topic4");
 
 		RevCommit lastTopicCommit = writeFileAndCommit(FILE1,
-				"change file1 in topic again", "1topic", "2", "3", "topic4",
-				"change");
+				"change file1 in topic again", "1topic", "2", "3", "topic4");
 
 		RebaseResult res = git.rebase().setUpstream("refs/heads/master").call();
 		assertEquals(Status.STOPPED, res.getStatus());
@@ -439,7 +437,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		res = git.rebase().setOperation(Operation.ABORT).call();
 		assertEquals(res.getStatus(), Status.ABORTED);
 		assertEquals("refs/heads/topic", db.getFullBranch());
-		checkFile(FILE1, "1topic", "2", "3", "topic4", "change");
+		checkFile(FILE1, "1topic", "2", "3", "topic4");
 		RevWalk rw = new RevWalk(db);
 		assertEquals(lastTopicCommit, rw
 				.parseCommit(db.resolve(Constants.HEAD)));
@@ -845,7 +843,13 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 	private RevCommit writeFileAndCommit(String fileName, String commitMessage,
 			String... lines) throws Exception {
-		writeFileAndAdd(fileName, lines);
+		StringBuilder sb = new StringBuilder();
+		for (String line : lines) {
+			sb.append(line);
+			sb.append('\n');
+		}
+		writeTrashFile(fileName, sb.toString());
+		git.add().addFilepattern(fileName).call();
 		return git.commit().setMessage(commitMessage).call();
 	}
 
@@ -856,7 +860,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 			sb.append(line);
 			sb.append('\n');
 		}
-		JGitTestUtil.writeTrashFile(db, fileName, sb.toString());
+		writeTrashFile(fileName, sb.toString());
 		git.add().addFilepattern(fileName).call();
 	}
 
