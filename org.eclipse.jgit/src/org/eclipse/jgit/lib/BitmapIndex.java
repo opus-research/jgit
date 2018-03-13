@@ -47,11 +47,7 @@ import java.util.Iterator;
 
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 
-/**
- * A compressed bitmap representation of the entire object graph.
- *
- * @since 3.0
- */
+/** A compressed bitmap representation of the entire object graph. */
 public interface BitmapIndex {
 	/**
 	 * Get the bitmap for the id. The returned bitmap is immutable and the

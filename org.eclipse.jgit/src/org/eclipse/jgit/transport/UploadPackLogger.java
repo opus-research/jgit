@@ -66,7 +66,6 @@ public interface UploadPackLogger {
 	 *
 	 * @param stats
 	 *            the statistics after sending a pack to the client.
-	 * @since 3.0
 	 */
 	public void onPackStatistics(PackWriter.Statistics stats);
 }
