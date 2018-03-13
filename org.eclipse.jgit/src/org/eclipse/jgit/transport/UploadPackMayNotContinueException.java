@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,41 +43,26 @@
 
 package org.eclipse.jgit.transport;
 
-import java.util.Collection;
-
 /**
- * Hook invoked by {@link ReceivePack} after all updates are executed.
- * <p>
- * The hook is called after all commands have been processed. Only commands with
- * a status of {@link ReceiveCommand.Result#OK} are passed into the hook. To get
- * all commands within the hook, see {@link ReceivePack#getAllCommands()}.
- * <p>
- * Any post-receive hook implementation should not update the status of a
- * command, as the command has already completed or failed, and the status has
- * already been returned to the client.
- * <p>
- * Hooks should execute quickly, as they block the server and the client from
- * completing the connection.
+ * Indicates UploadPack may not continue execution.
+ *
+ * @deprecated use {@link ServiceMayNotContinueException} instead.
  */
-public interface PostReceiveHook {
-	/** A simple no-op hook. */
-	public static final PostReceiveHook NULL = new PostReceiveHook() {
-		public void onPostReceive(final ReceivePack rp,
-				final Collection<ReceiveCommand> commands) {
-			// Do nothing.
-		}
-	};
+@Deprecated
+public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+	private static final long serialVersionUID = 1L;
+
+	/** Initialize with no message. */
+	public UploadPackMayNotContinueException() {
+		// Do not set a message.
+	}
 
 	/**
-	 * Invoked after all commands are executed and status has been returned.
-	 *
-	 * @param rp
-	 *            the process handling the current receive. Hooks may obtain
-	 *            details about the destination repository through this handle.
-	 * @param commands
-	 *            unmodifiable set of successfully completed commands. May be
-	 *            the empty set.
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
 	 */
-	public void onPostReceive(ReceivePack rp,
-			Collection<ReceiveCommand> commands);
+	public UploadPackMayNotContinueException(String msg) {
+		super(msg);
+	}
 }

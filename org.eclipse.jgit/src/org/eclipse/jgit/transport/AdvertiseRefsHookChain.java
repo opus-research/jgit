@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,41 +43,56 @@
 
 package org.eclipse.jgit.transport;
 
-import java.util.Collection;
+import java.util.List;
 
 /**
- * Hook invoked by {@link ReceivePack} after all updates are executed.
+ * {@link AdvertiseRefsHook} that delegates to a list of other hooks.
  * <p>
- * The hook is called after all commands have been processed. Only commands with
- * a status of {@link ReceiveCommand.Result#OK} are passed into the hook. To get
- * all commands within the hook, see {@link ReceivePack#getAllCommands()}.
- * <p>
- * Any post-receive hook implementation should not update the status of a
- * command, as the command has already completed or failed, and the status has
- * already been returned to the client.
- * <p>
- * Hooks should execute quickly, as they block the server and the client from
- * completing the connection.
+ * Hooks are run in the order passed to the constructor. A hook may inspect or
+ * modify the results of the previous hooks in the chain by calling
+ * {@link UploadPack#getAdvertisedRefs()}, or
+ * {@link ReceivePack#getAdvertisedRefs()} or
+ * {@link ReceivePack#getAdvertisedObjects()}.
  */
-public interface PostReceiveHook {
-	/** A simple no-op hook. */
-	public static final PostReceiveHook NULL = new PostReceiveHook() {
-		public void onPostReceive(final ReceivePack rp,
-				final Collection<ReceiveCommand> commands) {
-			// Do nothing.
-		}
-	};
+public class AdvertiseRefsHookChain implements AdvertiseRefsHook {
+	private final AdvertiseRefsHook[] hooks;
+	private final int count;
 
 	/**
-	 * Invoked after all commands are executed and status has been returned.
+	 * Create a new hook chaining the given hooks together.
 	 *
-	 * @param rp
-	 *            the process handling the current receive. Hooks may obtain
-	 *            details about the destination repository through this handle.
-	 * @param commands
-	 *            unmodifiable set of successfully completed commands. May be
-	 *            the empty set.
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
 	 */
-	public void onPostReceive(ReceivePack rp,
-			Collection<ReceiveCommand> commands);
+	public static AdvertiseRefsHook newChain(List<? extends AdvertiseRefsHook> hooks) {
+		AdvertiseRefsHook[] newHooks = new AdvertiseRefsHook[hooks.size()];
+		int i = 0;
+		for (AdvertiseRefsHook hook : hooks)
+			if (hook != AdvertiseRefsHook.DEFAULT)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return AdvertiseRefsHook.DEFAULT;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new AdvertiseRefsHookChain(newHooks, i);
+	}
+
+	public void advertiseRefs(ReceivePack rp)
+			throws ServiceMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].advertiseRefs(rp);
+	}
+
+	public void advertiseRefs(UploadPack rp)
+			throws ServiceMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].advertiseRefs(rp);
+	}
+
+	private AdvertiseRefsHookChain(AdvertiseRefsHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
+	}
 }

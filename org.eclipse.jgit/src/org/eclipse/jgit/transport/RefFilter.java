@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,41 +43,34 @@
 
 package org.eclipse.jgit.transport;
 
-import java.util.Collection;
+import java.util.Map;
+
+import org.eclipse.jgit.lib.Ref;
 
 /**
- * Hook invoked by {@link ReceivePack} after all updates are executed.
+ * Filters the list of refs that are advertised to the client.
  * <p>
- * The hook is called after all commands have been processed. Only commands with
- * a status of {@link ReceiveCommand.Result#OK} are passed into the hook. To get
- * all commands within the hook, see {@link ReceivePack#getAllCommands()}.
+ * The filter is called by {@link ReceivePack} and {@link UploadPack} to ensure
+ * that the refs are filtered before they are advertised to the client.
  * <p>
- * Any post-receive hook implementation should not update the status of a
- * command, as the command has already completed or failed, and the status has
- * already been returned to the client.
- * <p>
- * Hooks should execute quickly, as they block the server and the client from
- * completing the connection.
+ * This can be used by applications to control visibility of certain refs based
+ * on a custom set of rules.
  */
-public interface PostReceiveHook {
-	/** A simple no-op hook. */
-	public static final PostReceiveHook NULL = new PostReceiveHook() {
-		public void onPostReceive(final ReceivePack rp,
-				final Collection<ReceiveCommand> commands) {
-			// Do nothing.
+public interface RefFilter {
+	/** The default filter, allows all refs to be shown. */
+	public static final RefFilter DEFAULT = new RefFilter() {
+		public Map<String, Ref> filter (final Map<String, Ref> refs) {
+			return refs;
 		}
 	};
 
 	/**
-	 * Invoked after all commands are executed and status has been returned.
+	 * Filters a {@code Map} of refs before it is advertised to the client.
 	 *
-	 * @param rp
-	 *            the process handling the current receive. Hooks may obtain
-	 *            details about the destination repository through this handle.
-	 * @param commands
-	 *            unmodifiable set of successfully completed commands. May be
-	 *            the empty set.
+	 * @param refs
+	 *            the refs which this method need to consider.
+	 * @return
+	 *            the filtered map of refs.
 	 */
-	public void onPostReceive(ReceivePack rp,
-			Collection<ReceiveCommand> commands);
+	public Map<String, Ref> filter(Map<String, Ref> refs);
 }

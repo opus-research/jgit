@@ -52,7 +52,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 
 /**
- * A command being processed by {@link ReceiveSession}.
+ * A command being processed by {@link ReceivePack}.
  * <p>
  * This command instance roughly translates to the server side representation of
  * the {@link RemoteRefUpdate} created by the client.
@@ -135,7 +135,7 @@ public class ReceiveCommand {
 	private String message;
 
 	/**
-	 * Create a new command for {@link ReceiveSession}.
+	 * Create a new command for {@link ReceivePack}.
 	 *
 	 * @param oldId
 	 *            the old object id; must not be null. Use
@@ -158,6 +158,28 @@ public class ReceiveCommand {
 		if (ObjectId.zeroId().equals(newId))
 			type = Type.DELETE;
 		status = Result.NOT_ATTEMPTED;
+	}
+
+	/**
+	 * Create a new command for {@link ReceivePack}.
+	 *
+	 * @param oldId
+	 *            the old object id; must not be null. Use
+	 *            {@link ObjectId#zeroId()} to indicate a ref creation.
+	 * @param newId
+	 *            the new object id; must not be null. Use
+	 *            {@link ObjectId#zeroId()} to indicate a ref deletion.
+	 * @param name
+	 *            name of the ref being affected.
+	 * @param type
+	 *            type of the command.
+	 */
+	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
+			final String name, final Type type) {
+		this.oldId = oldId;
+		this.newId = newId;
+		this.name = name;
+		this.type = type;
 	}
 
 	/** @return the old value the client thinks the ref has. */
@@ -223,13 +245,13 @@ public class ReceiveCommand {
 	 * <p>
 	 * Sets the status of the command as a side effect.
 	 *
-	 * @param rs
+	 * @param rp
 	 *            receive-pack session.
 	 */
-	public void execute(final ReceiveSession rs) {
+	public void execute(final ReceivePack rp) {
 		try {
-			final RefUpdate ru = rs.getRepository().updateRef(getRefName());
-			ru.setRefLogIdent(rs.getRefLogIdent());
+			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
+			ru.setRefLogIdent(rp.getRefLogIdent());
 			switch (getType()) {
 			case DELETE:
 				if (!ObjectId.zeroId().equals(getOldId())) {
@@ -240,17 +262,17 @@ public class ReceiveCommand {
 					ru.setExpectedOldObjectId(getOldId());
 				}
 				ru.setForceUpdate(true);
-				setResult(ru.delete(rs.getRevWalk()));
+				setResult(ru.delete(rp.getRevWalk()));
 				break;
 
 			case CREATE:
 			case UPDATE:
 			case UPDATE_NONFASTFORWARD:
-				ru.setForceUpdate(rs.isAllowNonFastForwards());
+				ru.setForceUpdate(rp.isAllowNonFastForwards());
 				ru.setExpectedOldObjectId(getOldId());
 				ru.setNewObjectId(getNewId());
 				ru.setRefLogMessage("push", true);
-				setResult(ru.update(rs.getRevWalk()));
+				setResult(ru.update(rp.getRevWalk()));
 				break;
 			}
 		} catch (IOException err) {
