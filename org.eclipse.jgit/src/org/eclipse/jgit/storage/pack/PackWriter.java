@@ -978,10 +978,8 @@ public class PackWriter {
 				out.endObject();
 				otp.setCRC(out.getCRC32());
 				stats.reusedObjects++;
-				if (otp.isDeltaRepresentation()) {
-					stats.totalDeltas++;
+				if (otp.isDeltaRepresentation())
 					stats.reusedDeltas++;
-				}
 				return;
 			} catch (StoredObjectRepresentationNotAvailableException gone) {
 				if (otp.getOffset() == out.length()) {
