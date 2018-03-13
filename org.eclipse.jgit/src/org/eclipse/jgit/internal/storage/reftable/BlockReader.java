@@ -325,7 +325,7 @@ class BlockReader {
 		keysStart = ptr;
 		if (blockType != FILE_BLOCK_TYPE) {
 			restartCount = NB.decodeUInt16(buf, bufLen - 2);
-			restartIdx = bufLen - (restartCount * 4 + 2);
+			restartIdx = bufLen - (restartCount * 3 + 2);
 			keysEnd = restartIdx;
 		} else {
 			keysEnd = keysStart;
@@ -403,7 +403,7 @@ class BlockReader {
 		int end = restartCount;
 		for (;;) {
 			int mid = (low + end) >>> 1;
-			int p = NB.decodeInt32(buf, restartIdx + mid * 4);
+			int p = NB.decodeUInt24(buf, restartIdx + mid * 3);
 			ptr = p + 1; // skip 0 prefix length
 			int n = readVarint32() >>> 3;
 			int cmp = compareKey(useKeyLen, key, buf, ptr, n);
@@ -428,7 +428,7 @@ class BlockReader {
 				ptr = keysStart;
 				return -1;
 			}
-			ptr = NB.decodeInt32(buf, restartIdx + (rIdx - 1) * 4);
+			ptr = NB.decodeUInt24(buf, restartIdx + (rIdx - 1) * 3);
 		} else {
 			ptr = rPtr;
 		}
