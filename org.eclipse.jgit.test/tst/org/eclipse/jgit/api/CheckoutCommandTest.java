@@ -43,8 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.MASTER;
-import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -136,7 +134,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	@Test
 	public void testCreateBranchOnCheckout() throws Exception {
 		git.checkout().setCreateBranch(true).setName("test2").call();
-		assertNotNull(db.exactRef("refs/heads/test2"));
+		assertNotNull(db.getRef("test2"));
 	}
 
 	@Test
@@ -239,8 +237,8 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 				.setStartPoint("origin/test")
 				.setUpstreamMode(SetupUpstreamMode.TRACK).call();
 
-		assertEquals("refs/heads/test",
-				db2.exactRef(Constants.HEAD).getTarget().getName());
+		assertEquals("refs/heads/test", db2.getRef(Constants.HEAD).getTarget()
+				.getName());
 		StoredConfig config = db2.getConfig();
 		assertEquals("origin", config.getString(
 				ConfigConstants.CONFIG_BRANCH_SECTION, "test",
@@ -347,7 +345,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		CheckoutCommand co = git.checkout();
 		co.setName("master").call();
 
-		String commitId = db.exactRef(R_HEADS + MASTER).getObjectId().name();
+		String commitId = db.getRef(Constants.MASTER).getObjectId().name();
 		co = git.checkout();
 		co.setName(commitId).call();
 
@@ -445,7 +443,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	private void assertHeadDetached() throws IOException {
-		Ref head = db.exactRef(Constants.HEAD);
+		Ref head = db.getRef(Constants.HEAD);
 		assertFalse(head.isSymbolic());
 		assertSame(head, head.getTarget());
 	}
