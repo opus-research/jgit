@@ -43,29 +43,40 @@
 
 package org.eclipse.jgit.dircache;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.JGitTestUtil;
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.IO;
+import org.junit.Test;
 
 public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 	private final File index = pathOf("gitgit.index");
 
+	@Test
 	public void testReadIndex_LsFiles() throws Exception {
 		final Map<String, CGitIndexRecord> ls = readLsFiles();
-		final DirCache dc = new DirCache(index);
+		final DirCache dc = new DirCache(index, FS.DETECTED);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(ls.size(), dc.getEntryCount());
@@ -76,17 +87,17 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testTreeWalk_LsFiles() throws Exception {
 		final Repository db = createBareRepository();
 		final Map<String, CGitIndexRecord> ls = readLsFiles();
-		final DirCache dc = new DirCache(index);
+		final DirCache dc = new DirCache(index, db.getFS());
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(ls.size(), dc.getEntryCount());
 		{
 			final Iterator<CGitIndexRecord> rItr = ls.values().iterator();
 			final TreeWalk tw = new TreeWalk(db);
-			tw.reset();
 			tw.setRecursive(true);
 			tw.addTree(new DirCacheIterator(dc));
 			while (rItr.hasNext()) {
@@ -101,15 +112,19 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testUnsupportedOptionalExtension() throws Exception {
-		final DirCache dc = new DirCache(pathOf("gitgit.index.ZZZZ"));
+		final DirCache dc = new DirCache(pathOf("gitgit.index.ZZZZ"),
+				FS.DETECTED);
 		dc.read();
 		assertEquals(1, dc.getEntryCount());
 		assertEquals("A", dc.getEntry(0).getPathString());
 	}
 
+	@Test
 	public void testUnsupportedRequiredExtension() throws Exception {
-		final DirCache dc = new DirCache(pathOf("gitgit.index.aaaa"));
+		final DirCache dc = new DirCache(pathOf("gitgit.index.aaaa"),
+				FS.DETECTED);
 		try {
 			dc.read();
 			fail("Cache loaded an unsupported extension");
@@ -119,8 +134,10 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testCorruptChecksumAtFooter() throws Exception {
-		final DirCache dc = new DirCache(pathOf("gitgit.index.badchecksum"));
+		final DirCache dc = new DirCache(pathOf("gitgit.index.badchecksum"),
+				FS.DETECTED);
 		try {
 			dc.read();
 			fail("Cache loaded despite corrupt checksum");
@@ -140,10 +157,11 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 		assertEquals(c.stage, j.getStage());
 	}
 
+	@Test
 	public void testReadIndex_DirCacheTree() throws Exception {
 		final Map<String, CGitIndexRecord> cList = readLsFiles();
 		final Map<String, CGitLsTreeRecord> cTree = readLsTree();
-		final DirCache dc = new DirCache(index);
+		final DirCache dc = new DirCache(index, FS.DETECTED);
 		assertEquals(0, dc.getEntryCount());
 		dc.read();
 		assertEquals(cList.size(), dc.getEntryCount());
@@ -173,6 +191,39 @@ public class DirCacheCGitCompatabilityTest extends LocalDiskRepositoryTestCase {
 			assertTrue(sj.isValid());
 			assertEquals(sc.id, sj.getObjectId());
 		}
+	}
+
+	@Test
+	public void testReadWriteV3() throws Exception {
+		final File file = pathOf("gitgit.index.v3");
+		final DirCache dc = new DirCache(file, FS.DETECTED);
+		dc.read();
+
+		assertEquals(10, dc.getEntryCount());
+		assertV3TreeEntry(0, "dir1/file1.txt", false, false, dc);
+		assertV3TreeEntry(1, "dir2/file2.txt", true, false, dc);
+		assertV3TreeEntry(2, "dir3/file3.txt", false, false, dc);
+		assertV3TreeEntry(3, "dir3/file3a.txt", true, false, dc);
+		assertV3TreeEntry(4, "dir4/file4.txt", true, false, dc);
+		assertV3TreeEntry(5, "dir4/file4a.txt", false, false, dc);
+		assertV3TreeEntry(6, "file.txt", true, false, dc);
+		assertV3TreeEntry(7, "newdir1/newfile1.txt", false, true, dc);
+		assertV3TreeEntry(8, "newdir1/newfile2.txt", false, true, dc);
+		assertV3TreeEntry(9, "newfile.txt", false, true, dc);
+
+		final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		dc.writeTo(bos);
+		final byte[] indexBytes = bos.toByteArray();
+		final byte[] expectedBytes = IO.readFully(file);
+		assertTrue(Arrays.equals(expectedBytes, indexBytes));
+	}
+
+	private static void assertV3TreeEntry(int indexPosition, String path,
+			boolean skipWorkTree, boolean intentToAdd, DirCache dc) {
+		final DirCacheEntry entry = dc.getEntry(indexPosition);
+		assertEquals(path, entry.getPathString());
+		assertEquals(skipWorkTree, entry.isSkipWorkTree());
+		assertEquals(intentToAdd, entry.isIntentToAdd());
 	}
 
 	private File pathOf(final String name) {

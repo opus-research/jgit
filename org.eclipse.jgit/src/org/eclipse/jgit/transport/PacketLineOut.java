@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -65,6 +65,8 @@ public class PacketLineOut {
 
 	private final byte[] lenbuffer;
 
+	private boolean flushOnEnd;
+
 	/**
 	 * Create a new packet line writer.
 	 *
@@ -74,6 +76,18 @@ public class PacketLineOut {
 	public PacketLineOut(final OutputStream outputStream) {
 		out = outputStream;
 		lenbuffer = new byte[5];
+		flushOnEnd = true;
+	}
+
+	/**
+	 * Set the flush behavior during {@link #end()}.
+	 *
+	 * @param flushOnEnd
+	 *            if true, a flush-pkt written during {@link #end()} also
+	 *            flushes the underlying stream.
+	 */
+	public void setFlushOnEnd(boolean flushOnEnd) {
+		this.flushOnEnd = flushOnEnd;
 	}
 
 	/**
@@ -105,14 +119,6 @@ public class PacketLineOut {
 		out.write(packet);
 	}
 
-	void writeChannelPacket(final int channel, final byte[] buf, int off,
-			int len) throws IOException {
-		formatLength(len + 5);
-		lenbuffer[4] = (byte) channel;
-		out.write(lenbuffer, 0, 5);
-		out.write(buf, off, len);
-	}
-
 	/**
 	 * Write a packet end marker, sometimes referred to as a flush command.
 	 * <p>
@@ -129,7 +135,8 @@ public class PacketLineOut {
 	public void end() throws IOException {
 		formatLength(0);
 		out.write(lenbuffer, 0, 4);
-		flush();
+		if (flushOnEnd)
+			flush();
 	}
 
 	/**
@@ -149,6 +156,10 @@ public class PacketLineOut {
 			'7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
 	private void formatLength(int w) {
+		formatLength(lenbuffer, w);
+	}
+
+	static void formatLength(byte[] lenbuffer, int w) {
 		int o = 3;
 		while (o >= 0 && w != 0) {
 			lenbuffer[o--] = hexchar[w & 0xf];

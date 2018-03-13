@@ -54,6 +54,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
+import java.text.MessageFormat;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -85,7 +86,7 @@ public final class ServletUtils {
 	public static Repository getRepository(final ServletRequest req) {
 		Repository db = (Repository) req.getAttribute(ATTRIBUTE_REPOSITORY);
 		if (db == null)
-			throw new IllegalStateException("Expected Repository attribute");
+			throw new IllegalStateException(HttpServerText.get().expectedRepositoryAttribute);
 		return db;
 	}
 
@@ -109,8 +110,8 @@ public final class ServletUtils {
 		if (ENCODING_GZIP.equals(enc) || "x-gzip".equals(enc)) //$NON-NLS-1$
 			in = new GZIPInputStream(in);
 		else if (enc != null)
-			throw new IOException(HDR_CONTENT_ENCODING + " \"" + enc + "\""
-					+ ": not supported by this library.");
+			throw new IOException(MessageFormat.format(HttpServerText.get().encodingNotSupportedByThisLibrary
+					, HDR_CONTENT_ENCODING, enc));
 		return in;
 	}
 
@@ -189,9 +190,24 @@ public final class ServletUtils {
 		return content;
 	}
 
-	private static boolean acceptsGzipEncoding(final HttpServletRequest req) {
-		final String accepts = req.getHeader(HDR_ACCEPT_ENCODING);
-		return accepts != null && 0 <= accepts.indexOf(ENCODING_GZIP);
+	static boolean acceptsGzipEncoding(final HttpServletRequest req) {
+		return acceptsGzipEncoding(req.getHeader(HDR_ACCEPT_ENCODING));
+	}
+
+	static boolean acceptsGzipEncoding(String accepts) {
+		if (accepts == null)
+			return false;
+
+		int b = 0;
+		while (b < accepts.length()) {
+			int comma = accepts.indexOf(',', b);
+			int e = 0 <= comma ? comma : accepts.length();
+			String term = accepts.substring(b, e).trim();
+			if (term.equals(ENCODING_GZIP))
+				return true;
+			b = e + 1;
+		}
+		return false;
 	}
 
 	private static byte[] compress(final byte[] raw) throws IOException {

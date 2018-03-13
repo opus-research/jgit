@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
@@ -47,18 +47,27 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.lib.RepositoryCache;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.util.io.MessageWriter;
+import org.eclipse.jgit.util.io.StreamCopyThread;
 
 /**
  * Transport to access a local directory as though it were a remote peer.
@@ -84,27 +93,58 @@ import org.eclipse.jgit.util.FS;
  * system pipe to transfer data.
  */
 class TransportLocal extends Transport implements PackTransport {
-	private static final String PWD = ".";
+	static final TransportProtocol PROTO_LOCAL = new TransportProtocol() {
+		@Override
+		public String getName() {
+			return JGitText.get().transportProtoLocal;
+		}
 
-	static boolean canHandle(final URIish uri) {
-		if (uri.getHost() != null || uri.getPort() > 0 || uri.getUser() != null
-				|| uri.getPass() != null || uri.getPath() == null)
-			return false;
+		public Set<String> getSchemes() {
+			return Collections.singleton("file"); //$NON-NLS-1$
+		}
 
-		if ("file".equals(uri.getScheme()) || uri.getScheme() == null)
-			return FS.resolve(new File(PWD), uri.getPath()).isDirectory();
-		return false;
-	}
+		@Override
+		public boolean canHandle(URIish uri, Repository local, String remoteName) {
+			if (uri.getPath() == null
+					|| uri.getPort() > 0
+					|| uri.getUser() != null
+					|| uri.getPass() != null
+					|| uri.getHost() != null
+					|| (uri.getScheme() != null && !getSchemes().contains(uri.getScheme())))
+				return false;
+			return true;
+		}
+
+		@Override
+		public Transport open(URIish uri, Repository local, String remoteName)
+				throws NoRemoteRepositoryException {
+			// If the reference is to a local file, C Git behavior says
+			// assume this is a bundle, since repositories are directories.
+			//
+			File path = local.getFS().resolve(new File("."), uri.getPath());
+			if (path.isFile())
+				return new TransportBundleFile(local, uri, path);
+
+			File gitDir = RepositoryCache.FileKey.resolve(path, local.getFS());
+			if (gitDir == null)
+				throw new NoRemoteRepositoryException(uri, JGitText.get().notFound);
+			return new TransportLocal(local, uri, gitDir);
+		}
+	};
 
 	private final File remoteGitDir;
 
-	TransportLocal(final Repository local, final URIish uri) {
+	TransportLocal(Repository local, URIish uri, File gitDir) {
 		super(local, uri);
+		remoteGitDir = gitDir;
+	}
 
-		File d = FS.resolve(new File(PWD), uri.getPath()).getAbsoluteFile();
-		if (new File(d, Constants.DOT_GIT).isDirectory())
-			d = new File(d, Constants.DOT_GIT);
-		remoteGitDir = d;
+	UploadPack createUploadPack(final Repository dst) {
+		return new UploadPack(dst);
+	}
+
+	ReceivePack createReceivePack(final Repository dst) {
+		return new ReceivePack(dst);
 	}
 
 	@Override
@@ -129,28 +169,25 @@ class TransportLocal extends Transport implements PackTransport {
 		// Resources must be established per-connection.
 	}
 
-	protected Process startProcessWithErrStream(final String cmd)
+	protected Process spawn(final String cmd)
 			throws TransportException {
 		try {
-			final String[] args;
-			final Process proc;
+			String[] args = { "." };
+			ProcessBuilder proc = local.getFS().runInShell(cmd, args);
+			proc.directory(remoteGitDir);
 
-			if (cmd.startsWith("git-")) {
-				args = new String[] { "git", cmd.substring(4), PWD };
-			} else {
-				final int gitspace = cmd.indexOf("git ");
-				if (gitspace >= 0) {
-					final String git = cmd.substring(0, gitspace + 3);
-					final String subcmd = cmd.substring(gitspace + 4);
-					args = new String[] { git, subcmd, PWD };
-				} else {
-					args = new String[] { cmd, PWD };
-				}
-			}
+			// Remove the same variables CGit does.
+			Map<String, String> env = proc.environment();
+			env.remove("GIT_ALTERNATE_OBJECT_DIRECTORIES");
+			env.remove("GIT_CONFIG");
+			env.remove("GIT_CONFIG_PARAMETERS");
+			env.remove("GIT_DIR");
+			env.remove("GIT_WORK_TREE");
+			env.remove("GIT_GRAFT_FILE");
+			env.remove("GIT_INDEX_FILE");
+			env.remove("GIT_NO_REPLACE_OBJECTS");
 
-			proc = Runtime.getRuntime().exec(args, null, remoteGitDir);
-			new StreamRewritingThread(cmd, proc.getErrorStream()).start();
-			return proc;
+			return proc.start();
 		} catch (IOException err) {
 			throw new TransportException(uri, err.getMessage(), err);
 		}
@@ -164,9 +201,9 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new Repository(remoteGitDir);
+				dst = new FileRepository(remoteGitDir);
 			} catch (IOException err) {
-				throw new TransportException(uri, "not a git directory");
+				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
 
 			final PipedInputStream in_r;
@@ -190,13 +227,13 @@ class TransportLocal extends Transport implements PackTransport {
 				out_w = new PipedOutputStream(out_r);
 			} catch (IOException err) {
 				dst.close();
-				throw new TransportException(uri, "cannot connect pipes", err);
+				throw new TransportException(uri, JGitText.get().cannotConnectPipes, err);
 			}
 
 			worker = new Thread("JGit-Upload-Pack") {
 				public void run() {
 					try {
-						final UploadPack rp = new UploadPack(dst);
+						final UploadPack rp = createUploadPack(dst);
 						rp.upload(out_r, in_w, null);
 					} catch (IOException err) {
 						// Client side of the pipes should report the problem.
@@ -246,11 +283,26 @@ class TransportLocal extends Transport implements PackTransport {
 	class ForkLocalFetchConnection extends BasePackFetchConnection {
 		private Process uploadPack;
 
+		private Thread errorReaderThread;
+
 		ForkLocalFetchConnection() throws TransportException {
 			super(TransportLocal.this);
-			uploadPack = startProcessWithErrStream(getOptionUploadPack());
-			final InputStream upIn = uploadPack.getInputStream();
-			final OutputStream upOut = uploadPack.getOutputStream();
+
+			final MessageWriter msg = new MessageWriter();
+			setMessageWriter(msg);
+
+			uploadPack = spawn(getOptionUploadPack());
+
+			final InputStream upErr = uploadPack.getErrorStream();
+			errorReaderThread = new StreamCopyThread(upErr, msg.getRawStream());
+			errorReaderThread.start();
+
+			InputStream upIn = uploadPack.getInputStream();
+			OutputStream upOut = uploadPack.getOutputStream();
+
+			upIn = new BufferedInputStream(upIn);
+			upOut = new BufferedOutputStream(upOut);
+
 			init(upIn, upOut);
 			readAdvertisedRefs();
 		}
@@ -268,6 +320,16 @@ class TransportLocal extends Transport implements PackTransport {
 					uploadPack = null;
 				}
 			}
+
+			if (errorReaderThread != null) {
+				try {
+					errorReaderThread.join();
+				} catch (InterruptedException e) {
+					// Stop waiting and return anyway.
+				} finally {
+					errorReaderThread = null;
+				}
+			}
 		}
 	}
 
@@ -279,9 +341,9 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new Repository(remoteGitDir);
+				dst = new FileRepository(remoteGitDir);
 			} catch (IOException err) {
-				throw new TransportException(uri, "not a git directory");
+				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
 
 			final PipedInputStream in_r;
@@ -297,13 +359,13 @@ class TransportLocal extends Transport implements PackTransport {
 				out_w = new PipedOutputStream(out_r);
 			} catch (IOException err) {
 				dst.close();
-				throw new TransportException(uri, "cannot connect pipes", err);
+				throw new TransportException(uri, JGitText.get().cannotConnectPipes, err);
 			}
 
 			worker = new Thread("JGit-Receive-Pack") {
 				public void run() {
 					try {
-						final ReceivePack rp = new ReceivePack(dst);
+						final ReceivePack rp = createReceivePack(dst);
 						rp.receive(out_r, in_w, System.err);
 					} catch (IOException err) {
 						// Client side of the pipes should report the problem.
@@ -351,11 +413,26 @@ class TransportLocal extends Transport implements PackTransport {
 	class ForkLocalPushConnection extends BasePackPushConnection {
 		private Process receivePack;
 
+		private Thread errorReaderThread;
+
 		ForkLocalPushConnection() throws TransportException {
 			super(TransportLocal.this);
-			receivePack = startProcessWithErrStream(getOptionReceivePack());
-			final InputStream rpIn = receivePack.getInputStream();
-			final OutputStream rpOut = receivePack.getOutputStream();
+
+			final MessageWriter msg = new MessageWriter();
+			setMessageWriter(msg);
+
+			receivePack = spawn(getOptionReceivePack());
+
+			final InputStream rpErr = receivePack.getErrorStream();
+			errorReaderThread = new StreamCopyThread(rpErr, msg.getRawStream());
+			errorReaderThread.start();
+
+			InputStream rpIn = receivePack.getInputStream();
+			OutputStream rpOut = receivePack.getOutputStream();
+
+			rpIn = new BufferedInputStream(rpIn);
+			rpOut = new BufferedOutputStream(rpOut);
+
 			init(rpIn, rpOut);
 			readAdvertisedRefs();
 		}
@@ -373,34 +450,14 @@ class TransportLocal extends Transport implements PackTransport {
 					receivePack = null;
 				}
 			}
-		}
-	}
 
-	static class StreamRewritingThread extends Thread {
-		private final InputStream in;
-
-		StreamRewritingThread(final String cmd, final InputStream in) {
-			super("JGit " + cmd + " Errors");
-			this.in = in;
-		}
-
-		public void run() {
-			final byte[] tmp = new byte[512];
-			try {
-				for (;;) {
-					final int n = in.read(tmp);
-					if (n < 0)
-						break;
-					System.err.write(tmp, 0, n);
-					System.err.flush();
-				}
-			} catch (IOException err) {
-				// Ignore errors reading errors.
-			} finally {
+			if (errorReaderThread != null) {
 				try {
-					in.close();
-				} catch (IOException err2) {
-					// Ignore errors closing the pipe.
+					errorReaderThread.join();
+				} catch (InterruptedException e) {
+					// Stop waiting and return anyway.
+				} finally {
+					errorReaderThread = null;
 				}
 			}
 		}

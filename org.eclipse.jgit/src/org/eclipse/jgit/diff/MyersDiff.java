@@ -44,6 +44,9 @@
 
 package org.eclipse.jgit.diff;
 
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.LongList;
 
@@ -98,40 +101,47 @@ import org.eclipse.jgit.util.LongList;
  *
  * So the overall runtime complexity stays the same with linear space,
  * albeit with a larger constant factor.
+ *
+ * @param <S>
+ *            type of sequence.
  */
-public class MyersDiff {
+public class MyersDiff<S extends Sequence> {
+	/** Singleton instance of MyersDiff. */
+	public static final DiffAlgorithm INSTANCE = new LowLevelDiffAlgorithm() {
+		@Override
+		public <S extends Sequence> void diffNonCommon(EditList edits,
+				HashedSequenceComparator<S> cmp, HashedSequence<S> a,
+				HashedSequence<S> b, Edit region) {
+			new MyersDiff<S>(edits, cmp, a, b, region);
+		}
+	};
+
 	/**
-	 * The list of edits found during the last call to {@link #calculateEdits()}
+	 * The list of edits found during the last call to
+	 * {@link #calculateEdits(Edit)}
 	 */
 	protected EditList edits;
+
+	/** Comparison function for sequences. */
+	protected HashedSequenceComparator<S> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected Sequence a;
+	protected HashedSequence<S> a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected Sequence b;
+	protected HashedSequence<S> b;
 
-	/**
-	 * The only constructor
-	 *
-	 * @param a   the text A which should be compared
-	 * @param b   the text B which should be compared
-	 */
-	public MyersDiff(Sequence a, Sequence b) {
+	private MyersDiff(EditList edits, HashedSequenceComparator<S> cmp,
+			HashedSequence<S> a, HashedSequence<S> b, Edit region) {
+		this.edits = edits;
+		this.cmp = cmp;
 		this.a = a;
 		this.b = b;
-		calculateEdits();
-	}
-
-	/**
-	 * @return the list of edits found during the last call to {@link #calculateEdits()}
-	 */
-	public EditList getEdits() {
-		return edits;
+		calculateEdits(region);
 	}
 
 	// TODO: use ThreadLocal for future multi-threaded operations
@@ -140,11 +150,10 @@ public class MyersDiff {
 	/**
 	 * Entrypoint into the algorithm this class is all about. This method triggers that the
 	 * differences between A and B are calculated in form of a list of edits.
+	 * @param r portion of the sequences to examine.
 	 */
-	protected void calculateEdits() {
-		edits = new EditList();
-
-		middle.initialize(0, a.size(), 0, b.size());
+	private void calculateEdits(Edit r) {
+		middle.initialize(r.beginA, r.endA, r.beginB, r.endB);
 		if (middle.beginA >= middle.endA &&
 				middle.beginB >= middle.endB)
 			return;
@@ -291,22 +300,22 @@ public class MyersDiff {
 
 			final int getIndex(int d, int k) {
 // TODO: remove
-if (((d + k - middleK) % 2) == 1)
-	throw new RuntimeException("odd: " + d + " + " + k + " - " + middleK);
+if (((d + k - middleK) % 2) != 0)
+	throw new RuntimeException(MessageFormat.format(JGitText.get().unexpectedOddResult, d, k, middleK));
 				return (d + k - middleK) / 2;
 			}
 
 			final int getX(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
-	throw new RuntimeException("k " + k + " not in " + beginK + " - " + endK);
+	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, k, beginK, endK));
 				return x.get(getIndex(d, k));
 			}
 
 			final long getSnake(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
-	throw new RuntimeException("k " + k + " not in " + beginK + " - " + endK);
+	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, k, beginK, endK));
 				return snake.get(getIndex(d, k));
 			}
 
@@ -433,7 +442,7 @@ if (k < beginK || k > endK)
 		class ForwardEditPaths extends EditPaths {
 			final int snake(int k, int x) {
 				for (; x < endA && k + x < endB; x++)
-					if (!a.equals(x, b, k + x))
+					if (!cmp.equals(a, x, b, k + x))
 						break;
 				return x;
 			}
@@ -463,7 +472,7 @@ if (k < beginK || k > endK)
 				if (k < backward.beginK || k > backward.endK)
 					return false;
 				// TODO: move out of loop
-				if (((d - 1 + k - backward.middleK) % 2) == 1)
+				if (((d - 1 + k - backward.middleK) % 2) != 0)
 					return false;
 				if (x < backward.getX(d - 1, k))
 					return false;
@@ -475,7 +484,7 @@ if (k < beginK || k > endK)
 		class BackwardEditPaths extends EditPaths {
 			final int snake(int k, int x) {
 				for (; x > beginA && k + x > beginB; x--)
-					if (!a.equals(x - 1, b, k + x - 1))
+					if (!cmp.equals(a, x - 1, b, k + x - 1))
 						break;
 				return x;
 			}
@@ -505,7 +514,7 @@ if (k < beginK || k > endK)
 				if (k < forward.beginK || k > forward.endK)
 					return false;
 				// TODO: move out of loop
-				if (((d + k - forward.middleK) % 2) == 1)
+				if (((d + k - forward.middleK) % 2) != 0)
 					return false;
 				if (x > forward.getX(d, k))
 					return false;
@@ -520,14 +529,14 @@ if (k < beginK || k > endK)
 	 */
 	public static void main(String[] args) {
 		if (args.length != 2) {
-			System.err.println("Need 2 arguments");
+			System.err.println(JGitText.get().need2Arguments);
 			System.exit(1);
 		}
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			MyersDiff diff = new MyersDiff(a, b);
-			System.out.println(diff.getEdits().toString());
+			EditList r = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
+			System.out.println(r.toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

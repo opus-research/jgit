@@ -46,11 +46,14 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -58,7 +61,7 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PackLock;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Config.SectionParser;
@@ -70,6 +73,7 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.transport.PacketLineIn.AckNackResult;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -95,8 +99,8 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * {@link #readAdvertisedRefs()} methods in constructor or before any use. They
  * should also handle resources releasing in {@link #close()} method if needed.
  */
-abstract class BasePackFetchConnection extends BasePackConnection implements
-		FetchConnection {
+public abstract class BasePackFetchConnection extends BasePackConnection
+		implements FetchConnection {
 	/**
 	 * Maximum number of 'have' lines to send before giving up.
 	 * <p>
@@ -174,7 +178,13 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 
 	private PacketLineOut pckState;
 
-	BasePackFetchConnection(final PackTransport packTransport) {
+	/**
+	 * Create a new connection to fetch using the native git transport.
+	 *
+	 * @param packTransport
+	 *            the transport.
+	 */
+	public BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
 		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
@@ -233,6 +243,20 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 		return Collections.<PackLock> emptyList();
 	}
 
+	/**
+	 * Execute common ancestor negotiation and fetch the objects.
+	 *
+	 * @param monitor
+	 *            progress monitor to receive status updates.
+	 * @param want
+	 *            the advertised remote references the caller wants to fetch.
+	 * @param have
+	 *            additional objects to assume that already exist locally. This
+	 *            will be added to the set of objects reachable from the
+	 *            destination repository's references.
+	 * @throws TransportException
+	 *             if any exception occurs.
+	 */
 	protected void doFetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
@@ -267,6 +291,12 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 		}
 	}
 
+	@Override
+	public void close() {
+		walk.release();
+		super.close();
+	}
+
 	private int maxTimeWanted(final Collection<Ref> wants) {
 		int maxTime = 0;
 		for (final Ref r : wants) {
@@ -287,24 +317,19 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 	private void markReachable(final Set<ObjectId> have, final int maxTime)
 			throws IOException {
 		for (final Ref r : local.getAllRefs().values()) {
-			try {
-				final RevCommit o = walk.parseCommit(r.getObjectId());
-				o.add(REACHABLE);
-				reachableCommits.add(o);
-			} catch (IOException readError) {
-				// If we cannot read the value of the ref skip it.
-			}
+			ObjectId id = r.getPeeledObjectId();
+			if (id == null)
+				id = r.getObjectId();
+			if (id == null)
+				continue;
+			parseReachable(id);
 		}
 
-		for (final ObjectId id : have) {
-			try {
-				final RevCommit o = walk.parseCommit(id);
-				o.add(REACHABLE);
-				reachableCommits.add(o);
-			} catch (IOException readError) {
-				// If we cannot read the value of the ref skip it.
-			}
-		}
+		for (ObjectId id : local.getAdditionalHaves())
+			parseReachable(id);
+
+		for (ObjectId id : have)
+			parseReachable(id);
 
 		if (maxTime > 0) {
 			// Mark reachable commits until we reach maxTime. These may
@@ -328,6 +353,18 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 					reachableCommits.add(c);
 				}
 			}
+		}
+	}
+
+	private void parseReachable(ObjectId id) {
+		try {
+			RevCommit o = walk.parseCommit(id);
+			if (!o.has(REACHABLE)) {
+				o.add(REACHABLE);
+				reachableCommits.add(o);
+			}
+		} catch (IOException readError) {
+			// If we cannot read the value of the ref skip it.
 		}
 	}
 
@@ -390,8 +427,7 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 			// ACK status to tell us common objects for reuse in future
 			// requests.  If its not enabled, we can't talk to the peer.
 			//
-			throw new PackProtocolException(uri, "stateless RPC requires "
-					+ OPTION_MULTI_ACK_DETAILED + " to be enabled");
+			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().statelessRPCRequiresOptionToBeEnabled, OPTION_MULTI_ACK_DETAILED));
 		}
 
 		return line.toString();
@@ -405,12 +441,13 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 		int havesSinceLastContinue = 0;
 		boolean receivedContinue = false;
 		boolean receivedAck = false;
+		boolean negotiate = true;
 
 		if (statelessRPC)
 			state.writeTo(out, null);
 
 		negotiateBegin();
-		SEND_HAVES: for (;;) {
+		SEND_HAVES: while (negotiate) {
 			final RevCommit c = walk.next();
 			if (c == null)
 				break SEND_HAVES;
@@ -476,6 +513,8 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 					receivedAck = true;
 					receivedContinue = true;
 					havesSinceLastContinue = 0;
+					if (anr == AckNackResult.ACK_READY)
+						negotiate = false;
 					break;
 				}
 
@@ -570,6 +609,11 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 				}
 				return !remoteKnowsIsCommon;
 			}
+
+			@Override
+			public boolean requiresCommitBody() {
+				return false;
+			}
 		});
 	}
 
@@ -607,13 +651,21 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 	}
 
 	private void receivePack(final ProgressMonitor monitor) throws IOException {
-		final IndexPack ip;
+		InputStream input = in;
+		if (sideband)
+			input = new SideBandInputStream(input, monitor, getMessageWriter());
 
-		ip = IndexPack.create(local, sideband ? pckIn.sideband(monitor) : in);
-		ip.setFixThin(thinPack);
-		ip.setObjectChecking(transport.isCheckFetchedObjects());
-		ip.index(monitor);
-		packLock = ip.renameAndOpenPack(lockMessage);
+		ObjectInserter ins = local.newObjectInserter();
+		try {
+			PackParser parser = ins.newPackParser(input);
+			parser.setAllowThin(thinPack);
+			parser.setObjectChecking(transport.isCheckFetchedObjects());
+			parser.setLockMessage(lockMessage);
+			packLock = parser.parse(monitor);
+			ins.flush();
+		} finally {
+			ins.release();
+		}
 	}
 
 	private static class CancelledException extends Exception {

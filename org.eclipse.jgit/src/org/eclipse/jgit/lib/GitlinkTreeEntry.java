@@ -45,13 +45,18 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.IOException;
-
 /**
  * A tree entry representing a gitlink entry used for submodules.
  *
  * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
  */
+@Deprecated
 public class GitlinkTreeEntry extends TreeEntry {
 	private static final long serialVersionUID = 1L;
 
@@ -72,18 +77,9 @@ public class GitlinkTreeEntry extends TreeEntry {
 		return FileMode.GITLINK;
 	}
 
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitGitlink(this);
-	}
-
 	@Override
 	public String toString() {
-		final StringBuffer r = new StringBuffer();
+		final StringBuilder r = new StringBuilder();
 		r.append(ObjectId.toString(getId()));
 		r.append(" G ");
 		r.append(getFullName());

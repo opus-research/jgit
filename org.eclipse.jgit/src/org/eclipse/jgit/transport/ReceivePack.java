@@ -43,13 +43,19 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.BufferedWriter;
+import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_DELETE_REFS;
+import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_OFS_DELTA;
+import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_REPORT_STATUS;
+import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_SIDE_BAND_64K;
+import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
+import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
+import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -57,23 +63,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PackLock;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.revwalk.ObjectWalk;
+import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -84,12 +98,6 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a push connection, receiving objects.
  */
 public class ReceivePack {
-	static final String CAPABILITY_REPORT_STATUS = BasePackPushConnection.CAPABILITY_REPORT_STATUS;
-
-	static final String CAPABILITY_DELETE_REFS = BasePackPushConnection.CAPABILITY_DELETE_REFS;
-
-	static final String CAPABILITY_OFS_DELTA = BasePackPushConnection.CAPABILITY_OFS_DELTA;
-
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -147,13 +155,13 @@ public class ReceivePack {
 
 	private OutputStream rawOut;
 
+	private OutputStream msgOut;
+
 	private PacketLineIn pckIn;
 
 	private PacketLineOut pckOut;
 
-	private PrintWriter msgs;
-
-	private IndexPack ip;
+	private PackParser parser;
 
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
@@ -164,18 +172,22 @@ public class ReceivePack {
 	/** Commands to execute, as received by the client. */
 	private List<ReceiveCommand> commands;
 
+	/** Error to display instead of advertising the references. */
+	private StringBuilder advertiseError;
+
 	/** An exception caught while unpacking and fsck'ing the objects. */
 	private Throwable unpackError;
 
-	/** if {@link #enabledCapablities} has {@link #CAPABILITY_REPORT_STATUS} */
+	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
 	private boolean reportStatus;
+
+	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
+	private boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
 
-	private boolean needNewObjectIds;
-
-	private boolean needBaseObjectIds;
+	private boolean checkReferencedIsReachable;
 
 	/**
 	 * Create a new pack receive for an open repository.
@@ -243,42 +255,36 @@ public class ReceivePack {
 	}
 
 	/**
-	 * Configure this receive pack instance to keep track of the objects assumed
-	 * for delta bases.
-	 * <p>
-	 * By default a receive pack doesn't save the objects that were used as
-	 * delta bases. Setting this flag to {@code true} will allow the caller to
-	 * use {@link #getBaseObjectIds()} to retrieve that list.
-	 *
-	 * @param b {@code true} to enable keeping track of delta bases.
+	 * @return true if this instance will validate all referenced, but not
+	 *         supplied by the client, objects are reachable from another
+	 *         reference.
 	 */
-	public void setNeedBaseObjectIds(boolean b) {
-		this.needBaseObjectIds = b;
+	public boolean isCheckReferencedObjectsAreReachable() {
+		return checkReferencedIsReachable;
 	}
 
 	/**
-	 *  @return the set of objects the incoming pack assumed for delta purposes
-	 */
-	public final Set<ObjectId> getBaseObjectIds() {
-		return ip.getBaseObjectIds();
-	}
-
-	/**
-	 * Configure this receive pack instance to keep track of new objects.
+	 * Validate all referenced but not supplied objects are reachable.
 	 * <p>
-	 * By default a receive pack doesn't save the new objects that were created
-	 * when it was instantiated. Setting this flag to {@code true} allows the
-	 * caller to use {@link #getNewObjectIds()} to retrieve that list.
+	 * If enabled, this instance will verify that references to objects not
+	 * contained within the received pack are already reachable through at least
+	 * one other reference selected by the {@link #getRefFilter()} and displayed
+	 * as part of {@link #getAdvertisedRefs()}.
+	 * <p>
+	 * This feature is useful when the application doesn't trust the client to
+	 * not provide a forged SHA-1 reference to an object, in an attempt to
+	 * access parts of the DAG that they aren't allowed to see and which have
+	 * been hidden from them via the configured {@link RefFilter}.
+	 * <p>
+	 * Enabling this feature may imply at least some, if not all, of the same
+	 * functionality performed by {@link #setCheckReceivedObjects(boolean)}.
+	 * Applications are encouraged to enable both features, if desired.
 	 *
-	 * @param b {@code true} to enable keeping track of new objects.
+	 * @param b
+	 *            {@code true} to enable the additional check.
 	 */
-	public void setNeedNewObjectIds(boolean b) {
-		this.needNewObjectIds = b;
-	}
-
-	/** @return the new objects that were sent by the user */
-	public final Set<ObjectId> getNewObjectIds() {
-		return ip.getNewObjectIds();
+	public void setCheckReferencedObjectsAreReachable(boolean b) {
+		this.checkReferencedIsReachable = b;
 	}
 
 	/**
@@ -469,10 +475,17 @@ public class ReceivePack {
 	}
 
 	/**
-	 * Send an error message to the client, if it supports receiving them.
+	 * Send an error message to the client.
 	 * <p>
-	 * If the client doesn't support receiving messages, the message will be
-	 * discarded, with no other indication to the caller or to the client.
+	 * If any error messages are sent before the references are advertised to
+	 * the client, the errors will be sent instead of the advertisement and the
+	 * receive operation will be aborted. All clients should receive and display
+	 * such early stage errors.
+	 * <p>
+	 * If the reference advertisements have already been sent, messages are sent
+	 * in a side channel. If the client doesn't support receiving messages, the
+	 * message will be discarded, with no other indication to the caller or to
+	 * the client.
 	 * <p>
 	 * {@link PreReceiveHook}s should always try to use
 	 * {@link ReceiveCommand#setResult(Result, String)} with a result status of
@@ -485,7 +498,18 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendError(final String what) {
-		sendMessage("error", what);
+		if (refs == null) {
+			if (advertiseError == null)
+				advertiseError = new StringBuilder();
+			advertiseError.append(what).append('\n');
+		} else {
+			try {
+				if (msgOut != null)
+					msgOut.write(Constants.encode("error: " + what + "\n"));
+			} catch (IOException e) {
+				// Ignore write failures.
+			}
+		}
 	}
 
 	/**
@@ -499,12 +523,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		sendMessage("remote", what);
-	}
-
-	private void sendMessage(final String type, final String what) {
-		if (msgs != null)
-			msgs.println(type + ": " + what);
+		try {
+			if (msgOut != null)
+				msgOut.write(Constants.encode(what + "\n"));
+		} catch (IOException e) {
+			// Ignore write failures.
+		}
 	}
 
 	/**
@@ -530,6 +554,7 @@ public class ReceivePack {
 		try {
 			rawIn = input;
 			rawOut = output;
+			msgOut = messages;
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
@@ -544,34 +569,47 @@ public class ReceivePack {
 
 			pckIn = new PacketLineIn(rawIn);
 			pckOut = new PacketLineOut(rawOut);
-			if (messages != null) {
-				msgs = new PrintWriter(new BufferedWriter(
-						new OutputStreamWriter(messages, Constants.CHARSET),
-						8192)) {
-					@Override
-					public void println() {
-						print('\n');
-					}
-				};
-			}
+			pckOut.setFlushOnEnd(false);
 
 			enabledCapablities = new HashSet<String>();
 			commands = new ArrayList<ReceiveCommand>();
 
 			service();
 		} finally {
+			walk.release();
 			try {
-				if (msgs != null) {
-					msgs.flush();
+				if (sideBand) {
+					// If we are using side band, we need to send a final
+					// flush-pkt to tell the remote peer the side band is
+					// complete and it should stop decoding. We need to
+					// use the original output stream as rawOut is now the
+					// side band data channel.
+					//
+					((SideBandOutputStream) msgOut).flushBuffer();
+					((SideBandOutputStream) rawOut).flushBuffer();
+
+					PacketLineOut plo = new PacketLineOut(output);
+					plo.setFlushOnEnd(false);
+					plo.end();
+				}
+
+				if (biDirectionalPipe) {
+					// If this was a native git connection, flush the pipe for
+					// the caller. For smart HTTP we don't do this flush and
+					// instead let the higher level HTTP servlet code do it.
+					//
+					if (!sideBand && msgOut != null)
+						msgOut.flush();
+					rawOut.flush();
 				}
 			} finally {
 				unlockPack();
 				timeoutIn = null;
 				rawIn = null;
 				rawOut = null;
+				msgOut = null;
 				pckIn = null;
 				pckOut = null;
-				msgs = null;
 				refs = null;
 				enabledCapablities = null;
 				commands = null;
@@ -587,10 +625,13 @@ public class ReceivePack {
 	}
 
 	private void service() throws IOException {
-		if (biDirectionalPipe)
+		if (biDirectionalPipe) {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
-		else
+			pckOut.flush();
+		} else
 			refs = refFilter.filter(db.getAllRefs());
+		if (advertiseError != null)
+			return;
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -598,8 +639,9 @@ public class ReceivePack {
 			if (needPack()) {
 				try {
 					receivePack();
-					if (isCheckReceivedObjects())
+					if (needCheckConnectivity())
 						checkConnectivity();
+					parser = null;
 					unpackError = null;
 				} catch (IOException err) {
 					unpackError = err;
@@ -623,20 +665,22 @@ public class ReceivePack {
 					}
 				});
 				pckOut.end();
-			} else if (msgs != null) {
+			} else if (msgOut != null) {
 				sendStatusReport(false, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgs.println(s);
+						msgOut.write(Constants.encode(s + "\n"));
 					}
 				});
-				msgs.flush();
 			}
 
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
+
+			if (unpackError != null)
+				throw new UnpackException(unpackError);
 		}
 	}
 
-	private void unlockPack() {
+	private void unlockPack() throws IOException {
 		if (packLock != null) {
 			packLock.unlock();
 			packLock = null;
@@ -652,8 +696,13 @@ public class ReceivePack {
 	 *             the formatter failed to write an advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
-		final RevFlag advertised = walk.newFlag("ADVERTISED");
-		adv.init(walk, advertised);
+		if (advertiseError != null) {
+			adv.writeOne("ERR " + advertiseError);
+			return;
+		}
+
+		adv.init(db);
+		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
@@ -663,7 +712,7 @@ public class ReceivePack {
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
 			adv.advertiseHave(head.getObjectId());
-		adv.includeAdditionalHaves();
+		adv.includeAdditionalHaves(db);
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}");
 		adv.end();
@@ -692,7 +741,7 @@ public class ReceivePack {
 			}
 
 			if (line.length() < 83) {
-				final String m = "error: invalid protocol: wanted 'old new ref'";
+				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
 				sendError(m);
 				throw new PackProtocolException(m);
 			}
@@ -712,6 +761,17 @@ public class ReceivePack {
 
 	private void enableCapabilities() {
 		reportStatus = enabledCapablities.contains(CAPABILITY_REPORT_STATUS);
+
+		sideBand = enabledCapablities.contains(CAPABILITY_SIDE_BAND_64K);
+		if (sideBand) {
+			OutputStream out = rawOut;
+
+			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
+			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
+
+			pckOut = new PacketLineOut(rawOut);
+			pckOut.setFlushOnEnd(false);
+		}
 	}
 
 	private boolean needPack() {
@@ -730,24 +790,56 @@ public class ReceivePack {
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(10 * timeout * 1000);
 
-		ip = IndexPack.create(db, rawIn);
-		ip.setFixThin(true);
-		ip.setNeedNewObjectIds(needNewObjectIds);
-		ip.setNeedBaseObjectIds(needBaseObjectIds);
-		ip.setObjectChecking(isCheckReceivedObjects());
-		ip.index(NullProgressMonitor.INSTANCE);
+		ProgressMonitor receiving = NullProgressMonitor.INSTANCE;
+		ProgressMonitor resolving = NullProgressMonitor.INSTANCE;
+		if (sideBand)
+			resolving = new SideBandProgressMonitor(msgOut);
 
-		String lockMsg = "jgit receive-pack";
-		if (getRefLogIdent() != null)
-			lockMsg += " from " + getRefLogIdent().toExternalString();
-		packLock = ip.renameAndOpenPack(lockMsg);
+		ObjectInserter ins = db.newObjectInserter();
+		try {
+			String lockMsg = "jgit receive-pack";
+			if (getRefLogIdent() != null)
+				lockMsg += " from " + getRefLogIdent().toExternalString();
+
+			parser = ins.newPackParser(rawIn);
+			parser.setAllowThin(true);
+			parser.setNeedNewObjectIds(checkReferencedIsReachable);
+			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
+			parser.setObjectChecking(isCheckReceivedObjects());
+			parser.setLockMessage(lockMsg);
+			packLock = parser.parse(receiving, resolving);
+			ins.flush();
+		} finally {
+			ins.release();
+		}
 
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(timeout * 1000);
 	}
 
+	private boolean needCheckConnectivity() {
+		return isCheckReceivedObjects()
+				|| isCheckReferencedObjectsAreReachable();
+	}
+
 	private void checkConnectivity() throws IOException {
+		ObjectIdSubclassMap<ObjectId> baseObjects = null;
+		ObjectIdSubclassMap<ObjectId> providedObjects = null;
+
+		if (checkReferencedIsReachable) {
+			baseObjects = parser.getBaseObjectIds();
+			providedObjects = parser.getNewObjectIds();
+		}
+		parser = null;
+
 		final ObjectWalk ow = new ObjectWalk(db);
+		ow.setRetainBody(false);
+		if (checkReferencedIsReachable) {
+			ow.sort(RevSort.TOPO);
+			if (!baseObjects.isEmpty())
+				ow.sort(RevSort.BOUNDARY, true);
+		}
+
 		for (final ReceiveCommand cmd : commands) {
 			if (cmd.getResult() != Result.NOT_ATTEMPTED)
 				continue;
@@ -755,9 +847,50 @@ public class ReceivePack {
 				continue;
 			ow.markStart(ow.parseAny(cmd.getNewId()));
 		}
-		for (final Ref ref : refs.values())
-			ow.markUninteresting(ow.parseAny(ref.getObjectId()));
-		ow.checkConnectivity();
+		for (final Ref ref : refs.values()) {
+			RevObject o = ow.parseAny(ref.getObjectId());
+			ow.markUninteresting(o);
+
+			if (checkReferencedIsReachable && !baseObjects.isEmpty()) {
+				o = ow.peel(o);
+				if (o instanceof RevCommit)
+					o = ((RevCommit) o).getTree();
+				if (o instanceof RevTree)
+					ow.markUninteresting(o);
+			}
+		}
+
+		RevCommit c;
+		while ((c = ow.next()) != null) {
+			if (checkReferencedIsReachable //
+					&& !c.has(RevFlag.UNINTERESTING) //
+					&& !providedObjects.contains(c))
+				throw new MissingObjectException(c, Constants.TYPE_COMMIT);
+		}
+
+		RevObject o;
+		while ((o = ow.nextObject()) != null) {
+			if (o.has(RevFlag.UNINTERESTING))
+				continue;
+
+			if (checkReferencedIsReachable) {
+				if (providedObjects.contains(o))
+					continue;
+				else
+					throw new MissingObjectException(o, o.getType());
+			}
+
+			if (o instanceof RevBlob && !db.hasObject(o))
+				throw new MissingObjectException(o, Constants.TYPE_BLOB);
+		}
+
+		if (checkReferencedIsReachable) {
+			for (ObjectId id : baseObjects) {
+				o = ow.parseAny(id);
+				if (!o.has(RevFlag.UNINTERESTING))
+					throw new MissingObjectException(o, o.getType());
+			}
+		}
 	}
 
 	private void validateCommands() {
@@ -805,7 +938,7 @@ public class ReceivePack {
 				// other requested old id is invalid.
 				//
 				cmd.setResult(Result.REJECTED_OTHER_REASON,
-						"invalid old id sent");
+						JGitText.get().invalidOldIdSent);
 				continue;
 			}
 
@@ -813,7 +946,7 @@ public class ReceivePack {
 				if (ref == null) {
 					// The ref must have been advertised in order to be updated.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, "no such ref");
+					cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().noSuchRef);
 					continue;
 				}
 
@@ -822,7 +955,7 @@ public class ReceivePack {
 					// object id we advertised.
 					//
 					cmd.setResult(Result.REJECTED_OTHER_REASON,
-							"invalid old id sent");
+							JGitText.get().invalidOldIdSent);
 					continue;
 				}
 
@@ -865,7 +998,7 @@ public class ReceivePack {
 
 			if (!cmd.getRefName().startsWith(Constants.R_REFS)
 					|| !Repository.isValidRefName(cmd.getRefName())) {
-				cmd.setResult(Result.REJECTED_OTHER_REASON, "funny refname");
+				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().funnyRefname);
 			}
 		}
 	}
@@ -904,8 +1037,8 @@ public class ReceivePack {
 				break;
 			}
 		} catch (IOException err) {
-			cmd.setResult(Result.REJECTED_OTHER_REASON, "lock error: "
-					+ err.getMessage());
+			cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
+					JGitText.get().lockError, err.getMessage()));
 		}
 	}
 

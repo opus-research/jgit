@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2010, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
@@ -45,10 +46,13 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Ref;
 
@@ -58,11 +62,12 @@ import org.eclipse.jgit.lib.Ref;
  * @see BasePackConnection
  * @see BaseFetchConnection
  */
-abstract class BaseConnection implements Connection {
-
+public abstract class BaseConnection implements Connection {
 	private Map<String, Ref> advertisedRefs = Collections.emptyMap();
 
 	private boolean startedOperation;
+
+	private Writer messageWriter;
 
 	public Map<String, Ref> getRefsMap() {
 		return advertisedRefs;
@@ -74,6 +79,10 @@ abstract class BaseConnection implements Connection {
 
 	public final Ref getRef(final String name) {
 		return advertisedRefs.get(name);
+	}
+
+	public String getMessages() {
+		return messageWriter != null ? messageWriter.toString() : "";
 	}
 
 	public abstract void close();
@@ -103,7 +112,32 @@ abstract class BaseConnection implements Connection {
 	protected void markStartedOperation() throws TransportException {
 		if (startedOperation)
 			throw new TransportException(
-					"Only one operation call per connection is supported.");
+					JGitText.get().onlyOneOperationCallPerConnectionIsSupported);
 		startedOperation = true;
+	}
+
+	/**
+	 * Get the writer that buffers messages from the remote side.
+	 *
+	 * @return writer to store messages from the remote.
+	 */
+	protected Writer getMessageWriter() {
+		if (messageWriter == null)
+			setMessageWriter(new StringWriter());
+		return messageWriter;
+	}
+
+	/**
+	 * Set the writer that buffers messages from the remote side.
+	 *
+	 * @param writer
+	 *            the writer that messages will be delivered to. The writer's
+	 *            {@code toString()} method should be overridden to return the
+	 *            complete contents.
+	 */
+	protected void setMessageWriter(Writer writer) {
+		if (messageWriter != null)
+			throw new IllegalStateException(JGitText.get().writerAlreadyInitialized);
+		messageWriter = writer;
 	}
 }

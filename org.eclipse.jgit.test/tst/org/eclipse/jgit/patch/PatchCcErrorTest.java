@@ -43,12 +43,21 @@
 
 package org.eclipse.jgit.patch;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.MessageFormat;
 
-import junit.framework.TestCase;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.junit.JGitTestUtil;
+import org.junit.Test;
 
-public class PatchCcErrorTest extends TestCase {
+public class PatchCcErrorTest {
+	@Test
 	public void testError_CcTruncatedOld() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -57,7 +66,7 @@ public class PatchCcErrorTest extends TestCase {
 			final FormatError e = p.getErrors().get(0);
 			assertSame(FormatError.Severity.ERROR, e.getSeverity());
 			assertEquals(
-					"Truncated hunk, at least 1 lines is missing for ancestor 1",
+					MessageFormat.format(JGitText.get().truncatedHunkLinesMissingForAncestor, 1, 1),
 					e.getMessage());
 			assertEquals(346, e.getOffset());
 			assertTrue(e.getLineText().startsWith(
@@ -67,7 +76,7 @@ public class PatchCcErrorTest extends TestCase {
 			final FormatError e = p.getErrors().get(1);
 			assertSame(FormatError.Severity.ERROR, e.getSeverity());
 			assertEquals(
-					"Truncated hunk, at least 2 lines is missing for ancestor 2",
+					MessageFormat.format(JGitText.get().truncatedHunkLinesMissingForAncestor, 2, 2),
 					e.getMessage());
 			assertEquals(346, e.getOffset());
 			assertTrue(e.getLineText().startsWith(
@@ -85,7 +94,7 @@ public class PatchCcErrorTest extends TestCase {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = getName() + ".patch";
+		final String patchFile = JGitTestUtil.getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

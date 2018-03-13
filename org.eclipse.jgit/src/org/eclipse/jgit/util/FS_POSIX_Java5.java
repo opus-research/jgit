@@ -45,7 +45,20 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 
-class FS_POSIX_Java5 extends FS {
+class FS_POSIX_Java5 extends FS_POSIX {
+	FS_POSIX_Java5() {
+		super();
+	}
+
+	FS_POSIX_Java5(FS src) {
+		super(src);
+	}
+
+	@Override
+	public FS newInstance() {
+		return new FS_POSIX_Java5(this);
+	}
+
 	public boolean supportsExecute() {
 		return false;
 	}
@@ -55,6 +68,11 @@ class FS_POSIX_Java5 extends FS {
 	}
 
 	public boolean setExecute(final File f, final boolean canExec) {
+		return false;
+	}
+
+	@Override
+	public boolean retryFailedLockFileCommit() {
 		return false;
 	}
 }

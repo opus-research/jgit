@@ -50,6 +50,7 @@ import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_REPOSITORY;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -62,10 +63,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /**
  * Opens a repository named by the path info through {@link RepositoryResolver}.
@@ -81,7 +82,7 @@ import org.eclipse.jgit.lib.Repository;
  * attribute when the request is complete.
  */
 public class RepositoryFilter implements Filter {
-	private final RepositoryResolver resolver;
+	private final RepositoryResolver<HttpServletRequest> resolver;
 
 	private ServletContext context;
 
@@ -93,7 +94,7 @@ public class RepositoryFilter implements Filter {
 	 *            component to the actual {@link Repository} instance for the
 	 *            current web request.
 	 */
-	public RepositoryFilter(final RepositoryResolver resolver) {
+	public RepositoryFilter(final RepositoryResolver<HttpServletRequest> resolver) {
 		this.resolver = resolver;
 	}
 
@@ -109,9 +110,9 @@ public class RepositoryFilter implements Filter {
 			final ServletResponse rsp, final FilterChain chain)
 			throws IOException, ServletException {
 		if (request.getAttribute(ATTRIBUTE_REPOSITORY) != null) {
-			context.log("Internal server error, request attribute "
-					+ ATTRIBUTE_REPOSITORY + " was already set when "
-					+ getClass().getName() + " was invoked.");
+			context.log(MessageFormat.format(HttpServerText.get().internalServerErrorRequestAttributeWasAlreadySet
+					, ATTRIBUTE_REPOSITORY
+					, getClass().getName()));
 			((HttpServletResponse) rsp).sendError(SC_INTERNAL_SERVER_ERROR);
 			return;
 		}

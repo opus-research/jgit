@@ -43,29 +43,40 @@
 
 package org.eclipse.jgit.dircache;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.Test;
 
 public class DirCacheLargePathTest extends RepositoryTestCase {
+	@Test
 	public void testPath_4090() throws Exception {
 		testLongPath(4090);
 	}
 
+	@Test
 	public void testPath_4094() throws Exception {
 		testLongPath(4094);
 	}
 
+	@Test
 	public void testPath_4095() throws Exception {
 		testLongPath(4095);
 	}
 
+	@Test
 	public void testPath_4096() throws Exception {
 		testLongPath(4096);
 	}
 
+	@Test
 	public void testPath_16384() throws Exception {
 		testLongPath(16384);
 	}
@@ -85,7 +96,7 @@ public class DirCacheLargePathTest extends RepositoryTestCase {
 		assertEquals(shortPath, shortEnt.getPathString());
 
 		{
-			final DirCache dc1 = DirCache.lock(db);
+			final DirCache dc1 = db.lockDirCache();
 			{
 				final DirCacheBuilder b = dc1.builder();
 				b.add(longEnt);
@@ -97,7 +108,7 @@ public class DirCacheLargePathTest extends RepositoryTestCase {
 			assertSame(shortEnt, dc1.getEntry(1));
 		}
 		{
-			final DirCache dc2 = DirCache.read(db);
+			final DirCache dc2 = db.readDirCache();
 			assertEquals(2, dc2.getEntryCount());
 
 			assertNotSame(longEnt, dc2.getEntry(0));

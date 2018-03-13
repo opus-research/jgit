@@ -43,14 +43,21 @@
 
 package org.eclipse.jgit.patch;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.lib.FileMode;
+import org.junit.Test;
 
-import junit.framework.TestCase;
-
-public class PatchCcTest extends TestCase {
+public class PatchCcTest {
+	@Test
 	public void testParse_OneFileCc() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -59,8 +66,8 @@ public class PatchCcTest extends TestCase {
 		final CombinedFileHeader cfh = (CombinedFileHeader) p.getFiles().get(0);
 
 		assertEquals("org.spearce.egit.ui/src/org/spearce/egit/ui/UIText.java",
-				cfh.getNewName());
-		assertEquals(cfh.getNewName(), cfh.getOldName());
+				cfh.getNewPath());
+		assertEquals(cfh.getNewPath(), cfh.getOldPath());
 
 		assertEquals(98, cfh.startOffset);
 
@@ -106,6 +113,7 @@ public class PatchCcTest extends TestCase {
 		}
 	}
 
+	@Test
 	public void testParse_CcNewFile() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -113,8 +121,8 @@ public class PatchCcTest extends TestCase {
 
 		final CombinedFileHeader cfh = (CombinedFileHeader) p.getFiles().get(0);
 
-		assertSame(FileHeader.DEV_NULL, cfh.getOldName());
-		assertEquals("d", cfh.getNewName());
+		assertSame(DiffEntry.DEV_NULL, cfh.getOldPath());
+		assertEquals("d", cfh.getNewPath());
 
 		assertEquals(187, cfh.startOffset);
 
@@ -160,6 +168,7 @@ public class PatchCcTest extends TestCase {
 		}
 	}
 
+	@Test
 	public void testParse_CcDeleteFile() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -167,8 +176,8 @@ public class PatchCcTest extends TestCase {
 
 		final CombinedFileHeader cfh = (CombinedFileHeader) p.getFiles().get(0);
 
-		assertEquals("a", cfh.getOldName());
-		assertSame(FileHeader.DEV_NULL, cfh.getNewName());
+		assertEquals("a", cfh.getOldPath());
+		assertSame(DiffEntry.DEV_NULL, cfh.getNewPath());
 
 		assertEquals(187, cfh.startOffset);
 
@@ -189,7 +198,7 @@ public class PatchCcTest extends TestCase {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = getName() + ".patch";
+		final String patchFile = JGitTestUtil.getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

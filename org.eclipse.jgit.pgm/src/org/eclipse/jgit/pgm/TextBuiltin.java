@@ -49,17 +49,18 @@ import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.text.MessageFormat;
+import java.util.ResourceBundle;
 
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.Option;
 
 /**
  * Abstract command which can be invoked from the command line.
@@ -75,7 +76,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 public abstract class TextBuiltin {
 	private String commandName;
 
-	@Option(name = "--help", usage = "display this help text", aliases = { "-h" })
+	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
 	/** Stream to output to, typically this is standard output. */
@@ -85,7 +86,7 @@ public abstract class TextBuiltin {
 	protected Repository db;
 
 	/** Directory supplied via --git-dir command line option. */
-	protected File gitdir;
+	protected String gitdir;
 
 	/** RevWalk used during command line parsing, if it was required. */
 	protected RevWalk argWalk;
@@ -99,9 +100,19 @@ public abstract class TextBuiltin {
 		return true;
 	}
 
-	void init(final Repository repo, final File gd) {
+	/**
+	 * Initialize the command to work with a repository.
+	 *
+	 * @param repository
+	 *            the opened repository that the command should work on.
+	 * @param gitDir
+	 *            value of the {@code --git-dir} command line option, if
+	 *            {@code repository} is null.
+	 */
+	protected void init(final Repository repository, final String gitDir) {
 		try {
-			final String outputEncoding = repo != null ? repo.getConfig()
+			final String outputEncoding = repository != null ? repository
+					.getConfig()
 					.getString("i18n", null, "logOutputEncoding") : null;
 			if (outputEncoding != null)
 				out = new PrintWriter(new BufferedWriter(
@@ -110,15 +121,15 @@ public abstract class TextBuiltin {
 				out = new PrintWriter(new BufferedWriter(
 						new OutputStreamWriter(System.out)));
 		} catch (IOException e) {
-			throw die("cannot create output stream");
+			throw die(CLIText.get().cannotCreateOutputStream);
 		}
 
-		if (repo != null) {
-			db = repo;
-			gitdir = repo.getDirectory();
+		if (repository != null && repository.getDirectory() != null) {
+			db = repository;
+			gitdir = repository.getDirectory().getAbsolutePath();
 		} else {
-			db = null;
-			gitdir = gd;
+			db = repository;
+			gitdir = gitDir;
 		}
 	}
 
@@ -153,7 +164,7 @@ public abstract class TextBuiltin {
 			clp.parseArgument(args);
 		} catch (CmdLineException err) {
 			if (!help) {
-				System.err.println("fatal: " + err.getMessage());
+				System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 				System.exit(1);
 			}
 		}
@@ -181,17 +192,27 @@ public abstract class TextBuiltin {
 	 * @param clp
 	 */
 	public void printUsageAndExit(final String message, final CmdLineParser clp) {
-		System.err.println(message);
-		System.err.print("jgit ");
-		System.err.print(commandName);
-		clp.printSingleLineUsage(System.err);
-		System.err.println();
+		PrintWriter writer = new PrintWriter(System.err);
+		writer.println(message);
+		writer.print("jgit ");
+		writer.print(commandName);
+		clp.printSingleLineUsage(writer, getResourceBundle());
+		writer.println();
 
-		System.err.println();
-		clp.printUsage(System.err);
-		System.err.println();
+		writer.println();
+		clp.printUsage(writer, getResourceBundle());
+		writer.println();
 
+		writer.flush();
 		System.exit(1);
+	}
+
+	/**
+	 * @return the resource bundle that will be passed to args4j for purpose
+	 *         of string localization
+	 */
+	protected ResourceBundle getResourceBundle() {
+		return CLIText.get().resourceBundle();
 	}
 
 	/**
@@ -216,7 +237,7 @@ public abstract class TextBuiltin {
 	ObjectId resolve(final String s) throws IOException {
 		final ObjectId r = db.resolve(s);
 		if (r == null)
-			throw die("Not a revision: " + s);
+			throw die(MessageFormat.format(CLIText.get().notARevision, s));
 		return r;
 	}
 

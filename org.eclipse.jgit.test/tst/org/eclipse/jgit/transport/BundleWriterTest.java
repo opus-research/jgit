@@ -45,6 +45,11 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
@@ -63,9 +68,11 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.junit.Test;
 
 public class BundleWriterTest extends SampleDataRepositoryTestCase {
 
+	@Test
 	public void testWrite0() throws Exception {
 		// Create a tiny bundle, (well one of) the first commits only
 		final byte[] bundle = makeBundle("refs/heads/firstcommit",
@@ -92,6 +99,7 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
+	@Test
 	public void testWrite1() throws Exception {
 		byte[] bundle;
 
@@ -148,12 +156,12 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 			throws FileNotFoundException, IOException {
 		final BundleWriter bw;
 
-		bw = new BundleWriter(db, NullProgressMonitor.INSTANCE);
+		bw = new BundleWriter(db);
 		bw.include(name, ObjectId.fromString(anObjectToInclude));
 		if (assume != null)
 			bw.assume(assume);
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
-		bw.writeBundle(out);
+		bw.writeBundle(NullProgressMonitor.INSTANCE, out);
 		return out.toByteArray();
 	}
 

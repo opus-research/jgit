@@ -43,16 +43,24 @@
 
 package org.eclipse.jgit.dircache;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
 import java.util.Collections;
 
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.junit.Test;
 
 public class DirCacheBuilderIteratorTest extends RepositoryTestCase {
+	@Test
 	public void testPathFilterGroup_DoesNotSkipTail() throws Exception {
-		final DirCache dc = DirCache.read(db);
+		final DirCache dc = db.readDirCache();
 
 		final FileMode mode = FileMode.REGULAR_FILE;
 		final String[] paths = { "a.", "a/b", "a/c", "a/d", "a0b" };
@@ -71,7 +79,6 @@ public class DirCacheBuilderIteratorTest extends RepositoryTestCase {
 		final int expIdx = 2;
 		final DirCacheBuilder b = dc.builder();
 		final TreeWalk tw = new TreeWalk(db);
-		tw.reset();
 		tw.addTree(new DirCacheBuildIterator(b));
 		tw.setRecursive(true);
 		tw.setFilter(PathFilterGroup.createFromStrings(Collections
