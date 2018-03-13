@@ -42,10 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -66,7 +62,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.FileUtils;
 
 public class CommitAndLogCommandTests extends RepositoryTestCase {
 	public void testSomeCommits() throws NoHeadException, NoMessageException,
@@ -170,7 +165,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			JGitInternalException, WrongRepositoryStateException,
 			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
-		FileUtils.createNewFile(file);
+		file.createNewFile();
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();

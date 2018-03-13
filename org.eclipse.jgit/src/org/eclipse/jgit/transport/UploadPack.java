@@ -57,21 +57,18 @@ import java.util.Set;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
-import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
@@ -145,23 +142,17 @@ public class UploadPack {
 	/** Capabilities requested by the client. */
 	private final Set<String> options = new HashSet<String>();
 
-	/** Raw ObjectIds the client has asked for, before validating them. */
-	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
-
 	/** Objects the client wants to obtain. */
 	private final List<RevObject> wantAll = new ArrayList<RevObject>();
 
 	/** Objects on both sides, these don't have to be sent. */
 	private final List<RevObject> commonBase = new ArrayList<RevObject>();
 
-	/** Commit time of the oldest common commit, in seconds. */
-	private int oldestTime;
-
 	/** null if {@link #commonBase} should be examined again. */
 	private Boolean okToGiveUp;
 
-	/** Objects we sent in our advertisement list, clients can ask for these. */
-	private Set<ObjectId> advertised;
+	/** Marked on objects we sent in our advertisement list. */
+	private final RevFlag ADVERTISED;
 
 	/** Marked on objects the client has asked us to give them. */
 	private final RevFlag WANT;
@@ -179,10 +170,6 @@ public class UploadPack {
 
 	private MultiAck multiAck = MultiAck.OFF;
 
-	private PackWriter.Statistics statistics;
-
-	private UploadPackLogger logger;
-
 	/**
 	 * Create a new pack upload for an open repository.
 	 *
@@ -194,6 +181,7 @@ public class UploadPack {
 		walk = new RevWalk(db);
 		walk.setRetainBody(false);
 
+		ADVERTISED = walk.newFlag("ADVERTISED");
 		WANT = walk.newFlag("WANT");
 		PEER_HAS = walk.newFlag("PEER_HAS");
 		COMMON = walk.newFlag("COMMON");
@@ -201,10 +189,9 @@ public class UploadPack {
 		walk.carry(PEER_HAS);
 
 		SAVE = new RevFlagSet();
+		SAVE.add(ADVERTISED);
 		SAVE.add(WANT);
 		SAVE.add(PEER_HAS);
-		SAVE.add(COMMON);
-		SAVE.add(SATISFIED);
 		refFilter = RefFilter.DEFAULT;
 	}
 
@@ -216,11 +203,6 @@ public class UploadPack {
 	/** @return the RevWalk instance used by this connection. */
 	public final RevWalk getRevWalk() {
 		return walk;
-	}
-
-	/** @return all refs which were advertised to the client. */
-	public final Map<String, Ref> getAdvertisedRefs() {
-		return refs;
 	}
 
 	/** @return timeout (in seconds) before aborting an IO operation. */
@@ -293,16 +275,6 @@ public class UploadPack {
 	}
 
 	/**
-	 * Set the logger.
-	 *
-	 * @param logger
-	 *            the logger instance. If null, no logging occurs.
-	 */
-	public void setLogger(UploadPackLogger logger) {
-		this.logger = logger;
-	}
-
-	/**
 	 * Execute the upload task on the socket.
 	 *
 	 * @param input
@@ -351,31 +323,22 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * Get the PackWriter's statistics if a pack was sent to the client.
-	 *
-	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
-	 *         connection, or if the client was already up-to-date.
-	 */
-	public PackWriter.Statistics getPackStatistics() {
-		return statistics;
-	}
-
 	private void service() throws IOException {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else {
-			advertised = new HashSet<ObjectId>();
 			refs = refFilter.filter(db.getAllRefs());
-			for (Ref ref : refs.values()) {
-				if (ref.getObjectId() != null)
-					advertised.add(ref.getObjectId());
+			for (Ref r : refs.values()) {
+				try {
+					walk.parseAny(r.getObjectId()).add(ADVERTISED);
+				} catch (IOException e) {
+					// Skip missing/corrupt objects
+				}
 			}
 		}
 
 		recvWants();
-		if (wantIds.isEmpty())
+		if (wantAll.isEmpty())
 			return;
 
 		if (options.contains(OPTION_MULTI_ACK_DETAILED))
@@ -398,7 +361,7 @@ public class UploadPack {
 	 *             the formatter failed to write an advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
-		adv.init(db);
+		adv.init(walk, ADVERTISED);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK_DETAILED);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
@@ -409,11 +372,12 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
 		adv.setDerefTags(true);
 		refs = refFilter.filter(db.getAllRefs());
-		advertised = adv.send(refs);
+		adv.send(refs);
 		adv.end();
 	}
 
 	private void recvWants() throws IOException {
+		HashSet<ObjectId> wantIds = new HashSet<ObjectId>();
 		boolean isFirst = true;
 		for (;;) {
 			String line;
@@ -442,11 +406,49 @@ public class UploadPack {
 			wantIds.add(ObjectId.fromString(line.substring(5)));
 			isFirst = false;
 		}
+
+		if (wantIds.isEmpty())
+			return;
+
+		AsyncRevObjectQueue q = walk.parseAny(wantIds, true);
+		try {
+			for (;;) {
+				RevObject o;
+				try {
+					o = q.next();
+				} catch (IOException error) {
+					throw new PackProtocolException(MessageFormat.format(
+							JGitText.get().notValid, error.getMessage()), error);
+				}
+				if (o == null)
+					break;
+				if (o.has(WANT)) {
+					// Already processed, the client repeated itself.
+
+				} else if (o.has(ADVERTISED)) {
+					o.add(WANT);
+					wantAll.add(o);
+
+					if (o instanceof RevTag) {
+						o = walk.peel(o);
+						if (o instanceof RevCommit) {
+							if (!o.has(WANT)) {
+								o.add(WANT);
+								wantAll.add(o);
+							}
+						}
+					}
+				} else {
+					throw new PackProtocolException(MessageFormat.format(
+							JGitText.get().notValid, o.name()));
+				}
+			}
+		} finally {
+			q.release();
+		}
 	}
 
 	private boolean negotiate() throws IOException {
-		okToGiveUp = Boolean.FALSE;
-
 		ObjectId last = ObjectId.zeroId();
 		List<ObjectId> peerHas = new ArrayList<ObjectId>(64);
 		for (;;) {
@@ -490,76 +492,21 @@ public class UploadPack {
 		if (peerHas.isEmpty())
 			return last;
 
-		List<ObjectId> toParse = peerHas;
-		HashSet<ObjectId> peerHasSet = null;
-		boolean needMissing = false;
-
-		if (wantAll.isEmpty() && !wantIds.isEmpty()) {
-			// We have not yet parsed the want list. Parse it now.
-			peerHasSet = new HashSet<ObjectId>(peerHas);
-			int cnt = wantIds.size() + peerHasSet.size();
-			toParse = new ArrayList<ObjectId>(cnt);
-			toParse.addAll(wantIds);
-			toParse.addAll(peerHasSet);
-			needMissing = true;
-		}
-
-		AsyncRevObjectQueue q = walk.parseAny(toParse, needMissing);
+		// If both sides have the same object; let the client know.
+		//
+		AsyncRevObjectQueue q = walk.parseAny(peerHas, false);
 		try {
 			for (;;) {
 				RevObject obj;
 				try {
 					obj = q.next();
 				} catch (MissingObjectException notFound) {
-					if (wantIds.contains(notFound.getObjectId())) {
-						throw new PackProtocolException(
-								MessageFormat.format(JGitText.get().notValid,
-										notFound.getMessage()), notFound);
-					}
 					continue;
 				}
 				if (obj == null)
 					break;
 
-				// If the object is still found in wantIds, the want
-				// list wasn't parsed earlier, and was done in this batch.
-				//
-				if (wantIds.remove(obj)) {
-					if (!advertised.contains(obj)) {
-						throw new PackProtocolException(MessageFormat.format(
-								JGitText.get().notValid, obj.name()));
-					}
-
-					if (!obj.has(WANT)) {
-						obj.add(WANT);
-						wantAll.add(obj);
-					}
-
-					if (!(obj instanceof RevCommit))
-						obj.add(SATISFIED);
-
-					if (obj instanceof RevTag) {
-						RevObject target = walk.peel(obj);
-						if (target instanceof RevCommit) {
-							if (!target.has(WANT)) {
-								target.add(WANT);
-								wantAll.add(target);
-							}
-						}
-					}
-
-					if (!peerHasSet.contains(obj))
-						continue;
-				}
-
 				last = obj;
-
-				if (obj instanceof RevCommit) {
-					RevCommit c = (RevCommit) obj;
-					if (oldestTime == 0 || c.getCommitTime() < oldestTime)
-						oldestTime = c.getCommitTime();
-				}
-
 				if (obj.has(PEER_HAS))
 					continue;
 
@@ -568,8 +515,6 @@ public class UploadPack {
 					((RevCommit) obj).carry(PEER_HAS);
 				addCommonBase(obj);
 
-				// If both sides have the same object; let the client know.
-				//
 				switch (multiAck) {
 				case OFF:
 					if (commonBase.size() == 1)
@@ -634,7 +579,7 @@ public class UploadPack {
 
 		try {
 			for (RevObject obj : wantAll) {
-				if (!wantSatisfied(obj))
+				if (wantSatisfied(obj))
 					return false;
 			}
 			return true;
@@ -647,10 +592,13 @@ public class UploadPack {
 		if (want.has(SATISFIED))
 			return true;
 
+		if (!(want instanceof RevCommit)) {
+			want.add(SATISFIED);
+			return true;
+		}
+
 		walk.resetRetain(SAVE);
 		walk.markStart((RevCommit) want);
-		if (oldestTime != 0)
-			walk.setRevFilter(CommitTimeRevFilter.after(oldestTime * 1000L));
 		for (;;) {
 			final RevCommit c = walk.next();
 			if (c == null)
@@ -670,7 +618,6 @@ public class UploadPack {
 
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
-		SideBandOutputStream msgOut = null;
 
 		if (sideband) {
 			int bufsz = SideBandOutputStream.SMALL_BUF;
@@ -679,11 +626,9 @@ public class UploadPack {
 
 			packOut = new SideBandOutputStream(SideBandOutputStream.CH_DATA,
 					bufsz, rawOut);
-			if (!options.contains(OPTION_NO_PROGRESS)) {
-				msgOut = new SideBandOutputStream(
-						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut);
-				pm = new SideBandProgressMonitor(msgOut);
-			}
+			if (!options.contains(OPTION_NO_PROGRESS))
+				pm = new SideBandProgressMonitor(new SideBandOutputStream(
+						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut));
 		}
 
 		PackConfig cfg = packConfig;
@@ -691,78 +636,31 @@ public class UploadPack {
 			cfg = new PackConfig(db);
 		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
 		try {
-			pw.setUseCachedPacks(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
-
-			if (commonBase.isEmpty()) {
-				Set<ObjectId> tagTargets = new HashSet<ObjectId>();
-				for (Ref ref : refs.values()) {
-					if (ref.getPeeledObjectId() != null)
-						tagTargets.add(ref.getPeeledObjectId());
-					else if (ref.getObjectId() == null)
-						continue;
-					else if (ref.getName().startsWith(Constants.R_HEADS))
-						tagTargets.add(ref.getObjectId());
-				}
-				pw.setTagTargets(tagTargets);
-			}
-
-			RevWalk rw = walk;
-			if (wantAll.isEmpty()) {
-				pw.preparePack(pm, wantIds, commonBase);
-			} else {
-				walk.reset();
-
-				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
-				pw.preparePack(pm, ow, wantAll, commonBase);
-				rw = ow;
-			}
-
+			pw.preparePack(pm, wantAll, commonBase);
 			if (options.contains(OPTION_INCLUDE_TAG)) {
-				for (Ref ref : refs.values()) {
-					ObjectId objectId = ref.getObjectId();
-
-					// If the object was already requested, skip it.
-					if (wantAll.isEmpty()) {
-						if (wantIds.contains(objectId))
-							continue;
-					} else {
-						RevObject obj = rw.lookupOrNull(objectId);
-						if (obj != null && obj.has(WANT))
-							continue;
-					}
-
-					if (!ref.isPeeled())
-						ref = db.peel(ref);
-
-					ObjectId peeledId = ref.getPeeledObjectId();
-					if (peeledId == null)
+				for (final Ref r : refs.values()) {
+					final RevObject o;
+					try {
+						o = walk.parseAny(r.getObjectId());
+					} catch (IOException e) {
 						continue;
-
-					objectId = ref.getObjectId();
-					if (pw.willInclude(peeledId) && !pw.willInclude(objectId))
-						pw.addObject(rw.parseAny(objectId));
+					}
+					if (o.has(WANT) || !(o instanceof RevTag))
+						continue;
+					final RevTag t = (RevTag) o;
+					if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
+						pw.addObject(t);
 				}
 			}
-
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-			statistics = pw.getStatistics();
-
-			if (msgOut != null) {
-				String msg = pw.getStatistics().getMessage() + '\n';
-				msgOut.write(Constants.encode(msg));
-				msgOut.flush();
-			}
-
 		} finally {
 			pw.release();
 		}
+		packOut.flush();
 
 		if (sideband)
 			pckOut.end();
-
-		if (logger != null && statistics != null)
-			logger.onPackStatistics(statistics);
 	}
 }

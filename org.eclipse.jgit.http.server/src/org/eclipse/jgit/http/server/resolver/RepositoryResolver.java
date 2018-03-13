@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,49 +41,37 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.http.server.resolver;
 
-import java.io.IOException;
+import javax.servlet.http.HttpServletRequest;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.util.io.UnionInputStream;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.Repository;
 
-/**
- * Default implementation of the {@link NoteMerger}.
- * <p>
- * If ours and theirs are both non-null, which means they are either both edits
- * or both adds, then this merger will simply join the content of ours and
- * theirs (in that order) and return that as the merge result.
- * <p>
- * If one or ours/theirs is non-null and the other one is null then the non-null
- * value is returned as the merge result. This means that an edit/delete
- * conflict is resolved by keeping the edit version.
- * <p>
- * If both ours and theirs are null then the result of the merge is also null.
- */
-public class DefaultNoteMerger implements NoteMerger {
-
-	public Note merge(Note base, Note ours, Note theirs, ObjectReader reader,
-			ObjectInserter inserter) throws IOException {
-		if (ours == null)
-			return theirs;
-
-		if (theirs == null)
-			return ours;
-
-		if (ours.getData().equals(theirs.getData()))
-			return ours;
-
-		ObjectLoader lo = reader.open(ours.getData());
-		ObjectLoader lt = reader.open(theirs.getData());
-		UnionInputStream union = new UnionInputStream(lo.openStream(),
-				lt.openStream());
-		ObjectId noteData = inserter.insert(Constants.OBJ_BLOB,
-				lo.getSize() + lt.getSize(), union);
-		return new Note(ours, noteData);
-	}
+/** Locate a Git {@link Repository} by name from the URL. */
+public interface RepositoryResolver {
+	/**
+	 * Locate and open a reference to a {@link Repository}.
+	 * <p>
+	 * The caller is responsible for closing the returned Repository.
+	 *
+	 * @param req
+	 *            the current HTTP request, may be used to inspect session state
+	 *            including cookies or user authentication.
+	 * @param name
+	 *            name of the repository, as parsed out of the URL.
+	 * @return the opened repository instance, never null.
+	 * @throws RepositoryNotFoundException
+	 *             the repository does not exist or the name is incorrectly
+	 *             formatted as a repository name.
+	 * @throws ServiceNotAuthorizedException
+	 *             the repository exists, but HTTP access is not allowed for the
+	 *             current user.
+	 * @throws ServiceNotEnabledException
+	 *             the repository exists, but HTTP access is not allowed on the
+	 *             target repository, by any user.
+	 */
+	Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotAuthorizedException,
+			ServiceNotEnabledException;
 }

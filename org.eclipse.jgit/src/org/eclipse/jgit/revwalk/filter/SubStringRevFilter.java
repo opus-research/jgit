@@ -104,11 +104,6 @@ public abstract class SubStringRevFilter extends RevFilter {
 		return pattern.match(text(cmit)) >= 0;
 	}
 
-	@Override
-	public boolean requiresCommitBody() {
-		return true;
-	}
-
 	/**
 	 * Obtain the raw text to match against.
 	 *

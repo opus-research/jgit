@@ -42,13 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -64,8 +57,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
 
 public class CheckoutCommandTest extends RepositoryTestCase {
 	private Git git;
@@ -75,8 +66,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	RevCommit secondCommit;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 		git = new Git(db);
 		// commit something
@@ -95,7 +85,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		secondCommit = git.commit().setMessage("Second commit").call();
 	}
 
-	@Test
 	public void testSimpleCheckout() {
 		try {
 			git.checkout().setName("test").call();
@@ -104,7 +93,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckout() {
 		try {
 			git.checkout().setName("test").call();
@@ -121,7 +109,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCreateBranchOnCheckout() throws IOException {
 		try {
 			git.checkout().setCreateBranch(true).setName("test2").call();
@@ -131,7 +118,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		assertNotNull(db.getRef("test2"));
 	}
 
-	@Test
 	public void testCheckoutToNonExistingBranch() throws JGitInternalException,
 			RefAlreadyExistsException, InvalidRefNameException {
 		try {
@@ -142,9 +128,9 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
-	public void testCheckoutWithConflict() {
+	public void testCheckoutWithConflict() throws IOException {
 		CheckoutCommand co = git.checkout();
+		File trashFile = writeTrashFile("Test.txt", "Another change");
 		try {
 			writeTrashFile("Test.txt", "Another change");
 			assertEquals(Status.NOT_TRIED, co.getResult().getStatus());
@@ -152,11 +138,10 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			fail("Should have failed");
 		} catch (Exception e) {
 			assertEquals(Status.CONFLICTS, co.getResult().getStatus());
-			assertTrue(co.getResult().getConflictList().contains("Test.txt"));
+			assertTrue(co.getResult().getConflictList().contains(trashFile));
 		}
 	}
 
-	@Test
 	public void testCheckoutWithNonDeletedFiles() throws Exception {
 		File testFile = writeTrashFile("temp", "");
 		FileInputStream fis = new FileInputStream(testFile);
@@ -186,13 +171,12 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			co.setName("test").call();
 			assertTrue(testFile.exists());
 			assertEquals(Status.NONDELETED, co.getResult().getStatus());
-			assertTrue(co.getResult().getUndeletedList().contains("Test.txt"));
+			assertTrue(co.getResult().getUndeletedList().contains(testFile));
 		} finally {
 			fis.close();
 		}
 	}
 
-	@Test
 	public void testCheckoutCommit() {
 		try {
 			Ref result = git.checkout().setName(initialCommit.name()).call();

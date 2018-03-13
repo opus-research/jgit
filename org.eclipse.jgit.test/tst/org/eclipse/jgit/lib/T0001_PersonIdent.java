@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,24 +41,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.storage.pack.PackWriter;
+import java.util.Date;
+import java.util.TimeZone;
 
-/**
- * Logs activity that occurred within {@link UploadPack}.
- * <p>
- * Implementors of the interface are responsible for associating the current
- * thread to a particular connection, if they need to also include connection
- * information. One method is to use a {@link java.lang.ThreadLocal} to remember
- * the connection information before invoking UploadPack.
- */
-public interface UploadPackLogger {
-	/**
-	 * Notice to the logger after a pack has been sent.
-	 *
-	 * @param stats
-	 *            the statistics after sending a pack to the client.
-	 */
-	public void onPackStatistics(PackWriter.Statistics stats);
+import junit.framework.TestCase;
+
+public class T0001_PersonIdent extends TestCase {
+	public void test001_NewIdent() {
+		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
+				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
+		assertEquals("A U Thor", p.getName());
+		assertEquals("author@example.com", p.getEmailAddress());
+		assertEquals(1142878501000L, p.getWhen().getTime());
+		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
+				p.toExternalString());
+	}
+
+	public void test002_NewIdent() {
+		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
+				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
+		assertEquals("A U Thor", p.getName());
+		assertEquals("author@example.com", p.getEmailAddress());
+		assertEquals(1142878501000L, p.getWhen().getTime());
+		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
+				p.toExternalString());
+	}
 }

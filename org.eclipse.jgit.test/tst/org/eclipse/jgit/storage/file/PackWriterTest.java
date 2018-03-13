@@ -43,16 +43,12 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -63,20 +59,17 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.transport.PackParser;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.transport.IndexPack;
+import org.eclipse.jgit.util.JGitTestUtil;
 
 public class PackWriterTest extends SampleDataRepositoryTestCase {
 
@@ -92,41 +85,32 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 
 	private ByteArrayOutputStream os;
 
+	private File packBase;
+
+	private File packFile;
+
+	private File indexFile;
+
 	private PackFile pack;
 
-	private ObjectInserter inserter;
-
-	private FileRepository dst;
-
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		os = new ByteArrayOutputStream();
+		packBase = new File(trash, "tmp_pack");
+		packFile = new File(trash, "tmp_pack.pack");
+		indexFile = new File(trash, "tmp_pack.idx");
 		config = new PackConfig(db);
-
-		dst = createBareRepository();
-		File alt = new File(dst.getObjectDatabase().getDirectory(), "info/alternates");
-		alt.getParentFile().mkdirs();
-		write(alt, db.getObjectDatabase().getDirectory().getAbsolutePath() + "\n");
 	}
 
-	@After
 	public void tearDown() throws Exception {
-		if (writer != null) {
+		if (writer != null)
 			writer.release();
-			writer = null;
-		}
-		if (inserter != null) {
-			inserter.release();
-			inserter = null;
-		}
 		super.tearDown();
 	}
 
 	/**
 	 * Test constructor for exceptions, default settings, initialization.
 	 */
-	@Test
 	public void testContructor() {
 		writer = new PackWriter(config, db.newObjectReader());
 		assertEquals(false, writer.isDeltaBaseAsOffset());
@@ -138,7 +122,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	/**
 	 * Change default settings and verify them.
 	 */
-	@Test
 	public void testModifySettings() {
 		config.setReuseDeltas(false);
 		config.setReuseObjects(false);
@@ -159,7 +142,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWriteEmptyPack1() throws IOException {
 		createVerifyOpenPack(EMPTY_LIST_OBJECT, EMPTY_LIST_OBJECT, false, false);
 
@@ -175,7 +157,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWriteEmptyPack2() throws IOException {
 		createVerifyOpenPack(EMPTY_LIST_REVS.iterator());
 
@@ -189,7 +170,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testNotIgnoreNonExistingObjects() throws IOException {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
@@ -207,7 +187,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testIgnoreNonExistingObjects() throws IOException {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
@@ -222,7 +201,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack1() throws IOException {
 		config.setReuseDeltas(false);
 		writeVerifyPack1();
@@ -234,7 +212,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack1NoObjectReuse() throws IOException {
 		config.setReuseDeltas(false);
 		config.setReuseObjects(false);
@@ -247,7 +224,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack2() throws IOException {
 		writeVerifyPack2(false);
 	}
@@ -258,7 +234,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack2DeltasReuseRefs() throws IOException {
 		writeVerifyPack2(true);
 	}
@@ -269,7 +244,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack2DeltasReuseOffsets() throws IOException {
 		config.setDeltaBaseAsOffset(true);
 		writeVerifyPack2(true);
@@ -282,7 +256,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack2DeltasCRC32Copy() throws IOException {
 		final File packDir = new File(db.getObjectDatabase().getDirectory(), "pack");
 		final File crc32Pack = new File(packDir,
@@ -305,7 +278,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 * @throws MissingObjectException
 	 *
 	 */
-	@Test
 	public void testWritePack3() throws MissingObjectException, IOException {
 		config.setReuseDeltas(false);
 		final ObjectId forcedOrder[] = new ObjectId[] {
@@ -335,7 +307,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack4() throws IOException {
 		writeVerifyPack4(false);
 	}
@@ -346,7 +317,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testWritePack4ThinPack() throws IOException {
 		writeVerifyPack4(true);
 	}
@@ -358,7 +328,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
-	@Test
 	public void testWritePack2SizeDeltasVsNoDeltas() throws Exception {
 		testWritePack2();
 		final long sizePack2NoDeltas = os.size();
@@ -378,7 +347,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
-	@Test
 	public void testWritePack2SizeOffsetsVsRefs() throws Exception {
 		testWritePack2DeltasReuseRefs();
 		final long sizePack2DeltasRefs = os.size();
@@ -397,7 +365,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
-	@Test
 	public void testWritePack4SizeThinVsNoThin() throws Exception {
 		testWritePack4();
 		final long sizePack4 = os.size();
@@ -409,15 +376,9 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		assertTrue(sizePack4 > sizePack4Thin);
 	}
 
-	@Test
 	public void testWriteIndex() throws Exception {
 		config.setIndexVersion(2);
 		writeVerifyPack4(false);
-
-		File packFile = pack.getPackFile();
-		String name = packFile.getName();
-		String base = name.substring(0, name.lastIndexOf('.'));
-		File indexFile = new File(packFile.getParentFile(), base + ".idx");
 
 		// Validate that IndexPack came up with the right CRC32 value.
 		final PackIndex idx1 = PackIndex.open(indexFile);
@@ -555,31 +516,23 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private void verifyOpenPack(final boolean thin) throws IOException {
-		final byte[] packData = os.toByteArray();
-
 		if (thin) {
-			PackParser p = index(packData);
+			final InputStream is = new ByteArrayInputStream(os.toByteArray());
+			final IndexPack indexer = new IndexPack(db, is, packBase);
 			try {
-				p.parse(NullProgressMonitor.INSTANCE);
+				indexer.index(new TextProgressMonitor());
 				fail("indexer should grumble about missing object");
 			} catch (IOException x) {
 				// expected
 			}
 		}
-
-		ObjectDirectoryPackParser p = (ObjectDirectoryPackParser) index(packData);
-		p.setKeepEmpty(true);
-		p.setAllowThin(thin);
-		p.setIndexVersion(2);
-		p.parse(NullProgressMonitor.INSTANCE);
-		pack = p.getPackFile();
-		assertNotNull("have PackFile after parsing", pack);
-	}
-
-	private PackParser index(final byte[] packData) throws IOException {
-		if (inserter == null)
-			inserter = dst.newObjectInserter();
-		return inserter.newPackParser(new ByteArrayInputStream(packData));
+		final InputStream is = new ByteArrayInputStream(os.toByteArray());
+		final IndexPack indexer = new IndexPack(db, is, packBase);
+		indexer.setKeepEmpty(true);
+		indexer.setFixThin(thin);
+		indexer.setIndexVersion(2);
+		indexer.index(new TextProgressMonitor());
+		pack = new PackFile(indexFile, packFile);
 	}
 
 	private void verifyObjectsOrder(final ObjectId objectsOrder[]) {

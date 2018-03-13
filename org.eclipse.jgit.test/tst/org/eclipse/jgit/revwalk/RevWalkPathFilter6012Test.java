@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,8 +50,6 @@ import java.util.HashMap;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.junit.Before;
-import org.junit.Test;
 
 // Note: Much of this test case is broken as it depends upon
 // the graph applying topological sorting *before* doing merge
@@ -69,7 +64,6 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 
 	private HashMap<RevCommit, String> byName;
 
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
@@ -126,13 +120,11 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 				TreeFilter.ANY_DIFF));
 	}
 
-	@Test
 	public void test1() throws Exception {
 		// TODO --full-history
 		check(i, h, g, f, e, d, c, b, a);
 	}
 
-	@Test
 	public void test2() throws Exception {
 		// TODO --full-history
 		filter(pF);
@@ -140,7 +132,6 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 		// check(i, h, e, c, b, a);
 	}
 
-	@Test
 	public void test3() throws Exception {
 		// TODO --full-history
 		rw.sort(RevSort.TOPO);
@@ -149,7 +140,6 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 		// check(i, h, e, c, b, a);
 	}
 
-	@Test
 	public void test4() throws Exception {
 		// TODO --full-history
 		rw.sort(RevSort.COMMIT_TIME_DESC);
@@ -158,7 +148,6 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 		// check(i, h, e, c, b, a);
 	}
 
-	@Test
 	public void test5() throws Exception {
 		// TODO --simplify-merges
 		filter(pF);
@@ -166,13 +155,11 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 		// check(i, e, c, b, a);
 	}
 
-	@Test
 	public void test6() throws Exception {
 		filter(pF);
 		check(i, b, a);
 	}
 
-	@Test
 	public void test7() throws Exception {
 		rw.sort(RevSort.TOPO);
 		filter(pF);

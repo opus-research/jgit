@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-
-import org.junit.Test;
-
 
 public class HistogramDiffTest extends AbstractDiffTestCase {
 	@Override
@@ -56,7 +52,6 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		return hd;
 	}
 
-	@Test
 	public void testEdit_NoUniqueMiddleSide_FlipBlocks() {
 		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
 		assertEquals(2, r.size());
@@ -64,14 +59,12 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		assertEquals(new Edit(5, 5, 3, 5), r.get(1)); // INSERT "RR
 	}
 
-	@Test
 	public void testEdit_NoUniqueMiddleSide_Insert2() {
 		EditList r = diff(t("aRSz"), t("aRRSSz"));
 		assertEquals(1, r.size());
 		assertEquals(new Edit(2, 2, 2, 4), r.get(0));
 	}
 
-	@Test
 	public void testEdit_NoUniqueMiddleSide_FlipAndExpand() {
 		EditList r = diff(t("aRSz"), t("aSSRRz"));
 		assertEquals(2, r.size());
@@ -79,7 +72,6 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		assertEquals(new Edit(3, 3, 2, 5), r.get(1)); // INSERT "SRR"
 	}
 
-	@Test
 	public void testEdit_LcsContainsUnique() {
 		EditList r = diff(t("nqnjrnjsnm"), t("AnqnjrnjsnjTnmZ"));
 		assertEquals(new Edit(0, 0, 0, 1), r.get(0)); // INSERT "A";
@@ -88,7 +80,6 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		assertEquals(3, r.size());
 	}
 
-	@Test
 	public void testExceedsChainLength_DuringScanOfA() {
 		HistogramDiff hd = new HistogramDiff();
 		hd.setFallbackAlgorithm(null);
@@ -111,7 +102,6 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		assertEquals(new Edit(0, 4, 0, 4), r.get(0));
 	}
 
-	@Test
 	public void testExceedsChainLength_DuringScanOfB() {
 		HistogramDiff hd = new HistogramDiff();
 		hd.setFallbackAlgorithm(null);
@@ -122,7 +112,6 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		assertEquals(new Edit(0, 4, 0, 4), r.get(0));
 	}
 
-	@Test
 	public void testFallbackToMyersDiff() {
 		HistogramDiff hd = new HistogramDiff();
 		hd.setMaxChainLength(4);

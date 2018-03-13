@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,13 +54,11 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
-import org.junit.Before;
-import org.junit.Test;
 
 public class PushProcessTest extends SampleDataRepositoryTestCase {
 	private PushProcess process;
@@ -78,7 +72,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	private Status connectionUpdateStatus;
 
 	@Override
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		transport = new MockTransport(db, new URIish());
@@ -92,7 +85,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateFastForward() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -108,7 +100,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateNonFastForwardUnknownObject() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -124,7 +115,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateNonFastForward() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
@@ -139,7 +129,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateNonFastForwardForced() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
@@ -154,7 +143,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateCreateRef() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
@@ -167,7 +155,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateDelete() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db, null,
 				"refs/heads/master", false, null, null);
@@ -182,7 +169,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateDeleteNonExisting() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db, null,
 				"refs/heads/master", false, null, null);
@@ -194,7 +180,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateUpToDate() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -209,7 +194,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateExpectedRemote() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -226,7 +210,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateUnexpectedRemote() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -244,7 +227,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateUnexpectedRemoteVsForce() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -260,7 +242,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateRejectedByConnection() throws IOException {
 		connectionUpdateStatus = Status.REJECTED_OTHER_REASON;
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
@@ -277,7 +258,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUpdateMixedCases() throws IOException {
 		final RemoteRefUpdate rruOk = new RemoteRefUpdate(db, null,
 				"refs/heads/master", false, null, null);
@@ -299,7 +279,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testTrackingRefUpdateEnabled() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -321,7 +300,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testTrackingRefUpdateDisabled() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",
@@ -339,7 +317,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testTrackingRefUpdateOnReject() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
@@ -356,7 +333,6 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testPushResult() throws IOException {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"2c349335b7f797072cf729c4f3bb0914ecb6dec9",

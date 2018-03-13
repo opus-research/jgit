@@ -44,21 +44,17 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.junit.JGitTestUtil;
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.Patch;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.junit.Before;
-import org.junit.Test;
 
-public class DiffFormatterReflowTest {
+public class DiffFormatterReflowTest extends TestCase {
 	private RawText a;
 
 	private RawText b;
@@ -69,13 +65,12 @@ public class DiffFormatterReflowTest {
 
 	private DiffFormatter fmt;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		out = new ByteArrayOutputStream();
 		fmt = new DiffFormatter(out);
 	}
 
-	@Test
 	public void testNegativeContextFails() throws IOException {
 		init("X");
 		try {
@@ -86,61 +81,52 @@ public class DiffFormatterReflowTest {
 		}
 	}
 
-	@Test
 	public void testContext0() throws IOException {
 		init("X");
 		fmt.setContext(0);
 		assertFormatted();
 	}
 
-	@Test
 	public void testContext1() throws IOException {
 		init("X");
 		fmt.setContext(1);
 		assertFormatted();
 	}
 
-	@Test
 	public void testContext3() throws IOException {
 		init("X");
 		fmt.setContext(3);
 		assertFormatted();
 	}
 
-	@Test
 	public void testContext5() throws IOException {
 		init("X");
 		fmt.setContext(5);
 		assertFormatted();
 	}
 
-	@Test
 	public void testContext10() throws IOException {
 		init("X");
 		fmt.setContext(10);
 		assertFormatted();
 	}
 
-	@Test
 	public void testContext100() throws IOException {
 		init("X");
 		fmt.setContext(100);
 		assertFormatted();
 	}
 
-	@Test
 	public void testEmpty1() throws IOException {
 		init("E");
 		assertFormatted("E.patch");
 	}
 
-	@Test
 	public void testNoNewLine1() throws IOException {
 		init("Y");
 		assertFormatted("Y.patch");
 	}
 
-	@Test
 	public void testNoNewLine2() throws IOException {
 		init("Z");
 		assertFormatted("Z.patch");
@@ -153,7 +139,7 @@ public class DiffFormatterReflowTest {
 	}
 
 	private void assertFormatted() throws IOException {
-		assertFormatted(JGitTestUtil.getName() + ".out");
+		assertFormatted(getName() + ".out");
 	}
 
 	private void assertFormatted(final String name) throws IOException {

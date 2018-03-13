@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,36 +41,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.http.server.resolver;
 
-import static org.junit.Assert.assertEquals;
+import org.eclipse.jgit.http.server.HttpServerText;
 
-import java.util.Date;
-import java.util.TimeZone;
+/** Indicates the request service is not authorized for current user. */
+public class ServiceNotAuthorizedException extends Exception {
+	private static final long serialVersionUID = 1L;
 
-import org.junit.Test;
-
-public class T0001_PersonIdentTest {
-
-	@Test
-	public void test001_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
-				p.toExternalString());
-	}
-
-	@Test
-	public void test002_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
-				p.toExternalString());
+	/** Indicates the request service is not available. */
+	public ServiceNotAuthorizedException() {
+		super(HttpServerText.get().serviceNotPermitted);
 	}
 }

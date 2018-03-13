@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010, Robin Rosenberg
+ * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
+ * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +42,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.nio.charset.Charset;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.net.URISyntaxException;
+import java.net.URL;
 
-abstract class FS_POSIX extends FS {
-	@Override
-	public File gitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH");
-		File gitExe = searchPath(path, "git");
-		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
+public abstract class JGitTestUtil {
+	public static final String CLASSPATH_TO_RESOURCES = "org/eclipse/jgit/test/resources/";
 
-		if (isMacOS()) {
-			// On MacOSX, PATH is shorter when Eclipse is launched from the
-			// Finder than from a terminal. Therefore try to launch bash as a
-			// login shell and search using that.
-			//
-			String w = readPipe(userHome(), //
-					new String[] { "bash", "--login", "-c", "which git" }, //
-					Charset.defaultCharset().name());
-			if (w == null || w.length() == 0)
-				return null;
-			File parentFile = new File(w).getParentFile();
-			if (parentFile == null)
-				return null;
-			return parentFile.getParentFile();
+	private JGitTestUtil() {
+		throw new UnsupportedOperationException();
+	}
+
+	public static File getTestResourceFile(final String fileName) {
+		if (fileName == null || fileName.length() <= 0) {
+			return null;
 		}
-
-		return null;
+		final URL url = cl().getResource(CLASSPATH_TO_RESOURCES + fileName);
+		if (url == null) {
+			// If URL is null then try to load it as it was being
+			// loaded previously
+			return new File("tst", fileName);
+		}
+		try {
+			return new File(url.toURI());
+		} catch(URISyntaxException e) {
+			return new File(url.getPath());
+		}
 	}
 
-	@Override
-	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<String>(4 + args.length);
-		argv.add("sh");
-		argv.add("-c");
-		argv.add(cmd + " \"$@\"");
-		argv.add(cmd);
-		argv.addAll(Arrays.asList(args));
-		ProcessBuilder proc = new ProcessBuilder();
-		proc.command(argv);
-		return proc;
-	}
-
-	private static boolean isMacOS() {
-		final String osDotName = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return System.getProperty("os.name");
-					}
-				});
-		return "Mac OS X".equals(osDotName);
+	private static ClassLoader cl() {
+		return JGitTestUtil.class.getClassLoader();
 	}
 }

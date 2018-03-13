@@ -43,11 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -63,10 +58,8 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.junit.Test;
 
 public class MergeCommandTest extends RepositoryTestCase {
-	@Test
 	public void testMergeInItself() throws Exception {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
@@ -75,7 +68,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
 	}
 
-	@Test
 	public void testAlreadyUpToDate() throws Exception {
 		Git git = new Git(db);
 		RevCommit first = git.commit().setMessage("initial commit").call();
@@ -88,7 +80,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testFastForward() throws Exception {
 		Git git = new Git(db);
 		RevCommit first = git.commit().setMessage("initial commit").call();
@@ -104,7 +95,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(second, result.getNewHead());
 	}
 
-	@Test
 	public void testFastForwardWithFiles() throws Exception {
 		Git git = new Git(db);
 
@@ -131,7 +121,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(second, result.getNewHead());
 	}
 
-	@Test
 	public void testMultipleHeads() throws Exception {
 		Git git = new Git(db);
 
@@ -164,7 +153,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 	}
 
 
-	@Test
 	public void testContentMerge() throws Exception {
 		Git git = new Git(db);
 
@@ -209,7 +197,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
 	}
 
-	@Test
 	public void testMergeNonVersionedPaths() throws Exception {
 		Git git = new Git(db);
 
@@ -260,7 +247,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
 	}
 
-	@Test
 	public void testMultipleCreations() throws Exception {
 		Git git = new Git(db);
 
@@ -286,7 +272,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(MergeStatus.CONFLICTING, result.getMergeStatus());
 	}
 
-	@Test
 	public void testMultipleCreationsSameContent() throws Exception {
 		Git git = new Git(db);
 
@@ -313,7 +298,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals("1\nb(1)\n3\n", read(new File(db.getWorkTree(), "b")));
 	}
 
-	@Test
 	public void testSuccessfulContentMerge() throws Exception {
 		Git git = new Git(db);
 
@@ -364,14 +348,13 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(thirdCommit, newHead.getParent(0));
 		assertEquals(secondCommit, newHead.getParent(1));
 		assertEquals(
-				"Merge commit '3fa334456d236a92db020289fe0bf481d91777b4'",
+				"Merge commit '3fa334456d236a92db020289fe0bf481d91777b4' into HEAD",
 				newHead.getFullMessage());
 		// @TODO fix me
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 		// test index state
 	}
 
-	@Test
 	public void testSuccessfulContentMergeAndDirtyworkingTree()
 			throws Exception {
 		Git git = new Git(db);
@@ -425,13 +408,12 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(thirdCommit, newHead.getParent(0));
 		assertEquals(secondCommit, newHead.getParent(1));
 		assertEquals(
-				"Merge commit '064d54d98a4cdb0fed1802a21c656bfda67fe879'",
+				"Merge commit '064d54d98a4cdb0fed1802a21c656bfda67fe879' into HEAD",
 				newHead.getFullMessage());
 
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 	}
 
-	@Test
 	public void testSingleDeletion() throws Exception {
 		Git git = new Git(db);
 
@@ -484,7 +466,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 				read(new File(db.getWorkTree(), "c/c/c")));
 	}
 
-	@Test
 	public void testMultipleDeletions() throws Exception {
 		Git git = new Git(db);
 
@@ -513,7 +494,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 	}
 
-	@Test
 	public void testDeletionAndConflict() throws Exception {
 		Git git = new Git(db);
 
@@ -556,7 +536,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 				read(new File(db.getWorkTree(), "c/c/c")));
 	}
 
-	@Test
 	public void testMergeFailingWithDirtyWorkingTree() throws Exception {
 		Git git = new Git(db);
 
@@ -595,7 +574,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 	}
 
-	@Test
 	public void testMergeConflictFileFolder() throws Exception {
 		Git git = new Git(db);
 
