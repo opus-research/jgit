@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,55 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Date;
+import java.util.Properties;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.util.GitDateParser;
+import org.junit.Before;
+import org.junit.Test;
 
-class LsTree extends TextBuiltin {
-	@Option(name = "--recursive", usage = "usage_recurseIntoSubtrees", aliases = { "-r" })
-	private boolean recursive;
-
-	@Argument(index = 0, required = true, metaVar = "metaVar_treeish")
-	private AbstractTreeIterator tree;
-
-	@Argument(index = 1)
-	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<String>();
+public class GarbageCollectCommandTest extends RepositoryTestCase {
+	private Git git;
 
 	@Override
-	protected void run() throws Exception {
-		final TreeWalk walk = new TreeWalk(db);
-		walk.reset(); // drop the first empty tree, which we do not need here
-		if (paths.size() > 0)
-			walk.setFilter(PathFilterGroup.createFromStrings(paths));
-		walk.setRecursive(recursive);
-		walk.addTree(tree);
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		String path = "a.txt";
+		writeTrashFile(path, "content");
+		git.add().addFilepattern(path).call();
+		git.commit().setMessage("commit").call();
+	}
 
-		while (walk.next()) {
-			final FileMode mode = walk.getFileMode(0);
-			if (mode == FileMode.TREE)
-				outw.print('0');
-			outw.print(mode);
-			outw.print(' ');
-			outw.print(Constants.typeString(mode.getObjectType()));
+	@Test
+	public void testGConeCommit() throws Exception {
+		Date expire = GitDateParser.parse("now", null);
+		Properties res = git.gc().setExpire(expire).call();
+		assertTrue(res.size() == 7);
+	}
 
-			outw.print(' ');
-			outw.print(walk.getObjectId(0).name());
-
-			outw.print('\t');
-			outw.print(walk.getPathString());
-			outw.println();
-		}
+	@Test
+	public void testGCmoreCommits() throws Exception {
+		writeTrashFile("a.txt", "a couple of words for gc to pack");
+		writeTrashFile("b.txt", "a couple of words for gc to pack 2");
+		writeTrashFile("c.txt", "a couple of words for gc to pack 3");
+		git.commit().setAll(true).setMessage("commit2").call();
+		writeTrashFile("a.txt", "a couple of words for gc to pack more");
+		writeTrashFile("b.txt", "a couple of words for gc to pack more 2");
+		writeTrashFile("c.txt", "a couple of words for gc to pack more 3");
+		git.commit().setAll(true).setMessage("commit3").call();
+		Properties res = git.gc().setExpire(GitDateParser.parse("now", null))
+				.call();
+		assertTrue(res.size() == 7);
 	}
 }
