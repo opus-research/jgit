@@ -44,13 +44,10 @@
 package org.eclipse.jgit.storage.pack;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.RevObject;
 
 /**
@@ -81,71 +78,25 @@ public interface ObjectReuseAsIs {
 
 	/**
 	 * Select the best object representation for a packer.
-	 *
+	 * <p>
 	 * Implementations should iterate through all available representations of
 	 * an object, and pass them in turn to the PackWriter though
 	 * {@link PackWriter#select(ObjectToPack, StoredObjectRepresentation)} so
 	 * the writer can select the most suitable representation to reuse into the
 	 * output stream.
 	 *
-	 * The implementation may choose to consider multiple objects at once on
-	 * concurrent threads, but must evaluate all representations of an object
-	 * within the same thread.
-	 *
 	 * @param packer
 	 *            the packer that will write the object in the near future.
-	 * @param monitor
-	 *            progress monitor, implementation should update the monitor
-	 *            once for each item in the iteration when selection is done.
-	 * @param objects
-	 *            the objects that are being packed.
+	 * @param otp
+	 *            the object to pack.
 	 * @throws MissingObjectException
 	 *             there is no representation available for the object, as it is
 	 *             no longer in the repository. Packing will abort.
 	 * @throws IOException
 	 *             the repository cannot be accessed. Packing will abort.
 	 */
-	public void selectObjectRepresentation(PackWriter packer,
-			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
+	public void selectObjectRepresentation(PackWriter packer, ObjectToPack otp)
 			throws IOException, MissingObjectException;
-
-	/**
-	 * Write objects to the pack stream in roughly the order given.
-	 *
-	 * {@code PackWriter} invokes this method to write out one or more objects,
-	 * in approximately the order specified by the iteration over the list. A
-	 * simple implementation of this method would just iterate the list and
-	 * output each object:
-	 *
-	 * <pre>
-	 * for (ObjectToPack obj : list)
-	 *   out.writeObject(obj)
-	 * </pre>
-	 *
-	 * However more sophisticated implementors may try to perform some (small)
-	 * reordering to access objects that are stored close to each other at
-	 * roughly the same time. Implementations may choose to write objects out of
-	 * order, but this may increase pack file size due to using a larger header
-	 * format to reach a delta base that is later in the stream. It may also
-	 * reduce data locality for the reader, slowing down data access.
-	 *
-	 * Invoking {@link PackOutputStream#writeObject(ObjectToPack)} will cause
-	 * {@link #copyObjectAsIs(PackOutputStream, ObjectToPack, boolean)} to be
-	 * invoked recursively on {@code this} if the current object is scheduled
-	 * for reuse.
-	 *
-	 * @param out
-	 *            the stream to write each object to.
-	 * @param list
-	 *            the list of objects to write. Objects should be written in
-	 *            approximately this order. Implementors may resort the list
-	 *            elements in-place during writing if desired.
-	 * @throws IOException
-	 *             the stream cannot be written to, or one or more required
-	 *             objects cannot be accessed from the object database.
-	 */
-	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
-			throws IOException;
 
 	/**
 	 * Output a previously selected representation.
@@ -161,11 +112,7 @@ public interface ObjectReuseAsIs {
 	 *
 	 * <pre>
 	 * MyToPack mtp = (MyToPack) otp;
-	 * byte[] raw;
-	 * if (validate)
-	 * 	 raw = validate(mtp); // throw SORNAE here, if at all
-	 * else
-	 * 	 raw = readFast(mtp);
+	 * byte[] raw = validate(mtp); // throw SORNAE here, if at all
 	 * out.writeHeader(mtp, mtp.inflatedSize);
 	 * out.write(raw);
 	 * </pre>
@@ -174,11 +121,6 @@ public interface ObjectReuseAsIs {
 	 *            stream the object should be written to.
 	 * @param otp
 	 *            the object's saved representation information.
-	 * @param validate
-	 *            if true the representation must be validated and not be
-	 *            corrupt before being reused. If false, validation may be
-	 *            skipped as it will be performed elsewhere in the processing
-	 *            pipeline.
 	 * @throws StoredObjectRepresentationNotAvailableException
 	 *             the previously selected representation is no longer
 	 *             available. If thrown before {@code out.writeHeader} the pack
@@ -189,41 +131,6 @@ public interface ObjectReuseAsIs {
 	 *             the stream's write method threw an exception. Packing will
 	 *             abort.
 	 */
-	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp,
-			boolean validate) throws IOException,
-			StoredObjectRepresentationNotAvailableException;
-
-	/**
-	 * Obtain the available cached packs.
-	 * <p>
-	 * A cached pack has known starting points and may be sent entirely as-is,
-	 * with almost no effort on the sender's part.
-	 *
-	 * @return the available cached packs.
-	 * @throws IOException
-	 *             the cached packs cannot be listed from the repository.
-	 *             Callers may choose to ignore this and continue as-if there
-	 *             were no cached packs.
-	 */
-	public Collection<CachedPack> getCachedPacks() throws IOException;
-
-	/**
-	 * Append an entire pack's contents onto the output stream.
-	 * <p>
-	 * The entire pack, excluding its header and trailing footer is sent.
-	 *
-	 * @param out
-	 *            stream to append the pack onto.
-	 * @param pack
-	 *            the cached pack to send.
-	 * @param validate
-	 *            if true the representation must be validated and not be
-	 *            corrupt before being reused. If false, validation may be
-	 *            skipped as it will be performed elsewhere in the processing
-	 *            pipeline.
-	 * @throws IOException
-	 *             the pack cannot be read, or stream did not accept a write.
-	 */
-	public abstract void copyPackAsIs(PackOutputStream out, CachedPack pack,
-			boolean validate) throws IOException;
+	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp)
+			throws IOException, StoredObjectRepresentationNotAvailableException;
 }

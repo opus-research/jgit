@@ -45,25 +45,17 @@
  */
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.junit.Test;
 
 public abstract class ReadTreeTest extends RepositoryTestCase {
 	protected Tree theHead;
@@ -72,11 +64,11 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	// Each of these rules are from the read-tree manpage
 	// go there to see what they mean.
 	// Rule 0 is left out for obvious reasons :)
-	@Test
 	public void testRules1thru3_NoIndexEntry() throws IOException {
 		Tree head = new Tree(db);
-		head = buildTree(mk("foo"));
-		ObjectId objectId = head.findBlobMember("foo").getId();
+		FileTreeEntry headFile = head.addFile("foo");
+		ObjectId objectId = ObjectId.fromString("ba78e065e2c261d4f7b8f42107588051e87e18e9");
+		headFile.setId(objectId);
 		Tree merge = new Tree(db);
 
 		prescanTwoTrees(head, merge);
@@ -87,8 +79,8 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 		assertEquals(objectId, getUpdated().get("foo"));
 
-		merge = buildTree(mkmap("foo", "a"));
-		ObjectId anotherId = merge.findBlobMember("foo").getId();
+		ObjectId anotherId = ObjectId.fromString("ba78e065e2c261d4f7b8f42107588051e87e18ee");
+		merge.addFile("foo").setId(anotherId);
 
 		prescanTwoTrees(head, merge);
 
@@ -118,25 +110,21 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	private Tree buildTree(HashMap<String, String> headEntries) throws IOException {
 		Tree tree = new Tree(db);
+		ObjectWriter ow = new ObjectWriter(db);
 		if (headEntries == null)
 			return tree;
 		FileTreeEntry fileEntry;
 		Tree parent;
-		ObjectInserter oi = db.newObjectInserter();
-		try {
-			for (java.util.Map.Entry<String, String> e : headEntries.entrySet()) {
-				fileEntry = tree.addFile(e.getKey());
-				fileEntry.setId(genSha1(e.getValue()));
-				parent = fileEntry.getParent();
-				while (parent != null) {
-					parent.setId(oi.insert(Constants.OBJ_TREE, parent.format()));
-					parent = parent.getParent();
-				}
+		for (java.util.Map.Entry<String, String> e : headEntries.entrySet()) {
+			fileEntry = tree.addFile(e.getKey());
+			fileEntry.setId(genSha1(e.getValue()));
+			parent = fileEntry.getParent();
+			while (parent != null) {
+				parent.setId(ow.writeTree(parent));
+				parent = parent.getParent();
 			}
-			oi.flush();
-		} finally {
-			oi.release();
 		}
+
 		return tree;
 	}
 
@@ -161,7 +149,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	// for these rules, they all have clean yes/no options
 	// but it doesn't matter if the entry is clean or not
 	// so we can just ignore the state in the filesystem entirely
-	@Test
 	public void testRules4thru13_IndexEntryNotInHead() throws IOException {
 		// rules 4 and 5
 		HashMap<String, String> idxMap;
@@ -208,7 +195,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 		// rule 11
 		setupCase(headMap, null, idxMap);
-		assertTrue(new File(trash, "foo").delete());
+		new File(trash, "foo").delete();
 		writeTrashFile("foo", "bar");
 		db.getIndex().getMembers()[0].forceRecheck();
 		go();
@@ -246,7 +233,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 		// rules 21
 		setupCase(idxMap, mergeMap, idxMap);
-		assertTrue(new File(trash, "foo").delete());
+		new File(trash, "foo").delete();
 		writeTrashFile("foo", "bar");
 		db.getIndex().getMembers()[0].forceRecheck();
 		go();
@@ -259,7 +246,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertTrue(getConflicts().isEmpty());
 	}
 
-	@Test
 	public void testDirectoryFileSimple() throws IOException {
 		Tree treeDF = buildTree(mkmap("DF", "DF"));
 		Tree treeDFDF = buildTree(mkmap("DF/DF", "DF/DF"));
@@ -309,7 +295,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	 *19   D	    0       F											  Update
 	 */
 
-	@Test
 	public void testDirectoryFileConflicts_1() throws Exception {
 		// 1
 		doit(mk("DF/DF"), mk("DF"), mk("DF/DF"));
@@ -318,7 +303,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertRemoved("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_2() throws Exception {
 		// 2
 		setupCase(mk("DF/DF"), mk("DF"), mk("DF/DF"));
@@ -328,7 +312,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_3() throws Exception {
 		// 3 - the first to break!
 		doit(mk("DF/DF"), mk("DF/DF"), mk("DF"));
@@ -336,7 +319,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertRemoved("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_4() throws Exception {
 		// 4 (basically same as 3, just with H and M different)
 		doit(mk("DF/DF"), mkmap("DF/DF", "foo"), mk("DF"));
@@ -345,7 +327,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_5() throws Exception {
 		// 5
 		doit(mk("DF/DF"), mk("DF"), mk("DF"));
@@ -353,7 +334,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_6() throws Exception {
 		// 6
 		setupCase(mk("DF/DF"), mk("DF"), mk("DF"));
@@ -362,7 +342,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertRemoved("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_7() throws Exception {
 		// 7
 		doit(mk("DF"), mk("DF"), mk("DF/DF"));
@@ -380,28 +359,12 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("DF/DF/DF/DF/DF", "diff");
 		go();
 		assertConflict("DF/DF/DF/DF/DF");
+		assertUpdated("DF/DF");
 
-		// assertUpdated("DF/DF");
-								// Why do we expect an update on DF/DF. H==M,
-								// H&M are files and index contains a dir, index
-								// is dirty: that case is not in the table but
-								// we cannot update DF/DF to a file, this would
-								// require that we delete DF/DF/DF/DF/DF in workdir
-								// throwing away unsaved contents.
-								// This test would fail in DirCacheCheckoutTests.
 	}
 
-	@Test
-	public void testDirectoryFileConflicts_8() throws Exception {
-		// 8
-		setupCase(mk("DF"), mk("DF"), mk("DF/DF"));
-		recursiveDelete(new File(db.getWorkTree(), "DF"));
-		writeTrashFile("DF", "xy");
-		go();
-		assertConflict("DF/DF");
-	}
+	// 8 ?
 
-	@Test
 	public void testDirectoryFileConflicts_9() throws Exception {
 		// 9
 		doit(mk("DF"), mkmap("DF", "QP"), mk("DF/DF"));
@@ -409,22 +372,20 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_10() throws Exception {
 		// 10
 		cleanUpDF();
 		doit(mk("DF"), mk("DF/DF"), mk("DF/DF"));
 		assertNoConflicts();
+
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_11() throws Exception {
 		// 11
 		doit(mk("DF"), mk("DF/DF"), mkmap("DF/DF", "asdf"));
 		assertConflict("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_12() throws Exception {
 		// 12
 		cleanUpDF();
@@ -433,7 +394,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_13() throws Exception {
 		// 13
 		cleanUpDF();
@@ -444,7 +404,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_14() throws Exception {
 		// 14
 		cleanUpDF();
@@ -453,32 +412,20 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_15() throws Exception {
 		// 15
 		doit(mkmap(), mk("DF/DF"), mk("DF"));
-
-		// This test would fail in DirCacheCheckoutTests. I think this test is wrong,
-		// it should check for conflicts according to rule 15
-		// assertRemoved("DF");
-
+		assertRemoved("DF");
 		assertUpdated("DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_15b() throws Exception {
 		// 15, take 2, just to check multi-leveled
 		doit(mkmap(), mk("DF/DF/DF/DF"), mk("DF"));
-
-		// I think this test is wrong, it should
-		// check for conflicts according to rule 15
-		// This test would fail in DirCacheCheckouts
-		// assertRemoved("DF");
-
+		assertRemoved("DF");
 		assertUpdated("DF/DF/DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_16() throws Exception {
 		// 16
 		cleanUpDF();
@@ -487,7 +434,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_17() throws Exception {
 		// 17
 		cleanUpDF();
@@ -495,15 +441,9 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("DF/DF/DF", "asdf");
 		go();
 		assertConflict("DF/DF/DF");
-
-		// Why do we expect an update on DF. If we really update
-		// DF and update also the working tree we would have to
-		// overwrite a dirty file in the work-tree DF/DF/DF
-		// This test would fail in DirCacheCheckout
-		// assertUpdated("DF");
+		assertUpdated("DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_18() throws Exception {
 		// 18
 		cleanUpDF();
@@ -512,7 +452,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF/DF/DF");
 	}
 
-	@Test
 	public void testDirectoryFileConflicts_19() throws Exception {
 		// 19
 		cleanUpDF();
@@ -521,29 +460,29 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertUpdated("DF/DF/DF");
 	}
 
-	protected void cleanUpDF() throws Exception {
+	private void cleanUpDF() throws Exception {
 		tearDown();
 		setUp();
 		recursiveDelete(new File(trash, "DF"));
 	}
 
-	protected void assertConflict(String s) {
+	private void assertConflict(String s) {
 		assertTrue(getConflicts().contains(s));
 	}
 
-	protected void assertUpdated(String s) {
+	private void assertUpdated(String s) {
 		assertTrue(getUpdated().containsKey(s));
 	}
 
-	protected void assertRemoved(String s) {
+	private void assertRemoved(String s) {
 		assertTrue(getRemoved().contains(s));
 	}
 
-	protected void assertNoConflicts() {
+	private void assertNoConflicts() {
 		assertTrue(getConflicts().isEmpty());
 	}
 
-	protected void doit(HashMap<String, String> h, HashMap<String, String> m,
+	private void doit(HashMap<String, String> h, HashMap<String, String> m,
 			HashMap<String, String> i) throws IOException {
 		setupCase(h, m, i);
 		go();
@@ -565,57 +504,19 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		return map;
 	}
 
-	@Test
 	public void testUntrackedConflicts() throws IOException {
 		setupCase(null, mk("foo"), null);
 		writeTrashFile("foo", "foo");
 		go();
 
-		// test that we don't overwrite untracked files when there is a HEAD
-		recursiveDelete(new File(trash, "foo"));
-		setupCase(mk("other"), mkmap("other", "other", "foo", "foo"),
-				mk("other"));
-		writeTrashFile("foo", "bar");
-		try {
-			checkout();
-			fail("didn't get the expected exception");
-		} catch (CheckoutConflictException e) {
-			assertConflict("foo");
-			assertWorkDir(mkmap("foo", "bar", "other", "other"));
-			assertIndex(mk("other"));
-		}
-
-		// test that we don't overwrite untracked files when there is no HEAD
-		recursiveDelete(new File(trash, "other"));
-		recursiveDelete(new File(trash, "foo"));
-		setupCase(null, mk("foo"), null);
-		writeTrashFile("foo", "bar");
-		try {
-			checkout();
-			fail("didn't get the expected exception");
-		} catch (CheckoutConflictException e) {
-			assertConflict("foo");
-			assertWorkDir(mkmap("foo", "bar"));
-			assertIndex(mkmap());
-		}
-
-		// TODO: Why should we expect conflicts here?
-		// H and M are emtpy and according to rule #5 of
-		// the carry-over rules a dirty index is no reason
-		// for a conflict. (I also feel it should be a
-		// conflict because we are going to overwrite
-		// unsaved content in the working tree
-		// This test would fail in DirCacheCheckoutTest
-		// assertConflict("foo");
+		assertConflict("foo");
 
 		recursiveDelete(new File(trash, "foo"));
-		recursiveDelete(new File(trash, "other"));
 		setupCase(null, mk("foo"), null);
 		writeTrashFile("foo/bar/baz", "");
 		writeTrashFile("foo/blahblah", "");
 		go();
 
-		assertConflict("foo");
 		assertConflict("foo/bar/baz");
 		assertConflict("foo/blahblah");
 
@@ -629,7 +530,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
 	public void testCloseNameConflictsX0() throws IOException {
 		setupCase(mkmap("a/a", "a/a-c"), mkmap("a/a","a/a", "b.b/b.b","b.b/b.bs"), mkmap("a/a", "a/a-c") );
 		checkout();
@@ -641,7 +541,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
 	public void testCloseNameConflicts1() throws IOException {
 		setupCase(mkmap("a/a", "a/a-c"), mkmap("a/a","a/a", "a.a/a.a","a.a/a.a"), mkmap("a/a", "a/a-c") );
 		checkout();
@@ -653,25 +552,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertNoConflicts();
 	}
 
-	@Test
-	public void testCheckoutHierarchy() throws IOException {
-		setupCase(
-				mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
-						"e/g"),
-				mkmap("a", "a2", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
-						"e/g2"),
-				mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
-						"e/g3"));
-		try {
-			checkout();
-		} catch (CheckoutConflictException e) {
-			assertWorkDir(mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f",
-					"e/f", "e/g", "e/g3"));
-			assertConflict("e/g");
-		}
-	}
-
-	@Test
 	public void testCheckoutOutChanges() throws IOException {
 		setupCase(mk("foo"), mk("foo/bar"), mk("foo"));
 		checkout();
@@ -707,7 +587,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCheckoutUncachedChanges() throws IOException {
 		setupCase(mk("foo"), mk("foo"), mk("foo"));
 		writeTrashFile("foo", "otherData");
@@ -717,24 +596,21 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertTrue(new File(trash, "foo").isFile());
 	}
 
-	@Test
-	public void testDontOverwriteDirtyFile() throws IOException {
-		setupCase(mk("foo"), mk("other"), mk("foo"));
-		writeTrashFile("foo", "different");
-		try {
-			checkout();
-			fail("Didn't got the expected conflict");
-		} catch (CheckoutConflictException e) {
-			assertIndex(mk("foo"));
-			assertWorkDir(mkmap("foo", "different"));
-			assertTrue(getConflicts().equals(Arrays.asList("foo")));
-			assertTrue(new File(trash, "foo").isFile());
-		}
+	/**
+	 * The interface these tests need from a class implementing a checkout
+	 */
+	interface Checkout {
+		HashMap<String, ObjectId> updated();
+		ArrayList<String> conflicts();
+		ArrayList<String> removed();
+		void prescanTwoTrees() throws IOException;
+		void checkout() throws IOException;
 	}
 
 	public void assertWorkDir(HashMap<String, String> i)
 			throws CorruptObjectException, IOException {
 		TreeWalk walk = new TreeWalk(db);
+		walk.reset();
 		walk.setRecursive(true);
 		walk.addTree(new FileTreeIterator(db));
 		String expectedValue;
@@ -775,10 +651,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		String expectedValue;
 		String path;
 		GitIndex theIndex=db.getIndex();
-		// Without an explicit refresh we might miss index updates. If the index
-		// is updated multiple times inside a FileSystemTimer tick db.getIndex will
-		// not reload the index and return a cached (stale) index.
-		theIndex.read();
 		assertEquals("Index has not the right size.", i.size(),
 				theIndex.getMembers().length);
 		for (int j = 0; j < theIndex.getMembers().length; j++) {
@@ -796,7 +668,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 	public abstract void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException;
 	public abstract void checkout() throws IOException;
-	public abstract List<String> getRemoved();
-	public abstract Map<String, ObjectId> getUpdated();
-	public abstract List<String> getConflicts();
+	public abstract ArrayList<String> getRemoved();
+	public abstract HashMap<String, ObjectId> getUpdated();
+	public abstract ArrayList<String> getConflicts();
 }

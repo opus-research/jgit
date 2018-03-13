@@ -43,23 +43,16 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.junit.Test;
 
-public class RefListTest {
+public class RefListTest extends TestCase {
 	private static final ObjectId ID = ObjectId
 			.fromString("41eb0d88f833b558bddeb269b7ab77399cdf98ed");
 
@@ -69,7 +62,6 @@ public class RefListTest {
 
 	private static final Ref REF_c = newRef("c");
 
-	@Test
 	public void testEmpty() {
 		RefList<Ref> list = RefList.emptyList();
 		assertEquals(0, list.size());
@@ -87,7 +79,6 @@ public class RefListTest {
 		}
 	}
 
-	@Test
 	public void testEmptyBuilder() {
 		RefList<Ref> list = new RefList.Builder<Ref>().toRefList();
 		assertEquals(0, list.size());
@@ -109,7 +100,6 @@ public class RefListTest {
 		}
 	}
 
-	@Test
 	public void testBuilder_AddThenSort() {
 		RefList.Builder<Ref> builder = new RefList.Builder<Ref>(1);
 		builder.add(REF_B);
@@ -127,7 +117,6 @@ public class RefListTest {
 		assertSame(REF_B, list.get(1));
 	}
 
-	@Test
 	public void testBuilder_AddAll() {
 		RefList.Builder<Ref> builder = new RefList.Builder<Ref>(1);
 		Ref[] src = { REF_A, REF_B, REF_c, REF_A };
@@ -139,7 +128,6 @@ public class RefListTest {
 		assertSame(REF_c, list.get(1));
 	}
 
-	@Test
 	public void testBuilder_Set() {
 		RefList.Builder<Ref> builder = new RefList.Builder<Ref>();
 		builder.add(REF_A);
@@ -161,7 +149,6 @@ public class RefListTest {
 		assertSame(REF_B, list.get(1));
 	}
 
-	@Test
 	public void testBuilder_Remove() {
 		RefList.Builder<Ref> builder = new RefList.Builder<Ref>();
 		builder.add(REF_A);
@@ -172,7 +159,6 @@ public class RefListTest {
 		assertSame(REF_B, builder.get(0));
 	}
 
-	@Test
 	public void testSet() {
 		RefList<Ref> one = toList(REF_A, REF_A);
 		RefList<Ref> two = one.set(1, REF_B);
@@ -189,7 +175,6 @@ public class RefListTest {
 		assertSame(REF_B, two.get(1));
 	}
 
-	@Test
 	public void testAddToEmptyList() {
 		RefList<Ref> one = toList();
 		RefList<Ref> two = one.add(0, REF_B);
@@ -202,7 +187,6 @@ public class RefListTest {
 		assertSame(REF_B, two.get(0));
 	}
 
-	@Test
 	public void testAddToFrontOfList() {
 		RefList<Ref> one = toList(REF_A);
 		RefList<Ref> two = one.add(0, REF_B);
@@ -216,7 +200,6 @@ public class RefListTest {
 		assertSame(REF_A, two.get(1));
 	}
 
-	@Test
 	public void testAddToEndOfList() {
 		RefList<Ref> one = toList(REF_A);
 		RefList<Ref> two = one.add(1, REF_B);
@@ -230,7 +213,6 @@ public class RefListTest {
 		assertSame(REF_B, two.get(1));
 	}
 
-	@Test
 	public void testAddToMiddleOfListByInsertionPosition() {
 		RefList<Ref> one = toList(REF_A, REF_c);
 
@@ -250,7 +232,6 @@ public class RefListTest {
 		assertSame(REF_c, two.get(2));
 	}
 
-	@Test
 	public void testPutNewEntry() {
 		RefList<Ref> one = toList(REF_A, REF_c);
 		RefList<Ref> two = one.put(REF_B);
@@ -267,7 +248,6 @@ public class RefListTest {
 		assertSame(REF_c, two.get(2));
 	}
 
-	@Test
 	public void testPutReplaceEntry() {
 		Ref otherc = newRef(REF_c.getName());
 		assertNotSame(REF_c, otherc);
@@ -286,7 +266,6 @@ public class RefListTest {
 		assertSame(otherc, two.get(1));
 	}
 
-	@Test
 	public void testRemoveFrontOfList() {
 		RefList<Ref> one = toList(REF_A, REF_B, REF_c);
 		RefList<Ref> two = one.remove(0);
@@ -302,7 +281,6 @@ public class RefListTest {
 		assertSame(REF_c, two.get(1));
 	}
 
-	@Test
 	public void testRemoveMiddleOfList() {
 		RefList<Ref> one = toList(REF_A, REF_B, REF_c);
 		RefList<Ref> two = one.remove(1);
@@ -318,7 +296,6 @@ public class RefListTest {
 		assertSame(REF_c, two.get(1));
 	}
 
-	@Test
 	public void testRemoveEndOfList() {
 		RefList<Ref> one = toList(REF_A, REF_B, REF_c);
 		RefList<Ref> two = one.remove(2);
@@ -334,7 +311,6 @@ public class RefListTest {
 		assertSame(REF_B, two.get(1));
 	}
 
-	@Test
 	public void testRemoveMakesEmpty() {
 		RefList<Ref> one = toList(REF_A);
 		RefList<Ref> two = one.remove(1);
@@ -342,7 +318,6 @@ public class RefListTest {
 		assertSame(two, RefList.emptyList());
 	}
 
-	@Test
 	public void testToString() {
 		StringBuilder exp = new StringBuilder();
 		exp.append("[");
@@ -355,7 +330,6 @@ public class RefListTest {
 		assertEquals(exp.toString(), list.toString());
 	}
 
-	@Test
 	public void testBuilder_ToString() {
 		StringBuilder exp = new StringBuilder();
 		exp.append("[");
@@ -370,7 +344,6 @@ public class RefListTest {
 		assertEquals(exp.toString(), list.toString());
 	}
 
-	@Test
 	public void testFindContainsGet() {
 		RefList<Ref> list = toList(REF_A, REF_B, REF_c);
 
@@ -396,7 +369,6 @@ public class RefListTest {
 		assertFalse(list.contains("z"));
 	}
 
-	@Test
 	public void testIterable() {
 		RefList<Ref> list = toList(REF_A, REF_B, REF_c);
 
@@ -424,7 +396,6 @@ public class RefListTest {
 		}
 	}
 
-	@Test
 	public void testCopyLeadingPrefix() {
 		RefList<Ref> one = toList(REF_A, REF_B, REF_c);
 		RefList<Ref> two = one.copy(2).toRefList();
@@ -440,7 +411,6 @@ public class RefListTest {
 		assertSame(REF_B, two.get(1));
 	}
 
-	@Test
 	public void testCopyConstructorReusesArray() {
 		RefList.Builder<Ref> one = new RefList.Builder<Ref>();
 		one.add(REF_A);

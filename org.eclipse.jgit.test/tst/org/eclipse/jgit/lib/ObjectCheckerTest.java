@@ -44,25 +44,21 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import java.text.MessageFormat;
+
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.junit.Before;
-import org.junit.Test;
 
-public class ObjectCheckerTest {
+public class ObjectCheckerTest extends TestCase {
 	private ObjectChecker checker;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		checker = new ObjectChecker();
 	}
 
-	@Test
 	public void testInvalidType() {
 		try {
 			checker.check(Constants.OBJ_BAD, new byte[0]);
@@ -73,7 +69,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testCheckBlob() throws CorruptObjectException {
 		// Any blob should pass...
 		checker.checkBlob(new byte[0]);
@@ -83,7 +78,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_BLOB, new byte[1]);
 	}
 
-	@Test
 	public void testValidCommitNoParent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -99,7 +93,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommitBlankAuthor() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -115,7 +108,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommit1Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -135,7 +127,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommit2Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -159,7 +150,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommit128Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -181,7 +171,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testValidCommitNormalTime() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		final String when = "1222757360 -0730";
@@ -198,7 +187,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_COMMIT, data);
 	}
 
-	@Test
 	public void testInvalidCommitNoTree1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -215,7 +203,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoTree2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -232,7 +219,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoTree3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -249,7 +235,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoTree4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -266,7 +251,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -283,7 +267,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -300,7 +283,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -317,7 +299,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidTree4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -334,7 +315,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -354,7 +334,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -375,7 +354,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -396,7 +374,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -417,7 +394,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidParent5() {
 		final StringBuilder b = new StringBuilder();
 
@@ -440,7 +416,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoAuthor() {
 		final StringBuilder b = new StringBuilder();
 
@@ -461,7 +436,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoCommitter1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -482,7 +456,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitNoCommitter2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -504,7 +477,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -525,7 +497,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -546,7 +517,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -567,7 +537,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -588,7 +557,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor5() {
 		final StringBuilder b = new StringBuilder();
 
@@ -609,7 +577,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor6() {
 		final StringBuilder b = new StringBuilder();
 
@@ -630,7 +597,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidAuthor7() {
 		final StringBuilder b = new StringBuilder();
 
@@ -651,7 +617,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidCommitInvalidCommitter() {
 		final StringBuilder b = new StringBuilder();
 
@@ -673,7 +638,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testValidTag() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -690,7 +654,6 @@ public class ObjectCheckerTest {
 		checker.check(Constants.OBJ_TAG, data);
 	}
 
-	@Test
 	public void testInvalidTagNoObject1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -703,7 +666,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -720,7 +682,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -737,7 +698,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -754,7 +714,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject5() {
 		final StringBuilder b = new StringBuilder();
 
@@ -771,7 +730,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoObject6() {
 		final StringBuilder b = new StringBuilder();
 
@@ -787,7 +745,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -804,7 +761,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -823,7 +779,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -842,7 +797,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoType4() {
 		final StringBuilder b = new StringBuilder();
 
@@ -861,7 +815,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoTagHeader1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -880,7 +833,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoTagHeader2() {
 		final StringBuilder b = new StringBuilder();
 
@@ -900,7 +852,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagNoTagHeader3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -920,7 +871,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testValidTagHasNoTaggerHeader() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -934,7 +884,6 @@ public class ObjectCheckerTest {
 		checker.checkTag(Constants.encodeASCII(b.toString()));
 	}
 
-	@Test
 	public void testInvalidTagInvalidTaggerHeader1() {
 		final StringBuilder b = new StringBuilder();
 
@@ -955,7 +904,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTagInvalidTaggerHeader3() {
 		final StringBuilder b = new StringBuilder();
 
@@ -976,13 +924,11 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testValidEmptyTree() throws CorruptObjectException {
 		checker.checkTree(new byte[0]);
 		checker.check(Constants.OBJ_TREE, new byte[0]);
 	}
 
-	@Test
 	public void testValidTree1() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 regular-file");
@@ -990,7 +936,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree2() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100755 executable");
@@ -998,7 +943,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree3() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 tree");
@@ -1006,7 +950,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree4() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "120000 symlink");
@@ -1014,7 +957,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree5() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "160000 git link");
@@ -1022,7 +964,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTree6() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 .a");
@@ -1030,7 +971,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting1() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 fooaaa");
@@ -1039,7 +979,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting2() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100755 fooaaa");
@@ -1048,7 +987,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting3() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 a");
@@ -1057,7 +995,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting4() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1066,7 +1003,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting5() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a.c");
@@ -1076,7 +1012,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting6() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 a");
@@ -1085,7 +1020,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting7() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 an orang");
@@ -1094,7 +1028,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testValidTreeSorting8() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1104,7 +1037,6 @@ public class ObjectCheckerTest {
 		checker.checkTree(data);
 	}
 
-	@Test
 	public void testInvalidTreeModeStartsWithZero1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "0 a");
@@ -1117,7 +1049,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeStartsWithZero2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "0100644 a");
@@ -1130,7 +1061,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeStartsWithZero3() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "040000 a");
@@ -1143,7 +1073,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotOctal1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "8 a");
@@ -1156,7 +1085,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotOctal2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "Z a");
@@ -1169,7 +1097,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotSupportedMode1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "1 a");
@@ -1182,7 +1109,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeNotSupportedMode2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "170000 a");
@@ -1195,7 +1121,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeModeMissingName() {
 		final StringBuilder b = new StringBuilder();
 		b.append("100644");
@@ -1208,7 +1133,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameContainsSlash() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a/b");
@@ -1221,7 +1145,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameIsEmpty() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 ");
@@ -1234,7 +1157,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameIsDot() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 .");
@@ -1247,7 +1169,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeNameIsDotDot() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 ..");
@@ -1260,7 +1181,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeTruncatedInName() {
 		final StringBuilder b = new StringBuilder();
 		b.append("100644 b");
@@ -1273,7 +1193,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeTruncatedInObjectId() {
 		final StringBuilder b = new StringBuilder();
 		b.append("100644 b\0\1\2");
@@ -1286,7 +1205,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeBadSorting1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 foobar");
@@ -1300,7 +1218,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeBadSorting2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "40000 a");
@@ -1314,7 +1231,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeBadSorting3() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a0c");
@@ -1328,7 +1244,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames1() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1342,7 +1257,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames2() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1356,7 +1270,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames3() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");
@@ -1370,7 +1283,6 @@ public class ObjectCheckerTest {
 		}
 	}
 
-	@Test
 	public void testInvalidTreeDuplicateNames4() {
 		final StringBuilder b = new StringBuilder();
 		entry(b, "100644 a");

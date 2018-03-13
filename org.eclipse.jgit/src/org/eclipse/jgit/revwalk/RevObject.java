@@ -45,15 +45,15 @@ package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 
 /** Base object type accessed during revision walking. */
-public abstract class RevObject extends ObjectIdOwnerMap.Entry {
+public abstract class RevObject extends ObjectId {
 	static final int PARSED = 1;
 
 	int flags;
@@ -62,11 +62,23 @@ public abstract class RevObject extends ObjectIdOwnerMap.Entry {
 		super(name);
 	}
 
-	abstract void parseHeaders(RevWalk walk) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException;
+	void parseHeaders(final RevWalk walk) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		loadCanonical(walk);
+		flags |= PARSED;
+	}
 
-	abstract void parseBody(RevWalk walk) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException;
+	void parseBody(final RevWalk walk) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		if ((flags & PARSED) == 0)
+			parseHeaders(walk);
+	}
+
+	final byte[] loadCanonical(final RevWalk walk) throws IOException,
+			MissingObjectException, IncorrectObjectTypeException,
+			CorruptObjectException {
+		return walk.reader.open(this, getType()).getCachedBytes();
+	}
 
 	/**
 	 * Get Git object type. See {@link Constants}.
@@ -82,6 +94,16 @@ public abstract class RevObject extends ObjectIdOwnerMap.Entry {
 	 */
 	public final ObjectId getId() {
 		return this;
+	}
+
+	@Override
+	public final boolean equals(final AnyObjectId o) {
+		return this == o;
+	}
+
+	@Override
+	public final boolean equals(final Object o) {
+		return this == o;
 	}
 
 	/**

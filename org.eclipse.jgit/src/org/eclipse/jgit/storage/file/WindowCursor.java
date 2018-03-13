@@ -45,30 +45,18 @@
 package org.eclipse.jgit.storage.file;
 
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.text.MessageFormat;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackOutputStream;
@@ -92,16 +80,6 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public ObjectReader newReader() {
 		return new WindowCursor(db);
-	}
-
-	@Override
-	public Collection<ObjectId> resolve(AbbreviatedObjectId id)
-			throws IOException {
-		if (id.isComplete())
-			return Collections.singleton(id.toObjectId());
-		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
-		db.resolve(matches, id);
-		return matches;
 	}
 
 	public boolean has(AnyObjectId objectId) throws IOException {
@@ -138,31 +116,15 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return new LocalObjectToPack(obj);
 	}
 
-	public void selectObjectRepresentation(PackWriter packer,
-			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
+	public void selectObjectRepresentation(PackWriter packer, ObjectToPack otp)
 			throws IOException, MissingObjectException {
-		for (ObjectToPack otp : objects) {
-			db.selectObjectRepresentation(packer, otp, this);
-			monitor.update(1);
-		}
+		db.selectObjectRepresentation(packer, otp, this);
 	}
 
-	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp,
-			boolean validate) throws IOException,
-			StoredObjectRepresentationNotAvailableException {
+	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp)
+			throws IOException, StoredObjectRepresentationNotAvailableException {
 		LocalObjectToPack src = (LocalObjectToPack) otp;
-		src.pack.copyAsIs(out, src, validate, this);
-	}
-
-	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
-			throws IOException {
-		for (ObjectToPack otp : list)
-			out.writeObject(otp);
-	}
-
-	@SuppressWarnings("unchecked")
-	public Collection<CachedPack> getCachedPacks() throws IOException {
-		return (Collection<CachedPack>) db.getCachedPacks();
+		src.pack.copyAsIs(out, src, this);
 	}
 
 	/**
@@ -199,55 +161,6 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			need -= r;
 		}
 		return cnt - need;
-	}
-
-	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
-			boolean validate) throws IOException {
-		((LocalCachedPack) pack).copyAsIs(out, validate, this);
-	}
-
-	void copyPackAsIs(final PackFile pack, final long length, boolean validate,
-			final PackOutputStream out) throws IOException {
-		MessageDigest md = null;
-		if (validate) {
-			md = Constants.newMessageDigest();
-			byte[] buf = out.getCopyBuffer();
-			pin(pack, 0);
-			if (window.copy(0, buf, 0, 12) != 12) {
-				pack.setInvalid();
-				throw new IOException(JGitText.get().packfileIsTruncated);
-			}
-			md.update(buf, 0, 12);
-		}
-
-		long position = 12;
-		long remaining = length - (12 + 20);
-		while (0 < remaining) {
-			pin(pack, position);
-
-			int ptr = (int) (position - window.start);
-			int n = (int) Math.min(window.size() - ptr, remaining);
-			window.write(out, position, n, md);
-			position += n;
-			remaining -= n;
-		}
-
-		if (md != null) {
-			byte[] buf = new byte[20];
-			byte[] actHash = md.digest();
-
-			pin(pack, position);
-			if (window.copy(position, buf, 0, 20) != 20) {
-				pack.setInvalid();
-				throw new IOException(JGitText.get().packfileIsTruncated);
-			}
-			if (!Arrays.equals(actHash, buf)) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileCorruptionDetected, pack
-								.getPackFile().getPath()));
-			}
-		}
 	}
 
 	/**
@@ -328,7 +241,9 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	int getStreamFileThreshold() {
-		return WindowCache.getStreamFileThreshold();
+		if (db == null)
+			return ObjectLoader.STREAM_THRESHOLD;
+		return db.getStreamFileThreshold();
 	}
 
 	/** Release the current window cursor. */

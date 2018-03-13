@@ -91,9 +91,9 @@ public class IgnoreRule {
 			endIndex --;
 			dirOnly = true;
 		}
+		boolean hasSlash = pattern.contains("/");
 
 		pattern = pattern.substring(startIndex, endIndex);
-		boolean hasSlash = pattern.contains("/");
 
 		if (!hasSlash)
 			nameOnly = true;
@@ -105,7 +105,7 @@ public class IgnoreRule {
 
 		if (pattern.contains("*") || pattern.contains("?") || pattern.contains("[")) {
 			try {
-				matcher = new FileNameMatcher(pattern, Character.valueOf('/'));
+				matcher = new FileNameMatcher(pattern, new Character('/'));
 			} catch (InvalidPatternException e) {
 				e.printStackTrace();
 			}
@@ -188,11 +188,8 @@ public class IgnoreRule {
 
 			if (nameOnly) {
 				//Iterate through each sub-name
-				final String[] segments = target.split("/");
-				for (int idx = 0; idx < segments.length; idx++) {
-					final String segmentName = segments[idx];
-					if (segmentName.equals(pattern) &&
-							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
+				for (String folderName : target.split("/")) {
+					if (folderName.equals(pattern))
 						return true;
 				}
 			}
@@ -202,29 +199,23 @@ public class IgnoreRule {
 			if (matcher.isMatch())
 				return true;
 
-			final String[] segments = target.split("/");
 			if (nameOnly) {
-				for (int idx = 0; idx < segments.length; idx++) {
-					final String segmentName = segments[idx];
+				for (String folderName : target.split("/")) {
 					//Iterate through each sub-directory
 					matcher.reset();
-					matcher.append(segmentName);
-					if (matcher.isMatch() &&
-							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
+					matcher.append(folderName);
+					if (matcher.isMatch())
 						return true;
 				}
 			} else {
 				//TODO: This is the slowest operation
 				//This matches e.g. "/src/ne?" to "/src/new/file.c"
 				matcher.reset();
-				for (int idx = 0; idx < segments.length; idx++) {
-					final String segmentName = segments[idx];
-					if (segmentName.length() > 0) {
-						matcher.append("/" + segmentName);
-					}
+				for (String folderName : target.split("/")) {
+					if (folderName.length() > 0)
+						matcher.append("/" + folderName);
 
-					if (matcher.isMatch() &&
-							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
+					if (matcher.isMatch())
 						return true;
 				}
 			}
@@ -243,15 +234,5 @@ public class IgnoreRule {
 	 */
 	public boolean getResult() {
 		return !negation;
-	}
-
-	private boolean doesMatchDirectoryExpectations(boolean isDirectory, int segmentIdx, int segmentLength) {
-		// The segment we are checking is a directory, expectations are met.
-		if (segmentIdx < segmentLength - 1) {
-			return true;
-		}
-
-		// We are checking the last part of the segment for which isDirectory has to be considered.
-		return !dirOnly || isDirectory;
 	}
 }

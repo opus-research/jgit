@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -80,32 +79,6 @@ public class Git {
 	private final Repository repo;
 
 	/**
-	 * Returns a command object to execute a {@code clone} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
-	 *      >Git documentation about clone</a>
-	 * @return a {@link CloneCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code clone} command
-	 */
-	static public CloneCommand cloneRepository() {
-		return new CloneCommand();
-	}
-
-	/**
-	 * Returns a command object to execute a {@code init} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
-	 *      >Git documentation about init</a>
-	 * @return a {@link InitCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code init} command
-	 */
-	public static InitCommand init() {
-		return new InitCommand();
-	}
-
-	/**
 	 * Constructs a new {@link Git} object which can interact with the specified
 	 * git repository. All command classes returned by methods of this class
 	 * will always interact with this git repository.
@@ -160,51 +133,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code Pull} command
-	 *
-	 * @return a {@link PullCommand}
-	 */
-	public PullCommand pull() {
-		return new PullCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to create branches
-	 *
-	 * @return a {@link CreateBranchCommand}
-	 */
-	public CreateBranchCommand branchCreate() {
-		return new CreateBranchCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to delete branches
-	 *
-	 * @return a {@link DeleteBranchCommand}
-	 */
-	public DeleteBranchCommand branchDelete() {
-		return new DeleteBranchCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to list branches
-	 *
-	 * @return a {@link ListBranchCommand}
-	 */
-	public ListBranchCommand branchList() {
-		return new ListBranchCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to rename branches
-	 *
-	 * @return a {@link RenameBranchCommand}
-	 */
-	public RenameBranchCommand branchRename() {
-		return new RenameBranchCommand(repo);
-	}
-
-	/**
 	 * Returns a command object to execute a {@code Add} command
 	 *
 	 * @see <a
@@ -215,136 +143,6 @@ public class Git {
 	 */
 	public AddCommand add() {
 		return new AddCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code Tag} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
-	 *      >Git documentation about Tag</a>
-	 * @return a {@link TagCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code Tag} command
-	 */
-	public TagCommand tag() {
-		return new TagCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code Fetch} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-fetch.html"
-	 *      >Git documentation about Fetch</a>
-	 * @return a {@link FetchCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code Fetch} command
-	 */
-	public FetchCommand fetch() {
-		return new FetchCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code Push} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-push.html"
-	 *      >Git documentation about Push</a>
-	 * @return a {@link PushCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Push} command
-	 */
-	public PushCommand push() {
-		return new PushCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code cherry-pick} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-cherry-pick.html"
-	 *      >Git documentation about cherry-pick</a>
-	 * @return a {@link CherryPickCommand} used to collect all optional
-	 *         parameters and to finally execute the {@code cherry-pick} command
-	 */
-	public CherryPickCommand cherryPick() {
-		return new CherryPickCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code revert} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-revert.html"
-	 *      >Git documentation about reverting changes</a>
-	 * @return a {@link RevertCommand} used to collect all optional
-	 *         parameters and to finally execute the {@code cherry-pick} command
-	 */
-	public RevertCommand revert() {
-		return new RevertCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code Rebase} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rebase.html"
-	 *      >Git documentation about rebase</a>
-	 * @return a {@link RebaseCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code rebase} command
-	 */
-	public RebaseCommand rebase() {
-		return new RebaseCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code rm} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rm.html"
-	 *      >Git documentation about rm</a>
-	 * @return a {@link RmCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code rm} command
-	 */
-	public RmCommand rm() {
-		return new RmCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code checkout} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-checkout.html"
-	 *      >Git documentation about checkout</a>
-	 * @return a {@link CheckoutCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code checkout} command
-	 */
-	public CheckoutCommand checkout() {
-		return new CheckoutCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code reset} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reset.html"
-	 *      >Git documentation about reset</a>
-	 * @return a {@link ResetCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code reset} command
-	 */
-	public ResetCommand reset() {
-		return new ResetCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code status} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-status.html"
-	 *      >Git documentation about status</a>
-	 * @return a {@link StatusCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code status} command
-	 */
-	public StatusCommand status() {
-		return new StatusCommand(repo);
 	}
 
 	/**

@@ -49,7 +49,7 @@ import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-class FS_POSIX_Java6 extends FS_POSIX {
+class FS_POSIX_Java6 extends FS {
 	private static final Method canExecute;
 
 	private static final Method setExecute;
@@ -59,7 +59,7 @@ class FS_POSIX_Java6 extends FS_POSIX {
 		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE);
 	}
 
-	static boolean hasExecute() {
+	static boolean detect() {
 		return canExecute != null && setExecute != null;
 	}
 
@@ -72,19 +72,6 @@ class FS_POSIX_Java6 extends FS_POSIX {
 		} catch (NoSuchMethodException e) {
 			return null;
 		}
-	}
-
-	FS_POSIX_Java6() {
-		super();
-	}
-
-	FS_POSIX_Java6(FS src) {
-		super(src);
-	}
-
-	@Override
-	public FS newInstance() {
-		return new FS_POSIX_Java6(this);
 	}
 
 	public boolean supportsExecute() {

@@ -81,7 +81,7 @@ import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
  * {@link #readAdvertisedRefs()} methods in constructor or before any use. They
  * should also handle resources releasing in {@link #close()} method if needed.
  */
-public abstract class BasePackPushConnection extends BasePackConnection implements
+class BasePackPushConnection extends BasePackConnection implements
 		PushConnection {
 	static final String CAPABILITY_REPORT_STATUS = "report-status";
 
@@ -108,13 +108,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	/** Time in milliseconds spent transferring the pack data. */
 	private long packTransferTime;
 
-	/**
-	 * Create a new connection to push using the native git transport.
-	 *
-	 * @param packTransport
-	 *            the transport.
-	 */
-	public BasePackPushConnection(final PackTransport packTransport) {
+	BasePackPushConnection(final PackTransport packTransport) {
 		super(packTransport);
 		thinPack = transport.isPushThin();
 	}
@@ -149,16 +143,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		return new TransportException(uri, JGitText.get().pushNotPermitted);
 	}
 
-	/**
-	 * Push one or more objects and update the remote repository.
-	 *
-	 * @param monitor
-	 *            progress monitor to receive status updates.
-	 * @param refUpdates
-	 *            update commands to be applied to the remote repository.
-	 * @throws TransportException
-	 *             if any exception occurs.
-	 */
 	protected void doPush(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
@@ -246,6 +230,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		List<ObjectId> remoteObjects = new ArrayList<ObjectId>(getRefs().size());
 		List<ObjectId> newObjects = new ArrayList<ObjectId>(refUpdates.size());
 
+		final long start;
 		final PackWriter writer = new PackWriter(transport.getPackConfig(),
 				local.newObjectReader());
 		try {
@@ -258,16 +243,16 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					newObjects.add(r.getNewObjectId());
 			}
 
-			writer.setUseCachedPacks(true);
 			writer.setThin(thinPack);
-			writer.setReuseValidatingObjects(false);
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
+			start = System.currentTimeMillis();
 			writer.writePack(monitor, monitor, out);
 		} finally {
 			writer.release();
 		}
-		packTransferTime = writer.getStatistics().getTimeWriting();
+		out.flush();
+		packTransferTime = System.currentTimeMillis() - start;
 	}
 
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)

@@ -56,12 +56,12 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
-import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /** Server side implementation of smart push over HTTP. */
 class ReceivePackServlet extends HttpServlet {
@@ -112,12 +112,7 @@ class ReceivePackServlet extends HttpServlet {
 			rp.setBiDirectionalPipe(false);
 			rsp.setContentType(RSP_TYPE);
 
-			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
-				@Override
-				public void flush() throws IOException {
-					doFlush();
-				}
-			};
+			final SmartOutputStream out = new SmartOutputStream(req, rsp);
 			rp.receive(getInputStream(req), out, null);
 			out.close();
 

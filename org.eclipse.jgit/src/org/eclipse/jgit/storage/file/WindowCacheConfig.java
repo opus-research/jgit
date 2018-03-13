@@ -44,7 +44,6 @@
 package org.eclipse.jgit.storage.file;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.storage.pack.PackConfig;
 
 /** Configuration parameters for {@link WindowCache}. */
 public class WindowCacheConfig {
@@ -64,8 +63,6 @@ public class WindowCacheConfig {
 
 	private int deltaBaseCacheLimit;
 
-	private int streamFileThreshold;
-
 	/** Create a default configuration. */
 	public WindowCacheConfig() {
 		packedGitOpenFiles = 128;
@@ -73,7 +70,6 @@ public class WindowCacheConfig {
 		packedGitWindowSize = 8 * KB;
 		packedGitMMAP = false;
 		deltaBaseCacheLimit = 10 * MB;
-		streamFileThreshold = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 	}
 
 	/**
@@ -146,7 +142,7 @@ public class WindowCacheConfig {
 	}
 
 	/**
-	 * @return maximum number of bytes to cache in {@link DeltaBaseCache}
+	 * @return maximum number of bytes to cache in {@link UnpackedObjectCache}
 	 *         for inflated, recently accessed objects, without delta chains.
 	 *         <b>Default 10 MB.</b>
 	 */
@@ -157,27 +153,11 @@ public class WindowCacheConfig {
 	/**
 	 * @param newLimit
 	 *            maximum number of bytes to cache in
-	 *            {@link DeltaBaseCache} for inflated, recently accessed
+	 *            {@link UnpackedObjectCache} for inflated, recently accessed
 	 *            objects, without delta chains.
 	 */
 	public void setDeltaBaseCacheLimit(final int newLimit) {
 		deltaBaseCacheLimit = newLimit;
-	}
-
-	/** @return the size threshold beyond which objects must be streamed. */
-	public int getStreamFileThreshold() {
-		return streamFileThreshold;
-	}
-
-	/**
-	 * @param newLimit
-	 *            new byte limit for objects that must be streamed. Objects
-	 *            smaller than this size can be obtained as a contiguous byte
-	 *            array, while objects bigger than this size require using an
-	 *            {@link org.eclipse.jgit.lib.ObjectStream}.
-	 */
-	public void setStreamFileThreshold(final int newLimit) {
-		streamFileThreshold = newLimit;
 	}
 
 	/**
@@ -194,11 +174,5 @@ public class WindowCacheConfig {
 		setPackedGitWindowSize(rc.getInt("core", null, "packedgitwindowsize", getPackedGitWindowSize()));
 		setPackedGitMMAP(rc.getBoolean("core", null, "packedgitmmap", isPackedGitMMAP()));
 		setDeltaBaseCacheLimit(rc.getInt("core", null, "deltabasecachelimit", getDeltaBaseCacheLimit()));
-
-		long maxMem = Runtime.getRuntime().maxMemory();
-		long sft = rc.getLong("core", null, "streamfilethreshold", getStreamFileThreshold());
-		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
-		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
-		setStreamFileThreshold((int) sft);
 	}
 }

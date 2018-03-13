@@ -47,9 +47,15 @@
 
 package org.eclipse.jgit.transport;
 
+import java.net.ConnectException;
+import java.net.UnknownHostException;
+
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
+
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
 
 /**
  * The base class for transports that use SSH protocol. This class allows
@@ -62,7 +68,7 @@ public abstract class SshTransport extends TcpTransport {
 	/**
 	 * The open SSH session
 	 */
-	private RemoteSession sock;
+	protected Session sock;
 
 	/**
 	 * Create a new transport instance.
@@ -105,22 +111,34 @@ public abstract class SshTransport extends TcpTransport {
 		return sch;
 	}
 
+
 	/**
-	 * Get the default SSH session
-	 * 
-	 * @return a remote session
+	 * Initialize SSH session
+	 *
 	 * @throws TransportException
 	 *             in case of error with opening SSH session
 	 */
-	protected RemoteSession getSession() throws TransportException {
+	protected void initSession() throws TransportException {
 		if (sock != null)
-			return sock;
+			return;
 
 		final int tms = getTimeout() > 0 ? getTimeout() * 1000 : 0;
-
-		sock = sch
-				.getSession(uri, getCredentialsProvider(), local.getFS(), tms);
-		return sock;
+		final String user = uri.getUser();
+		final String pass = uri.getPass();
+		final String host = uri.getHost();
+		final int port = uri.getPort();
+		try {
+			sock = sch.getSession(user, pass, host, port, local.getFS());
+			if (!sock.isConnected())
+				sock.connect(tms);
+		} catch (JSchException je) {
+			final Throwable c = je.getCause();
+			if (c instanceof UnknownHostException)
+				throw new TransportException(uri, JGitText.get().unknownHost);
+			if (c instanceof ConnectException)
+				throw new TransportException(uri, c.getMessage());
+			throw new TransportException(uri, je.getMessage(), je);
+		}
 	}
 
 	@Override

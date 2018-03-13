@@ -43,11 +43,6 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.util.List;
 
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
@@ -56,8 +51,6 @@ import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
 
 public class RenameDetectorTest extends RepositoryTestCase {
 	private static final String PATH_A = "src/A";
@@ -70,14 +63,12 @@ public class RenameDetectorTest extends RepositoryTestCase {
 	private TestRepository testDb;
 
 	@Override
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		testDb = new TestRepository(db);
 		rd = new RenameDetector(db);
 	}
 
-	@Test
 	public void testExactRename_OneRename() throws Exception {
 		ObjectId foo = blob("foo");
 
@@ -92,7 +83,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(b, a, 100, entries.get(0));
 	}
 
-	@Test
 	public void testExactRename_DifferentObjects() throws Exception {
 		ObjectId foo = blob("foo");
 		ObjectId bar = blob("bar");
@@ -112,7 +102,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(q, entries.get(2));
 	}
 
-	@Test
 	public void testExactRename_OneRenameOneModify() throws Exception {
 		ObjectId foo = blob("foo");
 		ObjectId bar = blob("bar");
@@ -133,7 +122,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(c, entries.get(1));
 	}
 
-	@Test
 	public void testExactRename_ManyRenames() throws Exception {
 		ObjectId foo = blob("foo");
 		ObjectId bar = blob("bar");
@@ -155,7 +143,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(d, c, 100, entries.get(1));
 	}
 
-	@Test
 	public void testExactRename_MultipleIdenticalDeletes() throws Exception {
 		ObjectId foo = blob("foo");
 
@@ -178,7 +165,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(a, d, 100, entries.get(2));
 	}
 
-	@Test
 	public void testExactRename_PathBreaksTie() throws Exception {
 		ObjectId foo = blob("foo");
 
@@ -187,23 +173,19 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 		DiffEntry c = DiffEntry.add("c.txt", foo);
 		DiffEntry d = DiffEntry.delete("d.txt", foo);
-		DiffEntry e = DiffEntry.add("the_e_file.txt", foo);
 
 		// Add out of order to avoid first-match succeeding
 		rd.add(a);
 		rd.add(d);
-		rd.add(e);
 		rd.add(b);
 		rd.add(c);
 
 		List<DiffEntry> entries = rd.compute();
-		assertEquals(3, entries.size());
+		assertEquals(2, entries.size());
 		assertRename(d, c, 100, entries.get(0));
 		assertRename(b, a, 100, entries.get(1));
-		assertCopy(d, e, 100, entries.get(2));
 	}
 
-	@Test
 	public void testExactRename_OneDeleteManyAdds() throws Exception {
 		ObjectId foo = blob("foo");
 
@@ -225,7 +207,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertCopy(d, b, 100, entries.get(2));
 	}
 
-	@Test
 	public void testInexactRename_OnePair() throws Exception {
 		ObjectId aId = blob("foo\nbar\nbaz\nblarg\n");
 		ObjectId bId = blob("foo\nbar\nbaz\nblah\n");
@@ -241,7 +222,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(b, a, 66, entries.get(0));
 	}
 
-	@Test
 	public void testInexactRename_OneRenameTwoUnrelatedFiles() throws Exception {
 		ObjectId aId = blob("foo\nbar\nbaz\nblarg\n");
 		ObjectId bId = blob("foo\nbar\nbaz\nblah\n");
@@ -265,7 +245,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(d, entries.get(2));
 	}
 
-	@Test
 	public void testInexactRename_LastByteDifferent() throws Exception {
 		ObjectId aId = blob("foo\nbar\na");
 		ObjectId bId = blob("foo\nbar\nb");
@@ -281,7 +260,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(b, a, 88, entries.get(0));
 	}
 
-	@Test
 	public void testInexactRename_NewlinesOnly() throws Exception {
 		ObjectId aId = blob("\n\n\n");
 		ObjectId bId = blob("\n\n\n\n");
@@ -297,7 +275,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(b, a, 74, entries.get(0));
 	}
 
-	@Test
 	public void testInexactRename_SameContentMultipleTimes() throws Exception {
 		ObjectId aId = blob("a\na\na\na\n");
 		ObjectId bId = blob("a\na\na\n");
@@ -313,7 +290,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(b, a, 74, entries.get(0));
 	}
 
-	@Test
 	public void testInexactRenames_OnePair2() throws Exception {
 		ObjectId aId = blob("ab\nab\nab\nac\nad\nae\n");
 		ObjectId bId = blob("ac\nab\nab\nab\naa\na0\na1\n");
@@ -330,7 +306,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(b, a, 57, entries.get(0));
 	}
 
-	@Test
 	public void testNoRenames_SingleByteFiles() throws Exception {
 		ObjectId aId = blob("a");
 		ObjectId bId = blob("b");
@@ -347,7 +322,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(b, entries.get(1));
 	}
 
-	@Test
 	public void testNoRenames_EmptyFile1() throws Exception {
 		ObjectId aId = blob("");
 		DiffEntry a = DiffEntry.add(PATH_A, aId);
@@ -359,7 +333,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(a, entries.get(0));
 	}
 
-	@Test
 	public void testNoRenames_EmptyFile2() throws Exception {
 		ObjectId aId = blob("");
 		ObjectId bId = blob("blah");
@@ -376,7 +349,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(b, entries.get(1));
 	}
 
-	@Test
 	public void testNoRenames_SymlinkAndFile() throws Exception {
 		ObjectId aId = blob("src/dest");
 
@@ -393,7 +365,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(b, entries.get(1));
 	}
 
-	@Test
 	public void testNoRenames_GitlinkAndFile() throws Exception {
 		ObjectId aId = blob("src/dest");
 
@@ -410,7 +381,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(b, entries.get(1));
 	}
 
-	@Test
 	public void testNoRenames_SymlinkAndFileSamePath() throws Exception {
 		ObjectId aId = blob("src/dest");
 
@@ -428,7 +398,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(b, entries.get(1));
 	}
 
-	@Test
 	public void testBreakModify_BreakAll() throws Exception {
 		ObjectId aId = blob("foo");
 		ObjectId bId = blob("bar");
@@ -450,7 +419,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(DiffEntry.breakModify(m).get(0), a, 100, entries.get(1));
 	}
 
-	@Test
 	public void testBreakModify_BreakNone() throws Exception {
 		ObjectId aId = blob("foo");
 		ObjectId bId = blob("bar");
@@ -472,7 +440,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(a, entries.get(1));
 	}
 
-	@Test
 	public void testBreakModify_BreakBelowScore() throws Exception {
 		ObjectId aId = blob("foo");
 		ObjectId bId = blob("bar");
@@ -494,7 +461,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertRename(DiffEntry.breakModify(m).get(0), a, 100, entries.get(1));
 	}
 
-	@Test
 	public void testBreakModify_DontBreakAboveScore() throws Exception {
 		ObjectId aId = blob("blah\nblah\nfoo");
 		ObjectId bId = blob("blah\nblah\nbar");
@@ -516,7 +482,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertSame(a, entries.get(1));
 	}
 
-	@Test
 	public void testBreakModify_RejoinIfUnpaired() throws Exception {
 		ObjectId aId = blob("foo");
 		ObjectId bId = blob("bar");
@@ -543,7 +508,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertEquals(0, modify.score);
 	}
 
-	@Test
 	public void testSetRenameScore_IllegalArgs() throws Exception {
 		try {
 			rd.setRenameScore(-1);
@@ -560,7 +524,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testRenameLimit() throws Exception {
 		ObjectId aId = blob("foo\nbar\nbaz\nblarg\n");
 		ObjectId bId = blob("foo\nbar\nbaz\nblah\n");

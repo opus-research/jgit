@@ -97,58 +97,12 @@ public abstract class AnyObjectId implements Comparable {
 	int w5;
 
 	/**
-	 * Get the first 8 bits of the ObjectId.
+	 * For ObjectIdMap
 	 *
-	 * This is a faster version of {@code getByte(0)}.
-	 *
-	 * @return a discriminator usable for a fan-out style map. Returned values
-	 *         are unsigned and thus are in the range [0,255] rather than the
-	 *         signed byte range of [-128, 127].
+	 * @return a discriminator usable for a fan-out style map
 	 */
 	public final int getFirstByte() {
 		return w1 >>> 24;
-	}
-
-	/**
-	 * Get any byte from the ObjectId.
-	 *
-	 * Callers hard-coding {@code getByte(0)} should instead use the much faster
-	 * special case variant {@link #getFirstByte()}.
-	 *
-	 * @param index
-	 *            index of the byte to obtain from the raw form of the ObjectId.
-	 *            Must be in range [0, {@link Constants#OBJECT_ID_LENGTH}).
-	 * @return the value of the requested byte at {@code index}. Returned values
-	 *         are unsigned and thus are in the range [0,255] rather than the
-	 *         signed byte range of [-128, 127].
-	 * @throws ArrayIndexOutOfBoundsException
-	 *             {@code index} is less than 0, equal to
-	 *             {@link Constants#OBJECT_ID_LENGTH}, or greater than
-	 *             {@link Constants#OBJECT_ID_LENGTH}.
-	 */
-	public final int getByte(int index) {
-		int w;
-		switch (index >> 2) {
-		case 0:
-			w = w1;
-			break;
-		case 1:
-			w = w2;
-			break;
-		case 2:
-			w = w3;
-			break;
-		case 3:
-			w = w4;
-			break;
-		case 4:
-			w = w5;
-			break;
-		default:
-			throw new ArrayIndexOutOfBoundsException(index);
-		}
-
-		return (w >>> (8 * (3 - (index & 3)))) & 0xff;
 	}
 
 	/**
@@ -159,7 +113,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return < 0 if this id comes before other; 0 if this id is equal to
 	 *         other; > 0 if this id comes after other.
 	 */
-	public final int compareTo(final AnyObjectId other) {
+	public int compareTo(final AnyObjectId other) {
 		if (this == other)
 			return 0;
 
@@ -184,7 +138,7 @@ public abstract class AnyObjectId implements Comparable {
 		return NB.compareUInt32(w5, other.w5);
 	}
 
-	public final int compareTo(final Object other) {
+	public int compareTo(final Object other) {
 		return compareTo(((AnyObjectId) other));
 	}
 
@@ -199,7 +153,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return a negative integer, zero, or a positive integer as this object is
 	 *         less than, equal to, or greater than the specified object.
 	 */
-	public final int compareTo(final byte[] bs, final int p) {
+	public int compareTo(final byte[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, NB.decodeInt32(bs, p));
@@ -232,7 +186,7 @@ public abstract class AnyObjectId implements Comparable {
 	 * @return a negative integer, zero, or a positive integer as this object is
 	 *         less than, equal to, or greater than the specified object.
 	 */
-	public final int compareTo(final int[] bs, final int p) {
+	public int compareTo(final int[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, bs[p]);
@@ -265,7 +219,7 @@ public abstract class AnyObjectId implements Comparable {
 		return abbr.prefixCompare(this) == 0;
 	}
 
-	public final int hashCode() {
+	public int hashCode() {
 		return w2;
 	}
 
@@ -276,11 +230,11 @@ public abstract class AnyObjectId implements Comparable {
 	 *            the other id to compare to. May be null.
 	 * @return true only if both ObjectIds have identical bits.
 	 */
-	public final boolean equals(final AnyObjectId other) {
+	public boolean equals(final AnyObjectId other) {
 		return other != null ? equals(this, other) : false;
 	}
 
-	public final boolean equals(final Object o) {
+	public boolean equals(final Object o) {
 		if (o instanceof AnyObjectId)
 			return equals((AnyObjectId) o);
 		else
@@ -367,32 +321,6 @@ public abstract class AnyObjectId implements Comparable {
 	 */
 	public void copyTo(final OutputStream w) throws IOException {
 		w.write(toHexByteArray());
-	}
-
-	/**
-	 * Copy this ObjectId to a byte array in hex format.
-	 *
-	 * @param b
-	 *            the buffer to copy to.
-	 * @param o
-	 *            the offset within b to write at.
-	 */
-	public void copyTo(byte[] b, int o) {
-		formatHexByte(b, o + 0, w1);
-		formatHexByte(b, o + 8, w2);
-		formatHexByte(b, o + 16, w3);
-		formatHexByte(b, o + 24, w4);
-		formatHexByte(b, o + 32, w5);
-	}
-
-	/**
-	 * Copy this ObjectId to a ByteBuffer in hex format.
-	 *
-	 * @param b
-	 *            the buffer to copy to.
-	 */
-	public void copyTo(ByteBuffer b) {
-		b.put(toHexByteArray());
 	}
 
 	private byte[] toHexByteArray() {
@@ -509,17 +437,32 @@ public abstract class AnyObjectId implements Comparable {
 	}
 
 	/**
-	 * Return an abbreviation (prefix) of this object SHA-1.
+	 * Return unique abbreviation (prefix) of this object SHA-1.
+	 * <p>
+	 * This method is a utility for <code>abbreviate(repo, 8)</code>.
 	 *
-	 * This implementation does not guaranteeing uniqueness. Callers should
-	 * instead use {@link ObjectReader#abbreviate(AnyObjectId, int)} to obtain a
-	 * unique abbreviation within the scope of a particular object database.
-	 *
-	 * @param len
-	 *            length of the abbreviated string.
+	 * @param repo
+	 *            repository for checking uniqueness within.
 	 * @return SHA-1 abbreviation.
 	 */
-	public AbbreviatedObjectId abbreviate(final int len) {
+	public AbbreviatedObjectId abbreviate(final Repository repo) {
+		return abbreviate(repo, 8);
+	}
+
+	/**
+	 * Return unique abbreviation (prefix) of this object SHA-1.
+	 * <p>
+	 * Current implementation is not guaranteeing uniqueness, it just returns
+	 * fixed-length prefix of SHA-1 string.
+	 *
+	 * @param repo
+	 *            repository for checking uniqueness within.
+	 * @param len
+	 *            minimum length of the abbreviated string.
+	 * @return SHA-1 abbreviation.
+	 */
+	public AbbreviatedObjectId abbreviate(final Repository repo, final int len) {
+		// TODO implement checking for uniqueness
 		final int a = AbbreviatedObjectId.mask(len, 1, w1);
 		final int b = AbbreviatedObjectId.mask(len, 2, w2);
 		final int c = AbbreviatedObjectId.mask(len, 3, w3);
