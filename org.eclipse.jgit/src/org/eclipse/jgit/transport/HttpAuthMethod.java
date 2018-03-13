@@ -164,7 +164,7 @@ abstract class HttpAuthMethod {
 
 	/** Performs HTTP basic authentication (plaintext username/password). */
 	private static class Basic extends HttpAuthMethod {
-		static final String NAME = "Basic"; //$NON-NLS-1$
+		static final String NAME = "Basic";
 
 		private String user;
 
@@ -178,15 +178,15 @@ abstract class HttpAuthMethod {
 
 		@Override
 		void configureRequest(final HttpURLConnection conn) throws IOException {
-			String ident = user + ":" + pass; //$NON-NLS-1$
-			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
-			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc); //$NON-NLS-1$
+			String ident = user + ":" + pass;
+			String enc = Base64.encodeBytes(ident.getBytes("UTF-8"));
+			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc);
 		}
 	}
 
 	/** Performs HTTP digest authentication. */
 	private static class Digest extends HttpAuthMethod {
-		static final String NAME = "Digest"; //$NON-NLS-1$
+		static final String NAME = "Digest";
 
 		private static final Random PRNG = new Random();
 
@@ -201,11 +201,11 @@ abstract class HttpAuthMethod {
 		Digest(String hdr) {
 			params = parse(hdr);
 
-			final String qop = params.get("qop"); //$NON-NLS-1$
-			if ("auth".equals(qop)) { //$NON-NLS-1$
+			final String qop = params.get("qop");
+			if ("auth".equals(qop)) {
 				final byte[] bin = new byte[8];
 				PRNG.nextBytes(bin);
-				params.put("cnonce", Base64.encodeBytes(bin)); //$NON-NLS-1$
+				params.put("cnonce", Base64.encodeBytes(bin));
 			}
 		}
 
@@ -220,64 +220,64 @@ abstract class HttpAuthMethod {
 		void configureRequest(final HttpURLConnection conn) throws IOException {
 			final Map<String, String> r = new LinkedHashMap<String, String>();
 
-			final String realm = params.get("realm"); //$NON-NLS-1$
-			final String nonce = params.get("nonce"); //$NON-NLS-1$
-			final String cnonce = params.get("cnonce"); //$NON-NLS-1$
+			final String realm = params.get("realm");
+			final String nonce = params.get("nonce");
+			final String cnonce = params.get("cnonce");
 			final String uri = uri(conn.getURL());
-			final String qop = params.get("qop"); //$NON-NLS-1$
+			final String qop = params.get("qop");
 			final String method = conn.getRequestMethod();
 
-			final String A1 = user + ":" + realm + ":" + pass; //$NON-NLS-1$
-			final String A2 = method + ":" + uri; //$NON-NLS-1$
+			final String A1 = user + ":" + realm + ":" + pass;
+			final String A2 = method + ":" + uri;
 
-			r.put("username", user); //$NON-NLS-1$
-			r.put("realm", realm); //$NON-NLS-1$
-			r.put("nonce", nonce); //$NON-NLS-1$
-			r.put("uri", uri); //$NON-NLS-1$
+			r.put("username", user);
+			r.put("realm", realm);
+			r.put("nonce", nonce);
+			r.put("uri", uri);
 
 			final String response, nc;
-			if ("auth".equals(qop)) { //$NON-NLS-1$
-				nc = String.format("%08x", ++requestCount); //$NON-NLS-1$
-				response = KD(H(A1), nonce + ":" + nc + ":" + cnonce + ":" //$NON-NLS-1$
+			if ("auth".equals(qop)) {
+				nc = String.format("%08x", ++requestCount);
+				response = KD(H(A1), nonce + ":" + nc + ":" + cnonce + ":"
 						+ qop
 						+ ":"
 						+ H(A2));
 			} else {
 				nc = null;
-				response = KD(H(A1), nonce + ":" + H(A2)); //$NON-NLS-1$
+				response = KD(H(A1), nonce + ":" + H(A2));
 			}
-			r.put("response", response); //$NON-NLS-1$
-			if (params.containsKey("algorithm")) //$NON-NLS-1$
-				r.put("algorithm", "MD5"); //$NON-NLS-1$
+			r.put("response", response);
+			if (params.containsKey("algorithm"))
+				r.put("algorithm", "MD5");
 			if (cnonce != null && qop != null)
-				r.put("cnonce", cnonce); //$NON-NLS-1$
-			if (params.containsKey("opaque")) //$NON-NLS-1$
-				r.put("opaque", params.get("opaque")); //$NON-NLS-1$
+				r.put("cnonce", cnonce);
+			if (params.containsKey("opaque"))
+				r.put("opaque", params.get("opaque"));
 			if (qop != null)
-				r.put("qop", qop); //$NON-NLS-1$
+				r.put("qop", qop);
 			if (nc != null)
-				r.put("nc", nc); //$NON-NLS-1$
+				r.put("nc", nc);
 
 			StringBuilder v = new StringBuilder();
 			for (Map.Entry<String, String> e : r.entrySet()) {
 				if (v.length() > 0)
-					v.append(", "); //$NON-NLS-1$
+					v.append(", ");
 				v.append(e.getKey());
 				v.append('=');
-				v.append('"'); //$NON-NLS-1$
+				v.append('"');
 				v.append(e.getValue());
-				v.append('"'); //$NON-NLS-1$
+				v.append('"');
 			}
-			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + v); //$NON-NLS-1$
+			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + v);
 		}
 
 		private static String uri(URL u) {
 			StringBuilder r = new StringBuilder();
 			r.append(u.getProtocol());
-			r.append("://"); //$NON-NLS-1$
+			r.append("://");
 			r.append(u.getHost());
 			if (0 < u.getPort()) {
-				if (u.getPort() == 80 && "http".equals(u.getProtocol())) { //$NON-NLS-1$
+				if (u.getPort() == 80 && "http".equals(u.getProtocol())) {
 					/* nothing */
 				} else if (u.getPort() == 443
 						&& "https".equals(u.getProtocol())) {
@@ -295,30 +295,30 @@ abstract class HttpAuthMethod {
 		private static String H(String data) {
 			try {
 				MessageDigest md = newMD5();
-				md.update(data.getBytes("UTF-8")); //$NON-NLS-1$
+				md.update(data.getBytes("UTF-8"));
 				return LHEX(md.digest());
 			} catch (UnsupportedEncodingException e) {
-				throw new RuntimeException("UTF-8 encoding not available", e); //$NON-NLS-1$
+				throw new RuntimeException("UTF-8 encoding not available", e);
 			}
 		}
 
 		private static String KD(String secret, String data) {
 			try {
 				MessageDigest md = newMD5();
-				md.update(secret.getBytes("UTF-8")); //$NON-NLS-1$
+				md.update(secret.getBytes("UTF-8"));
 				md.update((byte) ':');
-				md.update(data.getBytes("UTF-8")); //$NON-NLS-1$
+				md.update(data.getBytes("UTF-8"));
 				return LHEX(md.digest());
 			} catch (UnsupportedEncodingException e) {
-				throw new RuntimeException("UTF-8 encoding not available", e); //$NON-NLS-1$
+				throw new RuntimeException("UTF-8 encoding not available", e);
 			}
 		}
 
 		private static MessageDigest newMD5() {
 			try {
-				return MessageDigest.getInstance("MD5"); //$NON-NLS-1$
+				return MessageDigest.getInstance("MD5");
 			} catch (NoSuchAlgorithmException e) {
-				throw new RuntimeException("No MD5 available", e); //$NON-NLS-1$
+				throw new RuntimeException("No MD5 available", e);
 			}
 		}
 
@@ -355,8 +355,8 @@ abstract class HttpAuthMethod {
 
 				final String name = auth.substring(next, eq);
 				final String value;
-				if (auth.charAt(eq + 1) == '"') { //$NON-NLS-1$
-					int dq = auth.indexOf('"', eq + 2); //$NON-NLS-1$
+				if (auth.charAt(eq + 1) == '"') {
+					int dq = auth.indexOf('"', eq + 2);
 					if (dq < 0) {
 						return Collections.emptyMap();
 					}

@@ -232,7 +232,7 @@ public class SubmoduleWalk {
 	 */
 	public static String getSubmoduleRemoteUrl(final Repository parent,
 			final String url) throws IOException {
-		if (!url.startsWith("./") && !url.startsWith("../")) //$NON-NLS-1$
+		if (!url.startsWith("./") && !url.startsWith("../"))
 			return url;
 
 		String remoteName = null;
@@ -270,9 +270,9 @@ public class SubmoduleWalk {
 		char separator = '/';
 		String submoduleUrl = url;
 		while (submoduleUrl.length() > 0) {
-			if (submoduleUrl.startsWith("./")) //$NON-NLS-1$
+			if (submoduleUrl.startsWith("./"))
 				submoduleUrl = submoduleUrl.substring(2);
-			else if (submoduleUrl.startsWith("../")) { //$NON-NLS-1$
+			else if (submoduleUrl.startsWith("../")) {
 				int lastSeparator = remoteUrl.lastIndexOf('/');
 				if (lastSeparator < 1) {
 					lastSeparator = remoteUrl.lastIndexOf(':');

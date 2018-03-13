@@ -646,7 +646,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (e == null)
 				continue;
 			final String name = e.getName();
-			if (".".equals(name) || "..".equals(name)) //$NON-NLS-1$
+			if (".".equals(name) || "..".equals(name))
 				continue;
 			if (Constants.DOT_GIT.equals(name))
 				continue;
@@ -937,7 +937,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 
 		public String toString() {
-			return getMode().toString() + " " + getName(); //$NON-NLS-1$
+			return getMode().toString() + " " + getName();
 		}
 
 		/**
@@ -1054,7 +1054,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					.getExcludesFile();
 			if (path != null) {
 				File excludesfile;
-				if (path.startsWith("~/")) //$NON-NLS-1$
+				if (path.startsWith("~/"))
 					excludesfile = fs.resolve(fs.userHome(), path.substring(2));
 				else
 					excludesfile = fs.resolve(null, path);
@@ -1062,7 +1062,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 
 			File exclude = fs
-					.resolve(repository.getDirectory(), "info/exclude"); //$NON-NLS-1$
+					.resolve(repository.getDirectory(), "info/exclude");
 			loadRulesFromFile(r, exclude);
 
 			return r.getRules().isEmpty() ? null : r;
