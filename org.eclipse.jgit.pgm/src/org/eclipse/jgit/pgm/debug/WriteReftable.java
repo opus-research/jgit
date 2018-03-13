@@ -80,10 +80,10 @@ class WriteReftable extends TextBuiltin {
 	private static final int MIB = 1 << 20;
 
 	@Option(name = "--block-size")
-	private int refBlockSize = 8 * KIB;
+	private int refBlockSize;
 
 	@Option(name = "--log-block-size")
-	private int logBlockSize = 8 * KIB;
+	private int logBlockSize;
 
 	@Option(name = "--restart-interval")
 	private int restartInterval;
@@ -106,29 +106,36 @@ class WriteReftable extends TextBuiltin {
 		ReftableWriter.Stats stats;
 		try (OutputStream os = new FileOutputStream(out)) {
 			ReftableWriter w = new ReftableWriter();
-			w.setRefBlockSize(refBlockSize);
-			w.setLogBlockSize(logBlockSize);
-			w.setRestartInterval(restartInterval);
-			w.begin(os);
-			for (Ref r : refs) {
-				w.writeRef(r);
+			if (refBlockSize > 0) {
+				w.setRefBlockSize(refBlockSize);
 			}
+			if (logBlockSize > 0) {
+				w.setLogBlockSize(logBlockSize);
+			}
+			if (restartInterval > 0) {
+				w.setRestartInterval(restartInterval);
+			}
+			w.begin(os);
+			w.sortAndWriteRefs(refs);
 			for (LogEntry e : logs) {
 				w.writeLog(e.ref, e.who, e.oldId, e.newId, e.message);
 			}
 			stats = w.finish().getStats();
 		}
 
-		int fileMiB = (int) Math.round(((double) stats.totalBytes()) / MIB);
+		double fileMiB = ((double) stats.totalBytes()) / MIB;
+		long avgPad = stats.paddingBytes()
+				/ (stats.refBlockCount() + stats.objBlockCount());
 		printf("Summary:");
-		printf("  file sz : %d MiB (%d bytes)", fileMiB, stats.totalBytes());
+		printf("  file sz : %.1f MiB (%d bytes)", fileMiB, stats.totalBytes());
 		printf("  padding : %d KiB", stats.paddingBytes() / KIB);
+		printf("  avg pad : %d bytes / block", avgPad);
 		errw.println();
 
 		printf("Refs:");
 		printf("  ref blk : %d", stats.refBlockSize());
 		printf("  restarts: %d", stats.restartInterval());
-		printf("  refs    : %d", refs.size());
+		printf("  refs    : %d", stats.refCount());
 		printf("  blocks  : %d", stats.refBlockCount());
 		if (stats.refIndexKeys() > 0) {
 			int idxSize = (int) Math.round(((double) stats.refIndexSize()) / KIB);
@@ -138,19 +145,37 @@ class WriteReftable extends TextBuiltin {
 			printf("  avg idx : %d bytes", avgIdx);
 		}
 		printf("  lookup  : %.1f", stats.diskSeeksPerRead());
-		long avgPad = stats.paddingBytes() / stats.refBlockCount();
-		printf("  avg pad : %d bytes / block", avgPad);
 		printf("  avg ref : %d bytes", stats.refBytes() / refs.size());
-		printf("  refs/blk: %d", refs.size() / stats.refBlockCount());
+		printf("  refs/blk: %d", stats.refCount() / stats.refBlockCount());
 		errw.println();
 
+		if (stats.objCount() > 0) {
+			int objMiB = (int) Math.round(((double) stats.objBytes()) / MIB);
+			int idLen = stats.objIdLength();
+			printf("Objects:");
+			printf("  obj blk : %d", stats.refBlockSize());
+			printf("  restarts: %d", stats.restartInterval());
+			printf("  objects : %d", stats.objCount());
+			printf("  blocks  : %d", stats.objBlockCount());
+			printf("  obj sz  : %d MiB (%d bytes)", objMiB, stats.objBytes());
+			if (stats.objIndexSize() > 0) {
+				int s = (int) Math.round(((double) stats.objIndexSize()) / KIB);
+				printf("  idx sz  : %d KiB", s);
+			}
+			printf("  id len  : %d bytes (%d hex digits)", idLen, 2 * idLen);
+			printf("  avg obj : %d bytes", stats.objBytes() / stats.objCount());
+			printf("  obj/blk : %d", stats.objCount() / stats.objBlockCount());
+			errw.println();
+		}
 		if (logs.size() > 0) {
 			int logMiB = (int) Math.round(((double) stats.logBytes()) / MIB);
 			printf("Log:");
 			printf("  log blk : %d", stats.logBlockSize());
-			printf("  logs    : %d", logs.size());
+			printf("  logs    : %d", stats.logCount());
+			printf("  blocks  : %d", stats.logBlockCount());
 			printf("  log sz  : %d MiB (%d bytes)", logMiB, stats.logBytes());
 			printf("  avg log : %d bytes", stats.logBytes() / logs.size());
+			printf("  log/blk : %d", stats.logCount() / stats.logBlockCount());
 			errw.println();
 		}
 	}
