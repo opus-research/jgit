@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +40,28 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
+
+package org.eclipse.jgit.console;
+
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * Exception thrown when a commit is rejected by a hook (either
- * {@link org.eclipse.jgit.util.Hook#PRE_COMMIT pre-commit} or
- * {@link org.eclipse.jgit.util.Hook#COMMIT_MSG commit-msg}).
- *
- * @since 3.7
+ * Translation bundle for JGit console
  */
-public class RejectCommitException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
+public class ConsoleText extends TranslationBundle {
 
 	/**
-	 * @param message
+	 * @return an instance of this translation bundle
 	 */
-	public RejectCommitException(String message) {
-		super(message);
+	public static ConsoleText get() {
+		return NLS.getBundleFor(ConsoleText.class);
 	}
+
+	// @formatter:off
+	/***/ public String answerNo;
+	/***/ public String answerYes;
+	/***/ public String noSystemConsoleAvailable;
+	/***/ public String password;
+	/***/ public String usernameFor;
 }
