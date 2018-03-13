@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,44 +41,27 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.util;
 
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.send;
+/** Toy RNG to ensure we get predictable numbers during unit tests. */
+public class TestRng {
+	private int next;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jgit.util.IO;
-
-/** Sends a small text meta file from the repository. */
-class TextFileServlet extends HttpServlet {
-	private static final long serialVersionUID = 1L;
-
-	private final String fileName;
-
-	TextFileServlet(final String name) {
-		this.fileName = name;
+	public TestRng(final String seed) {
+		next = 0;
+		for (int i = 0; i < seed.length(); i++)
+			next = next * 11 + seed.charAt(i);
 	}
 
-	public void doGet(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws IOException {
-		try {
-			rsp.setContentType("text/plain");
-			send(read(req), req, rsp);
-		} catch (FileNotFoundException noFile) {
-			rsp.sendError(SC_NOT_FOUND);
-		}
+	public byte[] nextBytes(final int cnt) {
+		final byte[] r = new byte[cnt];
+		for (int i = 0; i < cnt; i++)
+			r[i] = (byte) nextInt();
+		return r;
 	}
 
-	private byte[] read(final HttpServletRequest req) throws IOException {
-		final File gitdir = getRepository(req).getDirectory();
-		return IO.readFully(new File(gitdir, fileName));
+	public int nextInt() {
+		next = next * 1103515245 + 12345;
+		return next;
 	}
 }
