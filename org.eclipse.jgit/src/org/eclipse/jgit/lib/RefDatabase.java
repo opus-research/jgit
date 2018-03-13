@@ -94,8 +94,15 @@ public abstract class RefDatabase {
 	/**
 	 * Determine if a proposed reference name overlaps with an existing one.
 	 * <p>
-	 * Reference names use '/' as a component separator. If the reference
-	 * "refs/heads/foo" exists then "refs/heads/foo/bar" must not exist.
+	 * Reference names use '/' as a component separator, and may be stored in a
+	 * hierarchical storage such as a directory on the local filesystem.
+	 * <p>
+	 * If the reference "refs/heads/foo" exists then "refs/heads/foo/bar" must
+	 * not exist, as a reference cannot have a value and also be a container for
+	 * other references at the same time.
+	 * <p>
+	 * If the reference "refs/heads/foo/bar" exists than the reference
+	 * "refs/heads/foo" cannot exist, for the same reason.
 	 *
 	 * @param name
 	 *            proposed name.
@@ -104,26 +111,7 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the database could not be read to check for conflicts.
 	 */
-	public boolean isNameConflicting(final String name) throws IOException {
-		Map<String, Ref> all = getRefs(ALL);
-
-		// Cannot be nested within an existing reference.
-		int lastSlash = name.lastIndexOf('/');
-		while (0 < lastSlash) {
-			if (all.containsKey(name.substring(0, lastSlash)))
-				return true;
-			lastSlash = name.lastIndexOf('/', lastSlash - 1);
-		}
-
-		// Cannot be the container of an existing reference.
-		final String rName = name + '/';
-		for (String other : all.keySet()) {
-			if (other.startsWith(rName))
-				return true;
-		}
-
-		return false;
-	}
+	public abstract boolean isNameConflicting(String name) throws IOException;
 
 	/**
 	 * Create a new update command to create, modify or delete a reference.
