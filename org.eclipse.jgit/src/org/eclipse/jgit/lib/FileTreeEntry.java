@@ -100,7 +100,7 @@ public class FileTreeEntry extends TreeEntry {
 	 * @throws IOException
 	 */
 	public ObjectLoader openReader() throws IOException {
-		return getRepository().open(getId(), Constants.OBJ_BLOB);
+		return getRepository().openBlob(getId());
 	}
 
 	public void accept(final TreeVisitor tv, final int flags)

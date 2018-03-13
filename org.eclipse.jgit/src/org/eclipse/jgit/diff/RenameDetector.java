@@ -57,7 +57,6 @@ import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 
@@ -295,19 +294,14 @@ public class RenameDetector {
 			return;
 
 		if (getRenameLimit() == 0 || cnt <= getRenameLimit()) {
-			ObjectReader reader = repo.newObjectReader();
-			try {
-				SimilarityRenameDetector d;
+			SimilarityRenameDetector d;
 
-				d = new SimilarityRenameDetector(reader, deleted, added);
-				d.setRenameScore(getRenameScore());
-				d.compute(pm);
-				deleted = d.getLeftOverSources();
-				added = d.getLeftOverDestinations();
-				entries.addAll(d.getMatches());
-			} finally {
-				reader.release();
-			}
+			d = new SimilarityRenameDetector(repo, deleted, added);
+			d.setRenameScore(getRenameScore());
+			d.compute(pm);
+			deleted = d.getLeftOverSources();
+			added = d.getLeftOverDestinations();
+			entries.addAll(d.getMatches());
 		} else {
 			overRenameLimit = true;
 		}
