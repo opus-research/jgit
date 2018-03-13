@@ -152,7 +152,7 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * undefined behavior.
  * </p>
  */
-public class PackWriter {
+public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	/** A collection of object ids. */
@@ -1048,7 +1048,7 @@ public class PackWriter {
 				stats.reusedObjects += pack.getObjectCount();
 				stats.reusedDeltas += deltaCnt;
 				stats.totalDeltas += deltaCnt;
-				reuseSupport.copyPackAsIs(out, pack, reuseValidate);
+				reuseSupport.copyPackAsIs(out, pack);
 			}
 			writeChecksum(out);
 			out.flush();
@@ -1085,9 +1085,22 @@ public class PackWriter {
 		return state.snapshot();
 	}
 
-	/** Release all resources used by this writer. */
+	/**
+	 * Release all resources used by this writer. Use {@link #close()} instead.
+	 */
+	@Deprecated
 	public void release() {
-		reader.release();
+		close();
+	}
+
+	/**
+	 * Release all resources used by this writer.
+	 *
+	 * @since 4.0
+	 */
+	@Override
+	public void close() {
+		reader.close();
 		if (myDeflater != null) {
 			myDeflater.end();
 			myDeflater = null;
@@ -1853,7 +1866,7 @@ public class PackWriter {
 				false);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
-		if (useCachedPacks && reuseSupport != null
+		if (useCachedPacks && reuseSupport != null && !reuseValidate
 				&& (excludeInPacks == null || excludeInPacks.length == 0))
 			cachedPacks.addAll(
 					reuseSupport.getCachedPacksAndUpdate(needBitmap));
