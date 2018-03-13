@@ -80,6 +80,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
+import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -640,10 +641,21 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		if (reuseSupport != null && (
+		boolean needSearchForReuse = reuseSupport != null && (
 				   reuseDeltas
 				|| config.isReuseObjects()
-				|| !cachedPacks.isEmpty()))
+				|| !cachedPacks.isEmpty());
+
+		if (compressMonitor instanceof BatchingProgressMonitor) {
+			long delay = 1000;
+			if (needSearchForReuse && config.isDeltaCompress())
+				delay = 500;
+			((BatchingProgressMonitor) compressMonitor).setDelayStart(
+					delay,
+					TimeUnit.MILLISECONDS);
+		}
+
+		if (needSearchForReuse)
 			searchForReuse(compressMonitor);
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
@@ -1073,13 +1085,7 @@ public class PackWriter {
 		typeStats = stats.objectTypes[list.get(0).getType()];
 		long beginOffset = out.length();
 
-		if (list.get(0).getType() == Constants.OBJ_BLOB) {
-			for (ObjectToPack otp : list) {
-				if (otp.isWritten() || otp.getDeltaBase() != null)
-					continue;
-				writeObjectAndDeltaChildren(out, otp);
-			}
-		} else if (reuseSupport != null) {
+		if (reuseSupport != null) {
 			reuseSupport.writeObjects(out, list);
 		} else {
 			for (ObjectToPack otp : list)
@@ -1088,17 +1094,6 @@ public class PackWriter {
 
 		typeStats.bytes += out.length() - beginOffset;
 		typeStats.cntObjects = list.size();
-	}
-
-	private void writeObjectAndDeltaChildren(PackOutputStream out,
-			ObjectToPack otp) throws IOException {
-		writeObject(out, otp);
-
-		ObjectToPack child = otp.deltaChild;
-		while (child != null) {
-			writeObjectAndDeltaChildren(out, child);
-			child = child.deltaNext;
-		}
 	}
 
 	void writeObject(PackOutputStream out, ObjectToPack otp) throws IOException {
