@@ -43,29 +43,48 @@
 
 package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.storage.pack.PackWriter;
+import java.util.Collection;
+import java.util.List;
 
 /**
- * Logs activity that occurred within {@link UploadPack}.
+ * {@link PostReceiveHook} that delegates to a list of other hooks.
  * <p>
- * Implementors of the interface are responsible for associating the current
- * thread to a particular connection, if they need to also include connection
- * information. One method is to use a {@link java.lang.ThreadLocal} to remember
- * the connection information before invoking UploadPack.
+ * Hooks are run in the order passed to the constructor.
  */
-public interface UploadPackLogger {
-	/** A simple no-op logger. */
-	public static final UploadPackLogger NULL = new UploadPackLogger() {
-		public void onPackStatistics(PackWriter.Statistics stats) {
-			// Do nothing.
-		}
-	};
+public class PostReceiveHookChain implements PostReceiveHook {
+	private final PostReceiveHook[] hooks;
+	private final int count;
 
 	/**
-	 * Notice to the logger after a pack has been sent.
+	 * Create a new hook chaining the given hooks together.
 	 *
-	 * @param stats
-	 *            the statistics after sending a pack to the client.
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
 	 */
-	public void onPackStatistics(PackWriter.Statistics stats);
+	public static PostReceiveHook newChain(
+			List<? extends PostReceiveHook> hooks) {
+		PostReceiveHook[] newHooks = new PostReceiveHook[hooks.size()];
+		int i = 0;
+		for (PostReceiveHook hook : hooks)
+			if (hook != PostReceiveHook.NULL)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return PostReceiveHook.NULL;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new PostReceiveHookChain(newHooks, i);
+	}
+
+	public void onPostReceive(ReceivePack rp,
+			Collection<ReceiveCommand> commands) {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPostReceive(rp, commands);
+	}
+
+	private PostReceiveHookChain(PostReceiveHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
+	}
 }
