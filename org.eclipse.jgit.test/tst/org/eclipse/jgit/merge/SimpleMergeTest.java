@@ -44,28 +44,20 @@
 
 package org.eclipse.jgit.merge;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.CommitBuilder;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.Test;
 
@@ -93,65 +85,6 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		boolean merge = ourMerger.merge(new ObjectId[] { db.resolve("a"), db.resolve("c") });
 		assertTrue(merge);
 		assertEquals("02ba32d3649e510002c21651936b7077aa75ffa9",ourMerger.getResultTreeId().name());
-	}
-
-	@Test
-	public void testDuplicateParents() throws Exception {
-		ObjectId commitId;
-		RevCommit newCommit;
-		final ObjectInserter ow = db.newObjectInserter();
-		RevWalk rw = new RevWalk(db);
-		ObjectId parentA = db.resolve("a");
-		ObjectId parentB = db.resolve("b");
-		ObjectId[] parentIds_AA = new ObjectId[] { parentA, parentA };
-		ObjectId[] parentIds_AB = new ObjectId[] { parentA, parentB };
-		ObjectId[] parentIds_BA = new ObjectId[] { parentB, parentA };
-		ObjectId[] parentIds_BBAB = new ObjectId[] { parentB, parentB, parentA,
-				parentB };
-
-		commitId = commit(ow, db.readDirCache(), parentA, parentA);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(1, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentA, parentB);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentB, parentA);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_AA);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(1, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_AB);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_BA);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_BBAB);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), Arrays.asList(parentIds_AA));
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(1, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_AB);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_BA);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
-
-		commitId = commit(ow, db.readDirCache(), parentIds_BBAB);
-		newCommit = rw.parseCommit(commitId);
-		assertEquals(2, newCommit.getParentCount());
 	}
 
 	@Test
@@ -187,15 +120,15 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("libelf-po/a", FileMode.REGULAR_FILE));
-			b.add(makeEntry("libelf/c", FileMode.REGULAR_FILE));
+			b.add(createEntry("libelf-po/a", FileMode.REGULAR_FILE));
+			b.add(createEntry("libelf/c", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("Makefile", FileMode.REGULAR_FILE));
-			o.add(makeEntry("libelf-po/a", FileMode.REGULAR_FILE));
-			o.add(makeEntry("libelf/c", FileMode.REGULAR_FILE));
+			o.add(createEntry("Makefile", FileMode.REGULAR_FILE));
+			o.add(createEntry("libelf-po/a", FileMode.REGULAR_FILE));
+			o.add(createEntry("libelf/c", FileMode.REGULAR_FILE));
 
-			t.add(makeEntry("libelf-po/a", FileMode.REGULAR_FILE));
-			t.add(makeEntry("libelf/c", FileMode.REGULAR_FILE, "blah"));
+			t.add(createEntry("libelf-po/a", FileMode.REGULAR_FILE));
+			t.add(createEntry("libelf/c", FileMode.REGULAR_FILE, "blah"));
 
 			b.finish();
 			o.finish();
@@ -240,14 +173,14 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			b.add(makeEntry("d/t", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/t", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("d/o", FileMode.REGULAR_FILE, "o !"));
-			o.add(makeEntry("d/t", FileMode.REGULAR_FILE));
+			o.add(createEntry("d/o", FileMode.REGULAR_FILE, "o !"));
+			o.add(createEntry("d/t", FileMode.REGULAR_FILE));
 
-			t.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			t.add(makeEntry("d/t", FileMode.REGULAR_FILE, "t !"));
+			t.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			t.add(createEntry("d/t", FileMode.REGULAR_FILE, "t !"));
 
 			b.finish();
 			o.finish();
@@ -288,14 +221,14 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			b.add(makeEntry("d/t", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/t", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			o.add(makeEntry("d/t", FileMode.REGULAR_FILE, "o !"));
+			o.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			o.add(createEntry("d/t", FileMode.REGULAR_FILE, "o !"));
 
-			t.add(makeEntry("d/o", FileMode.REGULAR_FILE, "t !"));
-			t.add(makeEntry("d/t", FileMode.REGULAR_FILE, "t !"));
+			t.add(createEntry("d/o", FileMode.REGULAR_FILE, "t !"));
+			t.add(createEntry("d/t", FileMode.REGULAR_FILE, "t !"));
 
 			b.finish();
 			o.finish();
@@ -322,13 +255,13 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			b.add(makeEntry("d/t", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/t", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("d", FileMode.REGULAR_FILE));
+			o.add(createEntry("d", FileMode.REGULAR_FILE));
 
-			t.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			t.add(makeEntry("d/t", FileMode.REGULAR_FILE, "t !"));
+			t.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			t.add(createEntry("d/t", FileMode.REGULAR_FILE, "t !"));
 
 			b.finish();
 			o.finish();
@@ -355,13 +288,13 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			b.add(makeEntry("d/t", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			b.add(createEntry("d/t", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("d/o", FileMode.REGULAR_FILE));
-			o.add(makeEntry("d/t", FileMode.REGULAR_FILE, "o !"));
+			o.add(createEntry("d/o", FileMode.REGULAR_FILE));
+			o.add(createEntry("d/t", FileMode.REGULAR_FILE, "o !"));
 
-			t.add(makeEntry("d", FileMode.REGULAR_FILE));
+			t.add(createEntry("d", FileMode.REGULAR_FILE));
 
 			b.finish();
 			o.finish();
@@ -388,11 +321,11 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("d", FileMode.REGULAR_FILE));
+			b.add(createEntry("d", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("d", FileMode.REGULAR_FILE, "o !"));
+			o.add(createEntry("d", FileMode.REGULAR_FILE, "o !"));
 
-			t.add(makeEntry("d/o", FileMode.REGULAR_FILE));
+			t.add(createEntry("d/o", FileMode.REGULAR_FILE));
 
 			b.finish();
 			o.finish();
@@ -419,11 +352,11 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 			final DirCacheBuilder o = treeO.builder();
 			final DirCacheBuilder t = treeT.builder();
 
-			b.add(makeEntry("d", FileMode.REGULAR_FILE));
+			b.add(createEntry("d", FileMode.REGULAR_FILE));
 
-			o.add(makeEntry("d/o", FileMode.REGULAR_FILE));
+			o.add(createEntry("d/o", FileMode.REGULAR_FILE));
 
-			t.add(makeEntry("d", FileMode.REGULAR_FILE, "t !"));
+			t.add(createEntry("d", FileMode.REGULAR_FILE, "t !"));
 
 			b.finish();
 			o.finish();
@@ -440,12 +373,13 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		assertFalse(merge);
 	}
 
-	private void assertCorrectId(final DirCache treeT, final TreeWalk tw) {
+	private static void assertCorrectId(final DirCache treeT, final TreeWalk tw) {
 		assertEquals(treeT.getEntry(tw.getPathString()).getObjectId(), tw
 				.getObjectId(0));
 	}
 
-	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
+	private static ObjectId commit(final ObjectInserter odi,
+			final DirCache treeB,
 			final ObjectId[] parentIds) throws Exception {
 		final CommitBuilder c = new CommitBuilder();
 		c.setTreeId(treeB.writeTree(odi));
@@ -456,46 +390,5 @@ public class SimpleMergeTest extends SampleDataRepositoryTestCase {
 		ObjectId id = odi.insert(c);
 		odi.flush();
 		return id;
-	}
-
-	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
-			final AnyObjectId parentId1, final AnyObjectId parentId2)
-			throws Exception {
-		final CommitBuilder c = new CommitBuilder();
-		c.setTreeId(treeB.writeTree(odi));
-		c.setAuthor(new PersonIdent("A U Thor", "a.u.thor", 1L, 0));
-		c.setCommitter(c.getAuthor());
-		c.setParentIds(parentId1, parentId2);
-		c.setMessage("Tree " + c.getTreeId().name());
-		ObjectId id = odi.insert(c);
-		odi.flush();
-		return id;
-	}
-
-	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
-			List<ObjectId> parents) throws Exception {
-		final CommitBuilder c = new CommitBuilder();
-		c.setTreeId(treeB.writeTree(odi));
-		c.setAuthor(new PersonIdent("A U Thor", "a.u.thor", 1L, 0));
-		c.setCommitter(c.getAuthor());
-		c.setParentIds(parents);
-		c.setMessage("Tree " + c.getTreeId().name());
-		ObjectId id = odi.insert(c);
-		odi.flush();
-		return id;
-	}
-
-	private DirCacheEntry makeEntry(final String path, final FileMode mode)
-			throws Exception {
-		return makeEntry(path, mode, path);
-	}
-
-	private DirCacheEntry makeEntry(final String path, final FileMode mode,
-			final String content) throws Exception {
-		final DirCacheEntry ent = new DirCacheEntry(path);
-		ent.setFileMode(mode);
-		ent.setObjectId(new ObjectInserter.Formatter().idFor(OBJ_BLOB,
-				Constants.encode(content)));
-		return ent;
 	}
 }

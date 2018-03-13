@@ -66,15 +66,15 @@ import java.util.List;
 public class CommitBuilder {
 	private static final ObjectId[] EMPTY_OBJECTID_LIST = new ObjectId[0];
 
-	private static final byte[] htree = Constants.encodeASCII("tree");
+	private static final byte[] htree = Constants.encodeASCII("tree"); //$NON-NLS-1$
 
-	private static final byte[] hparent = Constants.encodeASCII("parent");
+	private static final byte[] hparent = Constants.encodeASCII("parent"); //$NON-NLS-1$
 
-	private static final byte[] hauthor = Constants.encodeASCII("author");
+	private static final byte[] hauthor = Constants.encodeASCII("author"); //$NON-NLS-1$
 
-	private static final byte[] hcommitter = Constants.encodeASCII("committer");
+	private static final byte[] hcommitter = Constants.encodeASCII("committer"); //$NON-NLS-1$
 
-	private static final byte[] hencoding = Constants.encodeASCII("encoding");
+	private static final byte[] hencoding = Constants.encodeASCII("encoding"); //$NON-NLS-1$
 
 	private ObjectId treeId;
 
@@ -166,10 +166,7 @@ public class CommitBuilder {
 	 *            branch being merged into the current branch.
 	 */
 	public void setParentIds(AnyObjectId parent1, AnyObjectId parent2) {
-		if (!parent1.equals(parent2))
-			parentIds = new ObjectId[] { parent1.copy(), parent2.copy() };
-		else
-			parentIds = new ObjectId[] { parent1.copy() };
+		parentIds = new ObjectId[] { parent1.copy(), parent2.copy() };
 	}
 
 	/**
@@ -180,19 +177,8 @@ public class CommitBuilder {
 	 */
 	public void setParentIds(ObjectId... newParents) {
 		parentIds = new ObjectId[newParents.length];
-
-		int newParentCount = 0;
-		outer: for (int i = 0; i < newParents.length; i++) {
-			for (int j = 0; j < newParentCount; j++)
-				if (parentIds[j].equals(newParents[i]))
-					continue outer;
-			parentIds[newParentCount++] = newParents[i].copy();
-		}
-		if (newParentCount == parentIds.length)
-			return;
-		ObjectId[] tmpIds = new ObjectId[newParentCount];
-		System.arraycopy(parentIds, 0, tmpIds, 0, newParentCount);
-		parentIds = tmpIds;
+		for (int i = 0; i < newParents.length; i++)
+			parentIds[i] = newParents[i].copy();
 	}
 
 	/**
@@ -203,19 +189,8 @@ public class CommitBuilder {
 	 */
 	public void setParentIds(List<? extends AnyObjectId> newParents) {
 		parentIds = new ObjectId[newParents.size()];
-
-		int newParentCount = 0;
-		outer: for (AnyObjectId newId : newParents) {
-			for (int j = 0; j < newParentCount; j++)
-				if (parentIds[j].equals(newId))
-					continue outer;
-			parentIds[newParentCount++] = newId.copy();
-		}
-		if (newParentCount == parentIds.length)
-			return;
-		ObjectId[] tmpIds = new ObjectId[newParentCount];
-		System.arraycopy(parentIds, 0, tmpIds, 0, newParentCount);
-		parentIds = tmpIds;
+		for (int i = 0; i < newParents.size(); i++)
+			parentIds[i] = newParents.get(i).copy();
 	}
 
 	/**
@@ -228,9 +203,6 @@ public class CommitBuilder {
 		if (parentIds.length == 0) {
 			setParentId(additionalParent);
 		} else {
-			for (int i = 0; i < parentIds.length; i++)
-				if (parentIds[i].equals(additionalParent))
-					return;
 			ObjectId[] newParents = new ObjectId[parentIds.length + 1];
 			System.arraycopy(parentIds, 0, newParents, 0, parentIds.length);
 			newParents[parentIds.length] = additionalParent.copy();
@@ -350,6 +322,7 @@ public class CommitBuilder {
 		return build();
 	}
 
+	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();

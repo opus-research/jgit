@@ -2,6 +2,7 @@
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -75,6 +76,7 @@ import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -130,6 +132,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** Cached canonical length, initialized from {@link #idBuffer()} */
 	private long canonLen = -1;
+
+	/** The offset of the content id in {@link #idBuffer()} */
+	private int contentIdOffset;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -234,11 +239,16 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL)
-					return i.idBuffer();
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
+					contentIdOffset = i.idOffset();
+					contentIdFromPtr = ptr;
+					return contentId = i.idBuffer();
+				}
+				contentIdOffset = 0;
+			} else {
+				contentIdOffset = 0;
 			}
 		}
-
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -427,7 +437,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	@Override
 	public int idOffset() {
-		return 0;
+		return contentIdOffset;
 	}
 
 	@Override
@@ -638,7 +648,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (e == null)
 				continue;
 			final String name = e.getName();
-			if (".".equals(name) || "..".equals(name))
+			if (".".equals(name) || "..".equals(name)) //$NON-NLS-1$ //$NON-NLS-2$
 				continue;
 			if (Constants.DOT_GIT.equals(name))
 				continue;
@@ -746,11 +756,22 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		// Git under windows only stores seconds so we round the timestamp
 		// Java gives us if it looks like the timestamp in index is seconds
-		// only. Otherwise we compare the timestamp at millisecond precision.
+		// only. Otherwise we compare the timestamp at millisecond precision,
+		// unless core.checkstat is set to "minimal", in which case we only
+		// compare the whole second part.
 		long cacheLastModified = entry.getLastModified();
 		long fileLastModified = getEntryLastModified();
-		if (cacheLastModified % 1000 == 0)
-			fileLastModified = fileLastModified - fileLastModified % 1000;
+		long lastModifiedMillis = fileLastModified % 1000;
+		long cacheMillis = cacheLastModified % 1000;
+		if (getOptions().getCheckStat() == CheckStat.MINIMAL) {
+			fileLastModified = fileLastModified - lastModifiedMillis;
+			cacheLastModified = cacheLastModified - cacheMillis;
+		} else if (cacheMillis == 0)
+			fileLastModified = fileLastModified - lastModifiedMillis;
+		// Some Java version on Linux return whole seconds only even when
+		// the file systems supports more precision.
+		else if (lastModifiedMillis == 0)
+			cacheLastModified = cacheLastModified - cacheMillis;
 
 		if (fileLastModified != cacheLastModified)
 			return MetadataDiff.DIFFER_BY_TIMESTAMP;
@@ -929,7 +950,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 
 		public String toString() {
-			return getMode().toString() + " " + getName();
+			return getMode().toString() + " " + getName(); //$NON-NLS-1$
 		}
 
 		/**
@@ -1046,15 +1067,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					.getExcludesFile();
 			if (path != null) {
 				File excludesfile;
-				if (path.startsWith("~/"))
+				if (path.startsWith("~/")) //$NON-NLS-1$
 					excludesfile = fs.resolve(fs.userHome(), path.substring(2));
 				else
 					excludesfile = fs.resolve(null, path);
 				loadRulesFromFile(r, excludesfile);
 			}
 
-			File exclude = fs
-					.resolve(repository.getDirectory(), "info/exclude");
+			File exclude = fs.resolve(repository.getDirectory(),
+					Constants.INFO_EXCLUDE);
 			loadRulesFromFile(r, exclude);
 
 			return r.getRules().isEmpty() ? null : r;

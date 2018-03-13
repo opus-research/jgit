@@ -42,10 +42,13 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
+
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -74,10 +77,24 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * to finally execute the command. Each instance of this class should only be
  * used for one invocation of the command (means: one call to {@link #call()})
  * <p>
- * This is currently a very basic implementation which takes only one starting
- * revision as option.
+ * Examples (<code>git</code> is a {@link Git} instance):
+ * <p>
+ * Get newest 10 commits, starting from the current branch:
  *
- * TODO: add more options (revision ranges, sorting, ...)
+ * <pre>
+ * ObjectId head = repository.resolve(Constants.HEAD);
+ *
+ * Iterable&lt;RevCommit&gt; commits = git.log().add(head).setMaxCount(10).call();
+ * </pre>
+ * <p>
+ *
+ * <p>
+ * Get commits only for a specific file:
+ *
+ * <pre>
+ * git.log().add(head).addPath(&quot;dir/filename.txt&quot;).call();
+ * </pre>
+ * <p>
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-log.html"
  *      >Git documentation about Log</a>
@@ -238,22 +255,38 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             the references could not be accessed
 	 */
 	public LogCommand all() throws IOException {
-		for (Ref ref : getRepository().getAllRefs().values()) {
+		Map<String, Ref> refs = getRepository().getRefDatabase().getRefs(ALL);
+		for (Ref ref : refs.values()) {
+			if(!ref.isPeeled())
+				ref = getRepository().peel(ref);
+
 			ObjectId objectId = ref.getPeeledObjectId();
 			if (objectId == null)
 				objectId = ref.getObjectId();
-			add(objectId);
+			RevCommit commit = null;
+			try {
+				commit = walk.parseCommit(objectId);
+			} catch (MissingObjectException e) {
+				// ignore: the ref points to an object that does not exist;
+				// it should be ignored as traversal starting point.
+			} catch (IncorrectObjectTypeException e) {
+				// ignore: the ref points to an object that is not a commit
+				// (e.g. a tree or a blob);
+				// it should be ignored as traversal starting point.
+			}
+			if (commit != null)
+				add(commit);
 		}
 		return this;
 	}
 
 	/**
 	 * Show only commits that affect any of the specified paths. The path must
-	 * either name a file or a directory exactly. Note that regex expressions or
-	 * wildcards are not supported.
+	 * either name a file or a directory exactly and use <code>/</code> (slash)
+	 * as separator. Note that regex expressions or wildcards are not supported.
 	 *
 	 * @param path
-	 *            a path is relative to the top level of the repository
+	 *            a repository-relative path (with <code>/</code> as separator)
 	 * @return {@code this}
 	 */
 	public LogCommand addPath(String path) {

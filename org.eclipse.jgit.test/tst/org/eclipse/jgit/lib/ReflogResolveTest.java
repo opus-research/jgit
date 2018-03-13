@@ -49,6 +49,7 @@ import static org.junit.Assert.fail;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
@@ -69,6 +70,38 @@ public class ReflogResolveTest extends RepositoryTestCase {
 
 		assertEquals(c2, db.resolve("master@{0}"));
 		assertEquals(c1, db.resolve("master@{1}"));
+	}
+
+	@Test
+	public void resolveUnnamedCurrentBranchCommits() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit c1 = git.commit().setMessage("create file").call();
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit c2 = git.commit().setMessage("edit file").call();
+
+		assertEquals(c2, db.resolve("master@{0}"));
+		assertEquals(c1, db.resolve("master@{1}"));
+
+		git.checkout().setCreateBranch(true).setName("newbranch")
+				.setStartPoint(c1).call();
+
+		// same as current branch, e.g. master
+		assertEquals(c1, db.resolve("@{0}"));
+		try {
+			assertEquals(c1, db.resolve("@{1}"));
+			fail(); // Looking at wrong ref, e.g HEAD
+		} catch (RevisionSyntaxException e) {
+			assertNotNull(e);
+		}
+
+		// detached head, read HEAD reflog
+		git.checkout().setName(c2.getName()).call();
+		assertEquals(c2, db.resolve("@{0}"));
+		assertEquals(c1, db.resolve("@{1}"));
+		assertEquals(c2, db.resolve("@{2}"));
 	}
 
 	@Test
@@ -94,17 +127,37 @@ public class ReflogResolveTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void resolveNegativeEntryNumber() throws Exception {
+	public void resolvePreviousBranch() throws Exception {
 		Git git = new Git(db);
 		writeTrashFile("file.txt", "content");
 		git.add().addFilepattern("file.txt").call();
-		git.commit().setMessage("create file").call();
+		RevCommit c1 = git.commit().setMessage("create file").call();
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit c2 = git.commit().setMessage("edit file").call();
+
+		git.checkout().setCreateBranch(true).setName("newbranch")
+				.setStartPoint(c1).call();
+
+		git.checkout().setName(c1.getName()).call();
+
+		git.checkout().setName("master").call();
+
+		assertEquals(c1.getName(), db.simplify("@{-1}"));
+		assertEquals("newbranch", db.simplify("@{-2}"));
+		assertEquals("master", db.simplify("@{-3}"));
+
+		// chained expression
 		try {
-			db.resolve("master@{-12}");
-			fail("Exception not thrown");
+			// Cannot refer to reflog of detached head
+			db.resolve("@{-1}@{0}");
+			fail();
 		} catch (RevisionSyntaxException e) {
-			assertNotNull(e);
+			// good
 		}
+		assertEquals(c1.getName(), db.resolve("@{-2}@{0}").getName());
+
+		assertEquals(c2.getName(), db.resolve("@{-3}@{0}").getName());
 	}
 
 	@Test
