@@ -45,6 +45,9 @@
 package org.eclipse.jgit.internal.storage.file;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -142,8 +145,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		final ObjectLoader ldr = db.openObject(this, objectId);
 		if (ldr == null) {
 			if (typeHint == OBJ_ANY)
-				throw new MissingObjectException(objectId.copy(),
-						JGitText.get().unknownObjectType2);
+				throw new MissingObjectException(objectId.copy(), "unknown");
 			throw new MissingObjectException(objectId.copy(), typeHint);
 		}
 		if (typeHint != OBJ_ANY && ldr.getType() != typeHint)
@@ -162,8 +164,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		long sz = db.getObjectSize(this, objectId);
 		if (sz < 0) {
 			if (typeHint == OBJ_ANY)
-				throw new MissingObjectException(objectId.copy(),
-						JGitText.get().unknownObjectType2);
+				throw new MissingObjectException(objectId.copy(), "unknown");
 			throw new MissingObjectException(objectId.copy(), typeHint);
 		}
 		return sz;
@@ -231,13 +232,27 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return cnt - need;
 	}
 
-	public void copyPackAsIs(PackOutputStream out, CachedPack pack)
-			throws IOException {
-		((LocalCachedPack) pack).copyAsIs(out, this);
+	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
+			boolean validate) throws IOException {
+		((LocalCachedPack) pack).copyAsIs(out, validate, this);
 	}
 
-	void copyPackAsIs(final PackFile pack, final long length,
+	void copyPackAsIs(final PackFile pack, final long length, boolean validate,
 			final PackOutputStream out) throws IOException {
+		MessageDigest md = null;
+		if (validate) {
+			md = Constants.newMessageDigest();
+			byte[] buf = out.getCopyBuffer();
+			pin(pack, 0);
+			if (window.copy(0, buf, 0, 12) != 12) {
+				pack.setInvalid();
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packfileIsTruncated, pack.getPackFile()
+								.getPath()));
+			}
+			md.update(buf, 0, 12);
+		}
+
 		long position = 12;
 		long remaining = length - (12 + 20);
 		while (0 < remaining) {
@@ -245,9 +260,28 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 			int ptr = (int) (position - window.start);
 			int n = (int) Math.min(window.size() - ptr, remaining);
-			window.write(out, position, n);
+			window.write(out, position, n, md);
 			position += n;
 			remaining -= n;
+		}
+
+		if (md != null) {
+			byte[] buf = new byte[20];
+			byte[] actHash = md.digest();
+
+			pin(pack, position);
+			if (window.copy(position, buf, 0, 20) != 20) {
+				pack.setInvalid();
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packfileIsTruncated, pack.getPackFile()
+								.getPath()));
+			}
+			if (!Arrays.equals(actHash, buf)) {
+				pack.setInvalid();
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packfileCorruptionDetected, pack
+								.getPackFile().getPath()));
+			}
 		}
 	}
 
