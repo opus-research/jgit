@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.hooks;
-
-import java.io.IOException;
-import java.io.PrintStream;
-
-import org.eclipse.jgit.api.errors.AbortedByHookException;
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.errors;
 
 /**
- * The <code>post-commit</code> hook implementation. This hook is run after the
- * commit was successfully executed.
+ * Thrown when an external command failed
  *
- * @since 4.2
+ * @since 4.5
  */
-public class PostCommitHook extends GitHook<Void> {
+public class CommandFailedException extends Exception {
 
-	/** The post-commit hook name. */
-	public static final String NAME = "post-commit"; //$NON-NLS-1$
+	private static final long serialVersionUID = 1L;
+
+	private int returnCode;
 
 	/**
-	 * @param repo
-	 *            The repository
-	 * @param outputStream
-	 *            The output stream the hook must use. {@code null} is allowed,
-	 *            in which case the hook will use {@code System.out}.
+	 * @param returnCode
+	 *            return code returned by the command
+	 * @param message
+	 *            error message
 	 */
-	protected PostCommitHook(Repository repo, PrintStream outputStream) {
-		super(repo, outputStream);
+	public CommandFailedException(int returnCode, String message) {
+		super(message);
+		this.returnCode = returnCode;
 	}
 
-	@Override
-	public Void call() throws IOException, AbortedByHookException {
-		doRun();
-		return null;
+	/**
+	 * @param returnCode
+	 *            return code returned by the command
+	 * @param message
+	 *            error message
+	 * @param cause
+	 *            exception causing this exception
+	 */
+	public CommandFailedException(int returnCode, String message,
+			Throwable cause) {
+		super(message, cause);
+		this.returnCode = returnCode;
 	}
 
-	@Override
-	public String getHookName() {
-		return NAME;
+	/**
+	 * @return return code returned by the command
+	 */
+	public int getReturnCode() {
+		return returnCode;
 	}
-
 }

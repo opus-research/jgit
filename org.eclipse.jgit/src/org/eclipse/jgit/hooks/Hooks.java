@@ -68,17 +68,6 @@ public class Hooks {
 	 * @param repo
 	 * @param outputStream
 	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The pre-commit hook for the given repository.
-	 */
-	public static PostCommitHook postCommit(Repository repo,
-			PrintStream outputStream) {
-		return new PostCommitHook(repo, outputStream);
-	}
-
-	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
 	 * @return The commit-msg hook for the given repository.
 	 */
 	public static CommitMsgHook commitMsg(Repository repo,
