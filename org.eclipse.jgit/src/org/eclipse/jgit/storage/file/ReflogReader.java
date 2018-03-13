@@ -77,7 +77,8 @@ public class ReflogReader {
 	 * @throws IOException
 	 */
 	public ReflogEntry getLastEntry() throws IOException {
-		return getReverseEntry(0);
+		List<ReflogEntry> entries = getReverseEntries(1);
+		return entries.size() > 0 ? entries.get(0) : null;
 	}
 
 	/**
@@ -89,38 +90,8 @@ public class ReflogReader {
 	}
 
 	/**
-	 * Get specific entry in the reflog relative to the last entry which is
-	 * considered entry zero.
-	 *
-	 * @param number
-	 * @return reflog entry or null if not found
-	 * @throws IOException
-	 */
-	public ReflogEntry getReverseEntry(int number) throws IOException {
-		if (number < 0)
-			throw new IllegalArgumentException();
-
-		final byte[] log;
-		try {
-			log = IO.readFully(logName);
-		} catch (FileNotFoundException e) {
-			return null;
-		}
-
-		int rs = RawParseUtils.prevLF(log, log.length);
-		int current = 0;
-		while (rs >= 0) {
-			rs = RawParseUtils.prevLF(log, rs);
-			if (number == current)
-				return new ReflogEntry(log, rs < 0 ? 0 : rs + 2);
-			current++;
-		}
-		return null;
-	}
-
-	/**
 	 * @param max
-	 *            max number of entries to read
+	 *            max numer of entries to read
 	 * @return all reflog entries in reverse order
 	 * @throws IOException
 	 */
