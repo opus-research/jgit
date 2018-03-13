@@ -146,8 +146,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		if (containsSymrefs(pending)) {
 			// packed-refs file cannot store symrefs
 			reject(pending.get(0), REJECTED_OTHER_REASON,
-					JGitText.get().atomicSymRefNotSupported,
-					pending);
+					JGitText.get().atomicSymRefNotSupported, pending);
 			return;
 		}
 

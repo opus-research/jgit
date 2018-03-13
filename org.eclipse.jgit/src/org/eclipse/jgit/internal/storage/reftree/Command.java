@@ -161,8 +161,9 @@ public class Command {
 		this.cmd = cmd;
 	}
 
-	static Ref toRef(RevWalk rw, ObjectId id, @Nullable String target, String name,
-			boolean mustExist) throws MissingObjectException, IOException {
+	static Ref toRef(RevWalk rw, ObjectId id, @Nullable String target,
+			String name, boolean mustExist)
+			throws MissingObjectException, IOException {
 		if (target != null) {
 			return new SymbolicRef(name,
 					new ObjectIdRef.Unpeeled(NETWORK, target, id));

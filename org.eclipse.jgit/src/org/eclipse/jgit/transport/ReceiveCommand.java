@@ -216,10 +216,10 @@ public class ReceiveCommand {
 	 * @param name
 	 *            name of the reference to make symbolic.
 	 * @return command instance.
-	 * @since 4.9
+	 * @since 4.10
 	 */
-	public static ReceiveCommand link(ObjectId oldId, @NonNull String newTarget,
-			@NonNull String name) {
+	public static ReceiveCommand link(@NonNull ObjectId oldId,
+			@NonNull String newTarget, @NonNull String name) {
 		return new ReceiveCommand(oldId, newTarget, name);
 	}
 
@@ -233,7 +233,7 @@ public class ReceiveCommand {
 	 * @param name
 	 *            name of the reference to make symbolic.
 	 * @return command instance.
-	 * @since 4.9
+	 * @since 4.10
 	 */
 	public static ReceiveCommand link(@Nullable String oldTarget,
 			@NonNull String newTarget, @NonNull String name) {
@@ -250,10 +250,10 @@ public class ReceiveCommand {
 	 * @param name
 	 *            name of the reference to convert from symbolic.
 	 * @return command instance.
-	 * @since 4.9
+	 * @since 4.10
 	 */
-	public static ReceiveCommand unlink(String oldTarget, ObjectId newId,
-			@NonNull String name) {
+	public static ReceiveCommand unlink(@NonNull String oldTarget,
+			@NonNull ObjectId newId, @NonNull String name) {
 		return new ReceiveCommand(oldTarget, newId, name);
 	}
 
@@ -300,13 +300,16 @@ public class ReceiveCommand {
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name) {
 		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
+			throw new IllegalArgumentException(
+					JGitText.get().oldIdMustNotBeNull);
 		}
 		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
+			throw new IllegalArgumentException(
+					JGitText.get().newIdMustNotBeNull);
 		}
 		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(JGitText.get().nameMustNotBeNullOrEmpty);
+			throw new IllegalArgumentException(
+					JGitText.get().nameMustNotBeNullOrEmpty);
 		}
 		this.oldId = oldId;
 		this.oldSymref = null;
@@ -343,13 +346,16 @@ public class ReceiveCommand {
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
 		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
+			throw new IllegalArgumentException(
+					JGitText.get().oldIdMustNotBeNull);
 		}
 		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
+			throw new IllegalArgumentException(
+					JGitText.get().newIdMustNotBeNull);
 		}
 		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(JGitText.get().nameMustNotBeNullOrEmpty);
+			throw new IllegalArgumentException(
+					JGitText.get().nameMustNotBeNullOrEmpty);
 		}
 		this.oldId = oldId;
 		this.oldSymref = null;
@@ -378,7 +384,8 @@ public class ReceiveCommand {
 			}
 			break;
 		default:
-			throw new IllegalStateException(JGitText.get().enumValueNotSupported0);
+			throw new IllegalStateException(
+					JGitText.get().enumValueNotSupported0);
 		}
 		this.type = type;
 	}
@@ -394,7 +401,7 @@ public class ReceiveCommand {
 	 *            to indicate a ref deletion.
 	 * @param name
 	 *            name of the reference to make symbolic.
-	 * @since 4.9
+	 * @since 4.10
 	 */
 	private ReceiveCommand(ObjectId oldId, String newSymref, String name) {
 		if (oldId == null) {
@@ -431,7 +438,7 @@ public class ReceiveCommand {
 	 *            {@link ObjectId#zeroId()} to indicate a ref deletion.
 	 * @param name
 	 *            name of the reference to convert from symbolic.
-	 * @since 4.9
+	 * @since 4.10
 	 */
 	private ReceiveCommand(String oldSymref, ObjectId newId, String name) {
 		if (newId == null) {
@@ -467,7 +474,7 @@ public class ReceiveCommand {
 	 *            new target. Use {@code null} to indicate a ref deletion.
 	 * @param name
 	 *            name of the reference to make symbolic.
-	 * @since 4.9
+	 * @since 4.10
 	 */
 	private ReceiveCommand(@Nullable String oldTarget, String newTarget, String name) {
 		if (name == null || name.isEmpty()) {
@@ -547,12 +554,11 @@ public class ReceiveCommand {
 	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
 	 *
 	 * @param msg
-	 *            the message to describe this change. If null and appendStatus
-	 *            is false, the reflog will not be updated.
+	 *            the message to describe this change. If null and appendStatus is
+	 *            false, the reflog will not be updated.
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied
-	 *            message.
+	 *            forced-update) should be appended to the user supplied message.
 	 * @since 4.9
 	 */
 	public void setRefLogMessage(String msg, boolean appendStatus) {
@@ -584,8 +590,7 @@ public class ReceiveCommand {
 	/**
 	 * Force writing a reflog for the updated ref.
 	 *
-	 * @param force
-	 *            whether to force.
+	 * @param force whether to force.
 	 * @since 4.9
 	 */
 	public void setForceRefLog(boolean force) {
@@ -593,8 +598,8 @@ public class ReceiveCommand {
 	}
 
 	/**
-	 * Check whether this command has a custom reflog message setting that
-	 * should override defaults in any containing
+	 * Check whether this command has a custom reflog message setting that should
+	 * override defaults in any containing
 	 * {@link org.eclipse.jgit.lib.BatchRefUpdate}.
 	 * <p>
 	 * Does not take into account whether {@code #setForceRefLog(boolean)} has
@@ -643,8 +648,8 @@ public class ReceiveCommand {
 	/**
 	 * Check whether the reflog should be written regardless of repo defaults.
 	 *
-	 * @return whether force writing is enabled; null if {@code
-	 * #setForceRefLog(boolean)} was never called.
+	 * @return whether force writing is enabled; {@code null} if
+	 *         {@code #setForceRefLog(boolean)} was never called.
 	 * @since 4.9
 	 */
 	@Nullable
@@ -697,7 +702,8 @@ public class ReceiveCommand {
 		if (type == Type.UPDATE && !AnyObjectId.equals(oldId, newId)) {
 			RevObject o = walk.parseAny(oldId);
 			RevObject n = walk.parseAny(newId);
-			if (!(o instanceof RevCommit) || !(n instanceof RevCommit)
+			if (!(o instanceof RevCommit)
+					|| !(n instanceof RevCommit)
 					|| !walk.isMergedInto((RevCommit) o, (RevCommit) n))
 				setType(Type.UPDATE_NONFASTFORWARD);
 		}
@@ -822,7 +828,7 @@ public class ReceiveCommand {
 
 	void reject(IOException err) {
 		setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
-						JGitText.get().lockError, err.getMessage()));
+				JGitText.get().lockError, err.getMessage()));
 	}
 
 	@SuppressWarnings("nls")
