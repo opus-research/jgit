@@ -85,9 +85,9 @@ public class FileUtilTest extends TestCase {
 	public void testDeleteRecursive() throws IOException {
 		File f1 = new File(trash, "test/test/a");
 		assertTrue(f1.mkdirs());
-		assertTrue(f1.createNewFile());
+		f1.createNewFile();
 		File f2 = new File(trash, "test/test/b");
-		assertTrue(f2.createNewFile());
+		f2.createNewFile();
 		File d = new File(trash, "test");
 		FileUtils.delete(d, FileUtils.RECURSIVE);
 		assertFalse(d.exists());
