@@ -43,28 +43,20 @@
 
 package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.pgm.archive.ArchiveCommand;
-import org.eclipse.jgit.pgm.archive.TarFormat;
-import org.eclipse.jgit.pgm.archive.ZipFormat;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_archive")
 class Archive extends TextBuiltin {
-	static {
-		ArchiveCommand.registerFormat("tar", new TarFormat());
-		ArchiveCommand.registerFormat("zip", new ZipFormat());
-	}
-
 	@Argument(index = 0, metaVar = "metaVar_treeish")
 	private ObjectId tree;
 
 	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private String format = "zip";
+	private ArchiveCommand.Format format = ArchiveCommand.Format.ZIP;
 
 	@Override
 	protected void run() throws Exception {
@@ -76,8 +68,6 @@ class Archive extends TextBuiltin {
 			cmd.setTree(tree)
 					.setFormat(format)
 					.setOutputStream(outs).call();
-		} catch (GitAPIException e) {
-			throw die(e.getMessage());
 		} finally {
 			cmd.release();
 		}
