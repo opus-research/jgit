@@ -83,7 +83,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -265,11 +264,11 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void createDir(File f) throws IOException {
-		if (!db.getFS().isDirectory(f) && !f.mkdirs()) {
+		if (!f.isDirectory() && !f.mkdirs()) {
 			File p = f;
-			while (p != null && !db.getFS().exists(p))
+			while (p != null && !p.exists())
 				p = p.getParentFile();
-			if (p == null || db.getFS().isDirectory(p))
+			if (p == null || p.isDirectory())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 			FileUtils.delete(p);
 			if (!f.mkdirs())
@@ -715,10 +714,9 @@ public class ResolveMerger extends ThreeWayMerger {
 				// support write operations
 				throw new UnsupportedOperationException();
 
-			FS fs = db.getFS();
 			of = new File(workTree, tw.getPathString());
 			File parentFolder = of.getParentFile();
-			if (!fs.exists(parentFolder))
+			if (!parentFolder.exists())
 				parentFolder.mkdirs();
 			fos = new FileOutputStream(of);
 			try {
@@ -730,7 +728,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		} else if (!result.containsConflicts()) {
 			// When working inCore, only trivial merges can be handled,
 			// so we generate objects only in conflict free cases
-			of = File.createTempFile("merge_", "_temp", null);
+			of = File.createTempFile("merge_", "_temp", null); //$NON-NLS-1$ //$NON-NLS-2$
 			fos = new FileOutputStream(of);
 			try {
 				fmt.formatMerge(fos, result, Arrays.asList(commitNames),

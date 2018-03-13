@@ -60,8 +60,8 @@ public class FS_POSIX_Java6 extends FS_POSIX {
 	private static final Method setExecute;
 
 	static {
-		canExecute = needMethod(File.class, "canExecute");
-		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE);
+		canExecute = needMethod(File.class, "canExecute"); //$NON-NLS-1$
+		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE); //$NON-NLS-1$
 	}
 
 	/**

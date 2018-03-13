@@ -47,6 +47,7 @@ package org.eclipse.jgit.lib;
  * Constants for use with the Configuration classes: section names,
  * configuration keys
  */
+@SuppressWarnings("nls")
 public class ConfigConstants {
 	/** The "core" section */
 	public static final String CONFIG_CORE_SECTION = "core";
@@ -119,9 +120,6 @@ public class ConfigConstants {
 
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
-
-	/** The "symlinks key */
-	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
 
 	/** The "streamFileThreshold" key */
 	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
