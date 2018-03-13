@@ -71,10 +71,6 @@ public interface HttpConnection {
 	 * @see HttpURLConnection#HTTP_OK
 	 */
 	public static final int HTTP_OK = java.net.HttpURLConnection.HTTP_OK;
-	/**
-	 * @see HttpURLConnection#HTTP_MOVED_PERM
-	 */
-	public static final int HTTP_MOVED_PERM = java.net.HttpURLConnection.HTTP_MOVED_PERM;
 
 	/**
 	 * @see HttpURLConnection#HTTP_NOT_FOUND

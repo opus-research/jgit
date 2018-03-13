@@ -141,9 +141,6 @@ public class HttpSupport {
 	/** The {@code Accept-Encoding} header. */
 	public static final String HDR_ACCEPT_ENCODING = "Accept-Encoding"; //$NON-NLS-1$
 
-	/** The {@code Location} header. */
-	public static final String HDR_LOCATION = "Location"; //$NON-NLS-1$
-
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_GZIP = "gzip"; //$NON-NLS-1$
 
@@ -235,18 +232,6 @@ public class HttpSupport {
 						JGitText.get().connectionTimeOut, host));
 			throw new ConnectException(ce.getMessage() + " " + host); //$NON-NLS-1$
 		}
-	}
-
-	/**
-	 * Extract a HTTP header from the response.
-	 * @param c connection the header should be obtained from.
-	 * @param headerField the header name
-	 * @return the header value
-	 * @throws IOException
-	 *             communications error prevented obtaining the header.
-	 */
-	public static String responseHeader(final HttpConnection c, final String headerField) throws IOException {
-		return c.getHeaderField(headerField);
 	}
 
 	/**
