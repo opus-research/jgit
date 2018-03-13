@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Robin Rosenberg <me@lathund.dewire.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,91 +43,83 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.internal.FS_Win32;
+class FS_POSIX_Java6 extends FS_POSIX {
+	private static final Method canExecute;
 
-/**
- * FS for Java7 on Windows
- */
-public class FS_Win32_Java7 extends FS_Win32 {
+	private static final Method setExecute;
 
-	FS_Win32_Java7(FS src) {
-		super(src);
+	static {
+		canExecute = needMethod(File.class, "canExecute"); //$NON-NLS-1$
+		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE); //$NON-NLS-1$
 	}
 
-	FS_Win32_Java7() {
+	static boolean hasExecute() {
+		return canExecute != null && setExecute != null;
+	}
+
+	private static Method needMethod(final Class<?> on, final String name,
+			final Class<?>... args) {
+		try {
+			return on.getMethod(name, args);
+		} catch (SecurityException e) {
+			return null;
+		} catch (NoSuchMethodException e) {
+			return null;
+		}
+	}
+
+	FS_POSIX_Java6() {
+		super();
+	}
+
+	FS_POSIX_Java6(FS src) {
+		super(src);
 	}
 
 	@Override
 	public FS newInstance() {
-		return new FS_Win32_Java7(this);
+		return new FS_POSIX_Java6(this);
 	}
 
-	@Override
-	public boolean supportsSymlinks() {
+	public boolean supportsExecute() {
 		return true;
 	}
 
-	@Override
-	public boolean isSymLink(File path) throws IOException {
-		return FileUtil.isSymlink(path);
+	public boolean canExecute(final File f) {
+		try {
+			final Object r = canExecute.invoke(f, (Object[]) null);
+			return ((Boolean) r).booleanValue();
+		} catch (IllegalArgumentException e) {
+			throw new Error(e);
+		} catch (IllegalAccessException e) {
+			throw new Error(e);
+		} catch (InvocationTargetException e) {
+			throw new Error(e);
+		}
+	}
+
+	public boolean setExecute(final File f, final boolean canExec) {
+		try {
+			final Object r;
+			r = setExecute.invoke(f, new Object[] { Boolean.valueOf(canExec) });
+			return ((Boolean) r).booleanValue();
+		} catch (IllegalArgumentException e) {
+			throw new Error(e);
+		} catch (IllegalAccessException e) {
+			throw new Error(e);
+		} catch (InvocationTargetException e) {
+			throw new Error(e);
+		}
 	}
 
 	@Override
-	public long lastModified(File path) throws IOException {
-		return FileUtil.lastModified(path);
-	}
-
-	@Override
-	public void setLastModified(File path, long time) throws IOException {
-		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public long length(File f) throws IOException {
-		return FileUtil.getLength(f);
-	}
-
-	@Override
-	public boolean exists(File path) {
-		return FileUtil.exists(path);
-	}
-
-	@Override
-	public boolean isDirectory(File path) {
-		return FileUtil.isDirectory(path);
-	}
-
-	public boolean isFile(File path) {
-		Path nioPath = path.toPath();
-		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
-	}
-
-	@Override
-	public boolean isHidden(File path) throws IOException {
-		return FileUtil.isHidden(path);
-	}
-
-	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtil.setHidden(path, hidden);
-	}
-
-	@Override
-	public String readSymLink(File path) throws IOException {
-		return FileUtil.readSymlink(path);
-	}
-
-	@Override
-	public void createSymLink(File path, String target) throws IOException {
-		FileUtil.createSymLink(path, target);
+	public boolean retryFailedLockFileCommit() {
+		return false;
 	}
 }
