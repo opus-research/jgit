@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,51 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.revwalk;
+package org.eclipse.jgit.diff;
 
-public abstract class RevQueueTestCase<T extends AbstractRevQueue> extends
-		RevWalkTestCase {
-	protected T q;
-
-	public void setUp() throws Exception {
-		super.setUp();
-		q = create();
+public class DiffTestDataGenerator {
+	/**
+	 * Generate sequence of characters in ascending order. The first character
+	 * is a space. All subsequent characters have an ASCII code one greater then
+	 * the ASCII code of the preceding character. On exception: the character
+	 * following which follows '~' is again a ' '.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len) {
+		return generateSequence(len, 0, 0);
 	}
 
-	protected abstract T create();
-
-	public void testEmpty() throws Exception {
-		assertNull(q.next());
-		assertTrue(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertFalse(q.anybodyHasFlag(RevWalk.UNINTERESTING));
-	}
-
-	public void testClear() throws Exception {
-		final RevCommit a = parse(commit());
-		final RevCommit b = parse(commit(a));
-
-		q.add(a);
-		q.add(b);
-		q.clear();
-		assertNull(q.next());
-	}
-
-	public void testHasFlags() throws Exception {
-		final RevCommit a = parse(commit());
-		final RevCommit b = parse(commit(a));
-
-		q.add(a);
-		q.add(b);
-
-		assertFalse(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertFalse(q.anybodyHasFlag(RevWalk.UNINTERESTING));
-
-		a.flags |= RevWalk.UNINTERESTING;
-		assertFalse(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertTrue(q.anybodyHasFlag(RevWalk.UNINTERESTING));
-
-		b.flags |= RevWalk.UNINTERESTING;
-		assertTrue(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertTrue(q.anybodyHasFlag(RevWalk.UNINTERESTING));
+	/**
+	 * Generate sequence of characters similar to the one returned by
+	 * {@link #generateSequence(int)}. But this time in each chunk of
+	 * <skipPeriod> characters the last <skipLength> characters are left out. By
+	 * calling this method twice with two different prime skipPeriod values and
+	 * short skipLength values you create test data which is similar to what
+	 * programmers do to their source code - huge files with only few
+	 * insertions/deletions/changes.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @param skipPeriod
+	 * @param skipLength
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len, int skipPeriod,
+			int skipLength) {
+		StringBuilder text = new StringBuilder(len);
+		int skipStart = skipPeriod - skipLength;
+		int skippedChars = 0;
+		for (int i = 0; i - skippedChars < len; ++i) {
+			if (skipPeriod == 0 || i % skipPeriod < skipStart) {
+				text.append((char) (32 + i % 95));
+			} else {
+				skippedChars++;
+			}
+		}
+		return text.toString();
 	}
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009, Johannes E. Schindelin
+ * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,51 +42,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.revwalk;
+package org.eclipse.jgit.diff;
 
-public abstract class RevQueueTestCase<T extends AbstractRevQueue> extends
-		RevWalkTestCase {
-	protected T q;
+import junit.framework.TestCase;
 
-	public void setUp() throws Exception {
-		super.setUp();
-		q = create();
+public class MyersDiffTest extends TestCase {
+	public void testAtEnd() {
+		assertDiff("HELLO", "HELL", " -4,1 +4,0");
 	}
 
-	protected abstract T create();
-
-	public void testEmpty() throws Exception {
-		assertNull(q.next());
-		assertTrue(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertFalse(q.anybodyHasFlag(RevWalk.UNINTERESTING));
+	public void testAtStart() {
+		assertDiff("Git", "JGit", " -0,0 +0,1");
 	}
 
-	public void testClear() throws Exception {
-		final RevCommit a = parse(commit());
-		final RevCommit b = parse(commit(a));
-
-		q.add(a);
-		q.add(b);
-		q.clear();
-		assertNull(q.next());
+	public void testSimple() {
+		assertDiff("HELLO WORLD", "LOW",
+			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
+		// is ambiguous, could be this, too:
+		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
 	}
 
-	public void testHasFlags() throws Exception {
-		final RevCommit a = parse(commit());
-		final RevCommit b = parse(commit(a));
+	public void assertDiff(String a, String b, String edits) {
+		MyersDiff diff = new MyersDiff(toCharArray(a), toCharArray(b));
+		assertEquals(edits, toString(diff.getEdits()));
+	}
 
-		q.add(a);
-		q.add(b);
+	private static String toString(EditList list) {
+		StringBuilder builder = new StringBuilder();
+		for (Edit e : list)
+			builder.append(" -" + e.beginA
+					+ "," + (e.endA - e.beginA)
+				+ " +" + e.beginB + "," + (e.endB - e.beginB));
+		return builder.toString();
+	}
 
-		assertFalse(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertFalse(q.anybodyHasFlag(RevWalk.UNINTERESTING));
+	private static CharArray toCharArray(String s) {
+		return new CharArray(s);
+	}
 
-		a.flags |= RevWalk.UNINTERESTING;
-		assertFalse(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertTrue(q.anybodyHasFlag(RevWalk.UNINTERESTING));
+	protected static String toString(Sequence seq, int begin, int end) {
+		CharArray a = (CharArray)seq;
+		return new String(a.array, begin, end - begin);
+	}
 
-		b.flags |= RevWalk.UNINTERESTING;
-		assertTrue(q.everbodyHasFlag(RevWalk.UNINTERESTING));
-		assertTrue(q.anybodyHasFlag(RevWalk.UNINTERESTING));
+	protected static String toString(CharArray a, CharArray b,
+			int x, int k) {
+		return "(" + x + "," + (k + x)
+			+ (x < 0 ? '<' :
+					(x >= a.array.length ?
+					 '>' : a.array[x]))
+			+ (k + x < 0 ? '<' :
+					(k + x >= b.array.length ?
+					 '>' : b.array[k + x]))
+			+ ")";
+	}
+
+	private static class CharArray implements Sequence {
+		char[] array;
+		public CharArray(String s) { array = s.toCharArray(); }
+		public int size() { return array.length; }
+		public boolean equals(int i, Sequence other, int j) {
+			CharArray o = (CharArray)other;
+			return array[i] == o.array[j];
+		}
 	}
 }
