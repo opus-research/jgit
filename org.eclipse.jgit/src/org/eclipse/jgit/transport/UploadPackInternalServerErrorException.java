@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+package org.eclipse.jgit.transport;
 
-import java.util.Collection;
+import java.io.IOException;
 
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.junit.Before;
-import org.junit.Test;
+/** UploadPack has already reported an error to the client. */
+public class UploadPackInternalServerErrorException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-public class ReflogCommandTest extends RepositoryTestCase {
-
-	private Git git;
-
-	private RevCommit commit1, commit2;
-
-	private static final String FILE = "test.txt";
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-
-		git = new Git(db);
-		// commit something
-		writeTrashFile(FILE, "Hello world");
-		git.add().addFilepattern(FILE).call();
-		commit1 = git.commit().setMessage("Initial commit").call();
-		git.rm().addFilepattern(FILE).call();
-		commit2 = git.commit().setMessage("Removed file").call();
-		git.notesAdd().setObjectId(commit1)
-				.setMessage("data").call();
+	/**
+	 * Initialize a new exception.
+	 *
+	 * @param why
+	 *            root cause.
+	 */
+	public UploadPackInternalServerErrorException(Throwable why) {
+		super(why);
 	}
-
-	@Test
-	public void testReflog() throws Exception {
-		Collection<ReflogEntry> reflog = git.reflog().call();
-		assertTrue(reflog.size() == 2);
-		ReflogEntry[] reflogs = reflog.toArray(new ReflogEntry[reflog.size()]);
-		assertEquals(reflogs[1].getComment(), "commit: Initial commit");
-		assertEquals(reflogs[0].getNewId(), commit2.getId());
-		assertEquals(reflogs[0].getOldId(), commit1.getId());
-	}
-
 }
