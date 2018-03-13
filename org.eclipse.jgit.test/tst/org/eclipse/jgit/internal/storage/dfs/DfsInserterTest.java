@@ -45,7 +45,6 @@ package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -98,7 +97,6 @@ public class DfsInserterTest {
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 
 		ObjectReader reader = ins.newReader();
-		assertSame(ins, reader.getCreatedFromInserter());
 		assertEquals("foo", readString(reader.open(id1)));
 		assertEquals("bar", readString(reader.open(id2)));
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
@@ -120,7 +118,6 @@ public class DfsInserterTest {
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 
 		ObjectReader reader = ins.newReader();
-		assertSame(ins, reader.getCreatedFromInserter());
 		assertTrue(Arrays.equals(data, readStream(reader.open(id1))));
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 		ins.flush();
@@ -139,7 +136,6 @@ public class DfsInserterTest {
 		assertEquals(1, db.getObjectDatabase().listPacks().size());
 
 		ObjectReader reader = ins.newReader();
-		assertSame(ins, reader.getCreatedFromInserter());
 		assertEquals("foo", readString(reader.open(id1)));
 		assertEquals("bar", readString(reader.open(id2)));
 		assertEquals(1, db.getObjectDatabase().listPacks().size());
@@ -158,7 +154,6 @@ public class DfsInserterTest {
 		assertFalse(abbr1.equals(abbr2));
 
 		ObjectReader reader = ins.newReader();
-		assertSame(ins, reader.getCreatedFromInserter());
 		Collection<ObjectId> objs;
 		objs = reader.resolve(AbbreviatedObjectId.fromString(abbr1));
 		assertEquals(1, objs.size());
