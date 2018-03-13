@@ -124,7 +124,7 @@ public class RepositoryFilter implements Filter {
 			((HttpServletResponse) rsp).sendError(SC_NOT_FOUND);
 			return;
 		}
-		if (name.length() > 0 && name.charAt(0) == '/')
+		if (name.startsWith("/"))
 			name = name.substring(1);
 
 		final Repository db;
