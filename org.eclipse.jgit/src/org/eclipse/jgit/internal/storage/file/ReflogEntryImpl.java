@@ -44,7 +44,6 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import java.io.IOException;
 import java.io.Serializable;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -69,16 +68,16 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 
 	private String comment;
 
-	ReflogEntryImpl(byte[] raw, int pos) throws IOException {
+	ReflogEntryImpl(byte[] raw, int pos) {
 		oldId = ObjectId.fromString(raw, pos);
 		pos += Constants.OBJECT_ID_STRING_LENGTH;
 		if (raw[pos++] != ' ')
-			throw new IOException(
+			throw new IllegalArgumentException(
 					JGitText.get().rawLogMessageDoesNotParseAsLogEntry);
-		newId = ObjectId.fromStringCheck(raw, pos);
+		newId = ObjectId.fromString(raw, pos);
 		pos += Constants.OBJECT_ID_STRING_LENGTH;
 		if (raw[pos++] != ' ') {
-			throw new IOException(
+			throw new IllegalArgumentException(
 					JGitText.get().rawLogMessageDoesNotParseAsLogEntry);
 		}
 		who = RawParseUtils.parsePersonIdentOnly(raw, pos);
