@@ -48,37 +48,28 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Set;
 
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
-import org.junit.Test;
 
 /**
  * Test reading of git config
  */
-public class ConfigTest {
-	@Test
+public class ConfigTest extends TestCase {
 	public void test001_ReadBareKey() throws ConfigInvalidException {
 		final Config c = parse("[foo]\nbar\n");
 		assertEquals(true, c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
-	@Test
 	public void test002_ReadWithSubsection() throws ConfigInvalidException {
 		final Config c = parse("[foo \"zip\"]\nbar\n[foo \"zap\"]\nbar=false\nn=3\n");
 		assertEquals(true, c.getBoolean("foo", "zip", "bar", false));
@@ -89,7 +80,6 @@ public class ConfigTest {
 		assertEquals(4, c.getInt("foo", "zap","m", 4));
 	}
 
-	@Test
 	public void test003_PutRemote() {
 		final Config c = new Config();
 		c.setString("sec", "ext", "name", "value");
@@ -98,7 +88,6 @@ public class ConfigTest {
 		assertEquals(expText, c.toText());
 	}
 
-	@Test
 	public void test004_PutGetSimple() {
 		Config c = new Config();
 		c.setString("my", null, "somename", "false");
@@ -106,7 +95,6 @@ public class ConfigTest {
 		assertEquals("[my]\n\tsomename = false\n", c.toText());
 	}
 
-	@Test
 	public void test005_PutGetStringList() {
 		Config c = new Config();
 		final LinkedList<String> values = new LinkedList<String>();
@@ -122,20 +110,17 @@ public class ConfigTest {
 		assertEquals(expText, c.toText());
 	}
 
-	@Test
 	public void test006_readCaseInsensitive() throws ConfigInvalidException {
 		final Config c = parse("[Foo]\nBar\n");
 		assertEquals(true, c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
-	@Test
 	public void test007_readUserConfig() {
 		final MockSystemReader mockSystemReader = new MockSystemReader();
 		SystemReader.setInstance(mockSystemReader);
 		final String hostname = mockSystemReader.getHostname();
-		final Config userGitConfig = mockSystemReader.openUserConfig(null,
-				FS.DETECTED);
+		final Config userGitConfig = mockSystemReader.openUserConfig(FS.DETECTED);
 		final Config localConfig = new Config(userGitConfig);
 		mockSystemReader.clearProperties();
 
@@ -190,7 +175,6 @@ public class ConfigTest {
 		assertEquals("author@localemail", authorEmail);
 	}
 
-	@Test
 	public void testReadBoolean_TrueFalse1() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = true\nb = false\n");
 		assertEquals("true", c.getString("s", null, "a"));
@@ -200,7 +184,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_TrueFalse2() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = TrUe\nb = fAlSe\n");
 		assertEquals("TrUe", c.getString("s", null, "a"));
@@ -210,7 +193,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_YesNo1() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = yes\nb = no\n");
 		assertEquals("yes", c.getString("s", null, "a"));
@@ -220,7 +202,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_YesNo2() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = yEs\nb = NO\n");
 		assertEquals("yEs", c.getString("s", null, "a"));
@@ -230,7 +211,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_OnOff1() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = on\nb = off\n");
 		assertEquals("on", c.getString("s", null, "a"));
@@ -240,7 +220,6 @@ public class ConfigTest {
 		assertFalse(c.getBoolean("s", "b", true));
 	}
 
-	@Test
 	public void testReadBoolean_OnOff2() throws ConfigInvalidException {
 		final Config c = parse("[s]\na = ON\nb = OFF\n");
 		assertEquals("ON", c.getString("s", null, "a"));
@@ -254,7 +233,6 @@ public class ConfigTest {
 		ONE_TWO;
 	}
 
-	@Test
 	public void testGetEnum() throws ConfigInvalidException {
 		Config c = parse("[s]\na = ON\nb = input\nc = true\nd = off\n");
 		assertSame(CoreConfig.AutoCRLF.TRUE, c.getEnum("s", null, "a",
@@ -277,14 +255,12 @@ public class ConfigTest {
 		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
 	}
 
-	@Test
 	public void testSetEnum() {
 		final Config c = new Config();
 		c.setEnum("s", "b", "c", TestEnum.ONE_TWO);
 		assertEquals("[s \"b\"]\n\tc = one two\n", c.toText());
 	}
 
-	@Test
 	public void testReadLong() throws ConfigInvalidException {
 		assertReadLong(1L);
 		assertReadLong(-1L);
@@ -302,7 +278,6 @@ public class ConfigTest {
 		}
 	}
 
-	@Test
 	public void testBooleanWithNoValue() throws ConfigInvalidException {
 		Config c = parse("[my]\n\tempty\n");
 		assertEquals("", c.getString("my", null, "empty"));
@@ -312,7 +287,6 @@ public class ConfigTest {
 		assertEquals("[my]\n\tempty\n", c.toText());
 	}
 
-	@Test
 	public void testEmptyString() throws ConfigInvalidException {
 		Config c = parse("[my]\n\tempty =\n");
 		assertNull(c.getString("my", null, "empty"));
@@ -333,7 +307,6 @@ public class ConfigTest {
 		assertEquals("[my]\n\tempty =\n", c.toText());
 	}
 
-	@Test
 	public void testUnsetBranchSection() throws ConfigInvalidException {
 		Config c = parse("" //
 				+ "[branch \"keep\"]\n"
@@ -355,7 +328,6 @@ public class ConfigTest {
 				+ "  packedGitLimit = 14\n", c.toText());
 	}
 
-	@Test
 	public void testUnsetSingleSection() throws ConfigInvalidException {
 		Config c = parse("" //
 				+ "[branch \"keep\"]\n"
@@ -376,7 +348,6 @@ public class ConfigTest {
 				+ "  packedGitLimit = 14\n", c.toText());
 	}
 
-	@Test
 	public void test008_readSectionNames() throws ConfigInvalidException {
 		final Config c = parse("[a]\n [B]\n");
 		Set<String> sections = c.getSections();
@@ -384,7 +355,6 @@ public class ConfigTest {
 		assertTrue("Sections should contain \"b\"", sections.contains("b"));
 	}
 
-	@Test
 	public void test009_readNamesInSection() throws ConfigInvalidException {
 		String configString = "[core]\n" + "repositoryformatversion = 0\n"
 				+ "filemode = false\n" + "logallrefupdates = true\n";
@@ -395,7 +365,6 @@ public class ConfigTest {
 				.contains("filemode"));
 	}
 
-	@Test
 	public void test010_readNamesInSubSection() throws ConfigInvalidException {
 		String configString = "[a \"sub1\"]\n"//
 				+ "x = 0\n" //
@@ -416,7 +385,6 @@ public class ConfigTest {
 		assertTrue("Subsection should contain \"b\"", names.contains("b"));
 	}
 
-	@Test
 	public void testQuotingForSubSectionNames() {
 		String resultPattern = "[testsection \"{0}\"]\n\ttestname = testvalue\n";
 		String result;

@@ -43,13 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.net.URI;
 import java.util.List;
@@ -75,7 +68,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.Transport;
@@ -93,7 +85,7 @@ public class HttpClientTests extends HttpTestCase {
 
 	private URIish smartAuthBasicURI;
 
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		remoteRepository = createTestRepository();
@@ -344,9 +336,8 @@ public class HttpClientTests extends HttpTestCase {
 
 	public void testListRemote_Smart_UploadPackDisabled() throws Exception {
 		FileRepository src = remoteRepository.getRepository();
-		final FileBasedConfig cfg = src.getConfig();
-		cfg.setBoolean("http", null, "uploadpack", false);
-		cfg.save();
+		src.getConfig().setBoolean("http", null, "uploadpack", false);
+		src.getConfig().save();
 
 		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, smartAuthNoneURI);
