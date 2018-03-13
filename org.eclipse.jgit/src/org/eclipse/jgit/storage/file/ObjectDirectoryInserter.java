@@ -146,7 +146,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
 	private File toTemp(final MessageDigest md, final int type, long len,
 			final InputStream is) throws IOException, FileNotFoundException,
 			Error {
@@ -186,7 +185,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 	}
 
-	@SuppressWarnings("resource" /* java 7 */)
 	private File toTemp(final int type, final byte[] buf, final int pos,
 			final int len) throws IOException, FileNotFoundException {
 		boolean delete = true;

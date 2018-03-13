@@ -121,9 +121,7 @@ public class EolCanonicalizingInputStreamTest {
 			}
 
 			assertEquals(expected.length, read);
-			cis2.close();
 		}
-		cis1.close();
 	}
 
 	private static byte[] asBytes(String in) {
