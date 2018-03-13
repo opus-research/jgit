@@ -55,6 +55,7 @@ import java.util.List;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.HistogramDiff;
 import org.eclipse.jgit.diff.MyersDiff;
+import org.eclipse.jgit.diff.PatienceDiff;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.errors.LargeObjectException;
@@ -101,6 +102,32 @@ class DiffAlgorithms extends TextBuiltin {
 		}
 	};
 
+	final Algorithm patience = new Algorithm() {
+		DiffAlgorithm create() {
+			PatienceDiff d = new PatienceDiff();
+			d.setFallbackAlgorithm(null);
+			return d;
+		}
+	};
+
+	final Algorithm patience_myers = new Algorithm() {
+		DiffAlgorithm create() {
+			PatienceDiff d = new PatienceDiff();
+			d.setFallbackAlgorithm(MyersDiff.INSTANCE);
+			return d;
+		}
+	};
+
+	final Algorithm patience_histogram_myers = new Algorithm() {
+		DiffAlgorithm create() {
+			HistogramDiff d2 = new HistogramDiff();
+			d2.setFallbackAlgorithm(MyersDiff.INSTANCE);
+			PatienceDiff d1 = new PatienceDiff();
+			d1.setFallbackAlgorithm(d2);
+			return d1;
+		}
+	};
+
 	// -----------------------------------------------------------------------
 	//
 	// Implementation of the suite lives below this line.
@@ -110,13 +137,13 @@ class DiffAlgorithms extends TextBuiltin {
 	@Option(name = "--algorithm", multiValued = true, metaVar = "NAME", usage = "Enable algorithm(s)")
 	List<String> algorithms = new ArrayList<String>();
 
-	@Option(name = "--text-limit", metaVar = "LIMIT", usage = "Maximum size in KiB to scan")
+	@Option(name = "--text-limit", metaVar = "LIMIT", usage = "Maximum size in KiB to scan per file revision")
 	int textLimit = 15 * 1024; // 15 MiB as later we do * 1024.
 
 	@Option(name = "--repository", aliases = { "-r" }, multiValued = true, metaVar = "GIT_DIR", usage = "Repository to scan")
 	List<File> gitDirs = new ArrayList<File>();
 
-	@Option(name = "--count", metaVar = "LIMIT", usage = "Number of files to consider")
+	@Option(name = "--count", metaVar = "LIMIT", usage = "Number of file revisions to be compared")
 	int count = 0; // unlimited
 
 	private final RawTextComparator cmp = RawTextComparator.DEFAULT;
@@ -248,17 +275,23 @@ class DiffAlgorithms extends TextBuiltin {
 				name = parent.getName();
 			out.println(name + ": start at " + startId.name());
 		}
-		out.format("  %12d files, %8d commits\n", files, commits);
 
-		out.format("%-25s %12s ( N=%-10d N=%-10d )\n", //
-				"Algorithm", "Time (ns)", minN, maxN);
-		out.println("-----------------------------------------------------");
+		out.format("  %12d files,     %8d commits\n", files, commits);
+		out.format("  N=%10d min lines, %8d max lines\n", minN, maxN);
+
+		out.format("%-25s %12s ( %12s  %12s )\n", //
+				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
+		out.format("%-25s %12s ( %12s  %12s )\n", //
+				"", "", "N=" + minN, "N=" + maxN);
+		out.println("-----------------------------------------------------"
+				+ "----------------");
+
 		for (Test test : all) {
-			out.format("%-25s %12d ( %12d %12d )", //
+			out.format("%-25s %12d ( %12d  %12d )", //
 					test.algorithm.name, //
 					test.runningTimeNanos, //
-					test.min.runningTimeNanos, //
-					test.max.runningTimeNanos);
+					test.minN.runningTimeNanos, //
+					test.maxN.runningTimeNanos);
 			out.println();
 		}
 		out.println();
@@ -295,16 +328,16 @@ class DiffAlgorithms extends TextBuiltin {
 
 		test.runningTimeNanos += runTime;
 
-		if (test.min == null || a.size() + b.size() < test.min.n) {
-			test.min = new Run();
-			test.min.n = a.size() + b.size();
-			test.min.runningTimeNanos = runTime;
+		if (test.minN == null || a.size() + b.size() < test.minN.n) {
+			test.minN = new Run();
+			test.minN.n = a.size() + b.size();
+			test.minN.runningTimeNanos = runTime;
 		}
 
-		if (test.max == null || a.size() + b.size() > test.max.n) {
-			test.max = new Run();
-			test.max.n = a.size() + b.size();
-			test.max.runningTimeNanos = runTime;
+		if (test.maxN == null || a.size() + b.size() > test.maxN.n) {
+			test.maxN = new Run();
+			test.maxN.n = a.size() + b.size();
+			test.maxN.runningTimeNanos = runTime;
 		}
 	}
 
@@ -317,7 +350,7 @@ class DiffAlgorithms extends TextBuiltin {
 					f.setAccessible(true);
 					Algorithm alg = (Algorithm) f.get(this);
 					alg.name = f.getName();
-					if (include(alg.name, algorithms)) {
+					if (included(alg.name, algorithms)) {
 						Test test = new Test();
 						test.algorithm = alg;
 						all.add(test);
@@ -333,7 +366,7 @@ class DiffAlgorithms extends TextBuiltin {
 		return all;
 	}
 
-	private static boolean include(String name, List<String> want) {
+	private static boolean included(String name, List<String> want) {
 		if (want.isEmpty())
 			return true;
 		for (String s : want) {
@@ -354,9 +387,9 @@ class DiffAlgorithms extends TextBuiltin {
 
 		long runningTimeNanos;
 
-		Run min;
+		Run minN;
 
-		Run max;
+		Run maxN;
 	}
 
 	private static class Run {
