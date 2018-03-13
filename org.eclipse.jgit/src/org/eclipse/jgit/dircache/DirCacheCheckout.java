@@ -508,7 +508,7 @@ public class DirCacheCheckout {
 
 	void processEntry(AbstractTreeIterator h, AbstractTreeIterator m,
 			DirCacheBuildIterator i, WorkingTreeIterator f) throws IOException {
-		DirCacheEntry dce = i != null ? i.getDirCacheEntry() : null;
+		DirCacheEntry dce;
 
 		String name = walk.getPathString();
 
@@ -595,7 +595,7 @@ public class DirCacheCheckout {
 			switch (ffMask) {
 			case 0xDDF: // 1 2
 				if (isModified(name)) {
-					conflict(name, dce, h, m); // 1
+					conflict(name, i.getDirCacheEntry(), h, m); // 1
 				} else {
 					update(name, mId, mMode); // 2
 				}
@@ -625,40 +625,41 @@ public class DirCacheCheckout {
 				break;
 			case 0xDF0: // conflict without a rule
 			case 0x0FD: // 15
-				conflict(name, dce, h, m);
+				conflict(name, (i != null) ? i.getDirCacheEntry() : null, h, m);
 				break;
 			case 0xFDF: // 7 8 9
 				if (equalIdAndMode(hId, hMode, mId, mMode)) {
 					if (isModified(name))
-						conflict(name, dce, h, m); // 8
+						conflict(name, i.getDirCacheEntry(), h, m); // 8
 					else
 						update(name, mId, mMode); // 7
 				} else if (!isModified(name))
 					update(name, mId, mMode); // 9
 				else
 					// To be confirmed - this case is not in the table.
-					conflict(name, dce, h, m);
+					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
 			case 0xFD0: // keep without a rule
-				keep(dce);
+				keep(i.getDirCacheEntry());
 				break;
 			case 0xFFD: // 12 13 14
-				if (equalIdAndMode(hId, hMode, iId, iMode))
+				if (equalIdAndMode(hId, hMode, iId, iMode)) {
+					dce = i.getDirCacheEntry();
 					if (f == null || f.isModified(dce, true))
 						conflict(name, dce, h, m);
 					else
 						remove(name);
-				else
-					conflict(name, dce, h, m);
+				} else
+					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
 			case 0x0DF: // 16 17
 				if (!isModified(name))
 					update(name, mId, mMode);
 				else
-					conflict(name, dce, h, m);
+					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
 			default:
-				keep(dce);
+				keep(i.getDirCacheEntry());
 			}
 			return;
 		}
@@ -706,6 +707,7 @@ public class DirCacheCheckout {
 			else
 				update(name, mId, mMode); // 3
 		} else {
+			dce = i.getDirCacheEntry();
 			if (h == null) {
 				/**
 				 * <pre>
@@ -745,7 +747,7 @@ public class DirCacheCheckout {
 				 * </pre>
 				 */
 
-				if (iMode == FileMode.GITLINK) {
+				if (dce.getFileMode() == FileMode.GITLINK) {
 					// Submodules that disappear from the checkout must
 					// be removed from the index, but not deleted from disk.
 					remove(name);
