@@ -86,6 +86,14 @@ abstract class FS_POSIX extends FS {
 	}
 
 	@Override
+	public boolean isCaseSensitive() {
+		if (isMacOS())
+			return false;
+		else
+			return true;
+	}
+
+	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
 		List<String> argv = new ArrayList<String>(4 + args.length);
 		argv.add("sh");
@@ -105,6 +113,6 @@ abstract class FS_POSIX extends FS {
 						return System.getProperty("os.name");
 					}
 				});
-		return "Mac OS X".equals(osDotName);
+		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName);
 	}
 }
