@@ -45,7 +45,6 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 
@@ -76,24 +75,5 @@ class FS_Win32 extends FS {
 	@Override
 	public boolean retryFailedLockFileCommit() {
 		return true;
-	}
-
-	@Override
-	public File gitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH");
-		File gitExe = searchPath(path, "git.exe", "git.cmd");
-		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
-
-		// This isn't likely to work, if bash is in $PATH, git should
-		// also be in $PATH. But its worth trying.
-		//
-		String w = readPipe(userHome(), //
-				new String[] { "bash", "--login", "-c", "which git" }, //
-				Charset.defaultCharset().name());
-		if (w != null)
-			return new File(w).getParentFile().getParentFile();
-
-		return null;
 	}
 }
