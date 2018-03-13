@@ -1,6 +1,6 @@
-prebuilt_jar(
+java_library(
   name = 'jgit',
-  binary_jar = '//org.eclipse.jgit:jgit',
+  exported_deps = ['//org.eclipse.jgit:jgit'],
   visibility = ['PUBLIC'],
 )
 
@@ -62,9 +62,12 @@ genrule(
   visibility = ['PUBLIC'],
 )
 
-prebuilt_jar(
+java_library(
   name = 'junit',
-  binary_jar = '//org.eclipse.jgit.junit:junit',
+  exported_deps = [
+    ':jgit',
+    '//org.eclipse.jgit.junit:junit'
+  ],
   visibility = ['PUBLIC'],
 )
 
