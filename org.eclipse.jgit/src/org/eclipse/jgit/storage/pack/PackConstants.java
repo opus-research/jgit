@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2012, Roberto Tyley <roberto.tyley@gmail.com>
+ * Copyright (C) 2013, Google Inc.
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,42 +41,17 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.storage.pack;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+/** Misc. constants used with pack files. */
+public class PackConstants {
 
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+	/** A pack file extension. */
+	public static final String PACK_EXT = "pack"; //$NON-NLS-1$
 
-public class ObjectDirectoryTest extends RepositoryTestCase {
+	/** A pack index file extension. */
+	public static final String PACK_INDEX_EXT = "idx"; //$NON-NLS-1$
 
-	@Test
-	public void testConcurrentInsertionOfBlobsToTheSameNewFanOutDirectory()
-			throws Exception {
-		ExecutorService e = Executors.newCachedThreadPool();
-		for (int i=0; i < 100; ++i) {
-			ObjectDirectory db = createBareRepository().getObjectDatabase();
-			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(db))) {
-				f.get();
-			}
-		}
+	private PackConstants() {
 	}
-
-	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
-			final ObjectDirectory db) {
-		Callable<ObjectId> callable = new Callable<ObjectId>() {
-			public ObjectId call() throws Exception {
-				return db.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
-			}
-		};
-		return Collections.nCopies(4, callable);
-	}
-
 }

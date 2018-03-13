@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Google Inc.
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,47 +41,95 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.pack;
+package org.eclipse.jgit.util;
 
-/** A pack file extension. */
-public class PackExt {
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 
-	/** A pack file extension. */
-	public static final PackExt PACK = new PackExt("pack"); //$NON-NLS-1$
+import org.eclipse.jgit.util.FS;
 
-	/** A pack index file extension. */
-	public static final PackExt INDEX = new PackExt("idx"); //$NON-NLS-1$
+/**
+ * FS for Java7 on Windows
+ */
+public class FS_Win32_Java7 extends FS_Win32 {
 
-	private final String ext;
-
-	/**
-	 * @param ext
-	 *            the file extension.
-	 */
-	public PackExt(String ext) {
-		this.ext = ext;
+	FS_Win32_Java7(FS src) {
+		super(src);
 	}
 
-	/** @return the file extension. */
-	public String getExtension() {
-		return ext;
+	FS_Win32_Java7() {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
-		if (obj instanceof PackExt) {
-			return ((PackExt) obj).getExtension().equals(getExtension());
-		}
-		return false;
+	public FS newInstance() {
+		return new FS_Win32_Java7(this);
 	}
 
 	@Override
-	public int hashCode() {
-		return getExtension().hashCode();
+	public boolean supportsSymlinks() {
+		return true;
 	}
 
 	@Override
-	public String toString() {
-		return String.format("PackExt[%s]", getExtension()); //$NON-NLS-1$
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	public boolean isFile(File path) {
+		Path nioPath = path.toPath();
+		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 }
