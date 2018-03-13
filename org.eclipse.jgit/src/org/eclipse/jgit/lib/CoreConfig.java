@@ -70,8 +70,6 @@ public class CoreConfig {
 
 	private final int streamFileThreshold;
 
-	private final boolean autoCRLF;
-
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
@@ -82,8 +80,6 @@ public class CoreConfig {
 		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
 		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
 		streamFileThreshold = (int) sft;
-
-		autoCRLF = rc.getBoolean("core", "autocrlf", false);
 	}
 
 	/**
@@ -111,12 +107,5 @@ public class CoreConfig {
 	/** @return the size threshold beyond which objects must be streamed. */
 	public int getStreamFileThreshold() {
 		return streamFileThreshold;
-	}
-
-	/**
-	 * @return whether automatic CRLF conversion has been configured
-	 */
-	public boolean isAutoCRLF() {
-		return autoCRLF;
 	}
 }
