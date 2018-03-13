@@ -920,6 +920,7 @@ public abstract class Repository {
 				// Can't decide whether unmerged paths exists. Return
 				// MERGING state to be on the safe side (in state MERGING
 				// you are not allow to do anything)
+				e.printStackTrace();
 			}
 			return RepositoryState.MERGING;
 		}
@@ -935,6 +936,7 @@ public abstract class Repository {
 				}
 			} catch (IOException e) {
 				// fall through to CHERRY_PICKING
+				e.printStackTrace();
 			}
 
 			return RepositoryState.CHERRY_PICKING;
