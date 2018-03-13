@@ -45,6 +45,9 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
@@ -90,6 +93,12 @@ public class CloneCommand implements Callable<Git> {
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private CredentialsProvider credentialsProvider;
+
+	private int timeout;
+
+	private boolean cloneAllBranches;
+
+	private Collection<String> branchesToClone;
 
 	/**
 	 * Executes the {@code Clone} command.
@@ -139,11 +148,6 @@ public class CloneCommand implements Callable<Git> {
 		config.addFetchRefSpec(refSpec);
 		config.update(repo.getConfig());
 
-		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branch, ConfigConstants.CONFIG_KEY_REMOTE, remote);
-		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branch, ConfigConstants.CONFIG_KEY_MERGE, branch);
-
 		repo.getConfig().save();
 
 		// run the fetch command
@@ -151,24 +155,52 @@ public class CloneCommand implements Callable<Git> {
 		command.setRemote(remote);
 		command.setProgressMonitor(monitor);
 		command.setTagOpt(TagOpt.FETCH_TAGS);
+		command.setTimeout(timeout);
 		if (credentialsProvider != null)
 			command.setCredentialsProvider(credentialsProvider);
+
+		List<RefSpec> specs = calculateRefSpecs(dst);
+		command.setRefSpecs(specs);
+
 		return command.call();
+	}
+
+	private List<RefSpec> calculateRefSpecs(final String dst) {
+		RefSpec wcrs = new RefSpec();
+		wcrs = wcrs.setForceUpdate(true);
+		wcrs = wcrs.setSourceDestination(Constants.R_HEADS + "*", dst + "/*"); //$NON-NLS-1$ //$NON-NLS-2$
+		List<RefSpec> specs = new ArrayList<RefSpec>();
+		if (cloneAllBranches)
+			specs.add(wcrs);
+		else if (branchesToClone != null
+				&& branchesToClone.size() > 0) {
+			for (final String selectedRef : branchesToClone)
+				if (wcrs.matchSource(selectedRef))
+					specs.add(wcrs.expandFromSource(selectedRef));
+		}
+		return specs;
 	}
 
 	private void checkout(Repository repo, FetchResult result)
 			throws JGitInternalException,
 			MissingObjectException, IncorrectObjectTypeException, IOException {
 
-		if (branch.startsWith(Constants.R_HEADS)) {
-			final RefUpdate head = repo.updateRef(Constants.HEAD);
-			head.disableRefLog();
-			head.link(branch);
+		Ref head = result.getAdvertisedRef(branch);
+		if (branch.equals(Constants.HEAD)) {
+			Ref foundBranch = findBranchToCheckout(result);
+			if (foundBranch != null)
+				head = foundBranch;
 		}
 
-		final Ref head = result.getAdvertisedRef(branch);
 		if (head == null || head.getObjectId() == null)
 			return; // throw exception?
+
+		if (head.getName().startsWith(Constants.R_HEADS)) {
+			final RefUpdate newHead = repo.updateRef(Constants.HEAD);
+			newHead.disableRefLog();
+			newHead.link(head.getName());
+			addMergeConfig(repo, head);
+		}
 
 		final RevCommit commit = parseCommit(repo, head);
 
@@ -177,9 +209,38 @@ public class CloneCommand implements Callable<Git> {
 		u.setNewObjectId(commit.getId());
 		u.forceUpdate();
 
-		DirCache dc = repo.lockDirCache();
-		DirCacheCheckout co = new DirCacheCheckout(repo, dc, commit.getTree());
-		co.checkout();
+		if (!bare) {
+			DirCache dc = repo.lockDirCache();
+			DirCacheCheckout co = new DirCacheCheckout(repo, dc,
+					commit.getTree());
+			co.checkout();
+		}
+	}
+
+	private Ref findBranchToCheckout(FetchResult result) {
+		Ref foundBranch = null;
+		final Ref idHEAD = result.getAdvertisedRef(Constants.HEAD);
+		for (final Ref r : result.getAdvertisedRefs()) {
+			final String n = r.getName();
+			if (!n.startsWith(Constants.R_HEADS))
+				continue;
+			if (idHEAD == null)
+				continue;
+			if (r.getObjectId().equals(idHEAD.getObjectId())) {
+				foundBranch = r;
+				break;
+			}
+		}
+		return foundBranch;
+	}
+
+	private void addMergeConfig(Repository repo, Ref head) throws IOException {
+		String branchName = Repository.shortenRefName(head.getName());
+		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
+				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
+		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
+				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
+		repo.getConfig().save();
 	}
 
 	private RevCommit parseCommit(final Repository repo, final Ref ref)
@@ -272,6 +333,38 @@ public class CloneCommand implements Callable<Git> {
 	public CloneCommand setCredentialsProvider(
 			CredentialsProvider credentialsProvider) {
 		this.credentialsProvider = credentialsProvider;
+		return this;
+	}
+
+	/**
+	 * @param timeout
+	 *            the timeout used for the fetch step
+	 * @return {@code this}
+	 */
+	public CloneCommand setTimeout(int timeout) {
+		this.timeout = timeout;
+		return this;
+	}
+
+	/**
+	 * @param cloneAllBranches
+	 *            true when all branches have to be fetched (indicates wildcard
+	 *            in created fetch refspec), false otherwise.
+	 * @return {@code this}
+	 */
+	public CloneCommand setCloneAllBranches(boolean cloneAllBranches) {
+		this.cloneAllBranches = cloneAllBranches;
+		return this;
+	}
+
+	/**
+	 * @param branchesToClone
+	 *            collection of branches to clone. Ignored when allSelected is
+	 *            true.
+	 * @return {@code this}
+	 */
+	public CloneCommand setBranchesToClone(Collection<String> branchesToClone) {
+		this.branchesToClone = branchesToClone;
 		return this;
 	}
 

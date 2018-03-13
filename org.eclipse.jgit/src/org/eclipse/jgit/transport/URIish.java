@@ -46,6 +46,7 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.File;
 import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -54,6 +55,7 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.util.StringUtils;
 
 /**
  * This URI like construct used for referencing Git archives over the net, as
@@ -75,13 +77,13 @@ public class URIish implements Serializable {
 	 * capturing groups: the first containing the user and the second containing
 	 * the password
 	 */
-	private static final String OPT_USER_PWD_P = "(?:([^/:@]+)(?::([^/]+))?@)?";
+	private static final String OPT_USER_PWD_P = "(?:([^\\\\/:@]+)(?::([^\\\\/]+))?@)?";
 
 	/**
 	 * Part of a pattern which matches the host part of URIs. Defines one
 	 * capturing group containing the host name.
 	 */
-	private static final String HOST_P = "([^/:]+)";
+	private static final String HOST_P = "([^\\\\/:]+)";
 
 	/**
 	 * Part of a pattern which matches the optional port part of URIs. Defines
@@ -93,7 +95,7 @@ public class URIish implements Serializable {
 	 * Part of a pattern which matches the ~username part (e.g. /~root in
 	 * git://host.xyz/~root/a.git) of URIs. Defines no capturing group.
 	 */
-	private static final String USER_HOME_P = "(?:/~(?:[^/]+))";
+	private static final String USER_HOME_P = "(?:/~(?:[^\\\\/]+))";
 
 	/**
 	 * Part of a pattern which matches the optional drive letter in paths (e.g.
@@ -105,13 +107,13 @@ public class URIish implements Serializable {
 	 * Part of a pattern which matches a relative path. Relative paths don't
 	 * start with slash or drive letters. Defines no capturing group.
 	 */
-	private static final String RELATIVE_PATH_P = "(?:(?:[^/]+/)*[^/]+/?)";
+	private static final String RELATIVE_PATH_P = "(?:(?:[^\\\\/]+[\\\\/])*[^\\\\/]+[\\\\/]?)";
 
 	/**
 	 * Part of a pattern which matches a relative or absolute path. Defines no
 	 * capturing group.
 	 */
-	private static final String PATH_P = "(" + OPT_DRIVE_LETTER_P + "/?"
+	private static final String PATH_P = "(" + OPT_DRIVE_LETTER_P + "[\\\\/]?"
 			+ RELATIVE_PATH_P + ")";
 
 	private static final long serialVersionUID = 1L;
@@ -129,7 +131,7 @@ public class URIish implements Serializable {
 			+ OPT_PORT_P //
 			+ "(" // open a catpuring group the the user-home-dir part
 			+ (USER_HOME_P + "?") //
-			+ "/)" //
+			+ "[\\\\/])" //
 			+ ")?" // close the optional group containing hostname
 			+ "(.+)?" //
 			+ "$");
@@ -139,7 +141,7 @@ public class URIish implements Serializable {
 	 * path (maybe even containing windows drive-letters) or a relative path.
 	 */
 	private static final Pattern LOCAL_FILE = Pattern.compile("^" //
-			+ "(/?" + PATH_P + ")" //
+			+ "([\\\\/]?" + PATH_P + ")" //
 			+ "$");
 
 	/**
@@ -148,7 +150,7 @@ public class URIish implements Serializable {
 	 * separator, but java.io.File.toURI() constructs those URIs.
 	 */
 	private static final Pattern SINGLE_SLASH_FILE_URI = Pattern.compile("^" //
-			+ "(file):(/(?!/)" //
+			+ "(file):([\\\\/](?![\\\\/])" //
 			+ PATH_P //
 			+ ")$");
 
@@ -159,7 +161,7 @@ public class URIish implements Serializable {
 			+ OPT_USER_PWD_P //
 			+ HOST_P //
 			+ ":(" //
-			+ ("(?:" + USER_HOME_P + "/)?") //
+			+ ("(?:" + USER_HOME_P + "[\\\\/])?") //
 			+ RELATIVE_PATH_P //
 			+ ")$");
 
@@ -168,9 +170,9 @@ public class URIish implements Serializable {
 	 */
 	private static final Pattern ABSOLUTE_SCP_URI = Pattern.compile("^" //
 			+ OPT_USER_PWD_P //
-			+ "([^/:]{2,})" //
+			+ "([^\\\\/:]{2,})" //
 			+ ":(" //
-			+ "/" + RELATIVE_PATH_P //
+			+ "[\\\\/]" + RELATIVE_PATH_P //
 			+ ")$");
 
 	private String scheme;
@@ -192,7 +194,10 @@ public class URIish implements Serializable {
 	 * @throws URISyntaxException
 	 */
 	public URIish(String s) throws URISyntaxException {
-		s = s.replace('\\', '/');
+		if (StringUtils.isEmptyOrNull(s)) {
+			throw new URISyntaxException("The uri was empty or null",
+					JGitText.get().cannotParseGitURIish);
+		}
 		Matcher matcher = SINGLE_SLASH_FILE_URI.matcher(s);
 		if (matcher.matches()) {
 			scheme = matcher.group(1);
@@ -552,7 +557,12 @@ public class URIish implements Serializable {
 	public String getHumanishName() throws IllegalArgumentException {
 		if ("".equals(getPath()) || getPath() == null)
 			throw new IllegalArgumentException();
-		String[] elements = getPath().split("/");
+		String s = getPath();
+		String[] elements;
+		if ("file".equals(scheme) || LOCAL_FILE.matcher(s).matches())
+			elements = s.split("[\\" + File.separatorChar + "/]");
+		else
+			elements = s.split("/");
 		if (elements.length == 0)
 			throw new IllegalArgumentException();
 		String result = elements[elements.length - 1];
