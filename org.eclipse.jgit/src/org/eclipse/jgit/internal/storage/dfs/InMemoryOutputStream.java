@@ -82,5 +82,4 @@ class InMemoryOutputStream extends DfsOutputStream {
 	public void close() {
 		flush();
 	}
-
 }
