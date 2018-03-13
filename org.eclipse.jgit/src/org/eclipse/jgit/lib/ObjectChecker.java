@@ -77,7 +77,8 @@ import static org.eclipse.jgit.lib.ObjectChecker.ErrorType.TREE_NOT_SORTED;
 import static org.eclipse.jgit.lib.ObjectChecker.ErrorType.UNKNOWN_TYPE;
 import static org.eclipse.jgit.lib.ObjectChecker.ErrorType.WIN32_BAD_NAME;
 import static org.eclipse.jgit.lib.ObjectChecker.ErrorType.ZERO_PADDED_FILEMODE;
-import static org.eclipse.jgit.util.Paths.pathCompare;
+import static org.eclipse.jgit.util.Paths.compare;
+import static org.eclipse.jgit.util.Paths.compareSameName;
 import static org.eclipse.jgit.util.RawParseUtils.nextLF;
 import static org.eclipse.jgit.util.RawParseUtils.parseBase10;
 
@@ -569,8 +570,8 @@ public class ObjectChecker {
 			if (nextNamePos + 1 == nextPtr)
 				return false;
 
-			int cmp = pathCompare(
-					raw, thisNamePos, thisNameEnd, FileMode.TYPE_TREE,
+			int cmp = compareSameName(
+					raw, thisNamePos, thisNameEnd,
 					raw, nextNamePos, nextPtr - 1, nextMode);
 			if (cmp < 0)
 				return false;
@@ -659,13 +660,10 @@ public class ObjectChecker {
 			}
 
 			if (lastNameB != 0) {
-				int cmp = pathCompare(
+				int cmp = compare(
 						raw, lastNameB, lastNameE, lastMode,
 						raw, thisNameB, ptr, thisMode);
-				if (cmp == 0) {
-					report(DUPLICATE_ENTRIES, id,
-							JGitText.get().corruptObjectDuplicateEntryNames);
-				} else if (cmp > 0) {
+				if (cmp > 0) {
 					report(TREE_NOT_SORTED, id,
 							JGitText.get().corruptObjectIncorrectSorting);
 				}

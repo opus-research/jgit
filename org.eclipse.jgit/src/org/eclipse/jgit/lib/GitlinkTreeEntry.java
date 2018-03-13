@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +43,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.TreeFormatter;
-import org.eclipse.jgit.util.Paths;
+/**
+ * A tree entry representing a gitlink entry used for submodules.
+ *
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class GitlinkTreeEntry extends TreeEntry {
 
-/** A tree entry found in a note branch that isn't a valid note. */
-class NonNoteEntry extends ObjectId {
-	/** Name of the entry in the tree, in raw format. */
-	private final byte[] name;
-
-	/** Mode of the entry as parsed from the tree. */
-	private final FileMode mode;
-
-	/** The next non-note entry in the same tree, as defined by tree order. */
-	NonNoteEntry next;
-
-	NonNoteEntry(byte[] name, FileMode mode, AnyObjectId id) {
-		super(id);
-		this.name = name;
-		this.mode = mode;
+	/**
+	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
+	 *
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
+	 */
+	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
 	}
 
-	void format(TreeFormatter fmt) {
-		fmt.append(name, mode, this);
+	public FileMode getMode() {
+		return FileMode.GITLINK;
 	}
 
-	int treeEntrySize() {
-		return TreeFormatter.entrySize(mode, name.length);
-	}
-
-	int pathCompare(byte[] bBuf, int bPos, int bLen, FileMode bMode) {
-		return Paths.compare(
-				name, 0, name.length, mode.getBits(),
-				bBuf, bPos, bLen, bMode.getBits());
+	@Override
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" G "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
 	}
 }

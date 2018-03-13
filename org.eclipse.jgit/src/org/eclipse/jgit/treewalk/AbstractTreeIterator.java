@@ -383,7 +383,7 @@ public abstract class AbstractTreeIterator {
 	}
 
 	private int pathCompare(byte[] b, int bPos, int bEnd, int bMode, int aPos) {
-		return Paths.pathCompare(
+		return Paths.compare(
 				path, aPos, pathLen, mode,
 				b, bPos, bEnd, bMode);
 	}

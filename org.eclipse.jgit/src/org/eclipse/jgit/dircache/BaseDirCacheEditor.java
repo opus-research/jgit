@@ -45,7 +45,7 @@
 package org.eclipse.jgit.dircache;
 
 import static org.eclipse.jgit.lib.FileMode.TYPE_TREE;
-import static org.eclipse.jgit.util.Paths.pathCompare;
+import static org.eclipse.jgit.util.Paths.compareSameName;
 
 import java.io.IOException;
 
@@ -207,8 +207,8 @@ abstract class BaseDirCacheEditor {
 
 				int s = nextSlash(nPath, prefixLen);
 				int m = s < nPath.length ? TYPE_TREE : n.getRawMode();
-				int cmp = pathCompare(
-						ePath, prefixLen, ePath.length, TYPE_TREE,
+				int cmp = compareSameName(
+						ePath, prefixLen, ePath.length,
 						nPath, prefixLen, s, m);
 				if (cmp < 0) {
 					break;

@@ -216,7 +216,7 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 		}
 
 		DirCacheEntry next = cache.getEntry(eIdx);
-		if (Paths.pathCompare(next.path, 0, next.path.length, 0,
+		if (Paths.compare(next.path, 0, next.path.length, 0,
 				entPath, 0, entLen, TYPE_TREE) < 0) {
 			// Next DirCacheEntry sorts before new entry as tree. Defer a
 			// DeleteTree command to delete any entries if they exist. This
