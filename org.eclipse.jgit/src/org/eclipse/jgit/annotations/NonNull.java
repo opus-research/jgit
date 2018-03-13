@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
- * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,47 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.internal.storage.file;
 
-import java.io.File;
-import java.io.IOException;
+package org.eclipse.jgit.annotations;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
 
-/** Attribute node loaded from global system-wide file. */
-public class GlobalAttributesNode extends AttributesNode {
-	final Repository repository;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-	/**
-	 * @param repository
-	 */
-	public GlobalAttributesNode(Repository repository) {
-		this.repository = repository;
-	}
-
-	/**
-	 * @return the attributes node
-	 * @throws IOException
-	 */
-	public AttributesNode load() throws IOException {
-		AttributesNode r = new AttributesNode();
-
-		FS fs = repository.getFS();
-		String path = repository.getConfig().get(CoreConfig.KEY)
-				.getAttributesFile();
-		if (path != null) {
-			File attributesFile;
-			if (path.startsWith("~/")) { //$NON-NLS-1$
-				attributesFile = fs.resolve(fs.userHome(),
-						path.substring(2));
-			} else {
-				attributesFile = fs.resolve(null, path);
-			}
-			FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributesFile);
-		}
-		return r.getRules().isEmpty() ? null : r;
-	}
+/**
+ * JGit's replacement for the {@code javax.annotation.Nonnull}.
+ * <p>
+ * Denotes that a local variable, parameter, field, method return value expected
+ * to be non {@code null}.
+ *
+ * @since 4.2
+ */
+@Documented
+@Retention(RetentionPolicy.CLASS)
+@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
+public @interface NonNull {
+	// marker annotation with no members
 }
