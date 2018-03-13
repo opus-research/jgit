@@ -175,6 +175,10 @@ public class PackWriter {
 
 	private boolean reuseDeltas;
 
+	private boolean reuseDeltaCommits;
+
+	private boolean reuseValidate;
+
 	private boolean thin;
 
 	private boolean useCachedPacks;
@@ -243,6 +247,7 @@ public class PackWriter {
 
 		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
 		reuseDeltas = config.isReuseDeltas();
+		reuseValidate = true; // be paranoid by default
 		stats = new Statistics();
 	}
 
@@ -273,6 +278,50 @@ public class PackWriter {
 	 */
 	public void setDeltaBaseAsOffset(boolean deltaBaseAsOffset) {
 		this.deltaBaseAsOffset = deltaBaseAsOffset;
+	}
+
+	/**
+	 * Check if the writer will reuse commits that are already stored as deltas.
+	 *
+	 * @return true if the writer would reuse commits stored as deltas, assuming
+	 *         delta reuse is already enabled.
+	 */
+	public boolean isReuseDeltaCommits() {
+		return reuseDeltaCommits;
+	}
+
+	/**
+	 * Set the writer to reuse existing delta versions of commits.
+	 *
+	 * @param reuse
+	 *            if true, the writer will reuse any commits stored as deltas.
+	 *            By default the writer does not reuse delta commits.
+	 */
+	public void setReuseDeltaCommits(boolean reuse) {
+		reuseDeltaCommits = reuse;
+	}
+
+	/**
+	 * Check if the writer validates objects before copying them.
+	 *
+	 * @return true if validation is enabled; false if the reader will handle
+	 *         object validation as a side-effect of it consuming the output.
+	 */
+	public boolean isReuseValidatingObjects() {
+		return reuseValidate;
+	}
+
+	/**
+	 * Enable (or disable) object validation during packing.
+	 *
+	 * @param validate
+	 *            if true the pack writer will validate an object before it is
+	 *            put into the output. This additional validation work may be
+	 *            necessary to avoid propagating corruption from one local pack
+	 *            file to another local pack file.
+	 */
+	public void setReuseValidatingObjects(boolean validate) {
+		reuseValidate = validate;
 	}
 
 	/** @return true if this writer is producing a thin pack. */
@@ -611,7 +660,7 @@ public class PackWriter {
 			stats.reusedObjects += pack.getObjectCount();
 			stats.reusedDeltas += deltaCnt;
 			stats.totalDeltas += deltaCnt;
-			reuseSupport.copyPackAsIs(out, pack);
+			reuseSupport.copyPackAsIs(out, pack, reuseValidate);
 		}
 		writeChecksum(out);
 		out.flush();
@@ -792,9 +841,9 @@ public class PackWriter {
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isDoNotDelta()) // delta is disabled for this path
+			if (otp.isReuseAsIs()) // already reusing a representation
 				continue;
-			if (otp.isDeltaRepresentation()) // already reusing a delta
+			if (otp.isDoNotDelta()) // delta is disabled for this path
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -954,14 +1003,19 @@ public class PackWriter {
 	}
 
 	private void writeObjects(PackOutputStream out) throws IOException {
+		writeObjects(out, objectsLists[Constants.OBJ_COMMIT]);
+		writeObjects(out, objectsLists[Constants.OBJ_TAG]);
+		writeObjects(out, objectsLists[Constants.OBJ_TREE]);
+		writeObjects(out, objectsLists[Constants.OBJ_BLOB]);
+	}
+
+	private void writeObjects(PackOutputStream out, List<ObjectToPack> list)
+			throws IOException {
 		if (reuseSupport != null) {
-			for (List<ObjectToPack> list : objectsLists)
-				reuseSupport.writeObjects(out, list);
+			reuseSupport.writeObjects(out, list);
 		} else {
-			for (List<ObjectToPack> list : objectsLists) {
-				for (ObjectToPack otp : list)
-					out.writeObject(otp);
-			}
+			for (ObjectToPack otp : list)
+				out.writeObject(otp);
 		}
 	}
 
@@ -978,7 +1032,7 @@ public class PackWriter {
 
 		while (otp.isReuseAsIs()) {
 			try {
-				reuseSupport.copyObjectAsIs(out, otp);
+				reuseSupport.copyObjectAsIs(out, otp, reuseValidate);
 				out.endObject();
 				otp.setCRC(out.getCRC32());
 				stats.reusedObjects++;
@@ -1482,7 +1536,7 @@ public class PackWriter {
 		} else
 			nWeight = next.getWeight();
 
-		if (nFmt == PACK_DELTA && reuseDeltas) {
+		if (nFmt == PACK_DELTA && reuseDeltas && reuseDeltaFor(otp)) {
 			ObjectId baseId = next.getDeltaBase();
 			ObjectToPack ptr = objectsMap.get(baseId);
 			if (ptr != null && !ptr.isEdge()) {
@@ -1507,6 +1561,21 @@ public class PackWriter {
 		}
 
 		otp.select(next);
+	}
+
+	private boolean reuseDeltaFor(ObjectToPack otp) {
+		switch (otp.getType()) {
+		case Constants.OBJ_COMMIT:
+			return reuseDeltaCommits;
+		case Constants.OBJ_TREE:
+			return true;
+		case Constants.OBJ_BLOB:
+			return true;
+		case Constants.OBJ_TAG:
+			return false;
+		default:
+			return true;
+		}
 	}
 
 	/** Summary of how PackWriter created the pack. */
