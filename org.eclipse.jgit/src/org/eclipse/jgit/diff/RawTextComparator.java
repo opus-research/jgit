@@ -49,7 +49,7 @@ import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
 import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
 /** Equivalence function for {@link RawText}. */
-public abstract class RawTextComparator extends DiffComparator<RawText> {
+public abstract class RawTextComparator extends SequenceComparator<RawText> {
 	/** No special treatment. */
 	public static final RawTextComparator DEFAULT = new RawTextComparator() {
 		@Override
@@ -76,7 +76,7 @@ public abstract class RawTextComparator extends DiffComparator<RawText> {
 		}
 
 		@Override
-		public int hashLine(final byte[] raw, int ptr, final int end) {
+		public int hashRegion(final byte[] raw, int ptr, final int end) {
 			int hash = 5381;
 			for (; ptr < end; ptr++)
 				hash = (hash << 5) ^ (raw[ptr] & 0xff);
@@ -127,7 +127,7 @@ public abstract class RawTextComparator extends DiffComparator<RawText> {
 		}
 
 		@Override
-		public int hashLine(byte[] raw, int ptr, int end) {
+		public int hashRegion(byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			for (; ptr < end; ptr++) {
 				byte c = raw[ptr];
@@ -167,7 +167,7 @@ public abstract class RawTextComparator extends DiffComparator<RawText> {
 		}
 
 		@Override
-		public int hashLine(final byte[] raw, int ptr, int end) {
+		public int hashRegion(final byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			ptr = trimLeadingWhitespace(raw, ptr, end);
 			for (; ptr < end; ptr++) {
@@ -206,7 +206,7 @@ public abstract class RawTextComparator extends DiffComparator<RawText> {
 		}
 
 		@Override
-		public int hashLine(final byte[] raw, int ptr, int end) {
+		public int hashRegion(final byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			end = trimTrailingWhitespace(raw, ptr, end);
 			for (; ptr < end; ptr++) {
@@ -255,7 +255,7 @@ public abstract class RawTextComparator extends DiffComparator<RawText> {
 		}
 
 		@Override
-		public int hashLine(final byte[] raw, int ptr, int end) {
+		public int hashRegion(final byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			end = trimTrailingWhitespace(raw, ptr, end);
 			while (ptr < end) {
@@ -271,25 +271,20 @@ public abstract class RawTextComparator extends DiffComparator<RawText> {
 	};
 
 	@Override
-	public int size(RawText seq) {
-		return seq.size();
-	}
-
-	@Override
 	public int hash(RawText seq, int ptr) {
 		return seq.hashes[ptr + 1];
 	}
 
 	/**
-	 * Compute a hash code for a single line.
+	 * Compute a hash code for a region.
 	 *
 	 * @param raw
 	 *            the raw file content.
 	 * @param ptr
-	 *            first byte of the content line to hash.
+	 *            first byte of the region to hash.
 	 * @param end
-	 *            1 past the last byte of the content line.
+	 *            1 past the last byte of the region.
 	 * @return hash code for the region <code>[ptr, end)</code> of raw.
 	 */
-	public abstract int hashLine(byte[] raw, int ptr, int end);
+	public abstract int hashRegion(byte[] raw, int ptr, int end);
 }

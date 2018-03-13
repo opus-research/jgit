@@ -180,26 +180,26 @@ public class MyersDiffPerformanceTest extends TestCase {
 			}
 		}
 		ret.runningTime = stopwatch.stop() / repetitions;
-		ret.N = cmp.size(ac) + cmp.size(bc);
+		ret.N = ac.size() + bc.size();
 		ret.D = myersDiff.getEdits().size();
 
 		return ret;
 	}
 
-	private static class CharArray {
-		char[] array;
+	private static class CharArray extends Sequence {
+		final char[] array;
 
 		public CharArray(String s) {
 			array = s.toCharArray();
 		}
+
+		@Override
+		public int size() {
+			return array.length;
+		}
 	}
 
-	private static class CharCmp extends DiffComparator<CharArray> {
-		@Override
-		public int size(CharArray seq) {
-			return seq.array.length;
-		}
-
+	private static class CharCmp extends SequenceComparator<CharArray> {
 		@Override
 		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
 			return a.array[ai] == b.array[bi];
