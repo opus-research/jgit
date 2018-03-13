@@ -48,6 +48,7 @@ import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -114,10 +115,11 @@ public abstract class TextBuiltin {
 					.getConfig()
 					.getString("i18n", null, "logOutputEncoding") : null;
 			if (outputEncoding != null)
-				out = new PrintWriter(new OutputStreamWriter(System.out,
-						outputEncoding));
+				out = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(System.out, outputEncoding)));
 			else
-				out = new PrintWriter(new OutputStreamWriter(System.out));
+				out = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(System.out)));
 		} catch (IOException e) {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}
