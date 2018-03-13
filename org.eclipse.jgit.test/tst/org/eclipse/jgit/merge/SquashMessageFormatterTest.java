@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2009, JetBrains s.r.o.
- * Copyright (C) 2009, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,37 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.merge;
 
-package org.eclipse.jgit.transport;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.lib.Repository;
+import java.util.Arrays;
+
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
- * The base class for transports that use HTTP as underlying protocol. This class
- * allows customizing HTTP connection settings.
+ * Test construction of squash message by {@link SquashMessageFormatterTest}.
  */
-public abstract class HttpTransport extends Transport {
-	/**
-	 * Create a new transport instance.
-	 *
-	 * @param local
-	 *            the repository this instance will fetch into, or push out of.
-	 *            This must be the repository passed to
-	 *            {@link #open(Repository, URIish)}.
-	 * @param uri
-	 *            the URI used to access the remote repository. This must be the
-	 *            URI passed to {@link #open(Repository, URIish)}.
-	 */
-	protected HttpTransport(Repository local, URIish uri) {
-		super(local, uri);
+public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
+	private GitDateFormatter dateFormatter;
+	private SquashMessageFormatter msgFormatter;
+	private RevCommit revCommit;
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+		msgFormatter = new SquashMessageFormatter();
 	}
 
-	/**
-	 * Create a minimal HTTP transport instance not tied to a single repository.
-	 *
-	 * @param uri
-	 */
-	protected HttpTransport(URIish uri) {
-		super(uri);
+	@Test
+	public void testCommit() throws Exception {
+		Git git = new Git(db);
+		revCommit = git.commit().setMessage("squash_me").call();
+
+		Ref master = db.getRef("refs/heads/master");
+		String message = msgFormatter.format(Arrays.asList(revCommit), master);
+		assertEquals(
+				"Squashed commit of the following:\n\ncommit "
+						+ revCommit.getName() + "\nAuthor: "
+						+ revCommit.getAuthorIdent().getName() + " <"
+						+ revCommit.getAuthorIdent().getEmailAddress()
+						+ ">\nDate:   " + dateFormatter.formatDate(author)
+						+ "\n\n\tsquash_me\n", message);
 	}
 }

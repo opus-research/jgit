@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2009, JetBrains s.r.o.
- * Copyright (C) 2009, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,37 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.transport;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
-import org.eclipse.jgit.lib.Repository;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
-/**
- * The base class for transports that use HTTP as underlying protocol. This class
- * allows customizing HTTP connection settings.
- */
-public abstract class HttpTransport extends Transport {
-	/**
-	 * Create a new transport instance.
-	 *
-	 * @param local
-	 *            the repository this instance will fetch into, or push out of.
-	 *            This must be the repository passed to
-	 *            {@link #open(Repository, URIish)}.
-	 * @param uri
-	 *            the URI used to access the remote repository. This must be the
-	 *            URI passed to {@link #open(Repository, URIish)}.
-	 */
-	protected HttpTransport(Repository local, URIish uri) {
-		super(local, uri);
-	}
+import org.junit.Test;
 
-	/**
-	 * Create a minimal HTTP transport instance not tied to a single repository.
-	 *
-	 * @param uri
-	 */
-	protected HttpTransport(URIish uri) {
-		super(uri);
+public class SquashCommitMsgTest extends RepositoryTestCase {
+	private static final String squashMsg = "squashed commit";
+
+	@Test
+	public void testReadWriteMergeMsg() throws IOException {
+		assertEquals(db.readSquashCommitMsg(), null);
+		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
+		db.writeSquashCommitMsg(squashMsg);
+		assertEquals(squashMsg, db.readSquashCommitMsg());
+		assertEquals(read(new File(db.getDirectory(), Constants.SQUASH_MSG)),
+				squashMsg);
+		db.writeSquashCommitMsg(null);
+		assertEquals(db.readSquashCommitMsg(), null);
+		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
+		FileOutputStream fos = new FileOutputStream(new File(db.getDirectory(),
+				Constants.SQUASH_MSG));
+		try {
+			fos.write(squashMsg.getBytes(Constants.CHARACTER_ENCODING));
+		} finally {
+			fos.close();
+		}
+		assertEquals(db.readSquashCommitMsg(), squashMsg);
 	}
 }
