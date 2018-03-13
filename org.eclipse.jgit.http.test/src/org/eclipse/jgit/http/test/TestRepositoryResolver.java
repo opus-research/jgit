@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2016, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,33 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.http.test;
 
-package org.eclipse.jgit.internal.storage.reftable;
+import javax.servlet.http.HttpServletRequest;
 
-import java.io.IOException;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
-import org.eclipse.jgit.lib.Ref;
+/** A simple repository resolver for tests. */
+public final class TestRepositoryResolver
+		implements RepositoryResolver<HttpServletRequest> {
 
-/** Iterator over references inside a {@link Reftable}. */
-public abstract class RefCursor implements AutoCloseable {
+	private final TestRepository<Repository> repo;
+
+	private final String repoName;
+
 	/**
-	 * Check if another reference is available.
+	 * Creates a new {@link TestRepositoryResolver} that resolves the given name to
+	 * the given repository.
 	 *
-	 * @return {@code true} if there is another result.
-	 * @throws IOException
-	 *             references cannot be read.
+	 * @param repo
+	 *            to resolve to
+	 * @param repoName
+	 *            to match
 	 */
-	public abstract boolean next() throws IOException;
-
-	/** @return reference at the current position. */
-	public abstract Ref getRef();
-
-	/** @return {@code true} if the current reference was deleted. */
-	public boolean wasDeleted() {
-		Ref r = getRef();
-		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
+	public TestRepositoryResolver(TestRepository<Repository> repo, String repoName) {
+		this.repo = repo;
+		this.repoName = repoName;
 	}
 
 	@Override
-	public abstract void close();
+	public Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotEnabledException {
+		if (!name.equals(repoName)) {
+			throw new RepositoryNotFoundException(name);
+		}
+		Repository db = repo.getRepository();
+		db.incrementOpen();
+		return db;
+	}
 }

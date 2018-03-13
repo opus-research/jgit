@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.ignore.internal;
 
-package org.eclipse.jgit.internal.storage.reftable;
+import static org.junit.Assert.assertEquals;
 
-import java.io.IOException;
+import org.junit.Test;
 
-import org.eclipse.jgit.lib.ReflogEntry;
+public class StringsTest {
 
-/** Empty {@link LogCursor} with no results. */
-class EmptyLogCursor extends LogCursor {
-	@Override
-	public boolean next() throws IOException {
-		return false;
+	private void testString(String string, int n, int m) {
+		assertEquals(string, n, Strings.count(string, '/', false));
+		assertEquals(string, m, Strings.count(string, '/', true));
 	}
 
-	@Override
-	public String getRefName() {
-		return null;
-	}
-
-	@Override
-	public long getUpdateIndex() {
-		return 0;
-	}
-
-	@Override
-	public ReflogEntry getReflogEntry() {
-		return null;
-	}
-
-	@Override
-	public void close() {
-		// Do nothing.
+	@Test
+	public void testCount() {
+		testString("", 0, 0);
+		testString("/", 1, 0);
+		testString("//", 2, 0);
+		testString("///", 3, 1);
+		testString("////", 4, 2);
+		testString("foo", 0, 0);
+		testString("/foo", 1, 0);
+		testString("foo/", 1, 0);
+		testString("/foo/", 2, 0);
+		testString("foo/bar", 1, 1);
+		testString("/foo/bar/", 3, 1);
+		testString("/foo/bar//", 4, 2);
+		testString("/foo//bar/", 4, 2);
+		testString(" /foo/ ", 2, 2);
 	}
 }

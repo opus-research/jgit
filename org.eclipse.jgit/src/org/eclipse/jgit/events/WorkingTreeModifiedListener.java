@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,32 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.events;
 
-import java.io.IOException;
+/**
+ * Receives {@link WorkingTreeModifiedEvent}s, which are fired whenever a
+ * {@link org.eclipse.jgit.dircache.DirCacheCheckout} modifies
+ * (adds/deletes/updates) files in the working tree.
+ *
+ * @since 4.9
+ */
+public interface WorkingTreeModifiedListener extends RepositoryListener {
 
-import org.eclipse.jgit.lib.ReflogEntry;
-
-/** Iterator over logs inside a {@link Reftable}. */
-public abstract class LogCursor implements AutoCloseable {
 	/**
-	 * Check if another log record is available.
+	 * Respond to working tree modifications.
 	 *
-	 * @return {@code true} if there is another result.
-	 * @throws IOException
-	 *             logs cannot be read.
+	 * @param event
 	 */
-	public abstract boolean next() throws IOException;
-
-	/** @return name of the current reference. */
-	public abstract String getRefName();
-
-	/** @return identifier of the transaction that created the log record. */
-	public abstract long getUpdateIndex();
-
-	/** @return current log entry. */
-	public abstract ReflogEntry getReflogEntry();
-
-	@Override
-	public abstract void close();
+	void onWorkingTreeModified(WorkingTreeModifiedEvent event);
 }
