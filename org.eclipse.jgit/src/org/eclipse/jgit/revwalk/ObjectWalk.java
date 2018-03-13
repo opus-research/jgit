@@ -259,7 +259,7 @@ public class ObjectWalk extends RevWalk {
 	 *
 	 * @return the current filter. Never null as a filter is always needed.
 	 *
-	 * @since 4.0
+	 * @since 4.1
 	 */
 	public ObjectFilter getObjectFilter() {
 		return objectFilter;
@@ -277,9 +277,9 @@ public class ObjectWalk extends RevWalk {
 	 *
 	 * @param newFilter
 	 *            the new filter. If null the special {@link ObjectFilter#ALL}
-	 *            filter will be used instead, as it matches every object.
+	 *            filter will be used instead, which as it matches every object.
 	 *
-	 * @since 4.0
+	 * @since 4.1
 	 */
 	public void setObjectFilter(ObjectFilter newFilter) {
 		assertNotStarted();
