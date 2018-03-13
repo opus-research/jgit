@@ -143,7 +143,7 @@ public abstract class Repository implements AutoCloseable {
 
 	/**
 	 * Registers a {@link FilterCommandFactory} responsible for creating
-	 * {@link FilterCommand}'s for a certain command name. If the factory f1 is
+	 * {@link FilterCommand}s for a certain command name. If the factory f1 is
 	 * registered for the name "jgit://builtin/x" then a call to
 	 * <code>getCommand("jgit://builtin/x", ...)</code> will call
 	 * <code>f1(...)</code> to create a new instance of {@link FilterCommand}
@@ -151,8 +151,8 @@ public abstract class Repository implements AutoCloseable {
 	 * @param commandName
 	 *            the name for which this factory is registered
 	 * @param fact
-	 *            the factory responsible to create {@link FilterCommand}s for
-	 *            the specified name. <code>null</code> can be specified to
+	 *            the factory responsible for creating {@link FilterCommand}s
+	 *            for the specified name. <code>null</code> can be specified to
 	 *            unregister a factory
 	 * @return the previous factory associated with <tt>commandName</tt>, or
 	 *         <tt>null</tt> if there was no mapping for <tt>commandName</tt>
@@ -167,12 +167,12 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
-	 * Checks whether some {@link FilterCommandFactory} is registered for a
+	 * Checks whether any {@link FilterCommandFactory} is registered for a
 	 * certain command name
 	 *
 	 * @param commandName
 	 *            the name for which the registry should be checked
-	 * @return <code>true</code> if some factory was registered for the name
+	 * @return <code>true</code> if any factory was registered for the name
 	 * @since 4.5
 	 */
 	public static boolean isRegistered(String commandName) {
@@ -180,8 +180,8 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
-	 * Creates a new {@link FilterCommand} for the given name. A factory has to
-	 * be registered for the name in advance.
+	 * Creates a new {@link FilterCommand} for the given name. A factory must be
+	 * registered for the name in advance.
 	 *
 	 * @param commandName
 	 *            The name for which a new {@link FilterCommand} should be
@@ -189,8 +189,8 @@ public abstract class Repository implements AutoCloseable {
 	 * @param db
 	 *            the repository this command should work on
 	 * @param in
-	 *            the {@link InputStream} this {@link FilterCommand} should
-	 *            read from
+	 *            the {@link InputStream} this {@link FilterCommand} should read
+	 *            from
 	 * @param out
 	 *            the {@link OutputStream} this {@link FilterCommand} should
 	 *            write to

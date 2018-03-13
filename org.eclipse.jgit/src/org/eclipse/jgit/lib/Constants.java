@@ -392,7 +392,7 @@ public final class Constants {
 	public static final String ATTR_FILTER_TYPE_SMUDGE = "smudge";
 
 	/**
-	 * Builtin filter commands are starting with this prefix
+	 * Builtin filter commands start with this prefix
 	 *
 	 * @since 4.5
 	 */
