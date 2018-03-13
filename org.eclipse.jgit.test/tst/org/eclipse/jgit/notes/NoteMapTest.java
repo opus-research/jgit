@@ -83,7 +83,7 @@ public class NoteMapTest extends RepositoryTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		tr = new TestRepository<>(db);
+		tr = new TestRepository<Repository>(db);
 		reader = db.newObjectReader();
 		inserter = db.newObjectInserter();
 	}

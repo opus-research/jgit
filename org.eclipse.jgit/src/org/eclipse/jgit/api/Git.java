@@ -147,7 +147,6 @@ public class Git implements AutoCloseable {
 	 *
 	 * @since 3.2
 	 */
-	@Override
 	public void close() {
 		if (closeRepo)
 			repo.close();

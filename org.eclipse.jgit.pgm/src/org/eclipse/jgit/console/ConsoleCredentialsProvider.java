@@ -48,12 +48,13 @@ package org.eclipse.jgit.console;
 import java.io.Console;
 
 import org.eclipse.jgit.errors.UnsupportedCredentialItem;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.ChainingCredentialsProvider;
 import org.eclipse.jgit.transport.CredentialItem;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.NetRCCredentialsProvider;
 import org.eclipse.jgit.transport.URIish;
+
+import org.eclipse.jgit.pgm.internal.CLIText;
 
 /**
  * Interacts with the user during authentication by using the text console.

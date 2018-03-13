@@ -73,10 +73,7 @@ public class GcKeepFilesTest extends GcTestCase {
 				.iterator();
 		PackFile singlePack = packIt.next();
 		assertFalse(packIt.hasNext());
-		String packFileName = singlePack.getPackFile().getPath();
-		String keepFileName = packFileName.substring(0,
-				packFileName.lastIndexOf('.')) + ".keep";
-		File keepFile = new File(keepFileName);
+		File keepFile = new File(singlePack.getPackFile().getPath() + ".keep");
 		assertFalse(keepFile.exists());
 		assertTrue(keepFile.createNewFile());
 		bb.commit().add("A", "A2").add("B", "B2").create();

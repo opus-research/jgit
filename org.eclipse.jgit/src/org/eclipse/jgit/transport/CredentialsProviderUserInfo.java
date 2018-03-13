@@ -85,17 +85,14 @@ public class CredentialsProviderUserInfo implements UserInfo,
 		return uri;
 	}
 
-	@Override
 	public String getPassword() {
 		return password;
 	}
 
-	@Override
 	public String getPassphrase() {
 		return passphrase;
 	}
 
-	@Override
 	public boolean promptPassphrase(String msg) {
 		CredentialItem.StringType v = newPrompt(msg);
 		if (provider.get(uri, v)) {
@@ -107,7 +104,6 @@ public class CredentialsProviderUserInfo implements UserInfo,
 		}
 	}
 
-	@Override
 	public boolean promptPassword(String msg) {
 		CredentialItem.Password p = new CredentialItem.Password(msg);
 		if (provider.get(uri, p)) {
@@ -123,25 +119,22 @@ public class CredentialsProviderUserInfo implements UserInfo,
 		return new CredentialItem.StringType(msg, true);
 	}
 
-	@Override
 	public boolean promptYesNo(String msg) {
 		CredentialItem.YesNoType v = new CredentialItem.YesNoType(msg);
 		return provider.get(uri, v) && v.getValue();
 	}
 
-	@Override
 	public void showMessage(String msg) {
 		provider.get(uri, new CredentialItem.InformationalMessage(msg));
 	}
 
-	@Override
 	public String[] promptKeyboardInteractive(String destination, String name,
 			String instruction, String[] prompt, boolean[] echo) {
 		CredentialItem.StringType[] v = new CredentialItem.StringType[prompt.length];
 		for (int i = 0; i < prompt.length; i++)
 			v[i] = new CredentialItem.StringType(prompt[i], !echo[i]);
 
-		List<CredentialItem> items = new ArrayList<>();
+		List<CredentialItem> items = new ArrayList<CredentialItem>();
 		if (instruction != null && instruction.length() > 0)
 			items.add(new CredentialItem.InformationalMessage(instruction));
 		items.addAll(Arrays.asList(v));

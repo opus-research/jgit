@@ -311,7 +311,6 @@ class PackIndexV2 extends PackIndex {
 		@Override
 		protected MutableEntry initEntry() {
 			return new MutableEntry() {
-				@Override
 				protected void ensureId() {
 					idBuffer.fromRaw(names[levelOne], levelTwo
 							- Constants.OBJECT_ID_LENGTH / 4);
@@ -319,7 +318,6 @@ class PackIndexV2 extends PackIndex {
 			};
 		}
 
-		@Override
 		public MutableEntry next() {
 			for (; levelOne < names.length; levelOne++) {
 				if (levelTwo < names[levelOne].length) {

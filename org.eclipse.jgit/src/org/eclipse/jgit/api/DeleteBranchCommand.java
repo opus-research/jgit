@@ -79,7 +79,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  *      >Git documentation about Branch</a>
  */
 public class DeleteBranchCommand extends GitCommand<List<String>> {
-	private final Set<String> branchNames = new HashSet<>();
+	private final Set<String> branchNames = new HashSet<String>();
 
 	private boolean force;
 
@@ -97,11 +97,10 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 	 * @throws CannotDeleteCurrentBranchException
 	 * @return the list with the (full) names of the deleted branches
 	 */
-	@Override
 	public List<String> call() throws GitAPIException,
 			NotMergedException, CannotDeleteCurrentBranchException {
 		checkCallable();
-		List<String> result = new ArrayList<>();
+		List<String> result = new ArrayList<String>();
 		if (branchNames.isEmpty())
 			return result;
 		try {

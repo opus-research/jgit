@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-
 import java.util.List;
 
 import org.eclipse.jgit.junit.RepositoryTestCase;

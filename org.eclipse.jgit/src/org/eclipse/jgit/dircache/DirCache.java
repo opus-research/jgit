@@ -46,7 +46,6 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -87,6 +86,7 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Support for the Git dircache (aka index file).
@@ -111,7 +111,6 @@ public class DirCache {
 	private static final byte[] NO_CHECKSUM = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
-		@Override
 		public int compare(final DirCacheEntry o1, final DirCacheEntry o2) {
 			final int cr = cmp(o1, o2);
 			if (cr != 0)
@@ -635,9 +634,9 @@ public class DirCache {
 	public void write() throws IOException {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
-		try (OutputStream o = tmp.getOutputStream();
-				OutputStream bo = new BufferedOutputStream(o)) {
-			writeTo(liveFile.getParentFile(), bo);
+		try {
+			writeTo(liveFile.getParentFile(),
+					new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -993,7 +992,7 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
-		List<String> paths = new ArrayList<>(128);
+		List<String> paths = new ArrayList<String>(128);
 		try (TreeWalk walk = new TreeWalk(repository)) {
 			walk.setOperationType(OperationType.CHECKIN_OP);
 			for (int i = 0; i < entryCnt; i++)
