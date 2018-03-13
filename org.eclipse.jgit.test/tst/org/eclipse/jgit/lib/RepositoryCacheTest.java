@@ -195,7 +195,6 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		assertEquals(0, ((Repository) db).useCnt.get());
 	}
 
-	@Test
 	public void testRepositoryUnregisteringWhenClosing() throws Exception {
 		FileKey loc = FileKey.exact(db.getDirectory(), db.getFS());
 		Repository d2 = RepositoryCache.open(loc);
