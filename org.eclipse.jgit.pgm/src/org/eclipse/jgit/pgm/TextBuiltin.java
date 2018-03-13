@@ -49,10 +49,7 @@ import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 import java.io.BufferedWriter;
-import java.io.FileDescriptor;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
@@ -82,17 +79,7 @@ public abstract class TextBuiltin {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
-	/** Writer to output to, typically this is standard output. */
-	protected JGitPrintWriter outw;
-
 	/** Stream to output to, typically this is standard output. */
-	protected OutputStream outs;
-
-	/**
-	 * Stream to output to, typically this is standard output.
-	 * 
-	 * @deprecated Use outw instead
-	 */
 	protected PrintWriter out;
 
 	/** Git repository the command was invoked within. */
@@ -127,14 +114,12 @@ public abstract class TextBuiltin {
 			final String outputEncoding = repository != null ? repository
 					.getConfig()
 					.getString("i18n", null, "logOutputEncoding") : null;
-			if (outs == null)
-				outs = new FileOutputStream(FileDescriptor.out);
 			if (outputEncoding != null)
-				outw = new JGitPrintWriter(new BufferedWriter(
-						new OutputStreamWriter(outs, outputEncoding)));
+				out = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(System.out, outputEncoding)));
 			else
-				outw = new JGitPrintWriter(new BufferedWriter(
-						new OutputStreamWriter(outs)));
+				out = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(System.out)));
 		} catch (IOException e) {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}

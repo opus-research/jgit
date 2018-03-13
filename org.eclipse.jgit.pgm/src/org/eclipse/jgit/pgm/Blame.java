@@ -210,18 +210,17 @@ class Blame extends TextBuiltin {
 					authorWidth, dateWidth);
 
 			for (int line = begin; line < end; line++) {
-				outw.print(abbreviate(blame.getSourceCommit(line)));
+				out.print(abbreviate(blame.getSourceCommit(line)));
 				if (showSourcePath)
-					outw.format(pathFmt, path(line));
+					out.format(pathFmt, path(line));
 				if (showSourceLine)
-					outw.format(numFmt, blame.getSourceLine(line) + 1);
+					out.format(numFmt, blame.getSourceLine(line) + 1);
 				if (!noAuthor)
-					outw.format(authorFmt, author(line), date(line));
-				outw.format(lineFmt, line + 1);
-				outw.flush();
-				blame.getResultContents().writeLine(outs, line);
-				outs.flush();
-				outw.print('\n');
+					out.format(authorFmt, author(line), date(line));
+				out.format(lineFmt, line + 1);
+				out.flush();
+				blame.getResultContents().writeLine(System.out, line);
+				out.print('\n');
 			}
 		} finally {
 			generator.release();
