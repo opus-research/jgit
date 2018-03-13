@@ -55,20 +55,21 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.SubscribeCommand.Command;
 
 /**
- * Subscribe implementation over a bi-directional connection. Client writes out
- * their current ref state and subscription requests, then receives a continuous
- * stream of packs.
+ * Subscribe implementation over a send-receive connection. The client writes
+ * out their current ref state and subscription requests, then receives a
+ * continuous stream of packs. The pubsub protocol is designed to operate over
+ * HTTP, so the client does not send any data back to the server after it
+ * receives data.
  */
 public class BasePackSubscribeConnection extends BasePackConnection implements
 		SubscribeConnection {
-	private boolean closed;
+	private volatile boolean closed;
 
 	/**
 	 * @param packTransport
 	 */
 	BasePackSubscribeConnection(PackTransport packTransport) {
 		super(packTransport);
-		closed = false;
 	}
 
 	/**
@@ -92,7 +93,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			if (restart == null)
 				pckOut.writeString("hello");
 			else {
-				String sequence = subscriber.getRestartSequence();
+				String sequence = subscriber.getLastPackNumber();
 				if (sequence == null)
 					pckOut.writeString("fast-restart " + restart);
 				else
@@ -132,7 +133,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			String parts[] = line.split(" ", 2);
 			if (parts[0].equals("reconnect")) {
 				subscriber.setRestartToken(null);
-				subscriber.setRestartSequence(null);
+				subscriber.setLastPackNumber(null);
 				return;
 			}
 			if (!parts[0].equals("fast-restart"))
@@ -172,7 +173,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				if (!line.startsWith("sequence "))
 					throw new TransportException(MessageFormat.format(
 							JGitText.get().expectedGot, "sequence", line));
-				subscriber.setRestartSequence(line.split(" ", 2)[1]);
+				subscriber.setLastPackNumber(line.split(" ", 2)[1]);
 				if ((line = pckIn.readString()) != PacketLineIn.END)
 					throw new TransportException(MessageFormat.format(
 							JGitText.get().expectedGot, "END", line));
@@ -199,6 +200,8 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			}
 		};
 		rp.setExpectDataAfterPackFooter(true);
+		// The client does not send status updates back to the server, so turn
+		// off the bidirectional functionality of ReceivePack
 		rp.setBiDirectionalPipe(false);
 		// Set the advertised refs to be the current refs/pubsub/* refs
 		rp.setAdvertisedRefs(repo.getPubSubRefs(), null);

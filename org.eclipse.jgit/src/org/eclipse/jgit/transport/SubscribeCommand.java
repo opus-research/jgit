@@ -83,4 +83,9 @@ public class SubscribeCommand {
 		SubscribeCommand o = (SubscribeCommand) other;
 		return o.command == command && o.spec.equals(spec);
 	}
+
+	@Override
+	public String toString() {
+		return "SubscribeCommand[" + command.toString() + " " + spec + "]";
+	}
 }

@@ -47,8 +47,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -73,8 +75,9 @@ public class SubscribedRepository {
 	private List<RefSpec> specs;
 
 	/**
-	 * Get the PubSub ref location from a remote ref. This prefixes the remote
-	 * ref with /heads/ so heads and tags can be stored under the pubsub ref.
+	 * Get the PubSub ref location from a remote ref. The /pubsub/ ref tree is
+	 * different from the /remotes/ tree in that it can store branches and tags.
+	 * Branches are under /heads/ and tags are under /tags/.
 	 *
 	 * @param remote
 	 *            e.g "origin"
@@ -103,7 +106,8 @@ public class SubscribedRepository {
 
 	/**
 	 * Get the remote ref location from a pubsub ref. This strips off the pubsub
-	 * prefix /heads/.
+	 * prefix /heads/. Translation is only allowed from a pubsub branch ref to a
+	 * remote ref, because the /remotes/ tree only stores branches.
 	 *
 	 * @param remote
 	 *            e.g "origin"
@@ -161,41 +165,73 @@ public class SubscribedRepository {
 
 	private static String translateRef(String oldPrefix, String newPrefix,
 			String ref) {
+		if (!ref.startsWith(oldPrefix))
+			throw new IllegalArgumentException(ref + " does not start with "
+					+ oldPrefix);
 		return newPrefix + ref.substring(oldPrefix.length());
 	}
 
 	/**
-	 * Create a new SubscribedRepo and set up local space for storing ref
-	 * updates in refs/pubsub.
+	 * Create a new SubscribedRepository using the Subscriber config. Create
+	 * a new FileRepository instance using the directory field from the config.
 	 *
 	 * @param s
 	 * @throws IOException
 	 */
 	public SubscribedRepository(PubSubConfig.Subscriber s) throws IOException {
+		this(s, new FileRepository(s.getDirectory()));
+	}
+
+	/**
+	 * Create a new SubscribedRepository using the Subscriber config and the
+	 * given repository. Ignore the repository directory field in the config.
+	 *
+	 * @param s
+	 * @param r
+	 */
+	public SubscribedRepository(PubSubConfig.Subscriber s, Repository r) {
 		remote = s.getRemote();
-		repository = new FileRepository(s.getDirectory());
+		repository = r;
 		specs = s.getSubscribeSpecs();
 		name = s.getName();
 	}
 
 	/**
-	 * Set up the refs/pubsub/* space and copy in all matching refs.
+	 * Set up the refs/pubsub/* space and copy in all matching refs. Remove any
+	 * refs that no longer match any subscriptions.
 	 *
 	 * @throws IOException
 	 */
 	public void setUpRefs() throws IOException {
+		Set<String> existingRefs = new LinkedHashSet<String>(
+				repository.getRefDatabase().getRefs(
+						getPubSubRefFromLocal(remote, Constants.R_REFS))
+						.keySet());
 		// Set up space in refs/pubsub/* by copying all locally matching refs
 		Map<String, Ref> refs = getRemoteRefs();
 		for (Map.Entry<String, Ref> entry : refs.entrySet()) {
-			String pubsubRef = getPubSubRefFromLocal(remote,
-					entry.getKey());
+			String ref = entry.getKey();
+			String existingRef = ref.substring(Constants.R_REFS.length());
+			existingRefs.remove(existingRef);
+			String pubsubRef = getPubSubRefFromLocal(remote, ref);
 			if (repository.getRef(pubsubRef) != null)
 				continue;
 			RefUpdate ru = repository.updateRef(pubsubRef);
 			// Create refs/pubsub/<remote name>/<ref>
 			ru.setExpectedOldObjectId(ObjectId.zeroId());
 			ru.setNewObjectId(entry.getValue().getObjectId());
+			ru.setRefLogMessage("pubsub setup", true);
 			ru.update();
+		}
+
+		for (String r : existingRefs) {
+			String pubsubRef = getPubSubRefFromLocal(
+					remote, Constants.R_REFS + r);
+			if (repository.getRef(pubsubRef) == null)
+				continue;
+			RefUpdate ru = repository.updateRef(pubsubRef);
+			ru.setForceUpdate(true);
+			ru.delete();
 		}
 	}
 
@@ -244,7 +280,7 @@ public class SubscribedRepository {
 				Ref r = rdb.getRef(remoteRef);
 				if (r == null)
 					continue;
-				c = Collections.nCopies(1, r);
+				c = Collections.singleton(r);
 			}
 			for (Ref r : c) {
 				if (isTag)
@@ -269,9 +305,8 @@ public class SubscribedRepository {
 			String pubsubRef = getPubSubRefFromLocal(remote, spec.getSource());
 			if (spec.isWildcard()) {
 				pubsubRef = pubsubRef.substring(0, pubsubRef.length() - 1);
-				for (Ref r : rdb.getRefs(pubsubRef).values()) {
+				for (Ref r : rdb.getRefs(pubsubRef).values())
 					matches.put(getLocalRefFromPubSub(remote, r.getName()), r);
-				}
 			} else {
 				Ref r = rdb.getRef(pubsubRef);
 				if (r != null)
