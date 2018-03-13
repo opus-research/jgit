@@ -91,7 +91,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
-	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
 	/***/ public String cannotCommitWriteTo;
@@ -512,6 +511,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
+	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String theFactoryMustNotBeNull;

@@ -153,18 +153,6 @@ public class MergeResult {
 			}
 		},
 		/** */
-		ABORTED {
-			@Override
-			public String toString() {
-				return "Aborted";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/** */
 		NOT_SUPPORTED {
 			@Override
 			public String toString() {
