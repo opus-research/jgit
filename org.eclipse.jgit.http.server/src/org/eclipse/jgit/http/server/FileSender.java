@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,6 +46,7 @@ package org.eclipse.jgit.http.server;
 import static javax.servlet.http.HttpServletResponse.SC_PARTIAL_CONTENT;
 import static javax.servlet.http.HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_RANGES;
+import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_LENGTH;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_RANGE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_IF_RANGE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_RANGE;
@@ -132,14 +133,14 @@ final class FileSender {
 		}
 
 		rsp.setHeader(HDR_ACCEPT_RANGES, "bytes");
-		rsp.setContentLength((int) (end - pos));
+		rsp.setHeader(HDR_CONTENT_LENGTH, Long.toString(end - pos));
 
 		if (sendBody) {
 			final OutputStream out = rsp.getOutputStream();
 			try {
 				final byte[] buf = new byte[4096];
 				while (pos < end) {
-					final int r = Math.min(buf.length, (int) (end - pos));
+					final int r = (int) Math.min(buf.length, end - pos);
 					final int n = source.read(buf, 0, r);
 					if (n < 0) {
 						throw new EOFException("Unexpected EOF on " + path);
@@ -159,14 +160,12 @@ final class FileSender {
 		final Enumeration<String> rangeHeaders = getRange(req);
 		if (!rangeHeaders.hasMoreElements()) {
 			// No range headers, the request is fine.
-			//
 			return true;
 		}
 
 		final String range = rangeHeaders.nextElement();
 		if (rangeHeaders.hasMoreElements()) {
 			// To simplify the code we support only one range.
-			//
 			return false;
 		}
 
@@ -180,20 +179,17 @@ final class FileSender {
 		if (ifRange != null && !getTailChecksum().equals(ifRange)) {
 			// If the client asked us to verify the ETag and its not
 			// what they expected we need to send the entire content.
-			//
 			return true;
 		}
 
 		try {
 			if (eq + 1 == dash) {
 				// "bytes=-500" means last 500 bytes
-				//
 				pos = Long.parseLong(range.substring(dash + 1));
 				pos = fileLen - pos;
 			} else {
 				// "bytes=500-" (position 500 to end)
 				// "bytes=500-1000" (position 500 to 1000)
-				//
 				pos = Long.parseLong(range.substring(eq + 1, dash));
 				if (dash < range.length() - 1) {
 					end = Long.parseLong(range.substring(dash + 1));
@@ -205,7 +201,6 @@ final class FileSender {
 			// "," appearing at the end of the first range telling
 			// us there is a second range following. To simplify
 			// the code we support only one range.
-			//
 			return false;
 		}
 

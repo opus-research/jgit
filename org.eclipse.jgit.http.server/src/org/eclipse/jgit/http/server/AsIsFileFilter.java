@@ -43,42 +43,51 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
+import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.send;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import javax.servlet.http.HttpServlet;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.lib.Repository;
 
-/** Sends a small text meta file from the repository. */
-class TextFileServlet extends HttpServlet {
-	private static final long serialVersionUID = 1L;
+class AsIsFileFilter implements Filter {
+	private final AsIsFileService asIs;
 
-	private final String fileName;
-
-	TextFileServlet(final String name) {
-		this.fileName = name;
+	AsIsFileFilter(final AsIsFileService getAnyFile) {
+		this.asIs = getAnyFile;
 	}
 
-	public void doGet(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws IOException {
+	public void init(FilterConfig config) throws ServletException {
+		// Do nothing.
+	}
+
+	public void destroy() {
+		// Do nothing.
+	}
+
+	public void doFilter(ServletRequest request, ServletResponse response,
+			FilterChain chain) throws IOException, ServletException {
 		try {
-			rsp.setContentType("text/plain");
-			send(read(req), req, rsp);
-		} catch (FileNotFoundException noFile) {
-			rsp.sendError(SC_NOT_FOUND);
+			final Repository db = getRepository(request);
+			asIs.access((HttpServletRequest) request, db);
+			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
 		}
-	}
-
-	private byte[] read(final HttpServletRequest req) throws IOException {
-		final File gitdir = getRepository(req).getDirectory();
-		return IO.readFully(new File(gitdir, fileName));
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,27 +44,26 @@
 package org.eclipse.jgit.http.server;
 
 import java.io.File;
-import java.io.IOException;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.glue.ErrorServlet;
 import org.eclipse.jgit.http.server.glue.MetaServlet;
 import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
 import org.eclipse.jgit.http.server.resolver.FileResolver;
-import org.eclipse.jgit.http.server.resolver.GetAnyFile;
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
 import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.UploadPack;
+import org.eclipse.jgit.util.StringUtils;
 
 /**
  * Handles Git repository access over HTTP.
@@ -80,7 +79,11 @@ import org.eclipse.jgit.transport.UploadPack;
  *       &lt;param-name&gt;base-path&lt;/param-name&gt;
  *       &lt;param-value&gt;/var/srv/git&lt;/param-value&gt;
  *     &lt;/init-param&gt;
- *   &lt;/servlet&gt;
+ *     &lt;init-param&gt;
+ *       &lt;param-name&gt;export-all&lt;/param-name&gt;
+ *       &lt;param-value&gt;0&lt;/param-value&gt;
+ *     &lt;/init-param&gt;
+ * &lt;/servlet&gt;
  *   &lt;servlet-mapping&gt;
  *     &lt;servlet-name&gt;GitServlet&lt;/servlet-name&gt;
  *     &lt;url-pattern&gt;/git/*&lt;/url-pattern&gt;
@@ -103,7 +106,7 @@ public class GitServlet extends MetaServlet {
 
 	private RepositoryResolver resolver;
 
-	private GetAnyFile getAnyFile = new GetAnyFile();
+	private AsIsFileService asIs = new AsIsFileService();
 
 	private UploadPackFactory uploadPackFactory = new DefaultUploadPackFactory();
 
@@ -139,9 +142,9 @@ public class GitServlet extends MetaServlet {
 	 *            through a dumb client. If {@code null} then dumb client
 	 *            support is completely disabled.
 	 */
-	public void setGetAnyFile(GetAnyFile f) {
+	public void setAsIsFileService(AsIsFileService f) {
 		assertNotInitialized();
-		this.getAnyFile = f != null ? f : GetAnyFile.DISABLED;
+		this.asIs = f != null ? f : AsIsFileService.DISABLED;
 	}
 
 	/**
@@ -174,10 +177,9 @@ public class GitServlet extends MetaServlet {
 		super.init(config);
 
 		if (resolver == null) {
-			final String basePath = config.getInitParameter("base-path");
-			if (basePath == null || "".equals(basePath))
-				throw new ServletException("Filter parameter base-path not set");
-			setRepositoryResolver(new FileResolver(new File(basePath)));
+			final File root = getFile("base-path");
+			final boolean exportAll = getBoolean("export-all");
+			setRepositoryResolver(new FileResolver(root, exportAll));
 		}
 
 		initialized = true;
@@ -201,25 +203,16 @@ public class GitServlet extends MetaServlet {
 			refs = refs.through(//
 					new ReceivePackServlet.InfoRefs(receivePackFactory));
 		}
-		if (getAnyFile != GetAnyFile.DISABLED) {
-			refs = refs.through(new GetAnyFileFilter(getAnyFile));
+		if (asIs != AsIsFileService.DISABLED) {
+			refs = refs.through(new IsLocalFilter());
+			refs = refs.through(new AsIsFileFilter(asIs));
 			refs.with(new InfoRefsServlet());
-		} else {
-			refs.with(new HttpServlet() {
-				private static final long serialVersionUID = 1L;
+		} else
+			refs.with(new ErrorServlet(HttpServletResponse.SC_FORBIDDEN));
 
-				@Override
-				protected void doGet(HttpServletRequest req,
-						HttpServletResponse rsp) throws ServletException,
-						IOException {
-					rsp.sendError(HttpServletResponse.SC_FORBIDDEN);
-				}
-			});
-		}
-
-		if (getAnyFile != GetAnyFile.DISABLED) {
+		if (asIs != AsIsFileService.DISABLED) {
 			final IsLocalFilter mustBeLocal = new IsLocalFilter();
-			final GetAnyFileFilter enabled = new GetAnyFileFilter(getAnyFile);
+			final AsIsFileFilter enabled = new AsIsFileFilter(asIs);
 
 			serve("*/" + Constants.HEAD)//
 					.through(mustBeLocal)//
@@ -263,10 +256,41 @@ public class GitServlet extends MetaServlet {
 		}
 	}
 
+	private File getFile(final String param) throws ServletException {
+		String n = getInitParameter(param);
+		if (n == null || "".equals(n))
+			throw new ServletException("Parameter " + param + " not set");
+
+		File path = new File(n);
+		if (!path.exists())
+			throw new ServletException(path + " (for " + param + ") not found");
+		return path;
+	}
+
+	private boolean getBoolean(String param) throws ServletException {
+		String n = getInitParameter(param);
+		if (n == null)
+			return false;
+		else if (StringUtils.equalsIgnoreCase("yes", n)
+				|| StringUtils.equalsIgnoreCase("true", n)
+				|| StringUtils.equalsIgnoreCase("1", n)
+				|| StringUtils.equalsIgnoreCase("on", n))
+			return true;
+		else if (StringUtils.equalsIgnoreCase("no", n)
+				|| StringUtils.equalsIgnoreCase("false", n)
+				|| StringUtils.equalsIgnoreCase("0", n)
+				|| StringUtils.equalsIgnoreCase("off", n))
+			return false;
+		else
+			throw new ServletException("Invalid boolean " + param + " = " + n);
+	}
+
 	@Override
-	protected ServletBinder register(final ServletBinder b) {
+	protected ServletBinder register(ServletBinder binder) {
 		if (resolver == null)
 			throw new IllegalStateException("No resolver available");
-		return b.through(new RepositoryFilter(resolver));
+		binder = binder.through(new NoCacheFilter());
+		binder = binder.through(new RepositoryFilter(resolver));
+		return binder;
 	}
 }
