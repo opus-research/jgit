@@ -55,7 +55,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NotSupportedException;
-import org.eclipse.jgit.errors.TooLargeObjectInPackException;
 import org.eclipse.jgit.errors.TooLargePackException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
@@ -131,7 +130,7 @@ public class PushCommand extends
 				refSpecs.addAll(config.getPushRefSpecs());
 			}
 			if (refSpecs.isEmpty()) {
-				Ref head = repo.exactRef(Constants.HEAD);
+				Ref head = repo.getRef(Constants.HEAD);
 				if (head != null && head.isSymbolic())
 					refSpecs.add(new RefSpec(head.getLeaf().getName()));
 			}
@@ -160,9 +159,6 @@ public class PushCommand extends
 
 				} catch (TooLargePackException e) {
 					throw new org.eclipse.jgit.api.errors.TooLargePackException(
-							e.getMessage(), e);
-				} catch (TooLargeObjectInPackException e) {
-					throw new org.eclipse.jgit.api.errors.TooLargeObjectInPackException(
 							e.getMessage(), e);
 				} catch (TransportException e) {
 					throw new org.eclipse.jgit.api.errors.TransportException(
@@ -348,7 +344,7 @@ public class PushCommand extends
 		} else {
 			Ref src;
 			try {
-				src = repo.findRef(nameOrSpec);
+				src = repo.getRef(nameOrSpec);
 			} catch (IOException e) {
 				throw new JGitInternalException(
 						JGitText.get().exceptionCaughtDuringExecutionOfPushCommand,
