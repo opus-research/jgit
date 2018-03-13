@@ -1010,12 +1010,7 @@ public class PackWriter implements AutoCloseable {
 	 */
 	@Deprecated
 	public void release() {
-		reader.close();
-		if (myDeflater != null) {
-			myDeflater.end();
-			myDeflater = null;
-		}
-		instances.remove(selfRef);
+		close();
 	}
 
 	/**
@@ -1025,7 +1020,12 @@ public class PackWriter implements AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		release();
+		reader.close();
+		if (myDeflater != null) {
+			myDeflater.end();
+			myDeflater = null;
+		}
+		instances.remove(selfRef);
 	}
 
 	private void searchForReuse(ProgressMonitor monitor) throws IOException {

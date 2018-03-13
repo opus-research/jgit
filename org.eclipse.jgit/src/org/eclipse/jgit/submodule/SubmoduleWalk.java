@@ -735,7 +735,7 @@ public class SubmoduleWalk implements AutoCloseable {
 	 */
 	@Deprecated
 	public void release() {
-		walk.close();
+		close();
 	}
 
 	/**
@@ -745,6 +745,6 @@ public class SubmoduleWalk implements AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		release();
+		walk.close();
 	}
 }

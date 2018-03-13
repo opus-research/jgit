@@ -385,9 +385,7 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	@Deprecated
 	public void release() {
-		if (reader != null) {
-			reader.close();
-		}
+		close();
 	}
 
 	/**
@@ -397,7 +395,8 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		release();
+		if (reader != null)
+			reader.close();
 	}
 
 	/**
