@@ -356,12 +356,15 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	}
 
 	ObjectId genSha1(String data) {
-		try (ObjectInserter w = db.newObjectInserter()) {
+		ObjectInserter w = db.newObjectInserter();
+		try {
 			ObjectId id = w.insert(Constants.OBJ_BLOB, data.getBytes());
 			w.flush();
 			return id;
 		} catch (IOException e) {
 			fail(e.toString());
+		} finally {
+			w.release();
 		}
 		return null;
 	}
