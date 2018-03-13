@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import static org.eclipse.jgit.internal.ketch.KetchConstants.*;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod.ALL_REFS;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.LOCK_FAILURE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
@@ -168,15 +167,14 @@ public class RemoteGitReplica extends KetchReplica {
 		Map<String, RemoteRefUpdate> updates = asUpdateMap(cmds);
 		PushConnection connection = tn.openPush();
 		try {
-			String txnNamespace = getTxnNamespace();
 			Map<String, Ref> adv = connection.getRefsMap();
-			RemoteRefUpdate accepted = updates.get(txnNamespace + ACCEPTED);
+			RemoteRefUpdate accepted = updates.get(getSystem().getTxnAccepted());
 			if (accepted != null && !check(adv, accepted)) {
 				reject(cmds);
 				return adv;
 			}
 
-			RemoteRefUpdate committed = updates.get(txnNamespace + COMMITTED);
+			RemoteRefUpdate committed = updates.get(getSystem().getTxnCommitted());
 			if (committed != null && !check(adv, committed)) {
 				reject(cmds);
 				return adv;

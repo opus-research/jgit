@@ -51,15 +51,15 @@ import java.util.List;
 import org.eclipse.jgit.lib.ObjectId;
 
 /** Snapshot of a leader and its view of the world */
-public class Snapshot {
-	final List<Replica> replicas = new ArrayList<>();
+public class LeaderSnapshot {
+	final List<ReplicaSnapshot> replicas = new ArrayList<>();
 	KetchLeader.State state;
 	long term;
 	LogId head;
 	LogId committed;
 	boolean running;
 
-	Snapshot() {
+	LeaderSnapshot() {
 	}
 
 	@Override
@@ -77,7 +77,7 @@ public class Snapshot {
 		s.append("------------------------------------\n"); //$NON-NLS-1$
 		debug(s, "(leader)", head, committed); //$NON-NLS-1$
 		s.append('\n');
-		for (Replica r : replicas) {
+		for (ReplicaSnapshot r : replicas) {
 			debug(s, r);
 			s.append('\n');
 		}
@@ -85,7 +85,7 @@ public class Snapshot {
 		return s.toString();
 	}
 
-	private static void debug(StringBuilder s, Replica r) {
+	private static void debug(StringBuilder s, ReplicaSnapshot r) {
 		debug(s, r.name, r.txnAccepted, r.txnCommitted);
 		s.append(String.format(" %-8s %s", r.type, r.state)); //$NON-NLS-1$
 		if (r.state == OFFLINE) {
@@ -105,25 +105,10 @@ public class Snapshot {
 
 	private static String str(ObjectId c) {
 		if (c instanceof LogId) {
-			return String.format("%5d/%s", //$NON-NLS-1$
-					Long.valueOf(((LogId) c).index), c.abbreviate(6).name());
+			return ((LogId) c).describeForLog();
 		} else if (c != null) {
 			return c.abbreviate(8).name();
 		}
 		return "-"; //$NON-NLS-1$
-	}
-
-	/** Snapshot of a replica. */
-	public static class Replica {
-		String name;
-		KetchReplica.Type type;
-		ObjectId txnAccepted;
-		ObjectId txnCommitted;
-		KetchReplica.State state;
-		String error;
-		long retryAtMillis;
-
-		Replica() {
-		}
 	}
 }

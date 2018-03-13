@@ -60,12 +60,10 @@ import org.eclipse.jgit.transport.ReceiveCommand;
  * finish processing.
  */
 public class ReplicaPushRequest {
-	private final Object lock = new Object();
 	private final KetchReplica replica;
 	private final Collection<ReceiveCommand> commands;
 	private Map<String, Ref> refs;
 	private Throwable exception;
-	private boolean done;
 
 	/**
 	 * Construct a new push request for a replica.
@@ -83,17 +81,13 @@ public class ReplicaPushRequest {
 
 	/** @return commands to be executed, and their results. */
 	public Collection<ReceiveCommand> getCommands() {
-		synchronized (lock) {
-			return commands;
-		}
+		return commands;
 	}
 
 	/** @return remote references, usually from the advertisement. */
 	@Nullable
 	public Map<String, Ref> getRefs() {
-		synchronized (lock) {
-			return refs;
-		}
+		return refs;
 	}
 
 	/**
@@ -101,17 +95,13 @@ public class ReplicaPushRequest {
 	 *            references observed from the replica.
 	 */
 	public void setRefs(Map<String, Ref> refs) {
-		synchronized (lock) {
-			this.refs = refs;
-		}
+		this.refs = refs;
 	}
 
 	/** @return exception thrown, if any. */
 	@Nullable
 	public Throwable getException() {
-		synchronized (lock) {
-			return exception;
-		}
+		return exception;
 	}
 
 	/**
@@ -143,15 +133,8 @@ public class ReplicaPushRequest {
 			KetchReplica.log.error(m.toString(), err);
 		}
 
-		boolean invoke;
-		synchronized (lock) {
-			invoke = !done;
-			this.exception = err;
-			this.done = true;
-		}
-		if (invoke) {
-			replica.afterPush(repo, this);
-		}
+		exception = err;
+		replica.afterPush(repo, this);
 	}
 
 	/**
@@ -186,13 +169,6 @@ public class ReplicaPushRequest {
 			KetchReplica.log.debug(m.toString());
 		}
 
-		boolean invoke;
-		synchronized (lock) {
-			invoke = !done;
-			done = true;
-		}
-		if (invoke) {
-			replica.afterPush(repo, this);
-		}
+		replica.afterPush(repo, this);
 	}
 }
