@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,56 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.lib;
 
-import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
-
-import org.eclipse.jgit.lib.Config.SectionParser;
-
 /**
- * This class keeps git repository core parameters.
+ * Constants for use with the Configuration classes: section names,
+ * configuration keys
  */
-public class CoreConfig {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
-		public CoreConfig parse(final Config cfg) {
-			return new CoreConfig(cfg);
-		}
-	};
+public class ConfigConstants {
+	/** The "core" section */
+	public static final String CONFIG_CORE_SECTION = "core";
 
-	private final int compression;
+	/** The "autocrlf" key */
+	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
-	private final int packIndexVersion;
+	/** The "bare" key */
+	public static final String CONFIG_KEY_BARE = "bare";
 
-	private final boolean logAllRefUpdates;
+	/** The "filemode" key */
+	public static final String CONFIG_KEY_FILEMODE = "filemode";
 
-	private CoreConfig(final Config rc) {
-		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt("pack", "indexversion", 2);
-		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-	}
+	/** The "logallrefupdates" key */
+	public static final String CONFIG_KEY_LOGALLREFUPDATES = "logallrefupdates";
 
-	/**
-	 * @see ObjectWriter
-	 * @return The compression level to use when storing loose objects
-	 */
-	public int getCompression() {
-		return compression;
-	}
+	/** The "repositoryformatversion" key */
+	public static final String CONFIG_KEY_REPO_FORMAT_VERSION = "repositoryformatversion";
 
-	/**
-	 * @return the preferred pack index file format; 0 for oldest possible.
-	 * @see org.eclipse.jgit.transport.IndexPack
-	 */
-	public int getPackIndexVersion() {
-		return packIndexVersion;
-	}
-
-	/**
-	 * @return whether to log all refUpdates
-	 */
-	public boolean isLogAllRefUpdates() {
-		return logAllRefUpdates;
-	}
+	/** The "worktree" key */
+	public static final String CONFIG_KEY_WORKTREE = "worktree";
 }
