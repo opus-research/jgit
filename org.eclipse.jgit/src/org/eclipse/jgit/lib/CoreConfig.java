@@ -140,8 +140,6 @@ public class CoreConfig {
 
 	private final String attributesfile;
 
-	private final boolean sparseCheckout;
-
 	/**
 	 * Options for symlink handling
 	 *
@@ -179,8 +177,6 @@ public class CoreConfig {
 				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
 		attributesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION,
 				null, ConfigConstants.CONFIG_KEY_ATTRIBUTESFILE);
-		sparseCheckout = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				null, ConfigConstants.CONFIG_KEY_SPARSECHECKOUT, false);
 	}
 
 	/**
@@ -217,13 +213,5 @@ public class CoreConfig {
 	 */
 	public String getAttributesFile() {
 		return attributesfile;
-	}
-
-	/**
-	 * @return indicates what sparsecheckout is set to
-	 * @since 4.10
-	 */
-	public boolean isSparseCheckout() {
-		return sparseCheckout;
 	}
 }

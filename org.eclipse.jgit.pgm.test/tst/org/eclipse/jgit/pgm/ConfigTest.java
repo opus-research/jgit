@@ -82,7 +82,6 @@ public class ConfigTest extends CLIRepositoryTestCase {
 		expect.add("core.repositoryformatversion=0");
 		if (!FS.DETECTED.supportsSymlinks())
 			expect.add("core.symlinks=false");
-		expect.add("core.sparsecheckout=false");
 		expect.add(""); // ends with LF (last line empty)
 		assertEquals("expected default configuration",
 				Arrays.asList(expect.toArray()).toString(),
