@@ -78,9 +78,6 @@ public class UploadPackLoggerChain implements UploadPackLogger {
 			return new UploadPackLoggerChain(newLoggers, i);
 	}
 
-	/**
-	 * @since 3.0
-	 */
 	public void onPackStatistics(PackWriter.Statistics stats) {
 		for (int i = 0; i < count; i++)
 			loggers[i].onPackStatistics(stats);

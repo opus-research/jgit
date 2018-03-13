@@ -444,7 +444,6 @@ public abstract class ObjectReader {
 	 *
 	 * @param avoid
 	 *            true to avoid unreachable objects.
-	 * @since 3.0
 	 */
 	public void setAvoidUnreachableObjects(boolean avoid) {
 		// Do nothing by default.
@@ -456,7 +455,6 @@ public abstract class ObjectReader {
 	 * @return the index or null if one does not exist.
 	 * @throws IOException
 	 *             when the index fails to load
-	 * @since 3.0
 	 */
 	public BitmapIndex getBitmapIndex() throws IOException {
 		return null;
