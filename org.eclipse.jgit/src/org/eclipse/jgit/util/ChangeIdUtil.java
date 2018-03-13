@@ -161,10 +161,9 @@ public class ChangeIdUtil {
 	 */
 	public static String insertId(String message, ObjectId changeId,
 			boolean replaceExisting) {
-		int indexOfChangeId = indexOfChangeId(message, "\n");
-		if (indexOfChangeId > 0) {
+		if (message.indexOf(CHANGE_ID) > 0) {
 			if (replaceExisting) {
-				int i = indexOfChangeId + 10;
+				int i = message.indexOf(CHANGE_ID) + 10;
 				while (message.charAt(i) == ' ')
 					i++;
 				String oldId = message.length() == (i + 40) ?
@@ -175,7 +174,23 @@ public class ChangeIdUtil {
 		}
 
 		String[] lines = message.split("\n"); //$NON-NLS-1$
-		int footerFirstLine = indexOfFirstFooterLine(lines);
+		int footerFirstLine = lines.length;
+		for (int i = lines.length - 1; i > 1; --i) {
+			if (footerPattern.matcher(lines[i]).matches()) {
+				footerFirstLine = i;
+				continue;
+			}
+			if (footerFirstLine != lines.length && lines[i].length() == 0) {
+				break;
+			}
+			if (footerFirstLine != lines.length
+					&& includeInFooterPattern.matcher(lines[i]).matches()) {
+				footerFirstLine = i + 1;
+				continue;
+			}
+			footerFirstLine = lines.length;
+			break;
+		}
 		int insertAfter = footerFirstLine;
 		for (int i = footerFirstLine; i < lines.length; ++i) {
 			if (issuePattern.matcher(lines[i]).matches()) {
@@ -201,55 +216,5 @@ public class ChangeIdUtil {
 			ret.append("\n"); //$NON-NLS-1$
 		}
 		return ret.toString();
-	}
-
-	/**
-	 * @param message
-	 * @param delimiter
-	 *            the line delimiter, like "\n" or "\r\n", needed to find the
-	 *            footer
-	 * @return the index of the ChangeId footer in the message, or -1 if no
-	 *         ChangeId footer available
-	 */
-	public static int indexOfChangeId(String message, String delimiter) {
-		String[] lines = message.split(delimiter);
-		int footerFirstLine = indexOfFirstFooterLine(lines);
-		if (footerFirstLine == lines.length)
-			return -1;
-
-		int indexOfFooter = 0;
-		for (int i = 0; i < footerFirstLine; ++i) {
-			indexOfFooter += lines[i].length() + delimiter.length();
-		}
-		return message.indexOf(CHANGE_ID, indexOfFooter);
-	}
-	/**
-	 * Find the index of the first line of the footer paragraph, or lines.length
-	 * if no footer is available
-	 *
-	 * @param lines
-	 *            the commit message split into lines stripped off the line
-	 *            delimiters
-	 * @return the index of the first line of the footer paragraph, or
-	 *         lines.length if no footer is available
-	 */
-	public static int indexOfFirstFooterLine(String[] lines) {
-		int footerFirstLine = lines.length;
-		for (int i = lines.length - 1; i > 1; --i) {
-			if (footerPattern.matcher(lines[i]).matches()) {
-				footerFirstLine = i;
-				continue;
-			}
-			if (footerFirstLine != lines.length && lines[i].length() == 0)
-				break;
-			if (footerFirstLine != lines.length
-					&& includeInFooterPattern.matcher(lines[i]).matches()) {
-				footerFirstLine = i + 1;
-				continue;
-			}
-			footerFirstLine = lines.length;
-			break;
-		}
-		return footerFirstLine;
 	}
 }
