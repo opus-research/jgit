@@ -3,7 +3,6 @@
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,12 +46,12 @@
 
 package org.eclipse.jgit.pgm;
 
+import java.io.File;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.InitCommand;
-import org.eclipse.jgit.lib.Repository;
 import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.storage.file.FileRepository;
 
 @Command(common = true, usage = "usage_CreateAnEmptyGitRepository")
 class Init extends TextBuiltin {
@@ -66,12 +65,12 @@ class Init extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		InitCommand command = Git.init();
-		command.setBare(bare);
-		command.setDirectory(gitdir);
-		Repository repository = command.call().getRepository();
-		out.println(MessageFormat.format(
-				CLIText.get().initializedEmptyGitRepositoryIn, repository
-						.getDirectory().getAbsolutePath()));
+		if (gitdir == null)
+			gitdir = new File(bare ? "." : Constants.DOT_GIT);
+		else
+			bare = true;
+		db = new FileRepository(gitdir);
+		db.create(bare);
+		out.println(MessageFormat.format(CLIText.get().initializedEmptyGitRepositoryIn, gitdir.getAbsolutePath()));
 	}
 }

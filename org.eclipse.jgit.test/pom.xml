@@ -52,7 +52,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>0.11.0-SNAPSHOT</version>
+    <version>0.10.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.test</artifactId>
@@ -61,6 +61,10 @@
   <description>
     JUnit tests for the core library.
   </description>
+
+  <properties>
+    <jni_dir>${basedir}/../libjgit_native/target</jni_dir>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -112,6 +116,25 @@
     </dependency>
   </dependencies>
 
+  <profiles>
+    <profile>
+      <id>jgit.native</id>
+      <activation>
+        <property>
+          <name>!jgit.native.skip</name>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.eclipse.jgit</groupId>
+          <artifactId>libjgit_native</artifactId>
+          <version>${project.version}</version>
+          <type>${jni_package}</type>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+
   <build>
     <testSourceDirectory>tst/</testSourceDirectory>
 
@@ -124,8 +147,14 @@
     <plugins>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.4.2</version>
         <configuration>
-          <argLine>-Xmx256m -Dfile.encoding=UTF-8</argLine>
+          <argLine>-Xmx256m -Dfile.encoding=UTF-8 -Djava.library.path=${java.library.path}${path.separator}${jni_dir}</argLine>
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*TestCase.java</include>
+            <include>**/T000*.java</include>
+          </includes>
         </configuration>
       </plugin>
     </plugins>

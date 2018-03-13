@@ -44,13 +44,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -71,13 +64,8 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class ConcurrentRepackTest extends RepositoryTestCase {
-	@Before
 	public void setUp() throws Exception {
 		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
 		windowCacheConfig.setPackedGitOpenFiles(1);
@@ -85,14 +73,12 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		super.setUp();
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		super.tearDown();
 		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
 		WindowCache.reconfigure(windowCacheConfig);
 	}
 
-	@Test
 	public void testObjectInNewPack() throws IncorrectObjectTypeException,
 			IOException {
 		// Create a new object in a new pack, and test that it is present.
@@ -103,7 +89,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertEquals(o1.name(), parse(o1).name());
 	}
 
-	@Test
 	public void testObjectMovedToNewPack1()
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it. Then remove that pack and put the
@@ -130,7 +115,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertEquals(o1.name(), parse(o1).name());
 	}
 
-	@Test
 	public void testObjectMovedWithinPack()
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it.
@@ -163,7 +147,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertEquals(o2.name(), parse(o2).name());
 	}
 
-	@Test
 	public void testObjectMovedToNewPack2()
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it. Then remove that pack and put the
@@ -253,10 +236,10 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		touch(begin, files[0].getParentFile());
 	}
 
-	private static void delete(final File[] list) throws IOException {
+	private static void delete(final File[] list) {
 		final long begin = list[0].getParentFile().lastModified();
 		for (final File f : list) {
-			FileUtils.delete(f);
+			f.delete();
 			assertFalse(f + " was removed", f.exists());
 		}
 		touch(begin, list[0].getParentFile());

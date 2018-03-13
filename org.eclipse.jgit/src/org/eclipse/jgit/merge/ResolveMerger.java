@@ -58,11 +58,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.Sequence;
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -73,7 +71,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -83,7 +80,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * A three-way merger performing a content-merge if necessary
@@ -140,7 +136,6 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private WorkingTreeIterator workingTreeIterator;
 
-	private MergeAlgorithm mergeAlgorithm;
 
 	/**
 	 * @param local
@@ -148,11 +143,6 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	protected ResolveMerger(Repository local, boolean inCore) {
 		super(local);
-		SupportedAlgorithm diffAlg = local.getConfig().getEnum(
-				ConfigConstants.CONFIG_DIFF_SECTION, null,
-				ConfigConstants.CONFIG_KEY_ALGORITHM,
-				SupportedAlgorithm.HISTOGRAM);
-		mergeAlgorithm = new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
 		commitNames = new String[] { "BASE", "OURS", "THEIRS" };
 		oi = getObjectInserter();
 		this.inCore = inCore;
@@ -183,6 +173,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
 			tw = new NameConflictTreeWalk(db);
+			tw.reset();
 			tw.addTree(mergeBase());
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
@@ -244,7 +235,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				createDir(f.getParentFile());
 				DirCacheCheckout.checkoutEntry(db,
 						f,
-						entry.getValue());
+						entry.getValue(), true);
 			} else {
 				if (!f.delete())
 					failingPathes.put(entry.getKey(),
@@ -261,7 +252,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				p = p.getParentFile();
 			if (p == null || p.isDirectory())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
-			FileUtils.delete(p);
+			p.delete();
 			if (!f.mkdirs())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 		}
@@ -446,7 +437,8 @@ public class ResolveMerger extends ThreeWayMerger {
 				// is not modified
 				if (work != null
 						&& (!nonTree(work.getEntryRawMode()) || work
-								.isModified(index.getDirCacheEntry(), true))) {
+								.isModified(index.getDirCacheEntry(), true,
+										true, db.getFS()))) {
 					failingPathes.put(tw.getPathString(),
 							MergeFailureReason.DIRTY_WORKTREE);
 					return false;
@@ -466,12 +458,10 @@ public class ResolveMerger extends ThreeWayMerger {
 			throws FileNotFoundException, IllegalStateException, IOException {
 		MergeFormatter fmt = new MergeFormatter();
 
-		RawText baseText = base == null ? RawText.EMPTY_TEXT : getRawText(
-				base.getEntryObjectId(), db);
-
 		// do the merge
-		MergeResult<RawText> result = mergeAlgorithm.merge(
-				RawTextComparator.DEFAULT, baseText,
+		MergeResult<RawText> result = MergeAlgorithm.merge(
+				RawTextComparator.DEFAULT,
+				getRawText(base.getEntryObjectId(), db),
 				getRawText(ours.getEntryObjectId(), db),
 				getRawText(theirs.getEntryObjectId(), db));
 
@@ -529,7 +519,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			} finally {
 				is.close();
 				if (inCore)
-					FileUtils.delete(of);
+					of.delete();
 			}
 			builder.add(dce);
 			return true;

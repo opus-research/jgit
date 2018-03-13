@@ -43,12 +43,17 @@
 
 package org.eclipse.jgit.util;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+
+import org.eclipse.jgit.util.fs.AccessDeniedException;
+import org.eclipse.jgit.util.fs.FileAccess;
+import org.eclipse.jgit.util.fs.FileAccessJava;
+import org.eclipse.jgit.util.fs.FileAccessNative;
+import org.eclipse.jgit.util.fs.FileInfo;
+import org.eclipse.jgit.util.fs.NoSuchFileException;
+import org.eclipse.jgit.util.fs.NotDirectoryException;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -97,11 +102,18 @@ public abstract class FS {
 
 	private final File userHome;
 
+	private final FileAccess access;
+
 	/**
 	 * Constructs a file system abstraction.
 	 */
 	protected FS() {
 		this.userHome = userHomeImpl();
+
+		if (NativeLibrary.isLoaded())
+			access = new FileAccessNative();
+		else
+			access = new FileAccessJava(this);
 	}
 
 	/**
@@ -138,6 +150,25 @@ public abstract class FS {
 	 * @return true if the change succeeded; false otherwise.
 	 */
 	public abstract boolean setExecute(File f, boolean canExec);
+
+	/**
+	 * Obtain information about the named file.
+	 *
+	 * @param file
+	 *            the file information shall be retrieved for.
+	 * @return information about the named file.
+	 * @throws NoSuchFileException
+	 *             A component of path does not name an existing file or path is
+	 *             an empty string.
+	 * @throws AccessDeniedException
+	 *             A component of the path prefix denies search permission.
+	 * @throws NotDirectoryException
+	 *             A component of the path prefix is not a directory.
+	 */
+	public FileInfo stat(File file) throws AccessDeniedException,
+			NoSuchFileException, NotDirectoryException {
+		return access.lstat(file);
+	}
 
 	/**
 	 * Resolve this file to its actual path name that the JRE can use.
@@ -202,57 +233,4 @@ public abstract class FS {
 			return null;
 		return new File(home).getAbsoluteFile();
 	}
-
-	static File searchPath(final String path, final String... lookFor) {
-		for (final String p : path.split(File.pathSeparator)) {
-			for (String command : lookFor) {
-				final File e = new File(p, command);
-				if (e.isFile())
-					return e.getAbsoluteFile();
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Execute a command and return a single line of output as a String
-	 *
-	 * @param dir
-	 *            Working directory for the command
-	 * @param command
-	 *            as component array
-	 * @param encoding
-	 * @return the one-line output of the command
-	 */
-	protected static String readPipe(File dir, String[] command, String encoding) {
-		try {
-			final Process p = Runtime.getRuntime().exec(command, null, dir);
-			final BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), encoding));
-			String r = null;
-			try {
-				r = lineRead.readLine();
-			} finally {
-				p.getOutputStream().close();
-				p.getErrorStream().close();
-				lineRead.close();
-			}
-
-			for (;;) {
-				try {
-					if (p.waitFor() == 0 && r != null && r.length() > 0)
-						return r;
-					break;
-				} catch (InterruptedException ie) {
-					// Stop bothering me, I have a zombie to reap.
-				}
-			}
-		} catch (IOException e) {
-			// ignore
-		}
-		return null;
-	}
-
-	/** @return the $prefix directory C Git would use. */
-	public abstract File gitPrefix();
 }
