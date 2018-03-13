@@ -97,7 +97,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.GitDateParser;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -287,8 +286,7 @@ public class GC {
 					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 			if (pruneExpireStr == null)
 				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
-			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
-					.getInstance().getLocale());
+			expire = GitDateParser.parse(pruneExpireStr, null);
 			expireAgeMillis = -1;
 		}
 		if (expire != null)
