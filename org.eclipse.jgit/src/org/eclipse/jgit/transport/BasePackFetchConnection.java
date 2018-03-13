@@ -599,11 +599,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 				}
 				return !remoteKnowsIsCommon;
 			}
-
-			@Override
-			public boolean requiresCommitBody() {
-				return false;
-			}
 		});
 	}
 

@@ -576,16 +576,12 @@ public class PackWriter {
 
 		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
-
 		long headerStart = out.length();
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
 		out.flush();
-		long headerEnd = out.length();
-
 		writeObjects(out);
 		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty())
-			stats.thinPackBytes = out.length() - (headerEnd - headerStart);
-
+			stats.thinPackBytes = out.length() - headerStart;
 		for (CachedPack pack : cachedPacks) {
 			stats.reusedObjects += pack.getObjectCount();
 			reuseSupport.copyPackAsIs(out, pack);
