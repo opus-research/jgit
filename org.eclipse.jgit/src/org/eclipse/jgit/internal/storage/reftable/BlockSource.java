@@ -62,7 +62,7 @@ public abstract class BlockSource implements AutoCloseable {
 	 *            input file.
 	 * @return block source to read from {@code table}.
 	 */
-	public static BlockSource of(byte[] table) {
+	public static BlockSource from(byte[] table) {
 		return new BlockSource() {
 			@Override
 			public ByteBuffer read(long position, int blockSize)
