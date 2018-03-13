@@ -741,9 +741,8 @@ public class BatchRefUpdate {
 	 * @since 4.9
 	 */
 	protected boolean isForceRefLog(ReceiveCommand cmd) {
-		Boolean isForceRefLog = cmd.isForceRefLog();
-		return isForceRefLog != null ? isForceRefLog.booleanValue()
-				: isForceRefLog();
+		return cmd.isForceRefLog() != null
+				? cmd.isForceRefLog().booleanValue() : isForceRefLog();
 	}
 
 	@Override
