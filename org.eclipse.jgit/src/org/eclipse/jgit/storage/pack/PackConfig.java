@@ -379,7 +379,6 @@ public class PackConfig {
 	 * @return true if existing delta chains should be cut at
 	 *         {@link #getMaxDeltaDepth()}. Default is false, allowing existing
 	 *         chains to be of any length.
-	 * @since 3.0
 	 */
 	public boolean getCutDeltaChains() {
 		return cutDeltaChains;
@@ -396,7 +395,6 @@ public class PackConfig {
 	 *
 	 * @param cut
 	 *            true to cut existing chains.
-	 * @since 3.0
 	 */
 	public void setCutDeltaChains(boolean cut) {
 		cutDeltaChains = cut;
