@@ -45,8 +45,10 @@ package org.eclipse.jgit.transport;
 
 /**
  * The required information to verify the push.
+ *
+ * @since 4.0
  */
-class PushCertificate {
+public class PushCertificate {
 	/** The tuple "name &lt;email&gt;" as presented in the push certificate. */
 	String pusher;
 
