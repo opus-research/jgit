@@ -69,7 +69,6 @@ import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
@@ -133,7 +132,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			revWalk = new RevWalk(repo);
 			RevCommit headCommit = revWalk.lookupCommit(head.getObjectId());
 
-			// we know for now there is only one commit
+			// we know for know there is only one commit
 			Ref ref = commits.get(0);
 
 			refLogMessage.append(ref.getName());
@@ -165,9 +164,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						headCommit, srcCommit }, MergeStatus.FAST_FORWARD,
 						mergeStrategy, null, null);
 			} else {
-
-				repo.writeMergeCommitMsg(new MergeMessageFormatter().format(
-						commits, head));
+				repo.writeMergeCommitMsg("merging " + ref.getName() + " into "
+						+ head.getName());
 				repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
 				ThreeWayMerger merger = (ThreeWayMerger) mergeStrategy
 						.newMerger(repo);

@@ -558,9 +558,6 @@ public abstract class Transport {
 	/** Pack configuration used by this transport to make pack file. */
 	private PackConfig packConfig;
 
-	/** Assists with authentication the connection. */
-	private CredentialsProvider credentialsProvider;
-
 	/**
 	 * Create a new transport instance.
 	 *
@@ -577,7 +574,6 @@ public abstract class Transport {
 		this.local = local;
 		this.uri = uri;
 		this.checkFetchedObjects = tc.isFsckObjects();
-		this.credentialsProvider = CredentialsProvider.getDefault();
 	}
 
 	/**
@@ -823,26 +819,6 @@ public abstract class Transport {
 	 */
 	public void setPackConfig(PackConfig pc) {
 		packConfig = pc;
-	}
-
-	/**
-	 * A credentials provider to assist with authentication connections..
-	 *
-	 * @param credentialsProvider
-	 *            the credentials provider, or null if there is none
-	 */
-	public void setCredentialsProvider(CredentialsProvider credentialsProvider) {
-		this.credentialsProvider = credentialsProvider;
-	}
-
-	/**
-	 * The configured credentials provider.
-	 *
-	 * @return the credentials provider, or null if no credentials provider is
-	 *         associated with this transport.
-	 */
-	public CredentialsProvider getCredentialsProvider() {
-		return credentialsProvider;
 	}
 
 	/**
