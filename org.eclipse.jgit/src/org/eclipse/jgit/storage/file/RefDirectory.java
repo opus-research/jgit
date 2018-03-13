@@ -69,8 +69,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -124,10 +122,6 @@ public class RefDirectory extends RefDatabase {
 
 	/** If in the header, denotes the file has peeled data. */
 	public static final String PACKED_REFS_PEELED = " peeled"; //$NON-NLS-1$
-
-	/** The names of the additional refs supported by this class */
-	private static final String[] additionalRefsNames = new String[] {
-			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD };
 
 	private final FileRepository parent;
 
@@ -301,17 +295,6 @@ public class RefDirectory extends RefDatabase {
 		}
 
 		return new RefMap(prefix, packed, upcast(loose), symbolic.toRefList());
-	}
-
-	@Override
-	public List<Ref> getAdditionalRefs() throws IOException {
-		List<Ref> ret = new LinkedList<Ref>();
-		for (String name : additionalRefsNames) {
-			Ref r = getRef(name);
-			if (r != null)
-				ret.add(r);
-		}
-		return ret;
 	}
 
 	@SuppressWarnings("unchecked")
