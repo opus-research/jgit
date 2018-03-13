@@ -677,18 +677,29 @@ public class UploadPack {
 			}
 
 			if (options.contains(OPTION_INCLUDE_TAG)) {
-				for (final Ref r : refs.values()) {
-					final RevObject o;
-					try {
-						o = rw.parseAny(r.getObjectId());
-					} catch (IOException e) {
-						continue;
+				for (Ref ref : refs.values()) {
+					ObjectId objectId = ref.getObjectId();
+
+					// If the object was already requested, skip it.
+					if (wantAll.isEmpty()) {
+						if (wantIds.contains(objectId))
+							continue;
+					} else {
+						RevObject obj = rw.lookupOrNull(objectId);
+						if (obj != null && obj.has(WANT))
+							continue;
 					}
-					if (o.has(WANT) || !(o instanceof RevTag))
+
+					if (!ref.isPeeled())
+						ref = db.peel(ref);
+
+					ObjectId peeledId = ref.getPeeledObjectId();
+					if (peeledId == null)
 						continue;
-					final RevTag t = (RevTag) o;
-					if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
-						pw.addObject(t);
+
+					objectId = ref.getObjectId();
+					if (pw.willInclude(peeledId) && !pw.willInclude(objectId))
+						pw.addObject(rw.parseAny(objectId));
 				}
 			}
 
