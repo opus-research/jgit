@@ -72,8 +72,8 @@ public abstract class SystemReader {
 			return System.getProperty(key);
 		}
 
-		public FileBasedConfig openUserConfig(FS fs) {
-			final File home = fs.userHome();
+		public FileBasedConfig openUserConfig() {
+			final File home = FS.userHome();
 			return new FileBasedConfig(new File(home, ".gitconfig"));
 		}
 
@@ -136,12 +136,9 @@ public abstract class SystemReader {
 	public abstract String getProperty(String key);
 
 	/**
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @return the git configuration found in the user home
 	 */
-	public abstract FileBasedConfig openUserConfig(FS fs);
+	public abstract FileBasedConfig openUserConfig();
 
 	/**
 	 * @return the current system time

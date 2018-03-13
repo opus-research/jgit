@@ -46,6 +46,7 @@ package org.eclipse.jgit.iplog;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -72,7 +73,15 @@ public class IpLogMeta {
 
 	private static final String S_CQ = "CQ";
 
+	private static final String S_CONSUMES = "consumes";
+
+	private static final String S_REVIEW = "review";
+
+	private static final String K_URL = "url";
+
 	private static final String K_NAME = "name";
+
+	private static final String K_VERSION = "version";
 
 	private static final String K_COMMENTS = "comments";
 
@@ -88,31 +97,35 @@ public class IpLogMeta {
 
 	private List<Project> projects = new ArrayList<Project>();
 
+	private List<Project> consumedProjects = new ArrayList<Project>();
+
 	private Set<CQ> cqs = new HashSet<CQ>();
+
+	private String reviewUrl;
 
 	List<Project> getProjects() {
 		return projects;
+	}
+
+	List<Project> getConsumedProjects() {
+		return consumedProjects;
 	}
 
 	Set<CQ> getCQs() {
 		return cqs;
 	}
 
+	String getReviewUrl() {
+		return reviewUrl;
+	}
+
 	void loadFrom(Config cfg) {
 		projects.clear();
+		consumedProjects.clear();
 		cqs.clear();
 
-		for (String id : cfg.getSubsections(S_PROJECT)) {
-			String name = cfg.getString(S_PROJECT, id, K_NAME);
-			Project project = new Project(id, name);
-			project.setComments(cfg.getString(S_PROJECT, id, K_COMMENTS));
-
-			for (String c : cfg.getStringList(S_PROJECT, id, K_SKIP_COMMIT))
-				project.addSkipCommit(ObjectId.fromString(c));
-			for (String license : cfg.getStringList(S_PROJECT, id, K_LICENSE))
-				project.addLicense(license);
-			projects.add(project);
-		}
+		projects.addAll(parseProjects(cfg, S_PROJECT));
+		consumedProjects.addAll(parseProjects(cfg, S_CONSUMES));
 
 		for (String id : cfg.getSubsections(S_CQ)) {
 			CQ cq = new CQ(Long.parseLong(id));
@@ -123,6 +136,26 @@ public class IpLogMeta {
 			cq.setComments(cfg.getString(S_CQ, id, K_COMMENTS));
 			cqs.add(cq);
 		}
+
+		reviewUrl = cfg.getString(S_REVIEW, null, K_URL);
+	}
+
+	private List<Project> parseProjects(final Config cfg,
+			final String sectionName) {
+		final List<Project> dst = new ArrayList<Project>();
+		for (String id : cfg.getSubsections(sectionName)) {
+			String name = cfg.getString(sectionName, id, K_NAME);
+			Project project = new Project(id, name);
+			project.setVersion(cfg.getString(sectionName, id, K_VERSION));
+			project.setComments(cfg.getString(sectionName, id, K_COMMENTS));
+
+			for (String c : cfg.getStringList(sectionName, id, K_SKIP_COMMIT))
+				project.addSkipCommit(ObjectId.fromString(c));
+			for (String license : cfg.getStringList(sectionName, id, K_LICENSE))
+				project.addLicense(license);
+			dst.add(project);
+		}
+		return dst;
 	}
 
 	/**
@@ -155,7 +188,7 @@ public class IpLogMeta {
 
 		LockFile lf = new LockFile(file);
 		if (!lf.lock())
-			throw new IOException("Cannot lock " + file);
+			throw new IOException(MessageFormat.format(IpLogText.get().cannotLock, file));
 		try {
 			FileBasedConfig cfg = new FileBasedConfig(file);
 			cfg.load();
@@ -181,7 +214,7 @@ public class IpLogMeta {
 
 			lf.write(Constants.encode(cfg.toText()));
 			if (!lf.commit())
-				throw new IOException("Cannot write " + file);
+				throw new IOException(MessageFormat.format(IpLogText.get().cannotWrite, file));
 		} finally {
 			lf.unlock();
 		}

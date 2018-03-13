@@ -59,6 +59,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
+import java.text.MessageFormat;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
@@ -66,9 +67,11 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.TreeMap;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -237,13 +240,18 @@ public class GitIndex {
 			buffer.order(ByteOrder.BIG_ENDIAN);
 			int j = channel.read(buffer);
 			if (j != buffer.capacity())
-				throw new IOException("Could not read index in one go, only "+j+" out of "+buffer.capacity()+" read");
+				throw new IOException(MessageFormat.format(JGitText.get().couldNotReadIndexInOneGo
+						, j, buffer.capacity()));
 			buffer.flip();
 			header = new Header(buffer);
 			entries.clear();
 			for (int i = 0; i < header.entries; ++i) {
 				Entry entry = new Entry(buffer);
+				final GitIndex.Entry existing = entries.get(entry.name);
 				entries.put(entry.name, entry);
+				if (existing != null) {
+					entry.stages |= existing.stages;
+				}
 			}
 			lastCacheTime = cacheFile.lastModified();
 		} finally {
@@ -261,7 +269,7 @@ public class GitIndex {
 		File tmpIndex = new File(cacheFile.getAbsoluteFile() + ".tmp");
 		File lock = new File(cacheFile.getAbsoluteFile() + ".lock");
 		if (!lock.createNewFile())
-			throw new IOException("Index file is in use");
+			throw new IOException(JGitText.get().indexFileIsInUse);
 		try {
 			FileOutputStream fileOutputStream = new FileOutputStream(tmpIndex);
 			FileChannel fc = fileOutputStream.getChannel();
@@ -293,10 +301,10 @@ public class GitIndex {
 			if (cacheFile.exists())
 				if (!cacheFile.delete())
 					throw new IOException(
-						"Could not rename delete old index");
+						JGitText.get().couldNotRenameDeleteOldIndex);
 			if (!tmpIndex.renameTo(cacheFile))
 				throw new IOException(
-						"Could not rename temporary index file to index");
+						JGitText.get().couldNotRenameTemporaryIndexFileToIndex);
 			changed = false;
 			statDirty = false;
 			lastCacheTime = cacheFile.lastModified();
@@ -304,10 +312,10 @@ public class GitIndex {
 		} finally {
 			if (!lock.delete())
 				throw new IOException(
-						"Could not delete lock file. Should not happen");
+						JGitText.get().couldNotDeleteLockFileShouldNotHappen);
 			if (tmpIndex.exists() && !tmpIndex.delete())
 				throw new IOException(
-						"Could not delete temporary index file. Should not happen");
+						JGitText.get().couldNotDeleteTemporaryIndexFileShouldNotHappen);
 		}
 	}
 
@@ -315,26 +323,26 @@ public class GitIndex {
 		for (Iterator i = entries.values().iterator(); i.hasNext();) {
 			Entry e = (Entry) i.next();
 			if (e.getStage() != 0) {
-				throw new NotSupportedException("Cannot work with other stages than zero right now. Won't write corrupt index.");
+				throw new NotSupportedException(JGitText.get().cannotWorkWithOtherStagesThanZeroRightNow);
 			}
 		}
 	}
 
-	private boolean File_canExecute(File f){
-		return db.getFS().canExecute(f);
+	static boolean File_canExecute( File f){
+		return FS.INSTANCE.canExecute(f);
 	}
 
-	private boolean File_setExecute(File f, boolean value) {
-		return db.getFS().setExecute(f, value);
+	static boolean File_setExecute(File f, boolean value) {
+		return FS.INSTANCE.setExecute(f, value);
 	}
 
-	private boolean File_hasExecute() {
-		return db.getFS().supportsExecute();
+	static boolean File_hasExecute() {
+		return FS.INSTANCE.supportsExecute();
 	}
 
 	static byte[] makeKey(File wd, File f) {
 		if (!f.getPath().startsWith(wd.getPath()))
-			throw new Error("Path is not in working dir");
+			throw new Error(JGitText.get().pathIsNotInWorkingDir);
 		String relName = Repository.stripWorkDir(wd, f);
 		return Constants.encode(relName);
 	}
@@ -373,6 +381,8 @@ public class GitIndex {
 
 		private byte[] name;
 
+		private int stages;
+
 		Entry(byte[] key, File f, int stage)
 				throws IOException {
 			ctime = f.lastModified() * 1000000L;
@@ -390,6 +400,7 @@ public class GitIndex {
 			sha1 = writer.writeBlob(f);
 			name = key;
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
+			stages = (1 >> getStage());
 		}
 
 		Entry(byte[] key, File f, int stage, byte[] newContent)
@@ -409,6 +420,7 @@ public class GitIndex {
 			sha1 = writer.writeBlob(newContent);
 			name = key;
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
+			stages = (1 >> getStage());
 		}
 
 		Entry(TreeEntry f, int stage) {
@@ -428,6 +440,7 @@ public class GitIndex {
 			sha1 = f.getId();
 			name = Constants.encode(f.getFullName());
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
+			stages = (1 >> getStage());
 		}
 
 		Entry(ByteBuffer b) {
@@ -444,6 +457,7 @@ public class GitIndex {
 			b.get(sha1bytes);
 			sha1 = ObjectId.fromRaw(sha1bytes);
 			flags = b.getShort();
+			stages = (1 << getStage());
 			name = new byte[flags & 0xFFF];
 			b.get(name);
 			b
@@ -597,7 +611,8 @@ public class GitIndex {
 							if (!file.isDirectory())
 								return true;
 						} else {
-							System.out.println("Does not handle mode "+mode+" ("+file+")");
+							System.out.println(MessageFormat.format(JGitText.get().doesNotHandleMode
+									, mode, file));
 							return true;
 						}
 					}
@@ -640,6 +655,19 @@ public class GitIndex {
 				}
 			}
 			return false;
+		}
+
+		/**
+		 * Returns the stages in which the entry's file is recorded in the index.
+		 * The stages are bit-encoded: bit N is set if the file is present
+		 * in stage N. In particular, the N-th bit will be set if this entry
+		 * itself is in stage N (see getStage()).
+		 *
+		 * @return flags denoting stages
+		 * @see #getStage()
+		 */
+		public int getStages() {
+			return stages;
 		}
 
 		// for testing
@@ -757,11 +785,11 @@ public class GitIndex {
 			version = buf.getInt();
 			entries = buf.getInt();
 			if (signature != 0x44495243)
-				throw new CorruptObjectException("Index signature is invalid: "
-						+ signature);
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().indexSignatureIsInvalid, signature));
 			if (version != 2)
-				throw new CorruptObjectException(
-						"Unknown index version (or corrupt index):" + version);
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().unknownIndexVersionOrCorruptIndex, version));
 		}
 
 		void write(ByteBuffer buf) {
@@ -853,7 +881,7 @@ public class GitIndex {
 		ByteBuffer buffer = ByteBuffer.wrap(bytes);
 		int j = channel.write(buffer);
 		if (j != bytes.length)
-			throw new IOException("Could not write file " + file);
+			throw new IOException(MessageFormat.format(JGitText.get().couldNotWriteFile, file));
 		channel.close();
 		if (config_filemode() && File_hasExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(e.mode)) {

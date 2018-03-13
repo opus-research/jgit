@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Thread to copy from an input stream to an output stream. */
 public class StreamCopyThread extends Thread {
@@ -56,7 +57,9 @@ public class StreamCopyThread extends Thread {
 
 	private final OutputStream dst;
 
-	private volatile boolean doFlush;
+	private final AtomicInteger flushCounter = new AtomicInteger(0);
+
+	private volatile boolean done;
 
 	/**
 	 * Create a thread to copy data from an input stream to an output stream.
@@ -82,9 +85,27 @@ public class StreamCopyThread extends Thread {
 	 * the request.
 	 */
 	public void flush() {
-		if (!doFlush) {
-			doFlush = true;
-			interrupt();
+		flushCounter.incrementAndGet();
+		interrupt();
+	}
+
+	/**
+	 * Request that the thread terminate, and wait for it.
+	 * <p>
+	 * This method signals to the copy thread that it should stop as soon as
+	 * there is no more IO occurring.
+	 *
+	 * @throws InterruptedException
+	 *             the calling thread was interrupted.
+	 */
+	public void halt() throws InterruptedException {
+		for (;;) {
+			join(250 /* milliseconds */);
+			if (isAlive()) {
+				done = true;
+				interrupt();
+			} else
+				break;
 		}
 	}
 
@@ -94,10 +115,11 @@ public class StreamCopyThread extends Thread {
 			final byte[] buf = new byte[BUFFER_SIZE];
 			for (;;) {
 				try {
-					if (doFlush) {
-						doFlush = false;
+					if (needFlush())
 						dst.flush();
-					}
+
+					if (done)
+						break;
 
 					final int n;
 					try {
@@ -107,7 +129,15 @@ public class StreamCopyThread extends Thread {
 					}
 					if (n < 0)
 						break;
-					dst.write(buf, 0, n);
+
+					for (;;) {
+						try {
+							dst.write(buf, 0, n);
+						} catch (InterruptedIOException wakey) {
+							continue;
+						}
+						break;
+					}
 				} catch (IOException e) {
 					break;
 				}
@@ -124,5 +154,14 @@ public class StreamCopyThread extends Thread {
 				// Ignore IO errors on close
 			}
 		}
+	}
+
+	private boolean needFlush() {
+		int i = flushCounter.get();
+		if (i > 0) {
+			flushCounter.decrementAndGet();
+			return true;
+		}
+		return false;
 	}
 }
