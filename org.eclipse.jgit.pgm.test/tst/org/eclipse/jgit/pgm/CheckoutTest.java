@@ -51,16 +51,14 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testCheckoutSelf() throws Exception {
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 
 		assertEquals("Already on 'master'", execute("git checkout master"));
 	}
 
 	@Test
 	public void testCheckoutBranch() throws Exception {
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 		new Git(db).branchCreate().setName("side").call();
 
 		assertEquals("Switched to branch 'side'", execute("git checkout side"));
@@ -68,8 +66,7 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testCheckoutNewBranch() throws Exception {
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 
 		assertEquals("Switched to a new branch 'side'",
 				execute("git checkout -b side"));
@@ -84,8 +81,7 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 
 		assertEquals("A branch named 'master' already exists.",
 				execute("git checkout -b master"));

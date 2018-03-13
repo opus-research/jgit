@@ -89,8 +89,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 		// create initial commit
 		git = new Git(db);
-		initialCommit = git.commit().setMessage("initial commit")
-				.setAllowEmpty(true).call();
+		initialCommit = git.commit().setMessage("initial commit").call();
 
 		// create nested file
 		File dir = new File(db.getWorkTree(), "dir");

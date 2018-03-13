@@ -58,8 +58,7 @@ public class ConfigTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
