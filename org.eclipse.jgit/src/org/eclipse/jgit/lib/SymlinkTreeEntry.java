@@ -57,6 +57,7 @@ package org.eclipse.jgit.lib;
  */
 @Deprecated
 public class SymlinkTreeEntry extends TreeEntry {
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in

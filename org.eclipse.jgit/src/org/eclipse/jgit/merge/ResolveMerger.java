@@ -452,41 +452,6 @@ public class ResolveMerger extends ThreeWayMerger {
 				unmergedPaths.add(tw.getPathString());
 			}
 			modifiedFiles.add(tw.getPathString());
-		} else if (modeO != modeT) {
-			// OURS or THEIRS has been deleted
-			if (((modeO != 0 && !tw.idEqual(T_BASE, T_OURS)) || (modeT != 0 && !tw
-					.idEqual(T_BASE, T_THEIRS)))) {
-
-				add(tw.getRawPath(), base, DirCacheEntry.STAGE_1);
-				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2);
-				DirCacheEntry e = add(tw.getRawPath(), theirs,
-						DirCacheEntry.STAGE_3);
-
-				// OURS was deleted checkout THEIRS
-				if (modeO == 0) {
-					// Check worktree before checking out THEIRS
-					if (isWorktreeDirty())
-						return false;
-					if (nonTree(modeT)) {
-						if (e != null)
-							toBeCheckedOut.put(tw.getPathString(), e);
-					}
-				}
-
-				unmergedPaths.add(tw.getPathString());
-
-				// generate a MergeResult for the deleted file
-				RawText baseText = base == null ? RawText.EMPTY_TEXT
-						: getRawText(base.getEntryObjectId(), db);
-				RawText ourText = ours == null ? RawText.EMPTY_TEXT
-						: getRawText(ours.getEntryObjectId(), db);
-				RawText theirsText = theirs == null ? RawText.EMPTY_TEXT
-						: getRawText(theirs.getEntryObjectId(), db);
-				MergeResult<RawText> result = mergeAlgorithm.merge(
-						RawTextComparator.DEFAULT, baseText, ourText,
-						theirsText);
-				mergeResults.put(tw.getPathString(), result);
-			}
 		}
 		return true;
 	}
