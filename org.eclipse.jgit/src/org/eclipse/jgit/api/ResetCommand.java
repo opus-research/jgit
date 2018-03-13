@@ -157,8 +157,8 @@ public class ResetCommand extends GitCommand<Ref> {
 			if (ref != null && commitId == null) {
 				// @TODO throw an InvalidRefNameException. We can't do that
 				// now because this would break the API
-				throw new JGitInternalException(MessageFormat
-						.format(JGitText.get().invalidRefName, ref));
+				throw new JGitInternalException("Invalid ref " + ref
+						+ " specified");
 			}
 
 			final ObjectId commitTree;
@@ -227,19 +227,24 @@ public class ResetCommand extends GitCommand<Ref> {
 			setCallable(false);
 			return result;
 		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
+			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfResetCommand,
-					e.getMessage()), e);
+					e);
 		}
 	}
 
 	private RevCommit parseCommit(final ObjectId commitId) {
-		try (RevWalk rw = new RevWalk(repo)) {
-			return rw.parseCommit(commitId);
+		RevCommit commit;
+		RevWalk rw = new RevWalk(repo);
+		try {
+			commit = rw.parseCommit(commitId);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cannotReadCommit, commitId.toString()), e);
+		} finally {
+			rw.release();
 		}
+		return commit;
 	}
 
 	private ObjectId resolveRefToCommitId() {
@@ -271,7 +276,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		if (!filepaths.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$ //$NON-NLS-2$
+					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$
 		this.mode = mode;
 		return this;
 	}
@@ -285,7 +290,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	public ResetCommand addPath(String path) {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "<paths>...", //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "<paths>...",
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
 		filepaths.add(path);
 		return this;
@@ -300,10 +305,11 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndexForPaths(ObjectId commitTree) {
 		DirCache dc = null;
-		try (final TreeWalk tw = new TreeWalk(repo)) {
+		try {
 			dc = repo.lockDirCache();
 			DirCacheBuilder builder = dc.builder();
 
+			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (commitTree != null)
 				tw.addTree(commitTree);
@@ -336,9 +342,11 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndex(ObjectId commitTree) throws IOException {
 		DirCache dc = repo.lockDirCache();
-		try (TreeWalk walk = new TreeWalk(repo)) {
+		TreeWalk walk = null;
+		try {
 			DirCacheBuilder builder = dc.builder();
 
+			walk = new TreeWalk(repo);
 			if (commitTree != null)
 				walk.addTree(commitTree);
 			else
@@ -372,6 +380,8 @@ public class ResetCommand extends GitCommand<Ref> {
 			builder.commit();
 		} finally {
 			dc.unlock();
+			if (walk != null)
+				walk.release();
 		}
 	}
 

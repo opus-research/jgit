@@ -51,7 +51,6 @@ import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
@@ -178,9 +177,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 							packFile.getPath()));
 				}
 				loadedIdx = idx;
-			} catch (InterruptedIOException e) {
-				// don't invalidate the pack, we are interrupted from another thread
-				throw e;
 			} catch (IOException e) {
 				invalid = true;
 				throw e;
@@ -348,11 +344,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return dstbuf;
 	}
 
-	void copyPackAsIs(PackOutputStream out, WindowCursor curs)
+	void copyPackAsIs(PackOutputStream out, boolean validate, WindowCursor curs)
 			throws IOException {
 		// Pin the first window, this ensures the length is accurate.
 		curs.pin(this, 0);
-		curs.copyPackAsIs(this, length, out);
+		curs.copyPackAsIs(this, length, validate, out);
 	}
 
 	final void copyAsIs(PackOutputStream out, LocalObjectToPack src,
@@ -506,7 +502,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// and we have it pinned.  Write this out without copying.
 			//
 			out.writeHeader(src, inflatedLength);
-			quickCopy.write(out, dataOffset, (int) dataLength);
+			quickCopy.write(out, dataOffset, (int) dataLength, null);
 
 		} else if (dataLength <= buf.length) {
 			// Tiny optimization: Lots of objects are very small deltas or
@@ -609,26 +605,22 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				length = fd.length();
 				onOpenPack();
 			}
-		} catch (InterruptedIOException e) {
-			// don't invalidate the pack, we are interrupted from another thread
-			openFail(false);
-			throw e;
 		} catch (IOException ioe) {
-			openFail(true);
+			openFail();
 			throw ioe;
 		} catch (RuntimeException re) {
-			openFail(true);
+			openFail();
 			throw re;
 		} catch (Error re) {
-			openFail(true);
+			openFail();
 			throw re;
 		}
 	}
 
-	private void openFail(boolean invalidate) {
+	private void openFail() {
 		activeWindows = 0;
 		activeCopyRawData = 0;
-		invalid = invalidate;
+		invalid = true;
 		doClose();
 	}
 
