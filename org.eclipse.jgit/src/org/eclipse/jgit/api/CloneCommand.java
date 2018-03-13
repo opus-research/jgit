@@ -50,13 +50,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -93,8 +93,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	private boolean cloneAllBranches;
-
-	private boolean cloneSubmodules;
 
 	private boolean noCheckout;
 
@@ -224,20 +222,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			DirCacheCheckout co = new DirCacheCheckout(clonedRepo, dc,
 					commit.getTree());
 			co.checkout();
-			if (cloneSubmodules)
-				cloneSubmodules(clonedRepo);
 		}
-	}
-
-	private void cloneSubmodules(Repository clonedRepo) {
-		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
-		if (init.call().isEmpty())
-			return;
-
-		SubmoduleUpdateCommand update = new SubmoduleUpdateCommand(clonedRepo);
-		configure(update);
-		update.setProgressMonitor(monitor);
-		update.call();
 	}
 
 	private Ref findBranchToCheckout(FetchResult result) {
@@ -270,14 +255,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
 		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
-		String autosetupRebase = clonedRepo.getConfig().getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
-		if (ConfigConstants.CONFIG_KEY_ALWAYS.equals(autosetupRebase)
-				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autosetupRebase))
-			clonedRepo.getConfig().setBoolean(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REBASE, true);
 		clonedRepo.getConfig().save();
 	}
 
@@ -376,17 +353,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 */
 	public CloneCommand setCloneAllBranches(boolean cloneAllBranches) {
 		this.cloneAllBranches = cloneAllBranches;
-		return this;
-	}
-
-	/**
-	 * @param cloneSubmodules
-	 *            true to initialize and update submodules. Ignored when
-	 *            {@link #setBare(boolean)} is set to true.
-	 * @return {@code this}
-	 */
-	public CloneCommand setCloneSubmodules(boolean cloneSubmodules) {
-		this.cloneSubmodules = cloneSubmodules;
 		return this;
 	}
 

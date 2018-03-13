@@ -36,13 +36,13 @@ public class InMemoryRepository extends DfsRepository {
 	 * @param repoDesc
 	 *             description of the repository.
 	 */
-	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
+	public InMemoryRepository(DfsRepository repoDesc) {
 		super(new DfsRepositoryBuilder<DfsRepositoryBuilder, InMemoryRepository>() {
 			@Override
 			public InMemoryRepository build() throws IOException {
 				throw new UnsupportedOperationException();
 			}
-		}.setRepositoryDescription(repoDesc));
+		});
 
 		objdb = new MemObjDatabase(this);
 		refdb = new MemRefDatabase();
@@ -79,7 +79,7 @@ public class InMemoryRepository extends DfsRepository {
 		}
 
 		@Override
-		protected synchronized void commitPackImpl(
+		protected synchronized void commitPack(
 				Collection<DfsPackDescription> desc,
 				Collection<DfsPackDescription> replace) {
 			List<DfsPackDescription> n;
