@@ -157,8 +157,8 @@ public class ResetCommand extends GitCommand<Ref> {
 			if (ref != null && commitId == null) {
 				// @TODO throw an InvalidRefNameException. We can't do that
 				// now because this would break the API
-				throw new JGitInternalException("Invalid ref " + ref
-						+ " specified");
+				throw new JGitInternalException(MessageFormat
+						.format(JGitText.get().invalidRefName, ref));
 			}
 
 			final ObjectId commitTree;
@@ -271,7 +271,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		if (!filepaths.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$
+					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$ //$NON-NLS-2$
 		this.mode = mode;
 		return this;
 	}
@@ -285,7 +285,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	public ResetCommand addPath(String path) {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "<paths>...",
+					JGitText.get().illegalCombinationOfArguments, "<paths>...", //$NON-NLS-1$
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
 		filepaths.add(path);
 		return this;
