@@ -127,10 +127,12 @@ public final class ServletUtils {
 	 *            the request whose body must be consumed.
 	 */
 	public static void consumeRequestBody(HttpServletRequest req) {
-		try {
-			consumeRequestBody(req.getInputStream());
-		} catch (IOException e) {
-			// Ignore any errors obtaining the input stream.
+		if (0 < req.getContentLength() || isChunked(req)) {
+			try {
+				consumeRequestBody(req.getInputStream());
+			} catch (IOException e) {
+				// Ignore any errors obtaining the input stream.
+			}
 		}
 	}
 
