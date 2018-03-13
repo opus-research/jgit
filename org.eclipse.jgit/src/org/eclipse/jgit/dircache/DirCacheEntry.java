@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A single file (or stage of a file) in a {@link DirCache}.
@@ -262,7 +261,8 @@ public class DirCacheEntry {
 	@SuppressWarnings("boxing")
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new InvalidPathException(toString(newPath));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
+					, toString(newPath)));
 		if (stage < 0 || 3 < stage)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
 					, stage, toString(newPath)));
@@ -562,6 +562,7 @@ public class DirCacheEntry {
 	 * @param sz
 	 *            new cached size of the file, as bytes.
 	 */
+	@SuppressWarnings("boxing")
 	public void setLength(final long sz) {
 		setLength((int) sz);
 	}
@@ -715,14 +716,7 @@ public class DirCacheEntry {
 				else
 					return false;
 				break;
-			case '\\':
-			case ':':
-				// Tree's never have a backslash in them, not even on Windows
-				// but even there we regard it as an invalid path
-				if ("Windows".equals(SystemReader.getInstance().getProperty(
-						"os.name")))
-					return false;
-				//$FALL-THROUGH$
+
 			default:
 				componentHasChars = true;
 			}
