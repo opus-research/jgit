@@ -123,8 +123,6 @@ public class Main {
 			configureHttpProxy();
 			execute(argv);
 		} catch (Die err) {
-			if (err.isAborted())
-				System.exit(1);
 			System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 			if (showStackTrace)
 				err.printStackTrace();
@@ -224,8 +222,6 @@ public class Main {
 		} finally {
 			if (cmd.outw != null)
 				cmd.outw.flush();
-			if (cmd.errw != null)
-				cmd.errw.flush();
 		}
 	}
 
