@@ -79,7 +79,6 @@ import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.errors.BinaryBlobException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
@@ -90,11 +89,9 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
@@ -483,62 +480,6 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @param ignoreConflicts
 	 *            see
 	 *            {@link ResolveMerger#mergeTrees(AbstractTreeIterator, RevTree, RevTree, boolean)}
-	 * @return <code>false</code> if the merge will fail because the index entry
-	 *         didn't match ours or the working-dir file was dirty and a
-	 *         conflict occurred
-	 * @throws MissingObjectException
-	 * @throws IncorrectObjectTypeException
-	 * @throws CorruptObjectException
-	 * @throws IOException
-	 * @since 3.5
-	 * @deprecated
-	 */
-	@Deprecated
-	protected boolean processEntry(CanonicalTreeParser base,
-			CanonicalTreeParser ours, CanonicalTreeParser theirs,
-			DirCacheBuildIterator index, WorkingTreeIterator work,
-			boolean ignoreConflicts) throws MissingObjectException,
-			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		return processEntry(base, ours, theirs, index, work, ignoreConflicts,
-				null);
-	}
-
-	/**
-	 * Processes one path and tries to merge taking git attributes in account.
-	 * This method will do all trivial (not content) merges and will also detect
-	 * if a merge will fail. The merge will fail when one of the following is
-	 * true
-	 * <ul>
-	 * <li>the index entry does not match the entry in ours. When merging one
-	 * branch into the current HEAD, ours will point to HEAD and theirs will
-	 * point to the other branch. It is assumed that the index matches the HEAD
-	 * because it will only not match HEAD if it was populated before the merge
-	 * operation. But the merge commit should not accidentally contain
-	 * modifications done before the merge. Check the <a href=
-	 * "http://www.kernel.org/pub/software/scm/git/docs/git-read-tree.html#_3_way_merge"
-	 * >git read-tree</a> documentation for further explanations.</li>
-	 * <li>A conflict was detected and the working-tree file is dirty. When a
-	 * conflict is detected the content-merge algorithm will try to write a
-	 * merged version into the working-tree. If the file is dirty we would
-	 * override unsaved data.</li>
-	 * </ul>
-	 *
-	 * @param base
-	 *            the common base for ours and theirs
-	 * @param ours
-	 *            the ours side of the merge. When merging a branch into the
-	 *            HEAD ours will point to HEAD
-	 * @param theirs
-	 *            the theirs side of the merge. When merging a branch into the
-	 *            current HEAD theirs will point to the branch which is merged
-	 *            into HEAD.
-	 * @param index
-	 *            the index entry
-	 * @param work
-	 *            the file in the working tree
-	 * @param ignoreConflicts
-	 *            see
-	 *            {@link ResolveMerger#mergeTrees(AbstractTreeIterator, RevTree, RevTree, boolean)}
 	 * @param attributes
 	 *            the attributes defined for this entry
 	 * @return <code>false</code> if the merge will fail because the index entry
@@ -726,7 +667,6 @@ public class ResolveMerger extends ThreeWayMerger {
 			// OURS or THEIRS has been deleted
 			if (((modeO != 0 && !tw.idEqual(T_BASE, T_OURS)) || (modeT != 0 && !tw
 					.idEqual(T_BASE, T_THEIRS)))) {
-				MergeResult<RawText> result = contentMerge(base, ours, theirs);
 
 				add(tw.getRawPath(), base, DirCacheEntry.STAGE_1, 0, 0);
 				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2, 0, 0);
@@ -747,7 +687,8 @@ public class ResolveMerger extends ThreeWayMerger {
 				unmergedPaths.add(tw.getPathString());
 
 				// generate a MergeResult for the deleted file
-				mergeResults.put(tw.getPathString(), result);
+				mergeResults.put(tw.getPathString(),
+						contentMerge(base, ours, theirs));
 			}
 		}
 		return true;
@@ -768,22 +709,12 @@ public class ResolveMerger extends ThreeWayMerger {
 	private MergeResult<RawText> contentMerge(CanonicalTreeParser base,
 			CanonicalTreeParser ours, CanonicalTreeParser theirs)
 			throws IOException {
-		RawText baseText;
-		RawText ourText;
-		RawText theirsText;
-
-		try {
-			baseText = base == null ? RawText.EMPTY_TEXT : getRawText(
+		RawText baseText = base == null ? RawText.EMPTY_TEXT : getRawText(
 				base.getEntryObjectId(), reader);
-			ourText = ours == null ? RawText.EMPTY_TEXT : getRawText(
+		RawText ourText = ours == null ? RawText.EMPTY_TEXT : getRawText(
 				ours.getEntryObjectId(), reader);
-			theirsText = theirs == null ? RawText.EMPTY_TEXT : getRawText(
+		RawText theirsText = theirs == null ? RawText.EMPTY_TEXT : getRawText(
 				theirs.getEntryObjectId(), reader);
-		} catch (BinaryBlobException e) {
-			MergeResult<RawText> r = new MergeResult<>(Collections.<RawText>emptyList());
-			r.setContainsConflicts(true);
-			return r;
-		}
 		return (mergeAlgorithm.merge(RawTextComparator.DEFAULT, baseText,
 				ourText, theirsText));
 	}
@@ -960,13 +891,10 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private static RawText getRawText(ObjectId id, ObjectReader reader)
-			throws IOException, BinaryBlobException {
+			throws IOException {
 		if (id.equals(ObjectId.zeroId()))
 			return new RawText(new byte[] {});
-
-		ObjectLoader loader = reader.open(id, OBJ_BLOB);
-		int threshold = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
-		return RawText.load(loader, threshold);
+		return new RawText(reader.open(id, OBJ_BLOB).getCachedBytes());
 	}
 
 	private static boolean nonTree(final int mode) {

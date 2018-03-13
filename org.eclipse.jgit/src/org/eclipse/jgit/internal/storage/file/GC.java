@@ -57,10 +57,10 @@ import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -903,7 +903,6 @@ public class GC {
 		}
 		prunePacked();
 		deleteOrphans();
-		deleteTempPacksIdx();
 
 		lastPackedRefs = refsBefore;
 		lastRepackTime = time;
@@ -926,7 +925,8 @@ public class GC {
 	 * </p>
 	 */
 	private void deleteOrphans() {
-		Path packDir = repo.getObjectDatabase().getPackDirectory().toPath();
+		Path packDir = Paths.get(repo.getObjectsDirectory().getAbsolutePath(),
+				"pack"); //$NON-NLS-1$
 		List<String> fileNames = null;
 		try (Stream<Path> files = Files.list(packDir)) {
 			fileNames = files.map(path -> path.getFileName().toString())
@@ -950,33 +950,12 @@ public class GC {
 			} else {
 				if (base == null || !n.startsWith(base)) {
 					try {
-						Files.delete(FileUtils.toPath(new File(packDir.toFile(), n)));
+						Files.delete(new File(packDir.toFile(), n).toPath());
 					} catch (IOException e) {
 						LOG.error(e.getMessage(), e);
 					}
 				}
 			}
-		}
-	}
-
-	private void deleteTempPacksIdx() {
-		Path packDir = repo.getObjectDatabase().getPackDirectory().toPath();
-		long threshold = Instant.now().toEpochMilli() - 24 * 60 * 60 * 1000;
-		try {
-			Files.newDirectoryStream(packDir, "gc_*_tmp") //$NON-NLS-1$
-					.forEach(t -> {
-						try {
-							long lastModified = Files.getLastModifiedTime(t)
-									.toMillis();
-							if (lastModified < threshold) {
-								Files.deleteIfExists(t);
-							}
-						} catch (IOException e) {
-							LOG.error(e.getMessage(), e);
-						}
-					});
-		} catch (IOException e) {
-			LOG.error(e.getMessage(), e);
 		}
 	}
 
@@ -1135,7 +1114,7 @@ public class GC {
 
 			// create temporary files
 			String id = pw.computeName().getName();
-			File packdir = repo.getObjectDatabase().getPackDirectory();
+			File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
 			tmpPack = File.createTempFile("gc_", ".pack_tmp", packdir); //$NON-NLS-1$ //$NON-NLS-2$
 			final String tmpBase = tmpPack.getName()
 					.substring(0, tmpPack.getName().lastIndexOf('.'));
@@ -1194,7 +1173,16 @@ public class GC {
 			// rename the temporary files to real files
 			File realPack = nameFor(id, ".pack"); //$NON-NLS-1$
 
-			repo.getObjectDatabase().closeAllPackHandles(realPack);
+			// if the packfile already exists (because we are rewriting a
+			// packfile for the same set of objects maybe with different
+			// PackConfig) then make sure we get rid of all handles on the file.
+			// Windows will not allow for rename otherwise.
+			if (realPack.exists())
+				for (PackFile p : repo.getObjectDatabase().getPacks())
+					if (realPack.getPath().equals(p.getPackFile().getPath())) {
+						p.close();
+						break;
+					}
 			tmpPack.setReadOnly();
 
 			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
@@ -1235,7 +1223,7 @@ public class GC {
 	}
 
 	private File nameFor(String name, String ext) {
-		File packdir = repo.getObjectDatabase().getPackDirectory();
+		File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
 		return new File(packdir, "pack-" + name + ext); //$NON-NLS-1$
 	}
 
