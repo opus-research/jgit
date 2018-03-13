@@ -354,7 +354,7 @@ public class FileRepository extends Repository {
 						ConfigConstants.CONFIG_KEY_WORKTREE, getWorkTree()
 								.getAbsolutePath());
 				LockFile dotGitLockFile = new LockFile(new File(workTree,
-						Constants.DOT_GIT), getFS());
+						Constants.DOT_GIT));
 				try {
 					if (dotGitLockFile.lock()) {
 						dotGitLockFile.write(Constants.encode(Constants.GITDIR
@@ -491,7 +491,7 @@ public class FileRepository extends Repository {
 	 * @throws IOException the ref could not be accessed.
 	 */
 	public ReflogReader getReflogReader(String refName) throws IOException {
-		Ref ref = getRef(refName);
+		Ref ref = findRef(refName);
 		if (ref != null)
 			return new ReflogReaderImpl(this, ref.getName());
 		return null;

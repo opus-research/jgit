@@ -82,6 +82,7 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.DepthWalk;
@@ -681,7 +682,7 @@ public class UploadPack {
 	 * Get the PackWriter's statistics if a pack was sent to the client.
 	 *
 	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         was sent, such as during the negotiation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
 	 * @since 3.0
 	 * @deprecated Use {@link #getStatistics()}.
@@ -696,7 +697,7 @@ public class UploadPack {
 	 * Get the PackWriter's statistics if a pack was sent to the client.
 	 *
 	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         was sent, such as during the negotiation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
 	 * @since 4.1
 	 */
@@ -704,22 +705,22 @@ public class UploadPack {
 		return statistics;
 	}
 
-	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
+	private Map<String, Ref> getAdvertisedOrDefaultRefs() throws IOException {
 		if (refs == null)
-			setAdvertisedRefs(null);
+			setAdvertisedRefs(db.getRefDatabase().getRefs(RefDatabase.ALL));
 		return refs;
 	}
 
 	private void service() throws IOException {
-		if (biDirectionalPipe)
-			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
-		else if (requestValidator instanceof AnyRequestValidator)
-			advertised = Collections.emptySet();
-		else
-			advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
-
 		boolean sendPack;
 		try {
+			if (biDirectionalPipe)
+				sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
+			else if (requestValidator instanceof AnyRequestValidator)
+				advertised = Collections.emptySet();
+			else
+				advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
+
 			recvWants();
 			if (wantIds.isEmpty()) {
 				preUploadHook.onBeginNegotiateRound(this, wantIds, 0);
@@ -742,10 +743,6 @@ public class UploadPack {
 			if (!clientShallowCommits.isEmpty())
 				walk.assumeShallow(clientShallowCommits);
 			sendPack = negotiate();
-		} catch (PackProtocolException err) {
-			reportErrorDuringNegotiate(err.getMessage());
-			throw err;
-
 		} catch (ServiceMayNotContinueException err) {
 			if (!err.isOutput() && err.getMessage() != null) {
 				try {
@@ -756,15 +753,20 @@ public class UploadPack {
 				}
 			}
 			throw err;
-
-		} catch (IOException err) {
-			reportErrorDuringNegotiate(JGitText.get().internalServerError);
-			throw err;
-		} catch (RuntimeException err) {
-			reportErrorDuringNegotiate(JGitText.get().internalServerError);
-			throw err;
-		} catch (Error err) {
-			reportErrorDuringNegotiate(JGitText.get().internalServerError);
+		} catch (IOException | RuntimeException | Error err) {
+			boolean output = false;
+			try {
+				String msg = err instanceof PackProtocolException
+						? err.getMessage()
+						: JGitText.get().internalServerError;
+				pckOut.writeString("ERR " + msg + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
+				output = true;
+			} catch (Throwable err2) {
+				// Ignore this secondary failure, leave output false.
+			}
+			if (output) {
+				throw new UploadPackInternalServerErrorException(err);
+			}
 			throw err;
 		}
 
@@ -775,23 +777,22 @@ public class UploadPack {
 	private static Set<ObjectId> refIdSet(Collection<Ref> refs) {
 		Set<ObjectId> ids = new HashSet<ObjectId>(refs.size());
 		for (Ref ref : refs) {
-			if (ref.getObjectId() != null)
-				ids.add(ref.getObjectId());
+			ObjectId id = ref.getObjectId();
+			if (id != null) {
+				ids.add(id);
+			}
+			id = ref.getPeeledObjectId();
+			if (id != null) {
+				ids.add(id);
+			}
 		}
 		return ids;
 	}
 
-	private void reportErrorDuringNegotiate(String msg) {
-		try {
-			pckOut.writeString("ERR " + msg + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
-		} catch (Throwable err) {
-			// Ignore this secondary failure.
-		}
-	}
-
 	private void processShallow() throws IOException {
+		int walkDepth = depth - 1;
 		try (DepthWalk.RevWalk depthWalk = new DepthWalk.RevWalk(
-				walk.getObjectReader(), depth)) {
+				walk.getObjectReader(), walkDepth)) {
 
 			// Find all the commits which will be shallow
 			for (ObjectId o : wantIds) {
@@ -808,12 +809,14 @@ public class UploadPack {
 
 				// Commits at the boundary which aren't already shallow in
 				// the client need to be marked as such
-				if (c.getDepth() == depth && !clientShallowCommits.contains(c))
+				if (c.getDepth() == walkDepth
+						&& !clientShallowCommits.contains(c))
 					pckOut.writeString("shallow " + o.name()); //$NON-NLS-1$
 
 				// Commits not on the boundary which are shallow in the client
 				// need to become unshallowed
-				if (c.getDepth() < depth && clientShallowCommits.remove(c)) {
+				if (c.getDepth() < walkDepth
+						&& clientShallowCommits.remove(c)) {
 					unshallowCommits.add(c.copy());
 					pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
 				}
@@ -948,6 +951,11 @@ public class UploadPack {
 
 			if (line.startsWith("deepen ")) { //$NON-NLS-1$
 				depth = Integer.parseInt(line.substring(7));
+				if (depth <= 0) {
+					throw new PackProtocolException(
+							MessageFormat.format(JGitText.get().invalidDepth,
+									Integer.valueOf(depth)));
+				}
 				continue;
 			}
 
@@ -974,7 +982,8 @@ public class UploadPack {
 	}
 
 	/**
-	 * Returns the clone/fetch depth. Valid only after calling recvWants().
+	 * Returns the clone/fetch depth. Valid only after calling recvWants(). A
+	 * depth of 1 means return only the wants.
 	 *
 	 * @return the depth requested by the client, or 0 if unbounded.
 	 * @since 4.0
@@ -1148,7 +1157,6 @@ public class UploadPack {
 
 		if (multiAck == MultiAck.DETAILED && !didOkToGiveUp && okToGiveUp()) {
 			ObjectId id = peerHas.get(peerHas.size() - 1);
-			sentReady = true;
 			pckOut.writeString("ACK " + id.name() + " ready\n"); //$NON-NLS-1$ //$NON-NLS-2$
 			sentReady = true;
 		}
@@ -1186,9 +1194,7 @@ public class UploadPack {
 			}
 			wantIds.clear();
 		} catch (MissingObjectException notFound) {
-			ObjectId id = notFound.getObjectId();
-			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().wantNotValid, id.name()), notFound);
+			throw new WantNotValidException(notFound.getObjectId(), notFound);
 		} finally {
 			q.release();
 		}
@@ -1213,8 +1219,7 @@ public class UploadPack {
 			if (!up.isBiDirectionalPipe())
 				new ReachableCommitRequestValidator().checkWants(up, wants);
 			else if (!wants.isEmpty())
-				throw new PackProtocolException(MessageFormat.format(
-						JGitText.get().wantNotValid, wants.iterator().next().name()));
+				throw new WantNotValidException(wants.iterator().next());
 		}
 	}
 
@@ -1247,8 +1252,7 @@ public class UploadPack {
 					refIdSet(up.getRepository().getRefDatabase().getRefs(ALL).values());
 				for (ObjectId obj : wants) {
 					if (!refIds.contains(obj))
-						throw new PackProtocolException(MessageFormat.format(
-								JGitText.get().wantNotValid, obj.name()));
+						throw new WantNotValidException(obj);
 				}
 			}
 		}
@@ -1294,14 +1298,11 @@ public class UploadPack {
 			RevObject obj;
 			while ((obj = q.next()) != null) {
 				if (!(obj instanceof RevCommit))
-					throw new PackProtocolException(MessageFormat.format(
-						JGitText.get().wantNotValid, obj.name()));
+					throw new WantNotValidException(obj);
 				walk.markStart((RevCommit) obj);
 			}
 		} catch (MissingObjectException notFound) {
-			ObjectId id = notFound.getObjectId();
-			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().wantNotValid, id.name()), notFound);
+			throw new WantNotValidException(notFound.getObjectId(), notFound);
 		} finally {
 			q.release();
 		}
@@ -1315,9 +1316,7 @@ public class UploadPack {
 
 		RevCommit bad = walk.next();
 		if (bad != null) {
-			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().wantNotValid,
-					bad.name()));
+			throw new WantNotValidException(bad);
 		}
 		walk.reset();
 	}
@@ -1494,16 +1493,19 @@ public class UploadPack {
 				pw.setTagTargets(tagTargets);
 			}
 
-			if (depth > 0)
-				pw.setShallowPack(depth, unshallowCommits);
-
 			RevWalk rw = walk;
+			if (depth > 0) {
+				pw.setShallowPack(depth, unshallowCommits);
+				rw = new DepthWalk.RevWalk(walk.getObjectReader(), depth - 1);
+				rw.assumeShallow(clientShallowCommits);
+			}
+
 			if (wantAll.isEmpty()) {
-				pw.preparePack(pm, wantIds, commonBase);
+				pw.preparePack(pm, wantIds, commonBase, clientShallowCommits);
 			} else {
 				walk.reset();
 
-				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
+				ObjectWalk ow = rw.toObjectWalkWithSameObjects();
 				pw.preparePack(pm, ow, wantAll, commonBase);
 				rw = ow;
 			}

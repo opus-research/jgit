@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 
 import static org.eclipse.jgit.util.FileUtils.RECURSIVE;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -53,6 +52,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Set;
 
 import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -62,14 +62,11 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
@@ -134,6 +131,29 @@ public class AddCommandTest extends RepositoryTestCase {
 			assertEquals(
 					"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:fee\n]",
 					indexState(CONTENT));
+		}
+	}
+
+	@Test
+	public void testAttributesWithTreeWalkFilter()
+			throws IOException, GitAPIException {
+		writeTrashFile(".gitattributes", "*.txt filter=lfs");
+		writeTrashFile("src/a.tmp", "foo");
+		writeTrashFile("src/a.txt", "foo\n");
+		File script = writeTempFile("sed s/o/e/g");
+
+		try (Git git = new Git(db)) {
+			StoredConfig config = git.getRepository().getConfig();
+			config.setString("filter", "lfs", "clean",
+					"sh " + slashify(script.getPath()));
+			config.save();
+
+			git.add().addFilepattern(".gitattributes").call();
+			git.commit().setMessage("attr").call();
+			git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
+					.addFilepattern(".gitattributes").call();
+			git.commit().setMessage("c1").call();
+			assertTrue(git.status().call().isClean());
 		}
 	}
 
@@ -934,7 +954,11 @@ public class AddCommandTest extends RepositoryTestCase {
 			}
 
 			public boolean canExecute(File f) {
-				return true;
+				try {
+					return read(f).startsWith("binary:");
+				} catch (IOException e) {
+					return false;
+				}
 			}
 
 			@Override
@@ -945,61 +969,125 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		Git git = Git.open(db.getDirectory(), executableFs);
 		String path = "a.txt";
+		String path2 = "a.sh";
 		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
+		writeTrashFile(path2, "binary: content");
+		git.add().addFilepattern(path).addFilepattern(path2).call();
 		RevCommit commit1 = git.commit().setMessage("commit").call();
-		TreeWalk walk = TreeWalk.forPath(db, path, commit1.getTree());
-		assertNotNull(walk);
-		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
-
-		FS nonExecutableFs = new FS() {
-
-			public boolean supportsExecute() {
-				return false;
-			}
-
-			public boolean setExecute(File f, boolean canExec) {
-				return false;
-			}
-
-			public ProcessBuilder runInShell(String cmd, String[] args) {
-				return null;
-			}
-
-			public boolean retryFailedLockFileCommit() {
-				return false;
-			}
-
-			public FS newInstance() {
-				return this;
-			}
-
-			protected File discoverGitExe() {
-				return null;
-			}
-
-			public boolean canExecute(File f) {
-				return false;
-			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
-		};
+		try (TreeWalk walk = new TreeWalk(db)) {
+			walk.addTree(commit1.getTree());
+			walk.next();
+			assertEquals(path2, walk.getPathString());
+			assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+			walk.next();
+			assertEquals(path, walk.getPathString());
+			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
+		}
 
 		config = db.getConfig();
 		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_FILEMODE, false);
 		config.save();
 
-		Git git2 = Git.open(db.getDirectory(), nonExecutableFs);
-		writeTrashFile(path, "content2");
-		git2.add().addFilepattern(path).call();
+		Git git2 = Git.open(db.getDirectory(), executableFs);
+		writeTrashFile(path2, "content2");
+		writeTrashFile(path, "binary: content2");
+		git2.add().addFilepattern(path).addFilepattern(path2).call();
 		RevCommit commit2 = git2.commit().setMessage("commit2").call();
-		walk = TreeWalk.forPath(db, path, commit2.getTree());
-		assertNotNull(walk);
-		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+		try (TreeWalk walk = new TreeWalk(db)) {
+			walk.addTree(commit2.getTree());
+			walk.next();
+			assertEquals(path2, walk.getPathString());
+			assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+			walk.next();
+			assertEquals(path, walk.getPathString());
+			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
+		}
+	}
+
+	@Test
+	public void testAddGitlink() throws Exception {
+		createNestedRepo("git-link-dir");
+		try (Git git = new Git(db)) {
+			git.add().addFilepattern("git-link-dir").call();
+
+			assertEquals(
+					"[git-link-dir, mode:160000]",
+					indexState(0));
+			Set<String> untrackedFiles = git.status().call().getUntracked();
+			assert (untrackedFiles.isEmpty());
+		}
+
+	}
+
+	@Test
+	public void testAddSubrepoWithDirNoGitlinks() throws Exception {
+		createNestedRepo("nested-repo");
+
+		// Set DIR_NO_GITLINKS
+		StoredConfig config = db.getConfig();
+		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_DIRNOGITLINKS, true);
+		config.save();
+
+		assert (db.getConfig().get(WorkingTreeOptions.KEY).isDirNoGitLinks());
+
+		try (Git git = new Git(db)) {
+			git.add().addFilepattern("nested-repo").call();
+
+			assertEquals(
+					"[nested-repo/README1.md, mode:100644]" +
+							"[nested-repo/README2.md, mode:100644]",
+					indexState(0));
+		}
+
+		// Turn off DIR_NO_GITLINKS, ensure nested-repo is still treated as
+		// a normal directory
+		// Set DIR_NO_GITLINKS
+		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_DIRNOGITLINKS, false);
+		config.save();
+
+		writeTrashFile("nested-repo", "README3.md", "content");
+
+		try (Git git = new Git(db)) {
+			git.add().addFilepattern("nested-repo").call();
+
+			assertEquals(
+					"[nested-repo/README1.md, mode:100644]" +
+							"[nested-repo/README2.md, mode:100644]" +
+							"[nested-repo/README3.md, mode:100644]",
+					indexState(0));
+		}
+	}
+
+	@Test
+	public void testAddGitlinkDoesNotChange() throws Exception {
+		createNestedRepo("nested-repo");
+
+		try (Git git = new Git(db)) {
+			git.add().addFilepattern("nested-repo").call();
+
+			assertEquals(
+					"[nested-repo, mode:160000]",
+					indexState(0));
+		}
+
+		// Set DIR_NO_GITLINKS
+		StoredConfig config = db.getConfig();
+		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_DIRNOGITLINKS, true);
+		config.save();
+
+		assert (db.getConfig().get(WorkingTreeOptions.KEY).isDirNoGitLinks());
+
+		try (Git git = new Git(db)) {
+			git.add().addFilepattern("nested-repo").call();
+
+			assertEquals(
+					"[nested-repo, mode:160000]",
+					indexState(0));
+		}
 	}
 
 	private static DirCacheEntry addEntryToBuilder(String path, File file,
@@ -1029,4 +1117,25 @@ public class AddCommandTest extends RepositoryTestCase {
 			throw new IOException("could not commit");
 	}
 
+	private void createNestedRepo(String path) throws IOException {
+		File gitLinkDir = new File(db.getWorkTree(), path);
+		FileUtils.mkdir(gitLinkDir);
+
+		FileRepositoryBuilder nestedBuilder = new FileRepositoryBuilder();
+		nestedBuilder.setWorkTree(gitLinkDir);
+
+		Repository nestedRepo = nestedBuilder.build();
+		nestedRepo.create();
+
+		writeTrashFile(path, "README1.md", "content");
+		writeTrashFile(path, "README2.md", "content");
+
+		// Commit these changes in the subrepo
+		try (Git git = new Git(nestedRepo)) {
+			git.add().addFilepattern(".").call();
+			git.commit().setMessage("subrepo commit").call();
+		} catch (GitAPIException e) {
+			throw new RuntimeException(e);
+		}
+	}
 }

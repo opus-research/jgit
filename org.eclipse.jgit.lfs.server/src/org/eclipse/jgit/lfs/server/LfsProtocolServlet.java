@@ -43,8 +43,11 @@
 package org.eclipse.jgit.lfs.server;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
-import static javax.servlet.http.HttpServletResponse.SC_SERVICE_UNAVAILABLE;
+import static org.apache.http.HttpStatus.SC_FORBIDDEN;
+import static org.apache.http.HttpStatus.SC_NOT_FOUND;
+import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_SERVICE_UNAVAILABLE;
+import static org.apache.http.HttpStatus.SC_UNPROCESSABLE_ENTITY;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -60,6 +63,11 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.lfs.errors.LfsException;
+import org.eclipse.jgit.lfs.errors.LfsRepositoryNotFound;
+import org.eclipse.jgit.lfs.errors.LfsRepositoryReadOnly;
+import org.eclipse.jgit.lfs.errors.LfsValidationError;
+
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -67,7 +75,7 @@ import com.google.gson.GsonBuilder;
 /**
  * LFS protocol handler implementing the LFS batch API [1]
  *
- * [1] https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md
+ * [1] https://github.com/github/git-lfs/blob/master/docs/api/v1/http-v1-batch.md
  *
  * @since 4.3
  */
@@ -80,43 +88,101 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	private Gson gson = createGson();
 
 	/**
-	 * Get the large file repository
+	 * Get the large file repository for the given request and path.
 	 *
-	 * @return the large file repository storing large files
+	 * @param request
+	 *            the request
+	 * @param path
+	 *            the path
+	 *
+	 * @return the large file repository storing large files or null if the
+	 *         request is not supported.
+	 * @throws LfsException
+	 * @since 4.5
 	 */
-	protected abstract LargeFileRepository getLargeFileRepository();
+	protected abstract LargeFileRepository getLargeFileRepository(
+			LfsRequest request, String path) throws LfsException;
+
+	/**
+	 * LFS request.
+	 *
+	 * @since 4.5
+	 */
+	protected static class LfsRequest {
+		private String operation;
+
+		private List<LfsObject> objects;
+
+		/**
+		 * Get the LFS operation.
+		 *
+		 * @return the operation
+		 */
+		public String getOperation() {
+			return operation;
+		}
+
+		/**
+		 * Get the LFS objects.
+		 *
+		 * @return the objects
+		 */
+		public List<LfsObject> getObjects() {
+			return objects;
+		}
+	}
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse res)
 			throws ServletException, IOException {
-		res.setStatus(SC_OK);
-		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
-
 		Writer w = new BufferedWriter(
 				new OutputStreamWriter(res.getOutputStream(), UTF_8));
 
-		Reader r = new BufferedReader(new InputStreamReader(req.getInputStream(), UTF_8));
+		Reader r = new BufferedReader(
+				new InputStreamReader(req.getInputStream(), UTF_8));
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
+		String path = req.getPathInfo();
 
-		LargeFileRepository repo = getLargeFileRepository();
-		if (repo == null) {
-			res.setStatus(SC_SERVICE_UNAVAILABLE);
-			return;
+		LargeFileRepository repo = null;
+		try {
+			repo = getLargeFileRepository(request, path);
+			if (repo == null) {
+				res.setStatus(SC_SERVICE_UNAVAILABLE);
+			} else {
+				res.setStatus(SC_OK);
+				res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
+				TransferHandler handler = TransferHandler
+						.forOperation(request.operation, repo, request.objects);
+				gson.toJson(handler.process(), w);
+			}
+		} catch (LfsValidationError e) {
+			sendError(res, w, SC_UNPROCESSABLE_ENTITY, e.getMessage());
+		} catch (LfsRepositoryNotFound e) {
+			sendError(res, w, SC_NOT_FOUND, e.getMessage());
+		} catch (LfsRepositoryReadOnly e) {
+			sendError(res, w, SC_FORBIDDEN, e.getMessage());
+		} catch (LfsException e) {
+			sendError(res, w, SC_SERVICE_UNAVAILABLE, e.getMessage());
+		} finally {
+			w.flush();
 		}
-
-		TransferHandler handler = TransferHandler
-				.forOperation(request.operation, repo, request.objects);
-		gson.toJson(handler.process(), w);
-		w.flush();
 	}
 
-	private static class LfsRequest {
-		String operation;
+	static class Error {
+		String message;
 
-		List<LfsObject> objects;
+		Error(String m) {
+			this.message = m;
+		}
 	}
 
-	private static Gson createGson() {
+	private void sendError(HttpServletResponse rsp, Writer writer, int status,
+			String message) {
+		rsp.setStatus(status);
+		gson.toJson(new Error(message), writer);
+	}
+
+	private Gson createGson() {
 		GsonBuilder gb = new GsonBuilder()
 				.setFieldNamingPolicy(
 						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)

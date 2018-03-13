@@ -55,6 +55,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.errors.TooLargeObjectInPackException;
 import org.eclipse.jgit.errors.TooLargePackException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
@@ -95,6 +96,8 @@ public class PushCommand extends
 
 	private OutputStream out;
 
+	private List<String> pushOptions;
+
 	/**
 	 * @param repo
 	 */
@@ -130,7 +133,7 @@ public class PushCommand extends
 				refSpecs.addAll(config.getPushRefSpecs());
 			}
 			if (refSpecs.isEmpty()) {
-				Ref head = repo.getRef(Constants.HEAD);
+				Ref head = repo.exactRef(Constants.HEAD);
 				if (head != null && head.isSymbolic())
 					refSpecs.add(new RefSpec(head.getLeaf().getName()));
 			}
@@ -148,6 +151,7 @@ public class PushCommand extends
 				if (receivePack != null)
 					transport.setOptionReceivePack(receivePack);
 				transport.setDryRun(dryRun);
+				transport.setPushOptions(pushOptions);
 				configure(transport);
 
 				final Collection<RemoteRefUpdate> toPush = transport
@@ -159,6 +163,9 @@ public class PushCommand extends
 
 				} catch (TooLargePackException e) {
 					throw new org.eclipse.jgit.api.errors.TooLargePackException(
+							e.getMessage(), e);
+				} catch (TooLargeObjectInPackException e) {
+					throw new org.eclipse.jgit.api.errors.TooLargeObjectInPackException(
 							e.getMessage(), e);
 				} catch (TransportException e) {
 					throw new org.eclipse.jgit.api.errors.TransportException(
@@ -185,7 +192,6 @@ public class PushCommand extends
 		}
 
 		return pushResults;
-
 	}
 
 	/**
@@ -344,7 +350,7 @@ public class PushCommand extends
 		} else {
 			Ref src;
 			try {
-				src = repo.getRef(nameOrSpec);
+				src = repo.findRef(nameOrSpec);
 			} catch (IOException e) {
 				throw new JGitInternalException(
 						JGitText.get().exceptionCaughtDuringExecutionOfPushCommand,
@@ -447,6 +453,26 @@ public class PushCommand extends
 	 */
 	public PushCommand setOutputStream(OutputStream out) {
 		this.out = out;
+		return this;
+	}
+
+	/**
+	 * @return the option strings associated with the push operation
+	 * @since 4.5
+	 */
+	public List<String> getPushOptions() {
+		return pushOptions;
+	}
+
+	/**
+	 * Sets the option strings associated with the push operation.
+	 *
+	 * @param pushOptions
+	 * @return {@code this}
+	 * @since 4.5
+	 */
+	public PushCommand setPushOptions(List<String> pushOptions) {
+		this.pushOptions = pushOptions;
 		return this;
 	}
 }

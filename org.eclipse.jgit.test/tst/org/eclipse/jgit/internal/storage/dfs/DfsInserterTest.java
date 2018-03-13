@@ -45,6 +45,7 @@ package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -97,6 +98,7 @@ public class DfsInserterTest {
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 
 		ObjectReader reader = ins.newReader();
+		assertSame(ins, reader.getCreatedFromInserter());
 		assertEquals("foo", readString(reader.open(id1)));
 		assertEquals("bar", readString(reader.open(id2)));
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
@@ -118,6 +120,7 @@ public class DfsInserterTest {
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 
 		ObjectReader reader = ins.newReader();
+		assertSame(ins, reader.getCreatedFromInserter());
 		assertTrue(Arrays.equals(data, readStream(reader.open(id1))));
 		assertEquals(0, db.getObjectDatabase().listPacks().size());
 		ins.flush();
@@ -136,6 +139,7 @@ public class DfsInserterTest {
 		assertEquals(1, db.getObjectDatabase().listPacks().size());
 
 		ObjectReader reader = ins.newReader();
+		assertSame(ins, reader.getCreatedFromInserter());
 		assertEquals("foo", readString(reader.open(id1)));
 		assertEquals("bar", readString(reader.open(id2)));
 		assertEquals(1, db.getObjectDatabase().listPacks().size());
@@ -154,6 +158,7 @@ public class DfsInserterTest {
 		assertFalse(abbr1.equals(abbr2));
 
 		ObjectReader reader = ins.newReader();
+		assertSame(ins, reader.getCreatedFromInserter());
 		Collection<ObjectId> objs;
 		objs = reader.resolve(AbbreviatedObjectId.fromString(abbr1));
 		assertEquals(1, objs.size());
@@ -212,6 +217,37 @@ public class DfsInserterTest {
 		assertTrue(packs[1].hasObject(reader, fooId));
 		assertTrue(pack_sources.contains(PackSource.UNREACHABLE_GARBAGE));
 		assertTrue(pack_sources.contains(PackSource.INSERT));
+	}
+
+	@Test
+	public void testNoCheckExisting() throws IOException {
+		byte[] contents = Constants.encode("foo");
+		ObjectId fooId;
+		try (ObjectInserter ins = db.newObjectInserter()) {
+			fooId = ins.insert(Constants.OBJ_BLOB, contents);
+			ins.flush();
+		}
+		assertEquals(1, db.getObjectDatabase().listPacks().size());
+
+		try (ObjectInserter ins = db.newObjectInserter()) {
+			((DfsInserter) ins).checkExisting(false);
+			assertEquals(fooId, ins.insert(Constants.OBJ_BLOB, contents));
+			ins.flush();
+		}
+		assertEquals(2, db.getObjectDatabase().listPacks().size());
+
+		// Verify that we have a foo in both INSERT packs.
+		DfsReader reader = new DfsReader(db.getObjectDatabase());
+		DfsPackFile packs[] = db.getObjectDatabase().getPacks();
+
+		assertEquals(2, packs.length);
+		DfsPackFile p1 = packs[0];
+		assertEquals(PackSource.INSERT, p1.getPackDescription().getPackSource());
+		assertTrue(p1.hasObject(reader, fooId));
+
+		DfsPackFile p2 = packs[1];
+		assertEquals(PackSource.INSERT, p2.getPackDescription().getPackSource());
+		assertTrue(p2.hasObject(reader, fooId));
 	}
 
 	private static String readString(ObjectLoader loader) throws IOException {

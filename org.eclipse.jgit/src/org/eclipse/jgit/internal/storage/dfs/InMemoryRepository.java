@@ -252,11 +252,20 @@ public class InMemoryRepository extends DfsRepository {
 		}
 	}
 
-	private class MemRefDatabase extends DfsRefDatabase {
+	/**
+	 * A ref database storing all refs in-memory.
+	 * <p>
+	 * This class is protected (and not private) to facilitate testing using
+	 * subclasses of InMemoryRepository.
+	 */
+    protected class MemRefDatabase extends DfsRefDatabase {
 		private final ConcurrentMap<String, Ref> refs = new ConcurrentHashMap<String, Ref>();
 		private final ReadWriteLock lock = new ReentrantReadWriteLock(true /* fair */);
 
-		MemRefDatabase() {
+		/**
+		 * Initialize a new in-memory ref database.
+		 */
+		protected MemRefDatabase() {
 			super(InMemoryRepository.this);
 		}
 
@@ -271,10 +280,10 @@ public class InMemoryRepository extends DfsRepository {
 				@Override
 				public void execute(RevWalk walk, ProgressMonitor monitor)
 						throws IOException {
-					if (performsAtomicTransactions()) {
+					if (performsAtomicTransactions() && isAtomic()) {
 						try {
 							lock.writeLock().lock();
-							batch(walk, getCommands());
+							batch(getCommands());
 						} finally {
 							lock.writeLock().unlock();
 						}
@@ -301,10 +310,11 @@ public class InMemoryRepository extends DfsRepository {
 			}
 			ids.sort();
 			sym.sort();
+			objdb.getCurrentPackList().markDirty();
 			return new RefCache(ids.toRefList(), sym.toRefList());
 		}
 
-		private void batch(RevWalk walk, List<ReceiveCommand> cmds) {
+		private void batch(List<ReceiveCommand> cmds) {
 			// Validate that the target exists in a new RevWalk, as the RevWalk
 			// from the RefUpdate might be reading back unflushed objects.
 			Map<ObjectId, ObjectId> peeled = new HashMap<>();
