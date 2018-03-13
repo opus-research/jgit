@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2009, Google Inc.
-   Copyright (C) 2009, Igor Fedorenko <igor@ifedorenko.com>
-   Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
-   Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+   Copyright (C) 2009-2010, Matthias Sohn <matthias.sohn@sap.com>
    and other copyright owners as documented in the project's IP log.
 
    This program and the accompanying materials are made available
@@ -50,51 +47,81 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>org.eclipse.jgit</groupId>
-    <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
-  </parent>
+  <prerequisites>
+    <maven>3.0</maven>
+  </prerequisites>
 
-  <artifactId>org.eclipse.jgit</artifactId>
-  <name>JGit - Core</name>
+  <groupId>org.eclipse.jgit</groupId>
+  <artifactId>jgit.tycho.parent</artifactId>
+  <version>0.6.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
 
-  <description>
-    Repository access and algorithms
-  </description>
+  <name>JGit Tycho Parent (Incubation)</name>
 
   <properties>
-    <translate-qualifier/>
+    <tycho-version>0.6.0</tycho-version>
+    <eclipse-site>http://download.eclipse.org/releases/galileo</eclipse-site>
   </properties>
 
-  <dependencies>
-    <dependency>
-      <groupId>com.jcraft</groupId>
-      <artifactId>jsch</artifactId>
-    </dependency>
-  </dependencies>
+  <modules>
+    <module>org.eclipse.jgit.feature</module>
+    <module>org.eclipse.jgit.updatesite</module>
+  </modules>
+
+  <repositories>
+    <repository>
+      <id>galileo</id>
+      <layout>p2</layout>
+      <url>${eclipse-site}</url>
+    </repository>
+  </repositories>
 
   <build>
-    <sourceDirectory>src/</sourceDirectory>
-
-    <resources>
-      <resource>
-        <directory>.</directory>
-        <includes>
-          <include>plugin.properties</include>
-        </includes>
-      </resource>
-    </resources>
-
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
+        <groupId>org.sonatype.tycho</groupId>
+        <artifactId>tycho-maven-plugin</artifactId>
+        <version>${tycho-version}</version>
+        <extensions>true</extensions>
+      </plugin>
+      <plugin>
+        <groupId>org.sonatype.tycho</groupId>
+        <artifactId>target-platform-configuration</artifactId>
+        <version>${tycho-version}</version>
         <configuration>
-          <archive>
-            <manifestFile>${bundle-manifest}</manifestFile>
-          </archive>
+          <resolver>p2</resolver>
         </configuration>
       </plugin>
     </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.sonatype.tycho</groupId>
+          <artifactId>maven-osgi-compiler-plugin</artifactId>
+          <version>${tycho-version}</version>
+          <configuration>
+            <encoding>UTF-8</encoding>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>2.4.1</version>
+          <configuration>
+            <encoding>ISO-8859-1</encoding>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.sonatype.tycho</groupId>
+          <artifactId>target-platform-configuration</artifactId>
+          <version>${tycho-version}</version>
+          <configuration>
+            <resolver>p2</resolver>
+	    <pomDependencies>consider</pomDependencies>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
 </project>
+

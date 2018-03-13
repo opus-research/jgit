@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2008-2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,6 +52,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -589,10 +590,10 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = db.getAllRefs();
+		refs = new HashMap<String, Ref>(db.getAllRefs());
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs.values());
-		if (!head.isSymbolic())
+		if (head != null && head.getName().equals(head.getOrigName()))
 			adv.advertiseHave(head.getObjectId());
 		adv.includeAdditionalHaves();
 		if (adv.isEmpty())

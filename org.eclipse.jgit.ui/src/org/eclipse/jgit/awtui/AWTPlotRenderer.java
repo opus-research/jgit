@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -147,7 +146,7 @@ final class AWTPlotRenderer extends AbstractPlotRenderer<SwingLane, Color> {
 	@Override
 	protected int drawLabel(int x, int y, Ref ref) {
 		String txt;
-		String name = ref.getName();
+		String name = ref.getOrigName();
 		if (name.startsWith(Constants.R_HEADS)) {
 			g.setBackground(Color.GREEN);
 			txt = name.substring(Constants.R_HEADS.length());
