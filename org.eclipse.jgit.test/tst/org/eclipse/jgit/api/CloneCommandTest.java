@@ -50,6 +50,7 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +58,7 @@ import java.util.Map;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -64,13 +66,14 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.submodule.SubmoduleStatus;
 import org.eclipse.jgit.submodule.SubmoduleStatusType;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
@@ -105,7 +108,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testCloneRepository() throws IOException,
-			JGitInternalException, GitAPIException {
+			JGitInternalException, GitAPIException, URISyntaxException {
 		File directory = createTempDirectory("testCloneRepository");
 		CloneCommand command = Git.cloneRepository();
 		command.setDirectory(directory);
@@ -130,6 +133,28 @@ public class CloneCommandTest extends RepositoryTestCase {
 								"test", ConfigConstants.CONFIG_KEY_MERGE));
 		assertEquals(2, git2.branchList().setListMode(ListMode.REMOTE).call()
 				.size());
+		assertEquals(new RefSpec("+refs/heads/*:refs/remotes/origin/*"),
+				fetchRefSpec(git2.getRepository()));
+	}
+
+	@Test
+	public void testBareCloneRepository() throws IOException,
+			JGitInternalException, GitAPIException, URISyntaxException {
+		File directory = createTempDirectory("testCloneRepository_bare");
+		CloneCommand command = Git.cloneRepository();
+		command.setBare(true);
+		command.setDirectory(directory);
+		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
+		assertEquals(new RefSpec("+refs/heads/*:refs/heads/*"),
+				fetchRefSpec(git2.getRepository()));
+	}
+
+	public static RefSpec fetchRefSpec(Repository r) throws URISyntaxException {
+		RemoteConfig remoteConfig =
+				new RemoteConfig(r.getConfig(), Constants.DEFAULT_REMOTE_NAME);
+		return remoteConfig.getFetchRefSpecs().get(0);
 	}
 
 	@Test
