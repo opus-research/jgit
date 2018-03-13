@@ -56,7 +56,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import org.eclipse.jgit.transport.CredentialsProvider.CredentialType;
 import org.eclipse.jgit.util.Base64;
 
 /**
@@ -99,34 +98,9 @@ abstract class HttpAuthMethod {
 	 *
 	 * @param uri
 	 *            the URI used to create the connection.
-	 * @param credentialsProvider
-	 *            the credentials provider, or null. If provided,
-	 *            {@link URIish#getPass() credentials in the URI} are ignored.
-	 *
-	 * @return true if the authentication method is able to provide
-	 *         authorization for the given URI
 	 */
-	boolean authorize(URIish uri, CredentialsProvider credentialsProvider) {
-		String username;
-		String password;
-
-		if (credentialsProvider != null) {
-			if (credentialsProvider.supports(CredentialType.USERNAME, CredentialType.PASSWORD)) {
-				username = (String) credentialsProvider.getCredentials(uri,
-						CredentialType.USERNAME);
-				password = (String) credentialsProvider.getCredentials(uri,
-						CredentialType.PASSWORD);
-			} else
-				return false;
-		} else {
-			username = uri.getUser();
-			password = uri.getPass();
-		}
-		if (username != null) {
-			authorize(username, password);
-			return true;
-		}
-		return false;
+	void authorize(URIish uri) {
+		authorize(uri.getUser(), uri.getPass());
 	}
 
 	/**
