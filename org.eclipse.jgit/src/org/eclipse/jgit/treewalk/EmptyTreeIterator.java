@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2009, Semen Vadishev <semen.vadishev@syntevo.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -50,7 +49,6 @@ import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 
@@ -58,7 +56,6 @@ import org.eclipse.jgit.lib.Repository;
 public class EmptyTreeIterator extends AbstractTreeIterator {
 	/** Create a new iterator with no parent. */
 	public EmptyTreeIterator() {
-        super(Constants.SYSTEM_CHARSET);
 		// Create a root empty tree.
 	}
 

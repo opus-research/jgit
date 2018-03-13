@@ -2,7 +2,6 @@
  * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2009, Semen Vadishev <semen.vadishev@syntevo.com>
  * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -48,7 +47,6 @@
 package org.eclipse.jgit.lib;
 
 import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
-import java.nio.charset.Charset;
 
 import org.eclipse.jgit.lib.Config.SectionParser;
 
@@ -69,21 +67,11 @@ public class CoreConfig {
 
 	private final boolean logAllRefUpdates;
 
-    private final Charset pathEncoding;
-
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
 		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-        pathEncoding = getCharset(rc.getString("core", null, "pathencoding"));
 	}
-
-    private Charset getCharset(String charsetName) {
-        if (charsetName != null) {
-            return Charset.forName(charsetName);
-        }
-        return Constants.SYSTEM_CHARSET ;
-    }
 
 	/**
 	 * @see ObjectWriter
@@ -107,11 +95,4 @@ public class CoreConfig {
 	public boolean isLogAllRefUpdates() {
 		return logAllRefUpdates;
 	}
-
-    /**
-     * @return Encoding to use for file names.
-     */
-    public Charset getPathEncoding() {
-        return pathEncoding;
-    }
 }

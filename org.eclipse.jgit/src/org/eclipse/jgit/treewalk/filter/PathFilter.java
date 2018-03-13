@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Semen Vadishev <semen.vadishev@syntevo.com>
+ * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -44,6 +44,7 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
 /**
@@ -81,19 +82,22 @@ public class PathFilter extends TreeFilter {
 
 	final String pathStr;
 
+	final byte[] pathRaw;
+
 	private PathFilter(final String s) {
 		pathStr = s;
+		pathRaw = Constants.encode(pathStr);
 	}
 
 	@Override
 	public boolean include(final TreeWalk walker) {
-		return walker.isPathPrefix(pathStr) == 0;
+		return walker.isPathPrefix(pathRaw, pathRaw.length) == 0;
 	}
 
 	@Override
 	public boolean shouldBeRecursive() {
-		for (final char c : pathStr.toCharArray())
-			if (c == '/')
+		for (final byte b : pathRaw)
+			if (b == '/')
 				return true;
 		return false;
 	}

@@ -45,7 +45,6 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Collections;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -58,7 +57,6 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryConfig;
 import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -662,8 +660,7 @@ public class TreeWalk {
 		final AbstractTreeIterator t = currentHead;
 		final int off = t.pathOffset;
 		final int end = t.pathLen;
-        final Charset cs = db.getConfig().getPathEncoding();
-		return RawParseUtils.decode(cs, t.path, off, end);
+		return RawParseUtils.decode(Constants.CHARSET, t.path, off, end);
 	}
 
 	/**
@@ -679,12 +676,11 @@ public class TreeWalk {
 	 *         least one '/' in the returned string.
 	 */
 	public String getPathString() {
-        final Charset cs = db.getConfig().getPathEncoding();
-		return pathOf(currentHead, cs);
+		return pathOf(currentHead);
 	}
 
 	/**
-	 * Get the current entry's complete path as a byte array.
+	 * Get the current entry's complete path as a UTF-8 byte array.
 	 *
 	 * @return complete path of the current entry, from the root of the
 	 *         repository. If the current entry is in a subtree there will be at
@@ -697,23 +693,6 @@ public class TreeWalk {
 		System.arraycopy(t.path, 0, r, 0, n);
 		return r;
 	}
-
-    /**
-     * Test if the supplied path matches the current entry's path.
-     *
-     * @see #isPathPrefix(byte[], int)
-     *
-     * @param p path to test. Callers should ensure the path does not
-     *          end with '/' prior to invocation.
-     * @return < 0 if p is before the current path; 0 if p matches the current
-     *         path; 1 if the current path is past p and p will never match
-     *         again on this tree walk.
-     */
-    public int isPathPrefix(String p) {
-        final Charset cs = db.getConfig().getPathEncoding();
-        byte[] pRaw = Constants.encode(p, cs);
-        return isPathPrefix(pRaw, pRaw.length);
-    }
 
 	/**
 	 * Test if the supplied path matches the current entry's path.
@@ -764,21 +743,6 @@ public class TreeWalk {
 		// Both strings are identical.
 		//
 		return 0;
-	}
-
-    /**
-     * Test if the supplied path matches (being suffix of) the current entry's
-     * path.
-     *
-     * @see #isPathSuffix(byte[], int)
-     * @param p    path to test.
-     * @return true if p is suffix of the current path;
-     *         false if otherwise
-     */
-    public boolean isPathSuffix(final String p) {
-        final Charset cs = db.getConfig().getPathEncoding();
-        byte[] pRaw = Constants.encode(p, cs);
-        return isPathSuffix(pRaw, pRaw.length);
 	}
 
 	/**
@@ -946,23 +910,12 @@ public class TreeWalk {
 
 	private CanonicalTreeParser parserFor(final AnyObjectId id)
 			throws IncorrectObjectTypeException, IOException {
-        final RepositoryConfig rc = getRepository().getConfig();
-        final CanonicalTreeParser p = new CanonicalTreeParser(rc);
+		final CanonicalTreeParser p = new CanonicalTreeParser();
 		p.reset(db, id, curs);
 		return p;
 	}
 
-    /**
-     * @param t
-     *            tree iterator to get path for.
-     * @return path of the tree iterator, as a string.
-     * @deprecated use #pathOf(AbstractTreeIterator, Charset) method instead.
-     */
 	static String pathOf(final AbstractTreeIterator t) {
-        return pathOf(t, Constants.SYSTEM_CHARSET);
+		return RawParseUtils.decode(Constants.CHARSET, t.path, 0, t.pathLen);
 	}
-
-    static String pathOf(final AbstractTreeIterator t, Charset pathEncoding) {
-        return RawParseUtils.decode(pathEncoding, t.path, 0, t.pathLen);
-    }
 }

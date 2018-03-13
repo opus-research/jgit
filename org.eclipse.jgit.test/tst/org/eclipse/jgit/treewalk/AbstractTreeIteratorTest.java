@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2009, Semen Vadishev <semen.vadishev@syntevo.com>
  * Copyright (C) 2009, Tor Arne Vestbø <torarnv@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -67,7 +66,7 @@ public class AbstractTreeIteratorTest extends TestCase {
 			mode = fileMode.getBits();
 
 			final int s = pathName.lastIndexOf('/');
-			final byte[] name = Constants.encode(pathName.substring(s + 1), Constants.SYSTEM_CHARSET);
+			final byte[] name = Constants.encode(pathName.substring(s + 1));
 			ensurePathCapacity(pathOffset + name.length, pathOffset);
 			System.arraycopy(name, 0, path, pathOffset, name.length);
 			pathLen = pathOffset + name.length;

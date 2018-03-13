@@ -58,7 +58,6 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.util.Comparator;
 import java.util.Date;
@@ -334,11 +333,11 @@ public class GitIndex {
 		return FS.INSTANCE.supportsExecute();
 	}
 
-	byte[] makeKey(File wd, File f) {
+	static byte[] makeKey(File wd, File f) {
 		if (!f.getPath().startsWith(wd.getPath()))
 			throw new Error("Path is not in working dir");
 		String relName = Repository.stripWorkDir(wd, f);
-		return encodePath(relName);
+		return Constants.encode(relName);
 	}
 
 	Boolean filemode;
@@ -428,7 +427,7 @@ public class GitIndex {
 				size = -1;
 			}
 			sha1 = f.getId();
-			name = encodePath(f.getFullName());
+			name = Constants.encode(f.getFullName());
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
 		}
 
@@ -663,26 +662,15 @@ public class GitIndex {
 		 * @return path name for this entry
 		 */
 		public String getName() {
-            final Charset cs = db.getConfig().getPathEncoding();
-            return RawParseUtils.decode(cs, name);
+			return RawParseUtils.decode(name);
 		}
 
 		/**
 		 * @return path name for this entry as byte array, hopefully UTF-8 encoded
-         * @deprecated use #getNameRaw() method instead.
 		 */
 		public byte[] getNameUTF8() {
 			return name;
 		}
-
-        /**
-         * @return path name for this entry as byte array, encoded by the
-         * character encoding specified at the repository configuration or
-         * by the system default encoding, if such option not found.
-         */
-        public byte[] getNameRaw() {
-            return name;
-        }
 
 		/**
 		 * @return SHA-1 of the entry managed by this index
@@ -814,7 +802,7 @@ public class GitIndex {
 				readTree(name, (Tree) te);
 			} else {
 				Entry e = new Entry(te, 0);
-				entries.put(encodePath(name), e);
+				entries.put(Constants.encode(name), e);
 			}
 		}
 	}
@@ -826,7 +814,7 @@ public class GitIndex {
 	 * @throws IOException
 	 */
 	public Entry addEntry(TreeEntry te) throws IOException {
-		byte[] key = encodePath(te.getFullName());
+		byte[] key = Constants.encode(te.getFullName());
 		Entry e = new Entry(te, 0);
 		entries.put(key, e);
 		return e;
@@ -905,7 +893,7 @@ public class GitIndex {
 			}
 			while (trees.size() < newName.length) {
 				if (!current.existsTree(newName[trees.size() - 1])) {
-					current = new Tree(current, encodePath(newName[trees.size() - 1]));
+					current = new Tree(current, Constants.encode(newName[trees.size() - 1]));
 					current.getParent().addEntry(current);
 					trees.push(current);
 				} else {
@@ -915,7 +903,7 @@ public class GitIndex {
 				}
 			}
 			FileTreeEntry ne = new FileTreeEntry(current, e.sha1,
-					encodePath(newName[newName.length - 1]),
+					Constants.encode(newName[newName.length - 1]),
 					(e.mode & FileMode.EXECUTABLE_FILE.getBits()) == FileMode.EXECUTABLE_FILE.getBits());
 			current.addEntry(ne);
 		}
@@ -927,11 +915,6 @@ public class GitIndex {
 		}
 		return current.getTreeId();
 	}
-
-    private byte[] encodePath(String path) {
-        final Charset cs = db.getConfig().getPathEncoding();
-        return Constants.encode(path, cs);
-    }
 
 	String[] splitDirPath(String name) {
 		String[] tmp = new String[name.length() / 2 + 1];
@@ -981,7 +964,7 @@ public class GitIndex {
 	 * @throws UnsupportedEncodingException
 	 */
 	public Entry getEntry(String path) throws UnsupportedEncodingException {
-		return entries.get(Repository.gitInternalSlash(encodePath(path)));
+		return entries.get(Repository.gitInternalSlash(Constants.encode(path)));
 	}
 
 	/**

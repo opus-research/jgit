@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Semen Vadishev <semen.vadishev@syntevo.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -60,7 +59,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.WindowCursor;
-import org.eclipse.jgit.lib.RepositoryConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -95,8 +93,7 @@ public class AbstractTreeIteratorHandler extends
 		final String name = params.getParameter(0);
 
 		if (new File(name).isDirectory()) {
-            final RepositoryConfig rc = clp.getRepository().getConfig();
-            setter.addValue(new FileTreeIterator(new File(name), rc));
+			setter.addValue(new FileTreeIterator(new File(name)));
 			return 1;
 		}
 
@@ -120,8 +117,7 @@ public class AbstractTreeIteratorHandler extends
 		if (id == null)
 			throw new CmdLineException(name + " is not a tree");
 
-        final RepositoryConfig rc = clp.getRepository().getConfig();
-        final CanonicalTreeParser p = new CanonicalTreeParser(rc);
+		final CanonicalTreeParser p = new CanonicalTreeParser();
 		final WindowCursor curs = new WindowCursor();
 		try {
 			p.reset(clp.getRepository(), clp.getRevWalk().parseTree(id), curs);

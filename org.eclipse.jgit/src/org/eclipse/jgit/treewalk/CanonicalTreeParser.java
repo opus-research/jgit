@@ -45,7 +45,6 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -57,7 +56,6 @@ import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryConfig;
 import org.eclipse.jgit.lib.WindowCursor;
 
 /** Parses raw Git trees from the canonical semi-text/semi-binary format. */
@@ -75,36 +73,10 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	/** Offset one past the current entry (first byte of next entry). */
 	private int nextPtr;
 
-    /**
-     * Create a new parser.
-     * <p>
-     * Paths will be encoded by the system default character encoding.
-     *
-     * @deprecated use CanonicalTreeParser(RepositoryConfig).
-     * constructor instead.
-	 */
-    public CanonicalTreeParser() {
-        this(Constants.SYSTEM_CHARSET);
+	/** Create a new parser. */
+	public CanonicalTreeParser() {
+		reset(EMPTY);
 	}
-
-    /**
-     * Create a new parser.
-     * <p>
-     * Paths will be encoded by the character encoding specified at the repository
-     * configuration or by the system default character encoding, if no corresponding
-     * option found.
-     *
-     * @param rc
-     *              repository configuration.
-     */
-    public CanonicalTreeParser(final RepositoryConfig rc) {
-        this(rc.getPathEncoding());
-    }
-
-    CanonicalTreeParser(final Charset pathNameEncoding) {
-        super(pathNameEncoding);
-        reset(EMPTY, pathNameEncoding);
-    }
 
 	/**
 	 * Create a new parser for a tree appearing in a subset of a repository.
@@ -132,7 +104,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	public CanonicalTreeParser(final byte[] prefix, final Repository repo,
 			final AnyObjectId treeId, final WindowCursor curs)
 			throws IncorrectObjectTypeException, IOException {
-		super(prefix, repo.getConfig().getPathEncoding());
+		super(prefix);
 		reset(repo, treeId, curs);
 	}
 
@@ -143,44 +115,16 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	/**
 	 * Reset this parser to walk through the given tree data.
 	 *
-     * @see #reset(byte[], RepositoryConfig)
 	 * @param treeData
 	 *            the raw tree content.
 	 */
 	public void reset(final byte[] treeData) {
-        reset(treeData, (Charset) null);
+		raw = treeData;
+		prevPtr = -1;
+		currPtr = 0;
+		if (!eof())
+			parseEntry();
 	}
-
-    /**
-	 * Reset this parser to walk through the given tree data.
-     * If single instance of CanonicalTreeParser used for multiple
-     * Git repositories, reset character encoding for path names
-     * as well.
-	 *
-	 * @param treeData
-	 *            the raw tree content.
-     * @param
-     *        rc
-     *            repository configuration.
-	 */
-    public void reset(final byte[] treeData, final RepositoryConfig rc) {
-        Charset pathNameEncoding = null;
-        if (rc != null) {
-            pathNameEncoding = rc.getPathEncoding();
-        }
-        reset(treeData, pathNameEncoding);
-    }
-
-    void reset(final byte[] treeData, final Charset pathNameEncoding) {
-        raw = treeData;
-        prevPtr = -1;
-        currPtr = 0;
-        if (pathNameEncoding != null) {
-            pathEncoding = pathNameEncoding;
-        }
-        if (!eof())
-            parseEntry();
-    }
 
 	/**
 	 * Reset this parser to walk through the given tree.
@@ -205,7 +149,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 			final AnyObjectId id, final WindowCursor curs)
 			throws IncorrectObjectTypeException, IOException {
 		CanonicalTreeParser p = this;
-        pathEncoding = repo.getConfig().getPathEncoding();
 		while (p.parent != null)
 			p = (CanonicalTreeParser) p.parent;
 		p.reset(repo, id, curs);
@@ -260,7 +203,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 			final ObjectId me = id.toObjectId();
 			throw new IncorrectObjectTypeException(me, Constants.TYPE_TREE);
 		}
-		reset(subtreeData, repo.getConfig());
+		reset(subtreeData);
 	}
 
 	@Override

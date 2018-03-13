@@ -44,7 +44,6 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.ByteArrayInputStream;
-import java.nio.charset.Charset;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -194,8 +193,7 @@ public class NameConflictTreeWalkTest extends RepositoryTestCase {
 
 	private DirCacheEntry makeEntry(final String path, final FileMode mode)
 			throws Exception {
-        final Charset cs = db.getConfig().getPathEncoding();
-        final byte[] pathBytes = Constants.encode(path, cs);
+		final byte[] pathBytes = Constants.encode(path);
 		final DirCacheEntry ent = new DirCacheEntry(path);
 		ent.setFileMode(mode);
 		ent.setObjectId(new ObjectWriter(db).computeBlobSha1(pathBytes.length,
