@@ -65,7 +65,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -107,11 +106,11 @@ public class PushCertificateStore implements AutoCloseable {
 			Constants.R_REFS + "meta/push-certs"; //$NON-NLS-1$
 
 	private static class PendingCert {
-		private PushCertificate cert;
-		private PersonIdent ident;
-		private Collection<ReceiveCommand> matching;
+		PushCertificate cert;
+		PersonIdent ident;
+		Collection<ReceiveCommand> matching;
 
-		private PendingCert(PushCertificate cert, PersonIdent ident,
+		PendingCert(PushCertificate cert, PersonIdent ident,
 				Collection<ReceiveCommand> matching) {
 			this.cert = cert;
 			this.ident = ident;
@@ -121,8 +120,8 @@ public class PushCertificateStore implements AutoCloseable {
 
 	private final Repository db;
 	private final List<PendingCert> pending;
-	private ObjectReader reader;
-	private RevCommit commit;
+	ObjectReader reader;
+	RevCommit commit;
 
 	/**
 	 * Create a new store backed by the given repository.
@@ -270,7 +269,7 @@ public class PushCertificateStore implements AutoCloseable {
 		};
 	}
 
-	private void load() throws IOException {
+	void load() throws IOException {
 		close();
 		reader = db.newObjectReader();
 		Ref ref = db.getRefDatabase().exactRef(REF_NAME);
@@ -283,7 +282,7 @@ public class PushCertificateStore implements AutoCloseable {
 		}
 	}
 
-	private static PushCertificate read(TreeWalk tw) throws IOException {
+	static PushCertificate read(TreeWalk tw) throws IOException {
 		if (tw == null || (tw.getRawMode(0) & TYPE_FILE) != TYPE_FILE) {
 			return null;
 		}
@@ -448,13 +447,10 @@ public class PushCertificateStore implements AutoCloseable {
 	}
 
 	private DirCache newDirCache() throws IOException {
-		DirCache dc = DirCache.newInCore();
 		if (commit != null) {
-			DirCacheBuilder b = dc.builder();
-			b.addTree(new byte[0], DirCacheEntry.STAGE_0, reader, commit.getTree());
-			b.finish();
+			return DirCache.read(reader, commit.getTree());
 		}
-		return dc;
+		return DirCache.newInCore();
 	}
 
 	private ObjectId saveCert(ObjectInserter inserter, DirCache dc,
@@ -532,7 +528,7 @@ public class PushCertificateStore implements AutoCloseable {
 		return TreeWalk.forPath(reader, pathName(refName), commit.getTree());
 	}
 
-	private static String pathName(String refName) {
+	static String pathName(String refName) {
 		return refName + "@{cert}"; //$NON-NLS-1$
 	}
 
