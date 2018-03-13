@@ -87,7 +87,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
-import org.eclipse.jgit.util.BuiltinCommand;
+import org.eclipse.jgit.util.FilterCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.Holder;
@@ -464,7 +464,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (filterCommand != null) {
 			if (Repository.isRegistered(filterCommand)) {
 				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
-				BuiltinCommand command = Repository.getCommand(filterCommand,
+				FilterCommand command = Repository.getCommand(filterCommand,
 						repository,
 						in, buffer);
 				while (command.run() != -1)

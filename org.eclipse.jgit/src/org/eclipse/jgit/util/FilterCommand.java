@@ -49,14 +49,12 @@ import java.io.OutputStream;
 /**
  * An abstraction for JGits builtin implementations for hooks and filters.
  * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin coammnds may be used. The are
- * constructed by {@link BuiltinCommandFactory} and take an InputStream,
- * OutputStream and a repository as constructor parameters. They offer a method
- * {@link #run()} which triggers the execution of the command().
+ * data from/to stdin/stdout these builtin coammnds may be used. They are
+ * constructed by {@link FilterCommandFactory}.
  *
  * @since 4.5
  */
-public abstract class BuiltinCommand {
+public abstract class FilterCommand {
 	/**
 	 * The {@link InputStream} this command should read from
 	 */
@@ -71,13 +69,13 @@ public abstract class BuiltinCommand {
 	 * @param in
 	 * @param out
 	 */
-	public BuiltinCommand(InputStream in, OutputStream out) {
+	public FilterCommand(InputStream in, OutputStream out) {
 		this.in = in;
 		this.out = out;
 	}
 
 	/**
-	 * Executes the command. The command is supposed to read data from
+	 * Execute the command. The command is supposed to read data from
 	 * {@link #in} and to write the result to {@link #out}. It returns the
 	 * number of bytes it read from {@link #in}. It should be called in a loop
 	 * until it returns -1 signaling that the {@link InputStream} is completely

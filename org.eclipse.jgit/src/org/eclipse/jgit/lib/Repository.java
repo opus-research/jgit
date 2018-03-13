@@ -90,8 +90,8 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.BuiltinCommand;
-import org.eclipse.jgit.util.BuiltinCommandFactory;
+import org.eclipse.jgit.util.FilterCommand;
+import org.eclipse.jgit.util.FilterCommandFactory;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
@@ -132,27 +132,27 @@ public abstract class Repository implements AutoCloseable {
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
-	private static ConcurrentHashMap<String, BuiltinCommandFactory> commandRegistry = new ConcurrentHashMap<>();
+	private static ConcurrentHashMap<String, FilterCommandFactory> commandRegistry = new ConcurrentHashMap<>();
 
 	/**
-	 * Registers a {@link BuiltinCommandFactory} responsible for creating
-	 * {@link BuiltinCommand}'s for a certain command name. If the factory f1 is
+	 * Registers a {@link FilterCommandFactory} responsible for creating
+	 * {@link FilterCommand}'s for a certain command name. If the factory f1 is
 	 * registered for the name "jgit://builtin/x" then a call to
 	 * <code>getCommand("jgit://builtin/x", ...)</code> will call
-	 * <code>f1(...)</code> to create a new instance of {@link BuiltinCommand}
+	 * <code>f1(...)</code> to create a new instance of {@link FilterCommand}
 	 *
 	 * @param commandName
 	 *            the name for which this factory is registered
 	 * @param fact
-	 *            the factory responsible to create {@link BuiltinCommand}s for
+	 *            the factory responsible to create {@link FilterCommand}s for
 	 *            the specified name. <code>null</code> can be specified to
 	 *            unregister a factory
 	 * @return the previous factory associated with <tt>commandName</tt>, or
 	 *         <tt>null</tt> if there was no mapping for <tt>commandName</tt>
 	 * @since 4.5
 	 */
-	public static BuiltinCommandFactory registerCommand(String commandName,
-			BuiltinCommandFactory fact) {
+	public static FilterCommandFactory registerCommand(String commandName,
+			FilterCommandFactory fact) {
 		if (fact == null)
 			return commandRegistry.remove(commandName);
 		else
@@ -160,7 +160,7 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
-	 * Checks whether some {@link BuiltinCommandFactory} is registered for a
+	 * Checks whether some {@link FilterCommandFactory} is registered for a
 	 * certain command name
 	 *
 	 * @param commandName
@@ -173,28 +173,28 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
-	 * Creates a new {@link BuiltinCommand} for the given name. A factory has to
+	 * Creates a new {@link FilterCommand} for the given name. A factory has to
 	 * be registered for the name in advance.
 	 *
 	 * @param commandName
-	 *            The name for which a new {@link BuiltinCommand} should be
+	 *            The name for which a new {@link FilterCommand} should be
 	 *            created
 	 * @param db
 	 *            the repository this command should work on
 	 * @param in
-	 *            the {@link InputStream} this {@link BuiltinCommand} should
+	 *            the {@link InputStream} this {@link FilterCommand} should
 	 *            read from
 	 * @param out
-	 *            the {@link OutputStream} this {@link BuiltinCommand} should
+	 *            the {@link OutputStream} this {@link FilterCommand} should
 	 *            write to
 	 * @return the command if a command could be created or <code>null</code> if
 	 *         there was no factory registered for that name
 	 * @throws IOException
 	 * @since 4.5
 	 */
-	public static BuiltinCommand getCommand(String commandName, Repository db,
+	public static FilterCommand getCommand(String commandName, Repository db,
 			InputStream in, OutputStream out) throws IOException {
-		BuiltinCommandFactory cf = commandRegistry.get(commandName);
+		FilterCommandFactory cf = commandRegistry.get(commandName);
 		return (cf == null) ? null : cf.create(db, in, out);
 	}
 
