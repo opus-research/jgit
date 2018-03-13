@@ -196,9 +196,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String encryptionError;
 	/***/ public String endOfFileInEscape;
 	/***/ public String entryNotFoundByPath;
-	/***/ public String enumValueNotSupported2;
-	/***/ public String enumValueNotSupported3;
-	/***/ public String enumValuesNotAvailable;
 	/***/ public String errorDecodingFromFile;
 	/***/ public String errorEncodingFromFile;
 	/***/ public String errorInBase64CodeReadingStream;
@@ -209,7 +206,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorReadingInfoRefs;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfFetchCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
@@ -272,7 +268,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidOldIdSent;
 	/***/ public String invalidPacketLineHeader;
 	/***/ public String invalidPath;
-	/***/ public String invalidRemote;
 	/***/ public String invalidRefName;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
@@ -449,7 +444,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unknownRepositoryFormat;
 	/***/ public String unknownZlibError;
 	/***/ public String unmergedPath;
-	/***/ public String unpackException;
 	/***/ public String unreadablePackIndex;
 	/***/ public String unrecognizedRef;
 	/***/ public String unsupportedCommand0;

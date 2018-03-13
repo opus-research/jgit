@@ -101,69 +101,33 @@ import org.eclipse.jgit.util.LongList;
  *
  * So the overall runtime complexity stays the same with linear space,
  * albeit with a larger constant factor.
- *
- * @param <S>
- *            type of sequence.
  */
-public class MyersDiff<S extends Sequence> {
-	/** Singleton instance of MyersDiff. */
-	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
-		public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
-				C cmp, S a, S b) {
-			Edit region = new Edit(0, a.size(), 0, b.size());
-			region = cmp.reduceCommonStartEnd(a, b, region);
-
-			switch (region.getType()) {
-			case INSERT:
-			case DELETE: {
-				EditList r = new EditList();
-				r.add(region);
-				return r;
-			}
-
-			case REPLACE:
-				return new MyersDiff<S>(cmp, a, b, region).getEdits();
-
-			case EMPTY:
-				return new EditList();
-
-			default:
-				throw new IllegalStateException();
-			}
-		}
-	};
-
+public class MyersDiff {
 	/**
 	 * The list of edits found during the last call to {@link #calculateEdits()}
 	 */
 	protected EditList edits;
 
-	/** Comparison function for sequences. */
-	protected HashedSequenceComparator<Subsequence<S>> cmp;
-
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected HashedSequence<Subsequence<S>> a;
+	protected Sequence a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected HashedSequence<Subsequence<S>> b;
+	protected Sequence b;
 
-	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b, Edit region) {
-		Subsequence<S> as = Subsequence.a(a, region);
-		Subsequence<S> bs = Subsequence.b(b, region);
-
-		HashedSequencePair<Subsequence<S>> pair = new HashedSequencePair<Subsequence<S>>(
-				new SubsequenceComparator<S>(cmp), as, bs);
-
-		this.cmp = pair.getComparator();
-		this.a = pair.getA();
-		this.b = pair.getB();
-
+	/**
+	 * The only constructor
+	 *
+	 * @param a   the text A which should be compared
+	 * @param b   the text B which should be compared
+	 */
+	public MyersDiff(Sequence a, Sequence b) {
+		this.a = a;
+		this.b = b;
 		calculateEdits();
-		Subsequence.toBase(edits, as, bs);
 	}
 
 	/**
@@ -472,7 +436,7 @@ if (k < beginK || k > endK)
 		class ForwardEditPaths extends EditPaths {
 			final int snake(int k, int x) {
 				for (; x < endA && k + x < endB; x++)
-					if (!cmp.equals(a, x, b, k + x))
+					if (!a.equals(x, b, k + x))
 						break;
 				return x;
 			}
@@ -514,7 +478,7 @@ if (k < beginK || k > endK)
 		class BackwardEditPaths extends EditPaths {
 			final int snake(int k, int x) {
 				for (; x > beginA && k + x > beginB; x--)
-					if (!cmp.equals(a, x - 1, b, k + x - 1))
+					if (!a.equals(x - 1, b, k + x - 1))
 						break;
 				return x;
 			}
@@ -565,8 +529,8 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			EditList res = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
-			System.out.println(res.toString());
+			MyersDiff diff = new MyersDiff(a, b);
+			System.out.println(diff.getEdits().toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
