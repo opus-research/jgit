@@ -63,7 +63,6 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lfs.CleanFilter;
-import org.eclipse.jgit.lfs.SmudgeFilter;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -86,7 +85,6 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Override
 	public void setUp() throws Exception {
 		CleanFilter.register();
-		SmudgeFilter.register();
 		super.setUp();
 	}
 
@@ -157,7 +155,7 @@ public class AddCommandTest extends RepositoryTestCase {
 					.addFilepattern(".gitattributes").call();
 
 			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n]", //TODO: doublecheck with native git
+					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n]",
 					indexState(CONTENT));
 
 			RevCommit c1 = git.commit().setMessage("c1").call();
@@ -170,14 +168,18 @@ public class AddCommandTest extends RepositoryTestCase {
 			git.commit().setMessage("c2").call();
 			assertTrue(git.status().call().isClean());
 			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f\nsize 7\n]",
+					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f\nsize 7\n]",
 					indexState(CONTENT));
 			assertEquals("foobar\n", read("src/a.txt"));
 			git.checkout().setName(c1.getName()).call();
 			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n]",
+					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid sha256:b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n]",
 					indexState(CONTENT));
-			assertEquals("foo\n", read("src/a.txt"));
+			// due to lfs clean filter but dummy smudge filter we expect strange
+			// content
+			assertEquals(
+					"versien https://git-lfs.github.cem/spec/v1\neid sha256:b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n",
+					read("src/a.txt"));
 		}
 	}
 

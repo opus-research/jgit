@@ -40,79 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs;
+package org.eclipse.jgit.util;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import org.eclipse.jgit.lfs.lib.LongObjectId;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.BuiltinCommand;
-import org.eclipse.jgit.util.BuiltinCommandFactory;
 
 /**
+ * An abstraction for JGits builtin implementations for hooks and filters.
+ * Instead of spawning an external processes to start a filter/hook and to pump
+ * data from/to stdin/stdout these builtin coammnds may be used. They are
+ * constructed by {@link FilterCommandFactory}.
+ *
  * @since 4.5
  */
-public class SmudgeFilter extends BuiltinCommand {
+public abstract class FilterCommand {
 	/**
-	 *
+	 * The {@link InputStream} this command should read from
 	 */
-	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
-		@Override
-		public BuiltinCommand create(Repository db, InputStream in,
-				OutputStream out) throws IOException {
-			return new SmudgeFilter(db, in, out);
-		}
-	};
+	protected InputStream in;
 
 	/**
-	 * Registers this filter to JGit by calling
-	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
+	 * The {@link OutputStream} this command should write to
 	 */
-	public final static void register() {
-		Repository.registerCommand(
-				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
-						+ "lfs/smudge", //$NON-NLS-1$
-				FACTORY);
-	};
-
-	LongObjectId id;
-
-	private InputStream mIn;
-
-	private LfsUtil lfsUtil;
+	protected OutputStream out;
 
 	/**
-	 * @param db
 	 * @param in
 	 * @param out
-	 * @throws IOException
 	 */
-	public SmudgeFilter(Repository db, InputStream in, OutputStream out)
-			throws IOException {
-		super(in, out);
-		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
-		LfsPointer res = LfsPointer.parseLfsPointer(in);
-		if (res != null) {
-			Path mediaFile = lfsUtil.getMediaFile(res.getOid());
-			if (Files.exists(mediaFile)) {
-				mIn = Files.newInputStream(mediaFile);
-			}
-		}
+	public FilterCommand(InputStream in, OutputStream out) {
+		this.in = in;
+		this.out = out;
 	}
 
-	@Override
-	public int run() throws IOException {
-		int b;
-		if (mIn != null) {
-			while ((b = mIn.read()) != -1)
-				out.write(b);
-			mIn.close();
-		}
-		out.close();
-		return -1;
-	}
+	/**
+	 * Execute the command. The command is supposed to read data from
+	 * {@link #in} and to write the result to {@link #out}. It returns the
+	 * number of bytes it read from {@link #in}. It should be called in a loop
+	 * until it returns -1 signaling that the {@link InputStream} is completely
+	 * processed.
+	 *
+	 * @return the number of bytes read from the {@link InputStream} or -1. -1
+	 *         means that the {@link InputStream} is completely processed.
+	 * @throws IOException
+	 *             when {@link IOException} occured while reading from
+	 *             {@link #in} or writing to {@link #out}
+	 *
+	 */
+	public abstract int run() throws IOException;
 }

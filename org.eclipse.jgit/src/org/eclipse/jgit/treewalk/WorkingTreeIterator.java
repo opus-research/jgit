@@ -87,7 +87,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
-import org.eclipse.jgit.util.BuiltinCommand;
+import org.eclipse.jgit.util.FilterCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.Holder;
@@ -396,7 +396,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
 			byte[] raw = rawbuf.array();
 			int n = rawbuf.limit();
-			if (!isBinary(raw, n)) { // TODO: why filter only binary
+			if (!isBinary(raw, n)) {
 				rawbuf = filterClean(raw, n, opType);
 				raw = rawbuf.array();
 				n = rawbuf.limit();
@@ -463,9 +463,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		String filterCommand = getCleanFilterCommand();
 		if (filterCommand != null) {
 			if (Repository.isRegistered(filterCommand)) {
-				LocalFile buffer = new TemporaryBuffer.LocalFile(null); // TODO: Check on smudge that we don't write twice to FS
-
-				BuiltinCommand command = Repository.getCommand(filterCommand,
+				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
+				FilterCommand command = Repository.getCommand(filterCommand,
 						repository,
 						in, buffer);
 				while (command.run() != -1)
