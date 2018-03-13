@@ -183,7 +183,7 @@ public final class DfsBlockCache {
 		if (tableSize < 1)
 			throw new IllegalArgumentException(JGitText.get().tSizeMustBeGreaterOrEqual1);
 
-		table = new AtomicReferenceArray<HashEntry>(tableSize);
+		table = new AtomicReferenceArray<>(tableSize);
 		loadLocks = new ReentrantLock[cfg.getConcurrencyLevel()];
 		for (int i = 0; i < loadLocks.length; i++)
 			loadLocks[i] = new ReentrantLock(true /* fair */);
@@ -194,10 +194,10 @@ public final class DfsBlockCache {
 		blockSizeShift = Integer.numberOfTrailingZeros(blockSize);
 
 		clockLock = new ReentrantLock(true /* fair */);
-		clockHand = new Ref<Object>(new DfsPackKey(), -1, 0, null);
+		clockHand = new Ref<>(new DfsPackKey(), -1, 0, null);
 		clockHand.next = clockHand;
 
-		packCache = new ConcurrentHashMap<DfsPackDescription, DfsPackFile>(
+		packCache = new ConcurrentHashMap<>(
 				16, 0.75f, 1);
 		packFiles = Collections.unmodifiableCollection(packCache.values());
 
@@ -357,7 +357,7 @@ public final class DfsBlockCache {
 			}
 
 			key.cachedSize.addAndGet(v.size());
-			Ref<DfsBlock> ref = new Ref<DfsBlock>(key, position, v.size(), v);
+			Ref<DfsBlock> ref = new Ref<>(key, position, v.size(), v);
 			ref.hot = true;
 			for (;;) {
 				HashEntry n = new HashEntry(clean(e2), ref);
@@ -405,23 +405,6 @@ public final class DfsBlockCache {
 					dead.value = null;
 					live -= dead.size;
 					dead.pack.cachedSize.addAndGet(-dead.size);
-
-					int slot = slot(dead.pack, dead.position);
-					for (HashEntry entry = table
-							.get(slot); entry != null; entry = entry.next) {
-						if (entry.ref == dead) {
-							ReentrantLock regionLock = lockFor(dead.pack,
-									dead.position);
-							regionLock.lock();
-							try {
-								table.compareAndSet(slot, entry, clean(entry));
-								break;
-							} finally {
-								regionLock.unlock();
-							}
-						}
-					}
-
 					statEvict++;
 				} while (maxBytes < live);
 				clockHand = prev;
@@ -478,7 +461,7 @@ public final class DfsBlockCache {
 			}
 
 			key.cachedSize.addAndGet(size);
-			ref = new Ref<T>(key, pos, size, v);
+			ref = new Ref<>(key, pos, size, v);
 			ref.hot = true;
 			for (;;) {
 				HashEntry n = new HashEntry(clean(e2), ref);
@@ -524,58 +507,6 @@ public final class DfsBlockCache {
 
 	void remove(DfsPackFile pack) {
 		packCache.remove(pack.getPackDescription());
-		removeRef(pack.key);
-	}
-
-	@SuppressWarnings("unchecked")
-	private void removeRef(DfsPackKey key) {
-		clockLock.lock();
-		try {
-			Ref prev = clockHand;
-			Ref hand = clockHand.next;
-			Ref last = null;
-			long live = liveBytes;
-			while (last != clockHand) {
-				if (prev == hand) {
-					break;
-				}
-				last = hand;
-				if (hand.pack == key) {
-					Ref dead = hand;
-					hand = hand.next;
-					prev.next = hand;
-					dead.next = null;
-					dead.value = null;
-					live -= dead.size;
-					dead.pack.cachedSize.addAndGet(-dead.size);
-
-					int slot = slot(dead.pack, dead.position);
-					for (HashEntry entry = table
-							.get(slot); entry != null; entry = entry.next) {
-						if (entry.ref == dead) {
-							ReentrantLock regionLock = lockFor(dead.pack,
-									dead.position);
-							regionLock.lock();
-							try {
-								table.compareAndSet(slot, entry, clean(entry));
-								break;
-							} finally {
-								regionLock.unlock();
-							}
-						}
-					}
-
-					statEvict++;
-				} else {
-					prev = hand;
-					hand = prev.next;
-				}
-			}
-			liveBytes = live;
-			clockHand = prev;
-		} finally {
-			clockLock.unlock();
-		}
 	}
 
 	private int slot(DfsPackKey pack, long position) {

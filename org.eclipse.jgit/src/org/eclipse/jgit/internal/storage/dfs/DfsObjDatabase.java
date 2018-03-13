@@ -160,7 +160,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	protected DfsObjDatabase(DfsRepository repository,
 			DfsReaderOptions options) {
 		this.repository = repository;
-		this.packList = new AtomicReference<PackList>(NO_PACKS);
+		this.packList = new AtomicReference<>(NO_PACKS);
 		this.readerOptions = options;
 	}
 
@@ -266,6 +266,32 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			throws IOException;
 
 	/**
+	 * Generate a new unique name for a pack file.
+	 *
+	 * <p>
+	 * Default implementation of this method would be equivalent to
+	 * {@code newPack(source).setEstimatedPackSize(estimatedPackSize)}. But the
+	 * clients can override this method to use the given
+	 * {@code estomatedPackSize} value more efficiently in the process of
+	 * creating a new {@link DfsPackDescription} object.
+	 *
+	 * @param source
+	 *            where the pack stream is created.
+	 * @param estimatedPackSize
+	 *            the estimated size of the pack.
+	 * @return a unique name for the pack file. Must not collide with any other
+	 *         pack file name in the same DFS.
+	 * @throws IOException
+	 *             a new unique pack description cannot be generated.
+	 */
+	protected DfsPackDescription newPack(PackSource source,
+			long estimatedPackSize) throws IOException {
+		DfsPackDescription pack = newPack(source);
+		pack.setEstimatedPackSize(estimatedPackSize);
+		return pack;
+	}
+
+	/**
 	 * Commit a pack and index pair that was written to the DFS.
 	 * <p>
 	 * Committing the pack/index pair makes them visible to readers. The JGit
@@ -293,13 +319,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	protected void commitPack(Collection<DfsPackDescription> desc,
 			Collection<DfsPackDescription> replaces) throws IOException {
 		commitPackImpl(desc, replaces);
-		if (replaces != null && !replaces.isEmpty()) {
-			DfsBlockCache cache = DfsBlockCache.getInstance();
-			for (DfsPackDescription replace : replaces) {
-				DfsPackFile packFile = cache.getOrCreate(replace, null);
-				packFile.close();
-			}
-		}
 		getRepository().fireEvent(new DfsPacksChangedEvent());
 	}
 
@@ -439,7 +458,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		List<DfsPackDescription> scanned = listPacks();
 		Collections.sort(scanned);
 
-		List<DfsPackFile> list = new ArrayList<DfsPackFile>(scanned.size());
+		List<DfsPackFile> list = new ArrayList<>(scanned.size());
 		boolean foundNew = false;
 		for (DfsPackDescription dsc : scanned) {
 			DfsPackFile oldPack = forReuse.remove(dsc);
@@ -464,7 +483,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 
 	private static Map<DfsPackDescription, DfsPackFile> reuseMap(PackList old) {
 		Map<DfsPackDescription, DfsPackFile> forReuse
-			= new HashMap<DfsPackDescription, DfsPackFile>();
+			= new HashMap<>();
 		for (DfsPackFile p : old.packs) {
 			if (p.invalid()) {
 				// The pack instance is corrupted, and cannot be safely used
