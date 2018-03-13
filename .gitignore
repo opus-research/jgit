@@ -1,5 +1,4 @@
-/.buckd
+/target
 /.project
 /buck-cache
 /buck-out
-/target
