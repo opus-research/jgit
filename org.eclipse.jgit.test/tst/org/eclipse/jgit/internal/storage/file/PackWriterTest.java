@@ -264,7 +264,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 			ParseException {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
-		new GC(db).collectGarbage();
+		new GC(db).gc();
 		createVerifyOpenPack(NONE, haves(nonExisting), false, true, true);
 		// shouldn't throw anything
 	}
@@ -711,7 +711,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 			}
 			ObjectWalk ow = walk.toObjectWalkWithSameObjects();
 
-			pw.preparePack(NullProgressMonitor.INSTANCE, ow, want, have);
+			pw.preparePack(NullProgressMonitor.INSTANCE, ow, want, have, NONE);
 			String id = pw.computeName().getName();
 			File packdir = new File(repo.getObjectsDirectory(), "pack");
 			File packFile = new File(packdir, "pack-" + id + ".pack");
