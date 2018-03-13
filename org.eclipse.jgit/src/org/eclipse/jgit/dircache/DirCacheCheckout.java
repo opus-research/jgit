@@ -45,6 +45,7 @@ package org.eclipse.jgit.dircache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,6 +63,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -73,6 +75,7 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
 
 /**
  * This class handles checking out one or two trees merging with the index.
@@ -899,31 +902,6 @@ public class DirCacheCheckout {
 					// to the other one.
 					// -> In all three cases we don't touch index and file.
 
-					/*
-					 * Conflict: Working tree, HEAD tree, and merge tree have
-					 * different modes and different content
-					 */
-					final int mMode = m.getEntryRawMode();
-					if (mMode != h.getEntryRawMode() //
-							&& f != null //
-							&& mMode != f.getEntryRawMode() //
-							&& f.isModified(dce, true)) {
-						conflict(name, dce, h, m);
-						return;
-					}
-
-					/*
-					 * Update: Index tree and merge tree have the same content
-					 * but different modes but both modes are file type modes
-					 */
-					final int iMode = i.getEntryRawMode();
-					if (mMode != iMode //
-							&& (mMode & FileMode.TYPE_FILE) != 0 //
-							&& (iMode & FileMode.TYPE_FILE) != 0) {
-						update(name, mId, m.getEntryFileMode());
-						return;
-					}
-
 					keep(dce);
 				}
 			}
@@ -1098,14 +1076,19 @@ public class DirCacheCheckout {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File parentDir = f.getParentFile();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
-		FileOutputStream channel = new FileOutputStream(tmpFile);
+		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
+		FileOutputStream rawChannel = new FileOutputStream(tmpFile);
+		OutputStream channel;
+		if (opt.getAutoCRLF() == AutoCRLF.TRUE)
+			channel = new AutoCRLFOutputStream(rawChannel);
+		else
+			channel = rawChannel;
 		try {
 			ol.copyTo(channel);
 		} finally {
 			channel.close();
 		}
 		FS fs = repo.getFS();
-		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		if (opt.isFileMode() && fs.supportsExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
 				if (!fs.canExecute(tmpFile))
@@ -1126,6 +1109,9 @@ public class DirCacheCheckout {
 			}
 		}
 		entry.setLastModified(f.lastModified());
-		entry.setLength((int) ol.getSize());
+		if (opt.getAutoCRLF() != AutoCRLF.FALSE)
+			entry.setLength(f.length()); // AutoCRLF wants on-disk-size
+		else
+			entry.setLength((int) ol.getSize());
 	}
 }
