@@ -335,7 +335,7 @@ public class UploadPack {
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
 
-		setTransferConfig(null);
+		transferConfig = new TransferConfig(db);
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -554,8 +554,6 @@ public class UploadPack {
 	 */
 	public void setTransferConfig(TransferConfig tc) {
 		this.transferConfig = tc != null ? tc : new TransferConfig(db);
-		setRequestPolicy(transferConfig.isAllowTipSha1InWant()
-				? RequestPolicy.TIP : RequestPolicy.ADVERTISED);
 	}
 
 	/** @return the configured logger. */

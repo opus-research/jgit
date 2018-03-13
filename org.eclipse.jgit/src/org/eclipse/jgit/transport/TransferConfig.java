@@ -87,7 +87,6 @@ public class TransferConfig {
 
 	/**
 	 * @return allow clients to request non-advertised tip SHA-1s?
-	 * @since 3.1
 	 */
 	public boolean isAllowTipSha1InWant() {
 		return allowTipSha1InWant;
@@ -95,7 +94,6 @@ public class TransferConfig {
 
 	/**
 	 * @return {@link RefFilter} respecting configured hidden refs.
-	 * @since 3.1
 	 */
 	public RefFilter getRefFilter() {
 		if (hideRefs.length == 0)
