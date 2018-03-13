@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -98,6 +99,8 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a Git repository.
@@ -108,6 +111,8 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
+	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
+
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -117,6 +122,8 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Use counter */
 	final AtomicInteger useCnt = new AtomicInteger(1);
+
+	final AtomicLong closedAt = new AtomicLong();
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -934,9 +941,25 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		if (useCnt.decrementAndGet() == 0) {
-			doClose();
-			RepositoryCache.unregister(this);
+		int newCount = useCnt.decrementAndGet();
+		if (newCount == 0) {
+			if (RepositoryCache.isCached(this)) {
+				closedAt.set(System.currentTimeMillis());
+			} else {
+				doClose();
+			}
+		} else if (newCount == -1) {
+			// should not happen, only log when useCnt became negative to
+			// minimize number of log entries
+			if (LOG.isDebugEnabled()) {
+				IllegalStateException e = new IllegalStateException();
+				LOG.debug(JGitText.get().corruptUseCnt, e);
+			} else {
+				LOG.warn(JGitText.get().corruptUseCnt);
+			}
+			if (RepositoryCache.isCached(this)) {
+				closedAt.set(System.currentTimeMillis());
+			}
 		}
 	}
 
