@@ -202,9 +202,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * @return the repository this iterator works with
-	 *
-	 * @since 3.3
+	 * @return the repositoryt this iterator works with
 	 */
 	public Repository getRepository() {
 		return repository;

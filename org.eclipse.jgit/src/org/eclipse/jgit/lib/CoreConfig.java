@@ -103,8 +103,6 @@ public class CoreConfig {
 
 	/**
 	 * Options for symlink handling
-	 *
-	 * @since 3.3
 	 */
 	public static enum SymLinks {
 		/** Checkout symbolic links as plain files */
@@ -115,8 +113,6 @@ public class CoreConfig {
 
 	/**
 	 * Options for hiding files whose names start with a period
-	 *
-	 * @since 3.3
 	 */
 	public static enum HideDotFiles {
 		/** Do not hide .files */

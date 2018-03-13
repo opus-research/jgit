@@ -102,18 +102,12 @@ public class WorkingTreeOptions {
 		return checkStat;
 	}
 
-	/**
-	 * @return how we handle symbolic links
-	 * @since 3.3
-	 */
+	/** @return how we handle symbolic links */
 	public SymLinks getSymLinks() {
 		return symlinks;
 	}
 
-	/**
-	 * @return how we create '.'-files (on Windows)
-	 * @since 3.3
-	 */
+	/** @return how we create '.'-files */
 	public HideDotFiles getHideDotFiles() {
 		return hideDotFiles;
 	}
