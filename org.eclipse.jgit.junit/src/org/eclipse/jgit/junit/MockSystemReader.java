@@ -50,12 +50,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
@@ -63,8 +61,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.time.MonotonicClock;
-import org.eclipse.jgit.util.time.ProposedTimestamp;
 
 /**
  * Mock {@link SystemReader} for tests.
@@ -88,7 +84,7 @@ public class MockSystemReader extends SystemReader {
 
 	long now = 1250379778668L; // Sat Aug 15 20:12:58 GMT-03:30 2009
 
-	final Map<String, String> values = new HashMap<>();
+	final Map<String, String> values = new HashMap<String, String>();
 
 	FileBasedConfig userGitConfig;
 
@@ -148,27 +144,6 @@ public class MockSystemReader extends SystemReader {
 	@Override
 	public long getCurrentTime() {
 		return now;
-	}
-
-	@Override
-	public MonotonicClock getClock() {
-		return new MonotonicClock() {
-			@Override
-			public ProposedTimestamp propose() {
-				long t = getCurrentTime();
-				return new ProposedTimestamp() {
-					@Override
-					public long read(TimeUnit unit) {
-						return unit.convert(t, TimeUnit.MILLISECONDS);
-					}
-
-					@Override
-					public void blockUntil(Duration maxWait) {
-						// Do not wait.
-					}
-				};
-			}
-		};
 	}
 
 	/**

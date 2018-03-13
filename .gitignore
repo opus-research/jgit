@@ -1,6 +1,5 @@
+/.buckd
 /.project
+/buck-cache
+/buck-out
 /target
-.DS_Store
-infer-out
-bazel-*
-*~

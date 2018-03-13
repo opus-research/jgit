@@ -175,9 +175,9 @@ public class OpenSshConfig {
 	}
 
 	private Map<String, Host> parse(final InputStream in) throws IOException {
-		final Map<String, Host> m = new LinkedHashMap<>();
+		final Map<String, Host> m = new LinkedHashMap<String, Host>();
 		final BufferedReader br = new BufferedReader(new InputStreamReader(in));
-		final List<Host> current = new ArrayList<>(4);
+		final List<Host> current = new ArrayList<Host>(4);
 		String line;
 
 		while ((line = br.readLine()) != null) {
@@ -311,7 +311,6 @@ public class OpenSshConfig {
 
 	static String userName() {
 		return AccessController.doPrivileged(new PrivilegedAction<String>() {
-			@Override
 			public String run() {
 				return System.getProperty("user.name"); //$NON-NLS-1$
 			}

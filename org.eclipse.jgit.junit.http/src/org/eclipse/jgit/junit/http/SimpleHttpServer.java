@@ -92,7 +92,6 @@ public class SimpleHttpServer {
 	private ServletContextHandler smart(final String path) {
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			@Override
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {

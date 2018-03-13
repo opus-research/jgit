@@ -47,9 +47,6 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode.Merge;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.errors.CanceledException;
 import org.eclipse.jgit.api.errors.DetachedHeadException;
@@ -72,10 +69,8 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.lib.SubmoduleConfig.FetchRecurseSubmodulesMode;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.transport.FetchResult;
-import org.eclipse.jgit.transport.TagOpt;
 
 /**
  * The Pull command
@@ -96,12 +91,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	private String remoteBranchName;
 
 	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
-
-	private TagOpt tagOption;
-
-	private FastForwardMode fastForwardMode;
-
-	private FetchRecurseSubmodulesMode submoduleRecurseMode = null;
 
 	/**
 	 * @param repo
@@ -205,42 +194,31 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 * @throws GitAPIException
 	 */
-	@Override
 	public PullResult call() throws GitAPIException,
 			WrongRepositoryStateException, InvalidConfigurationException,
-			InvalidRemoteException, CanceledException,
+			DetachedHeadException, InvalidRemoteException, CanceledException,
 			RefNotFoundException, RefNotAdvertisedException, NoHeadException,
 			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
 
 		monitor.beginTask(JGitText.get().pullTaskName, 2);
-		Config repoConfig = repo.getConfig();
 
-		String branchName = null;
+		String branchName;
 		try {
 			String fullBranch = repo.getFullBranch();
-			if (fullBranch != null
-					&& fullBranch.startsWith(Constants.R_HEADS)) {
-				branchName = fullBranch.substring(Constants.R_HEADS.length());
+			if (fullBranch == null)
+				throw new NoHeadException(
+						JGitText.get().pullOnRepoWithoutHEADCurrentlyNotSupported);
+			if (!fullBranch.startsWith(Constants.R_HEADS)) {
+				// we can not pull if HEAD is detached and branch is not
+				// specified explicitly
+				throw new DetachedHeadException();
 			}
+			branchName = fullBranch.substring(Constants.R_HEADS.length());
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfPullCommand,
 					e);
-		}
-		if (remoteBranchName == null && branchName != null) {
-			// get the name of the branch in the remote repository
-			// stored in configuration key branch.<branch name>.merge
-			remoteBranchName = repoConfig.getString(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_MERGE);
-		}
-		if (remoteBranchName == null) {
-			remoteBranchName = branchName;
-		}
-		if (remoteBranchName == null) {
-			throw new NoHeadException(
-					JGitText.get().cannotCheckoutFromUnbornBranch);
 		}
 
 		if (!repo.getRepositoryState().equals(RepositoryState.SAFE))
@@ -248,23 +226,32 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 					JGitText.get().cannotPullOnARepoWithState, repo
 							.getRepositoryState().name()));
 
-		if (remote == null && branchName != null) {
+		Config repoConfig = repo.getConfig();
+		if (remote == null) {
 			// get the configured remote for the currently checked out branch
 			// stored in configuration key branch.<branch name>.remote
 			remote = repoConfig.getString(
 					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
 					ConfigConstants.CONFIG_KEY_REMOTE);
 		}
-		if (remote == null) {
+		if (remote == null)
 			// fall back to default remote
 			remote = Constants.DEFAULT_REMOTE_NAME;
-		}
+
+		if (remoteBranchName == null)
+			// get the name of the branch in the remote repository
+			// stored in configuration key branch.<branch name>.merge
+			remoteBranchName = repoConfig.getString(
+					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+					ConfigConstants.CONFIG_KEY_MERGE);
 
 		// determines whether rebase should be used after fetching
-		if (pullRebaseMode == null && branchName != null) {
+		if (pullRebaseMode == null) {
 			pullRebaseMode = getRebaseMode(branchName, repoConfig);
 		}
 
+		if (remoteBranchName == null)
+			remoteBranchName = branchName;
 
 		final boolean isRemote = !remote.equals("."); //$NON-NLS-1$
 		String remoteUri;
@@ -285,9 +272,9 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 						JGitText.get().operationCanceled,
 						JGitText.get().pullTaskName));
 
-			FetchCommand fetch = new FetchCommand(repo).setRemote(remote)
-					.setProgressMonitor(monitor).setTagOpt(tagOption)
-					.setRecurseSubmodules(submoduleRecurseMode);
+			FetchCommand fetch = new FetchCommand(repo);
+			fetch.setRemote(remote);
+			fetch.setProgressMonitor(monitor);
 			configure(fetch);
 
 			fetchRes = fetch.call();
@@ -352,9 +339,10 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			result = new PullResult(fetchRes, remote, rebaseRes);
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
-			MergeResult mergeRes = merge.include(upstreamName, commitToMerge)
-					.setStrategy(strategy).setProgressMonitor(monitor)
-					.setFastForward(getFastForwardMode()).call();
+			merge.include(upstreamName, commitToMerge);
+			merge.setStrategy(strategy);
+			merge.setProgressMonitor(monitor);
+			MergeResult mergeRes = merge.call();
 			monitor.update(1);
 			result = new PullResult(fetchRes, remote, mergeRes);
 		}
@@ -424,54 +412,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	/**
-	 * Sets the specification of annotated tag behavior during fetch
-	 *
-	 * @param tagOpt
-	 * @return {@code this}
-	 * @since 4.7
-	 */
-	public PullCommand setTagOpt(TagOpt tagOpt) {
-		checkCallable();
-		this.tagOption = tagOpt;
-		return this;
-	}
-
-	/**
-	 * Sets the fast forward mode. It is used if pull is configured to do a
-	 * merge as opposed to rebase. If non-{@code null} takes precedence over the
-	 * fast-forward mode configured in git config.
-	 *
-	 * @param fastForwardMode
-	 *            corresponds to the --ff/--no-ff/--ff-only options. If
-	 *            {@code null} use the value of {@code pull.ff} configured in
-	 *            git config. If {@code pull.ff} is not configured fall back to
-	 *            the value of {@code merge.ff}. If {@code merge.ff} is not
-	 *            configured --ff is the built-in default.
-	 * @return {@code this}
-	 * @since 4.9
-	 */
-	public PullCommand setFastForward(
-			@Nullable FastForwardMode fastForwardMode) {
-		checkCallable();
-		this.fastForwardMode = fastForwardMode;
-		return this;
-	}
-
-	/**
-	 * Set the mode to be used for recursing into submodules.
-	 *
-	 * @param recurse
-	 * @return {@code this}
-	 * @since 4.7
-	 * @see FetchCommand#setRecurseSubmodules(FetchRecurseSubmodulesMode)
-	 */
-	public PullCommand setRecurseSubmodules(
-			@Nullable FetchRecurseSubmodulesMode recurse) {
-		this.submoduleRecurseMode = recurse;
-		return this;
-	}
-
-	/**
 	 * Reads the rebase mode to use for a pull command from the repository
 	 * configuration. This is the value defined for the configurations
 	 * {@code branch.[branchName].rebase}, or,if not set, {@code pull.rebase}.
@@ -495,16 +435,5 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 					ConfigConstants.CONFIG_KEY_REBASE, BranchRebaseMode.NONE);
 		}
 		return mode;
-	}
-
-	private FastForwardMode getFastForwardMode() {
-		if (fastForwardMode != null) {
-			return fastForwardMode;
-		}
-		Config config = repo.getConfig();
-		Merge ffMode = config.getEnum(Merge.values(),
-				ConfigConstants.CONFIG_PULL_SECTION, null,
-				ConfigConstants.CONFIG_KEY_FF, null);
-		return ffMode != null ? FastForwardMode.valueOf(ffMode) : null;
 	}
 }

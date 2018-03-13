@@ -556,7 +556,6 @@ public class RefSpec implements Serializable {
 		return true;
 	}
 
-	@Override
 	public int hashCode() {
 		int hc = 0;
 		if (getSource() != null)
@@ -566,7 +565,6 @@ public class RefSpec implements Serializable {
 		return hc;
 	}
 
-	@Override
 	public boolean equals(final Object obj) {
 		if (!(obj instanceof RefSpec))
 			return false;
@@ -590,7 +588,6 @@ public class RefSpec implements Serializable {
 		return a.equals(b);
 	}
 
-	@Override
 	public String toString() {
 		final StringBuilder r = new StringBuilder();
 		if (isForceUpdate())

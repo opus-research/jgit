@@ -249,7 +249,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		return p;
 	}
 
-	@Override
 	public CanonicalTreeParser createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
 		return createSubtreeIterator(reader, new MutableObjectId());
@@ -281,7 +280,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		return currPtr == 0;
 	}
 
-	@Override
 	public boolean eof() {
 		return currPtr == raw.length;
 	}

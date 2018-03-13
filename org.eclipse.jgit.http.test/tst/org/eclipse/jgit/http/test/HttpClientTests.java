@@ -94,7 +94,6 @@ public class HttpClientTests extends HttpTestCase {
 
 	private URIish smartAuthBasicURI;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -133,7 +132,6 @@ public class HttpClientTests extends HttpTestCase {
 	private ServletContextHandler smart(final String path) {
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			@Override
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {

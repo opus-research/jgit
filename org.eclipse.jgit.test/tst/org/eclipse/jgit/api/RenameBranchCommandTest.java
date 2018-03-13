@@ -69,7 +69,6 @@ public class RenameBranchCommandTest extends RepositoryTestCase {
 
 	private Git git;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

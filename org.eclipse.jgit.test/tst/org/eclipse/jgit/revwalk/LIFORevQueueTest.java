@@ -53,12 +53,10 @@ import java.util.Collections;
 import org.junit.Test;
 
 public class LIFORevQueueTest extends RevQueueTestCase<LIFORevQueue> {
-	@Override
 	protected LIFORevQueue create() {
 		return new LIFORevQueue();
 	}
 
-	@Override
 	@Test
 	public void testEmpty() throws Exception {
 		super.testEmpty();
@@ -73,7 +71,7 @@ public class LIFORevQueueTest extends RevQueueTestCase<LIFORevQueue> {
 
 	@Test
 	public void testAddLargeBlocks() throws Exception {
-		final ArrayList<RevCommit> lst = new ArrayList<>();
+		final ArrayList<RevCommit> lst = new ArrayList<RevCommit>();
 		for (int i = 0; i < 3 * BlockRevQueue.Block.BLOCK_SIZE; i++) {
 			final RevCommit c = commit();
 			lst.add(c);

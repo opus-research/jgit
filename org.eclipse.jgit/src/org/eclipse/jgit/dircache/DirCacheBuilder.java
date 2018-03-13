@@ -218,7 +218,6 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 		return e;
 	}
 
-	@Override
 	public void finish() {
 		if (!sorted)
 			resort();
