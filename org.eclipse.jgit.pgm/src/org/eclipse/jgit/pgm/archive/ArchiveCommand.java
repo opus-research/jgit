@@ -42,10 +42,12 @@
  */
 package org.eclipse.jgit.pgm.archive;
 
+import java.lang.String;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.EnumMap;
 import java.util.Map;
+import java.text.MessageFormat;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -53,7 +55,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -105,10 +106,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * the --format= option)
 	 */
 	public static enum Format {
-		/** Zip format */
 		ZIP,
-
-		/** Posix TAR-format */
 		TAR
 	}
 
@@ -244,9 +242,8 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 
 	/**
 	 * @param tree
-	 *            the tag, commit, or tree object to produce an archive for
+	 *	      the tag, commit, or tree object to produce an archive for
 	 * @return this
-	 * @throws IOException
 	 */
 	public ArchiveCommand setTree(ObjectId tree) throws IOException {
 		final RevWalk rw = new RevWalk(walk.getObjectReader());
