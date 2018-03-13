@@ -236,8 +236,8 @@ class SimilarityIndex {
 					break;
 				srcKey = keyOf(srcHash[srcIdx]);
 
-			} else /* if (dstKey < srcKey) */{
-				// Regions of dst which do not appear in src.
+			} else /* if (srcKey > dstKey) */{
+				// Regions of dst which do not appear in dst.
 				if (++dstIdx == dstHash.length)
 					break;
 				dstKey = keyOf(dstHash[dstIdx]);
