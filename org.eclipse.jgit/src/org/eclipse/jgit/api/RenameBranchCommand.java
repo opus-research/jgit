@@ -121,10 +121,6 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 				fullOldName = ref.getName();
 			} else {
 				fullOldName = repo.getFullBranch();
-				if (fullOldName == null) {
-					throw new RefNotFoundException(MessageFormat.format(
-							JGitText.get().refNotResolved, Constants.HEAD));
-				}
 				if (ObjectId.isId(fullOldName))
 					throw new DetachedHeadException();
 			}
