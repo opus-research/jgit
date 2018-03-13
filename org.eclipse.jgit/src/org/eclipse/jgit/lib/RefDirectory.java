@@ -409,8 +409,12 @@ public class RefDirectory extends RefDatabase {
 		RevObject obj = rw.parseAny(leaf.getObjectId());
 		ObjectIdRef newLeaf;
 		if (obj instanceof RevTag) {
+			do {
+				obj = rw.parseAny(((RevTag) obj).getObject());
+			} while (obj instanceof RevTag);
+
 			newLeaf = new ObjectIdRef.PeeledTag(leaf.getStorage(), leaf
-					.getName(), leaf.getObjectId(), rw.peel(obj).copy());
+					.getName(), leaf.getObjectId(), obj.copy());
 		} else {
 			newLeaf = new ObjectIdRef.PeeledNonTag(leaf.getStorage(), leaf
 					.getName(), leaf.getObjectId());
@@ -586,7 +590,7 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private boolean isLogAllRefUpdates() {
-		return parent.getConfig().get(CoreConfig.KEY).isLogAllRefUpdates();
+		return parent.getConfig().getCore().isLogAllRefUpdates();
 	}
 
 	private boolean shouldAutoCreateLog(final String refName) {

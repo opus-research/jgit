@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -394,15 +393,11 @@ public class UploadPack {
 			}
 			if (!o.has(ADVERTISED))
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()));
-			try {
-				want(o);
-			} catch (IOException e) {
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()), e);
-			}
+			want(o);
 		}
 	}
 
-	private void want(RevObject o) throws MissingObjectException, IOException {
+	private void want(RevObject o) {
 		if (!o.has(WANT)) {
 			o.add(WANT);
 			wantAll.add(o);
@@ -411,7 +406,9 @@ public class UploadPack {
 				wantCommits.add((RevCommit) o);
 
 			else if (o instanceof RevTag) {
-				o = walk.peel(o);
+				do {
+					o = ((RevTag) o).getObject();
+				} while (o instanceof RevTag);
 				if (o instanceof RevCommit)
 					want(o);
 			}
