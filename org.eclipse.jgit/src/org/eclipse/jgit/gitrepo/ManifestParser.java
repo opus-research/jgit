@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
@@ -325,7 +324,7 @@ public class ManifestParser extends DefaultHandler {
 	 *
 	 * @return filtered projects list reference, never null
 	 */
-	public @NonNull List<RepoProject> getFilteredProjects() {
+	public List<RepoProject> getFilteredProjects() {
 		return filteredProjects;
 	}
 
