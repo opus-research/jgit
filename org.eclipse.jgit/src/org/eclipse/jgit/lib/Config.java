@@ -52,7 +52,6 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -83,7 +82,7 @@ public class Config {
 	private static final long KiB = 1024;
 	private static final long MiB = 1024 * KiB;
 	private static final long GiB = 1024 * MiB;
-	private static final int MAX_DEPTH = 10;
+	private static final int MAX_DEPTH = 999;
 
 	/** the change listeners */
 	private final ListenerList listeners = new ListenerList();
@@ -510,7 +509,7 @@ public class Config {
 	 *            indication of the units.
 	 * @return the value, or {@code defaultValue} if not set, expressed in
 	 *         {@code units}.
-	 * @since 4.4
+	 * @since 4.5
 	 */
 	public long getTimeUnit(String section, String subsection, String name,
 			long defaultValue, TimeUnit wantUnit) {
@@ -1248,15 +1247,9 @@ public class Config {
 				decoded = RawParseUtils.decode(bytes);
 			}
 			newEntries.addAll(fromTextRecurse(decoded, depth + 1));
-		} catch (FileNotFoundException fnfe) {
-			if (path.exists()) {
-				throw new ConfigInvalidException(MessageFormat
-						.format(JGitText.get().cannotReadFile, path), fnfe);
-			}
 		} catch (IOException ioe) {
-			throw new ConfigInvalidException(
-					MessageFormat.format(JGitText.get().cannotReadFile, path),
-					ioe);
+			throw new ConfigInvalidException(MessageFormat.format(
+					JGitText.get().invalidIncludedPathInConfigFile, path));
 		}
 	}
 
