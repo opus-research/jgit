@@ -105,16 +105,6 @@ public class RebaseResult {
 			}
 		},
 		/**
-		 * The repository contains uncommitted changes and the rebase is not a
-		 * fast-forward
-		 */
-		UNCOMMITTED_CHANGES {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
 		 * Conflicts: checkout of target HEAD failed
 		 */
 		CONFLICTS {
@@ -195,8 +185,6 @@ public class RebaseResult {
 
 	private List<String> conflicts;
 
-	private List<String> uncommittedChanges;
-
 	private RebaseResult(Status status) {
 		this.status = status;
 		currentCommit = null;
@@ -209,7 +197,7 @@ public class RebaseResult {
 
 	/**
 	 * Create <code>RebaseResult</code>
-	 *
+	 * 
 	 * @param status
 	 * @param commit
 	 *            current commit
@@ -248,20 +236,6 @@ public class RebaseResult {
 	}
 
 	/**
-	 * Create <code>RebaseResult</code> with status
-	 * {@link Status#UNCOMMITTED_CHANGES}
-	 *
-	 * @param uncommittedChanges
-	 *            the list of paths
-	 * @return the RebaseResult
-	 */
-	static RebaseResult uncommittedChanges(List<String> uncommittedChanges) {
-		RebaseResult result = new RebaseResult(Status.UNCOMMITTED_CHANGES);
-		result.uncommittedChanges = uncommittedChanges;
-		return result;
-	}
-
-	/**
 	 * @return the overall status
 	 */
 	public Status getStatus() {
@@ -291,13 +265,4 @@ public class RebaseResult {
 	public List<String> getConflicts() {
 		return conflicts;
 	}
-
-	/**
-	 * @return the list of uncommitted changes if status is
-	 *         {@link Status#UNCOMMITTED_CHANGES}
-	 */
-	public List<String> getUncommittedChanges() {
-		return uncommittedChanges;
-	}
-
 }
