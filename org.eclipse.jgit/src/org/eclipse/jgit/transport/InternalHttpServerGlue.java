@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,40 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
-
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.transport;
 
 /**
- * Translation bundle for JGit http server
+ * Internal API to to assist {@code org.eclipse.jgit.http.server}.
+ * <p>
+ * <b>Do not call.</b>
+ *
+ * @since 4.0
  */
-public class HttpServerText extends TranslationBundle {
-
+public class InternalHttpServerGlue {
 	/**
-	 * @return an instance of this translation bundle
+	 * Apply a default user agent for a request.
+	 *
+	 * @param up
+	 *            current UploadPack instance.
+	 * @param agent
+	 *            user agent string from the HTTP headers.
 	 */
-	public static HttpServerText get() {
-		return NLS.getBundleFor(HttpServerText.class);
+	public static void setPeerUserAgent(UploadPack up, String agent) {
+		up.userAgent = agent;
 	}
 
-	// @formatter:off
-	/***/ public String alreadyInitializedByContainer;
-	/***/ public String cannotGetLengthOf;
-	/***/ public String clientHas175ChunkedEncodingBug;
-	/***/ public String encodingNotSupportedByThisLibrary;
-	/***/ public String expectedRepositoryAttribute;
-	/***/ public String filterMustNotBeNull;
-	/***/ public String internalErrorDuringReceivePack;
-	/***/ public String internalErrorDuringUploadPack;
-	/***/ public String internalServerError;
-	/***/ public String internalServerErrorRequestAttributeWasAlreadySet;
-	/***/ public String invalidBoolean;
-	/***/ public String invalidIndex;
-	/***/ public String invalidRegexGroup;
-	/***/ public String noResolverAvailable;
-	/***/ public String parameterNotSet;
-	/***/ public String pathForParamNotFound;
-	/***/ public String pathNotSupported;
-	/***/ public String receivedCorruptObject;
-	/***/ public String repositoryAccessForbidden;
-	/***/ public String repositoryNotFound;
-	/***/ public String servletAlreadyInitialized;
-	/***/ public String servletMustNotBeNull;
-	/***/ public String servletWasAlreadyBound;
-	/***/ public String unexpectedeOFOn;
+	/**
+	 * Apply a default user agent for a request.
+	 *
+	 * @param rp
+	 *            current ReceivePack instance.
+	 * @param agent
+	 *            user agent string from the HTTP headers.
+	 */
+	public static void setPeerUserAgent(ReceivePack rp, String agent) {
+		rp.userAgent = agent;
+	}
+
+	private InternalHttpServerGlue() {
+	}
 }
