@@ -63,6 +63,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -126,7 +127,6 @@ public class ReftableTest {
 		assertEquals(exp.getName(), act.getName());
 		assertEquals(exp.getObjectId(), act.getObjectId());
 		assertNull(act.getPeeledObjectId());
-		assertFalse(r.wasDeleted());
 		assertFalse(r.next());
 
 		r = seek(table, MASTER);
@@ -190,7 +190,6 @@ public class ReftableTest {
 		assertEquals(name, act.getName());
 		assertEquals(NEW, act.getStorage());
 		assertNull(act.getObjectId());
-		assertTrue(r.wasDeleted());
 	}
 
 	@Test
