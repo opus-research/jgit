@@ -43,6 +43,14 @@
 
 package org.eclipse.jgit.http.server;
 
+import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
+import static org.eclipse.jgit.util.HttpSupport.HDR_CACHE_CONTROL;
+import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
+import static org.eclipse.jgit.util.HttpSupport.HDR_DATE;
+import static org.eclipse.jgit.util.HttpSupport.HDR_ETAG;
+import static org.eclipse.jgit.util.HttpSupport.HDR_EXPIRES;
+import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -102,9 +110,9 @@ public abstract class RepositoryServlet extends HttpServlet {
 	 *            the response whose content must not be cached.
 	 */
 	protected void nocache(final HttpServletResponse rsp) {
-		rsp.setHeader("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
-		rsp.setHeader("Pragma", "no-cache");
-		rsp.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
+		rsp.setHeader(HDR_EXPIRES, "Fri, 01 Jan 1980 00:00:00 GMT");
+		rsp.setHeader(HDR_PRAGMA, "no-cache");
+		rsp.setHeader(HDR_CACHE_CONTROL, "no-cache, max-age=0, must-revalidate");
 	}
 
 	/**
@@ -119,9 +127,9 @@ public abstract class RepositoryServlet extends HttpServlet {
 	 */
 	protected void cacheForever(final HttpServletResponse rsp) {
 		final long now = System.currentTimeMillis();
-		rsp.setHeader("Cache-Control", "public, max-age=31536000");
-		rsp.setDateHeader("Expires", now + 31536000000L);
-		rsp.setDateHeader("Date", now);
+		rsp.setDateHeader(HDR_DATE, now);
+		rsp.setDateHeader(HDR_EXPIRES, now + 31536000000L);
+		rsp.setHeader(HDR_CACHE_CONTROL, "public, max-age=31536000");
 	}
 
 	/**
@@ -187,6 +195,7 @@ public abstract class RepositoryServlet extends HttpServlet {
 		final OutputStream out = rsp.getOutputStream();
 		try {
 			out.write(content);
+			out.flush();
 		} finally {
 			out.close();
 		}
@@ -194,18 +203,18 @@ public abstract class RepositoryServlet extends HttpServlet {
 
 	private byte[] sendInit(byte[] content, final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		rsp.setHeader("ETag", etag(content));
+		rsp.setHeader(HDR_ETAG, etag(content));
 		if (256 < content.length && acceptsGzipEncoding(req)) {
 			content = compress(content);
-			rsp.setHeader("Content-Encoding", "gzip");
+			rsp.setHeader(HDR_CONTENT_ENCODING, ENCODING_GZIP);
 		}
 		rsp.setContentLength(content.length);
 		return content;
 	}
 
 	private static boolean acceptsGzipEncoding(final HttpServletRequest req) {
-		final String accepts = req.getHeader("Accept-Encoding");
-		return accepts != null && 0 <= accepts.indexOf("gzip");
+		final String accepts = req.getHeader(HDR_CONTENT_ENCODING);
+		return accepts != null && 0 <= accepts.indexOf(ENCODING_GZIP);
 	}
 
 	private static byte[] compress(final byte[] raw) throws IOException {

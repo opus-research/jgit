@@ -54,7 +54,7 @@ public interface RepositoryResolver {
 	 * Locate and open a reference to a {@link Repository}.
 	 * <p>
 	 * The caller is responsible for closing the returned Repository.
-	 * 
+	 *
 	 * @param req
 	 *            the current HTTP request, may be used to inspect session state
 	 *            including cookies or user authentication.
