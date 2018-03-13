@@ -359,7 +359,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String funnyRefname;
 	/***/ public String gcFailed;
 	/***/ public String gcLogExists;
-	/***/ public String gcTooManyUnpruned;
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
@@ -625,6 +624,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
+	/***/ public String sha1CollisionDetected1;
 	/***/ public String shallowCommitsAlreadyInitialized;
 	/***/ public String shallowPacksRequireDepthWalk;
 	/***/ public String shortCompressedStreamAt;

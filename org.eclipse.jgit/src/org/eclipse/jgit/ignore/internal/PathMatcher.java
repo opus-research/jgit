@@ -90,7 +90,7 @@ public class PathMatcher extends AbstractMatcher {
 	static private List<IMatcher> createMatchers(List<String> segments,
 			Character pathSeparator, boolean dirOnly)
 			throws InvalidPatternException {
-		List<IMatcher> matchers = new ArrayList<IMatcher>(segments.size());
+		List<IMatcher> matchers = new ArrayList<>(segments.size());
 		for (int i = 0; i < segments.size(); i++) {
 			String segment = segments.get(i);
 			IMatcher matcher = createNameMatcher0(segment, pathSeparator,
@@ -170,6 +170,7 @@ public class PathMatcher extends AbstractMatcher {
 		}
 	}
 
+	@Override
 	public boolean matches(String path, boolean assumeDirectory) {
 		if (matchers == null)
 			return simpleMatch(path, assumeDirectory);
@@ -209,6 +210,7 @@ public class PathMatcher extends AbstractMatcher {
 		return false;
 	}
 
+	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		throw new UnsupportedOperationException(

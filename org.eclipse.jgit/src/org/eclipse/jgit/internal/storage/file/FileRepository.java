@@ -498,7 +498,7 @@ public class FileRepository extends Repository {
 	 */
 	@Override
 	public Set<ObjectId> getAdditionalHaves() {
-		HashSet<ObjectId> r = new HashSet<ObjectId>();
+		HashSet<ObjectId> r = new HashSet<>();
 		for (AlternateHandle d : objectDatabase.myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;
@@ -650,7 +650,6 @@ public class FileRepository extends Repository {
 					gc.setPackConfig(new PackConfig(this));
 					gc.setProgressMonitor(monitor);
 					gc.setAuto(true);
-					gc.setLog(gcLog);
 					gc.gc();
 					// On success, clear out any old gc.log files.
 					gcLog.cleanUp();

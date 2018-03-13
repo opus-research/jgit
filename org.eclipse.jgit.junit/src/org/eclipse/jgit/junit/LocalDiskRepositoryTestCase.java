@@ -293,7 +293,7 @@ public abstract class LocalDiskRepositoryTestCase {
 			throws IllegalStateException, IOException {
 		DirCache dc = repo.readDirCache();
 		StringBuilder sb = new StringBuilder();
-		TreeSet<Long> timeStamps = new TreeSet<Long>();
+		TreeSet<Long> timeStamps = new TreeSet<>();
 
 		// iterate once over the dircache just to collect all time stamps
 		if (0 != (includedOptions & MOD_TIME)) {
@@ -559,7 +559,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	}
 
 	private static HashMap<String, String> cloneEnv() {
-		return new HashMap<String, String>(System.getenv());
+		return new HashMap<>(System.getenv());
 	}
 
 	private static final class CleanupThread extends Thread {
@@ -581,7 +581,7 @@ public abstract class LocalDiskRepositoryTestCase {
 			}
 		}
 
-		private final List<File> toDelete = new ArrayList<File>();
+		private final List<File> toDelete = new ArrayList<>();
 
 		@Override
 		public void run() {
