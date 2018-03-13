@@ -72,7 +72,14 @@ public class GitConstructionTest extends RepositoryTestCase {
 				.setURI(db.getDirectory().toURI().toString())
 				.setDirectory(createUniqueTestGitDir(true)).call()
 				.getRepository();
-		addRepoToClose(bareRepo);
+	}
+
+	@Override
+	@After
+	public void tearDown() throws Exception {
+		db.close();
+		bareRepo.close();
+		super.tearDown();
 	}
 
 	@Test
@@ -81,7 +88,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 		assertEquals(1, git.branchList().call().size());
 
 		git = Git.wrap(bareRepo);
-		assertEquals(1, git.branchList().setListMode(ListMode.ALL).call()
+		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
 				.size());
 
 		try {
@@ -98,7 +105,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 		assertEquals(1, git.branchList().call().size());
 
 		git = Git.open(bareRepo.getDirectory());
-		assertEquals(1, git.branchList().setListMode(ListMode.ALL).call()
+		assertEquals(2, git.branchList().setListMode(ListMode.ALL).call()
 				.size());
 
 		git = Git.open(db.getWorkTree());
