@@ -56,7 +56,7 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseUpdateIndex;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableOutputStream.computeVarintSize;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
@@ -446,15 +446,16 @@ class BlockWriter {
 
 		@Override
 		int valueType() {
-			return Math.min(blocks.size(), VALUE_TYPE_MASK);
+			int cnt = blocks.size();
+			return cnt > VALUE_TYPE_MASK ? 0 : cnt;
 		}
 
 		@Override
 		int valueSize() {
 			int n = 0;
 			int cnt = blocks.size();
-			if (cnt >= VALUE_TYPE_MASK) {
-				n += computeVarintSize(cnt - VALUE_TYPE_MASK);
+			if (cnt > VALUE_TYPE_MASK) {
+				n += computeVarintSize(cnt);
 			}
 			n += computeVarintSize(blocks.get(0));
 			for (int j = 1; j < cnt; j++) {
@@ -468,8 +469,8 @@ class BlockWriter {
 		@Override
 		void writeValue(ReftableOutputStream os) throws IOException {
 			int cnt = blocks.size();
-			if (cnt >= VALUE_TYPE_MASK) {
-				os.writeVarint(cnt - VALUE_TYPE_MASK);
+			if (cnt > VALUE_TYPE_MASK) {
+				os.writeVarint(cnt);
 			}
 			os.writeVarint(blocks.get(0));
 			for (int j = 1; j < cnt; j++) {
@@ -483,28 +484,29 @@ class BlockWriter {
 	static class LogEntry extends Entry {
 		final ObjectId oldId;
 		final ObjectId newId;
+		final long timeSecs;
 		final short tz;
 		final byte[] name;
 		final byte[] email;
 		final byte[] msg;
 
-		LogEntry(String refName, long timeUsec, PersonIdent who,
-				ObjectId oldId, ObjectId newId,
-				String message) {
-			super(key(refName, timeUsec));
+		LogEntry(String refName, long updateIndex, PersonIdent who,
+				ObjectId oldId, ObjectId newId, String message) {
+			super(key(refName, updateIndex));
 
 			this.oldId = oldId;
 			this.newId = newId;
+			this.timeSecs = who.getWhen().getTime() / 1000L;
 			this.tz = (short) who.getTimeZoneOffset();
 			this.name = who.getName().getBytes(UTF_8);
 			this.email = who.getEmailAddress().getBytes(UTF_8);
 			this.msg = message.getBytes(UTF_8);
 		}
 
-		static byte[] key(String refName, long time) {
-			byte[] name = refName.getBytes(UTF_8);
+		static byte[] key(String ref, long index) {
+			byte[] name = ref.getBytes(UTF_8);
 			byte[] key = Arrays.copyOf(name, name.length + 1 + 8);
-			NB.encodeInt64(key, key.length - 8, reverseTime(time));
+			NB.encodeInt64(key, key.length - 8, reverseUpdateIndex(index));
 			return key;
 		}
 
@@ -521,6 +523,7 @@ class BlockWriter {
 		@Override
 		int valueSize() {
 			return 2 * OBJECT_ID_LENGTH
+					+ computeVarintSize(timeSecs)
 					+ 2 // tz
 					+ computeVarintSize(name.length) + name.length
 					+ computeVarintSize(email.length) + email.length
@@ -531,6 +534,7 @@ class BlockWriter {
 		void writeValue(ReftableOutputStream os) {
 			os.writeId(oldId);
 			os.writeId(newId);
+			os.writeVarint(timeSecs);
 			os.writeInt16(tz);
 			os.writeVarintString(name);
 			os.writeVarintString(email);
