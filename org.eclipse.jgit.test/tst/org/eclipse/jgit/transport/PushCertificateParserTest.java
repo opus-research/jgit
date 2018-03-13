@@ -293,10 +293,6 @@ public class PushCertificateParserTest {
 		pckParser.receiveSignature(pckIn);
 		PushCertificate pckCert = pckParser.build();
 
-		// Nonce status is null since this was not parsed in the context of the wire
-		// protocol; as a result, certs are not actually equal.
-		assertNull(streamCert.getNonceStatus());
-
 		assertEquals(pckCert.getVersion(), streamCert.getVersion());
 		assertEquals(pckCert.getPusherIdent().getName(),
 				streamCert.getPusherIdent().getName());
@@ -317,6 +313,8 @@ public class PushCertificateParserTest {
 		assertEquals(pckCmd.getRefName(), streamCmd.getRefName());
 		assertEquals(pckCmd.getOldId(), streamCmd.getOldId());
 		assertEquals(pckCmd.getNewId().name(), streamCmd.getNewId().name());
+
+		assertNull(streamCert.getNonceStatus());
 	}
 
 	@Test
