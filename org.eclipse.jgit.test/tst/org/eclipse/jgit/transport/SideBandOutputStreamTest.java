@@ -49,8 +49,7 @@ import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.HDR_SIZE;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 import static org.eclipse.jgit.transport.SideBandOutputStream.SMALL_BUF;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

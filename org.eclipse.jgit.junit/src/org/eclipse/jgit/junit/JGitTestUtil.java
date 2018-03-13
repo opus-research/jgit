@@ -62,41 +62,33 @@ public abstract class JGitTestUtil {
 	}
 
 	public static String getName() {
-		GatherStackTrace stack;
-		try {
-			throw new GatherStackTrace();
-		} catch (GatherStackTrace wanted) {
-			stack = wanted;
-		}
-
-		try {
-			for (StackTraceElement stackTrace : stack.getStackTrace()) {
-				String className = stackTrace.getClassName();
-				String methodName = stackTrace.getMethodName();
-				Method method;
-				try {
-					method = Class.forName(className) //
-							.getMethod(methodName, (Class[]) null);
-				} catch (NoSuchMethodException e) {
-					// could be private, i.e. not a test method
-					// could have arguments, not handled
-					continue;
-				}
-
-				Test annotation = method.getAnnotation(Test.class);
-				if (annotation != null)
-					return methodName;
+		Throwable throwable = new Throwable();
+		for (StackTraceElement stackTrace : throwable.getStackTrace()) {
+			String className = stackTrace.getClassName();
+			String methodName = stackTrace.getMethodName();
+			Method method;
+			try {
+				method = Class.forName(className).getMethod(methodName,
+						(Class[]) null);
+			} catch (SecurityException e) {
+				throw new Error(
+						"Cannot determie name of test, possibly incomplete getName",
+						e);
+			} catch (NoSuchMethodException e) {
+				// could be private, i.e. not a test method
+				// could have arguments, not handled
+				continue;
+			} catch (ClassNotFoundException e) {
+				throw new Error(
+						"Cannot determie name of test, possibly incomplete getName",
+						e);
 			}
-		} catch (ClassNotFoundException shouldNeverOccur) {
-			// Fall through and crash.
+			Test annotation = method.getAnnotation(Test.class);
+			if (annotation != null)
+				return methodName;
 		}
-
-		throw new AssertionError("Cannot determine name of current test");
-	}
-
-	@SuppressWarnings("serial")
-	private static class GatherStackTrace extends Exception {
-		// Thrown above to collect the stack frame.
+		throw new Error(
+				"Cannot determie name of test, possibly incomplete getName");
 	}
 
 	public static void assertEquals(byte[] exp, byte[] act) {

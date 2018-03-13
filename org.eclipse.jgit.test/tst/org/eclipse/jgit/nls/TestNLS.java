@@ -43,9 +43,7 @@
 
 package org.eclipse.jgit.nls;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.*;
 
 import java.util.Locale;
 import java.util.concurrent.BrokenBarrierException;

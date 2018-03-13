@@ -43,9 +43,7 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
