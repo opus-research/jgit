@@ -231,8 +231,7 @@ public class GC {
 	// TODO(ms): in 5.0 change signature and return Future<Collection<PackFile>>
 	public Collection<PackFile> gc() throws IOException, ParseException {
 		final GcLog gcLog = background ? new GcLog(repo) : null;
-		if (gcLog != null && !gcLog.lock(background)) {
-			// there is already a background gc running
+		if (gcLog != null && gcLog.lock(background)) {
 			return Collections.emptyList();
 		}
 
@@ -242,7 +241,6 @@ public class GC {
 				if (automatic && tooManyLooseObjects() && gcLog != null) {
 					String message = JGitText.get().gcTooManyUnpruned;
 					gcLog.write(message);
-					gcLog.commit();
 				}
 				return newPacks;
 			} catch (IOException | ParseException e) {
