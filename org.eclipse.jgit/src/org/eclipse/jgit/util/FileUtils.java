@@ -398,10 +398,8 @@ public class FileUtils {
 	 * Create a symbolic link
 	 *
 	 * @param path
-	 *            the path of the symbolic link to create
 	 * @param target
-	 *            the target of the symbolic link
-	 * @return the path to the symbolic link
+	 * @return path to the created link
 	 * @throws IOException
 	 * @since 4.2
 	 */
