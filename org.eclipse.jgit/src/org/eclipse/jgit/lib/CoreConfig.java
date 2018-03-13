@@ -56,38 +56,13 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  * This class keeps git repository core parameters.
  */
 public class CoreConfig {
-	/**
-	 * Key for {@link Config#get(SectionParser)}.
-	 * <p>
-	 * @deprecated The default for some config values depends on properties of the
-	 *             repository that are not captured in the {@link Config}, such as
-	 *             whether it has a working tree. Use {@link #key(Repository)}
-	 *             instead.
-	 */
-	@Deprecated
+	/** Key for {@link Config#get(SectionParser)}. */
 	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
 		@Override
-		public CoreConfig parse(Config cfg) {
-			// Assume non-bare for backwards compatibility, so isLogAllRefUpdates
-			// continues to default to true if unset.
-			return new CoreConfig(cfg, false);
+		public CoreConfig parse(final Config cfg) {
+			return new CoreConfig(cfg);
 		}
 	};
-
-	/**
-	 * Key for {@link Config#get(SectionParser)}.
-	 * <p>
-	 * Takes into account properties of the repository that are not captured in
-	 * the {@link Config}, such as whether it has a working tree.
-	 *
-	 * @param repo
-	 *            repository containing the config.
-	 * @return section parser.
-	 * @since 4.9
-	 */
-	public static Config.SectionParser<CoreConfig> key(Repository repo) {
-		return cfg -> new CoreConfig(cfg, repo.isBare());
-	}
 
 	/** Permissible values for {@code core.autocrlf}. */
 	public static enum AutoCRLF {
@@ -196,13 +171,13 @@ public class CoreConfig {
 		DOTGITONLY
 	}
 
-	private CoreConfig(Config rc, boolean bare) {
+	private CoreConfig(final Config rc) {
 		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
 				ConfigConstants.CONFIG_KEY_COMPRESSION, DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
 				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
 		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
+				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
 		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
 		attributesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION,

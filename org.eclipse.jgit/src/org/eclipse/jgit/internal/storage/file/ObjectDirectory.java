@@ -83,7 +83,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.util.FS;
@@ -121,7 +120,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final AlternateHandle handle = new AlternateHandle(this);
 
-	private final Repository repo;
+	private final Config config;
 
 	private final File objects;
 
@@ -150,8 +149,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 	/**
 	 * Initialize a reference to an on-disk object directory.
 	 *
-	 * @param repo
-	 *            repository containing this directory.
+	 * @param cfg
+	 *            configuration this directory consults for write settings.
 	 * @param dir
 	 *            the location of the <code>objects</code> directory.
 	 * @param alternatePaths
@@ -165,9 +164,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 * @throws IOException
 	 *             an alternate object cannot be opened.
 	 */
-	public ObjectDirectory(Repository repo, File dir,
+	public ObjectDirectory(final Config cfg, final File dir,
 			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
-		this.repo = repo;
+		config = cfg;
 		objects = dir;
 		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
 		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
@@ -218,7 +217,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public ObjectDirectoryInserter newInserter() {
-		return new ObjectDirectoryInserter(this, repo.getConfig());
+		return new ObjectDirectoryInserter(this, config);
 	}
 
 	@Override
@@ -755,7 +754,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// lastmodified attribute of the folder and assume that no new
 		// pack files can be in this folder if his modification time has
 		// not changed.
-		boolean trustFolderStat = getConfig().getBoolean(
+		boolean trustFolderStat = config.getBoolean(
 				ConfigConstants.CONFIG_CORE_SECTION,
 				ConfigConstants.CONFIG_KEY_TRUSTFOLDERSTAT, true);
 
@@ -764,13 +763,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	Repository getRepository() {
-		return repo;
-	}
-
-	@Override
 	Config getConfig() {
-		return repo.getConfig();
+		return config;
 	}
 
 	@Override
@@ -1036,7 +1030,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return new AlternateRepository(db);
 		}
 
-		ObjectDirectory db = new ObjectDirectory(repo, objdir, null, fs, null);
+		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs, null);
 		return new AlternateHandle(db);
 	}
 
