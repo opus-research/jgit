@@ -43,10 +43,6 @@
 package org.eclipse.jgit.pgm;
 
 import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.util.Arrays;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
@@ -73,7 +69,7 @@ public class DescribeTest extends CLIRepositoryTestCase {
 	public void testNoHead() throws Exception {
 		assertArrayEquals(
 				new String[] { "fatal: No names found, cannot describe anything." },
-				executeUnchecked("git describe"));
+				execute("git describe"));
 	}
 
 	@Test
@@ -81,7 +77,7 @@ public class DescribeTest extends CLIRepositoryTestCase {
 		git.commit().setMessage("initial commit").call();
 		assertArrayEquals(
 				new String[] { "fatal: No names found, cannot describe anything." },
-				executeUnchecked("git describe"));
+				execute("git describe"));
 	}
 
 	@Test
@@ -106,23 +102,5 @@ public class DescribeTest extends CLIRepositoryTestCase {
 		initialCommitAndTag();
 		assertArrayEquals(new String[] { "v1.0-0-g6fd41be", "" },
 				execute("git describe --long HEAD"));
-	}
-
-	@Test
-	public void testHelpArgumentBeforeUnknown() throws Exception {
-		String[] output = execute("git describe -h -XYZ");
-		String all = Arrays.toString(output);
-		assertTrue("Unexpected help output: " + all,
-				all.contains("jgit describe"));
-		assertFalse("Unexpected help output: " + all, all.contains("fatal"));
-	}
-
-	@Test
-	public void testHelpArgumentAfterUnknown() throws Exception {
-		String[] output = executeUnchecked("git describe -XYZ -h");
-		String all = Arrays.toString(output);
-		assertTrue("Unexpected help output: " + all,
-				all.contains("jgit describe"));
-		assertTrue("Unexpected help output: " + all, all.contains("fatal"));
 	}
 }

@@ -310,11 +310,6 @@ public class InMemoryRepository extends DfsRepository {
 			Map<ObjectId, ObjectId> peeled = new HashMap<>();
 			try (RevWalk rw = new RevWalk(getRepository())) {
 				for (ReceiveCommand c : cmds) {
-					if (c.getResult() != ReceiveCommand.Result.NOT_ATTEMPTED) {
-						reject(cmds);
-						return;
-					}
-
 					if (!ObjectId.zeroId().equals(c.getNewId())) {
 						try {
 							RevObject o = rw.parseAny(c.getNewId());
