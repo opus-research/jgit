@@ -54,7 +54,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.Proxy;
-import java.net.ProxySelector;
 import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
@@ -95,7 +94,6 @@ import org.apache.http.conn.ssl.X509HostnameVerifier;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
-import org.apache.http.impl.conn.SystemDefaultRoutePlanner;
 import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.transport.http.apache.internal.HttpApacheText;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -163,10 +161,8 @@ public class HttpClientConnection implements HttpConnection {
 				clientBuilder.setConnectionManager(
 						new BasicHttpClientConnectionManager(registry));
 			}
-			client = clientBuilder
-					.setRoutePlanner(new SystemDefaultRoutePlanner(ProxySelector.getDefault()))
-					.setDefaultRequestConfig(configBuilder.build())
-					.build();
+			clientBuilder.setDefaultRequestConfig(configBuilder.build());
+			client = clientBuilder.build();
 		}
 
 		return client;
