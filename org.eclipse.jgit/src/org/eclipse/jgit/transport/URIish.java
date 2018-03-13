@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2009, Mykola Nikishov <mn@mn.com.ua>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -57,8 +56,6 @@ import java.util.regex.Pattern;
  * any special character is written as-is.
  */
 public class URIish {
-	private static final String DOT_GIT = ".git";
-
 	private static final Pattern FULL_URI = Pattern
 			.compile("^(?:([a-z][a-z0-9+-]+)://(?:([^/]+?)(?::([^/]+?))?@)?(?:([^/]+?))?(?::(\\d+))?)?((?:[A-Za-z]:)?/.+)$");
 
@@ -79,7 +76,7 @@ public class URIish {
 
 	/**
 	 * Parse and construct an {@link URIish} from a string
-	 *
+	 * 
 	 * @param s
 	 * @throws URISyntaxException
 	 */
@@ -162,7 +159,7 @@ public class URIish {
 
 	/**
 	 * Return a new URI matching this one, but with a different host.
-	 *
+	 * 
 	 * @param n
 	 *            the new value for host.
 	 * @return a new URI with the updated value.
@@ -182,7 +179,7 @@ public class URIish {
 
 	/**
 	 * Return a new URI matching this one, but with a different scheme.
-	 *
+	 * 
 	 * @param n
 	 *            the new value for scheme.
 	 * @return a new URI with the updated value.
@@ -202,7 +199,7 @@ public class URIish {
 
 	/**
 	 * Return a new URI matching this one, but with a different path.
-	 *
+	 * 
 	 * @param n
 	 *            the new value for path.
 	 * @return a new URI with the updated value.
@@ -222,7 +219,7 @@ public class URIish {
 
 	/**
 	 * Return a new URI matching this one, but with a different user.
-	 *
+	 * 
 	 * @param n
 	 *            the new value for user.
 	 * @return a new URI with the updated value.
@@ -242,7 +239,7 @@ public class URIish {
 
 	/**
 	 * Return a new URI matching this one, but with a different password.
-	 *
+	 * 
 	 * @param n
 	 *            the new value for password.
 	 * @return a new URI with the updated value.
@@ -262,7 +259,7 @@ public class URIish {
 
 	/**
 	 * Return a new URI matching this one, but with a different port.
-	 *
+	 * 
 	 * @param n
 	 *            the new value for port.
 	 * @return a new URI with the updated value.
@@ -366,53 +363,4 @@ public class URIish {
 
 		return r.toString();
 	}
-
-	/**
-	 * Get the "humanish" part of the path. Some examples of a 'humanish' part
-	 * for a full path:
-	 * <table>
-	 * <tr>
-	 * <th>Path</th>
-	 * <th>Humanish part</th>
-	 * </tr>
-	 * <tr>
-	 * <td><code>/path/to/repo.git</code></td>
-	 * <td rowspan="4"><code>repo</code></td>
-	 * </tr>
-	 * <tr>
-	 * <td><code>/path/to/repo.git/</code></td>
-	 * </tr>
-	 * <tr>
-	 * <td><code>/path/to/repo/.git</code></td>
-	 * </tr>
-	 * <tr>
-	 * <td><code>/path/to/repo/</code></td>
-	 * </tr>
-	 * <tr>
-	 * <td><code>/path//to</code></td>
-	 * <td>an empty string</td>
-	 * </tr>
-	 * </table>
-	 *
-	 * @return the "humanish" part of the path. May be an empty string. Never
-	 *         {@code null}.
-	 * @throws IllegalArgumentException
-	 *             if it's impossible to determine a humanish part, or path is
-	 *             {@code null} or empty
-	 * @see #getPath
-	 */
-	public String getHumanishName() throws IllegalArgumentException {
-		if ("".equals(getPath()) || getPath() == null)
-			throw new IllegalArgumentException();
-		String[] elements = getPath().split("/");
-		if (elements.length == 0)
-			throw new IllegalArgumentException();
-		String result = elements[elements.length - 1];
-		if (DOT_GIT.equals(result))
-			result = elements[elements.length - 2];
-		else if (result.endsWith(DOT_GIT))
-			result = result.substring(0, result.length() - DOT_GIT.length());
-		return result;
-	}
-
 }
