@@ -105,7 +105,7 @@ class Batch extends BatchRefUpdate {
 				return;
 			}
 
-			if (behavior == HIDDEN_REJECT && c.getRefName().startsWith(R_TXN)) {
+			if (behavior == HIDDEN_REJECT && isBootstrapRef(c)) {
 				c.setResult(REJECTED_OTHER_REASON, MessageFormat
 						.format(JGitText.get().invalidRefName, c.getRefName()));
 				reject(JGitText.get().transactionAborted);
@@ -123,7 +123,7 @@ class Batch extends BatchRefUpdate {
 				}
 			}
 
-			if (behavior == UNION && c.getRefName().startsWith(R_TXN)) {
+			if (behavior == UNION && isBootstrapRef(c)) {
 				forBootstrap.add(c);
 			} else {
 				forTree.add(new Command(rw, c));
@@ -153,13 +153,17 @@ class Batch extends BatchRefUpdate {
 					}
 				} else {
 					String msg = commit.getMessage();
-					if (msg != null) {
+					if (msg == null || msg.isEmpty()) {
 						msg = commit.getResult().name();
 					}
 					reject(msg);
 				}
 			}
 		}
+	}
+
+	private static boolean isBootstrapRef(ReceiveCommand c) {
+		return c.getRefName().startsWith(R_TXN);
 	}
 
 	private BatchRefUpdate newBootstrapBatch() {

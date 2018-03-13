@@ -82,13 +82,34 @@ public class RefTreeDb extends RefDatabase {
 
 	/** How the RefTreeDb should handle the bootstrap layer. */
 	public enum BootstrapBehavior {
-		/** Union the bootstrap references into the same namespace. */
+		/**
+		 * Union the bootstrap references into the same namespace.
+		 * <p>
+		 * Users will be able to see and directly update bootstrap references.
+		 * Some updates may fail, for example {@code refs/heads/master} and
+		 * {@code refs/txn/committed} at the same time is not possible.
+		 */
 		UNION,
 
-		/** Hide bootstrap references, but reject updates in namespace. */
+		/**
+		 * Hide bootstrap references, but reject updates in namespace.
+		 * <p>
+		 * Bootstrap references cannot be read through this database, so it is
+		 * as if they do not exist. However updates to the bootstrap namespace
+		 * are rejected with "funny refname" errors to prevent users from
+		 * overwriting a bootstrap reference.
+		 */
 		HIDDEN_REJECT,
 
-		/** Hide the bootstrap references. */
+		/**
+		 * Hide the bootstrap references and store over them.
+		 * <p>
+		 * This behavior makes the bootstrap invisible to users and requires any
+		 * code that needs to access a bootstrap reference to explicitly do so
+		 * through {@link RefTreeDb#getBootstrap()}. By making the bootstrap
+		 * layer invisible to users, users may use the bootstrap namespace for
+		 * their own data.
+		 */
 		HIDDEN;
 	}
 
