@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2014, 2017 Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -58,8 +58,6 @@ import org.eclipse.jgit.internal.JGitText;
 /**
  * Various {@link String} related utility methods, written mostly to avoid
  * generation of new String objects (e.g. via splitting Strings etc).
- *
- * @since 3.6
  */
 public class Strings {
 
@@ -125,12 +123,15 @@ public class Strings {
 	static int count(String s, char c, boolean ignoreFirstLast) {
 		int start = 0;
 		int count = 0;
-		while (true) {
+		int length = s.length();
+		while (start < length) {
 			start = s.indexOf(c, start);
-			if (start == -1)
+			if (start == -1) {
 				break;
-			if (!ignoreFirstLast || (start != 0 && start != s.length()))
+			}
+			if (!ignoreFirstLast || (start != 0 && start != length - 1)) {
 				count++;
+			}
 			start++;
 		}
 		return count;
@@ -150,7 +151,7 @@ public class Strings {
 		if (count < 1)
 			throw new IllegalStateException(
 					"Pattern must have at least two segments: " + pattern); //$NON-NLS-1$
-		List<String> segments = new ArrayList<String>(count);
+		List<String> segments = new ArrayList<>(count);
 		int right = 0;
 		while (true) {
 			int left = right;

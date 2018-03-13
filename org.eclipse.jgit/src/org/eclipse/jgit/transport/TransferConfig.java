@@ -69,14 +69,27 @@ public class TransferConfig {
 	private static final String FSCK = "fsck"; //$NON-NLS-1$
 
 	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<TransferConfig> KEY = new SectionParser<TransferConfig>() {
-		public TransferConfig parse(final Config cfg) {
-			return new TransferConfig(cfg);
-		}
-	};
+	public static final Config.SectionParser<TransferConfig> KEY =
+			TransferConfig::new;
 
-	enum FsckMode {
-		ERROR, WARN, IGNORE;
+	/**
+	 * A git configuration value for how to handle a fsck failure of a particular kind.
+	 * Used in e.g. fsck.missingEmail.
+	 * @since 4.9
+	 */
+	public enum FsckMode {
+		/**
+		 * Treat it as an error (the default).
+		 */
+		ERROR,
+		/**
+		 * Issue a warning (in fact, jgit treats this like IGNORE, but git itself does warn).
+		 */
+		WARN,
+		/**
+		 * Ignore the error.
+		 */
+		IGNORE;
 	}
 
 	private final boolean fetchFsck;
@@ -207,8 +220,9 @@ public class TransferConfig {
 			return RefFilter.DEFAULT;
 
 		return new RefFilter() {
+			@Override
 			public Map<String, Ref> filter(Map<String, Ref> refs) {
-				Map<String, Ref> result = new HashMap<String, Ref>();
+				Map<String, Ref> result = new HashMap<>();
 				for (Map.Entry<String, Ref> e : refs.entrySet()) {
 					boolean add = true;
 					for (String hide : hideRefs) {

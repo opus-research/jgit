@@ -77,12 +77,13 @@ public class LocalDiskRefTreeDatabaseTest extends LocalDiskRepositoryTestCase {
 	private RevCommit A;
 	private RevCommit B;
 
+	@Override
 	@Before
 	public void setUp() throws Exception {
 		FileRepository init = createWorkRepository();
 		FileBasedConfig cfg = init.getConfig();
 		cfg.setInt("core", null, "repositoryformatversion", 1);
-		cfg.setString("extensions", null, "refsStorage", "reftree");
+		cfg.setString("extensions", null, "refStorage", "reftree");
 		cfg.save();
 
 		repo = (FileRepository) new FileRepositoryBuilder()

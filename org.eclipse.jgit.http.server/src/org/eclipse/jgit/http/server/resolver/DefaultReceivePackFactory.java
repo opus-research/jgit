@@ -48,7 +48,6 @@ import javax.servlet.http.HttpServletRequest;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
@@ -68,12 +67,6 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
  */
 public class DefaultReceivePackFactory implements
 		ReceivePackFactory<HttpServletRequest> {
-	private static final SectionParser<ServiceConfig> CONFIG = new SectionParser<ServiceConfig>() {
-		public ServiceConfig parse(final Config cfg) {
-			return new ServiceConfig(cfg);
-		}
-	};
-
 	private static class ServiceConfig {
 		final boolean set;
 
@@ -85,9 +78,10 @@ public class DefaultReceivePackFactory implements
 		}
 	}
 
+	@Override
 	public ReceivePack create(final HttpServletRequest req, final Repository db)
 			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-		final ServiceConfig cfg = db.getConfig().get(CONFIG);
+		final ServiceConfig cfg = db.getConfig().get(ServiceConfig::new);
 		String user = req.getRemoteUser();
 
 		if (cfg.set) {

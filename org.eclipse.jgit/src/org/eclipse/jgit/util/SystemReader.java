@@ -56,10 +56,12 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectChecker;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.util.time.MonotonicClock;
+import org.eclipse.jgit.util.time.MonotonicSystemClock;
 
 /**
  * Interface to read values from the system.
@@ -85,22 +87,27 @@ public abstract class SystemReader {
 	private static class Default extends SystemReader {
 		private volatile String hostname;
 
+		@Override
 		public String getenv(String variable) {
 			return System.getenv(variable);
 		}
 
+		@Override
 		public String getProperty(String key) {
 			return System.getProperty(key);
 		}
 
+		@Override
 		public FileBasedConfig openSystemConfig(Config parent, FS fs) {
 			File configFile = fs.getGitSystemConfig();
 			if (configFile == null) {
 				return new FileBasedConfig(null, fs) {
+					@Override
 					public void load() {
 						// empty, do not load
 					}
 
+					@Override
 					public boolean isOutdated() {
 						// regular class would bomb here
 						return false;
@@ -110,11 +117,13 @@ public abstract class SystemReader {
 			return new FileBasedConfig(parent, configFile, fs);
 		}
 
+		@Override
 		public FileBasedConfig openUserConfig(Config parent, FS fs) {
 			final File home = fs.userHome();
 			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs); //$NON-NLS-1$
 		}
 
+		@Override
 		public String getHostname() {
 			if (hostname == null) {
 				try {
@@ -231,6 +240,14 @@ public abstract class SystemReader {
 	public abstract long getCurrentTime();
 
 	/**
+	 * @return clock instance preferred by this system.
+	 * @since 4.6
+	 */
+	public MonotonicClock getClock() {
+		return new MonotonicSystemClock();
+	}
+
+	/**
 	 * @param when TODO
 	 * @return the local time zone
 	 */
@@ -321,6 +338,7 @@ public abstract class SystemReader {
 
 	private String getOsName() {
 		return AccessController.doPrivileged(new PrivilegedAction<String>() {
+			@Override
 			public String run() {
 				return getProperty("os.name"); //$NON-NLS-1$
 			}

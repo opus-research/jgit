@@ -68,7 +68,6 @@ public class CLIText extends TranslationBundle {
 	 * @param line
 	 *            the line to format
 	 * @return the formatted line
-	 * @since 2.2
 	 */
 	public static String formatLine(String line) {
 		return MessageFormat.format(get().lineFormat, line);
@@ -81,7 +80,6 @@ public class CLIText extends TranslationBundle {
 	 * @param message
 	 *            the message to format
 	 * @return the formatted line
-	 * @since 4.2
 	 */
 	public static String fatalError(String message) {
 		return MessageFormat.format(get().fatalError, message);
@@ -123,6 +121,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cantWrite;
 	/***/ public String changesNotStagedForCommit;
 	/***/ public String changesToBeCommitted;
+	/***/ public String checkingOut;
 	/***/ public String checkoutConflict;
 	/***/ public String checkoutConflictPathLine;
 	/***/ public String cleanRequireForce;
@@ -144,12 +143,14 @@ public class CLIText extends TranslationBundle {
 	/***/ public String failedToLockTag;
 	/***/ public String fatalError;
 	/***/ public String fatalThisProgramWillDestroyTheRepository;
+	/***/ public String fetchingSubmodule;
 	/***/ public String fileIsRequired;
 	/***/ public String ffNotPossibleAborting;
 	/***/ public String forcedUpdate;
 	/***/ public String fromURI;
 	/***/ public String initializedEmptyGitRepositoryIn;
 	/***/ public String invalidHttpProxyOnlyHttpSupported;
+	/***/ public String invalidRecurseSubmodulesMode;
 	/***/ public String jgitVersion;
 	/***/ public String lfsNoAccessKey;
 	/***/ public String lfsNoSecretKey;
@@ -195,6 +196,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String metaVar_pass;
 	/***/ public String metaVar_path;
 	/***/ public String metaVar_paths;
+	/***/ public String metaVar_pattern;
 	/***/ public String metaVar_port;
 	/***/ public String metaVar_ref;
 	/***/ public String metaVar_refs;
@@ -265,6 +267,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String statusDeletedByUs;
 	/***/ public String statusBothAdded;
 	/***/ public String statusBothModified;
+	/***/ public String submoduleRegistered;
 	/***/ public String switchedToNewBranch;
 	/***/ public String switchedToBranch;
 	/***/ public String tagAlreadyExists;

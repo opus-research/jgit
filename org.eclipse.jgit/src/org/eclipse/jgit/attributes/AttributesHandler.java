@@ -54,8 +54,8 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
  * The attributes handler knows how to retrieve, parse and merge attributes from
@@ -144,7 +144,8 @@ public class AttributesHandler {
 		mergeInfoAttributes(entryPath, isDirectory, attributes);
 
 		// Gets the attributes located on the current entry path
-		mergePerDirectoryEntryAttributes(entryPath, isDirectory,
+		mergePerDirectoryEntryAttributes(entryPath, entryPath.lastIndexOf('/'),
+				isDirectory,
 				treeWalk.getTree(WorkingTreeIterator.class),
 				treeWalk.getTree(DirCacheIterator.class),
 				treeWalk.getTree(CanonicalTreeParser.class),
@@ -206,6 +207,8 @@ public class AttributesHandler {
 	 *            the path to test. The path must be relative to this attribute
 	 *            node's own repository path, and in repository path format
 	 *            (uses '/' and not '\').
+	 * @param nameRoot
+	 *            index of the '/' preceeding the current level, or -1 if none
 	 * @param isDirectory
 	 *            true if the target item is a directory.
 	 * @param workingTreeIterator
@@ -217,7 +220,7 @@ public class AttributesHandler {
 	 * @throws IOException
 	 */
 	private void mergePerDirectoryEntryAttributes(String entryPath,
-			boolean isDirectory,
+			int nameRoot, boolean isDirectory,
 			@Nullable WorkingTreeIterator workingTreeIterator,
 			@Nullable DirCacheIterator dirCacheIterator,
 			@Nullable CanonicalTreeParser otherTree, Attributes result)
@@ -228,9 +231,12 @@ public class AttributesHandler {
 			AttributesNode attributesNode = attributesNode(
 					treeWalk, workingTreeIterator, dirCacheIterator, otherTree);
 			if (attributesNode != null) {
-				mergeAttributes(attributesNode, entryPath, isDirectory, result);
+				mergeAttributes(attributesNode,
+						entryPath.substring(nameRoot + 1), isDirectory,
+						result);
 			}
-			mergePerDirectoryEntryAttributes(entryPath, isDirectory,
+			mergePerDirectoryEntryAttributes(entryPath,
+					entryPath.lastIndexOf('/', nameRoot - 1), isDirectory,
 					parentOf(workingTreeIterator), parentOf(dirCacheIterator),
 					parentOf(otherTree), result);
 		}

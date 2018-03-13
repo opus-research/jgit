@@ -50,15 +50,19 @@ import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.errors.FilterFailedException;
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
@@ -83,14 +87,19 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.EolStreamTypeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class handles checking out one or two trees merging with the index.
  */
 public class DirCacheCheckout {
+	private static Logger LOG = LoggerFactory.getLogger(DirCacheCheckout.class);
+
 	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
 
 	/**
@@ -121,11 +130,11 @@ public class DirCacheCheckout {
 
 	private Repository repo;
 
-	private HashMap<String, CheckoutMetadata> updated = new HashMap<String, CheckoutMetadata>();
+	private HashMap<String, CheckoutMetadata> updated = new HashMap<>();
 
-	private ArrayList<String> conflicts = new ArrayList<String>();
+	private ArrayList<String> conflicts = new ArrayList<>();
 
-	private ArrayList<String> removed = new ArrayList<String>();
+	private ArrayList<String> removed = new ArrayList<>();
 
 	private ObjectId mergeCommitTree;
 
@@ -141,9 +150,11 @@ public class DirCacheCheckout {
 
 	private boolean failOnConflict = true;
 
-	private ArrayList<String> toBeDeleted = new ArrayList<String>();
+	private ArrayList<String> toBeDeleted = new ArrayList<>();
 
 	private boolean emptyDirCache;
+
+	private boolean performingCheckout;
 
 	/**
 	 * @return a list of updated paths and smudgeFilterCommands
@@ -426,7 +437,8 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * Execute this checkout
+	 * Execute this checkout. A {@link WorkingTreeModifiedEvent} is fired if the
+	 * working tree was modified; even if the checkout fails.
 	 *
 	 * @return <code>false</code> if this method could not delete all the files
 	 *         which should be deleted (e.g. because of of the files was
@@ -442,7 +454,17 @@ public class DirCacheCheckout {
 		try {
 			return doCheckout();
 		} finally {
-			dc.unlock();
+			try {
+				dc.unlock();
+			} finally {
+				if (performingCheckout) {
+					WorkingTreeModifiedEvent event = new WorkingTreeModifiedEvent(
+							getUpdated().keySet(), getRemoved());
+					if (!event.isEmpty()) {
+						repo.fireEvent(event);
+					}
+				}
+			}
 		}
 	}
 
@@ -466,11 +488,13 @@ public class DirCacheCheckout {
 			// update our index
 			builder.finish();
 
+			performingCheckout = true;
 			File file = null;
 			String last = null;
 			// when deleting files process them in the opposite order as they have
 			// been reported. This ensures the files are deleted before we delete
 			// their parent folders
+			IntList nonDeleted = new IntList();
 			for (int i = removed.size() - 1; i >= 0; i--) {
 				String r = removed.get(i);
 				file = new File(repo.getWorkTree(), r);
@@ -480,30 +504,82 @@ public class DirCacheCheckout {
 					// a submodule, in which case we shall not attempt
 					// to delete it. A submodule is not empty, so it
 					// is safe to check this after a failed delete.
-					if (!repo.getFS().isDirectory(file))
+					if (!repo.getFS().isDirectory(file)) {
+						nonDeleted.add(i);
 						toBeDeleted.add(r);
+					}
 				} else {
 					if (last != null && !isSamePrefix(r, last))
 						removeEmptyParents(new File(repo.getWorkTree(), last));
 					last = r;
 				}
 			}
-			if (file != null)
+			if (file != null) {
 				removeEmptyParents(file);
-
-			for (Map.Entry<String, CheckoutMetadata> e : updated.entrySet()) {
-				String path = e.getKey();
-				CheckoutMetadata meta = e.getValue();
-				DirCacheEntry entry = dc.getEntry(path);
-				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader, false, meta);
 			}
-
+			removed = filterOut(removed, nonDeleted);
+			nonDeleted = null;
+			Iterator<Map.Entry<String, CheckoutMetadata>> toUpdate = updated
+					.entrySet().iterator();
+			Map.Entry<String, CheckoutMetadata> e = null;
+			try {
+				while (toUpdate.hasNext()) {
+					e = toUpdate.next();
+					String path = e.getKey();
+					CheckoutMetadata meta = e.getValue();
+					DirCacheEntry entry = dc.getEntry(path);
+					if (!FileMode.GITLINK.equals(entry.getRawMode())) {
+						checkoutEntry(repo, entry, objectReader, false, meta);
+					}
+					e = null;
+				}
+			} catch (Exception ex) {
+				// We didn't actually modify the current entry nor any that
+				// might follow.
+				if (e != null) {
+					toUpdate.remove();
+				}
+				while (toUpdate.hasNext()) {
+					e = toUpdate.next();
+					toUpdate.remove();
+				}
+				throw ex;
+			}
 			// commit the index builder - a new index is persisted
 			if (!builder.commit())
 				throw new IndexWriteException();
 		}
 		return toBeDeleted.size() == 0;
+	}
+
+	private static ArrayList<String> filterOut(ArrayList<String> strings,
+			IntList indicesToRemove) {
+		int n = indicesToRemove.size();
+		if (n == strings.size()) {
+			return new ArrayList<>(0);
+		}
+		switch (n) {
+		case 0:
+			return strings;
+		case 1:
+			strings.remove(indicesToRemove.get(0));
+			return strings;
+		default:
+			int length = strings.size();
+			ArrayList<String> result = new ArrayList<>(length - n);
+			// Process indicesToRemove from the back; we know that it
+			// contains indices in descending order.
+			int j = n - 1;
+			int idx = indicesToRemove.get(j);
+			for (int i = 0; i < length; i++) {
+				if (i == idx) {
+					idx = (--j >= 0) ? indicesToRemove.get(j) : -1;
+				} else {
+					result.add(strings.get(i));
+				}
+			}
+			return result;
+		}
 	}
 
 	private static boolean isSamePrefix(String a, String b) {
@@ -1293,8 +1369,13 @@ public class DirCacheCheckout {
 			return;
 		}
 
+		String name = f.getName();
+		if (name.length() > 200) {
+			name = name.substring(0, 200);
+		}
 		File tmpFile = File.createTempFile(
-				"._" + f.getName(), null, parentDir); //$NON-NLS-1$
+				"._" + name, null, parentDir); //$NON-NLS-1$
+
 		EolStreamType nonNullEolStreamType;
 		if (checkoutMetadata.eolStreamType != null) {
 			nonNullEolStreamType = checkoutMetadata.eolStreamType;
@@ -1303,45 +1384,19 @@ public class DirCacheCheckout {
 		} else {
 			nonNullEolStreamType = EolStreamType.DIRECT;
 		}
-		OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
-				new FileOutputStream(tmpFile), nonNullEolStreamType);
-		if (checkoutMetadata.smudgeFilterCommand != null) {
-			ProcessBuilder filterProcessBuilder = fs.runInShell(
-					checkoutMetadata.smudgeFilterCommand, new String[0]);
-			filterProcessBuilder.directory(repo.getWorkTree());
-			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-					repo.getDirectory().getAbsolutePath());
-			ExecutionResult result;
-			int rc;
-			try {
-				// TODO: wire correctly with AUTOCRLF
-				result = fs.execute(filterProcessBuilder, ol.openStream());
-				rc = result.getRc();
-				if (rc == 0) {
-					result.getStdout().writeTo(channel,
-							NullProgressMonitor.INSTANCE);
+		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
+				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
+			if (checkoutMetadata.smudgeFilterCommand != null) {
+				if (FilterCommandRegistry
+						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
+					runBuiltinFilterCommand(repo, checkoutMetadata, ol,
+							channel);
+				} else {
+					runExternalFilterCommand(repo, entry, checkoutMetadata, ol,
+							fs, channel);
 				}
-			} catch (IOException | InterruptedException e) {
-				throw new IOException(new FilterFailedException(e,
-						checkoutMetadata.smudgeFilterCommand,
-						entry.getPathString()));
-
-			} finally {
-				channel.close();
-			}
-			if (rc != 0) {
-				throw new IOException(new FilterFailedException(rc,
-						checkoutMetadata.smudgeFilterCommand,
-						entry.getPathString(),
-						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-						RawParseUtils.decode(result.getStderr()
-								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-			}
-		} else {
-			try {
+			} else {
 				ol.copyTo(channel);
-			} finally {
-				channel.close();
 			}
 		}
 		// The entry needs to correspond to the on-disk filesize. If the content
@@ -1380,6 +1435,63 @@ public class DirCacheCheckout {
 			}
 		}
 		entry.setLastModified(fs.lastModified(f));
+	}
+
+	// Run an external filter command
+	private static void runExternalFilterCommand(Repository repo,
+			DirCacheEntry entry,
+			CheckoutMetadata checkoutMetadata, ObjectLoader ol, FS fs,
+			OutputStream channel) throws IOException {
+		ProcessBuilder filterProcessBuilder = fs.runInShell(
+				checkoutMetadata.smudgeFilterCommand, new String[0]);
+		filterProcessBuilder.directory(repo.getWorkTree());
+		filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+				repo.getDirectory().getAbsolutePath());
+		ExecutionResult result;
+		int rc;
+		try {
+			// TODO: wire correctly with AUTOCRLF
+			result = fs.execute(filterProcessBuilder, ol.openStream());
+			rc = result.getRc();
+			if (rc == 0) {
+				result.getStdout().writeTo(channel,
+						NullProgressMonitor.INSTANCE);
+			}
+		} catch (IOException | InterruptedException e) {
+			throw new IOException(new FilterFailedException(e,
+					checkoutMetadata.smudgeFilterCommand,
+					entry.getPathString()));
+		}
+		if (rc != 0) {
+			throw new IOException(new FilterFailedException(rc,
+					checkoutMetadata.smudgeFilterCommand,
+					entry.getPathString(),
+					result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+					RawParseUtils.decode(result.getStderr()
+							.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+		}
+	}
+
+	// Run a builtin filter command
+	private static void runBuiltinFilterCommand(Repository repo,
+			CheckoutMetadata checkoutMetadata, ObjectLoader ol,
+			OutputStream channel) throws MissingObjectException, IOException {
+		FilterCommand command = null;
+		try {
+			command = FilterCommandRegistry.createFilterCommand(
+					checkoutMetadata.smudgeFilterCommand, repo, ol.openStream(),
+					channel);
+		} catch (IOException e) {
+			LOG.error(JGitText.get().failedToDetermineFilterDefinition, e);
+			// In case an IOException occurred during creating of the command
+			// then proceed as if there would not have been a builtin filter.
+			ol.copyTo(channel);
+		}
+		if (command != null) {
+			while (command.run() != -1) {
+				// loop as long as command.run() tells there is work to do
+			}
+		}
 	}
 
 	@SuppressWarnings("deprecation")
