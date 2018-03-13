@@ -447,31 +447,15 @@ public class TestRepository<R extends Repository> {
 	 * @return commit builder that amends the branch on commit.
 	 * @throws Exception
 	 */
-	public CommitBuilder amendRef(String ref) throws Exception {
-		String name = normalizeRef(ref);
-		Ref r = db.getRef(name);
+	public CommitBuilder amend(String ref) throws Exception {
+		Ref r = db.getRef(normalizeRef(ref));
 		if (r == null)
 			throw new IOException("Not a ref: " + ref);
-		return amend(pool.parseCommit(r.getObjectId()), branch(name).commit());
-	}
+		RevCommit old = pool.parseCommit(r.getObjectId());
 
-	/**
-	 * Amend an existing commit.
-	 *
-	 * @param id
-	 *            the id of the commit to amend.
-	 * @return commit builder.
-	 * @throws Exception
-	 */
-	public CommitBuilder amend(AnyObjectId id) throws Exception {
-		return amend(pool.parseCommit(id), commit());
-	}
-
-	private CommitBuilder amend(RevCommit old, CommitBuilder b) throws Exception {
-		pool.parseBody(old);
+		CommitBuilder b = branch(ref).commit();
 		b.author(old.getAuthorIdent());
 		b.committer(old.getCommitterIdent());
-		b.message(old.getFullMessage());
 		// Use the committer name from the old commit, but update it after ticking
 		// the clock in CommitBuilder#create().
 		b.updateCommitterTime = true;
@@ -546,61 +530,6 @@ public class TestRepository<R extends Repository> {
 		} else
 			ref = Constants.R_HEADS + ref;
 		return ref;
-	}
-
-	/**
-	 * Soft-reset HEAD to a detached state.
-	 * <p>
-	 * @param id
-	 *            ID of detached head.
-	 * @throws Exception
-	 * @see #reset(String)
-	 */
-	public void reset(AnyObjectId id) throws Exception {
-		RefUpdate ru = db.updateRef(Constants.HEAD, true);
-		ru.setNewObjectId(id);
-		RefUpdate.Result result = ru.forceUpdate();
-		switch (result) {
-			case FAST_FORWARD:
-			case FORCED:
-			case NEW:
-			case NO_CHANGE:
-				break;
-			default:
-				throw new IOException(String.format(
-						"Checkout \"%s\" failed: %s", id.name(), result));
-		}
-	}
-
-	/**
-	 * Soft-reset HEAD to a different commit.
-	 * <p>
-	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but
-	 * not the index or the working tree of a non-bare repository.
-	 *
-	 * @param name
-	 *            revision string; either an existing ref name, or something that
-	 *            can be parsed to an object ID.
-	 * @throws Exception
-	 */
-	public void reset(String name) throws Exception {
-		RefUpdate.Result result;
-		ObjectId id = db.resolve(name);
-		if (id == null)
-			throw new IOException("Not a revision: " + name);
-		RefUpdate ru = db.updateRef(Constants.HEAD, false);
-		ru.setNewObjectId(id);
-		result = ru.forceUpdate();
-		switch (result) {
-			case FAST_FORWARD:
-			case FORCED:
-			case NEW:
-			case NO_CHANGE:
-				break;
-			default:
-				throw new IOException(String.format(
-						"Checkout \"%s\" failed: %s", name, result));
-		}
 	}
 
 	/**

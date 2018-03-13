@@ -45,7 +45,6 @@ package org.eclipse.jgit.junit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -55,18 +54,14 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -83,12 +78,6 @@ public class TestRepositoryTest {
 		rw = tr.getRevWalk();
 	}
 
-	@After
-	public void tearDown() {
-		rw.close();
-		repo.close();
-	}
-
 	@Test
 	public void insertChangeId() throws Exception {
 		RevCommit c1 = tr.commit().message("message").insertChangeId().create();
@@ -103,84 +92,7 @@ public class TestRepositoryTest {
 	}
 
 	@Test
-	public void resetFromSymref() throws Exception {
-		repo.updateRef("HEAD").link("refs/heads/master");
-		Ref head = repo.getRef("HEAD");
-		RevCommit master = tr.branch("master").commit().create();
-		RevCommit branch = tr.branch("branch").commit().create();
-		RevCommit detached = tr.commit().create();
-
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
-		assertEquals(master, repo.getRef("refs/heads/master").getObjectId());
-		assertEquals(branch, repo.getRef("refs/heads/branch").getObjectId());
-
-		// Reset to branches preserves symref.
-		tr.reset("master");
-		head = repo.getRef("HEAD");
-		assertEquals(master, head.getObjectId());
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
-
-		tr.reset("branch");
-		head = repo.getRef("HEAD");
-		assertEquals(branch, head.getObjectId());
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
-		ObjectId lastHeadBeforeDetach = head.getObjectId().copy();
-
-		// Reset to a SHA-1 detaches.
-		tr.reset(detached);
-		head = repo.getRef("HEAD");
-		assertEquals(detached, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		tr.reset(detached.name());
-		head = repo.getRef("HEAD");
-		assertEquals(detached, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		// Reset back to a branch remains detached.
-		tr.reset("master");
-		head = repo.getRef("HEAD");
-		assertEquals(lastHeadBeforeDetach, head.getObjectId());
-		assertFalse(head.isSymbolic());
-	}
-
-	@Test
-	public void resetFromDetachedHead() throws Exception {
-		Ref head = repo.getRef("HEAD");
-		RevCommit master = tr.branch("master").commit().create();
-		RevCommit branch = tr.branch("branch").commit().create();
-		RevCommit detached = tr.commit().create();
-
-		assertNull(head);
-		assertEquals(master, repo.getRef("refs/heads/master").getObjectId());
-		assertEquals(branch, repo.getRef("refs/heads/branch").getObjectId());
-
-		tr.reset("master");
-		head = repo.getRef("HEAD");
-		assertEquals(master, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		tr.reset("branch");
-		head = repo.getRef("HEAD");
-		assertEquals(branch, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		tr.reset(detached);
-		head = repo.getRef("HEAD");
-		assertEquals(detached, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		tr.reset(detached.name());
-		head = repo.getRef("HEAD");
-		assertEquals(detached, head.getObjectId());
-		assertFalse(head.isSymbolic());
-	}
-
-	@Test
-	public void amendRef() throws Exception {
+	public void amend() throws Exception {
 		RevCommit root = tr.commit()
 				.add("todelete", "to be deleted")
 				.create();
@@ -196,7 +108,7 @@ public class TestRepositoryTest {
 		assertEquals("bar contents", blobAsString(orig, "bar"));
 		assertEquals("baz contents", blobAsString(orig, "dir/baz"));
 
-		RevCommit amended = tr.amendRef("master")
+		RevCommit amended = tr.amend("master")
 				.tick(3)
 				.add("bar", "fixed bar contents")
 				.create();
@@ -217,52 +129,6 @@ public class TestRepositoryTest {
 		assertEquals("fixed bar contents", blobAsString(amended, "bar"));
 		assertEquals("baz contents", blobAsString(amended, "dir/baz"));
 		assertNull(TreeWalk.forPath(repo, "todelete", amended.getTree()));
-	}
-
-	@Test
-	public void amendHead() throws Exception {
-		repo.updateRef("HEAD").link("refs/heads/master");
-		RevCommit root = tr.commit()
-				.add("foo", "foo contents")
-				.create();
-		RevCommit orig = tr.commit().parent(root)
-				.message("original message")
-				.add("bar", "bar contents")
-				.create();
-		tr.branch("master").update(orig);
-
-		RevCommit amended = tr.amendRef("HEAD")
-				.add("foo", "fixed foo contents")
-				.create();
-
-		Ref head = repo.getRef(Constants.HEAD);
-		assertEquals(amended, head.getObjectId());
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
-
-		rw.parseBody(amended);
-		assertEquals("original message", amended.getFullMessage());
-		assertEquals("fixed foo contents", blobAsString(amended, "foo"));
-		assertEquals("bar contents", blobAsString(amended, "bar"));
-	}
-
-	@Test
-	public void amendCommit() throws Exception {
-		RevCommit root = tr.commit()
-				.add("foo", "foo contents")
-				.create();
-		RevCommit orig = tr.commit().parent(root)
-				.message("original message")
-				.add("bar", "bar contents")
-				.create();
-		RevCommit amended = tr.amend(orig.copy())
-				.add("foo", "fixed foo contents")
-				.create();
-
-		rw.parseBody(amended);
-		assertEquals("original message", amended.getFullMessage());
-		assertEquals("fixed foo contents", blobAsString(amended, "foo"));
-		assertEquals("bar contents", blobAsString(amended, "bar"));
 	}
 
 	private String blobAsString(AnyObjectId treeish, String path)
