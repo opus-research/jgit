@@ -509,7 +509,7 @@ public abstract class Repository {
 						done = k;
 						break;
 					default:
-						rev = rw.peel(rev);
+						rev = rw.parseAny(rev);
 						if (rev instanceof RevCommit) {
 							RevCommit commit = ((RevCommit) rev);
 							if (commit.getParentCount() == 0)
