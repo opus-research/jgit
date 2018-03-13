@@ -197,15 +197,6 @@ public class DiffFormatter implements AutoCloseable {
 	}
 
 	/**
-	 * @return the object reader if {@link #setRepository(Repository)} has
-	 *         already been called
-	 * @since 4.3
-	 */
-	public ObjectReader getObjectReader() {
-		return reader;
-	}
-
-	/**
 	 * Change the number of lines of context to display.
 	 *
 	 * @param lineCount

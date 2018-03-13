@@ -58,10 +58,9 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -75,11 +74,7 @@ import org.eclipse.jgit.util.io.NullOutputStream;
  *      >Git documentation about diff</a>
  */
 public class DiffCommand extends GitCommand<List<DiffEntry>> {
-	private ObjectId oldTreeish;
-
 	private AbstractTreeIterator oldTree;
-
-	private ObjectId newTreeish;
 
 	private AbstractTreeIterator newTree;
 
@@ -115,76 +110,54 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return a DiffEntry for each path which is different
 	 */
 	public List<DiffEntry> call() throws GitAPIException {
-		try (DiffFormatter diffFmt = newDiffFormatter();
-				RevWalk rw = new RevWalk(diffFmt.getObjectReader())) {
-			AbstractTreeIterator oldTreeIt = resolveOldTree(rw);
-			AbstractTreeIterator newTreeIt = resolveNewTree(rw);
-			List<DiffEntry> result = diffFmt.scan(oldTreeIt, newTreeIt);
-			if (showNameAndStatusOnly) {
-				return result;
-			}
-			if (contextLines >= 0)
-				diffFmt.setContext(contextLines);
-			if (destinationPrefix != null)
-				diffFmt.setNewPrefix(destinationPrefix);
-			if (sourcePrefix != null)
-				diffFmt.setOldPrefix(sourcePrefix);
-			diffFmt.format(result);
-			diffFmt.flush();
-			return result;
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
-	}
-
-	private DiffFormatter newDiffFormatter() {
 		final DiffFormatter diffFmt;
-		if (out != null && !showNameAndStatusOnly) {
+		if (out != null && !showNameAndStatusOnly)
 			diffFmt = new DiffFormatter(new BufferedOutputStream(out));
-		} else {
+		else
 			diffFmt = new DiffFormatter(NullOutputStream.INSTANCE);
-		}
 		diffFmt.setRepository(repo);
 		diffFmt.setProgressMonitor(monitor);
-		diffFmt.setPathFilter(pathFilter);
-		return diffFmt;
-	}
-
-	private AbstractTreeIterator resolveOldTree(RevWalk rw)
-			throws NoHeadException, IOException {
-		if (oldTree != null) {
-			return oldTree;
-		} else if (oldTreeish != null) {
-			return getTreeIterator(rw, oldTreeish);
-		} else if (cached) {
-			ObjectId head = repo.resolve(HEAD + "^{tree}"); //$NON-NLS-1$
-			if (head == null) {
-				throw new NoHeadException(JGitText.get().cannotReadTree);
+		try {
+			if (cached) {
+				if (oldTree == null) {
+					ObjectId head = repo.resolve(HEAD + "^{tree}"); //$NON-NLS-1$
+					if (head == null)
+						throw new NoHeadException(JGitText.get().cannotReadTree);
+					CanonicalTreeParser p = new CanonicalTreeParser();
+					try (ObjectReader reader = repo.newObjectReader()) {
+						p.reset(reader, head);
+					}
+					oldTree = p;
+				}
+				newTree = new DirCacheIterator(repo.readDirCache());
+			} else {
+				if (oldTree == null)
+					oldTree = new DirCacheIterator(repo.readDirCache());
+				if (newTree == null)
+					newTree = new FileTreeIterator(repo);
 			}
-			return getTreeIterator(rw, head);
-		} else {
-			return new DirCacheIterator(repo.readDirCache());
-		}
-	}
 
-	private AbstractTreeIterator resolveNewTree(RevWalk rw) throws IOException {
-		if (cached) {
-			return new DirCacheIterator(repo.readDirCache());
-		} else if (newTree != null) {
-			return newTree;
-		} else if (newTreeish != null) {
-			return getTreeIterator(rw, newTreeish);
-		} else {
-			return new FileTreeIterator(repo);
-		}
-	}
+			diffFmt.setPathFilter(pathFilter);
 
-	private static AbstractTreeIterator getTreeIterator(RevWalk rw, ObjectId id)
-			throws IOException {
-		RevTree tree = rw.parseTree(id);
-		CanonicalTreeParser p = new CanonicalTreeParser();
-		p.reset(rw.getObjectReader(), tree);
-		return p;
+			List<DiffEntry> result = diffFmt.scan(oldTree, newTree);
+			if (showNameAndStatusOnly)
+				return result;
+			else {
+				if (contextLines >= 0)
+					diffFmt.setContext(contextLines);
+				if (destinationPrefix != null)
+					diffFmt.setNewPrefix(destinationPrefix);
+				if (sourcePrefix != null)
+					diffFmt.setOldPrefix(sourcePrefix);
+				diffFmt.format(result);
+				diffFmt.flush();
+				return result;
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			diffFmt.close();
+		}
 	}
 
 	/**
@@ -209,37 +182,12 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	}
 
 	/**
-	 * @param oldTreeish
-	 *            id of the previous state
-	 * @return this instance
-	 * @since 4.3
-	 */
-	public DiffCommand setOldTree(ObjectId oldTreeish) {
-		this.oldTreeish = oldTreeish.copy();
-		oldTree = null;
-		return this;
-	}
-
-	/**
 	 * @param oldTree
 	 *            the previous state
 	 * @return this instance
 	 */
 	public DiffCommand setOldTree(AbstractTreeIterator oldTree) {
 		this.oldTree = oldTree;
-		oldTreeish = null;
-		return this;
-	}
-
-	/**
-	 * @param newTreeish
-	 *            id of the updated state
-	 * @return this instance
-	 * @since 4.3
-	 */
-	public DiffCommand setNewTree(ObjectId newTreeish) {
-		this.newTreeish = newTreeish.copy();
-		newTree = null;
 		return this;
 	}
 
@@ -250,7 +198,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 */
 	public DiffCommand setNewTree(AbstractTreeIterator newTree) {
 		this.newTree = newTree;
-		newTreeish = null;
 		return this;
 	}
 
