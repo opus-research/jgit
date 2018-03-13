@@ -108,7 +108,6 @@ public class DfsGarbageCollector {
 	private PackConfig packConfig;
 	private ReftableConfig reftableConfig;
 	private boolean convertToReftable = true;
-	private boolean includeDeletes;
 	private long reftableInitialMinUpdateIndex = 1;
 	private long reftableInitialMaxUpdateIndex = 1;
 
@@ -183,17 +182,6 @@ public class DfsGarbageCollector {
 	 */
 	public DfsGarbageCollector setConvertToReftable(boolean convert) {
 		convertToReftable = convert;
-		return this;
-	}
-
-	/**
-	 * @param include
-	 *            if true, the garbage collector will include tombstones for
-	 *            deleted references in the reftable. Default is {@code false}.
-	 * @return {@code this}
-	 */
-	public DfsGarbageCollector setIncludeDeletes(boolean include) {
-		includeDeletes = include;
 		return this;
 	}
 
@@ -498,12 +486,7 @@ public class DfsGarbageCollector {
 		return newPackDesc;
 	}
 
-	/**
-	 * @return statistics corresponding to the {@link #getNewPacks()}.
-	 *
-	 * <p>The elements can be null if the stat is not available for the pack
-	 * file.
-	 */
+	/** @return statistics corresponding to the {@link #getNewPacks()}. */
 	public List<PackStatistics> getNewPackStatistics() {
 		return newPackStats;
 	}
@@ -654,6 +637,7 @@ public class DfsGarbageCollector {
 			ProgressMonitor pm, long estimatedPackSize) throws IOException {
 		DfsPackDescription pack = repo.getObjectDatabase().newPack(source,
 				estimatedPackSize);
+		newPackDesc.add(pack);
 
 		if (source == GC && reftableConfig != null) {
 			writeReftable(pack);
@@ -687,7 +671,6 @@ public class DfsGarbageCollector {
 		PackStatistics stats = pw.getStatistics();
 		pack.setPackStats(stats);
 		pack.setLastModified(startTimeMillis);
-		newPackDesc.add(pack);
 		newPackStats.add(stats);
 		newPackObj.add(pw.getObjectSet());
 		return pack;
@@ -697,7 +680,6 @@ public class DfsGarbageCollector {
 		if (reftableConfig != null) {
 			DfsPackDescription pack = objdb.newPack(GC);
 			newPackDesc.add(pack);
-			newPackStats.add(null);
 			writeReftable(pack);
 		}
 	}
@@ -711,7 +693,7 @@ public class DfsGarbageCollector {
 		try (ReftableStack stack = ReftableStack.open(ctx, reftablesBefore)) {
 			ReftableCompactor compact = new ReftableCompactor();
 			compact.addAll(stack.readers());
-			compact.setIncludeDeletes(includeDeletes);
+			compact.setIncludeDeletes(false);
 			compactReftable(pack, compact);
 		}
 	}

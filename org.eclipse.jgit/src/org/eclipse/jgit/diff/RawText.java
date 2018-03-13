@@ -70,7 +70,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * they are converting from "line number" to "element index".
  */
 public class RawText extends Sequence {
-	/** A RawText of length 0 */
+	/** A Rawtext of length 0 */
 	public static final RawText EMPTY_TEXT = new RawText(new byte[0]);
 
 	/** Number of bytes to check for heuristics in {@link #isBinary(byte[])} */
@@ -308,10 +308,8 @@ public class RawText extends Sequence {
 	 *   the ObjectLoader for the blob
 	 * @param threshold
 	 *   if the blob is larger than this size, it is always assumed to be binary.
-	 * @since 4.10
 	 * @return the RawText representing the blob.
 	 * @throws BinaryBlobException if the blob contains binary data.
-	 * @throws IOException if the input could not be read.
 	 */
 	public static RawText load(ObjectLoader ldr, int threshold) throws IOException, BinaryBlobException {
 		long sz = ldr.getSize();
@@ -337,15 +335,13 @@ public class RawText extends Sequence {
 				if (n < 0) {
 					throw new EOFException();
 				}
-				left -= n;
 
-				while (n > 0) {
-					if (head[off] == '\0') {
-						throw new BinaryBlobException();
-					}
-					off++;
-					n--;
-				}
+				left -= n;
+				off += n;
+			}
+
+			if (isBinary(head)) {
+				throw new BinaryBlobException();
 			}
 
 			byte data[];

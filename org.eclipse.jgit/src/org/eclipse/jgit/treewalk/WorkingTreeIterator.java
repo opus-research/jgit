@@ -289,7 +289,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			contentIdFromPtr = ptr;
 			return contentId = idBufferBlob(entries[ptr]);
 		case FileMode.TYPE_GITLINK:
-		case FileMode.TYPE_TREE:
 			contentIdFromPtr = ptr;
 			return contentId = idSubmodule(entries[ptr]);
 		}
@@ -932,16 +931,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 			return false;
 		case DIFFER_BY_METADATA:
-			if (mode == FileMode.TREE.getBits() && entry.getFileMode().equals(FileMode.GITLINK)) {
-				byte[] idBuffer = idBuffer();
-				int idOffset = idOffset();
-				if (entry.getObjectId().compareTo(idBuffer, idOffset) == 0) {
-					return true;
-				} else if (ObjectId.zeroId().compareTo(idBuffer, idOffset) == 0) {
-					return new File(repository.getWorkTree(), entry.getPathString()).list().length > 0;
-				}
-				return false;
-			} else if (mode == FileMode.SYMLINK.getBits())
+			if (mode == FileMode.SYMLINK.getBits())
 				return contentCheck(entry, reader);
 			return true;
 		default:
@@ -1404,7 +1394,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (eolStreamTypeHolder == null) {
 			EolStreamType type=null;
 			if (state.walk != null) {
-				type = state.walk.getEolStreamType(opType);
+				if (opType != null) {
+					type = state.walk.getEolStreamType(opType);
+				} else {
+					type=state.walk.getEolStreamType();
+				}
 			} else {
 				switch (getOptions().getAutoCRLF()) {
 				case FALSE:
