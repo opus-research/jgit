@@ -1269,11 +1269,4 @@ public abstract class Repository {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
 		}
 	}
-
-	/**
-	 * @return true if the repo is in use
-	 */
-	public boolean isUsed() {
-		return useCnt.get() > 0;
-	}
 }
