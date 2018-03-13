@@ -47,7 +47,6 @@ package org.eclipse.jgit.pgm;
 import java.io.File;
 
 import org.kohsuke.args4j.Argument;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 
 @Command(common = false, usage = "Server side backend for 'jgit push'")

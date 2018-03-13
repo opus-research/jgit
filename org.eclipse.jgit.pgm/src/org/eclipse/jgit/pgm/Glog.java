@@ -58,7 +58,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
 import org.eclipse.jgit.awtui.CommitGraphPane;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.revplot.PlotWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
