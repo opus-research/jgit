@@ -76,13 +76,4 @@ class FS_Win32 extends FS {
 	public boolean retryFailedLockFileCommit() {
 		return true;
 	}
-
-	@Override
-	public File gitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH");
-		File gitExe = searchPath(path, "git.exe", "git.cmd");
-		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
-		return super.gitPrefix();
-	}
 }
