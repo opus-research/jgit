@@ -68,6 +68,7 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -76,6 +77,7 @@ import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
+import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
@@ -151,7 +153,7 @@ public abstract class PackParser {
 
 	private int entryCount;
 
-	private ObjectIdSubclassMap<DeltaChain> baseById;
+	private ObjectIdOwnerMap<DeltaChain> baseById;
 
 	/**
 	 * Objects referenced by their name from deltas, that aren't in this pack.
@@ -165,7 +167,7 @@ public abstract class PackParser {
 	private LongMap<UnresolvedDelta> baseByPos;
 
 	/** Blobs whose contents need to be double-checked after indexing. */
-	private List<PackedObjectInfo> deferredCheckBlobs;
+	private BlockList<PackedObjectInfo> deferredCheckBlobs;
 
 	private MessageDigest packDigest;
 
@@ -437,9 +439,9 @@ public abstract class PackParser {
 			readPackHeader();
 
 			entries = new PackedObjectInfo[(int) objectCount];
-			baseById = new ObjectIdSubclassMap<DeltaChain>();
+			baseById = new ObjectIdOwnerMap<DeltaChain>();
 			baseByPos = new LongMap<UnresolvedDelta>();
-			deferredCheckBlobs = new ArrayList<PackedObjectInfo>();
+			deferredCheckBlobs = new BlockList<PackedObjectInfo>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
@@ -578,7 +580,6 @@ public abstract class PackParser {
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
 			oe.setOffset(visit.delta.position);
-			onInflatedObjectData(oe, type, visit.data);
 			addObjectAndTrack(oe);
 			visit.id = oe;
 
@@ -767,8 +768,6 @@ public abstract class PackParser {
 					JGitText.get().unsupportedPackVersion, vers));
 		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
-
-		onPackHeader(objectCount);
 	}
 
 	private void readPackFooter() throws IOException {
@@ -876,7 +875,6 @@ public abstract class PackParser {
 		objectDigest.update(Constants.encodeASCII(sz));
 		objectDigest.update((byte) 0);
 
-		final byte[] data;
 		boolean checkContentLater = false;
 		if (type == Constants.OBJ_BLOB) {
 			byte[] readBuffer = buffer();
@@ -893,10 +891,9 @@ public abstract class PackParser {
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			checkContentLater = isCheckObjectCollisions()
 					&& readCurs.has(tempObjectId);
-			data = null;
 
 		} else {
-			data = inflateAndReturn(Source.INPUT, sz);
+			final byte[] data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			verifySafeObject(tempObjectId, type, data);
@@ -905,8 +902,6 @@ public abstract class PackParser {
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
 		obj.setOffset(pos);
 		onEndWholeObject(obj);
-		if (data != null)
-			onInflatedObjectData(obj, type, data);
 		addObjectAndTrack(obj);
 		if (checkContentLater)
 			deferredCheckBlobs.add(obj);
@@ -1149,31 +1144,6 @@ public abstract class PackParser {
 			int len) throws IOException;
 
 	/**
-	 * Invoked for commits, trees, tags, and small blobs.
-	 *
-	 * @param obj
-	 *            the object info, populated.
-	 * @param typeCode
-	 *            the type of the object.
-	 * @param data
-	 *            inflated data for the object.
-	 * @throws IOException
-	 *             the object cannot be archived.
-	 */
-	protected abstract void onInflatedObjectData(PackedObjectInfo obj,
-			int typeCode, byte[] data) throws IOException;
-
-	/**
-	 * Provide the implementation with the original stream's pack header.
-	 *
-	 * @param objCnt
-	 *            number of objects expected in the stream.
-	 * @throws IOException
-	 *             the implementation refuses to work with this many objects.
-	 */
-	protected abstract void onPackHeader(long objCnt) throws IOException;
-
-	/**
 	 * Provide the implementation with the original stream's pack footer.
 	 *
 	 * @param hash
@@ -1400,7 +1370,7 @@ public abstract class PackParser {
 		return inflater;
 	}
 
-	private static class DeltaChain extends ObjectId {
+	private static class DeltaChain extends ObjectIdOwnerMap.Entry {
 		UnresolvedDelta head;
 
 		DeltaChain(final AnyObjectId id) {
