@@ -53,7 +53,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.Sets;
 import org.junit.Test;
 
 public class StatusCommandTest extends RepositoryTestCase {
