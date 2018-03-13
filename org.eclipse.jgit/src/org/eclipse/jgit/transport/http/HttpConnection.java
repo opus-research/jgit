@@ -258,7 +258,6 @@ public interface HttpConnection {
 	 * @param random
 	 *            the source of randomness for this generator or null. See
 	 *            {@link SSLContext#init(KeyManager[], TrustManager[], SecureRandom)}
-	 *
 	 * @throws NoSuchAlgorithmException
 	 * @throws KeyManagementException
 	 */
