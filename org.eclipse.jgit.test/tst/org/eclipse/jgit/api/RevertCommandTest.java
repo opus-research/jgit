@@ -55,7 +55,7 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
 /**
- * Test revert command
+ * Test cherry-pick command
  */
 public class RevertCommandTest extends RepositoryTestCase {
 	@Test
@@ -90,10 +90,7 @@ public class RevertCommandTest extends RepositoryTestCase {
 		checkFile(new File(db.getWorkTree(), "a"),
 				"first line\nsec. line\nthird line\nfourth line\n");
 		Iterator<RevCommit> history = git.log().call().iterator();
-		RevCommit revertCommit = history.next();
-		String expectedMessage = "Revert \"fixed a\"\n\n"
-				+ "This reverts commit " + fixingA.getId().getName() + ".\n";
-		assertEquals(expectedMessage, revertCommit.getFullMessage());
+		assertEquals("Revert \"fixed a\"", history.next().getShortMessage());
 		assertEquals("fixed b", history.next().getFullMessage());
 		assertEquals("fixed a", history.next().getFullMessage());
 		assertEquals("enlarged a", history.next().getFullMessage());
