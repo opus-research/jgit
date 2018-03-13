@@ -296,7 +296,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorEncodingFromFile;
 	/***/ public String errorInBase64CodeReadingStream;
 	/***/ public String errorInPackedRefs;
-	/***/ public String errorInvalidPushCert;
 	/***/ public String errorInvalidProtocolWantedOldNewRef;
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
@@ -532,6 +531,10 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pullOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;
+	/***/ public String pushCertificateInvalidField;
+	/***/ public String pushCertificateInvalidFieldValue;
+	/***/ public String pushCertificateInvalidHeader;
+	/***/ public String pushCertificateInvalidSignature;
 	/***/ public String pushIsNotSupportedForBundleTransport;
 	/***/ public String pushNotPermitted;
 	/***/ public String rawLogMessageDoesNotParseAsLogEntry;
@@ -590,7 +593,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
-	/***/ public String serviceNotPermittedNoName;
 	/***/ public String shallowCommitsAlreadyInitialized;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
@@ -661,6 +663,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unableToCreateNewObject;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
+	/***/ public String unauthorized;
 	/***/ public String unencodeableFile;
 	/***/ public String unexpectedCompareResult;
 	/***/ public String unexpectedEndOfConfigFile;
