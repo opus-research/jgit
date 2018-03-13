@@ -46,7 +46,6 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -87,6 +86,7 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Support for the Git dircache (aka index file).
@@ -634,9 +634,9 @@ public class DirCache {
 	public void write() throws IOException {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
-		try (OutputStream o = tmp.getOutputStream();
-				OutputStream bo = new BufferedOutputStream(o)) {
-			writeTo(liveFile.getParentFile(), bo);
+		try {
+			writeTo(liveFile.getParentFile(),
+					new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;

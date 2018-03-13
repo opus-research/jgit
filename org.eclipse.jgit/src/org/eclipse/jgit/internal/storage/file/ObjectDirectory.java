@@ -567,7 +567,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				warnTmpl = JGitText.get().packWasDeleted;
 			}
 			removePack(p);
-		} else if (FileUtils.isStaleFileHandleInCausalChain(e)) {
+		} else if (FileUtils.isStaleFileHandle(e)) {
 			warnTmpl = JGitText.get().packHandleIsStale;
 			removePack(p);
 		}
