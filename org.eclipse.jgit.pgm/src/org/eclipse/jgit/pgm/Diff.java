@@ -52,7 +52,6 @@ import java.io.BufferedOutputStream;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
@@ -190,9 +189,7 @@ class Diff extends TextBuiltin {
 			} else if (newTree == null)
 				newTree = new FileTreeIterator(db);
 
-			TextProgressMonitor pm = new TextProgressMonitor();
-			pm.setDelayStart(2, TimeUnit.SECONDS);
-			diffFmt.setProgressMonitor(pm);
+			diffFmt.setProgressMonitor(new TextProgressMonitor());
 			diffFmt.setPathFilter(pathFilter);
 			if (detectRenames != null)
 				diffFmt.setDetectRenames(detectRenames.booleanValue());

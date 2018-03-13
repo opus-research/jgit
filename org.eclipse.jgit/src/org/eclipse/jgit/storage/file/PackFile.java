@@ -305,29 +305,29 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return dstbuf;
 	}
 
-	void copyPackAsIs(PackOutputStream out, boolean validate, WindowCursor curs)
+	void copyPackAsIs(PackOutputStream out, WindowCursor curs)
 			throws IOException {
 		// Pin the first window, this ensures the length is accurate.
 		curs.pin(this, 0);
-		curs.copyPackAsIs(this, length, validate, out);
+		curs.copyPackAsIs(this, out, 12, length - (12 + 20));
 	}
 
 	final void copyAsIs(PackOutputStream out, LocalObjectToPack src,
-			boolean validate, WindowCursor curs) throws IOException,
+			WindowCursor curs) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
 		beginCopyAsIs(src);
 		try {
-			copyAsIs2(out, src, validate, curs);
+			copyAsIs2(out, src, curs);
 		} finally {
 			endCopyAsIs();
 		}
 	}
 
 	private void copyAsIs2(PackOutputStream out, LocalObjectToPack src,
-			boolean validate, WindowCursor curs) throws IOException,
+			WindowCursor curs) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
-		final CRC32 crc1 = validate ? new CRC32() : null;
-		final CRC32 crc2 = validate ? new CRC32() : null;
+		final CRC32 crc1 = new CRC32();
+		final CRC32 crc2 = new CRC32();
 		final byte[] buf = out.getCopyBuffer();
 
 		// Rip apart the header so we can discover the size.
@@ -348,23 +348,17 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			do {
 				c = buf[headerCnt++] & 0xff;
 			} while ((c & 128) != 0);
-			if (validate) {
-				crc1.update(buf, 0, headerCnt);
-				crc2.update(buf, 0, headerCnt);
-			}
+			crc1.update(buf, 0, headerCnt);
+			crc2.update(buf, 0, headerCnt);
 		} else if (typeCode == Constants.OBJ_REF_DELTA) {
-			if (validate) {
-				crc1.update(buf, 0, headerCnt);
-				crc2.update(buf, 0, headerCnt);
-			}
+			crc1.update(buf, 0, headerCnt);
+			crc2.update(buf, 0, headerCnt);
 
 			readFully(src.offset + headerCnt, buf, 0, 20, curs);
-			if (validate) {
-				crc1.update(buf, 0, 20);
-				crc2.update(buf, 0, 20);
-			}
+			crc1.update(buf, 0, 20);
+			crc2.update(buf, 0, 20);
 			headerCnt += 20;
-		} else if (validate) {
+		} else {
 			crc1.update(buf, 0, headerCnt);
 			crc2.update(buf, 0, headerCnt);
 		}
@@ -380,7 +374,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		try {
 			quickCopy = curs.quickCopy(this, dataOffset, dataLength);
 
-			if (validate && idx().hasCRC32Support()) {
+			if (idx().hasCRC32Support()) {
 				// Index has the CRC32 code cached, validate the object.
 				//
 				expectedCRC = idx().findCRC32(src);
@@ -403,7 +397,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 							JGitText.get().objectAtHasBadZlibStream,
 							src.offset, getPackFile()));
 				}
-			} else if (validate) {
+			} else {
 				// We don't have a CRC32 code in the index, so compute it
 				// now while inflating the raw data to get zlib to tell us
 				// whether or not the data is safe.
@@ -433,8 +427,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 							src.offset));
 				}
 				expectedCRC = crc1.getValue();
-			} else {
-				expectedCRC = -1;
 			}
 		} catch (DataFormatException dataFormat) {
 			setCorrupt(src.offset);
@@ -462,7 +454,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// and we have it pinned.  Write this out without copying.
 			//
 			out.writeHeader(src, inflatedLength);
-			quickCopy.write(out, dataOffset, (int) dataLength, null);
+			quickCopy.write(out, dataOffset, (int) dataLength);
 
 		} else if (dataLength <= buf.length) {
 			// Tiny optimization: Lots of objects are very small deltas or
@@ -481,13 +473,12 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			while (cnt > 0) {
 				final int n = (int) Math.min(cnt, buf.length);
 				readFully(pos, buf, 0, n, curs);
-				if (validate)
-					crc2.update(buf, 0, n);
+				crc2.update(buf, 0, n);
 				out.write(buf, 0, n);
 				pos += n;
 				cnt -= n;
 			}
-			if (validate && crc2.getValue() != expectedCRC) {
+			if (crc2.getValue() != expectedCRC) {
 				throw new CorruptObjectException(MessageFormat.format(JGitText
 						.get().objectAtHasBadZlibStream, src.offset,
 						getPackFile()));
@@ -497,10 +488,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	boolean invalid() {
 		return invalid;
-	}
-
-	void setInvalid() {
-		invalid = true;
 	}
 
 	private void readFully(final long position, final byte[] dstbuf,
