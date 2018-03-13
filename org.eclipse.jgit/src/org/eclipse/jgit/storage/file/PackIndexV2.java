@@ -50,8 +50,8 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -161,17 +161,17 @@ class PackIndexV2 extends PackIndex {
 	}
 
 	@Override
-	public long getObjectCount() {
+	long getObjectCount() {
 		return objectCnt;
 	}
 
 	@Override
-	public long getOffset64Count() {
+	long getOffset64Count() {
 		return offset64.length / 8;
 	}
 
 	@Override
-	public ObjectId getObjectId(final long nthPosition) {
+	ObjectId getObjectId(final long nthPosition) {
 		int levelOne = Arrays.binarySearch(fanoutTable, nthPosition + 1);
 		long base;
 		if (levelOne >= 0) {
@@ -194,7 +194,7 @@ class PackIndexV2 extends PackIndex {
 	}
 
 	@Override
-	public long findOffset(final AnyObjectId objId) {
+	long findOffset(final AnyObjectId objId) {
 		final int levelOne = objId.getFirstByte();
 		final int levelTwo = binarySearchLevelTwo(objId, levelOne);
 		if (levelTwo == -1)
@@ -206,7 +206,7 @@ class PackIndexV2 extends PackIndex {
 	}
 
 	@Override
-	public long findCRC32(AnyObjectId objId) throws MissingObjectException {
+	long findCRC32(AnyObjectId objId) throws MissingObjectException {
 		final int levelOne = objId.getFirstByte();
 		final int levelTwo = binarySearchLevelTwo(objId, levelOne);
 		if (levelTwo == -1)
@@ -215,18 +215,17 @@ class PackIndexV2 extends PackIndex {
 	}
 
 	@Override
-	public boolean hasCRC32Support() {
+	boolean hasCRC32Support() {
 		return true;
 	}
 
-	@Override
 	public Iterator<MutableEntry> iterator() {
 		return new EntriesIteratorV2();
 	}
 
 	@Override
-	public void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
-			int matchLimit) throws IOException {
+	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id, int matchLimit)
+			throws IOException {
 		int[] data = names[id.getFirstByte()];
 		int max = offset32[id.getFirstByte()].length >>> 2;
 		int high = max;

@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.util.io;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -125,7 +124,7 @@ public class TimeoutInputStreamTest {
 		final byte[] act = new byte[exp.length];
 		out.write(exp);
 		IO.readFully(is, act, 0, act.length);
-		assertArrayEquals(exp, act);
+		assertTrue(Arrays.equals(exp, act));
 	}
 
 	@Test
@@ -136,7 +135,7 @@ public class TimeoutInputStreamTest {
 		IO.readFully(is, act, 0, 1);
 		IO.readFully(is, act, 1, 1);
 		IO.readFully(is, act, 2, 1);
-		assertArrayEquals(exp, act);
+		assertTrue(Arrays.equals(exp, act));
 	}
 
 	@Test

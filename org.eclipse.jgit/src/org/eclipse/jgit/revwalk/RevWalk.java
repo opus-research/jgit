@@ -52,12 +52,12 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RevWalkException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.Constants;
@@ -170,7 +170,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	final MutableObjectId idBuffer;
 
-	ObjectIdOwnerMap<RevObject> objects;
+	private ObjectIdOwnerMap<RevObject> objects;
 
 	private int freeFlags = APP_FLAGS;
 
@@ -682,8 +682,7 @@ public class RevWalk implements Iterable<RevCommit> {
 				r = new RevTag(id);
 				break;
 			default:
-				throw new IllegalArgumentException(MessageFormat.format(
-						JGitText.get().invalidGitType, Integer.valueOf(type)));
+				throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidGitType, type));
 			}
 			objects.add(r);
 		}
@@ -844,8 +843,8 @@ public class RevWalk implements Iterable<RevCommit> {
 			break;
 		}
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(type)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().badObjectType, type));
 		}
 		objects.add(r);
 		return r;
@@ -966,7 +965,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	/**
-	 * Ensure the object's full body content is available.
+	 * Ensure the object's fully body content is available.
 	 * <p>
 	 * This method only returns successfully if the object exists and was parsed
 	 * without error.
@@ -1027,8 +1026,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	int allocFlag() {
 		if (freeFlags == 0)
 			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().flagsAlreadyCreated,
-					Integer.valueOf(32 - RESERVED_FLAGS)));
+					JGitText.get().flagsAlreadyCreated, 32 - RESERVED_FLAGS));
 		final int m = Integer.lowestOneBit(freeFlags);
 		freeFlags &= ~m;
 		return m;

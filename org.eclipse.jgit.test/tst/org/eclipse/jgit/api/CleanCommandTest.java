@@ -44,10 +44,10 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Before;
@@ -75,7 +75,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testClean() throws NoWorkTreeException, GitAPIException {
+	public void testClean() throws NoWorkTreeException, IOException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -94,8 +94,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCleanWithPaths() throws NoWorkTreeException,
-			GitAPIException {
+	public void testCleanWithPaths() throws NoWorkTreeException, IOException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -112,26 +111,6 @@ public class CleanCommandTest extends RepositoryTestCase {
 		assertTrue(files.size() == 1);
 		assertTrue(cleanedFiles.contains("File3.txt"));
 		assertTrue(!cleanedFiles.contains("File2.txt"));
-	}
-
-	@Test
-	public void testCleanWithDryRun() throws NoWorkTreeException,
-			GitAPIException {
-		// create status
-		StatusCommand command = git.status();
-		Status status = command.call();
-		Set<String> files = status.getUntracked();
-		assertTrue(files.size() > 0);
-
-		// run clean
-		Set<String> cleanedFiles = git.clean().setDryRun(true).call();
-
-		status = git.status().call();
-		files = status.getUntracked();
-
-		assertTrue(files.size() == 2);
-		assertTrue(cleanedFiles.contains("File2.txt"));
-		assertTrue(cleanedFiles.contains("File3.txt"));
 	}
 
 }

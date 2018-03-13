@@ -53,7 +53,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>1.0.0.201106071701-r</version>
   </parent>
 
   <artifactId>org.eclipse.jgit</artifactId>
@@ -83,8 +83,6 @@
         <directory>.</directory>
         <includes>
           <include>plugin.properties</include>
-          <include>about.html</include>
-		  <include>META-INF/eclipse.inf</include>
         </includes>
       </resource>
       <resource>
@@ -143,13 +141,7 @@
           </archive>
         </configuration>
       </plugin>
-
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>clirr-maven-plugin</artifactId>
-      </plugin>
     </plugins>
-
     <pluginManagement>
       <plugins>
         <plugin>
@@ -162,18 +154,4 @@
       </plugins>
     </pluginManagement>
   </build>
-
-  <reporting>
-    <plugins>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>clirr-maven-plugin</artifactId>
-        <version>${clirr-version}</version>
-        <configuration>
-          <comparisonVersion>${jgit-last-release-version}</comparisonVersion>
-          <minSeverity>info</minSeverity>
-        </configuration>
-      </plugin>
-    </plugins>
-  </reporting>
 </project>

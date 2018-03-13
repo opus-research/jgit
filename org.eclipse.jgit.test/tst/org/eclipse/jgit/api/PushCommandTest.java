@@ -52,12 +52,12 @@ import java.net.URISyntaxException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -85,7 +85,7 @@ public class PushCommandTest extends RepositoryTestCase {
 		Git git1 = new Git(db);
 		// create some refs via commits and tag
 		RevCommit commit = git1.commit().setMessage("initial commit").call();
-		Ref tagRef = git1.tag().setName("tag").call();
+		RevTag tag = git1.tag().setName("tag").call();
 
 		try {
 			db2.resolve(commit.getId().getName() + "^{commit}");
@@ -100,8 +100,7 @@ public class PushCommandTest extends RepositoryTestCase {
 
 		assertEquals(commit.getId(),
 				db2.resolve(commit.getId().getName() + "^{commit}"));
-		assertEquals(tagRef.getObjectId(),
-				db2.resolve(tagRef.getObjectId().getName()));
+		assertEquals(tag.getId(), db2.resolve(tag.getId().getName()));
 	}
 
 	@Test
@@ -195,77 +194,5 @@ public class PushCommandTest extends RepositoryTestCase {
 					git2.getRepository().resolve("refs/heads/test"));
 
 		}
-	}
-
-	/**
-	 * Check that the push refspec is read from config.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testPushWithRefSpecFromConfig() throws Exception {
-		Git git = new Git(db);
-		Git git2 = new Git(createBareRepository());
-
-		final StoredConfig config = git.getRepository().getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
-		URIish uri = new URIish(git2.getRepository().getDirectory().toURI()
-				.toURL());
-		remoteConfig.addURI(uri);
-		remoteConfig.addPushRefSpec(new RefSpec("HEAD:refs/heads/newbranch"));
-		remoteConfig.update(config);
-		config.save();
-
-		writeTrashFile("f", "content of f");
-		git.add().addFilepattern("f").call();
-		RevCommit commit = git.commit().setMessage("adding f").call();
-
-		assertEquals(null, git2.getRepository().resolve("refs/heads/master"));
-		git.push().setRemote("test").call();
-		assertEquals(commit.getId(),
-				git2.getRepository().resolve("refs/heads/newbranch"));
-
-
-	}
-
-	/**
-	 * Check that only HEAD is pushed if no refspec is given.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testPushWithoutPushRefSpec() throws Exception {
-		Git git = new Git(db);
-		Git git2 = new Git(createBareRepository());
-
-		final StoredConfig config = git.getRepository().getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
-		URIish uri = new URIish(git2.getRepository().getDirectory().toURI()
-				.toURL());
-		remoteConfig.addURI(uri);
-		remoteConfig.addFetchRefSpec(new RefSpec(
-				"+refs/heads/*:refs/remotes/origin/*"));
-		remoteConfig.update(config);
-		config.save();
-
-		writeTrashFile("f", "content of f");
-		git.add().addFilepattern("f").call();
-		RevCommit commit = git.commit().setMessage("adding f").call();
-
-		git.checkout().setName("not-pushed").setCreateBranch(true).call();
-		git.checkout().setName("branchtopush").setCreateBranch(true).call();
-
-		assertEquals(null,
-				git2.getRepository().resolve("refs/heads/branchtopush"));
-		assertEquals(null, git2.getRepository()
-				.resolve("refs/heads/not-pushed"));
-		assertEquals(null, git2.getRepository().resolve("refs/heads/master"));
-		git.push().setRemote("test").call();
-		assertEquals(commit.getId(),
-				git2.getRepository().resolve("refs/heads/branchtopush"));
-		assertEquals(null, git2.getRepository()
-				.resolve("refs/heads/not-pushed"));
-		assertEquals(null, git2.getRepository().resolve("refs/heads/master"));
-
 	}
 }

@@ -72,7 +72,7 @@ class Merge extends TextBuiltin {
 			mergeStrategy = MergeStrategy.get(strategyName);
 			if (mergeStrategy == null)
 				throw die(MessageFormat.format(
-						CLIText.get().unknownMergeStrategy, strategyName));
+						CLIText.get().unknownMergeStratey, strategyName));
 		}
 
 		// determine the other revision we want to merge with HEAD
@@ -114,7 +114,6 @@ class Merge extends TextBuiltin {
 		case MERGED:
 			out.println(MessageFormat.format(CLIText.get().mergeMadeBy,
 					mergeStrategy.getName()));
-			break;
 		case NOT_SUPPORTED:
 			out.println(MessageFormat.format(
 					CLIText.get().unsupportedOperation, result.toString()));

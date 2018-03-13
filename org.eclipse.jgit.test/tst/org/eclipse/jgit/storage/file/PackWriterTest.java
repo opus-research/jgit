@@ -55,22 +55,18 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevBlob;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
@@ -83,8 +79,8 @@ import org.junit.Test;
 
 public class PackWriterTest extends SampleDataRepositoryTestCase {
 
-	private static final Set<ObjectId> EMPTY_SET_OBJECT = Collections
-			.<ObjectId> emptySet();
+	private static final List<ObjectId> EMPTY_LIST_OBJECT = Collections
+			.<ObjectId> emptyList();
 
 	private static final List<RevObject> EMPTY_LIST_REVS = Collections
 			.<RevObject> emptyList();
@@ -166,7 +162,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testWriteEmptyPack1() throws IOException {
-		createVerifyOpenPack(EMPTY_SET_OBJECT, EMPTY_SET_OBJECT, false, false);
+		createVerifyOpenPack(EMPTY_LIST_OBJECT, EMPTY_LIST_OBJECT, false, false);
 
 		assertEquals(0, writer.getObjectCount());
 		assertEquals(0, pack.getObjectCount());
@@ -199,7 +195,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
 		try {
-			createVerifyOpenPack(EMPTY_SET_OBJECT, Collections.singleton(
+			createVerifyOpenPack(EMPTY_LIST_OBJECT, Collections.nCopies(1,
 					nonExisting), false, false);
 			fail("Should have thrown MissingObjectException");
 		} catch (MissingObjectException x) {
@@ -216,7 +212,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	public void testIgnoreNonExistingObjects() throws IOException {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
-		createVerifyOpenPack(EMPTY_SET_OBJECT, Collections.singleton(
+		createVerifyOpenPack(EMPTY_LIST_OBJECT, Collections.nCopies(1,
 				nonExisting), false, true);
 		// shouldn't throw anything
 	}
@@ -451,76 +447,14 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		}
 	}
 
-	@Test
-	public void testExclude() throws Exception {
-		FileRepository repo = createBareRepository();
-
-		TestRepository<FileRepository> testRepo = new TestRepository<FileRepository>(
-				repo);
-		BranchBuilder bb = testRepo.branch("refs/heads/master");
-		RevBlob contentA = testRepo.blob("A");
-		RevCommit c1 = bb.commit().add("f", contentA).create();
-		testRepo.getRevWalk().parseHeaders(c1);
-		PackIndex pf1 = writePack(repo, Collections.singleton(c1),
-				Collections.<PackIndex> emptySet());
-		assertContent(
-				pf1,
-				Arrays.asList(c1.getId(), c1.getTree().getId(),
-						contentA.getId()));
-		RevBlob contentB = testRepo.blob("B");
-		RevCommit c2 = bb.commit().add("f", contentB).create();
-		testRepo.getRevWalk().parseHeaders(c2);
-		PackIndex pf2 = writePack(repo, Collections.singleton(c2),
-				Collections.singleton(pf1));
-		assertContent(
-				pf2,
-				Arrays.asList(c2.getId(), c2.getTree().getId(),
-						contentB.getId()));
-	}
-
-	private void assertContent(PackIndex pi, List<ObjectId> expected) {
-		assertEquals("Pack index has wrong size.", expected.size(),
-				pi.getObjectCount());
-		for (int i = 0; i < pi.getObjectCount(); i++)
-			assertTrue(
-					"Pack index didn't contain the expected id "
-							+ pi.getObjectId(i),
-					expected.contains(pi.getObjectId(i)));
-	}
-
-	private PackIndex writePack(FileRepository repo,
-			Set<? extends ObjectId> want, Set<PackIndex> excludeObjects)
-			throws IOException {
-		PackWriter pw = new PackWriter(repo);
-		pw.setDeltaBaseAsOffset(true);
-		pw.setReuseDeltaCommits(false);
-		for (PackIndex idx : excludeObjects)
-			pw.excludeObjects(idx);
-		pw.preparePack(NullProgressMonitor.INSTANCE, want,
-				Collections.<ObjectId> emptySet());
-		String id = pw.computeName().getName();
-		File packdir = new File(repo.getObjectsDirectory(), "pack");
-		File packFile = new File(packdir, "pack-" + id + ".pack");
-		FileOutputStream packOS = new FileOutputStream(packFile);
-		pw.writePack(NullProgressMonitor.INSTANCE,
-				NullProgressMonitor.INSTANCE, packOS);
-		packOS.close();
-		File idxFile = new File(packdir, "pack-" + id + ".idx");
-		FileOutputStream idxOS = new FileOutputStream(idxFile);
-		pw.writeIndex(idxOS);
-		idxOS.close();
-		pw.release();
-		return PackIndex.open(idxFile);
-	}
-
 	// TODO: testWritePackDeltasCycle()
 	// TODO: testWritePackDeltasDepth()
 
 	private void writeVerifyPack1() throws IOException {
-		final HashSet<ObjectId> interestings = new HashSet<ObjectId>();
+		final LinkedList<ObjectId> interestings = new LinkedList<ObjectId>();
 		interestings.add(ObjectId
 				.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"));
-		createVerifyOpenPack(interestings, EMPTY_SET_OBJECT, false, false);
+		createVerifyOpenPack(interestings, EMPTY_LIST_OBJECT, false, false);
 
 		final ObjectId expectedOrder[] = new ObjectId[] {
 				ObjectId.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"),
@@ -540,10 +474,10 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 
 	private void writeVerifyPack2(boolean deltaReuse) throws IOException {
 		config.setReuseDeltas(deltaReuse);
-		final HashSet<ObjectId> interestings = new HashSet<ObjectId>();
+		final LinkedList<ObjectId> interestings = new LinkedList<ObjectId>();
 		interestings.add(ObjectId
 				.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"));
-		final HashSet<ObjectId> uninterestings = new HashSet<ObjectId>();
+		final LinkedList<ObjectId> uninterestings = new LinkedList<ObjectId>();
 		uninterestings.add(ObjectId
 				.fromString("540a36d136cf413e4b064c2b0e0a4db60f77feab"));
 		createVerifyOpenPack(interestings, uninterestings, false, false);
@@ -568,10 +502,10 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private void writeVerifyPack4(final boolean thin) throws IOException {
-		final HashSet<ObjectId> interestings = new HashSet<ObjectId>();
+		final LinkedList<ObjectId> interestings = new LinkedList<ObjectId>();
 		interestings.add(ObjectId
 				.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"));
-		final HashSet<ObjectId> uninterestings = new HashSet<ObjectId>();
+		final LinkedList<ObjectId> uninterestings = new LinkedList<ObjectId>();
 		uninterestings.add(ObjectId
 				.fromString("c59759f143fb1fe21c197981df75a7ee00290799"));
 		createVerifyOpenPack(interestings, uninterestings, thin, false);
@@ -597,8 +531,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 				.computeName().name());
 	}
 
-	private void createVerifyOpenPack(final Set<ObjectId> interestings,
-			final Set<ObjectId> uninterestings, final boolean thin,
+	private void createVerifyOpenPack(final Collection<ObjectId> interestings,
+			final Collection<ObjectId> uninterestings, final boolean thin,
 			final boolean ignoreMissingUninteresting)
 			throws MissingObjectException, IOException {
 		NullProgressMonitor m = NullProgressMonitor.INSTANCE;
