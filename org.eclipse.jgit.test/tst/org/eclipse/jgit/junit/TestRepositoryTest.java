@@ -62,7 +62,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -128,25 +127,25 @@ public class TestRepositoryTest {
 	@Test
 	public void resetFromSymref() throws Exception {
 		repo.updateRef("HEAD").link("refs/heads/master");
-		Ref head = repo.exactRef("HEAD");
+		Ref head = repo.getRef("HEAD");
 		RevCommit master = tr.branch("master").commit().create();
 		RevCommit branch = tr.branch("branch").commit().create();
 		RevCommit detached = tr.commit().create();
 
 		assertTrue(head.isSymbolic());
 		assertEquals("refs/heads/master", head.getTarget().getName());
-		assertEquals(master, repo.exactRef("refs/heads/master").getObjectId());
-		assertEquals(branch, repo.exactRef("refs/heads/branch").getObjectId());
+		assertEquals(master, repo.getRef("refs/heads/master").getObjectId());
+		assertEquals(branch, repo.getRef("refs/heads/branch").getObjectId());
 
 		// Reset to branches preserves symref.
 		tr.reset("master");
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(master, head.getObjectId());
 		assertTrue(head.isSymbolic());
 		assertEquals("refs/heads/master", head.getTarget().getName());
 
 		tr.reset("branch");
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(branch, head.getObjectId());
 		assertTrue(head.isSymbolic());
 		assertEquals("refs/heads/master", head.getTarget().getName());
@@ -154,50 +153,50 @@ public class TestRepositoryTest {
 
 		// Reset to a SHA-1 detaches.
 		tr.reset(detached);
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(detached, head.getObjectId());
 		assertFalse(head.isSymbolic());
 
 		tr.reset(detached.name());
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(detached, head.getObjectId());
 		assertFalse(head.isSymbolic());
 
 		// Reset back to a branch remains detached.
 		tr.reset("master");
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(lastHeadBeforeDetach, head.getObjectId());
 		assertFalse(head.isSymbolic());
 	}
 
 	@Test
 	public void resetFromDetachedHead() throws Exception {
-		Ref head = repo.exactRef("HEAD");
+		Ref head = repo.getRef("HEAD");
 		RevCommit master = tr.branch("master").commit().create();
 		RevCommit branch = tr.branch("branch").commit().create();
 		RevCommit detached = tr.commit().create();
 
 		assertNull(head);
-		assertEquals(master, repo.exactRef("refs/heads/master").getObjectId());
-		assertEquals(branch, repo.exactRef("refs/heads/branch").getObjectId());
+		assertEquals(master, repo.getRef("refs/heads/master").getObjectId());
+		assertEquals(branch, repo.getRef("refs/heads/branch").getObjectId());
 
 		tr.reset("master");
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(master, head.getObjectId());
 		assertFalse(head.isSymbolic());
 
 		tr.reset("branch");
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(branch, head.getObjectId());
 		assertFalse(head.isSymbolic());
 
 		tr.reset(detached);
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(detached, head.getObjectId());
 		assertFalse(head.isSymbolic());
 
 		tr.reset(detached.name());
-		head = repo.exactRef("HEAD");
+		head = repo.getRef("HEAD");
 		assertEquals(detached, head.getObjectId());
 		assertFalse(head.isSymbolic());
 	}
@@ -223,7 +222,7 @@ public class TestRepositoryTest {
 				.tick(3)
 				.add("bar", "fixed bar contents")
 				.create();
-		assertEquals(amended, repo.exactRef("refs/heads/master").getObjectId());
+		assertEquals(amended, repo.getRef("refs/heads/master").getObjectId());
 		rw.parseBody(amended);
 
 		assertEquals(1, amended.getParentCount());
@@ -258,7 +257,7 @@ public class TestRepositoryTest {
 				.add("foo", "fixed foo contents")
 				.create();
 
-		Ref head = repo.exactRef(Constants.HEAD);
+		Ref head = repo.getRef(Constants.HEAD);
 		assertEquals(amended, head.getObjectId());
 		assertTrue(head.isSymbolic());
 		assertEquals("refs/heads/master", head.getTarget().getName());
@@ -292,7 +291,7 @@ public class TestRepositoryTest {
 	public void commitToUnbornHead() throws Exception {
 		repo.updateRef("HEAD").link("refs/heads/master");
 		RevCommit root = tr.branch("HEAD").commit().create();
-		Ref ref = repo.exactRef(Constants.HEAD);
+		Ref ref = repo.getRef(Constants.HEAD);
 		assertEquals(root, ref.getObjectId());
 		assertTrue(ref.isSymbolic());
 		assertEquals("refs/heads/master", ref.getTarget().getName());
@@ -317,7 +316,7 @@ public class TestRepositoryTest {
 		RevCommit result = tr.cherryPick(toPick);
 		rw.parseBody(result);
 
-		Ref headRef = tr.getRepository().exactRef("HEAD");
+		Ref headRef = tr.getRepository().getRef("HEAD");
 		assertEquals(result, headRef.getObjectId());
 		assertTrue(headRef.isSymbolic());
 		assertEquals("refs/heads/master", headRef.getLeaf().getName());
@@ -372,45 +371,7 @@ public class TestRepositoryTest {
 				.create();
 		assertNotEquals(head, toPick);
 		assertNull(tr.cherryPick(toPick));
-		assertEquals(head, repo.exactRef("HEAD").getObjectId());
-	}
-
-	@Test
-	public void reattachToMaster_Race() throws Exception {
-		RevCommit commit = tr.branch("master").commit().create();
-		tr.branch("master").update(commit);
-		tr.branch("other").update(commit);
-		repo.updateRef("HEAD").link("refs/heads/master");
-
-		// Create a detached HEAD that is not an .
-		tr.reset(commit);
-		Ref head = repo.exactRef("HEAD");
-		assertEquals(commit, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		// Try to reattach to master.
-		RefUpdate refUpdate = repo.updateRef("HEAD");
-
-		// Make a change during reattachment.
-		repo.updateRef("HEAD").link("refs/heads/other");
-
-		assertEquals(
-				RefUpdate.Result.LOCK_FAILURE, refUpdate.link("refs/heads/master"));
-	}
-
-	@Test
-	public void nonRacingChange() throws Exception {
-		tr.branch("master").update(tr.branch("master").commit().create());
-		tr.branch("other").update(tr.branch("other").commit().create());
-		repo.updateRef("HEAD").link("refs/heads/master");
-
-		// Try to update HEAD.
-		RefUpdate refUpdate = repo.updateRef("HEAD");
-
-		// Proceed a master. This should not affect changing HEAD.
-		tr.branch("master").update(tr.branch("master").commit().create());
-
-		assertEquals(RefUpdate.Result.FORCED, refUpdate.link("refs/heads/other"));
+		assertEquals(head, repo.getRef("HEAD").getObjectId());
 	}
 
 	private String blobAsString(AnyObjectId treeish, String path)

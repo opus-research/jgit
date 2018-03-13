@@ -116,17 +116,22 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
 
-		try (Transport transport = Transport.open(repo, remote)) {
-			transport.setCheckFetchedObjects(checkFetchedObjects);
-			transport.setRemoveDeletedRefs(isRemoveDeletedRefs());
-			transport.setDryRun(dryRun);
-			if (tagOption != null)
-				transport.setTagOpt(tagOption);
-			transport.setFetchThin(thin);
-			configure(transport);
+		try {
+			Transport transport = Transport.open(repo, remote);
+			try {
+				transport.setCheckFetchedObjects(checkFetchedObjects);
+				transport.setRemoveDeletedRefs(isRemoveDeletedRefs());
+				transport.setDryRun(dryRun);
+				if (tagOption != null)
+					transport.setTagOpt(tagOption);
+				transport.setFetchThin(thin);
+				configure(transport);
 
-			FetchResult result = transport.fetch(monitor, refSpecs);
-			return result;
+				FetchResult result = transport.fetch(monitor, refSpecs);
+				return result;
+			} finally {
+				transport.close();
+			}
 		} catch (NoRemoteRepositoryException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote), e);

@@ -65,6 +65,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
@@ -72,7 +73,6 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.IndexDiffFilter;
@@ -247,7 +247,7 @@ public class IndexDiff {
 
 	private final Repository repository;
 
-	private final AnyObjectId tree;
+	private final RevTree tree;
 
 	private TreeFilter filter = null;
 
@@ -310,13 +310,10 @@ public class IndexDiff {
 	public IndexDiff(Repository repository, ObjectId objectId,
 			WorkingTreeIterator workingTreeIterator) throws IOException {
 		this.repository = repository;
-		if (objectId != null) {
-			try (RevWalk rw = new RevWalk(repository)) {
-				tree = rw.parseTree(objectId);
-			}
-		} else {
+		if (objectId != null)
+			tree = new RevWalk(repository).parseTree(objectId);
+		else
 			tree = null;
-		}
 		this.initialWorkingTreeIterator = workingTreeIterator;
 	}
 
@@ -406,7 +403,6 @@ public class IndexDiff {
 		dirCache = repository.readDirCache();
 
 		try (TreeWalk treeWalk = new TreeWalk(repository)) {
-			treeWalk.setOperationType(OperationType.CHECKIN_OP);
 			treeWalk.setRecursive(true);
 			// add the trees (tree, dirchache, workdir)
 			if (tree != null)
@@ -415,7 +411,6 @@ public class IndexDiff {
 				treeWalk.addTree(new EmptyTreeIterator());
 			treeWalk.addTree(new DirCacheIterator(dirCache));
 			treeWalk.addTree(initialWorkingTreeIterator);
-			initialWorkingTreeIterator.setDirCacheIterator(treeWalk, 1);
 			Collection<TreeFilter> filters = new ArrayList<TreeFilter>(4);
 
 			if (monitor != null) {

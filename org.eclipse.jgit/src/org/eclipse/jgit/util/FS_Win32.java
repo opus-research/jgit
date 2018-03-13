@@ -51,10 +51,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.errors.CommandFailedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * FS implementation for Windows
@@ -62,7 +58,6 @@ import org.slf4j.LoggerFactory;
  * @since 3.0
  */
 public class FS_Win32 extends FS {
-	private final static Logger LOG = LoggerFactory.getLogger(FS_Win32.class);
 
 	private volatile Boolean supportSymlinks;
 
@@ -118,19 +113,12 @@ public class FS_Win32 extends FS {
 			if (searchPath(path, "bash.exe") != null) { //$NON-NLS-1$
 				// This isn't likely to work, but its worth trying:
 				// If bash is in $PATH, git should also be in $PATH.
-				String w;
-				try {
-					w = readPipe(userHome(),
+				String w = readPipe(userHome(),
 						new String[]{"bash", "--login", "-c", "which git"}, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 						Charset.defaultCharset().name());
-				} catch (CommandFailedException e) {
-					LOG.warn(e.getMessage());
-					return null;
-				}
-				if (!StringUtils.isEmptyOrNull(w)) {
+				if (!StringUtils.isEmptyOrNull(w))
 					// The path may be in cygwin/msys notation so resolve it right away
 					gitExe = resolve(null, w);
-				}
 			}
 		}
 
@@ -183,8 +171,7 @@ public class FS_Win32 extends FS {
 			createSymLink(linkName, tempFile.getPath());
 			supportSymlinks = Boolean.TRUE;
 			linkName.delete();
-		} catch (IOException | UnsupportedOperationException
-				| InternalError e) {
+		} catch (IOException | UnsupportedOperationException e) {
 			supportSymlinks = Boolean.FALSE;
 		} finally {
 			if (tempFile != null)

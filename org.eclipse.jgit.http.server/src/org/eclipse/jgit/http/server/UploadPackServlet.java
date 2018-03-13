@@ -197,7 +197,7 @@ class UploadPackServlet extends HttpServlet {
 				out.close();
 			} else if (!rsp.isCommitted()) {
 				rsp.reset();
-				sendError(req, rsp, e.getStatusCode(), e.getMessage());
+				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
 			}
 			return;
 

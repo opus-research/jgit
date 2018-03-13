@@ -46,7 +46,6 @@ package org.eclipse.jgit.junit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -104,6 +103,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Wrapper to make creating test data easier.
@@ -112,18 +112,23 @@ import org.eclipse.jgit.util.FileUtils;
  *            type of Repository the test data is stored on.
  */
 public class TestRepository<R extends Repository> {
+	private static final PersonIdent defaultAuthor;
 
-	public static final String AUTHOR = "J. Author";
+	private static final PersonIdent defaultCommitter;
 
-	public static final String AUTHOR_EMAIL = "jauthor@example.com";
+	static {
+		final MockSystemReader m = new MockSystemReader();
+		final long now = m.getCurrentTime();
+		final int tz = m.getTimezone(now);
 
-	public static final String COMMITTER = "J. Committer";
+		final String an = "J. Author";
+		final String ae = "jauthor@example.com";
+		defaultAuthor = new PersonIdent(an, ae, now, tz);
 
-	public static final String COMMITTER_EMAIL = "jcommitter@example.com";
-
-	private final PersonIdent defaultAuthor;
-
-	private final PersonIdent defaultCommitter;
+		final String cn = "J. Committer";
+		final String ce = "jcommitter@example.com";
+		defaultCommitter = new PersonIdent(cn, ce, now, tz);
+	}
 
 	private final R db;
 
@@ -170,7 +175,6 @@ public class TestRepository<R extends Repository> {
 	 *            the MockSystemReader to use for clock and other system
 	 *            operations.
 	 * @throws IOException
-	 * @since 4.2
 	 */
 	public TestRepository(R db, RevWalk rw, MockSystemReader reader)
 			throws IOException {
@@ -179,10 +183,6 @@ public class TestRepository<R extends Repository> {
 		this.pool = rw;
 		this.inserter = db.newObjectInserter();
 		this.mockSystemReader = reader;
-		long now = mockSystemReader.getCurrentTime();
-		int tz = mockSystemReader.getTimezone(now);
-		defaultAuthor = new PersonIdent(AUTHOR, AUTHOR_EMAIL, now, tz);
-		defaultCommitter = new PersonIdent(COMMITTER, COMMITTER_EMAIL, now, tz);
 	}
 
 	/** @return the repository this helper class operates against. */
@@ -203,12 +203,20 @@ public class TestRepository<R extends Repository> {
 		return git;
 	}
 
-	/**
-	 * @return current date.
-	 * @since 4.2
-	 */
+	/** @return current date. */
 	public Date getDate() {
 		return new Date(mockSystemReader.getCurrentTime());
+	}
+
+	/**
+	 * @return current date.
+	 *
+	 * @deprecated Use {@link #getDate()} instead.
+	 */
+	@Deprecated
+	public Date getClock() {
+		// Remove once Gitiles and Gerrit are using the updated JGit.
+		return getDate();
 	}
 
 	/** @return timezone used for default identities. */
@@ -490,7 +498,7 @@ public class TestRepository<R extends Repository> {
 	 */
 	public CommitBuilder amendRef(String ref) throws Exception {
 		String name = normalizeRef(ref);
-		Ref r = db.exactRef(name);
+		Ref r = db.getRef(name);
 		if (r == null)
 			throw new IOException("Not a ref: " + ref);
 		return amend(pool.parseCommit(r.getObjectId()), branch(name).commit());
@@ -572,31 +580,6 @@ public class TestRepository<R extends Repository> {
 
 		default:
 			throw new IOException("Cannot write " + ref + " " + u.getResult());
-		}
-	}
-
-	/**
-	 * Delete a reference.
-	 *
-	 * @param ref
-	 *	      the name of the reference to delete. This is normalized
-	 *	      in the same way as {@link #update(String, AnyObjectId)}.
-	 * @throws Exception
-	 * @since 4.4
-	 */
-	public void delete(String ref) throws Exception {
-		ref = normalizeRef(ref);
-		RefUpdate u = db.updateRef(ref);
-		switch (u.delete()) {
-		case FAST_FORWARD:
-		case FORCED:
-		case NEW:
-		case NO_CHANGE:
-			updateServerInfo();
-			return;
-
-		default:
-			throw new IOException("Cannot delete " + ref + " " + u.getResult());
 		}
 	}
 
@@ -692,7 +675,7 @@ public class TestRepository<R extends Repository> {
 		RevCommit parent = commit.getParent(0);
 		pool.parseHeaders(parent);
 
-		Ref headRef = db.exactRef(Constants.HEAD);
+		Ref headRef = db.getRef(Constants.HEAD);
 		if (headRef == null)
 			throw new IOException("Missing HEAD");
 		RevCommit head = pool.parseCommit(headRef.getObjectId());
@@ -835,7 +818,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.checkCommit(o, bin);
+				oc.checkCommit(bin);
 				assertHash(o, bin);
 			}
 
@@ -845,7 +828,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.check(o, o.getType(), bin);
+				oc.check(o.getType(), bin);
 				assertHash(o, bin);
 			}
 		}
@@ -879,20 +862,20 @@ public class TestRepository<R extends Repository> {
 				Set<ObjectId> all = new HashSet<ObjectId>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
-				pw.preparePack(m, all, PackWriter.NONE);
+				pw.preparePack(m, all, Collections.<ObjectId> emptySet());
 
 				final ObjectId name = pw.computeName();
 
 				pack = nameFor(odb, name, ".pack");
 				try (OutputStream out =
-						new BufferedOutputStream(new FileOutputStream(pack))) {
+						new SafeBufferedOutputStream(new FileOutputStream(pack))) {
 					pw.writePack(m, m, out);
 				}
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
 				try (OutputStream out =
-						new BufferedOutputStream(new FileOutputStream(idx))) {
+						new SafeBufferedOutputStream(new FileOutputStream(idx))) {
 					pw.writeIndex(out);
 				}
 				idx.setReadOnly();
@@ -918,7 +901,7 @@ public class TestRepository<R extends Repository> {
 
 	private void writeFile(final File p, final byte[] bin) throws IOException,
 			ObjectWritingException {
-		final LockFile lck = new LockFile(p);
+		final LockFile lck = new LockFile(p, db.getFS());
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);
 		try {
@@ -973,15 +956,6 @@ public class TestRepository<R extends Repository> {
 		public RevCommit update(RevCommit to) throws Exception {
 			return TestRepository.this.update(ref, to);
 		}
-
-		/**
-		 * Delete this branch.
-		 * @throws Exception
-		 * @since 4.4
-		 */
-		public void delete() throws Exception {
-			TestRepository.this.delete(ref);
-		}
 	}
 
 	/** Helper to generate a commit. */
@@ -1014,7 +988,7 @@ public class TestRepository<R extends Repository> {
 		CommitBuilder(BranchBuilder b) throws Exception {
 			branch = b;
 
-			Ref ref = db.exactRef(branch.ref);
+			Ref ref = db.getRef(branch.ref);
 			if (ref != null && ref.getObjectId() != null)
 				parent(pool.parseCommit(ref.getObjectId()));
 		}
@@ -1177,7 +1151,8 @@ public class TestRepository<R extends Repository> {
 			return self;
 		}
 
-		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c) {
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
+				throws IOException {
 			if (changeId == null)
 				return;
 			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");

@@ -101,7 +101,7 @@ public class SubmoduleSyncCommand extends GitCommand<Map<String, String>> {
 	 * @throws IOException
 	 */
 	protected String getHeadBranch(final Repository subRepo) throws IOException {
-		Ref head = subRepo.exactRef(Constants.HEAD);
+		Ref head = subRepo.getRef(Constants.HEAD);
 		if (head != null && head.isSymbolic())
 			return Repository.shortenRefName(head.getLeaf().getName());
 		else
@@ -111,7 +111,8 @@ public class SubmoduleSyncCommand extends GitCommand<Map<String, String>> {
 	public Map<String, String> call() throws GitAPIException {
 		checkCallable();
 
-		try (SubmoduleWalk generator = SubmoduleWalk.forIndex(repo)) {
+		try {
+			SubmoduleWalk generator = SubmoduleWalk.forIndex(repo);
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
 			Map<String, String> synced = new HashMap<String, String>();

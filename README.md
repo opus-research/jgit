@@ -18,6 +18,10 @@ there, but the automated builds use Maven.
     All portions of JGit are covered by the EDL. Absolutely no GPL,
     LGPL or EPL contributions are accepted within this package.
 
+- org.eclipse.jgit.java7
+
+    Extensions for users of Java 7.
+
 - org.eclipse.jgit.ant
 
     Ant tasks based on JGit.
@@ -55,6 +59,10 @@ Tests
 
     Unit tests for org.eclipse.jgit
 
+- org.eclipse.jgit.java7.test
+
+    Unit tests for Java 7 specific features
+
 - org.eclipse.jgit.ant.test
 - org.eclipse.jgit.pgm.test
 - org.eclipse.jgit.http.test
@@ -65,9 +73,11 @@ Tests
 Warnings/Caveats
 ----------------
 
-- Native smbolic links are supported, provided the file system supports
-  them. For Windows you must have Windows Vista/Windows 2008 or newer,
-  use a non-administrator account and have the SeCreateSymbolicLinkPrivilege.
+- Native smbolic links are supported, but only if you are using Java 7
+  or newer and include the org.eclipse.jgit.java7 jar/bundle in the
+  classpath, provided the file system supports them. For Windows you
+  must have Windows Vista/Windows 2008 or newer, use a
+  non-administrator account and have the SeCreateSymbolicLinkPrivilege.
 
 - Only the timestamp of the index is used by jgit if the index is
   dirty.
@@ -142,6 +152,12 @@ Package Features
 
     * Assorted set of command line utilities. Mostly for ad-hoc testing of jgit
       log, glog, fetch etc.
+
+- org.eclipse.jgit.java7/
+
+    * Support for symbolic links.
+
+    * Optimizations for reading file system attributes
 
 - org.eclipse.jgit.ant/
 

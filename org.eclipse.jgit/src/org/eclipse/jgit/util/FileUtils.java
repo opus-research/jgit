@@ -398,10 +398,8 @@ public class FileUtils {
 	 * Create a symbolic link
 	 *
 	 * @param path
-	 *            the path of the symbolic link to create
 	 * @param target
-	 *            the target of the symbolic link
-	 * @return the path to the symbolic link
+	 * @return path to the created link
 	 * @throws IOException
 	 * @since 4.2
 	 */
@@ -409,9 +407,7 @@ public class FileUtils {
 			throws IOException {
 		Path nioPath = path.toPath();
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
-			BasicFileAttributes attrs = Files.readAttributes(nioPath,
-					BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-			if (attrs.isRegularFile() || attrs.isSymbolicLink()) {
+			if (Files.isRegularFile(nioPath)) {
 				delete(path);
 			} else {
 				delete(path, EMPTY_DIRECTORIES_ONLY | RECURSIVE);

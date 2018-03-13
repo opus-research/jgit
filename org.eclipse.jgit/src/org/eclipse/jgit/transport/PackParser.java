@@ -122,14 +122,14 @@ public abstract class PackParser {
 
 	private InputStream in;
 
-	byte[] buf;
+	private byte[] buf;
 
 	/** Position in the input stream of {@code buf[0]}. */
 	private long bBase;
 
 	private int bOffset;
 
-	int bAvail;
+	private int bAvail;
 
 	private ObjectChecker objCheck;
 
@@ -185,9 +185,6 @@ public abstract class PackParser {
 
 	/** Git object size limit */
 	private long maxObjectSizeLimit;
-
-	private final ReceivedPackStatistics.Builder stats =
-			new ReceivedPackStatistics.Builder();
 
 	/**
 	 * Initialize a pack parser.
@@ -458,8 +455,8 @@ public abstract class PackParser {
 	}
 
 	/**
-	 * Get the size of the newly created pack.
-	 * <p>
+	 * Get the size of the parsed pack.
+	 *
 	 * This will also include the pack index size if an index was created. This
 	 * method should only be called after pack parsing is finished.
 	 *
@@ -469,18 +466,6 @@ public abstract class PackParser {
 	 */
 	public long getPackSize() {
 		return -1;
-	}
-
-	/**
-	 * Returns the statistics of the parsed pack.
-	 * <p>
-	 * This should only be called after pack parsing is finished.
-	 *
-	 * @return {@link ReceivedPackStatistics}
-	 * @since 4.6
-	 */
-	public ReceivedPackStatistics getReceivedPackStatistics() {
-		return stats.build();
 	}
 
 	/**
@@ -641,7 +626,6 @@ public abstract class PackParser {
 	private void resolveDeltas(DeltaVisit visit, final int type,
 			ObjectTypeAndSize info, ProgressMonitor progress)
 			throws IOException {
-		stats.addDeltaObject(type);
 		do {
 			progress.update(1);
 			info = openDatabase(visit.delta, info);
@@ -935,7 +919,6 @@ public abstract class PackParser {
 
 	// Cleanup all resources associated with our input parsing.
 	private void endInput() {
-		stats.setNumBytesRead(streamPosition());
 		in = null;
 	}
 
@@ -964,14 +947,12 @@ public abstract class PackParser {
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
-			stats.addWholeObject(typeCode);
 			onBeginWholeObject(streamPosition, typeCode, sz);
 			onObjectHeader(Source.INPUT, hdrBuf, 0, hdrPtr);
 			whole(streamPosition, typeCode, sz);
 			break;
 
 		case Constants.OBJ_OFS_DELTA: {
-			stats.addOffsetDelta();
 			c = readFrom(Source.INPUT);
 			hdrBuf[hdrPtr++] = (byte) c;
 			long ofs = c & 127;
@@ -994,7 +975,6 @@ public abstract class PackParser {
 		}
 
 		case Constants.OBJ_REF_DELTA: {
-			stats.addRefDelta();
 			c = fill(Source.INPUT, 20);
 			final ObjectId base = ObjectId.fromRaw(buf, c);
 			System.arraycopy(buf, c, hdrBuf, hdrPtr, 20);
@@ -1069,11 +1049,8 @@ public abstract class PackParser {
 			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, data);
+				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				if (e.getErrorType() != null) {
-					throw e;
-				}
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().invalidObject,
 						Constants.typeString(type),
@@ -1164,13 +1141,13 @@ public abstract class PackParser {
 	}
 
 	// Consume cnt bytes from the buffer.
-	void use(final int cnt) {
+	private void use(final int cnt) {
 		bOffset += cnt;
 		bAvail -= cnt;
 	}
 
 	// Ensure at least need bytes are available in in {@link #buf}.
-	int fill(final Source src, final int need) throws IOException {
+	private int fill(final Source src, final int need) throws IOException {
 		while (bAvail < need) {
 			int next = bOffset + bAvail;
 			int free = buf.length - next;

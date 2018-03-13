@@ -54,11 +54,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.CommandFailedException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * FS implementation for Cygwin on Windows
@@ -66,9 +63,6 @@ import org.slf4j.LoggerFactory;
  * @since 3.0
  */
 public class FS_Win32_Cygwin extends FS_Win32 {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(FS_Win32_Cygwin.class);
-
 	private static String cygpath;
 
 	/**
@@ -113,18 +107,11 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	public File resolve(final File dir, final String pn) {
 		String useCygPath = System.getProperty("jgit.usecygpath"); //$NON-NLS-1$
 		if (useCygPath != null && useCygPath.equals("true")) { //$NON-NLS-1$
-			String w;
-			try {
-				w = readPipe(dir, //
+			String w = readPipe(dir, //
 					new String[] { cygpath, "--windows", "--absolute", pn }, // //$NON-NLS-1$ //$NON-NLS-2$
 					"UTF-8"); //$NON-NLS-1$
-			} catch (CommandFailedException e) {
-				LOG.warn(e.getMessage());
-				return null;
-			}
-			if (!StringUtils.isEmptyOrNull(w)) {
+			if (w != null)
 				return new File(w);
-			}
 		}
 		return super.resolve(dir, pn);
 	}
@@ -175,15 +162,17 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 				errRedirect, stdinArgs);
 	}
 
+	@Override
+	public boolean supportsSymlinks() {
+		return true;
+	}
+
 	/**
 	 * @since 3.7
 	 */
 	@Override
 	public File findHook(Repository repository, String hookName) {
 		final File gitdir = repository.getDirectory();
-		if (gitdir == null) {
-			return null;
-		}
 		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
 				.resolve(hookName);
 		if (Files.isExecutable(hookPath))

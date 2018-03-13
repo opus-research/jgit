@@ -51,9 +51,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.NonNull;
-import org.eclipse.jgit.annotations.Nullable;
-
 /**
  * Abstraction of name to {@link ObjectId} mapping.
  * <p>
@@ -82,10 +79,8 @@ public abstract class RefDatabase {
 	 * <p>
 	 * If the reference is nested deeper than this depth, the implementation
 	 * should either fail, or at least claim the reference does not exist.
-	 *
-	 * @since 4.2
 	 */
-	public static final int MAX_SYMBOLIC_REF_DEPTH = 5;
+	protected static final int MAX_SYMBOLIC_REF_DEPTH = 5;
 
 	/** Magic value for {@link #getRefs(String)} to return all references. */
 	public static final String ALL = "";//$NON-NLS-1$
@@ -137,7 +132,6 @@ public abstract class RefDatabase {
 	 * @since 2.3
 	 * @see #isNameConflicting(String)
 	 */
-	@NonNull
 	public Collection<String> getConflictingNames(String name)
 			throws IOException {
 		Map<String, Ref> allRefs = getRefs(ALL);
@@ -175,7 +169,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract RefUpdate newUpdate(String name, boolean detach)
 			throws IOException;
 
@@ -190,7 +183,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract RefRename newRename(String fromName, String toName)
 			throws IOException;
 
@@ -201,31 +193,13 @@ public abstract class RefDatabase {
 	 *
 	 * @return a new batch update object.
 	 */
-	@NonNull
 	public BatchRefUpdate newBatchUpdate() {
 		return new BatchRefUpdate(this);
 	}
 
 	/**
-	 * Whether the database is capable of performing batch updates as atomic
-	 * transactions.
-	 * <p>
-	 * If true, by default {@link BatchRefUpdate} instances will perform updates
-	 * atomically, meaning either all updates will succeed, or all updates will
-	 * fail. It is still possible to turn off this behavior on a per-batch basis
-	 * by calling {@code update.setAtomic(false)}.
-	 * <p>
-	 * If false, {@link BatchRefUpdate} instances will never perform updates
-	 * atomically, and calling {@code update.setAtomic(true)} will cause the
-	 * entire batch to fail with {@code REJECTED_OTHER_REASON}.
-	 * <p>
-	 * This definition of atomicity is stronger than what is provided by
-	 * {@link org.eclipse.jgit.transport.ReceivePack}. {@code ReceivePack} will
-	 * attempt to reject all commands if it knows in advance some commands may
-	 * fail, even if the storage layer does not support atomic transactions. Here,
-	 * atomicity applies even in the case of unforeseeable errors.
-	 *
-	 * @return whether transactions are atomic by default.
+	 * @return if the database performs {@code newBatchUpdate()} as an atomic
+	 *         transaction.
 	 * @since 3.6
 	 */
 	public boolean performsAtomicTransactions() {
@@ -249,7 +223,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@Nullable
 	public abstract Ref getRef(String name) throws IOException;
 
 	/**
@@ -265,13 +238,21 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	@Nullable
 	public Ref exactRef(String name) throws IOException {
-		Ref ref = getRef(name);
-		if (ref == null || !name.equals(ref.getName())) {
-			return null;
+		int slash = name.lastIndexOf('/');
+		String prefix = name.substring(0, slash + 1);
+		String rest = name.substring(slash + 1);
+		Ref result = getRefs(prefix).get(rest);
+		if (result != null || slash != -1) {
+			return result;
 		}
-		return ref;
+
+		for (Ref ref : getAdditionalRefs()) {
+			if (name.equals(ref.getName())) {
+				return ref;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -289,7 +270,6 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	@NonNull
 	public Map<String, Ref> exactRef(String... refs) throws IOException {
 		Map<String, Ref> result = new HashMap<>(refs.length);
 		for (String name : refs) {
@@ -314,7 +294,6 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	@Nullable
 	public Ref firstExactRef(String... refs) throws IOException {
 		for (String name : refs) {
 			Ref ref = exactRef(name);
@@ -338,7 +317,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract Map<String, Ref> getRefs(String prefix) throws IOException;
 
 	/**
@@ -353,7 +331,6 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
 	 */
-	@NonNull
 	public abstract List<Ref> getAdditionalRefs() throws IOException;
 
 	/**
@@ -370,11 +347,10 @@ public abstract class RefDatabase {
 	 * @return {@code ref} if {@code ref.isPeeled()} is true; otherwise a new
 	 *         Ref object representing the same data as Ref, but isPeeled() will
 	 *         be true and getPeeledObjectId() will contain the peeled object
-	 *         (or {@code null}).
+	 *         (or null).
 	 * @throws IOException
 	 *             the reference space or object space cannot be accessed.
 	 */
-	@NonNull
 	public abstract Ref peel(Ref ref) throws IOException;
 
 	/**
@@ -398,10 +374,9 @@ public abstract class RefDatabase {
 	 * @param name
 	 *            short name of ref to find, e.g. "master" to find
 	 *            "refs/heads/master" in map.
-	 * @return The first ref matching the name, or {@code null} if not found.
+	 * @return The first ref matching the name, or null if not found.
 	 * @since 3.4
 	 */
-	@Nullable
 	public static Ref findRef(Map<String, Ref> map, String name) {
 		for (String prefix : SEARCH_PATH) {
 			String fullname = prefix + name;
