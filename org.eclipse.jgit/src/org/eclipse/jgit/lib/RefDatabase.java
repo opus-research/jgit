@@ -199,7 +199,6 @@ public abstract class RefDatabase {
 	/**
 	 * @return if the database performs {@code newBatchUpdate()} as an atomic
 	 *         transaction.
-	 * @since 3.6
 	 */
 	public boolean performsAtomicTransactions() {
 		return false;

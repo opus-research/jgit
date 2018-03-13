@@ -221,9 +221,7 @@ public abstract class BaseReceivePack {
 	/** All SHA-1s shown to the client, which can be possible edges. */
 	private Set<ObjectId> advertisedHaves;
 
-	/** Capabilities advertised. */
-	private Set<String> advertisedCapabilities;
-	/** Capabilities requested by the client. Is a subset of {@code advertisedCapabilites} */
+	/** Capabilities requested by the client. */
 	private Set<String> enabledCapabilities;
 	private Set<ObjectId> clientShallowCommits;
 	private List<ReceiveCommand> commands;
@@ -908,15 +906,13 @@ public abstract class BaseReceivePack {
 		}
 
 		adv.init(db);
-		advertisedCapabilities = new HashSet<String>();
-		advertisedCapabilities.add(CAPABILITY_SIDE_BAND_64K);
-		advertisedCapabilities.add(CAPABILITY_DELETE_REFS);
-		advertisedCapabilities.add(CAPABILITY_REPORT_STATUS);
+		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
+		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
+		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (db.getRefDatabase().performsAtomicTransactions())
-			advertisedCapabilities.add(CAPABILITY_ATOMIC);
+			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
-			advertisedCapabilities.add(CAPABILITY_OFS_DELTA);
-		adv.advertiseCapabilities(advertisedCapabilities);
+			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
 			adv.advertiseHave(obj);
@@ -952,11 +948,6 @@ public abstract class BaseReceivePack {
 				final FirstLine firstLine = new FirstLine(line);
 				enabledCapabilities = firstLine.getCapabilities();
 				line = firstLine.getLine();
-				boolean clientBehavior = advertisedCapabilities.containsAll(enabledCapabilities);
-				if (!clientBehavior) {
-					throw new PackProtocolException(MessageFormat.format(JGitText.get().nonadvertisedCapabilitesRequested,
-							enabledCapabilities.toString(), advertisedCapabilities.toString()));
-				}
 			}
 
 			if (line.length() < 83) {
@@ -1263,10 +1254,7 @@ public abstract class BaseReceivePack {
 		}
 	}
 
-	/**
-	 * @return if any commands have been rejected so far.
-	 * @since 3.6
-	 */
+	/** @return if any commands have been rejected so far. */
 	protected boolean anyRejects() {
 		for (ReceiveCommand cmd : commands) {
 			if (cmd.getResult() != Result.NOT_ATTEMPTED && cmd.getResult() != Result.OK)
@@ -1275,10 +1263,7 @@ public abstract class BaseReceivePack {
 		return false;
 	}
 
-	/**
-	 * Set the result to fail for any command that was not processed yet.
-	 * @since 3.6
-	 */
+	/** Set the result to fail for any command that was not processed yet. */
 	protected void failPendingCommands() {
 		for (ReceiveCommand cmd : commands) {
 			if (cmd.getResult() == Result.NOT_ATTEMPTED)
