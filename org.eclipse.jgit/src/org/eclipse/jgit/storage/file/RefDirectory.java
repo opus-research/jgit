@@ -67,8 +67,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -608,7 +606,6 @@ public class RefDirectory extends RefDatabase {
 			write = false;
 
 		if (write) {
-			WriteConfig wc = getRepository().getConfig().get(WriteConfig.KEY);
 			FileOutputStream out;
 			try {
 				out = new FileOutputStream(log, true);
@@ -621,15 +618,7 @@ public class RefDirectory extends RefDatabase {
 				out = new FileOutputStream(log, true);
 			}
 			try {
-				if (wc.getFSyncRefFiles()) {
-					FileChannel fc = out.getChannel();
-					ByteBuffer buf = ByteBuffer.wrap(rec);
-					while (0 < buf.remaining())
-						fc.write(buf);
-					fc.force(true);
-				} else {
-					out.write(rec);
-				}
+				out.write(rec);
 			} finally {
 				out.close();
 			}
@@ -768,7 +757,6 @@ public class RefDirectory extends RefDatabase {
 			@Override
 			protected void writeFile(String name, byte[] content)
 					throws IOException {
-				lck.setFSync(true);
 				lck.setNeedStatInformation(true);
 				try {
 					lck.write(content);
