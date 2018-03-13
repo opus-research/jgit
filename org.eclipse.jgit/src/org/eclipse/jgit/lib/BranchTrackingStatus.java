@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -73,11 +72,11 @@ public class BranchTrackingStatus {
 		BranchConfig branchConfig = new BranchConfig(repository.getConfig(),
 				branchName);
 
-		String trackingBranch = branchConfig.getTrackingBranch();
-		if (trackingBranch == null)
+		String remoteTrackingBranch = branchConfig.getRemoteTrackingBranch();
+		if (remoteTrackingBranch == null)
 			return null;
 
-		Ref tracking = repository.getRef(trackingBranch);
+		Ref tracking = repository.getRef(remoteTrackingBranch);
 		if (tracking == null)
 			return null;
 
@@ -100,7 +99,7 @@ public class BranchTrackingStatus {
 		int aheadCount = RevWalkUtils.count(walk, localCommit, mergeBase);
 		int behindCount = RevWalkUtils.count(walk, trackingCommit, mergeBase);
 
-		return new BranchTrackingStatus(trackingBranch, aheadCount, behindCount);
+		return new BranchTrackingStatus(remoteTrackingBranch, aheadCount, behindCount);
 	}
 
 	private final String remoteTrackingBranch;
