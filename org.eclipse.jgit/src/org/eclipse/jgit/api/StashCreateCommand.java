@@ -52,12 +52,14 @@ import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -239,6 +241,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 				MutableObjectId id = new MutableObjectId();
 				List<PathEdit> wtEdits = new ArrayList<PathEdit>();
 				List<String> wtDeletes = new ArrayList<String>();
+				boolean hasChanges = false;
 				do {
 					AbstractTreeIterator headIter = treeWalk.getTree(0,
 							AbstractTreeIterator.class);
@@ -246,9 +249,18 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 							DirCacheIterator.class);
 					WorkingTreeIterator wtIter = treeWalk.getTree(2,
 							WorkingTreeIterator.class);
-					if (headIter != null && indexIter != null && wtIter != null) {
-						if (wtIter.idEqual(indexIter)
-								|| wtIter.idEqual(headIter))
+					if (indexIter != null
+							&& !indexIter.getDirCacheEntry().isMerged())
+						throw new UnmergedPathsException(
+								new UnmergedPathException(
+										indexIter.getDirCacheEntry()));
+					if (wtIter != null) {
+						if (indexIter == null && headIter == null)
+							continue;
+						hasChanges = true;
+						if (indexIter != null && wtIter.idEqual(indexIter))
+							continue;
+						if (headIter != null && wtIter.idEqual(headIter))
 							continue;
 						treeWalk.getObjectId(id, 0);
 						final DirCacheEntry entry = new DirCacheEntry(
@@ -265,16 +277,18 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 							in.close();
 						}
 						wtEdits.add(new PathEdit(entry) {
-
 							public void apply(DirCacheEntry ent) {
 								ent.copyMetaData(entry);
 							}
 						});
-					} else if (indexIter == null)
-						wtDeletes.add(treeWalk.getPathString());
-					else if (wtIter == null && headIter != null)
+					}
+					hasChanges = true;
+					if (wtIter == null && headIter != null)
 						wtDeletes.add(treeWalk.getPathString());
 				} while (treeWalk.next());
+
+				if (!hasChanges)
+					return null;
 
 				String branch = Repository.shortenRefName(head.getTarget()
 						.getName());

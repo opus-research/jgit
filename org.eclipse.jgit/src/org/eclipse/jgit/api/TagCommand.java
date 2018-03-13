@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,6 +50,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -65,9 +66,18 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * A class used to execute a {@code Tag} command. It has setters for all
- * supported options and arguments of this command and a {@link #call()} method
- * to finally execute the command.
+ * Create/update an annotated tag object.
+ * <p>
+ * Examples (<code>git</code> is a {@link Git} instance):
+ * <p>
+ * Create a new annotated tag for the current commit:
+ *
+ * <pre>
+ * git.tag().setName(&quot;v1.0&quot;).setMessage(&quot;First stable release&quot;).call();
+ * </pre>
+ * <p>
+ * Use {@link Repository#updateRef(String)} to create a lightweight tag (just a
+ * named reference to a commit).
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
  *      >Git documentation about Tag</a>
@@ -119,7 +129,7 @@ public class TagCommand extends GitCommand<Ref> {
 
 			// if no id is set, we should attempt to use HEAD
 			if (id == null) {
-				ObjectId objectId = repo.resolve(Constants.HEAD + "^{commit}");
+				ObjectId objectId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
 				if (objectId == null)
 					throw new NoHeadException(
 							JGitText.get().tagOnRepoWithoutHEADCurrentlyNotSupported);
@@ -141,7 +151,7 @@ public class TagCommand extends GitCommand<Ref> {
 					RefUpdate tagRef = repo.updateRef(refName);
 					tagRef.setNewObjectId(tagId);
 					tagRef.setForceUpdate(forceUpdate);
-					tagRef.setRefLogMessage("tagged " + name, false);
+					tagRef.setRefLogMessage("tagged " + name, false); //$NON-NLS-1$
 					Result updateResult = tagRef.update(revWalk);
 					switch (updateResult) {
 					case NEW:
@@ -151,6 +161,11 @@ public class TagCommand extends GitCommand<Ref> {
 						throw new ConcurrentRefUpdateException(
 								JGitText.get().couldNotLockHEAD,
 								tagRef.getRef(), updateResult);
+					case REJECTED:
+						throw new RefAlreadyExistsException(
+								MessageFormat.format(
+										JGitText.get().tagAlreadyExists,
+										newTag.toString()));
 					default:
 						throw new JGitInternalException(MessageFormat.format(
 								JGitText.get().updatingRefFailed, refName,

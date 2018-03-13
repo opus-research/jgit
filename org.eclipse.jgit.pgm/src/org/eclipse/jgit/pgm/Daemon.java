@@ -51,7 +51,6 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.transport.DaemonClient;
@@ -111,11 +110,7 @@ class Daemon extends TextBuiltin {
 
 			FileBasedConfig cfg = new FileBasedConfig(configFile, FS.DETECTED);
 			cfg.load();
-
-			WindowCacheConfig wcc = new WindowCacheConfig();
-			wcc.fromConfig(cfg);
-			WindowCache.reconfigure(wcc);
-
+			new WindowCacheConfig().fromConfig(cfg).install();
 			packConfig.fromConfig(cfg);
 		}
 
@@ -127,7 +122,7 @@ class Daemon extends TextBuiltin {
 
 		final FileResolver<DaemonClient> resolver = new FileResolver<DaemonClient>();
 		for (final File f : directory) {
-			out.println(MessageFormat.format(CLIText.get().exporting, f.getAbsolutePath()));
+			outw.println(MessageFormat.format(CLIText.get().exporting, f.getAbsolutePath()));
 			resolver.exportDirectory(f);
 		}
 		resolver.setExportAll(exportAll);
@@ -152,10 +147,11 @@ class Daemon extends TextBuiltin {
 			service(d, n).setOverridable(false);
 
 		d.start();
-		out.println(MessageFormat.format(CLIText.get().listeningOn, d.getAddress()));
+		outw.println(MessageFormat.format(CLIText.get().listeningOn, d.getAddress()));
 	}
 
-	private DaemonService service(final org.eclipse.jgit.transport.Daemon d,
+	private static DaemonService service(
+			final org.eclipse.jgit.transport.Daemon d,
 			final String n) {
 		final DaemonService svc = d.getService(n);
 		if (svc == null)
