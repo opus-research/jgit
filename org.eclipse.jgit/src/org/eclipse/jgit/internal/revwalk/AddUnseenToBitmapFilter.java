@@ -78,7 +78,7 @@ public class AddUnseenToBitmapFilter extends RevFilter {
 	 */
 	public AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmap) {
 		this.seen = seen;
-		this.bitmap = bitmapResult;
+		this.bitmap = bitmap;
 	}
 
 	@Override
