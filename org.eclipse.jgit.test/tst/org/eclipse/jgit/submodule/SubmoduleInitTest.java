@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.jgit.api.SubmoduleInitCommand;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -74,7 +73,7 @@ import org.junit.Test;
 public class SubmoduleInitTest extends RepositoryTestCase {
 
 	@Test
-	public void repositoryWithNoSubmodules() throws GitAPIException {
+	public void repositoryWithNoSubmodules() {
 		SubmoduleInitCommand command = new SubmoduleInitCommand(db);
 		Collection<String> modules = command.call();
 		assertNotNull(modules);
@@ -83,7 +82,7 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 
 	@Test
 	public void repositoryWithUninitializedModule() throws IOException,
-			ConfigInvalidException, GitAPIException {
+			ConfigInvalidException {
 		final String path = addSubmoduleToIndex();
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
@@ -157,7 +156,7 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 
 	@Test
 	public void resolveOneLevelHigherRelativeUrl() throws IOException,
-			ConfigInvalidException, GitAPIException {
+			ConfigInvalidException {
 		final String path = addSubmoduleToIndex();
 
 		String base = "git://server/repo.git";
@@ -198,7 +197,7 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 
 	@Test
 	public void resolveTwoLevelHigherRelativeUrl() throws IOException,
-			ConfigInvalidException, GitAPIException {
+			ConfigInvalidException {
 		final String path = addSubmoduleToIndex();
 
 		String base = "git://server/repo.git";
@@ -239,7 +238,7 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 
 	@Test
 	public void resolveWorkingDirectoryRelativeUrl() throws IOException,
-			GitAPIException, ConfigInvalidException {
+			ConfigInvalidException {
 		final String path = addSubmoduleToIndex();
 
 		String base = db.getWorkTree().getAbsolutePath();
@@ -282,7 +281,7 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 
 	@Test
 	public void resolveInvalidParentUrl() throws IOException,
-			ConfigInvalidException, GitAPIException {
+			ConfigInvalidException {
 		final String path = addSubmoduleToIndex();
 
 		String base = "no_slash";

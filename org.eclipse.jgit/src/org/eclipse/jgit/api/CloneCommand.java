@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -112,9 +111,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	/**
 	 * Executes the {@code Clone} command.
 	 *
+	 * @throws JGitInternalException
+	 *             if the repository can't be created
 	 * @return the newly created {@code Git} object with associated repository
 	 */
-	public Git call() throws GitAPIException {
+	public Git call() throws JGitInternalException {
 		try {
 			URIish u = new URIish(uri);
 			Repository repository = init(u);
@@ -131,7 +132,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 	}
 
-	private Repository init(URIish u) throws GitAPIException {
+	private Repository init(URIish u) {
 		InitCommand command = Git.init();
 		command.setBare(bare);
 		if (directory == null)
@@ -144,7 +145,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	private FetchResult fetch(Repository clonedRepo, URIish u)
-			throws URISyntaxException, IOException, GitAPIException {
+			throws URISyntaxException,
+			JGitInternalException,
+			InvalidRemoteException, IOException {
 		// create the remote config and save it
 		RemoteConfig config = new RemoteConfig(clonedRepo.getConfig(), remote);
 		config.addURI(u);
@@ -190,8 +193,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	private void checkout(Repository clonedRepo, FetchResult result)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException, GitAPIException {
+			throws JGitInternalException,
+			MissingObjectException, IncorrectObjectTypeException, IOException {
 
 		Ref head = result.getAdvertisedRef(branch);
 		if (branch.equals(Constants.HEAD)) {
@@ -227,8 +230,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 	}
 
-	private void cloneSubmodules(Repository clonedRepo) throws IOException,
-			GitAPIException {
+	private void cloneSubmodules(Repository clonedRepo) throws IOException {
 		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
 		if (init.call().isEmpty())
 			return;
