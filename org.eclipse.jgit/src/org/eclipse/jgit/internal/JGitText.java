@@ -398,6 +398,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidIdLength;
 	/***/ public String invalidIgnoreParamSubmodule;
 	/***/ public String invalidIgnoreRule;
+	/***/ public String invalidIncludedPathInConfigFile;
 	/***/ public String invalidIntegerValue;
 	/***/ public String invalidKey;
 	/***/ public String invalidLineInConfigFile;
@@ -654,6 +655,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
+	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
 	/***/ public String transportExceptionBadRef;
 	/***/ public String transportExceptionEmptyRef;
