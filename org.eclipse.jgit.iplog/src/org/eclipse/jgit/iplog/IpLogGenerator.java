@@ -78,13 +78,15 @@ import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.iplog.Committer.ActiveRange;
 import org.eclipse.jgit.lib.BlobBasedConfig;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -142,7 +144,7 @@ public class IpLogGenerator {
 
 	private NameConflictTreeWalk tw;
 
-	private ObjectReader curs;
+	private final WindowCursor curs = new WindowCursor();
 
 	private final MutableObjectId idbuf = new MutableObjectId();
 
@@ -182,7 +184,6 @@ public class IpLogGenerator {
 			throws IOException, ConfigInvalidException {
 		try {
 			db = repo;
-			curs = db.newObjectReader();
 			rw = new RevWalk(db);
 			tw = new NameConflictTreeWalk(db);
 
@@ -193,7 +194,7 @@ public class IpLogGenerator {
 			scanProjectCommits(meta.getProjects().get(0), c);
 			commits.add(c);
 		} finally {
-			curs.release();
+			WindowCursor.release(curs);
 			db = null;
 			rw = null;
 			tw = null;
@@ -416,7 +417,10 @@ public class IpLogGenerator {
 
 	private byte[] openBlob(int side) throws IOException {
 		tw.getObjectId(idbuf, side);
-		return curs.open(idbuf, Constants.OBJ_BLOB).getCachedBytes();
+		ObjectLoader ldr = db.openObject(curs, idbuf);
+		if (ldr == null)
+			throw new MissingObjectException(idbuf.copy(), Constants.OBJ_BLOB);
+		return ldr.getCachedBytes();
 	}
 
 	/**

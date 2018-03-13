@@ -51,7 +51,7 @@ import java.util.Arrays;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -164,22 +164,22 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 	 */
 	public void addTree(final byte[] pathPrefix, final int stage,
 			final Repository db, final AnyObjectId tree) throws IOException {
-		final ObjectReader reader = db.newObjectReader();
+		final TreeWalk tw = new TreeWalk(db);
+		tw.reset();
+		final WindowCursor curs = new WindowCursor();
 		try {
-			final TreeWalk tw = new TreeWalk(reader);
-			tw.reset();
-			tw.addTree(new CanonicalTreeParser(pathPrefix, reader, tree
-					.toObjectId()));
-			tw.setRecursive(true);
-			if (tw.next()) {
-				final DirCacheEntry newEntry = toEntry(stage, tw);
-				beforeAdd(newEntry);
-				fastAdd(newEntry);
-				while (tw.next())
-					fastAdd(toEntry(stage, tw));
-			}
+			tw.addTree(new CanonicalTreeParser(pathPrefix, db, tree
+					.toObjectId(), curs));
 		} finally {
-			reader.release();
+			curs.release();
+		}
+		tw.setRecursive(true);
+		if (tw.next()) {
+			final DirCacheEntry newEntry = toEntry(stage, tw);
+			beforeAdd(newEntry);
+			fastAdd(newEntry);
+			while (tw.next())
+				fastAdd(toEntry(stage, tw));
 		}
 	}
 
