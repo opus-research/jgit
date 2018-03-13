@@ -49,13 +49,13 @@ package org.eclipse.jgit.lib;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Collection;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.lib.FileObjectDatabase.AlternateHandle;
+import org.eclipse.jgit.lib.FileObjectDatabase.AlternateRepository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -249,12 +249,17 @@ public class FileRepository extends Repository {
 		}
 
 		refs = new RefDirectory(this);
-		if (objectDir != null)
-			objectDatabase = new ObjectDirectory(fs.resolve(objectDir, ""),
-					alternateObjectDir, fs);
-		else
-			objectDatabase = new ObjectDirectory(fs.resolve(gitDir, "objects"),
-					alternateObjectDir, fs);
+		if (objectDir != null) {
+			objectDatabase = new ObjectDirectory(repoConfig, //
+					fs.resolve(objectDir, ""), //
+					alternateObjectDir, //
+					fs);
+		} else {
+			objectDatabase = new ObjectDirectory(repoConfig, //
+					fs.resolve(gitDir, "objects"), //
+					alternateObjectDir, //
+					fs);
+		}
 
 		if (indexFile != null)
 			this.indexFile = indexFile;
@@ -390,43 +395,6 @@ public class FileRepository extends Repository {
 	}
 
 	/**
-	 * Open object in all packs containing specified object.
-	 *
-	 * @param objectId
-	 *            id of object to search for
-	 * @param curs
-	 *            temporary working space associated with the calling thread.
-	 * @return collection of loaders for this object, from all packs containing
-	 *         this object
-	 * @throws IOException
-	 */
-	public Collection<PackedObjectLoader> openObjectInAllPacks(
-			final AnyObjectId objectId, final WindowCursor curs)
-			throws IOException {
-		Collection<PackedObjectLoader> result = new LinkedList<PackedObjectLoader>();
-		openObjectInAllPacks(objectId, result, curs);
-		return result;
-	}
-
-	/**
-	 * Open object in all packs containing specified object.
-	 *
-	 * @param objectId
-	 *            id of object to search for
-	 * @param resultLoaders
-	 *            result collection of loaders for this object, filled with
-	 *            loaders from all packs containing specified object
-	 * @param curs
-	 *            temporary working space associated with the calling thread.
-	 * @throws IOException
-	 */
-	void openObjectInAllPacks(final AnyObjectId objectId,
-			final Collection<PackedObjectLoader> resultLoaders,
-			final WindowCursor curs) throws IOException {
-		objectDatabase.openObjectInAllPacks(resultLoaders, curs, objectId);
-	}
-
-	/**
 	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
 	 * <p>
 	 * When a repository borrows objects from another repository, it can
@@ -438,11 +406,11 @@ public class FileRepository extends Repository {
 	 */
 	public Set<ObjectId> getAdditionalHaves() {
 		HashSet<ObjectId> r = new HashSet<ObjectId>();
-		for (ObjectDatabase d : getObjectDatabase().getAlternates()) {
-			if (d instanceof AlternateRepositoryDatabase) {
+		for (AlternateHandle d : objectDatabase. myAlternates()) {
+			if (d instanceof AlternateRepository) {
 				Repository repo;
 
-				repo = ((AlternateRepositoryDatabase) d).getRepository();
+				repo = ((AlternateRepository) d).repository;
 				for (Ref ref : repo.getAllRefs().values())
 					r.add(ref.getObjectId());
 				r.addAll(repo.getAdditionalHaves());
