@@ -241,7 +241,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *         containing objects referenced by commits further back in the
 	 *         history of the repository.
 	 */
-	@Override
 	public Collection<PackFile> getPacks() {
 		PackList list = packList.get();
 		if (list == NO_PACKS)
@@ -746,8 +745,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			final List<PackExt> extensions = new ArrayList<PackExt>(
 					PackExt.values().length);
 			for (PackExt ext : PackExt.values()) {
-				final String name = base + ext.getExtension();
-				if (names.contains(name))
+				if (names.contains(base + ext.getExtension()))
 					extensions.add(ext);
 			}
 
