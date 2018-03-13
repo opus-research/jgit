@@ -109,7 +109,6 @@
         <directory>.</directory>
         <includes>
           <include>META-INF/services/org.eclipse.jgit.pgm.TextBuiltin</include>
-          <include>about.html</include>
         </includes>
       </resource>
       <resource>
