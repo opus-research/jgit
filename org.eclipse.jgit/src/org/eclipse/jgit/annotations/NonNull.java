@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Ivan Motsch <ivan.motsch@bsiag.com>
+ * Copyright (C) 2015, Andrey Loskutov <loskutov@gmx.de>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,21 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
 
-import java.util.Collection;
+package org.eclipse.jgit.annotations;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Attributes macro expander as described in
- * http://git-scm.com/docs/gitattributes
+ * JGit's replacement for the {@code javax.annotation.Nonnull}.
+ * <p>
+ * Denotes that a local variable, parameter, field, method return value expected
+ * to be non {@code null}.
  *
  * @since 4.2
  */
-public interface MacroExpander {
-
-	/**
-	 * @param attr
-	 * @return the macro extension including the attribute iself
-	 */
-	Collection<Attribute> expandMacro(Attribute attr);
+@Documented
+@Retention(RetentionPolicy.CLASS)
+@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
+public @interface NonNull {
+	// marker annotation with no members
 }
