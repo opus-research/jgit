@@ -94,10 +94,10 @@ public class ReftableTest {
 		try (RefCursor rc = t.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(HEAD)) {
+		try (RefCursor rc = t.seekRef(HEAD)) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(R_HEADS)) {
+		try (RefCursor rc = t.seekRef(R_HEADS)) {
 			assertFalse(rc.next());
 		}
 		try (LogCursor rc = t.allLogs()) {
@@ -111,7 +111,7 @@ public class ReftableTest {
 		try (RefCursor rc = t.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(HEAD)) {
+		try (RefCursor rc = t.seekRef(HEAD)) {
 			assertFalse(rc.next());
 		}
 		try (LogCursor rc = t.allLogs()) {
@@ -186,7 +186,7 @@ public class ReftableTest {
 			assertFalse(rc.wasDeleted());
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(MASTER)) {
+		try (RefCursor rc = t.seekRef(MASTER)) {
 			assertTrue(rc.next());
 			Ref act = rc.getRef();
 			assertNotNull(act);
@@ -220,7 +220,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				24 + 4 + 5 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 68,
+				24 + 4 + 5 + 2 + HEAD.length() + 1 + MASTER.length() + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -233,60 +233,6 @@ public class ReftableTest {
 			assertNotNull(act.getLeaf());
 			assertEquals(MASTER, act.getTarget().getName());
 			assertNull(act.getObjectId());
-		}
-	}
-
-	@Test
-	public void oneTextRef() throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter().begin(buffer);
-		writer.writeText(
-				"MERGE_HEAD",
-				id(1).name() + '\n' + id(2).name() + '\n');
-		writer.finish();
-		byte[] table = buffer.toByteArray();
-
-		assertEquals(
-				24 + 4 + 5 + 2 + "MERGE_HEAD".length() + 1 + 82 + 68,
-				table.length);
-
-		ReftableReader t = read(table);
-		try (RefCursor rc = t.allRefs()) {
-			assertTrue(rc.next());
-			Ref act = rc.getRef();
-			assertNotNull(act);
-			assertFalse(act.isSymbolic());
-			assertEquals("MERGE_HEAD", act.getName());
-			assertEquals(id(1), act.getObjectId());
-			assertFalse(rc.next());
-		}
-	}
-
-	@Test
-	public void oneNonRefTextFile() throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter().begin(buffer);
-		writer.writeText("SAVE", "content");
-		writer.finish();
-		byte[] table = buffer.toByteArray();
-
-		assertEquals(
-				24 + 4 + 5 + 2 + "SAVE".length() + 1 + "content".length() + 68,
-				table.length);
-
-		ReftableReader t = read(table);
-		assertFalse(t.hasRef("SAVE")); // behaves as deleted.
-
-		t.setIncludeDeletes(true);
-		try (RefCursor rc = t.allRefs()) {
-			assertTrue(rc.next());
-			Ref act = rc.getRef();
-			assertNotNull(act);
-			assertFalse(act.isSymbolic());
-			assertEquals(NEW, act.getStorage());
-			assertEquals("SAVE", act.getName());
-			assertNull(act.getObjectId());
-			assertFalse(rc.next());
 		}
 	}
 
@@ -319,70 +265,12 @@ public class ReftableTest {
 	public void seekNotFound() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		ReftableReader t = read(write(exp));
-		try (RefCursor rc = t.seek("refs/heads/a")) {
+		try (RefCursor rc = t.seekRef("refs/heads/a")) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek("refs/heads/n")) {
+		try (RefCursor rc = t.seekRef("refs/heads/n")) {
 			assertFalse(rc.next());
 		}
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void indexScan() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 5670; i++) {
-			refs.add(ref(String.format("refs/heads/%04d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertTrue(stats.refIndexLevels() > 0);
-		assertTrue(stats.refIndexSize() > 0);
-		assertScan(refs, read(table));
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void indexSeek() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 5670; i++) {
-			refs.add(ref(String.format("refs/heads/%04d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertTrue(stats.refIndexLevels() > 0);
-		assertTrue(stats.refIndexSize() > 0);
-		assertSeek(refs, read(table));
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void noIndexScan() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 567; i++) {
-			refs.add(ref(String.format("refs/heads/%03d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertEquals(0, stats.refIndexLevels());
-		assertEquals(0, stats.refIndexSize());
-		assertEquals(4, stats.refBlockCount());
-		assertEquals(table.length, stats.totalBytes());
-		assertScan(refs, read(table));
-	}
-
-	@SuppressWarnings("boxing")
-	@Test
-	public void noIndexSeek() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 567; i++) {
-			refs.add(ref(String.format("refs/heads/%03d", i), i));
-		}
-
-		byte[] table = write(refs);
-		assertEquals(0, stats.refIndexLevels());
-		assertEquals(4, stats.refBlockCount());
-		assertSeek(refs, read(table));
 	}
 
 	public void unpeeledDoesNotWrite() {
@@ -416,39 +304,13 @@ public class ReftableTest {
 		table[table.length - 1] = 0x42;
 
 		try {
-			read(table).seek(HEAD);
+			read(table).seekRef(HEAD);
 			fail("expected IOException");
 		} catch (IOException e) {
 			assertEquals(JGitText.get().invalidReftableCRC, e.getMessage());
 		}
 	}
 
-
-	private static void assertScan(List<Ref> refs, Reftable t)
-			throws IOException {
-		try (RefCursor rc = t.allRefs()) {
-			for (Ref exp : refs) {
-				assertTrue("has " + exp.getName(), rc.next());
-				Ref act = rc.getRef();
-				assertEquals(exp.getName(), act.getName());
-				assertEquals(exp.getObjectId(), act.getObjectId());
-			}
-			assertFalse(rc.next());
-		}
-	}
-
-	private static void assertSeek(List<Ref> refs, Reftable t)
-			throws IOException {
-		for (Ref exp : refs) {
-			try (RefCursor rc = t.seek(exp.getName())) {
-				assertTrue("has " + exp.getName(), rc.next());
-				Ref act = rc.getRef();
-				assertEquals(exp.getName(), act.getName());
-				assertEquals(exp.getObjectId(), act.getObjectId());
-				assertFalse(rc.next());
-			}
-		}
-	}
 
 	private static Ref ref(String name, int id) {
 		return new ObjectIdRef.PeeledNonTag(PACKED, name, id(id));
