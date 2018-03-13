@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Robin Rosenberg
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,75 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.storage.file;
+package org.eclipse.jgit.errors;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.JGitText;
 
 /**
- * Utility for reading reflog entries
+ * An exception occurring when a file cannot be locked
  */
-public class ReflogReader {
-	private File logName;
+public class LockFailedException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	private File file;
 
 	/**
-	 * @param db
-	 * @param refname
-	 */
-	public ReflogReader(Repository db, String refname) {
-		logName = new File(db.getDirectory(), Constants.LOGS + '/' + refname);
-	}
-
-	/**
-	 * Get the last entry in the reflog
+	 * Construct a CannotLockException for the given file and message
 	 *
-	 * @return the latest reflog entry, or null if no log
-	 * @throws IOException
+	 * @param file
+	 *            file that could not be locked
+	 * @param message
+	 *            exception message
 	 */
-	public ReflogEntry getLastEntry() throws IOException {
-		List<ReflogEntry> entries = getReverseEntries(1);
-		return entries.size() > 0 ? entries.get(0) : null;
+	public LockFailedException(File file, String message) {
+		super(message);
+		this.file = file;
 	}
 
 	/**
-	 * @return all reflog entries in reverse order
-	 * @throws IOException
+	 * Construct a CannotLockException for the given file
+	 *
+	 * @param file
+	 *            file that could not be locked
 	 */
-	public List<ReflogEntry> getReverseEntries() throws IOException {
-		return getReverseEntries(Integer.MAX_VALUE);
+	public LockFailedException(File file) {
+		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
 	}
 
 	/**
-	 * @param max
-	 *            max numer of entries to read
-	 * @return all reflog entries in reverse order
-	 * @throws IOException
+	 * Get the file that could not be locked
+	 *
+	 * @return file
 	 */
-	public List<ReflogEntry> getReverseEntries(int max) throws IOException {
-		final byte[] log;
-		try {
-			log = IO.readFully(logName);
-		} catch (FileNotFoundException e) {
-			return Collections.emptyList();
-		}
-
-		int rs = RawParseUtils.prevLF(log, log.length);
-		List<ReflogEntry> ret = new ArrayList<ReflogEntry>();
-		while (rs >= 0 && max-- > 0) {
-			rs = RawParseUtils.prevLF(log, rs);
-			ReflogEntry entry = new ReflogEntry(log, rs < 0 ? 0 : rs + 2);
-			ret.add(entry);
-		}
-		return ret;
+	public File getFile() {
+		return file;
 	}
 }
