@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Google Inc. and others.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,12 +47,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
-import org.eclipse.jgit.storage.pack.PackExt;
-
 /**
  * Output stream to create a file on the DFS.
  *
- * @see DfsObjDatabase#writeFile(DfsPackDescription, PackExt)
+ * @see DfsObjDatabase#writePackFile(DfsPackDescription)
+ * @see DfsObjDatabase#writePackIndex(DfsPackDescription)
  */
 public abstract class DfsOutputStream extends OutputStream {
 	/**

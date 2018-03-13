@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -76,7 +74,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackOutputStream;
 import org.eclipse.jgit.util.LongList;
 import org.eclipse.jgit.util.NB;
@@ -94,6 +91,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			return b.packLastModified - a.packLastModified;
 		}
 	};
+
+	private final File idxFile;
 
 	private final File packFile;
 
@@ -136,10 +135,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Construct a reader for an existing, pre-indexed packfile.
 	 *
+	 * @param idxFile
+	 *            path of the <code>.idx</code> file listing the contents.
 	 * @param packFile
 	 *            path of the <code>.pack</code> file holding the data.
 	 */
-	public PackFile(final File packFile) {
+	public PackFile(final File idxFile, final File packFile) {
+		this.idxFile = idxFile;
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
 
@@ -156,7 +158,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				throw new PackInvalidException(packFile);
 
 			try {
-				final PackIndex idx = PackIndex.open(extFile(INDEX));
+				final PackIndex idx = PackIndex.open(idxFile);
 
 				if (packChecksum == null)
 					packChecksum = idx.packChecksum;
@@ -1077,12 +1079,5 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		synchronized (list) {
 			list.add(offset);
 		}
-	}
-
-	private File extFile(PackExt ext) {
-		String p = packFile.getName();
-		int dot = p.lastIndexOf('.');
-		String b = (dot < 0) ? p : p.substring(0, dot);
-		return new File(packFile.getParentFile(), b + '.' + ext.getExtension());
 	}
 }
