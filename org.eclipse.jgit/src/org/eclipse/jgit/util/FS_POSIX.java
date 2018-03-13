@@ -52,8 +52,6 @@ import java.util.List;
 
 /**
  * Base FS for POSIX based systems
- *
- * @since 3.0
  */
 public abstract class FS_POSIX extends FS {
 	@Override
@@ -90,7 +88,7 @@ public abstract class FS_POSIX extends FS {
 	}
 
 	/**
-	 * Constructor
+	 * Constructore
 	 *
 	 * @param src
 	 *            FS to copy some settings from

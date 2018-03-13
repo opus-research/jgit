@@ -53,8 +53,6 @@ import java.util.List;
 
 /**
  * FS implementation for Cygwin on Windows
- *
- * @since 3.0
  */
 public class FS_Win32_Cygwin extends FS_Win32 {
 	private static String cygpath;

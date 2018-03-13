@@ -50,7 +50,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>3.5.0-SNAPSHOT</version>
+    <version>3.0.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.java7</artifactId>
@@ -78,104 +78,113 @@
 
     <resources>
       <resource>
-        <directory>.</directory>
-        <includes>
-          <include>plugin.properties</include>
-          <include>about.html</include>
-        </includes>
+	<directory>.</directory>
+	<includes>
+	  <include>plugin.properties</include>
+	  <include>about.html</include>
+		  <include>META-INF/eclipse.inf</include>
+	</includes>
       </resource>
       <resource>
-	    <directory>resources/</directory>
+	<directory>resources/</directory>
       </resource>
     </resources>
 
     <plugins>
       <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>7</source>
-          <target>7</target>
-          <encoding>UTF-8</encoding>
-        </configuration>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>7</source>
+	  <target>7</target>
+	  <encoding>UTF-8</encoding>
+	</configuration>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>translate-source-qualifier</id>
-            <phase>generate-resources</phase>
-            <configuration>
-              <tasks>
-                <copy file="META-INF/SOURCE-MANIFEST.MF" tofile="${source-bundle-manifest}" overwrite="true"/>
-                <replace file="${source-bundle-manifest}">
-                  <replacefilter token=".qualifier" value=".${maven.build.timestamp}"/>
-                </replace>
-              </tasks>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <inherited>true</inherited>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <phase>process-classes</phase>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-            <configuration>
-              <archive>
-                <manifestFile>${source-bundle-manifest}</manifestFile>
-              </archive>
-            </configuration>
-          </execution>
-        </executions>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-antrun-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>translate-source-qualifier</id>
+	    <phase>generate-resources</phase>
+	    <configuration>
+	      <tasks>
+		<copy file="META-INF/SOURCE-MANIFEST.MF" tofile="${source-bundle-manifest}" overwrite="true"/>
+		<replace file="${source-bundle-manifest}">
+		  <replacefilter token=".qualifier" value=".${maven.build.timestamp}"/>
+		</replace>
+	      </tasks>
+	    </configuration>
+	    <goals>
+	      <goal>run</goal>
+	    </goals>
+	  </execution>
+	</executions>
       </plugin>
 
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifestFile>${bundle-manifest}</manifestFile>
-          </archive>
-        </configuration>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-source-plugin</artifactId>
+	<inherited>true</inherited>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <phase>process-classes</phase>
+	    <goals>
+	      <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <archive>
+		<manifestFile>${source-bundle-manifest}</manifestFile>
+	      </archive>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>clirr-maven-plugin</artifactId>
+	<artifactId>maven-jar-plugin</artifactId>
+	<configuration>
+	  <archive>
+	    <manifestFile>${bundle-manifest}</manifestFile>
+	  </archive>
+	</configuration>
+      </plugin>
+
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>clirr-maven-plugin</artifactId>
       </plugin>
     </plugins>
 
     <pluginManagement>
       <plugins>
-        <plugin>
-	      <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-pmd-plugin</artifactId>
-          <version>2.7.1</version>
-          <configuration>
-            <sourceEncoding>utf-8</sourceEncoding>
-            <minimumTokens>100</minimumTokens>
-            <targetJdk>1.5</targetJdk>
-            <format>xml</format>
-            <failOnViolation>false</failOnViolation>
-          </configuration>
-          <executions>
-            <execution>
-              <goals>
-                <goal>cpd-check</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-pmd-plugin</artifactId>
+	  <version>2.7.1</version>
+	  <configuration>
+	    <sourceEncoding>utf-8</sourceEncoding>
+	    <minimumTokens>100</minimumTokens>
+	    <targetJdk>1.5</targetJdk>
+	    <format>xml</format>
+	    <failOnViolation>false</failOnViolation>
+	  </configuration>
+	  <executions>
+	    <execution>
+	      <goals>
+		<goal>cpd-check</goal>
+	      </goals>
+	    </execution>
+	  </executions>
+	</plugin>
+
+	<plugin>
+	  <groupId>org.codehaus.mojo</groupId>
+	  <artifactId>findbugs-maven-plugin</artifactId>
+	  <configuration>
+	    <excludeFilterFile>findBugs/FindBugsExcludeFilter.xml</excludeFilterFile>
+	  </configuration>
+	</plugin>
       </plugins>
     </pluginManagement>
   </build>
@@ -183,13 +192,13 @@
   <reporting>
     <plugins>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>clirr-maven-plugin</artifactId>
-        <version>${clirr-version}</version>
-        <configuration>
-          <comparisonVersion>${jgit-last-release-version}</comparisonVersion>
-          <minSeverity>info</minSeverity>
-        </configuration>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>clirr-maven-plugin</artifactId>
+	<version>${clirr-version}</version>
+	<configuration>
+	  <comparisonVersion>${jgit-last-release-version}</comparisonVersion>
+	  <minSeverity>info</minSeverity>
+	</configuration>
       </plugin>
     </plugins>
   </reporting>

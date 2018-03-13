@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008, Charles O'Farrell <charleso@charleso.org>
  * Copyright (C) 2009-2010, Google Inc.
- * Copyright (C) 2008-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2008-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -74,7 +75,6 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
 public class RefUpdateTest extends SampleDataRepositoryTestCase {
@@ -284,21 +284,6 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
-	public void testDeleteWithoutHead() throws IOException {
-		// Prepare repository without HEAD
-		RefUpdate refUpdate = db.updateRef(Constants.HEAD, true);
-		refUpdate.setForceUpdate(true);
-		refUpdate.setNewObjectId(ObjectId.zeroId());
-		Result updateResult = refUpdate.update();
-		assertEquals(Result.FORCED, updateResult);
-		Result deleteHeadResult = db.updateRef(Constants.HEAD).delete();
-		assertEquals(Result.NO_CHANGE, deleteHeadResult);
-
-		// Any result is ok as long as it's not an NPE
-		db.updateRef(Constants.R_HEADS + "master").delete();
-	}
-
-	@Test
 	public void testRefKeySameAsName() {
 		Map<String, Ref> allRefs = db.getAllRefs();
 		for (Entry<String, Ref> e : allRefs.entrySet()) {
@@ -455,6 +440,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 
 		// now update that ref
 		updateRef = db.updateRef(Constants.HEAD);
+		updateRef.setForceUpdate(true);
 		updateRef.setNewObjectId(oldValue);
 		update = updateRef.update();
 		assertEquals(Result.FAST_FORWARD, update);

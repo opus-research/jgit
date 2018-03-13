@@ -90,13 +90,12 @@ public class AutoCRLFOutputStream extends OutputStream {
 	}
 
 	@Override
-	public void write(byte[] b, final int startOff, final int startLen)
-			throws IOException {
-		final int overflow = buffer(b, startOff, startLen);
+	public void write(byte[] b, int off, int len) throws IOException {
+		int overflow = buffer(b, off, len);
 		if (overflow < 0)
 			return;
-		final int off = startOff + startLen - overflow;
-		final int len = overflow;
+		off = off + len - overflow;
+		len = overflow;
 		if (len == 0)
 			return;
 		int lastw = off;
@@ -105,7 +104,7 @@ public class AutoCRLFOutputStream extends OutputStream {
 			return;
 		}
 		for (int i = off; i < off + len; ++i) {
-			final byte c = b[i];
+			byte c = b[i];
 			if (c == '\r') {
 				buf = '\r';
 			} else if (c == '\n') {

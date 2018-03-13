@@ -170,14 +170,8 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			return loadPropertiesFile(propsFile);
 
 		Properties props = new Properties();
-		String user = uri.getUser();
-		String pass = uri.getPass();
-		if (user != null && pass != null) {
-		        props.setProperty("accesskey", user); //$NON-NLS-1$
-		        props.setProperty("secretkey", pass); //$NON-NLS-1$
-		} else
-			throw new NotSupportedException(MessageFormat.format(
-					JGitText.get().cannotReadFile, propsFile));
+		props.setProperty("accesskey", uri.getUser()); //$NON-NLS-1$
+		props.setProperty("secretkey", uri.getPass()); //$NON-NLS-1$
 		return props;
 	}
 

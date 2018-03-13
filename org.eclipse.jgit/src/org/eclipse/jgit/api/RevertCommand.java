@@ -95,8 +95,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 
 	private List<String> unmergedPaths;
 
-	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
-
 	/**
 	 * @param repo
 	 */
@@ -162,7 +160,8 @@ public class RevertCommand extends GitCommand<RevCommit> {
 				String revertName = srcCommit.getId().abbreviate(7).name()
 						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
-				ResolveMerger merger = (ResolveMerger) strategy.newMerger(repo);
+				ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
+						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcCommit.getTree());
 				merger.setCommitNames(new String[] {
@@ -170,7 +169,7 @@ public class RevertCommand extends GitCommand<RevCommit> {
 
 				String shortMessage = "Revert \"" + srcCommit.getShortMessage() //$NON-NLS-1$
 						+ "\""; //$NON-NLS-1$
-				String newMessage = shortMessage + "\n\n" //$NON-NLS-1$
+				String newMessage = shortMessage + "\n\n"
 						+ "This reverts commit " + srcCommit.getId().getName() //$NON-NLS-1$
 						+ ".\n"; //$NON-NLS-1$
 				if (merger.merge(headCommit, srcParent)) {
@@ -186,24 +185,24 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							.setMessage(newMessage)
 							.setReflogComment("revert: " + shortMessage).call(); //$NON-NLS-1$
 					revertedRefs.add(src);
-					headCommit = newHead;
 				} else {
 					unmergedPaths = merger.getUnmergedPaths();
 					Map<String, MergeFailureReason> failingPaths = merger
 							.getFailingPaths();
 					if (failingPaths != null)
 						failingResult = new MergeResult(null,
-								merger.getBaseCommitId(),
+								merger.getBaseCommit(0, 1),
 								new ObjectId[] { headCommit.getId(),
 										srcParent.getId() },
-								MergeStatus.FAILED, strategy,
+								MergeStatus.FAILED, MergeStrategy.RECURSIVE,
 								merger.getMergeResults(), failingPaths, null);
 					else
 						failingResult = new MergeResult(null,
-								merger.getBaseCommitId(),
+								merger.getBaseCommit(0, 1),
 								new ObjectId[] { headCommit.getId(),
 										srcParent.getId() },
-								MergeStatus.CONFLICTING, strategy,
+								MergeStatus.CONFLICTING,
+								MergeStrategy.RECURSIVE,
 								merger.getMergeResults(), failingPaths, null);
 					if (!merger.failed() && !unmergedPaths.isEmpty()) {
 						String message = new MergeMessageFormatter()
@@ -301,16 +300,5 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 */
 	public List<String> getUnmergedPaths() {
 		return unmergedPaths;
-	}
-
-	/**
-	 * @param strategy
-	 *            The merge strategy to use during this revert command.
-	 * @return {@code this}
-	 * @since 3.4
-	 */
-	public RevertCommand setStrategy(MergeStrategy strategy) {
-		this.strategy = strategy;
-		return this;
 	}
 }

@@ -57,7 +57,6 @@ import java.net.URLConnection;
 import java.text.MessageFormat;
 import java.util.Properties;
 
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.AmazonS3;
 import org.kohsuke.args4j.Argument;
 
@@ -116,7 +115,7 @@ class AmazonS3Client extends TextBuiltin {
 			final OutputStream os = s3.beginPut(bucket, key, null, null);
 			final byte[] tmp = new byte[2048];
 			int n;
-			while ((n = ins.read(tmp)) > 0)
+			while ((n = System.in.read(tmp)) > 0)
 				os.write(tmp, 0, n);
 			os.close();
 

@@ -53,8 +53,6 @@ import java.util.List;
 
 /**
  * FS implementation for Windows
- *
- * @since 3.0
  */
 public class FS_Win32 extends FS {
 	/**

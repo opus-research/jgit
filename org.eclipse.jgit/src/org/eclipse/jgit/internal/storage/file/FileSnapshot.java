@@ -45,8 +45,6 @@ package org.eclipse.jgit.internal.storage.file;
 
 import java.io.File;
 
-import org.eclipse.jgit.util.FS;
-
 /**
  * Caches when a file was last read, making it possible to detect future edits.
  * <p>
@@ -83,7 +81,7 @@ public class FileSnapshot {
 	public static final FileSnapshot MISSING_FILE = new FileSnapshot(0, 0) {
 		@Override
 		public boolean isModified(File path) {
-			return FS.DETECTED.exists(path);
+			return path.exists();
 		}
 	};
 
