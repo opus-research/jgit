@@ -48,13 +48,9 @@ package org.eclipse.jgit.treewalk;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Reader;
 
-import org.eclipse.jgit.attributes.Attributes;
-import org.eclipse.jgit.attributes.AttributesQuery;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -81,10 +77,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 */
 	protected final FS fs;
 
-	private File attributesFile;
-
-	private Attributes gitInfoAttributes;
-
 	/**
 	 * Create a new iterator to traverse the work tree and its children.
 	 *
@@ -95,7 +87,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		this(repo.getWorkTree(), repo.getFS(), WorkingTreeOptions
 				.createConfigurationInstance(repo.getConfig()));
 		initRootIterator(repo);
-		attributesFile = new File(repo.getDirectory(), Constants.INFO_ATTRIBUTES);
 	}
 
 	/**
@@ -139,32 +130,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	@Override
 	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
-		final FileEntry fileEntry = (FileEntry)current();
-		final File file = fileEntry.file;
-		return new FileTreeIterator(this, file, fs);
-	}
-
-	protected AttributesQuery decorateAttributesQuery(AttributesQuery query)
-			throws IOException {
-		final WorkingTreeIterator parent = (WorkingTreeIterator) this.parent;
-		if (parent != null)
-			return parent.decorateAttributesQuery(query);
-
-		if (gitInfoAttributes == null) {
-			gitInfoAttributes = new Attributes();
-
-			if (attributesFile.exists()) {
-				final Reader reader = new FileReader(attributesFile);
-				try {
-					gitInfoAttributes.parse(reader);
-				} finally {
-					reader.close();
-				}
-			}
-		}
-
-		return gitInfoAttributes.isEmpty() ? query : new AttributesQuery(
-				gitInfoAttributes, "", query);
+		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
 
 	private Entry[] entries() {
