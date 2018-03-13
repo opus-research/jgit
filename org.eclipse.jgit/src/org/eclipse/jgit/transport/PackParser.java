@@ -54,7 +54,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -67,7 +66,6 @@ import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
-import org.eclipse.jgit.lib.BlobObjectChecker;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -84,6 +82,7 @@ import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.LongMap;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.sha1.SHA1;
 
@@ -1044,21 +1043,16 @@ public abstract class PackParser {
 		if (type == Constants.OBJ_BLOB) {
 			byte[] readBuffer = buffer();
 			InputStream inf = inflate(Source.INPUT, sz);
-			BlobObjectChecker checker = Optional.ofNullable(objCheck)
-					.flatMap(ObjectChecker::newBlobObjectChecker)
-					.orElse(BlobObjectChecker.NULL_CHECKER);
 			long cnt = 0;
 			while (cnt < sz) {
 				int r = inf.read(readBuffer);
 				if (r <= 0)
 					break;
 				objectDigest.update(readBuffer, 0, r);
-				checker.update(readBuffer, 0, r);
 				cnt += r;
 			}
 			inf.close();
 			objectDigest.digest(tempObjectId);
-			checker.endBlob(tempObjectId);
 			data = null;
 		} else {
 			data = inflateAndReturn(Source.INPUT, sz);
