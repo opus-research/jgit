@@ -50,6 +50,7 @@ import static org.eclipse.jgit.lib.FileMode.GITLINK;
 import static org.eclipse.jgit.lib.FileMode.SYMLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
+import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.LOCK_FAILURE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
@@ -194,7 +195,6 @@ public class RefTree {
 	/** Borrowed reader to access the repository. */
 	private final ObjectReader reader;
 	private DirCache contents;
-
 	private Map<ObjectId, String> pendingBlobs;
 
 	private RefTree(ObjectReader reader, DirCache dc) {
@@ -212,7 +212,7 @@ public class RefTree {
 	 *             cannot read a symbolic reference target.
 	 */
 	@Nullable
-	public Ref getRef(String name) throws IOException {
+	public Ref exactRef(String name) throws IOException {
 		Ref r = readRef(name);
 		if (r == null) {
 			return r;
@@ -248,7 +248,7 @@ public class RefTree {
 				byte[] bin = reader.open(id, OBJ_BLOB).getCachedBytes();
 				dst = RawParseUtils.decode(bin);
 			}
-			Ref trg = new ObjectIdRef.Unpeeled(PACKED, dst, null);
+			Ref trg = new ObjectIdRef.Unpeeled(NEW, dst, null);
 			return new SymbolicRef(name, trg);
 		}
 
