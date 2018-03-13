@@ -106,10 +106,7 @@ java_library(
 
 java_library(
     name = "jsch",
-    visibility = [
-        "//org.eclipse.jgit:__pkg__",
-        "//org.eclipse.jgit.test:__pkg__",
-    ],
+    visibility = ["//org.eclipse.jgit:__pkg__"],
     exports = ["@jsch//jar"],
 )
 

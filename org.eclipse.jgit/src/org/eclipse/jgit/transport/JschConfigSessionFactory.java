@@ -153,13 +153,10 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 		} catch (JSchException je) {
 			final Throwable c = je.getCause();
-			if (c instanceof UnknownHostException) {
-				throw new TransportException(uri, JGitText.get().unknownHost,
-						je);
-			}
-			if (c instanceof ConnectException) {
-				throw new TransportException(uri, c.getMessage(), je);
-			}
+			if (c instanceof UnknownHostException)
+				throw new TransportException(uri, JGitText.get().unknownHost);
+			if (c instanceof ConnectException)
+				throw new TransportException(uri, c.getMessage());
 			throw new TransportException(uri, je.getMessage(), je);
 		}
 

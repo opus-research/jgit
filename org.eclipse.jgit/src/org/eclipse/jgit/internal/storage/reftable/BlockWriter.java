@@ -354,12 +354,10 @@ class BlockWriter {
 
 	static class RefEntry extends Entry {
 		final Ref ref;
-		final long updateIndexDelta;
 
-		RefEntry(Ref ref, long updateIndexDelta) {
+		RefEntry(Ref ref) {
 			super(nameUtf8(ref));
 			this.ref = ref;
-			this.updateIndexDelta = updateIndexDelta;
 		}
 
 		@Override
@@ -382,18 +380,17 @@ class BlockWriter {
 
 		@Override
 		int valueSize() {
-			int n = computeVarintSize(updateIndexDelta);
 			switch (valueType()) {
 			case VALUE_NONE:
-				return n;
+				return 0;
 			case VALUE_1ID:
-				return n + OBJECT_ID_LENGTH;
+				return OBJECT_ID_LENGTH;
 			case VALUE_2ID:
-				return n + 2 * OBJECT_ID_LENGTH;
+				return 2 * OBJECT_ID_LENGTH;
 			case VALUE_SYMREF:
 				if (ref.isSymbolic()) {
 					int nameLen = nameUtf8(ref.getTarget()).length;
-					return n + computeVarintSize(nameLen) + nameLen;
+					return computeVarintSize(nameLen) + nameLen;
 				}
 			}
 			throw new IllegalStateException();
@@ -401,7 +398,6 @@ class BlockWriter {
 
 		@Override
 		void writeValue(ReftableOutputStream os) throws IOException {
-			os.writeVarint(updateIndexDelta);
 			switch (valueType()) {
 			case VALUE_NONE:
 				return;
