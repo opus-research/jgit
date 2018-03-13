@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.diff;
 
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
 
 public class HistogramDiffTest extends AbstractDiffTestCase {
 	@Override
@@ -75,7 +77,7 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 	public void testEdit_LcsContainsUnique() {
 		EditList r = diff(t("nqnjrnjsnm"), t("AnqnjrnjsnjTnmZ"));
 		assertEquals(new Edit(0, 0, 0, 1), r.get(0)); // INSERT "A";
-		assertEquals(new Edit(9, 9, 10, 13), r.get(1)); // INSERT "njD";
+		assertEquals(new Edit(9, 9, 10, 13), r.get(1)); // INSERT "jTn";
 		assertEquals(new Edit(10, 10, 14, 15), r.get(2)); // INSERT "Z";
 		assertEquals(3, r.size());
 	}
@@ -114,21 +116,47 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 
 	public void testFallbackToMyersDiff() {
 		HistogramDiff hd = new HistogramDiff();
-		hd.setMaxChainLength(4);
+		hd.setMaxChainLength(64);
 
-		RawTextComparator cmp = RawTextComparator.DEFAULT;
-		RawText ac = t("bbbbb");
-		RawText bc = t("AbCbDbEFbZ");
+		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
+		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharCmp cmp = new CharCmp();
+		CharArray ac = new CharArray(a);
+		CharArray bc = new CharArray(b);
 		EditList r;
 
 		// Without fallback our results are limited due to collisions.
 		hd.setFallbackAlgorithm(null);
 		r = hd.diff(cmp, ac, bc);
-		assertEquals(1, r.size());
+		assertEquals(70, r.size());
 
 		// Results go up when we add a fallback for the high collision regions.
 		hd.setFallbackAlgorithm(MyersDiff.INSTANCE);
 		r = hd.diff(cmp, ac, bc);
-		assertEquals(5, r.size());
+		assertEquals(73, r.size());
+
+		// But they still differ from Myers due to the way we did early steps.
+		EditList myersResult = MyersDiff.INSTANCE.diff(cmp, ac, bc);
+		assertFalse("Not same as Myers", myersResult.equals(r));
+	}
+
+	public void testPerformanceTestDeltaLength() {
+		HistogramDiff hd = new HistogramDiff();
+		hd.setFallbackAlgorithm(null);
+
+		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
+		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharCmp cmp = new CharCmp();
+		CharArray ac = new CharArray(a);
+		CharArray bc = new CharArray(b);
+		EditList r;
+
+		hd.setMaxChainLength(64);
+		r = hd.diff(cmp, ac, bc);
+		assertEquals(70, r.size());
+
+		hd.setMaxChainLength(176);
+		r = hd.diff(cmp, ac, bc);
+		assertEquals(72, r.size());
 	}
 }
