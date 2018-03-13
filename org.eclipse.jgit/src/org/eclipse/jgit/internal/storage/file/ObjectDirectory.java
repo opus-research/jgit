@@ -52,6 +52,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,8 +85,6 @@ import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Traditional file system based {@link ObjectDatabase}.
@@ -105,8 +105,6 @@ import org.slf4j.LoggerFactory;
  * considered.
  */
 public class ObjectDirectory extends FileObjectDatabase {
-	private static Logger log = LoggerFactory.getLogger(ObjectDirectory.class);
-
 	private static final PackList NO_PACKS = new PackList(
 			FileSnapshot.DIRTY, new PackFile[0]);
 
@@ -567,8 +565,14 @@ public class ObjectDirectory extends FileObjectDatabase {
 			// Don't remove the pack from the list, as the error may be
 			// transient.
 		}
-		log.error(MessageFormat.format(tmpl,
-				p.getPackFile().getAbsolutePath()), e);
+		StringBuilder buf = new StringBuilder(MessageFormat.format(tmpl,
+				p.getPackFile().getAbsolutePath()));
+		StringWriter sw = new StringWriter();
+		e.printStackTrace(new PrintWriter(sw));
+		buf.append('\n');
+		buf.append(sw.toString());
+		// TODO instead of syserr we should use a logging framework
+		System.err.println(buf.toString());
 	}
 
 	@Override
