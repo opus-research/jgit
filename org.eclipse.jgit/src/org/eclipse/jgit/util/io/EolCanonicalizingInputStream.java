@@ -75,8 +75,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 	 *
 	 * @param in
 	 *            raw input stream
-	 * @param detectBinary
-	 *            {@code true} if binary check should be done
 	 */
 	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary) {
 		this.in = in;
