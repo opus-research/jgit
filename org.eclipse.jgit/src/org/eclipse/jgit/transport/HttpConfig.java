@@ -52,6 +52,7 @@ import java.util.function.Supplier;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.StringUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,20 +71,15 @@ public class HttpConfig {
 
 	private static final String FTP = "ftp"; //$NON-NLS-1$
 
-	/** git config section key for http settings. */
-	public static final String HTTP = "http"; //$NON-NLS-1$
+	private static final String HTTP = "http"; //$NON-NLS-1$
 
-	/** git config key for the "followRedirects" setting. */
-	public static final String FOLLOW_REDIRECTS_KEY = "followRedirects"; //$NON-NLS-1$
+	private static final String FOLLOW_REDIRECTS_KEY = "followRedirects"; //$NON-NLS-1$
 
-	/** git config key for the "maxRedirects" setting. */
-	public static final String MAX_REDIRECTS_KEY = "maxRedirects"; //$NON-NLS-1$
+	private static final String MAX_REDIRECTS_KEY = "maxRedirects"; //$NON-NLS-1$
 
-	/** git config key for the "postBuffer" setting. */
-	public static final String POST_BUFFER_KEY = "postBuffer"; //$NON-NLS-1$
+	private static final String POST_BUFFER_KEY = "postBuffer"; //$NON-NLS-1$
 
-	/** git config key for the "sslVerify" setting. */
-	public static final String SSL_VERIFY_KEY = "sslVerify"; //$NON-NLS-1$
+	private static final String SSL_VERIFY_KEY = "sslVerify"; //$NON-NLS-1$
 
 	private static final String MAX_REDIRECT_SYSTEM_PROPERTY = "http.maxRedirects"; //$NON-NLS-1$
 
@@ -246,7 +242,7 @@ public class HttpConfig {
 		int bestMatchLength = -1;
 		boolean withUser = false;
 		String uPath = uri.getPath();
-		boolean hasPath = uPath != null && !uPath.isEmpty();
+		boolean hasPath = !StringUtils.isEmptyOrNull(uPath);
 		if (hasPath) {
 			uPath = normalize(uPath);
 			if (uPath == null) {
@@ -279,7 +275,7 @@ public class HttpConfig {
 				// Path: prefix match, longer is better
 				String cPath = candidate.getPath();
 				int matchLength = -1;
-				if (cPath == null || cPath.isEmpty()) {
+				if (StringUtils.isEmptyOrNull(cPath)) {
 					matchLength = 0;
 				} else {
 					if (!hasPath) {
