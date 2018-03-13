@@ -73,7 +73,8 @@ class Subscribe extends TextBuiltin {
 		if (uris.isEmpty())
 			throw die(MessageFormat.format(
 					CLIText.get().noRemoteUriSubscribe, remote));
-		String uriRoot = PubSubConfig.getUriRoot(uris.get(0));
+		URIish uri = uris.get(0);
+		String uriRoot = PubSubConfig.getUriRoot(uri);
 		String dir = db.getDirectory().getAbsolutePath();
 
 		// Add new repository + remote to config
@@ -85,8 +86,18 @@ class Subscribe extends TextBuiltin {
 
 		Subscriber s = p.getSubscriber(remote, dir);
 
-		if (s == null)
-			p.addSubscriber(new Subscriber(p, remote, dir));
+		if (s == null) {
+			// Check that there are no existing repositories subscribed to the
+			// same remote repository.
+			Subscriber newSubscriber = new Subscriber(p, remote, dir);
+			for (Subscriber oldSubscriber : p.getSubscribers()) {
+				if (newSubscriber.getName() == oldSubscriber.getName())
+					throw die(MessageFormat.format(
+							CLIText.get().cannotSubscribeTwice, uri,
+							oldSubscriber.getDirectory()));
+			}
+			p.addSubscriber(newSubscriber);
+		}
 
 		try {
 			SubscribeDaemon.updateConfig(pubsubConfig);
