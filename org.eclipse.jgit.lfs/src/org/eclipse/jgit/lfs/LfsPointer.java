@@ -48,6 +48,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
@@ -64,6 +67,12 @@ public class LfsPointer {
 	 * The version of the LfsPointer file format
 	 */
 	public static final String VERSION = "https://git-lfs.github.com/spec/v1"; //$NON-NLS-1$
+
+	/**
+	 * The version of the LfsPointer file format using legacy URL
+	 * @since 4.7
+	 */
+	public static final String VERSION_LEGACY = "https://hawser.github.com/spec/v1"; //$NON-NLS-1$
 
 	/**
 	 * The name of the hash function as used in the pointer files. This will
@@ -109,13 +118,18 @@ public class LfsPointer {
 	 *            written
 	 */
 	public void encode(OutputStream out) {
-		try (PrintStream ps = new PrintStream(out)) {
+		try (PrintStream ps = new PrintStream(out, false,
+				StandardCharsets.UTF_8.name())) {
 			ps.print("version "); //$NON-NLS-1$
-			ps.println(VERSION);
+			ps.print(VERSION + "\n"); //$NON-NLS-1$
 			ps.print("oid " + HASH_FUNCTION_NAME + ":"); //$NON-NLS-1$ //$NON-NLS-2$
-			ps.println(oid.name());
+			ps.print(oid.name() + "\n"); //$NON-NLS-1$
 			ps.print("size "); //$NON-NLS-1$
-			ps.println(size);
+			ps.print(size + "\n"); //$NON-NLS-1$
+		} catch (UnsupportedEncodingException e) {
+			// should not happen, we are using a standard charset
+			throw new UnsupportedCharsetException(
+					StandardCharsets.UTF_8.name());
 		}
 	}
 
@@ -137,19 +151,18 @@ public class LfsPointer {
 		long sz = -1;
 
 		try (BufferedReader br = new BufferedReader(
-				new InputStreamReader(in))) {
+				new InputStreamReader(in, StandardCharsets.UTF_8.name()))) {
 			for (String s = br.readLine(); s != null; s = br.readLine()) {
 				if (s.startsWith("#") || s.length() == 0) { //$NON-NLS-1$
 					continue;
 				} else if (s.startsWith("version") && s.length() > 8 //$NON-NLS-1$
-						&& s.substring(8).trim().equals(VERSION)) {
+						&& (s.substring(8).trim().equals(VERSION) ||
+								s.substring(8).trim().equals(VERSION_LEGACY))) {
 					versionLine = true;
 				} else if (s.startsWith("oid sha256:")) { //$NON-NLS-1$
 					id = LongObjectId.fromString(s.substring(11).trim());
 				} else if (s.startsWith("size") && s.length() > 5) { //$NON-NLS-1$
 					sz = Long.parseLong(s.substring(5).trim());
-				} else {
-					return null;
 				}
 			}
 			if (versionLine && id != null && sz > -1) {

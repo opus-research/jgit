@@ -90,6 +90,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String badObjectType;
 	/***/ public String badRef;
 	/***/ public String badSectionEntry;
+	/***/ public String badShallowLine;
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
@@ -666,6 +667,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
+	/***/ public String timeIsUncertain;
 	/***/ public String timerAlreadyTerminated;
 	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;

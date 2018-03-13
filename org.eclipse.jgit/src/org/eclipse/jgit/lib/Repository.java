@@ -4,6 +4,7 @@
  * Copyright (C) 2006-2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2012, Daniel Megert <daniel_megert@ch.ibm.com>
+ * Copyright (C) 2017, Wim Jongman <wim.jongman@remainsoftware.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,6 +53,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -94,7 +96,6 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,8 +108,7 @@ import org.slf4j.LoggerFactory;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
-	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
-
+	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -653,7 +653,10 @@ public abstract class Repository implements AutoCloseable {
 							// detached
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-							throw new RevisionSyntaxException(revstr);
+							throw new RevisionSyntaxException(MessageFormat
+									.format(JGitText.get().invalidRefName,
+											name),
+									revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -703,7 +706,10 @@ public abstract class Repository implements AutoCloseable {
 						if (name.equals("")) //$NON-NLS-1$
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-							throw new RevisionSyntaxException(revstr);
+							throw new RevisionSyntaxException(MessageFormat
+									.format(JGitText.get().invalidRefName,
+											name),
+									revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -752,7 +758,9 @@ public abstract class Repository implements AutoCloseable {
 			return null;
 		name = revstr.substring(done);
 		if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-			throw new RevisionSyntaxException(revstr);
+			throw new RevisionSyntaxException(
+					MessageFormat.format(JGitText.get().invalidRefName, name),
+					revstr);
 		if (getRef(name) != null)
 			return name;
 		return resolveSimple(name);
@@ -869,6 +877,7 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/** Decrement the use count, and maybe close resources. */
+	@Override
 	public void close() {
 		int newCount = useCnt.decrementAndGet();
 		if (newCount == 0) {
@@ -902,8 +911,9 @@ public abstract class Repository implements AutoCloseable {
 		getRefDatabase().close();
 	}
 
-	@NonNull
 	@SuppressWarnings("nls")
+	@Override
+	@NonNull
 	public String toString() {
 		String desc;
 		File directory = getDirectory();
@@ -1175,7 +1185,7 @@ public abstract class Repository implements AutoCloseable {
 		// we want DirCache to inform us so that we can inform registered
 		// listeners about index changes
 		IndexChangedListener l = new IndexChangedListener() {
-
+			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				notifyIndexChanged();
 			}
@@ -1799,15 +1809,12 @@ public abstract class Repository implements AutoCloseable {
 			throws FileNotFoundException, IOException {
 		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
-			BufferedOutputStream bos = new SafeBufferedOutputStream(
-					new FileOutputStream(headsFile));
-			try {
+			try (OutputStream bos = new BufferedOutputStream(
+					new FileOutputStream(headsFile))) {
 				for (ObjectId id : heads) {
 					id.copyTo(bos);
 					bos.write('\n');
 				}
-			} finally {
-				bos.close();
 			}
 		} else {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
@@ -1880,5 +1887,41 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	public void autoGC(ProgressMonitor monitor) {
 		// default does nothing
+	}
+
+	/**
+	 * Normalizes the passed branch name into a possible valid branch name. The
+	 * validity of the returned name should be checked by a subsequent call to
+	 * {@link #isValidRefName(String)}.
+	 * <p/>
+	 * Future implementations of this method could be more restrictive or more
+	 * lenient about the validity of specific characters in the returned name.
+	 * <p/>
+	 * The current implementation returns a trimmed string only containing word
+	 * characters ([a-zA-Z_0-9]) and hyphens ('-'). Colons are replaced by
+	 * hyphens. Repeating underscores and hyphens are replaced by a single
+	 * occurrence. Underscores and hyphens at the beginning of the string are
+	 * removed.
+	 *
+	 * @param name
+	 *            The name to normalize.
+	 *
+	 * @return The normalized String or null if null was passed.
+	 * @since 4.7
+	 * @see #isValidRefName(String)
+	 */
+	public static String normalizeBranchName(String name) {
+		if (name == null || name.length() == 0) {
+			return name;
+		}
+		String result = name.trim();
+		return result.replaceAll("\\s+([_:-])*?\\s+", "$1") //$NON-NLS-1$//$NON-NLS-2$
+				.replaceAll(":", "-") //$NON-NLS-1$//$NON-NLS-2$
+				.replaceAll("\\s+", "_") //$NON-NLS-1$//$NON-NLS-2$
+				.replaceAll("_{2,}", "_") //$NON-NLS-1$//$NON-NLS-2$
+				.replaceAll("-{2,}", "-") //$NON-NLS-1$//$NON-NLS-2$
+				.replaceAll("[^\\w-]", "") //$NON-NLS-1$ //$NON-NLS-2$
+				.replaceAll("^_+", "") //$NON-NLS-1$//$NON-NLS-2$
+				.replaceAll("^-+", ""); //$NON-NLS-1$//$NON-NLS-2$
 	}
 }
