@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -53,8 +54,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.NotSupportedException;
-import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -177,12 +176,8 @@ public class LsRemoteCommand extends
 		} catch (URISyntaxException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
-		} catch (NotSupportedException e) {
+		} catch (IOException e) {
 			throw new JGitInternalException(
-					JGitText.get().exceptionCaughtDuringExecutionOfLsRemoteCommand,
-					e);
-		} catch (TransportException e) {
-				throw new org.eclipse.jgit.api.errors.TransportException(
 					JGitText.get().exceptionCaughtDuringExecutionOfLsRemoteCommand,
 					e);
 		} finally {
