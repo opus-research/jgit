@@ -50,64 +50,47 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.DigestOutputStream;
 
-import org.eclipse.jgit.attributes.FilterCommand;
-import org.eclipse.jgit.attributes.FilterCommandFactory;
-import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.lfs.errors.CorruptMediaFile;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.BuiltinCommand;
+import org.eclipse.jgit.util.BuiltinCommandFactory;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
- * Built-in LFS clean filter
+ * A LFS Clean filter.
  *
  * When new content is about to be added to the git repository and this filter
  * is configured for that content, then this filter will replace the original
- * content with content of a so-called LFS pointer file. The pointer file
- * content will then be added to the git repository. Additionally this filter
- * writes the original content in a so-called 'media file' to '.git/lfs/objects/
- * <first-two-characters-of-contentid>/<rest-of-contentid>'
+ * content with content of a so called pointer file. The pointer file content
+ * will then be added to the git repository. Additionally this filter writes the
+ * original content in a so called 'media file' at '.git/lfs/objectsDir/
+ * <first-two-characters-of-contentid>/ <rest-of-contentid>'
  *
- * @see <a href="https://github.com/github/git-lfs/blob/master/docs/spec.md">Git
- *      LFS Specification</a>
- * @since 4.6
+ * @since 4.5
  */
-public class CleanFilter extends FilterCommand {
+public class CleanFilter extends BuiltinCommand {
 	/**
-	 * The factory is responsible for creating instances of {@link CleanFilter}
+	 * The factory is responsible for creating instances for {@link CleanFilter}
+	 * . This factory can be registered to the repository with the help of
+	 * {@link Repository#registerComand(String, BuiltinCommandFactory)}
 	 */
-	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
-
+	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
 		@Override
-		public FilterCommand create(Repository db, InputStream in,
+		public BuiltinCommand create(Repository db, InputStream in,
 				OutputStream out) throws IOException {
 			return new CleanFilter(db, in, out);
 		}
 	};
 
-	/**
-	 * Registers this filter by calling
-	 * {@link FilterCommandRegistry#register(String, FilterCommandFactory)}
-	 */
-	public final static void register() {
-		FilterCommandRegistry.register(
-				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
-						+ "lfs/clean", //$NON-NLS-1$
-				FACTORY);
-	}
-
-	// The OutputStream to a temporary file which will be renamed to mediafile
-	// when the operation succeeds
-	private OutputStream tmpOut;
-
 	// Used to compute the hash for the original content
-	private DigestOutputStream dOut;
+	private DigestOutputStream mOut;
 
-	private Lfs lfsUtil;
+	private LfsUtil lfsUtil;
 
 	// the size of the original content
-	private long size;
+	private long size = 0;
 
 	// a temporary file into which the original content is written. When no
 	// errors occur this file will be renamed to the mediafile
@@ -117,10 +100,10 @@ public class CleanFilter extends FilterCommand {
 	 * @param db
 	 *            the repository
 	 * @param in
-	 *            an {@link InputStream} providing the original content
+	 *            a {@link InputStream} providing the original content
 	 * @param out
 	 *            the {@link OutputStream} into which the content of the pointer
-	 *            file should be written. That's the content which will be added
+	 *            file should be written. That's the content which will be add
 	 *            to the git repository
 	 * @throws IOException
 	 *             when the creation of the temporary file fails or when no
@@ -129,48 +112,38 @@ public class CleanFilter extends FilterCommand {
 	public CleanFilter(Repository db, InputStream in, OutputStream out)
 			throws IOException {
 		super(in, out);
-		lfsUtil = new Lfs(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
+		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
 		Files.createDirectories(lfsUtil.getLfsTmpDir());
-		tmpFile = lfsUtil.createTmpFile();
-		tmpOut = Files.newOutputStream(tmpFile,
-				StandardOpenOption.CREATE);
-		this.dOut = new DigestOutputStream(
-				tmpOut,
+		tmpFile = lfsUtil.getTmpFile();
+		mOut = new DigestOutputStream(
+				Files.newOutputStream(tmpFile, StandardOpenOption.CREATE),
 				Constants.newMessageDigest());
 	}
 
 	public int run() throws IOException {
-		try {
-			int b = in.read();
-			if (b != -1) {
-				dOut.write(b);
-				size++;
-				return 1;
-			} else {
-				dOut.close();
-				tmpOut.close();
-				LongObjectId loid = LongObjectId
-						.fromRaw(dOut.getMessageDigest().digest());
-				Path mediaFile = lfsUtil.getMediaFile(loid);
-				if (Files.isRegularFile(mediaFile)) {
-					long fsSize = Files.size(mediaFile);
-					if (fsSize != size) {
-						throw new CorruptMediaFile(mediaFile, size, fsSize);
-					}
-				} else {
-					FileUtils.mkdirs(mediaFile.getParent().toFile(), true);
-					FileUtils.rename(tmpFile.toFile(), mediaFile.toFile());
+		int b = in.read();
+		if (b != -1) {
+			mOut.write(b);
+			size++;
+			return 1;
+		} else {
+			mOut.close();
+			LongObjectId loid = LongObjectId
+					.fromRaw(mOut.getMessageDigest().digest());
+			Path mediaFile = lfsUtil.getMediaFile(loid);
+			if (Files.isRegularFile(mediaFile)) {
+				long fsSize = Files.size(mediaFile);
+				if (fsSize != size) {
+					throw new CorruptMediaFile(mediaFile, size, fsSize);
 				}
-				LfsPointer lfsPointer = new LfsPointer(loid, size);
-				lfsPointer.encode(out);
-				out.close();
-				return -1;
+			} else {
+				FileUtils.mkdirs(mediaFile.getParent().toFile(), true);
+				FileUtils.rename(tmpFile.toFile(), mediaFile.toFile());
 			}
-		} catch (IOException e) {
+			LfsPointer lfsPointer = new LfsPointer(loid, size);
+			lfsPointer.encode(out);
 			out.close();
-			dOut.close();
-			tmpOut.close();
-			throw e;
+			return -1;
 		}
 	}
 }

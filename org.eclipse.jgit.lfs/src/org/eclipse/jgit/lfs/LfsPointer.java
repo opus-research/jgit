@@ -45,13 +45,12 @@ package org.eclipse.jgit.lfs;
 import java.io.OutputStream;
 import java.io.PrintStream;
 
-import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 
 /**
- * Represents an LFS pointer file
+ * Represents a LFS pointer file
  *
- * @since 4.6
+ * @since 4.5
  */
 public class LfsPointer {
 	/**
@@ -60,11 +59,9 @@ public class LfsPointer {
 	public static final String VERSION = "https://git-lfs.github.com/spec/v1"; //$NON-NLS-1$
 
 	/**
-	 * The name of the hash function as used in the pointer files. This will
-	 * evaluate to "sha256"
+	 * The hash function to be used to compute id's
 	 */
-	public static final String HASH_FUNCTION_NAME = Constants.LONG_HASH_FUNCTION
-			.toLowerCase().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
+	public static final String OIDTYPE = "sha256"; //$NON-NLS-1$
 
 	private LongObjectId oid;
 
@@ -96,7 +93,7 @@ public class LfsPointer {
 	}
 
 	/**
-	 * Encode this object into the LFS format defined by {@link #VERSION}
+	 * Encode this object into a format defined by {@link #VERSION}
 	 *
 	 * @param out
 	 *            the {@link OutputStream} into which the encoded data should be
@@ -106,16 +103,10 @@ public class LfsPointer {
 		try (PrintStream ps = new PrintStream(out)) {
 			ps.print("version "); //$NON-NLS-1$
 			ps.println(VERSION);
-			ps.print("oid " + HASH_FUNCTION_NAME + ":"); //$NON-NLS-1$ //$NON-NLS-2$
+			ps.print("oid "); //$NON-NLS-1$
 			ps.println(LongObjectId.toString(oid));
 			ps.print("size "); //$NON-NLS-1$
 			ps.println(size);
 		}
-	}
-
-	@Override
-	public String toString() {
-		return "LfsPointer: oid=" + LongObjectId.toString(oid) + ", size=" //$NON-NLS-1$ //$NON-NLS-2$
-				+ size;
 	}
 }
