@@ -62,6 +62,8 @@ import javax.net.ssl.TrustManager;
  * The interface of connections used during HTTP communication. This interface
  * is that subset of the interface exposed by {@link HttpURLConnection} which is
  * used by JGit
+ *
+ * @since 3.2
  */
 public interface HttpConnection {
 	/**

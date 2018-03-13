@@ -48,6 +48,8 @@ import java.net.URL;
 
 /**
  * A factory returning instances of {@link JDKHttpConnection}
+ *
+ * @since 3.2
  */
 public class JDKHttpConnectionFactory implements HttpConnectionFactory {
 	public HttpConnection create(URL url) throws IOException {

@@ -56,11 +56,14 @@ import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
 public abstract class HttpTransport extends Transport {
 	/**
 	 * factory for creating HTTP connections
+	 *
+	 * @since 3.2
 	 */
 	protected static HttpConnectionFactory connectionFactory = new JDKHttpConnectionFactory();
 
 	/**
 	 * @return the {@link HttpConnectionFactory} used to create new connections
+	 * @since 3.2
 	 */
 	public static HttpConnectionFactory getConnectionFactory() {
 		return connectionFactory;
@@ -71,6 +74,7 @@ public abstract class HttpTransport extends Transport {
 	 * connections
 	 *
 	 * @param cf
+	 * @since 3.2
 	 */
 	public static void setConnectionFactory(HttpConnectionFactory cf) {
 		connectionFactory = cf;
