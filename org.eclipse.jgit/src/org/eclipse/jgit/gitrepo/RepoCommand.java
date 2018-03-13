@@ -109,7 +109,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private String uri;
 	private String groups;
 	private PersonIdent author;
-	private RemoteReader callback;
+	private GetHeadFromUri callback;
 
 	private List<Project> bareProjects;
 	private Git git;
@@ -118,23 +118,17 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/**
 	 * A callback to get head sha1 of a repository from its uri.
 	 *
-	 * We provided a default implementation {@link DefaultRemoteReader} to
-	 * use ls-remote command to read the sha1 from the repository. Callers may
-	 * have their own quicker implementation.
+	 * We provided a default implementation {@link #DefaultGetHeadFromUri} to
+	 * use ls-remote command to read the head sha1 from the repository. Callers
+	 * may have its own quicker implementations.
 	 */
-	public interface RemoteReader {
-		/**
-		 * Read a remote repository's HEAD sha1.
-		 *
-		 * @param uri
-		 *            The URI of the remote repository
-		 * @return the sha1 of the HEAD of the remote repository
-		 */
+	public interface GetHeadFromUri {
 		public ObjectId sha1(String uri) throws GitAPIException;
 	}
 
-	/** A default implementation of {@link RemoteReader} callback. */
-	public static class DefaultRemoteReader implements RemoteReader {
+	/** A default implementation of {@link GetHeadFromUri} callback. */
+	public static class DefaultGetHeadFromUri implements GetHeadFromUri {
+		@Override
 		public ObjectId sha1(String uri) throws GitAPIException {
 			Collection<Ref> refs = Git
 					.lsRemoteRepository()
@@ -429,7 +423,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @param callback
 	 * @return this command
 	 */
-	public RepoCommand setRemoteReader(final RemoteReader callback) {
+	public RepoCommand setGetHeadFromUri(final GetHeadFromUri callback) {
 		this.callback = callback;
 		return this;
 	}
@@ -447,7 +441,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			if (author == null)
 				author = new PersonIdent(repo);
 			if (callback == null)
-				callback = new DefaultRemoteReader();
+				callback = new DefaultGetHeadFromUri();
 		} else
 			git = new Git(repo);
 
@@ -462,7 +456,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			DirCache index = DirCache.newInCore();
 			DirCacheBuilder builder = index.builder();
 			ObjectInserter inserter = repo.newObjectInserter();
-			RevWalk rw = new RevWalk(repo);
 
 			try {
 				Config cfg = new Config();
@@ -494,7 +487,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				// create a new DirCacheEntry for .gitmodules file.
 				final DirCacheEntry dcEntry = new DirCacheEntry(Constants.DOT_GIT_MODULES);
 				ObjectId objectId = inserter.insert(Constants.OBJ_BLOB,
-						content.getBytes(Constants.CHARACTER_ENCODING));
+						content.getBytes(Charset.forName(Constants.CHARACTER_ENCODING)));
 				dcEntry.setObjectId(objectId);
 				dcEntry.setFileMode(FileMode.REGULAR_FILE);
 				builder.add(dcEntry);
@@ -514,6 +507,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 				ObjectId commitId = inserter.insert(commit);
 				inserter.flush();
+				RevWalk rw = new RevWalk(repo);
 
 				RefUpdate ru = repo.updateRef(Constants.HEAD);
 				ru.setNewObjectId(commitId);
@@ -540,8 +534,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				return rw.parseCommit(commitId);
 			} catch (IOException e) {
 				throw new ManifestErrorException(e);
-			} finally {
-				rw.release();
 			}
 		} else {
 			return git
