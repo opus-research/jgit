@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit.http;
+package org.eclipse.jgit.transport;
 
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.text.MessageFormat;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
+import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.AnyObjectId;
 
-public class MockServletConfig implements ServletConfig {
-	private final Map<String, String> parameters = new HashMap<String, String>();
+/**
+ * Indicates client requested an object the server does not want to serve.
+ * <p>
+ * Typically visible only inside of the server implementation; clients are
+ * usually looking at the text message from the server in a generic
+ * {@link PackProtocolException}.
+ *
+ * @since 4.3
+ */
+public class WantNotValidException extends PackProtocolException {
+	private static final long serialVersionUID = 1L;
 
-	public void setInitParameter(String name, String value) {
-		parameters.put(name, value);
+	/**
+	 * Construct a {@code "want $id not valid"} exception.
+	 *
+	 * @param id
+	 *            invalid object identifier received from the client.
+	 */
+	public WantNotValidException(AnyObjectId id) {
+		super(msg(id));
 	}
 
-	public String getInitParameter(String name) {
-		return parameters.get(name);
+	/**
+	 * Construct a {@code "want $id not valid"} exception.
+	 *
+	 * @param id
+	 *            invalid object identifier received from the client.
+	 * @param cause
+	 *            root cause of the object being invalid, such as an IOException
+	 *            from the storage system.
+	 */
+	public WantNotValidException(AnyObjectId id, Throwable cause) {
+		super(msg(id), cause);
 	}
 
-	public Enumeration<String> getInitParameterNames() {
-		final Iterator<String> i = parameters.keySet().iterator();
-		return new Enumeration<String>() {
-			public boolean hasMoreElements() {
-				return i.hasNext();
-			}
-
-			public String nextElement() {
-				return i.next();
-			}
-		};
-	}
-
-	public String getServletName() {
-		return "MOCK_SERVLET";
-	}
-
-	public ServletContext getServletContext() {
-		return null;
+	private static String msg(AnyObjectId id) {
+		return MessageFormat.format(JGitText.get().wantNotValid, id.name());
 	}
 }
