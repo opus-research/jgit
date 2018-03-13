@@ -44,7 +44,7 @@
 package org.eclipse.jgit.storage.file;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.lib.ObjectLoader;
 
 /** Configuration parameters for {@link WindowCache}. */
 public class WindowCacheConfig {
@@ -73,7 +73,7 @@ public class WindowCacheConfig {
 		packedGitWindowSize = 8 * KB;
 		packedGitMMAP = false;
 		deltaBaseCacheLimit = 10 * MB;
-		streamFileThreshold = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
+		streamFileThreshold = ObjectLoader.STREAM_THRESHOLD;
 	}
 
 	/**
