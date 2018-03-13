@@ -43,20 +43,15 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
-
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Test;
 
 public class RevObjectTest extends RevWalkTestCase {
-	@Test
 	public void testId() throws Exception {
 		final RevCommit a = commit();
 		assertSame(a, a.getId());
 	}
 
-	@Test
 	public void testEquals() throws Exception {
 		final RevCommit a1 = commit();
 		final RevCommit b1 = commit();
@@ -85,7 +80,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertTrue(AnyObjectId.equals(b1, b2));
 	}
 
-	@Test
 	public void testRevObjectTypes() throws Exception {
 		assertEquals(Constants.OBJ_TREE, tree().getType());
 		assertEquals(Constants.OBJ_COMMIT, commit().getType());
@@ -93,7 +87,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertEquals(Constants.OBJ_TAG, tag("emptyTree", tree()).getType());
 	}
 
-	@Test
 	public void testHasRevFlag() throws Exception {
 		final RevCommit a = commit();
 		assertFalse(a.has(RevFlag.UNINTERESTING));
@@ -101,7 +94,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertTrue(a.has(RevFlag.UNINTERESTING));
 	}
 
-	@Test
 	public void testHasAnyFlag() throws Exception {
 		final RevCommit a = commit();
 		final RevFlag flag1 = rw.newFlag("flag1");
@@ -115,7 +107,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertTrue(a.hasAny(s));
 	}
 
-	@Test
 	public void testHasAllFlag() throws Exception {
 		final RevCommit a = commit();
 		final RevFlag flag1 = rw.newFlag("flag1");
@@ -131,7 +122,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertTrue(a.hasAll(s));
 	}
 
-	@Test
 	public void testAddRevFlag() throws Exception {
 		final RevCommit a = commit();
 		final RevFlag flag1 = rw.newFlag("flag1");
@@ -145,7 +135,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertEquals(flag1.mask | flag2.mask, a.flags);
 	}
 
-	@Test
 	public void testAddRevFlagSet() throws Exception {
 		final RevCommit a = commit();
 		final RevFlag flag1 = rw.newFlag("flag1");
@@ -160,7 +149,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertEquals(flag1.mask | flag2.mask, a.flags);
 	}
 
-	@Test
 	public void testRemoveRevFlag() throws Exception {
 		final RevCommit a = commit();
 		final RevFlag flag1 = rw.newFlag("flag1");
@@ -172,7 +160,6 @@ public class RevObjectTest extends RevWalkTestCase {
 		assertEquals(flag1.mask, a.flags);
 	}
 
-	@Test
 	public void testRemoveRevFlagSet() throws Exception {
 		final RevCommit a = commit();
 		final RevFlag flag1 = rw.newFlag("flag1");

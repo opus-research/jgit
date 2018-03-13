@@ -43,30 +43,25 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.*;
-
 import java.io.File;
 import java.io.IOException;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class FileUtilTest {
+public class FileUtilTest extends TestCase {
 
 	private final File trash = new File(new File("target"), "trash");
 
-	@Before
-	public void setUp() throws Exception {
+	@Override
+	protected void setUp() throws Exception {
 		assertTrue(trash.mkdirs());
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	@Override
+	protected void tearDown() throws Exception {
 		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
 	}
 
-	@Test
 	public void testDeleteFile() throws IOException {
 		File f = new File(trash, "test");
 		assertTrue(f.createNewFile());
@@ -87,7 +82,6 @@ public class FileUtilTest {
 		}
 	}
 
-	@Test
 	public void testDeleteRecursive() throws IOException {
 		File f1 = new File(trash, "test/test/a");
 		f1.mkdirs();
@@ -112,7 +106,6 @@ public class FileUtilTest {
 		}
 	}
 
-	@Test
 	public void testMkdir() throws IOException {
 		File d = new File(trash, "test");
 		FileUtils.mkdir(d);
@@ -141,7 +134,6 @@ public class FileUtilTest {
 		assertTrue(f.delete());
 	}
 
-	@Test
 	public void testMkdirs() throws IOException {
 		File root = new File(trash, "test");
 		assertTrue(root.mkdir());

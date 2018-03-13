@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
-
-import org.junit.Test;
-
 public abstract class RevQueueTestCase<T extends AbstractRevQueue> extends
 		RevWalkTestCase {
 	protected T q;
@@ -58,14 +54,12 @@ public abstract class RevQueueTestCase<T extends AbstractRevQueue> extends
 
 	protected abstract T create();
 
-	@Test
 	public void testEmpty() throws Exception {
 		assertNull(q.next());
 		assertTrue(q.everbodyHasFlag(RevWalk.UNINTERESTING));
 		assertFalse(q.anybodyHasFlag(RevWalk.UNINTERESTING));
 	}
 
-	@Test
 	public void testClear() throws Exception {
 		final RevCommit a = parseBody(commit());
 		final RevCommit b = parseBody(commit(a));
@@ -76,7 +70,6 @@ public abstract class RevQueueTestCase<T extends AbstractRevQueue> extends
 		assertNull(q.next());
 	}
 
-	@Test
 	public void testHasFlags() throws Exception {
 		final RevCommit a = parseBody(commit());
 		final RevCommit b = parseBody(commit(a));

@@ -43,17 +43,13 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.*;
-
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
-import org.junit.Test;
 
 public class RepositoryCacheTest extends RepositoryTestCase {
-	@Test
 	public void testNonBareFileKey() {
 		File gitdir = db.getDirectory();
 		File parent = gitdir.getParentFile();
@@ -67,7 +63,6 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		assertEquals(other, FileKey.lenient(other, db.getFS()).getFile());
 	}
 
-	@Test
 	public void testBareFileKey() throws IOException {
 		Repository bare = createBareRepository();
 		File gitdir = bare.getDirectory();
@@ -82,7 +77,6 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		assertEquals(gitdir, FileKey.lenient(new File(parent, name), db.getFS()).getFile());
 	}
 
-	@Test
 	public void testFileKeyOpenExisting() throws IOException {
 		Repository r;
 
@@ -97,7 +91,6 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		r.close();
 	}
 
-	@Test
 	public void testFileKeyOpenNew() throws IOException {
 		final Repository n = createBareRepository();
 		final File gitdir = n.getDirectory();
@@ -118,7 +111,6 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		assertFalse(gitdir.exists());
 	}
 
-	@Test
 	public void testCacheRegisterOpen() throws Exception {
 		final File dir = db.getDirectory();
 		RepositoryCache.register(db);
@@ -129,7 +121,6 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		assertSame(db, RepositoryCache.open(FileKey.lenient(parent, db.getFS())));
 	}
 
-	@Test
 	public void testCacheOpen() throws Exception {
 		final FileKey loc = FileKey.exact(db.getDirectory(), db.getFS());
 		final Repository d2 = RepositoryCache.open(loc);

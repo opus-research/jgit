@@ -43,20 +43,16 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.*;
+import junit.framework.TestCase;
 
-import org.junit.Before;
-import org.junit.Test;
-
-public class LongMapTest {
+public class LongMapTest extends TestCase {
 	private LongMap<Long> map;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		map = new LongMap<Long>();
 	}
 
-	@Test
 	public void testEmptyMap() {
 		assertFalse(map.containsKey(0));
 		assertFalse(map.containsKey(1));
@@ -68,7 +64,6 @@ public class LongMapTest {
 		assertNull(map.remove(1));
 	}
 
-	@Test
 	public void testInsertMinValue() {
 		final Long min = Long.valueOf(Long.MIN_VALUE);
 		assertNull(map.put(Long.MIN_VALUE, min));
@@ -77,7 +72,6 @@ public class LongMapTest {
 		assertFalse(map.containsKey(Integer.MIN_VALUE));
 	}
 
-	@Test
 	public void testReplaceMaxValue() {
 		final Long min = Long.valueOf(Long.MAX_VALUE);
 		final Long one = Long.valueOf(1);
@@ -87,7 +81,6 @@ public class LongMapTest {
 		assertSame(one, map.get(Long.MAX_VALUE));
 	}
 
-	@Test
 	public void testRemoveOne() {
 		final long start = 1;
 		assertNull(map.put(start, Long.valueOf(start)));
@@ -95,7 +88,6 @@ public class LongMapTest {
 		assertFalse(map.containsKey(start));
 	}
 
-	@Test
 	public void testRemoveCollision1() {
 		// This test relies upon the fact that we always >>> 1 the value
 		// to derive an unsigned hash code. Thus, 0 and 1 fall into the
@@ -111,7 +103,6 @@ public class LongMapTest {
 		assertTrue(map.containsKey(1));
 	}
 
-	@Test
 	public void testRemoveCollision2() {
 		// This test relies upon the fact that we always >>> 1 the value
 		// to derive an unsigned hash code. Thus, 0 and 1 fall into the
@@ -127,7 +118,6 @@ public class LongMapTest {
 		assertFalse(map.containsKey(1));
 	}
 
-	@Test
 	public void testSmallMap() {
 		final long start = 12;
 		final long n = 8;
@@ -137,7 +127,6 @@ public class LongMapTest {
 			assertEquals(Long.valueOf(i), map.get(i));
 	}
 
-	@Test
 	public void testLargeMap() {
 		final long start = Integer.MAX_VALUE;
 		final long n = 100000;

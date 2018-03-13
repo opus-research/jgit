@@ -45,9 +45,6 @@
 
 package org.eclipse.jgit.junit;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -60,6 +57,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import junit.framework.Assert;
+import junit.framework.TestCase;
+
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
@@ -71,8 +72,6 @@ import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
-import org.junit.After;
-import org.junit.Before;
 
 /**
  * JUnit TestCase with specialized support for temporary local repository.
@@ -91,7 +90,7 @@ import org.junit.Before;
  * a test, or tests may fail altogether if there is insufficient file
  * descriptors or address space for the test process.
  */
-public abstract class LocalDiskRepositoryTestCase {
+public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	private static Thread shutdownHook;
 
 	private static int testCount;
@@ -111,8 +110,9 @@ public abstract class LocalDiskRepositoryTestCase {
 
 	private MockSystemReader mockSystemReader;
 
-	@Before
-	public void setUp() throws Exception {
+	@Override
+	protected void setUp() throws Exception {
+		super.setUp();
 
 		synchronized(this) {
 			if (shutdownHook == null) {
@@ -131,7 +131,7 @@ public abstract class LocalDiskRepositoryTestCase {
 				Runtime.getRuntime().addShutdownHook(shutdownHook);
 			}
 		}
-		recursiveDelete(testId(), trash, true, false);
+		recursiveDelete(testName(), trash, true, false);
 
 		mockSystemReader = new MockSystemReader();
 		mockSystemReader.userGitConfig = new FileBasedConfig(new File(trash,
@@ -174,8 +174,8 @@ public abstract class LocalDiskRepositoryTestCase {
 		return stringBuilder.toString();
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	@Override
+	protected void tearDown() throws Exception {
 		RepositoryCache.clear();
 		for (Repository r : toClose)
 			r.close();
@@ -188,7 +188,8 @@ public abstract class LocalDiskRepositoryTestCase {
 		if (useMMAP)
 			System.gc();
 
-		recursiveDelete(testId(), trash, false, true);
+		recursiveDelete(testName(), trash, false, true);
+		super.tearDown();
 	}
 
 	/** Increment the {@link #author} and {@link #committer} times. */
@@ -209,7 +210,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	 *            the recursively directory to delete, if present.
 	 */
 	protected void recursiveDelete(final File dir) {
-		recursiveDelete(testId(), dir, false, true);
+		recursiveDelete(testName(), dir, false, true);
 	}
 
 	private static boolean recursiveDelete(final String testName,
@@ -413,6 +414,10 @@ public abstract class LocalDiskRepositoryTestCase {
 		return new String(body, 0, body.length, "UTF-8");
 	}
 
+	protected static void assertEquals(AnyObjectId exp, AnyObjectId act) {
+		Assert.assertEquals(exp, act);
+	}
+
 	private static String[] toEnvArray(final Map<String, String> env) {
 		final String[] envp = new String[env.size()];
 		int i = 0;
@@ -426,7 +431,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		return new HashMap<String, String>(System.getenv());
 	}
 
-	private String testId() {
-		return getClass().getName() + "." + testCount;
+	private String testName() {
+		return getClass().getName() + "." + getName();
 	}
 }

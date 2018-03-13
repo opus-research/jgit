@@ -44,32 +44,29 @@
 package org.eclipse.jgit.lib;
 
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRng;
-import org.junit.Test;
 
-public class ObjectLoaderTest {
+public class ObjectLoaderTest extends TestCase {
 	private TestRng rng;
 
-	private TestRng getRng() {
-		if (rng == null)
-			rng = new TestRng(JGitTestUtil.getName());
-		return rng;
+	protected void setUp() throws Exception {
+		super.setUp();
+		rng = new TestRng(getName());
 	}
 
-	@Test
 	public void testSmallObjectLoader() throws MissingObjectException,
 			IOException {
-		final byte[] act = getRng().nextBytes(512);
+		final byte[] act = rng.nextBytes(512);
 		final ObjectLoader ldr = new ObjectLoader.SmallObject(OBJ_BLOB, act);
 
 		assertEquals(OBJ_BLOB, ldr.getType());
@@ -109,10 +106,9 @@ public class ObjectLoaderTest {
 		assertTrue("same content", Arrays.equals(act, tmp.toByteArray()));
 	}
 
-	@Test
 	public void testLargeObjectLoader() throws MissingObjectException,
 			IOException {
-		final byte[] act = getRng().nextBytes(512);
+		final byte[] act = rng.nextBytes(512);
 		final ObjectLoader ldr = new ObjectLoader() {
 			@Override
 			public byte[] getCachedBytes() throws LargeObjectException {
@@ -183,10 +179,9 @@ public class ObjectLoaderTest {
 		assertTrue("same content", Arrays.equals(act, tmp.toByteArray()));
 	}
 
-	@Test
 	public void testLimitedGetCachedBytes() throws LargeObjectException,
 			MissingObjectException, IOException {
-		byte[] act = getRng().nextBytes(512);
+		byte[] act = rng.nextBytes(512);
 		ObjectLoader ldr = new ObjectLoader.SmallObject(OBJ_BLOB, act) {
 			@Override
 			public boolean isLarge() {
@@ -211,7 +206,6 @@ public class ObjectLoaderTest {
 		assertTrue("same content", Arrays.equals(act, copy));
 	}
 
-	@Test
 	public void testLimitedGetCachedBytesExceedsJavaLimits()
 			throws LargeObjectException, MissingObjectException, IOException {
 		ObjectLoader ldr = new ObjectLoader() {

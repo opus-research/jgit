@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import static org.junit.Assert.*;
-
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
 import java.io.IOException;
@@ -59,11 +57,9 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.junit.Test;
 
-public class PathSuffixFilterTest extends RepositoryTestCase {
+public class PathSuffixFilterTestCase extends RepositoryTestCase {
 
-	@Test
 	public void testNonRecursiveFiltering() throws IOException {
 		final ObjectInserter odi = db.newObjectInserter();
 		final ObjectId aSth = odi.insert(OBJ_BLOB, "a.sth".getBytes());
@@ -98,7 +94,6 @@ public class PathSuffixFilterTest extends RepositoryTestCase {
 		assertEquals(expected, paths);
 	}
 
-	@Test
 	public void testRecursiveFiltering() throws IOException {
 		final ObjectInserter odi = db.newObjectInserter();
 		final ObjectId aSth = odi.insert(OBJ_BLOB, "a.sth".getBytes());

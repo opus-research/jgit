@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.util.io;
 
-import static org.junit.Assert.*;
-
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
@@ -54,11 +52,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jgit.util.IO;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.util.io.InterruptTimer;
+import org.eclipse.jgit.util.io.TimeoutOutputStream;
 
-public class TimeoutOutputStreamTest {
+import junit.framework.TestCase;
+
+public class TimeoutOutputStreamTest extends TestCase {
 	private static final int timeout = 250;
 
 	private PipedOutputStream out;
@@ -71,8 +70,8 @@ public class TimeoutOutputStreamTest {
 
 	private long start;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
+		super.setUp();
 		out = new PipedOutputStream();
 		in = new FullPipeInputStream(out);
 		timer = new InterruptTimer();
@@ -80,14 +79,13 @@ public class TimeoutOutputStreamTest {
 		os.setTimeout(timeout);
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		timer.terminate();
 		for (Thread t : active())
 			assertFalse(t instanceof InterruptTimer.AlarmThread);
+		super.tearDown();
 	}
 
-	@Test
 	public void testTimeout_writeByte_Success1() throws IOException {
 		in.free(1);
 		os.write('a');
@@ -95,7 +93,6 @@ public class TimeoutOutputStreamTest {
 		assertEquals('a', in.read());
 	}
 
-	@Test
 	public void testTimeout_writeByte_Success2() throws IOException {
 		final byte[] exp = new byte[] { 'a', 'b', 'c' };
 		final byte[] act = new byte[exp.length];
@@ -108,7 +105,6 @@ public class TimeoutOutputStreamTest {
 		assertTrue(Arrays.equals(exp, act));
 	}
 
-	@Test
 	public void testTimeout_writeByte_Timeout() throws IOException {
 		beginWrite();
 		try {
@@ -120,7 +116,6 @@ public class TimeoutOutputStreamTest {
 		assertTimeout();
 	}
 
-	@Test
 	public void testTimeout_writeBuffer_Success1() throws IOException {
 		final byte[] exp = new byte[] { 'a', 'b', 'c' };
 		final byte[] act = new byte[exp.length];
@@ -131,7 +126,6 @@ public class TimeoutOutputStreamTest {
 		assertTrue(Arrays.equals(exp, act));
 	}
 
-	@Test
 	public void testTimeout_writeBuffer_Timeout() throws IOException {
 		beginWrite();
 		try {
@@ -143,7 +137,6 @@ public class TimeoutOutputStreamTest {
 		assertTimeout();
 	}
 
-	@Test
 	public void testTimeout_flush_Success() throws IOException {
 		final boolean[] called = new boolean[1];
 		os = new TimeoutOutputStream(new OutputStream() {
@@ -162,7 +155,6 @@ public class TimeoutOutputStreamTest {
 		assertTrue(called[0]);
 	}
 
-	@Test
 	public void testTimeout_flush_Timeout() throws IOException {
 		final boolean[] called = new boolean[1];
 		os = new TimeoutOutputStream(new OutputStream() {
@@ -196,7 +188,6 @@ public class TimeoutOutputStreamTest {
 		assertTrue(called[0]);
 	}
 
-	@Test
 	public void testTimeout_close_Success() throws IOException {
 		final boolean[] called = new boolean[1];
 		os = new TimeoutOutputStream(new OutputStream() {
@@ -215,7 +206,6 @@ public class TimeoutOutputStreamTest {
 		assertTrue(called[0]);
 	}
 
-	@Test
 	public void testTimeout_close_Timeout() throws IOException {
 		final boolean[] called = new boolean[1];
 		os = new TimeoutOutputStream(new OutputStream() {

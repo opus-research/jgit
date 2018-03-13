@@ -44,24 +44,21 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.*;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.junit.Test;
 
-public class RawTextTest {
-	@Test
+public class RawTextTest extends TestCase {
 	public void testEmpty() {
 		final RawText r = new RawText(new byte[0]);
 		assertEquals(0, r.size());
 	}
 
-	@Test
 	public void testEquals() {
 		final RawText a = new RawText(Constants.encodeASCII("foo-a\nfoo-b\n"));
 		final RawText b = new RawText(Constants.encodeASCII("foo-b\nfoo-c\n"));
@@ -79,7 +76,6 @@ public class RawTextTest {
 		assertTrue(cmp.equals(b, 0, a, 1));
 	}
 
-	@Test
 	public void testWriteLine1() throws IOException {
 		final RawText a = new RawText(Constants.encodeASCII("foo-a\nfoo-b\n"));
 		final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -88,7 +84,6 @@ public class RawTextTest {
 		assertEquals("foo-a", RawParseUtils.decode(r));
 	}
 
-	@Test
 	public void testWriteLine2() throws IOException {
 		final RawText a = new RawText(Constants.encodeASCII("foo-a\nfoo-b"));
 		final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -97,7 +92,6 @@ public class RawTextTest {
 		assertEquals("foo-b", RawParseUtils.decode(r));
 	}
 
-	@Test
 	public void testWriteLine3() throws IOException {
 		final RawText a = new RawText(Constants.encodeASCII("a\n\nb\n"));
 		final ByteArrayOutputStream o = new ByteArrayOutputStream();
@@ -106,7 +100,6 @@ public class RawTextTest {
 		assertEquals("", RawParseUtils.decode(r));
 	}
 
-	@Test
 	public void testComparatorReduceCommonStartEnd()
 			throws UnsupportedEncodingException {
 		final RawTextComparator c = RawTextComparator.DEFAULT;
@@ -141,7 +134,6 @@ public class RawTextTest {
 		assertEquals(new Edit(2, 3, 2, 3), e);
 	}
 
-	@Test
 	public void testComparatorReduceCommonStartEnd_EmptyLine()
 			throws UnsupportedEncodingException {
 		RawText a;

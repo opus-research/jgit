@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.*;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -77,16 +75,13 @@ import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
-import org.junit.Before;
-import org.junit.Test;
 
 public class HookMessageTest extends HttpTestCase {
 	private FileRepository remoteRepository;
 
 	private URIish remoteURI;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		final TestRepository<FileRepository> src = createTestRepository();
@@ -135,7 +130,6 @@ public class HookMessageTest extends HttpTestCase {
 		cfg.save();
 	}
 
-	@Test
 	public void testPush_CreateBranch() throws Exception {
 		final TestRepository src = createTestRepository();
 		final RevBlob Q_txt = src.blob("new text");

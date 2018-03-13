@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.notes;
 
-import static org.junit.Assert.*;
-
 import java.io.IOException;
 
 import org.eclipse.jgit.junit.TestRepository;
@@ -60,9 +58,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class NoteMapTest extends RepositoryTestCase {
 	private TestRepository<Repository> tr;
@@ -72,8 +67,7 @@ public class NoteMapTest extends RepositoryTestCase {
 	private ObjectInserter inserter;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		tr = new TestRepository<Repository>(db);
@@ -82,14 +76,12 @@ public class NoteMapTest extends RepositoryTestCase {
 	}
 
 	@Override
-	@After
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		reader.release();
 		inserter.release();
 		super.tearDown();
 	}
 
-	@Test
 	public void testReadFlatTwoNotes() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -114,7 +106,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertNull("no note for data1", map.get(data1));
 	}
 
-	@Test
 	public void testReadFanout2_38() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -139,7 +130,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertNull("no note for data1", map.get(data1));
 	}
 
-	@Test
 	public void testReadFanout2_2_36() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -164,7 +154,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertNull("no note for data1", map.get(data1));
 	}
 
-	@Test
 	public void testReadFullyFannedOut() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -189,7 +178,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertNull("no note for data1", map.get(data1));
 	}
 
-	@Test
 	public void testGetCachedBytes() throws Exception {
 		final String exp = "this is test data";
 		RevBlob a = tr.blob("a");
@@ -206,7 +194,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertEquals(exp, RawParseUtils.decode(act));
 	}
 
-	@Test
 	public void testWriteUnchangedFlat() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -230,7 +217,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertSame("same tree", r.getTree(), n.getTree());
 	}
 
-	@Test
 	public void testWriteUnchangedFanout2_38() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -261,7 +247,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertSame("same tree", r.getTree(), n.getTree());
 	}
 
-	@Test
 	public void testCreateFromEmpty() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -291,7 +276,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertFalse("no a", map.contains(a));
 	}
 
-	@Test
 	public void testEditFlat() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -338,7 +322,6 @@ public class NoteMapTest extends RepositoryTestCase {
 				.forPath(reader, "zoo-animals.txt", n.getTree()).getObjectId(0));
 	}
 
-	@Test
 	public void testEditFanout2_38() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -379,7 +362,6 @@ public class NoteMapTest extends RepositoryTestCase {
 				.forPath(reader, "zoo-animals.txt", n.getTree()).getObjectId(0));
 	}
 
-	@Test
 	public void testLeafSplitsWhenFull() throws Exception {
 		RevBlob data1 = tr.blob("data1");
 		MutableObjectId idBuf = new MutableObjectId();
@@ -420,7 +402,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertNotNull("has " + path, tw);
 	}
 
-	@Test
 	public void testRemoveDeletesTreeFanout2_38() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob data1 = tr.blob("data1");

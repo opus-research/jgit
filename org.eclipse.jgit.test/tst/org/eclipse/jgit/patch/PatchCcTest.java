@@ -43,18 +43,15 @@
 
 package org.eclipse.jgit.patch;
 
-import static org.junit.Assert.*;
-
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.lib.FileMode;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class PatchCcTest {
-	@Test
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.lib.FileMode;
+
+public class PatchCcTest extends TestCase {
 	public void testParse_OneFileCc() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -110,7 +107,6 @@ public class PatchCcTest {
 		}
 	}
 
-	@Test
 	public void testParse_CcNewFile() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -165,7 +161,6 @@ public class PatchCcTest {
 		}
 	}
 
-	@Test
 	public void testParse_CcDeleteFile() throws IOException {
 		final Patch p = parseTestPatchFile();
 		assertEquals(1, p.getFiles().size());
@@ -195,7 +190,7 @@ public class PatchCcTest {
 	}
 
 	private Patch parseTestPatchFile() throws IOException {
-		final String patchFile = JGitTestUtil.getName() + ".patch";
+		final String patchFile = getName() + ".patch";
 		final InputStream in = getClass().getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");

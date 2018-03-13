@@ -43,13 +43,14 @@
 
 package org.eclipse.jgit.nls;
 
-import static org.junit.Assert.*;
-
 import java.util.Locale;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
-public class TestNLS {
+import junit.framework.TestCase;
+
+
+public class TestNLS extends TestCase {
 
 	public void testNLSLocale() {
 		NLS.setLocale(NLS.ROOT_LOCALE);
