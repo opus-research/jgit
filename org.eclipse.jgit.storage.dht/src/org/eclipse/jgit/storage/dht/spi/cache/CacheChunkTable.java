@@ -228,6 +228,7 @@ public class CacheChunkTable implements ChunkTable {
 					int oldLimit = in.pushLimit(cnt);
 					members.setMeta(ChunkMeta.parseFrom(in));
 					in.popLimit(oldLimit);
+					tag = in.readTag();
 					continue;
 				}
 				default:

@@ -54,7 +54,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.dht.DhtRefDatabase.DhtRef;
 import org.eclipse.jgit.storage.dht.spi.Database;
 
 class DhtRefUpdate extends RefUpdate {
@@ -108,7 +107,7 @@ class DhtRefUpdate extends RefUpdate {
 			dstRef = dstRef.getLeaf();
 
 		refKey = RefKey.create(repo, dstRef.getName());
-		oldData = ((DhtRef) dstRef).getRefData();
+		oldData = RefDataUtil.fromRef(dstRef);
 
 		if (dstRef.isSymbolic())
 			setOldObjectId(null);
@@ -159,11 +158,7 @@ class DhtRefUpdate extends RefUpdate {
 	@Override
 	protected Result doLink(String target) throws IOException {
 		try {
-			RefData.Builder d = RefData.newBuilder(oldData);
-			clearRefData(d);
-			updateSequence(d);
-			d.setSymref(target);
-			newData = d.build();
+			newData = RefDataUtil.symbolic(target);
 			boolean r = db.ref().compareAndPut(refKey, oldData, newData);
 			if (r) {
 				getRefDatabase().stored(dstRef.getName(), newData);
@@ -180,45 +175,26 @@ class DhtRefUpdate extends RefUpdate {
 	}
 
 	private RefData newData() throws IOException {
-		RefData.Builder d = RefData.newBuilder(oldData);
-		clearRefData(d);
-		updateSequence(d);
-
 		ObjectId newId = getNewObjectId();
-		d.getTargetBuilder().setObjectName(newId.name());
 		try {
-			DhtReader ctx = (DhtReader) rw.getObjectReader();
 			RevObject obj = rw.parseAny(newId);
+			DhtReader ctx = (DhtReader) rw.getObjectReader();
 
-			ChunkKey oKey = ctx.findChunk(newId);
-			if (oKey != null)
-				d.getTargetBuilder().setChunkKey(oKey.asString());
+			ChunkKey key = ctx.findChunk(newId);
+			if (key != null)
+				newId = new RefDataUtil.IdWithChunk(newId, key);
 
 			if (obj instanceof RevTag) {
 				ObjectId pId = rw.peel(obj);
-				ChunkKey pKey = ctx.findChunk(pId);
-				if (pKey != null)
-					d.getPeeledBuilder().setChunkKey(pKey.asString());
-				d.getPeeledBuilder().setObjectName(pId.name());
-			}
+				key = ctx.findChunk(pId);
+				pId = key != null ? new RefDataUtil.IdWithChunk(pId, key) : pId;
+				return RefDataUtil.peeled(newId, pId);
+			} else if (obj != null)
+				return RefDataUtil.peeled(newId, null);
+			else
+				return RefDataUtil.id(newId);
 		} catch (MissingObjectException e) {
-			// Automatic peeling failed. Ignore the problem and deal with it
-			// during reading later, this is the classical Git behavior on disk.
+			return RefDataUtil.id(newId);
 		}
-		return d.build();
-	}
-
-	private static void clearRefData(RefData.Builder d) {
-		// Clear fields individually rather than discarding the RefData.
-		// This way implementation specific extensions are carried
-		// through from the old version to the new version.
-		d.clearSymref();
-		d.clearTarget();
-		d.clearPeeled();
-		d.clearIsPeeled();
-	}
-
-	private static void updateSequence(RefData.Builder d) {
-		d.setSequence(d.getSequence() + 1);
 	}
 }
