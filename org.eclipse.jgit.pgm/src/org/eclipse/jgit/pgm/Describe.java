@@ -62,7 +62,7 @@ class Describe extends TextBuiltin {
 	@Option(name = "--long", usage = "usage_LongFormat")
 	private boolean longDesc;
 
-	@Option(name = "--match", usage = "usage_Match", metaVar = "metaVar_pattern")
+	@Option(name = "--match", multiValued = true, usage = "usage_Match", metaVar = "metaVar_pattern")
 	private List<String> patterns = new ArrayList<>();
 
 	@Override
