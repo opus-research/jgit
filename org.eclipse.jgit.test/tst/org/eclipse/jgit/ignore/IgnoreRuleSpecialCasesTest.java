@@ -836,8 +836,114 @@ public class IgnoreRuleSpecialCasesTest {
 	}
 
 	@Test
+	public void testEscapedExclamationMark() throws Exception {
+		assertMatch("\\!b!.txt", "!b!.txt", true);
+		assertMatch("a\\!b!.txt", "a\\!b!.txt", true);
+	}
+
+	@Test
+	public void testEscapedHash() throws Exception {
+		assertMatch("\\#b", "#b", true);
+		assertMatch("a\\#", "a\\#", true);
+	}
+
+	@Test
+	public void testEscapedTrailingSpaces() throws Exception {
+		assertMatch("\\ ", " ", true);
+		assertMatch("a\\ ", "a ", true);
+	}
+
+	@Test
+	public void testNotEscapingBackslash() throws Exception {
+		assertMatch("\\out", "\\out", true);
+		assertMatch("\\out", "a/\\out", true);
+		assertMatch("c:\\/", "c:\\/", true);
+		assertMatch("c:\\/", "a/c:\\/", true);
+		assertMatch("c:\\tmp", "c:\\tmp", true);
+		assertMatch("c:\\tmp", "a/c:\\tmp", true);
+	}
+
+	@Test
 	public void testMultipleEscapedCharacters1() throws Exception {
 		assertMatch("\\]a?c\\*\\[d\\?\\]", "]abc*[d?]", true);
+	}
+
+	@Test
+	public void testDollar() throws Exception {
+		assertMatch("$", "$", true);
+		assertMatch("$x", "$x", true);
+		assertMatch("$x", "x$", false);
+		assertMatch("$x", "$", false);
+
+		assertMatch("$x.*", "$x.a", true);
+		assertMatch("*$", "x$", true);
+		assertMatch("*.$", "x.$", true);
+
+		assertMatch("$*x", "$ax", true);
+		assertMatch("x*$", "xa$", true);
+		assertMatch("x*$", "xa", false);
+		assertMatch("[a$b]", "$", true);
+	}
+
+	@Test
+	public void testCaret() throws Exception {
+		assertMatch("^", "^", true);
+		assertMatch("^x", "^x", true);
+		assertMatch("^x", "x^", false);
+		assertMatch("^x", "^", false);
+
+		assertMatch("^x.*", "^x.a", true);
+		assertMatch("*^", "x^", true);
+		assertMatch("*.^", "x.^", true);
+
+		assertMatch("x*^", "xa^", true);
+		assertMatch("^*x", "^ax", true);
+		assertMatch("^*x", "ax", false);
+		assertMatch("[a^b]", "^", true);
+	}
+
+	@Test
+	public void testPlus() throws Exception {
+		assertMatch("+", "+", true);
+		assertMatch("+x", "+x", true);
+		assertMatch("+x", "x+", false);
+		assertMatch("+x", "+", false);
+		assertMatch("x+", "xx", false);
+
+		assertMatch("+x.*", "+x.a", true);
+		assertMatch("*+", "x+", true);
+		assertMatch("*.+", "x.+", true);
+
+		assertMatch("x*+", "xa+", true);
+		assertMatch("+*x", "+ax", true);
+		assertMatch("+*x", "ax", false);
+		assertMatch("[a+b]", "+", true);
+	}
+
+	@Test
+	public void testPipe() throws Exception {
+		assertMatch("|", "|", true);
+		assertMatch("|x", "|x", true);
+		assertMatch("|x", "x|", false);
+		assertMatch("|x", "|", false);
+		assertMatch("x|x", "xx", false);
+
+		assertMatch("x|x.*", "x|x.a", true);
+		assertMatch("*|", "x|", true);
+		assertMatch("*.|", "x.|", true);
+
+		assertMatch("x*|a", "xb|a", true);
+		assertMatch("b|*x", "b|ax", true);
+		assertMatch("b|*x", "ax", false);
+		assertMatch("[a|b]", "|", true);
+	}
+
+	@Test
+	public void testBrackets() throws Exception {
+		assertMatch("{}*()", "{}x()", true);
+		assertMatch("[a{}()b][a{}()b]?[a{}()b][a{}()b]", "{}x()", true);
+		assertMatch("x*{x}3", "xa{x}3", true);
+		assertMatch("a*{x}3", "axxx", false);
 	}
 
 	@Test
