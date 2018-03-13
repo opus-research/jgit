@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -70,7 +71,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 * implementation for that format will be constructed and returned to the
 	 * caller. The file may or may not be held open by the returned instance.
 	 * </p>
-	 * 
+	 *
 	 * @param idxFile
 	 *            existing pack .idx to read.
 	 * @return access implementation for the requested file.
@@ -84,7 +85,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 		final FileInputStream fd = new FileInputStream(idxFile);
 		try {
 			final byte[] hdr = new byte[8];
-			NB.readFully(fd, hdr, 0, hdr.length);
+			IO.readFully(fd, hdr, 0, hdr.length);
 			if (isTOC(hdr)) {
 				final int v = NB.decodeInt32(hdr, 4);
 				switch (v) {
@@ -123,7 +124,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 
 	/**
 	 * Determine if an object is contained within the pack file.
-	 * 
+	 *
 	 * @param id
 	 *            the object to look for. Must not be null.
 	 * @return true if the object is listed in this index; false otherwise.
@@ -140,14 +141,14 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 * <p>
 	 * Iterator returns objects in SHA-1 lexicographical order.
 	 * </p>
-	 * 
+	 *
 	 * @return iterator over pack index entries
 	 */
 	public abstract Iterator<MutableEntry> iterator();
 
 	/**
 	 * Obtain the total number of objects described by this index.
-	 * 
+	 *
 	 * @return number of objects in this index, and likewise in the associated
 	 *         pack that this index was generated from.
 	 */
@@ -212,7 +213,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 
 	/**
 	 * Locate the file offset position for the requested object.
-	 * 
+	 *
 	 * @param objId
 	 *            name of the object to locate within the pack.
 	 * @return offset of the object's header and compressed content; -1 if the
@@ -246,7 +247,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Represent mutable entry of pack index consisting of object id and offset
 	 * in pack (both mutable).
-	 * 
+	 *
 	 */
 	public static class MutableEntry {
 		final MutableObjectId idBuffer = new MutableObjectId();
@@ -255,7 +256,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 
 		/**
 		 * Returns offset for this index object entry
-		 * 
+		 *
 		 * @return offset of this object in a pack file
 		 */
 		public long getOffset() {
