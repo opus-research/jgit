@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.File;
-import java.io.IOException;
 import java.net.URISyntaxException;
 
 import junit.framework.TestCase;
@@ -426,44 +424,27 @@ public class URIishTest extends TestCase {
 		assertEquals("c", humanishName);
 	}
 
-	public void testFileProtocol() throws IllegalArgumentException,
-			URISyntaxException, IOException {
-		// as defined by git docu
-		URIish u = new URIish("file:///a/b.txt");
-		assertEquals("file", u.getScheme());
-		assertFalse(u.isRemote());
-		assertNull(u.getHost());
-		assertNull(u.getPass());
-		assertEquals("/a/b.txt", u.getPath());
-		assertEquals(-1, u.getPort());
-		assertNull(u.getUser());
-		assertEquals("b.txt", u.getHumanishName());
+	public void testUserPasswordAndPort() throws URISyntaxException {
+		String str = "http://user:secret@host.xy:80/some/path";
+		URIish u = new URIish(str);
+		assertEquals("http", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/path", u.getPath());
+		assertEquals("host.xy", u.getHost());
+		assertEquals(80, u.getPort());
+		assertEquals("user", u.getUser());
+		assertEquals("secret", u.getPass());
+		assertEquals(u, new URIish(str));
 
-		File tmp = File.createTempFile("jgitUnitTest", ".tmp");
-		u = new URIish(tmp.toURI().toString());
-		assertEquals("file", u.getScheme());
-		assertFalse(u.isRemote());
-		assertNull(u.getHost());
-		assertNull(u.getPass());
-		assertTrue(u.getPath().contains("jgitUnitTest"));
-		assertEquals(-1, u.getPort());
-		assertNull(u.getUser());
-		assertTrue(u.getHumanishName().startsWith("jgitUnitTest"));
-
-		u = new URIish("file:/a/b.txt");
-		assertEquals("file", u.getScheme());
-		assertFalse(u.isRemote());
-		assertNull(u.getHost());
-		assertNull(u.getPass());
-		assertEquals("/a/b.txt", u.getPath());
-		assertEquals(-1, u.getPort());
-		assertNull(u.getUser());
-		assertEquals("b.txt", u.getHumanishName());
-	}
-
-	public void testIncorrectSshUrl() throws URISyntaxException {
-		final String incorrectSshUrl = "ssh://some-host:/path/to/repository.git";
-		URIish u = new URIish(incorrectSshUrl);
-		assertFalse(TransportGitSsh.canHandle(u));
+		str = "http://user:secret@pass@host.xy:80/some/path";
+		u = new URIish(str);
+		assertEquals("http", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/path", u.getPath());
+		assertEquals("host.xy", u.getHost());
+		assertEquals(80, u.getPort());
+		assertEquals("user", u.getUser());
+		assertEquals("secret@pass", u.getPass());
+		assertEquals(u, new URIish(str));
 	}
 }
