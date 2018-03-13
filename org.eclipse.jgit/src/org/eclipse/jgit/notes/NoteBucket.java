@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
 
-import java.io.File;
+package org.eclipse.jgit.notes;
+
+import java.io.IOException;
+
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 
 /**
- * Abstraction of file system access functions
+ * A tree that stores note objects.
+ *
+ * @see FanoutBucket
+ * @see LeafBucket
  */
-public abstract class FSAccess {
-
-	private static boolean isNativeImplementation;
-
-	/**
-	 * The only instance
-	 */
-	public final static FSAccess INSTANCE;
-
-	static {
-		FSAccess fsa = null;
-		try {
-			System.loadLibrary("jgitnative");
-			fsa = new FSAccessNative();
-			isNativeImplementation = true;
-			System.out.println("successfully loaded native implementation");
-		} catch (IllegalArgumentException e) {
-			isNativeImplementation = false;
-		} catch (SecurityException e) {
-			isNativeImplementation = false;
-		}
-		// fall back to (slower) Java implementation if native implementation is
-		// not available
-		if (fsa == null) {
-			fsa = new FSAccessJava();
-			System.out
-					.println("failed loading native implementation, loading Java implementation");
-		}
-		INSTANCE = fsa;
-	}
-
-	/**
-	 * @return <code>true</code> if native implementation could be loaded
-	 */
-	public static final boolean isNativeImplementation() {
-		return isNativeImplementation;
-	}
-
-	/**
-	 * The lstat() method obtains lstat information about the named file from
-	 * the underlying file system
-	 *
-	 * @param file
-	 *            the file lstat information shall be retrieved for
-	 * @return lstat information about the named file
-	 * @throws NoSuchFileException
-	 *             lstat returned error ENOENT
-	 * @throws NotDirectoryException
-	 *             lstat returned ENOTDIR
-	 */
-	public abstract LStat lstat(File file) throws NoSuchFileException,
-			NotDirectoryException;
+abstract class NoteBucket {
+	abstract ObjectId get(AnyObjectId objId, ObjectReader reader)
+			throws IOException;
 }

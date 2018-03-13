@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,64 +41,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
+package org.eclipse.jgit.errors;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.URIish;
 
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.lib.Repository;
+/**
+ * An exception thrown when a {@link CredentialItem} is requested from a
+ * {@link CredentialsProvider} which is not supported by this provider.
+ */
+public class UnsupportedCredentialItem extends RuntimeException {
+	private static final long serialVersionUID = 1L;
 
-public class FSAccessTest extends LocalDiskRepositoryTestCase {
-	private Repository db;
-
-	private File trash;
-
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-		db = createWorkRepository();
-		trash = db.getWorkTree();
-	}
-
-	public void test_lstat() throws IOException {
-		File test = writeTrashFile("test.txt", "Hello Java");
-
-		LStat stat = FSAccess.INSTANCE.lstat(test);
-		// TODO remove println
-		System.out.println(stat.toString() + '\n');
-		// mtime should be > 0
-		assertTrue(stat.getMTimeSec() > 0);
-		// file size
-		assertTrue(stat.getSize() == 10);
-		// test lstat features not supported by Java
-		if (FSAccess.isNativeImplementation()) {
-			// for a new file ctime and mtime should be identical
-			assertTrue(stat.getCTimeSec() == stat.getMTimeSec());
-			// at least these values should be > 0
-			assertTrue(stat.getDevice() > 0);
-			assertTrue(stat.getGroupId() > 0);
-			assertTrue(stat.getUserId() > 0);
-			assertTrue(stat.getInode() > 0);
-			assertTrue(stat.getMode() > 0);
-		}
-
-		BufferedWriter out = new BufferedWriter(new FileWriter(test));
-		out.write("Changed the text to see if lstat sees that");
-		out.close();
-		stat = FSAccess.INSTANCE.lstat(test);
-		// TODO remove println
-		System.out.println(stat.toString() + '\n');
-		assertTrue(stat.getSize() == 42);
-
-		// TODO add tests for error conditions (ENOENT, ENOTDIR)
-	}
-
-	private File writeTrashFile(String name, String body) throws IOException {
-		final File path = new File(trash, name);
-		write(path, body);
-		return path;
+	/**
+	 * Constructs an UnsupportedCredentialItem with the specified detail message
+	 * prefixed with provided URI.
+	 *
+	 * @param uri
+	 *            URI used for transport
+	 * @param s
+	 *            message
+	 */
+	public UnsupportedCredentialItem(final URIish uri, final String s) {
+		super(uri.setPass(null) + ": " + s);
 	}
 }

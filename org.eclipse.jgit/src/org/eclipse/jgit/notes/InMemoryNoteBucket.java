@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,64 +40,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
 
-import java.io.File;
+package org.eclipse.jgit.notes;
 
-/**
- * Expose some file system functions not available from Java
- */
-public class FSAccessNative extends FSAccess {
-
-	static {
-		// TODO remove println
-		// System.out.println("java.library.path "
-		// + System.getProperty("java.library.path"));
-		// System.loadLibrary("jgitnative");
-	}
-
+/** A note bucket that has been loaded into the process. */
+abstract class InMemoryNoteBucket extends NoteBucket {
 	/**
-	 * empty default constructor
-	 */
-	public FSAccessNative() {
-		// empty default constructor
-	}
-
-	/**
-	 * Retrieves lstat() data via native lstat() call
+	 * Number of leading digits that leads to this bucket in the note path.
 	 *
-	 * @param path
-	 *            Filesystem path the lstat data is requested for
-	 * @return the returned array contains the following lstat data:
-	 *         <ul>
-	 *         <li>[0] ctime seconds, the last time a file's metadata changed</li>
-	 *         <li>[1] ctime nanoseconds</li>
-	 *         <li>[2] mtime seconds, the last time a file's data changed</li>
-	 *         <li>[3] mtime nanoseconds</li>
-	 *         <li>[4] dev, device inode resides on</li>
-	 *         <li>[5] ino, inode's number</li>
-	 *         <li>[6] mode, inode protection mode</li>
-	 *         <li>[7] uid, user-id of owner</li>
-	 *         <li>[8] gid, group-id of owner</li>
-	 *         <li>[9] file size, in bytes</li>
-	 *         </ul>
+	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
+	 * is typically 2 higher than its parent, placing about 256 items in each
+	 * level of the tree.
 	 */
-	private static final native int[] lstatImpl(String path);
+	final int prefixLen;
 
-	/**
-	 * Retrieves lstat data for file at given path
-	 *
-	 * @param file
-	 *            file the lstat data is requested for
-	 * @return the lstat data
-	 */
-	public LStat lstat(File file) throws NoSuchFileException,
-			NotDirectoryException {
-		String path = file.getAbsolutePath();
-		int[] rawlstat = lstatImpl(path);
-		if (rawlstat.length != 10)
-			throw new IllegalArgumentException("lstat() didn't return int[10]");
-
-		return new LStat(rawlstat);
+	InMemoryNoteBucket(int prefixLen) {
+		this.prefixLen = prefixLen;
 	}
 }

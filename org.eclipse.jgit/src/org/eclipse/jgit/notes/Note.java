@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,24 +40,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
 
-import java.io.IOException;
+package org.eclipse.jgit.notes;
 
-/**
- * Thrown if lstat() call in native code returns errorno ENOTDIR
- *
- * TODO: To be replaced by java.nio.file.NotDirectoryException as soon as we can
- * use Java 7
- */
-public class NotDirectoryException extends IOException {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.ObjectId;
+
+/** In-memory representation of a single note attached to one object. */
+class Note extends ObjectId {
+	private ObjectId data;
 
 	/**
-	 * @param file
-	 *            a string identifying the file or null if not known
+	 * A Git note about the object referenced by {@code noteOn}.
+	 *
+	 * @param noteOn
+	 *            the object that has a note attached to it.
+	 * @param noteData
+	 *            the actual note data contained in this note
 	 */
-	public NotDirectoryException(String file) {
-		super(file);
+	Note(AnyObjectId noteOn, ObjectId noteData) {
+		super(noteOn);
+		data = noteData;
+	}
+
+	ObjectId getData() {
+		return data;
+	}
+
+	void setData(ObjectId newData) {
+		data = newData;
+	}
+
+	@Override
+	public String toString() {
+		return "Note[" + name() + " -> " + data.name() + "]";
 	}
 }
