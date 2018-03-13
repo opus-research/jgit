@@ -436,7 +436,7 @@ public class ReceivePack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return the hook invoked before updates occur. */
+	/** @return get the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -459,7 +459,7 @@ public class ReceivePack {
 		preReceive = h != null ? h : PreReceiveHook.NULL;
 	}
 
-	/** @return the hook invoked after updates occur. */
+	/** @return get the hook invoked after updates occur. */
 	public PostReceiveHook getPostReceiveHook() {
 		return postReceive;
 	}
@@ -578,8 +578,7 @@ public class ReceivePack {
 	 * <p>
 	 * When possible, prefer {@link #sendMessage(String)} or
 	 * {@link #sendError(String)}; this method is intended only for callers who
-	 * need to do their own
-	 * encoding.
+	 * need to do their own encoding.
 	 *
 	 * @param what
 	 *            bytes to send.
