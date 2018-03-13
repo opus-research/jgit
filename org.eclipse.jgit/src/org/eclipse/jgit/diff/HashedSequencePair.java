@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,77 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+package org.eclipse.jgit.diff;
 
 /**
- * Contains options used by the WorkingTreeIterator.
+ * Wraps two {@link Sequence} instances to cache their element hash codes.
+ *
+ * This pair wraps two sequences that contain cached hash codes for the
+ * specified region of each input sequence.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class WorkingTreeOptions {
+public class HashedSequencePair<S extends Sequence> {
+	private final SequenceComparator<? super S> cmp;
+
+	private final S baseA;
+
+	private final S baseB;
+
+	private final Edit region;
+
+	private HashedSequence<S> cachedA;
+
+	private HashedSequence<S> cachedB;
 
 	/**
-	 * Creates default options which reflect the original configuration of Git
-	 * on Unix systems.
+	 * Construct a pair to provide fast hash codes.
 	 *
-	 * @return created working tree options
+	 * @param cmp
+	 *            the base comparator for the sequence elements.
+	 * @param a
+	 *            the A sequence.
+	 * @param b
+	 *            the B sequence.
+	 * @param region
+	 *            a range of elements in each sequence that should be hashed.
+	 *            Only these elements are accessible.
 	 */
-	public static WorkingTreeOptions createDefaultInstance() {
-		return new WorkingTreeOptions(AutoCRLF.FALSE);
+	public HashedSequencePair(SequenceComparator<? super S> cmp, S a, S b,
+			Edit region) {
+		this.cmp = cmp;
+		this.baseA = a;
+		this.baseB = b;
+		this.region = region;
 	}
 
-	/**
-	 * Creates options based on the specified repository configuration.
-	 *
-	 * @param config
-	 *            repository configuration to create options for
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createConfigurationInstance(Config config) {
-		return new WorkingTreeOptions(config.get(CoreConfig.KEY).getAutoCRLF());
+	/** @return obtain a comparator that uses the cached hash codes. */
+	public HashedSequenceComparator<S> getComparator() {
+		return new HashedSequenceComparator<S>(cmp);
 	}
 
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 **/
-	private final AutoCRLF autoCRLF;
-
-	/**
-	 * Creates new options.
-	 *
-	 * @param autoCRLF
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
-	 */
-	public WorkingTreeOptions(AutoCRLF autoCRLF) {
-		this.autoCRLF = autoCRLF;
+	/** @return wrapper around A that includes cached hash codes. */
+	public HashedSequence<S> getA() {
+		if (cachedA == null)
+			cachedA = wrap(baseA, region.beginA, region.endA);
+		return cachedA;
 	}
 
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 *
-	 * @return true if EOLs should be canonicalized.
-	 */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+	/** @return wrapper around B that includes cached hash codes. */
+	public HashedSequence<S> getB() {
+		if (cachedB == null)
+			cachedB = wrap(baseB, region.beginB, region.endB);
+		return cachedB;
+	}
+
+	private HashedSequence<S> wrap(S base, int ptr, int end) {
+		final int begin = ptr;
+		int[] hashes = new int[end - ptr];
+		int i = 0;
+		while (ptr < end)
+			hashes[i++] = cmp.hash(base, ptr++);
+		return new HashedSequence<S>(base, hashes, begin);
 	}
 }

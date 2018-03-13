@@ -128,9 +128,13 @@ public class PatienceDiff implements DiffAlgorithm {
 		}
 
 		case REPLACE: {
-			State<S, C> d = new State<S, C>(cmp, a, b);
-			d.diff(e, null, 0, 0);
-			return d.edits;
+			HashedSequencePair<S> p = new HashedSequencePair<S>(cmp, a, b, e);
+			State<HashedSequence<S>, HashedSequenceComparator<S>> s;
+
+			s = new State<HashedSequence<S>, HashedSequenceComparator<S>>(
+					p.getComparator(), p.getA(), p.getB());
+			s.diff(e, null, 0, 0);
+			return s.edits;
 		}
 
 		case EMPTY:

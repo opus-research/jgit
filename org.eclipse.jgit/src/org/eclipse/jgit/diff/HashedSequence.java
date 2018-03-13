@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+package org.eclipse.jgit.diff;
 
 /**
- * Contains options used by the WorkingTreeIterator.
+ * Wraps a {@link Sequence} to assign hash codes to elements.
+ *
+ * This sequence acts as a proxy for the real sequence, caching element hash
+ * codes so they don't need to be recomputed each time. Sequences of this type
+ * must be used with a {@link HashedSequenceComparator}.
+ *
+ * To construct an instance of this type use {@link HashedSequencePair}.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class WorkingTreeOptions {
+public final class HashedSequence<S extends Sequence> extends Sequence {
+	final S base;
 
-	/**
-	 * Creates default options which reflect the original configuration of Git
-	 * on Unix systems.
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createDefaultInstance() {
-		return new WorkingTreeOptions(AutoCRLF.FALSE);
+	final int[] hashes;
+
+	final int begin;
+
+	HashedSequence(S base, int[] hashes, int begin) {
+		this.base = base;
+		this.hashes = hashes;
+		this.begin = begin;
 	}
 
-	/**
-	 * Creates options based on the specified repository configuration.
-	 *
-	 * @param config
-	 *            repository configuration to create options for
-	 *
-	 * @return created working tree options
-	 */
-	public static WorkingTreeOptions createConfigurationInstance(Config config) {
-		return new WorkingTreeOptions(config.get(CoreConfig.KEY).getAutoCRLF());
-	}
-
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 **/
-	private final AutoCRLF autoCRLF;
-
-	/**
-	 * Creates new options.
-	 *
-	 * @param autoCRLF
-	 *            indicates whether EOLs of text files should be converted to
-	 *            '\n' before calculating the blob ID.
-	 */
-	public WorkingTreeOptions(AutoCRLF autoCRLF) {
-		this.autoCRLF = autoCRLF;
-	}
-
-	/**
-	 * Indicates whether EOLs of text files should be converted to '\n' before
-	 * calculating the blob ID.
-	 *
-	 * @return true if EOLs should be canonicalized.
-	 */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+	@Override
+	public int size() {
+		return base.size();
 	}
 }
