@@ -1737,45 +1737,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals("file1", diffs.get(0).getOldPath());
 	}
 
-	@Test
-	public void testFastForwardRebaseWithAutoStash() throws Exception {
-		// create file0, add and commit
-		db.getConfig().setBoolean(ConfigConstants.CONFIG_REBASE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSTASH, true);
-		writeTrashFile("file0", "file0");
-		git.add().addFilepattern("file0").call();
-		git.commit().setMessage("commit0").call();
-		// create file1, add and commit
-		writeTrashFile(FILE1, "file1");
-		git.add().addFilepattern(FILE1).call();
-		RevCommit commit = git.commit().setMessage("commit1").call();
-
-		// create topic branch
-		createBranch(commit, "refs/heads/topic");
-
-		// checkout master branch / modify file1, add and commit
-		checkoutBranch("refs/heads/master");
-		writeTrashFile(FILE1, "modified file1");
-		git.add().addFilepattern(FILE1).call();
-		git.commit().setMessage("commit3").call();
-
-		// checkout topic branch / modify file0
-		checkoutBranch("refs/heads/topic");
-		writeTrashFile("file0", "unstaged modified file0");
-
-		// rebase
-		assertEquals(Status.FAST_FORWARD,
-				git.rebase().setUpstream("refs/heads/master")
-				.call().getStatus());
-		checkFile(new File(db.getWorkTree(), "file0"),
-				"unstaged modified file0");
-		checkFile(new File(db.getWorkTree(), FILE1), "modified file1");
-		assertEquals("[file0, mode:100644, content:file0]"
-				+ "[file1, mode:100644, content:modified file1]",
-				indexState(CONTENT));
-		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
-	}
-
 	private List<DiffEntry> getStashedDiff() throws AmbiguousObjectException,
 			IncorrectObjectTypeException, IOException, MissingObjectException {
 		ObjectId stashId = db.resolve("stash@{0}");
@@ -2347,7 +2308,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 						assertFalse(messageFixupFile.exists());
 						assertTrue(messageSquashFile.exists());
 						assertEquals(
-								"# This is a combination of 2 commits.\n# The first commit's message is:\nAdd file2\nnew line\n# This is the 2nd commit message:\nupdated file1 on master\nnew line",
+								"# This is a combination of 2 commits.\n# This is the 2nd commit message:\nupdated file1 on master\nnew line\n# The first commit's message is:\nAdd file2\nnew line",
 								commit);
 
 						try {
@@ -2426,7 +2387,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 						assertFalse(messageFixupFile.exists());
 						assertTrue(messageSquashFile.exists());
 						assertEquals(
-								"# This is a combination of 3 commits.\n# The first commit's message is:\nAdd file1\nnew line\n# This is the 2nd commit message:\nAdd file2\nnew line\n# This is the 3rd commit message:\nupdated file1 on master\nnew line",
+								"# This is a combination of 3 commits.\n# This is the 3rd commit message:\nupdated file1 on master\nnew line\n# This is the 2nd commit message:\nAdd file2\nnew line\n# The first commit's message is:\nAdd file1\nnew line",
 								commit);
 
 						try {
@@ -2441,7 +2402,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 							fail(t.getMessage());
 						}
 
-						return "# This is a combination of 3 commits.\n# The first commit's message is:\nAdd file1\nnew line\n# This is the 2nd commit message:\nAdd file2\nnew line\n# This is the 3rd commit message:\nupdated file1 on master\nnew line";
+						return "# This is a combination of 3 commits.\n# This is the 3rd commit message:\nupdated file1 on master\nnew line\n# This is the 2nd commit message:\nAdd file2\nnew line\n# The first commit's message is:\nAdd file1\nnew line";
 					}
 				}).call();
 
@@ -2454,7 +2415,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		ObjectId head2Id = db.resolve(Constants.HEAD + "^1");
 		RevCommit head1Commit = walk.parseCommit(head2Id);
 		assertEquals(
-				"Add file1\nnew line\nAdd file2\nnew line\nupdated file1 on master\nnew line",
+				"updated file1 on master\nnew line\nAdd file2\nnew line\nAdd file1\nnew line",
 				head1Commit.getFullMessage());
 	}
 
@@ -2508,7 +2469,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 						assertFalse(messageFixupFile.exists());
 						assertTrue(messageSquashFile.exists());
 						assertEquals(
-								"# This is a combination of 3 commits.\n# The first commit's message is:\nAdd file1\nnew line\n# The 2nd commit message will be skipped:\n# Add file2\n# new line\n# This is the 3rd commit message:\nupdated file1 on master\nnew line",
+								"# This is a combination of 3 commits.\n# This is the 3rd commit message:\nupdated file1 on master\nnew line\n# The 2nd commit message will be skipped:\n# Add file2\n# new line\n# The first commit's message is:\nAdd file1\nnew line",
 								commit);
 
 						try {

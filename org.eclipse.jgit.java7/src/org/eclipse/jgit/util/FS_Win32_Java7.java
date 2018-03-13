@@ -51,7 +51,7 @@ import java.io.IOException;
  */
 public class FS_Win32_Java7 extends FS_Win32 {
 
-	private volatile Boolean supportSymlinks;
+	private volatile Boolean dectedSupportSymlinks;
 
 	FS_Win32_Java7(FS src) {
 		super(src);
@@ -67,21 +67,21 @@ public class FS_Win32_Java7 extends FS_Win32 {
 
 	@Override
 	public boolean supportsSymlinks() {
-		if (supportSymlinks == null)
-			detectSymlinkSupport();
-		return Boolean.TRUE.equals(supportSymlinks);
+		if (dectedSupportSymlinks == null)
+			dectedSymlinkSupport();
+		return Boolean.TRUE.equals(dectedSupportSymlinks);
 	}
 
-	private void detectSymlinkSupport() {
+	private void dectedSymlinkSupport() {
 		File tempFile = null;
 		try {
 			tempFile = File.createTempFile("tempsymlinktarget", ""); //$NON-NLS-1$ //$NON-NLS-2$
 			File linkName = new File(tempFile.getParentFile(), "tempsymlink"); //$NON-NLS-1$
 			FileUtil.createSymLink(linkName, tempFile.getPath());
-			supportSymlinks = Boolean.TRUE;
+			dectedSupportSymlinks = Boolean.TRUE;
 			linkName.delete();
-		} catch (IOException | UnsupportedOperationException e) {
-			supportSymlinks = Boolean.FALSE;
+		} catch (IOException e) {
+			dectedSupportSymlinks = Boolean.FALSE;
 		} finally {
 			if (tempFile != null)
 				try {
@@ -152,9 +152,6 @@ public class FS_Win32_Java7 extends FS_Win32 {
 		FileUtil.createSymLink(path, target);
 	}
 
-	/**
-	 * @since 3.3
-	 */
 	@Override
 	public Attributes getAttributes(File path) {
 		return FileUtil.getFileAttributesBasic(this, path);

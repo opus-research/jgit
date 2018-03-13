@@ -180,9 +180,7 @@ class FileUtil {
 					readAttributes.isRegularFile(), //
 					readAttributes.creationTime().toMillis(), //
 					readAttributes.lastModifiedTime().toMillis(),
-					readAttributes.isSymbolicLink() ? Constants
-							.encode(FileUtils.readSymLink(path)).length
-							: readAttributes.size());
+					readAttributes.size());
 			return attributes;
 		} catch (NoSuchFileException e) {
 			return new FileUtil.Java7BasicAttributes(fs, path, false, false,

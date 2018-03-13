@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2014, Gustaf Lundh <gustaf.lundh@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -389,11 +388,7 @@ public class RevWalk implements Iterable<RevCommit> {
 			treeFilter = TreeFilter.ALL;
 			markStart(tip);
 			markStart(base);
-			RevCommit mergeBase;
-			while ((mergeBase = next()) != null)
-				if (mergeBase == base)
-					return true;
-			return false;
+			return next() == base;
 		} finally {
 			filter = oldRF;
 			treeFilter = oldTF;
@@ -1311,19 +1306,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		final int carry = c.flags & carryFlags;
 		if (carry != 0)
 			RevCommit.carryFlags(c, carry);
-	}
-
-	/**
-	 * Assume additional commits are shallow (have no parents).
-	 *
-	 * @param ids
-	 *            commits that should be treated as shallow commits, in addition
-	 *            to any commits already known to be shallow by the repository.
-	 * @since 3.3
-	 */
-	public void assumeShallow(Collection<? extends ObjectId> ids) {
-		for (ObjectId id : ids)
-			lookupCommit(id).parents = RevCommit.NO_PARENTS;
 	}
 
 	void initializeShallowCommits() throws IOException {

@@ -65,8 +65,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.InvalidPathException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -384,8 +382,7 @@ public abstract class Repository {
 		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
-				final Ref ref = getRef((String)resolved);
-				return ref != null ? ref.getLeaf().getObjectId() : null;
+				return getRef((String) resolved).getLeaf().getObjectId();
 			} else {
 				return (ObjectId) resolved;
 			}
@@ -1154,14 +1151,6 @@ public abstract class Repository {
 		if (refName.endsWith(".lock")) //$NON-NLS-1$
 			return false;
 
-		// Borrow logic for filterig out invalid paths. These
-		// are also invalid ref
-		try {
-			DirCacheCheckout.checkValidPath(refName);
-		} catch (InvalidPathException e) {
-			return false;
-		}
-
 		int components = 1;
 		char p = '\0';
 		for (int i = 0; i < len; i++) {
@@ -1272,40 +1261,6 @@ public abstract class Repository {
 		if (refName.startsWith(Constants.R_REMOTES))
 			return refName.substring(Constants.R_REMOTES.length());
 		return refName;
-	}
-
-	/**
-	 * @param refName
-	 * @return the remote branch name part of <code>refName</code>, i.e. without
-	 *         the <code>refs/remotes/&lt;remote&gt;</code> prefix, if
-	 *         <code>refName</code> represents a remote tracking branch;
-	 *         otherwise null.
-	 * @since 3.4
-	 */
-	public String shortenRemoteBranchName(String refName) {
-		for (String remote : getRemoteNames()) {
-			String remotePrefix = Constants.R_REMOTES + remote + "/"; //$NON-NLS-1$
-			if (refName.startsWith(remotePrefix))
-				return refName.substring(remotePrefix.length());
-		}
-		return null;
-	}
-
-	/**
-	 * @param refName
-	 * @return the remote name part of <code>refName</code>, i.e. without the
-	 *         <code>refs/remotes/&lt;remote&gt;</code> prefix, if
-	 *         <code>refName</code> represents a remote tracking branch;
-	 *         otherwise null.
-	 * @since 3.4
-	 */
-	public String getRemoteName(String refName) {
-		for (String remote : getRemoteNames()) {
-			String remotePrefix = Constants.R_REMOTES + remote + "/"; //$NON-NLS-1$
-			if (refName.startsWith(remotePrefix))
-				return remote;
-		}
-		return null;
 	}
 
 	/**
@@ -1646,14 +1601,5 @@ public abstract class Repository {
 			boolean append)
 			throws IOException {
 		new RebaseTodoFile(this).writeRebaseTodoFile(path, steps, append);
-	}
-
-	/**
-	 * @return the names of all known remotes
-	 * @since 3.4
-	 */
-	public Set<String> getRemoteNames() {
-		return getConfig()
-				.getSubsections(ConfigConstants.CONFIG_REMOTE_SECTION);
 	}
 }
