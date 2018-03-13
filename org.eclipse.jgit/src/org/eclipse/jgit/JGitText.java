@@ -483,11 +483,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceRefNotSpecifiedForRefspec;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
-	/***/ public String stashApplyFailed;
-	/***/ public String stashApplyOnUnsafeRepository;
-	/***/ public String stashCommitMissingTwoParents;
 	/***/ public String stashFailed;
-	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
