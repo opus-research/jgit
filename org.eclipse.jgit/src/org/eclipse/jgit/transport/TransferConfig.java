@@ -76,7 +76,7 @@ public class TransferConfig {
 		}
 	};
 
-	public enum FsckMode {
+	enum FsckMode {
 		ERROR, WARN, IGNORE;
 	}
 
