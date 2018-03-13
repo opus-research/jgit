@@ -120,12 +120,12 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		// Without fallback our results are limited due to collisions.
 		hd.setFallbackAlgorithm(null);
 		r = hd.diff(cmp, ac, bc);
-		assertEquals(69, r.size());
+		assertEquals(70, r.size());
 
 		// Results go when we add a fallback for the high collision regions.
 		hd.setFallbackAlgorithm(MyersDiff.INSTANCE);
 		r = hd.diff(cmp, ac, bc);
-		assertEquals(72, r.size());
+		assertEquals(73, r.size());
 
 		// But they still differ from Myers due to the way we did early steps.
 		EditList myersResult = MyersDiff.INSTANCE.diff(cmp, ac, bc);
@@ -145,10 +145,10 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 
 		hd.setMaxChainLength(64);
 		r = hd.diff(cmp, ac, bc);
-		assertEquals(69, r.size());
+		assertEquals(70, r.size());
 
 		hd.setMaxChainLength(176);
 		r = hd.diff(cmp, ac, bc);
-		assertEquals(71, r.size());
+		assertEquals(72, r.size());
 	}
 }
