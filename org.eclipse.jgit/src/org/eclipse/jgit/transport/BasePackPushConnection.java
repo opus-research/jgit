@@ -385,8 +385,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		final int oldTimeout = timeoutIn.getTimeout();
 		final int sendTime = (int) Math.min(packTransferTime, 28800000L);
 		try {
-			int timeout = 10 * Math.max(sendTime, oldTimeout);
-			timeoutIn.setTimeout((timeout < 0) ? Integer.MAX_VALUE : timeout);
+			timeoutIn.setTimeout(10 * Math.max(sendTime, oldTimeout));
 			return pckIn.readString();
 		} finally {
 			timeoutIn.setTimeout(oldTimeout);
