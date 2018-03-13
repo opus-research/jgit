@@ -368,6 +368,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			git.stashApply().call();
 			fail("Exception not thrown");
 		} catch (StashApplyFailureException e) {
+			// expected
  		}
 		assertEquals("content3", read(PATH));
 	}
@@ -398,12 +399,100 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			git.stashApply().call();
 			fail("Expected conflict");
 		} catch (StashApplyFailureException e) {
+			// expected
 		}
 		Status status = new StatusCommand(db).call();
 		assertEquals(1, status.getConflicting().size());
 		assertEquals(
 				"content\n<<<<<<< HEAD\n=======\nstashed change\n>>>>>>> stash\nmore content\ncommitted change\n",
 				read(PATH));
+	}
+
+	@Test
+	public void stashedApplyOnOtherBranch() throws Exception {
+		writeTrashFile(PATH, "content\nmore content\n");
+		git.add().addFilepattern(PATH).call();
+		git.commit().setMessage("more content").call();
+		String path2 = "file2.txt";
+		File file2 = writeTrashFile(path2, "content\nmore content\n");
+		git.add().addFilepattern(PATH).call();
+		git.add().addFilepattern(path2).call();
+		git.commit().setMessage("even content").call();
+
+		String otherBranch = "otherBranch";
+		git.branchCreate().setName(otherBranch).call();
+
+		writeTrashFile(PATH, "master content");
+		git.add().addFilepattern(PATH).call();
+		git.commit().setMessage("even content").call();
+
+		git.checkout().setName(otherBranch).call();
+
+		writeTrashFile(PATH, "otherBranch content");
+		git.add().addFilepattern(PATH).call();
+		git.commit().setMessage("even more content").call();
+
+		writeTrashFile(path2, "content\nstashed change\nmore content\n");
+
+		RevCommit stashed = git.stashCreate().call();
+
+		assertNotNull(stashed);
+		assertEquals("content\nmore content\n", read(file2));
+		assertEquals("otherBranch content",
+				read(committedFile));
+		assertTrue(git.status().call().isClean());
+
+		git.checkout().setName("master").call();
+		git.stashApply().call();
+		assertEquals("content\nstashed change\nmore content\n", read(file2));
+		assertEquals("master content",
+				read(committedFile));
+	}
+
+	@Test
+	public void stashedApplyOnOtherBranchWithStagedChange() throws Exception {
+		writeTrashFile(PATH, "content\nmore content\n");
+		git.add().addFilepattern(PATH).call();
+		git.commit().setMessage("more content").call();
+		String path2 = "file2.txt";
+		File file2 = writeTrashFile(path2, "content\nmore content\n");
+		git.add().addFilepattern(PATH).call();
+		git.add().addFilepattern(path2).call();
+		git.commit().setMessage("even content").call();
+
+		String otherBranch = "otherBranch";
+		git.branchCreate().setName(otherBranch).call();
+
+		writeTrashFile(PATH, "master content");
+		git.add().addFilepattern(PATH).call();
+		git.commit().setMessage("even content").call();
+
+		git.checkout().setName(otherBranch).call();
+
+		writeTrashFile(PATH, "otherBranch content");
+		git.add().addFilepattern(PATH).call();
+		git.commit().setMessage("even more content").call();
+
+		writeTrashFile(path2,
+				"content\nstashed change in index\nmore content\n");
+		git.add().addFilepattern(path2).call();
+		writeTrashFile(path2, "content\nstashed change\nmore content\n");
+
+		RevCommit stashed = git.stashCreate().call();
+
+		assertNotNull(stashed);
+		assertEquals("content\nmore content\n", read(file2));
+		assertEquals("otherBranch content", read(committedFile));
+		assertTrue(git.status().call().isClean());
+
+		git.checkout().setName("master").call();
+		git.stashApply().call();
+		assertEquals("content\nstashed change\nmore content\n", read(file2));
+		assertEquals(
+				"[file.txt, mode:100644, content:master content]"
+						+ "[file2.txt, mode:100644, content:content\nstashed change in index\nmore content\n]",
+				indexState(CONTENT));
+		assertEquals("master content", read(committedFile));
 	}
 
 	@Test
@@ -446,6 +535,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			git.stashApply().call();
 			fail("Exception not thrown");
 		} catch (StashApplyFailureException e) {
+			// expected
 		}
 		assertEquals("content2", read(PATH));
 	}
@@ -518,7 +608,8 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			fail("Exception not thrown");
 		} catch (JGitInternalException e) {
 			assertEquals(MessageFormat.format(
-					JGitText.get().stashCommitMissingTwoParents, head.name()),
+					JGitText.get().stashCommitIncorrectNumberOfParents,
+					head.name(), 0),
 					e.getMessage());
 		}
 	}
@@ -557,5 +648,92 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		git.stashApply().setStashRef("stash@{0}").call();
 
 		assertFalse(file.exists());
+	}
+
+	@Test
+	public void untrackedFileNotIncluded() throws Exception {
+		String untrackedPath = "untracked.txt";
+		File untrackedFile = writeTrashFile(untrackedPath, "content");
+		// at least one modification needed
+		writeTrashFile(PATH, "content2");
+		git.add().addFilepattern(PATH).call();
+		git.stashCreate().call();
+		assertTrue(untrackedFile.exists());
+
+		git.stashApply().setStashRef("stash@{0}").call();
+		assertTrue(untrackedFile.exists());
+
+		Status status = git.status().call();
+		assertEquals(1, status.getUntracked().size());
+		assertTrue(status.getUntracked().contains(untrackedPath));
+		assertEquals(1, status.getChanged().size());
+		assertTrue(status.getChanged().contains(PATH));
+		assertTrue(status.getAdded().isEmpty());
+		assertTrue(status.getConflicting().isEmpty());
+		assertTrue(status.getMissing().isEmpty());
+		assertTrue(status.getRemoved().isEmpty());
+		assertTrue(status.getModified().isEmpty());
+	}
+
+	@Test
+	public void untrackedFileIncluded() throws Exception {
+		String path = "a/b/untracked.txt";
+		File untrackedFile = writeTrashFile(path, "content");
+		RevCommit stashedCommit = git.stashCreate().setIncludeUntracked(true)
+				.call();
+		assertNotNull(stashedCommit);
+		assertFalse(untrackedFile.exists());
+		deleteTrashFile("a/b"); // checkout should create parent dirs
+
+		git.stashApply().setStashRef("stash@{0}").call();
+		assertTrue(untrackedFile.exists());
+		assertEquals("content", read(path));
+
+		Status status = git.status().call();
+		assertEquals(1, status.getUntracked().size());
+		assertTrue(status.getAdded().isEmpty());
+		assertTrue(status.getChanged().isEmpty());
+		assertTrue(status.getConflicting().isEmpty());
+		assertTrue(status.getMissing().isEmpty());
+		assertTrue(status.getRemoved().isEmpty());
+		assertTrue(status.getModified().isEmpty());
+		assertTrue(status.getUntracked().contains(path));
+	}
+
+	@Test
+	public void untrackedFileConflictsWithCommit() throws Exception {
+		String path = "untracked.txt";
+		writeTrashFile(path, "untracked");
+		git.stashCreate().setIncludeUntracked(true).call();
+
+		writeTrashFile(path, "committed");
+		head = git.commit().setMessage("add file").call();
+		git.add().addFilepattern(path).call();
+		git.commit().setMessage("conflicting commit").call();
+
+		try {
+			git.stashApply().setStashRef("stash@{0}").call();
+			fail("StashApplyFailureException should be thrown.");
+		} catch (StashApplyFailureException e) {
+			assertEquals(e.getMessage(), JGitText.get().stashApplyConflict);
+		}
+		assertEquals("committed", read(path));
+	}
+
+	@Test
+	public void untrackedFileConflictsWithWorkingDirectory()
+			throws Exception {
+		String path = "untracked.txt";
+		writeTrashFile(path, "untracked");
+		git.stashCreate().setIncludeUntracked(true).call();
+
+		writeTrashFile(path, "working-directory");
+		try {
+			git.stashApply().setStashRef("stash@{0}").call();
+			fail("StashApplyFailureException should be thrown.");
+		} catch (StashApplyFailureException e) {
+			assertEquals(e.getMessage(), JGitText.get().stashApplyConflict);
+		}
+		assertEquals("working-directory", read(path));
 	}
 }

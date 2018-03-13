@@ -58,6 +58,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -77,6 +78,9 @@ class Clone extends AbstractFetchCommand {
 
 	@Option(name = "--branch", aliases = { "-b" }, metaVar = "metaVar_branchName", usage = "usage_checkoutBranchAfterClone")
 	private String branch;
+
+	@Option(name = "--no-checkout", aliases = { "-n" }, usage = "usage_noCheckoutAfterClone")
+	private boolean noCheckout;
 
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
@@ -121,16 +125,19 @@ class Clone extends AbstractFetchCommand {
 
 		saveRemote(uri);
 		final FetchResult r = runFetch();
-		final Ref checkoutRef;
-		if (branch == null)
-			checkoutRef = guessHEAD(r);
-		else {
-			checkoutRef = r.getAdvertisedRef(Constants.R_HEADS + branch);
-			if (checkoutRef == null)
-				throw die(MessageFormat.format(CLIText.get().noSuchRemoteRef,
-						branch));
+
+		if (!noCheckout) {
+			final Ref checkoutRef;
+			if (branch == null)
+				checkoutRef = guessHEAD(r);
+			else {
+				checkoutRef = r.getAdvertisedRef(Constants.R_HEADS + branch);
+				if (checkoutRef == null)
+					throw die(MessageFormat.format(
+							CLIText.get().noSuchRemoteRef, branch));
+			}
+			doCheckout(checkoutRef);
 		}
-		doCheckout(checkoutRef);
 	}
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,

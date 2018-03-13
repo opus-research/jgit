@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -92,11 +91,10 @@ public class CloneCommandTest extends RepositoryTestCase {
 		writeTrashFile("Test.txt", "Hello world");
 		git.add().addFilepattern("Test.txt").call();
 		git.commit().setMessage("Initial commit").call();
+		git.tag().setName("tag-initial").setMessage("Tag initial").call();
 
-		// create a master branch and switch to it
-		git.branchCreate().setName("test").call();
-		RefUpdate rup = db.updateRef(Constants.HEAD);
-		rup.link("refs/heads/test");
+		// create a test branch and switch to it
+		git.checkout().setCreateBranch(true).setName("test").call();
 
 		// commit something on the test branch
 		writeTrashFile("Test.txt", "Some change");
@@ -112,7 +110,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		File directory = createTempDirectory("testCloneRepository");
 		CloneCommand command = Git.cloneRepository();
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertNotNull(git2);
@@ -144,7 +142,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		CloneCommand command = Git.cloneRepository();
 		command.setBare(true);
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertEquals(new RefSpec("+refs/heads/*:refs/heads/*"),
@@ -164,7 +162,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		CloneCommand command = Git.cloneRepository();
 		command.setBranch("refs/heads/master");
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
 
@@ -179,7 +177,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command = Git.cloneRepository();
 		command.setBranch("refs/heads/master");
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		command.setNoCheckout(true);
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
@@ -194,7 +192,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command = Git.cloneRepository();
 		command.setBranch("refs/heads/master");
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		command.setBare(true);
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
@@ -206,6 +204,36 @@ public class CloneCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testCloneRepositoryWithBranchShortName() throws Exception {
+		File directory = createTempDirectory("testCloneRepositoryWithBranch");
+		CloneCommand command = Git.cloneRepository();
+		command.setBranch("test");
+		command.setDirectory(directory);
+		command.setURI(fileUri());
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
+
+		assertNotNull(git2);
+		assertEquals("refs/heads/test", git2.getRepository().getFullBranch());
+	}
+
+	@Test
+	public void testCloneRepositoryWithTagName() throws Exception {
+		File directory = createTempDirectory("testCloneRepositoryWithBranch");
+		CloneCommand command = Git.cloneRepository();
+		command.setBranch("tag-initial");
+		command.setDirectory(directory);
+		command.setURI(fileUri());
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
+
+		assertNotNull(git2);
+		ObjectId taggedCommit = db.resolve("tag-initial^{commit}");
+		assertEquals(taggedCommit.name(), git2
+				.getRepository().getFullBranch());
+	}
+
+	@Test
 	public void testCloneRepositoryOnlyOneBranch() throws IOException,
 			JGitInternalException, GitAPIException {
 		File directory = createTempDirectory("testCloneRepositoryWithBranch");
@@ -214,7 +242,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setBranchesToClone(Collections
 				.singletonList("refs/heads/master"));
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertNotNull(git2);
@@ -229,7 +257,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		command.setBranchesToClone(Collections
 				.singletonList("refs/heads/master"));
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		command.setBare(true);
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
@@ -256,14 +284,14 @@ public class CloneCommandTest extends RepositoryTestCase {
 		File directory = createTempDirectory(dirName);
 		CloneCommand command = Git.cloneRepository();
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertNotNull(git2);
 		// clone again
 		command = Git.cloneRepository();
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		try {
 			git2 = command.call();
 			// we shouldn't get here
@@ -282,7 +310,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		File directory = createTempDirectory("testCloneRepositoryWithMultipleHeadBranches");
 		CloneCommand clone = Git.cloneRepository();
 		clone.setDirectory(directory);
-		clone.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		clone.setURI(fileUri());
 		Git git2 = clone.call();
 		addRepoToClose(git2.getRepository());
 		assertNotNull(git2);
@@ -315,7 +343,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		CloneCommand clone = Git.cloneRepository();
 		clone.setDirectory(directory);
 		clone.setCloneSubmodules(true);
-		clone.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		clone.setURI(fileUri());
 		Git git2 = clone.call();
 		addRepoToClose(git2.getRepository());
 		assertNotNull(git2);
@@ -430,7 +458,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		File directory = createTempDirectory("testCloneRepository1");
 		CloneCommand command = Git.cloneRepository();
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		Git git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertFalse(git2
@@ -448,7 +476,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		directory = createTempDirectory("testCloneRepository2");
 		command = Git.cloneRepository();
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertTrue(git2
@@ -464,7 +492,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 		directory = createTempDirectory("testCloneRepository2");
 		command = Git.cloneRepository();
 		command.setDirectory(directory);
-		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setURI(fileUri());
 		git2 = command.call();
 		addRepoToClose(git2.getRepository());
 		assertTrue(git2
@@ -473,5 +501,9 @@ public class CloneCommandTest extends RepositoryTestCase {
 				.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION, "test",
 						ConfigConstants.CONFIG_KEY_REBASE, false));
 
+	}
+
+	private String fileUri() {
+		return "file://" + git.getRepository().getWorkTree().getAbsolutePath();
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, 2013 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -73,6 +73,7 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
@@ -1191,8 +1192,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.addCommand(commands);
-		batchUpdate
-				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
+		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
 		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
 		assertEquals(ReceiveCommand.Result.REJECTED_NONFASTFORWARD, commands
@@ -1215,8 +1215,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
-		batchUpdate
-				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
+		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
 		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
 		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
@@ -1224,6 +1223,27 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 				.keySet().toString());
 		assertEquals(B.getId(), refs.get("refs/heads/master").getObjectId());
 		assertEquals(A.getId(), refs.get("refs/heads/masters").getObjectId());
+	}
+
+	@Test
+	public void testBatchRefUpdateNonFastForwardDoesNotDoExpensiveMergeCheck()
+			throws IOException {
+		writeLooseRef("refs/heads/master", B);
+		List<ReceiveCommand> commands = Arrays.asList(
+				newCommand(B, A, "refs/heads/master",
+						ReceiveCommand.Type.UPDATE_NONFASTFORWARD));
+		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
+		batchUpdate.setAllowNonFastForwards(true);
+		batchUpdate.addCommand(commands);
+		batchUpdate.execute(new RevWalk(diskRepo) {
+			@Override
+			public boolean isMergedInto(RevCommit base, RevCommit tip) {
+				throw new AssertionError("isMergedInto() should not be called");
+			}
+		}, new StrictWorkMonitor());
+		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
+		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
+		assertEquals(A.getId(), refs.get("refs/heads/master").getObjectId());
 	}
 
 	@Test
@@ -1267,8 +1287,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		BatchRefUpdate batchUpdate = refdir.newBatchUpdate();
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
-		batchUpdate
-				.execute(new RevWalk(diskRepo), NullProgressMonitor.INSTANCE);
+		batchUpdate.execute(new RevWalk(diskRepo), new StrictWorkMonitor());
 		Map<String, Ref> refs = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(ReceiveCommand.Result.OK, commands.get(0).getResult());
 		assertEquals(ReceiveCommand.Result.OK, commands.get(1).getResult());
@@ -1280,10 +1299,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 	private static ReceiveCommand newCommand(RevCommit a, RevCommit b,
 			String string, Type update) {
-		ReceiveCommand ret = new ReceiveCommand(a != null ? a.getId() : null,
+		return new ReceiveCommand(a != null ? a.getId() : null,
 				b != null ? b.getId() : null, string, update);
-		ret.setResult(ReceiveCommand.Result.NOT_ATTEMPTED);
-		return ret;
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {
@@ -1310,5 +1327,30 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private void deleteLooseRef(String name) {
 		File path = new File(diskRepo.getDirectory(), name);
 		assertTrue("deleted " + name, path.delete());
+	}
+
+	private static final class StrictWorkMonitor implements ProgressMonitor {
+		private int lastWork, totalWork;
+
+		public void start(int totalTasks) {
+			// empty
+		}
+
+		public void beginTask(String title, int totalWork) {
+			this.totalWork = totalWork;
+			lastWork = 0;
+		}
+
+		public void update(int completed) {
+			lastWork += completed;
+		}
+
+		public void endTask() {
+			assertEquals("Units of work recorded", totalWork, lastWork);
+		}
+
+		public boolean isCancelled() {
+			return false;
+		}
 	}
 }

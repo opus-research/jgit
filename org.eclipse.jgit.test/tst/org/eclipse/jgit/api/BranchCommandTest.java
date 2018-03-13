@@ -121,7 +121,7 @@ public class BranchCommandTest extends RepositoryTestCase {
 		Git localGit = new Git(localRepository);
 		StoredConfig config = localRepository.getConfig();
 		RemoteConfig rc = new RemoteConfig(config, "origin");
-		rc.addURI(new URIish(remoteRepository.getDirectory().getPath()));
+		rc.addURI(new URIish(remoteRepository.getDirectory().getAbsolutePath()));
 		rc.addFetchRefSpec(new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
 		rc.update(config);
 		config.save();
@@ -194,6 +194,20 @@ public class BranchCommandTest extends RepositoryTestCase {
 	public void testListAllBranchesShouldNotDie() throws Exception {
 		Git git = setUpRepoWithRemote();
 		git.branchList().setListMode(ListMode.ALL).call();
+	}
+
+	@Test
+	public void testListBranchesWithContains() throws Exception {
+		git.branchCreate().setName("foo").setStartPoint(secondCommit).call();
+
+		List<Ref> refs = git.branchList().call();
+		assertEquals(2, refs.size());
+
+		List<Ref> refsContainingSecond = git.branchList()
+				.setContains(secondCommit.name()).call();
+		assertEquals(1, refsContainingSecond.size());
+		// master is on initial commit, so it should not be returned
+		assertEquals("refs/heads/foo", refsContainingSecond.get(0).getName());
 	}
 
 	@Test

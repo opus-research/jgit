@@ -3,6 +3,7 @@
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -64,8 +65,8 @@ import org.eclipse.jgit.util.StringUtils;
 /**
  * This URI like construct used for referencing Git archives over the net, as
  * well as locally stored archives. It is similar to RFC 2396 URI's, but also
- * support SCP and the malformed file://<path> syntax (as opposed to the correct
- * file:<path> syntax.
+ * support SCP and the malformed file://&lt;path&gt; syntax (as opposed to the correct
+ * file:&lt;path&gt; syntax.
  */
 public class URIish implements Serializable {
 	/**
@@ -87,7 +88,7 @@ public class URIish implements Serializable {
 	 * Part of a pattern which matches the host part of URIs. Defines one
 	 * capturing group containing the host name.
 	 */
-	private static final String HOST_P = "((?:[^\\\\/:]+)|(?:\\[[0-9a-f:]+\\]))";
+	private static final String HOST_P = "((?:[^\\\\/:]+)|(?:\\[[0-9a-f:]+\\]))"; //$NON-NLS-1$
 
 	/**
 	 * Part of a pattern which matches the optional port part of URIs. Defines
@@ -111,7 +112,7 @@ public class URIish implements Serializable {
 	 * Part of a pattern which matches a relative path. Relative paths don't
 	 * start with slash or drive letters. Defines no capturing group.
 	 */
-	private static final String RELATIVE_PATH_P = "(?:(?:[^\\\\/]+[\\\\/])*[^\\\\/]+[\\\\/]?)"; //$NON-NLS-1$
+	private static final String RELATIVE_PATH_P = "(?:(?:[^\\\\/]+[\\\\/]+)*[^\\\\/]+[\\\\/]*)"; //$NON-NLS-1$
 
 	/**
 	 * Part of a pattern which matches a relative or absolute path. Defines no
@@ -659,7 +660,7 @@ public class URIish implements Serializable {
 	/**
 	 * Get the "humanish" part of the path. Some examples of a 'humanish' part
 	 * for a full path:
-	 * <table>
+	 * <table summary="path vs humanish path" border="1">
 	 * <tr>
 	 * <th>Path</th>
 	 * <th>Humanish part</th>
@@ -698,7 +699,7 @@ public class URIish implements Serializable {
 		if ("file".equals(scheme) || LOCAL_FILE.matcher(s).matches()) //$NON-NLS-1$
 			elements = s.split("[\\" + File.separatorChar + "/]"); //$NON-NLS-1$ //$NON-NLS-2$
 		else
-			elements = s.split("/"); //$NON-NLS-1$
+			elements = s.split("/+"); //$NON-NLS-1$
 		if (elements.length == 0)
 			throw new IllegalArgumentException();
 		String result = elements[elements.length - 1];
