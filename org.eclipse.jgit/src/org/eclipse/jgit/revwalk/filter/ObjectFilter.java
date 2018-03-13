@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+/**
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.revwalk.filter;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
 import java.io.IOException;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.revwalk.ObjectWalk;
 
-public class FileUtils7Test {
+/**
+ * Selects interesting objects when walking.
+ * <p>
+ * Applications should install the filter on an ObjectWalk by
+ * {@link ObjectWalk#setObjectFilter(ObjectFilter)} prior to starting traversal.
+ *
+ * @since 4.0
+ */
+public abstract class ObjectFilter {
+	/** Default filter that always returns true. */
+	public static final ObjectFilter ALL = new AllFilter();
 
-	private final File trash = new File(new File("target"), "trash");
-
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
+	private static final class AllFilter extends ObjectFilter {
+		@Override
+		public boolean include(ObjectWalk walker, AnyObjectId o) {
+			return true;
+		}
 	}
 
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
-	}
-
-	@Test
-	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
-			throws IOException {
-		FS fs = FS.DETECTED;
-		File dir = new File(trash, "dir");
-		File file = new File(dir, "file");
-		File link = new File(trash, "link");
-		FileUtils.mkdirs(dir);
-		FileUtils.createNewFile(file);
-		fs.createSymLink(link, "dir");
-		FileUtils.delete(link, FileUtils.RECURSIVE);
-		assertFalse(link.exists());
-		assertTrue(dir.exists());
-		assertTrue(file.exists());
-	}
+	/**
+	 * Determine if the named object should be included in the walk.
+	 *
+	 * @param walker
+	 *            the active walker this filter is being invoked from within.
+	 * @param objid
+	 *            the object currently being tested.
+	 * @return {@code true} if the named object should be included in the walk.
+	 * @throws MissingObjectException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was missing
+	 * @throws IncorrectObjectTypeException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was of the wrong type
+	 * @throws IOException
+	 *             an object the filter needed to consult to determine its
+	 *             answer could not be read.
+	 */
+	public abstract boolean include(ObjectWalk walker, AnyObjectId objid)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			       IOException;
 }
