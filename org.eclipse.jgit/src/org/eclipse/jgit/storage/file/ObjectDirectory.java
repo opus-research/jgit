@@ -171,9 +171,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public void create() throws IOException {
-		FileUtils.mkdirs(objects);
-		FileUtils.mkdir(infoDirectory);
-		FileUtils.mkdir(packDirectory);
+		objects.mkdirs();
+		infoDirectory.mkdir();
+		packDirectory.mkdir();
 	}
 
 	@Override
@@ -233,11 +233,13 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *            path of the pack file to open.
 	 * @param idx
 	 *            path of the corresponding index file.
+	 * @return the pack that was opened and added to the database.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public void openPack(final File pack, final File idx) throws IOException {
+	public PackFile openPack(final File pack, final File idx)
+			throws IOException {
 		final String p = pack.getName();
 		final String i = idx.getName();
 
@@ -250,7 +252,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 		if (!p.substring(0, 45).equals(i.substring(0, 45)))
 			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
 
-		insertPack(new PackFile(idx, pack));
+		PackFile res = new PackFile(idx, pack);
+		insertPack(res);
+		return res;
 	}
 
 	@Override
@@ -488,7 +492,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
-		FileUtils.mkdir(dst.getParentFile());
+		dst.getParentFile().mkdir();
 		if (tmp.renameTo(dst)) {
 			unpackedObjectCache.add(id);
 			return InsertLooseObjectResult.INSERTED;
@@ -517,6 +521,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	Config getConfig() {
 		return config;
+	}
+
+	@Override
+	FS getFS() {
+		return fs;
 	}
 
 	private void insertPack(final PackFile pf) {

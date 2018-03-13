@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Garmin International
+ * Copyright (C) 2011, Jesse Greenwald <jesse.greenwald@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,70 +41,77 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+
+package org.eclipse.jgit.revwalk;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Before;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.junit.Test;
 
-public class InitCommandTest extends RepositoryTestCase {
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-	}
+public class RevWalkResetTest extends RevWalkTestCase {
 
 	@Test
-	public void testInitRepository() {
-		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-		} catch (Exception e) {
-			fail(e.getMessage());
+	public void testRevFilterReceivesParsedCommits() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c = commit(b);
+
+		final AtomicBoolean filterRan = new AtomicBoolean();
+		RevFilter testFilter = new RevFilter() {
+
+			@Override
+			public boolean include(RevWalk walker, RevCommit cmit)
+					throws StopWalkException, MissingObjectException,
+					IncorrectObjectTypeException, IOException {
+				assertNotNull("commit is parsed", cmit.getRawBuffer());
+				filterRan.set(true);
+				return true;
+			}
+
+			@Override
+			public RevFilter clone() {
+				return this;
+			}
+
+		};
+
+		// Do an initial run through the walk
+		filterRan.set(false);
+		rw.setRevFilter(testFilter);
+		markStart(c);
+		rw.markUninteresting(b);
+		for (RevCommit cmit = rw.next(); cmit != null; cmit = rw.next()) {
+			// Don't dispose the body here, because we want to test the effect
+			// of marking 'b' as uninteresting.
 		}
+		assertTrue("filter ran", filterRan.get());
+
+		// Run through the walk again, this time disposing of all commits.
+		filterRan.set(false);
+		rw.reset();
+		markStart(c);
+		for (RevCommit cmit = rw.next(); cmit != null; cmit = rw.next()) {
+			cmit.disposeBody();
+		}
+		assertTrue("filter ran", filterRan.get());
+
+		// Do the third run through the reused walk. Test that the explicitly
+		// disposed commits are parsed on this walk.
+		filterRan.set(false);
+		rw.reset();
+		markStart(c);
+		for (RevCommit cmit = rw.next(); cmit != null; cmit = rw.next()) {
+			// spin through the walk.
+		}
+		assertTrue("filter ran", filterRan.get());
+
 	}
-
-	@Test
-	public void testInitBareRepository() {
-		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-
-		if (!(temp.delete())) {
-			throw new IOException("Could not delete temp file: "
-					+ temp.getAbsolutePath());
-		}
-
-		if (!(temp.mkdir())) {
-			throw new IOException("Could not create temp directory: "
-					+ temp.getAbsolutePath());
-		}
-		return temp;
-	}
-
 }
