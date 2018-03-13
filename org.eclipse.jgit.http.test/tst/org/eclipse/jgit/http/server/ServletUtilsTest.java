@@ -41,35 +41,24 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.http.server;
 
-/**
- * Key for any row that the DHT will be asked to store.
- * <p>
- * Implementations of this interface know how to encode and decode themselves
- * from a byte array format, expecting the DHT to use the byte array as the row
- * key within the database.
- * <p>
- * It is strongly encouraged to use only row keys that are valid UTF-8 strings,
- * as most DHT systems have client tools that can interact with rows using the
- * UTF-8 encoding.
- */
-public interface RowKey {
-	/** @return key formatted as byte array for storage in the DHT. */
-	public byte[] toBytes();
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-	/** @return relatively unique hash code value for in-memory compares. */
-	public int hashCode();
+import org.junit.Test;
 
-	/**
-	 * Compare this key to another key for equality.
-	 *
-	 * @param other
-	 *            the other key instance, may be null.
-	 * @return true if these keys reference the same row.
-	 */
-	public boolean equals(Object other);
+public class ServletUtilsTest {
+	@Test
+	public void testAcceptGzip() {
+		assertFalse(ServletUtils.acceptsGzipEncoding((String) null));
+		assertFalse(ServletUtils.acceptsGzipEncoding(""));
 
-	/** @return pretty printable string for debugging/reporting only. */
-	public String toString();
+		assertTrue(ServletUtils.acceptsGzipEncoding("gzip"));
+		assertTrue(ServletUtils.acceptsGzipEncoding("deflate,gzip"));
+		assertTrue(ServletUtils.acceptsGzipEncoding("gzip,deflate"));
+
+		assertFalse(ServletUtils.acceptsGzipEncoding("gzip(proxy)"));
+		assertFalse(ServletUtils.acceptsGzipEncoding("proxy-gzip"));
+	}
 }
