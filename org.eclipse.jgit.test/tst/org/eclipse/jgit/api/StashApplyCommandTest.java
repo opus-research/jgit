@@ -425,7 +425,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 	public void stashChangeInANewSubdirectory() throws Exception {
 		String subdir = "subdir";
 		String fname = "file2.txt";
-		String path = subdir + "/" + fname;
+		String path = subdir + System.getProperty("file.separator") + fname;
 		String otherBranch = "otherbranch";
 
 		writeTrashFile(subdir, fname, "content2");
