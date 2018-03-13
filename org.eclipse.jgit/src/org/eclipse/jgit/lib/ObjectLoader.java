@@ -324,11 +324,16 @@ public abstract class ObjectLoader {
 		}
 	}
 
-
 	/**
-	 * Delegation for ObjectLoader.
+	 * Wraps a delegate ObjectLoader.
+	 *
+	 * @since 4.10
 	 */
 	public static abstract class Filter extends ObjectLoader {
+		/**
+		 * @return delegate ObjectLoader to handle all processing.
+		 * @since 4.10
+		 */
 		protected abstract ObjectLoader delegate();
 
 		@Override
