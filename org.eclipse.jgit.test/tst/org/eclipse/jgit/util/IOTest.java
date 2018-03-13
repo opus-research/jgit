@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015, Google Inc.
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,53 +41,44 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.util;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
-import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.lib.ObjectId;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+
+import org.eclipse.jgit.lib.Constants;
 import org.junit.Test;
 
-/** Tests for base receive-pack utilities. */
-public class BaseReceivePackTest {
+public class IOTest {
 	@Test
-	public void chomp() {
-		assertEquals("foo", BaseReceivePack.chomp("foo"));
-		assertEquals("foo", BaseReceivePack.chomp("foo\n"));
-		assertEquals("foo\n", BaseReceivePack.chomp("foo\n\n"));
+	public void testReadLine() throws Exception {
+		Reader r = newReader("foo\nbar\nbaz\n");
+		assertEquals("foo\n", IO.readLine(r, 0));
+		assertEquals("bar\n", IO.readLine(r, 0));
+		assertEquals("baz\n", IO.readLine(r, 0));
 	}
 
 	@Test
-	public void parseCommand() throws Exception {
-		String o = "0000000000000000000000000000000000000000";
-		String n = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
-		String r = "refs/heads/master";
-		ReceiveCommand cmd = BaseReceivePack.parseCommand(o + " " + n + " " + r);
-		assertEquals(ObjectId.zeroId(), cmd.getOldId());
-		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-				cmd.getNewId().name());
-		assertEquals("refs/heads/master", cmd.getRefName());
-
-		assertParseCommandFails(null);
-		assertParseCommandFails("");
-		assertParseCommandFails(o.substring(35) + " " + n.substring(35)
-				+ " " + r + "\n");
-		assertParseCommandFails(o + " " + n + " " + r + "\n");
-		assertParseCommandFails(o + " " + n + " " + "refs^foo");
-		assertParseCommandFails(o + " " + n.substring(10) + " " + r);
-		assertParseCommandFails(o.substring(10) + " " + n + " " + r);
-		assertParseCommandFails("X" + o.substring(1) + " " + n + " " + r);
-		assertParseCommandFails(o + " " + "X" + n.substring(1) + " " + r);
+	public void testReadLineWithNoTrailingNewline() throws Exception {
+		Reader r = newReader("foo\nbar\nbaz");
+		assertEquals("foo\n", IO.readLine(r, 0));
+		assertEquals("bar\n", IO.readLine(r, 0));
+		assertEquals("baz", IO.readLine(r, 0));
 	}
 
-	private void assertParseCommandFails(String input) {
-		try {
-			BaseReceivePack.parseCommand(input);
-			fail();
-		} catch (PackProtocolException e) {
-			// Expected.
-		}
+	@Test
+	public void testReadLineWithSizeHint() throws Exception {
+		Reader r = newReader("foo\nbar\nbaz\n");
+		assertEquals("foo\n", IO.readLine(r, 64));
+		assertEquals("bar\n", IO.readLine(r, 64));
+		assertEquals("baz\n", IO.readLine(r, 64));
+	}
+
+	private static Reader newReader(String in) {
+		return new InputStreamReader(
+				new ByteArrayInputStream(Constants.encode(in)));
 	}
 }
