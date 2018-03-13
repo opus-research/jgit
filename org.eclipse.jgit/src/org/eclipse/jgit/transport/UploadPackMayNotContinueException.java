@@ -41,56 +41,37 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.storage.dht.spi.memory.MemoryDatabase;
-import org.junit.Before;
-import org.junit.Test;
+/** Indicates UploadPack may not continue execution. */
+public class UploadPackMayNotContinueException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-public class DhtRepositoryBuilderTest {
-	private MemoryDatabase db;
+	private boolean output;
 
-	@Before
-	public void setUpDatabase() {
-		db = new MemoryDatabase();
+	/** Initialize with no message. */
+	public UploadPackMayNotContinueException() {
+		// Do not set a message.
 	}
 
-	@Test
-	public void testCreateAndOpen() throws IOException {
-		String name = "test.git";
+	/**
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
+	 */
+	public UploadPackMayNotContinueException(String msg) {
+		super(msg);
+	}
 
-		DhtRepository repo1 = db.open(name);
-		assertSame(db, repo1.getDatabase());
-		assertSame(repo1, repo1.getRefDatabase().getRepository());
-		assertSame(repo1, repo1.getObjectDatabase().getRepository());
+	/** @return true if the message was already output to the client. */
+	public boolean isOutput() {
+		return output;
+	}
 
-		assertEquals(name, repo1.getRepositoryName().asString());
-		assertNull(repo1.getRepositoryKey());
-		assertFalse(repo1.getObjectDatabase().exists());
-
-		repo1.create(true);
-		assertNotNull(repo1.getRepositoryKey());
-		assertTrue(repo1.getObjectDatabase().exists());
-
-		DhtRepository repo2 = db.open(name);
-		assertNotNull(repo2.getRepositoryKey());
-		assertTrue(repo2.getObjectDatabase().exists());
-		assertEquals(0, repo2.getAllRefs().size());
-
-		Ref HEAD = repo2.getRef(Constants.HEAD);
-		assertTrue(HEAD.isSymbolic());
-		assertEquals(Constants.R_HEADS + Constants.MASTER, //
-				HEAD.getLeaf().getName());
+	/** Mark this message has being sent to the client. */
+	public void setOutput() {
+		output = true;
 	}
 }

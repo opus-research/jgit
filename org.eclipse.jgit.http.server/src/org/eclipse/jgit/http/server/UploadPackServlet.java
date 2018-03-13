@@ -45,6 +45,7 @@ package org.eclipse.jgit.http.server;
 
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+import static javax.servlet.http.HttpServletResponse.SC_SERVICE_UNAVAILABLE;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
@@ -67,6 +68,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.UploadPack;
+import org.eclipse.jgit.transport.UploadPackMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
@@ -75,7 +77,7 @@ import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 class UploadPackServlet extends HttpServlet {
 	private static final String REQ_TYPE = "application/x-git-upload-pack-request";
 
-	private static final String RSP_TYPE = "application/x-git-upload-pack-result";
+	static final String RSP_TYPE = "application/x-git-upload-pack-result";
 
 	private static final long serialVersionUID = 1L;
 
@@ -110,10 +112,10 @@ class UploadPackServlet extends HttpServlet {
 	}
 
 	static class Factory implements Filter {
-		private final UploadPackFactory<HttpServletRequest> receivePackFactory;
+		private final UploadPackFactory<HttpServletRequest> uploadPackFactory;
 
-		Factory(UploadPackFactory<HttpServletRequest> receivePackFactory) {
-			this.receivePackFactory = receivePackFactory;
+		Factory(UploadPackFactory<HttpServletRequest> uploadPackFactory) {
+			this.uploadPackFactory = uploadPackFactory;
 		}
 
 		public void doFilter(ServletRequest request, ServletResponse response,
@@ -122,13 +124,13 @@ class UploadPackServlet extends HttpServlet {
 			HttpServletResponse rsp = (HttpServletResponse) response;
 			UploadPack rp;
 			try {
-				rp = receivePackFactory.create(req, getRepository(req));
+				rp = uploadPackFactory.create(req, getRepository(req));
 			} catch (ServiceNotAuthorizedException e) {
 				rsp.sendError(SC_UNAUTHORIZED);
 				return;
 
 			} catch (ServiceNotEnabledException e) {
-				rsp.sendError(SC_FORBIDDEN);
+				RepositoryFilter.sendError(SC_FORBIDDEN, req, rsp);
 				return;
 			}
 
@@ -170,6 +172,11 @@ class UploadPackServlet extends HttpServlet {
 			};
 			up.upload(getInputStream(req), out, null);
 			out.close();
+
+		} catch (UploadPackMayNotContinueException e) {
+			if (!e.isOutput())
+				rsp.sendError(SC_SERVICE_UNAVAILABLE);
+			return;
 
 		} catch (IOException e) {
 			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
