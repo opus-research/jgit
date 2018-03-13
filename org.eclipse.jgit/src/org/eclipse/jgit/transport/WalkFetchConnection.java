@@ -223,7 +223,6 @@ class WalkFetchConnection extends BaseFetchConnection {
 		workQueue = new LinkedList<ObjectId>();
 	}
 
-	@Override
 	public boolean didFetchTestConnectivity() {
 		return true;
 	}
@@ -249,12 +248,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 		}
 	}
 
-	@Override
 	public Collection<PackLock> getPackLocks() {
 		return packLocks;
 	}
 
-	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}

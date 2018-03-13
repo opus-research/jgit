@@ -224,8 +224,7 @@ public class DfsPackCompactor {
 				}
 
 				boolean rollback = true;
-				DfsPackDescription pack = objdb.newPack(COMPACT,
-						estimatePackSize());
+				DfsPackDescription pack = objdb.newPack(COMPACT);
 				try {
 					writePack(objdb, pack, pw, pm);
 					writeIndex(objdb, pack, pw);
@@ -250,17 +249,6 @@ public class DfsPackCompactor {
 		} finally {
 			rw = null;
 		}
-	}
-
-	private long estimatePackSize() {
-		// Every pack file contains 12 bytes of header and 20 bytes of trailer.
-		// Include the final pack file header and trailer size here and ignore
-		// the same from individual pack files.
-		long size = 32;
-		for (DfsPackFile pack : srcPacks) {
-			size += pack.getPackDescription().getFileSize(PACK) - 32;
-		}
-		return size;
 	}
 
 	/** @return all of the source packs that fed into this compaction. */
@@ -293,7 +281,6 @@ public class DfsPackCompactor {
 		// older packs, allowing the PackWriter to be handed newer objects
 		// first and older objects last.
 		Collections.sort(srcPacks, new Comparator<DfsPackFile>() {
-			@Override
 			public int compare(DfsPackFile a, DfsPackFile b) {
 				return a.getPackDescription().compareTo(b.getPackDescription());
 			}
@@ -359,7 +346,6 @@ public class DfsPackCompactor {
 			want.add(new ObjectIdWithOffset(id, ent.getOffset()));
 		}
 		Collections.sort(want, new Comparator<ObjectIdWithOffset>() {
-			@Override
 			public int compare(ObjectIdWithOffset a, ObjectIdWithOffset b) {
 				return Long.signum(a.offset - b.offset);
 			}

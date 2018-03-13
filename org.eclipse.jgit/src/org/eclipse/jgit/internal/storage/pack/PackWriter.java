@@ -170,14 +170,12 @@ public class PackWriter implements AutoCloseable {
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
 
 	private static final Iterable<PackWriter> instancesIterable = new Iterable<PackWriter>() {
-		@Override
 		public Iterator<PackWriter> iterator() {
 			return new Iterator<PackWriter>() {
 				private final Iterator<WeakReference<PackWriter>> it =
 						instances.keySet().iterator();
 				private PackWriter next;
 
-				@Override
 				public boolean hasNext() {
 					if (next != null)
 						return true;
@@ -191,7 +189,6 @@ public class PackWriter implements AutoCloseable {
 					return false;
 				}
 
-				@Override
 				public PackWriter next() {
 					if (hasNext()) {
 						PackWriter result = next;
@@ -201,7 +198,6 @@ public class PackWriter implements AutoCloseable {
 					throw new NoSuchElementException();
 				}
 
-				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}
@@ -373,6 +369,7 @@ public class PackWriter implements AutoCloseable {
 	 *            the callback to set
 	 *
 	 * @return this object for chaining.
+	 * @since 4.1
 	 */
 	public PackWriter setObjectCountCallback(ObjectCountCallback callback) {
 		this.callback = callback;
@@ -384,6 +381,7 @@ public class PackWriter implements AutoCloseable {
 	 *
 	 * @param clientShallowCommits
 	 *            the shallow commits in the client
+	 * @since 4.1
 	 */
 	public void setClientShallowCommits(Set<ObjectId> clientShallowCommits) {
 		stats.clientShallowCommits = Collections
@@ -744,20 +742,21 @@ public class PackWriter implements AutoCloseable {
 	 *            Must not be {@code null}.
 	 * @throws IOException
 	 *            an I/O problem occured while reading objects.
+	 *
+	 * @since 4.5
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
 			@NonNull Set<? extends ObjectId> want,
 			@NonNull Set<? extends ObjectId> have,
 			@NonNull Set<? extends ObjectId> shallow) throws IOException {
-		try (ObjectWalk ow = getObjectWalk()) {
-			ow.assumeShallow(shallow);
-			preparePack(countingMonitor, ow, want, have);
+		ObjectWalk ow;
+		if (shallowPack) {
+			ow = new DepthWalk.ObjectWalk(reader, depth - 1);
+		} else {
+			ow = new ObjectWalk(reader);
 		}
-	}
-
-	private ObjectWalk getObjectWalk() {
-		return shallowPack ? new DepthWalk.ObjectWalk(reader, depth - 1)
-				: new ObjectWalk(reader);
+		ow.assumeShallow(shallow);
+		preparePack(countingMonitor, ow, want, have);
 	}
 
 	/**
@@ -1090,6 +1089,8 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * Release all resources used by this writer.
+	 *
+	 * @since 4.0
 	 */
 	@Override
 	public void close() {
@@ -1258,7 +1259,6 @@ public class PackWriter implements AutoCloseable {
 		// bigger ones, because source files grow and hardly ever shrink.
 		//
 		Arrays.sort(list, 0, cnt, new Comparator<ObjectToPack>() {
-			@Override
 			public int compare(ObjectToPack a, ObjectToPack b) {
 				int cmp = (a.isDoNotDelta() ? 1 : 0)
 						- (b.isDoNotDelta() ? 1 : 0);
@@ -1404,7 +1404,6 @@ public class PackWriter implements AutoCloseable {
 			// can schedule these for us.
 			for (final DeltaTask task : taskBlock.tasks) {
 				executor.execute(new Runnable() {
-					@Override
 					public void run() {
 						try {
 							task.call();
@@ -2259,6 +2258,8 @@ public class PackWriter implements AutoCloseable {
 		 * @return the count of objects that needed to be discovered through an
 		 *         object walk because they were not found in bitmap indices.
 		 *         Returns -1 if no bitmap indices were found.
+		 *
+		 * @since 4.0
 		 */
 		public long getBitmapIndexMisses() {
 			return statistics.getBitmapIndexMisses();

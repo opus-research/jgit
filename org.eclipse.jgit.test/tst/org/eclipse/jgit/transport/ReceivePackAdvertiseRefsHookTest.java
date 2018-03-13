@@ -128,6 +128,16 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		d.update(R_PRIVATE, P);
 	}
 
+	@Override
+	@After
+	public void tearDown() throws Exception {
+		if (src != null)
+			src.close();
+		if (dst != null)
+			dst.close();
+		super.tearDown();
+	}
+
 	@Test
 	public void testFilterHidesPrivate() throws Exception {
 		Map<String, Ref> refs;
@@ -546,7 +556,6 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	}
 
 	private static final class HidePrivateHook extends AbstractAdvertiseRefsHook {
-		@Override
 		public Map<String, Ref> getAdvertisedRefs(Repository r, RevWalk revWalk) {
 			Map<String, Ref> refs = new HashMap<String, Ref>(r.getAllRefs());
 			assertNotNull(refs.remove(R_PRIVATE));

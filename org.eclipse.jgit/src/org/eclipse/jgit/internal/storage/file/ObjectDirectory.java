@@ -125,8 +125,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final File packDirectory;
 
-	private final File preservedDirectory;
-
 	private final File alternatesFile;
 
 	private final AtomicReference<PackList> packList;
@@ -167,7 +165,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		objects = dir;
 		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
 		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
-		preservedDirectory = new File(packDirectory, "preserved"); //$NON-NLS-1$
 		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
 		packList = new AtomicReference<PackList>(NO_PACKS);
 		unpackedObjectCache = new UnpackedObjectCache();
@@ -188,16 +185,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 	/**
 	 * @return the location of the <code>objects</code> directory.
 	 */
-	@Override
 	public final File getDirectory() {
 		return objects;
-	}
-
-	/**
-	 * @return the location of the <code>preserved</code> directory.
-	 */
-	public final File getPreservedDirectory() {
-		return preservedDirectory;
 	}
 
 	@Override
@@ -261,7 +250,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	@Override
 	public PackFile openPack(final File pack)
 			throws IOException {
 		final String p = pack.getName();
@@ -446,7 +434,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return null;
 	}
 
-	@Override
 	ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
 			throws IOException {
 		File path = fileFor(id);
@@ -462,7 +449,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	@Override
 	long getObjectSize(WindowCursor curs, AnyObjectId id)
 			throws IOException {
 		if (unpackedObjectCache.isUnpacked(id)) {
@@ -581,7 +567,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				warnTmpl = JGitText.get().packWasDeleted;
 			}
 			removePack(p);
-		} else if (FileUtils.isStaleFileHandleInCausalChain(e)) {
+		} else if (FileUtils.isStaleFileHandle(e)) {
 			warnTmpl = JGitText.get().packHandleIsStale;
 			removePack(p);
 		}
@@ -683,7 +669,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 				&& old != scanPacks(old);
 	}
 
-	@Override
 	Config getConfig() {
 		return config;
 	}
@@ -705,14 +690,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			final BufferedReader reader = open(shallowFile);
 			try {
 				String line;
-				while ((line = reader.readLine()) != null) {
-					try {
-						shallowCommitsIds.add(ObjectId.fromString(line));
-					} catch (IllegalArgumentException ex) {
-						throw new IOException(MessageFormat
-								.format(JGitText.get().badShallowLine, line));
-					}
-				}
+				while ((line = reader.readLine()) != null)
+					shallowCommitsIds.add(ObjectId.fromString(line));
 			} finally {
 				reader.close();
 			}
@@ -954,7 +933,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *            identity of the loose object to map to the directory.
 	 * @return location of the object, if it were to exist as a loose object.
 	 */
-	@Override
 	public File fileFor(AnyObjectId objectId) {
 		String n = objectId.name();
 		String d = n.substring(0, 2);
@@ -995,7 +973,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 			repository = r;
 		}
 
-		@Override
 		void close() {
 			repository.close();
 		}

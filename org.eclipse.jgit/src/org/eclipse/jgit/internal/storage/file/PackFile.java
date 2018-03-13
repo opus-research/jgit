@@ -46,8 +46,8 @@
 package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
-import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.KEEP;
+import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 
 import java.io.EOFException;
 import java.io.File;
@@ -94,7 +94,6 @@ import org.eclipse.jgit.util.RawParseUtils;
 public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/** Sorts PackFiles to be most recently created to least recently created. */
 	public static final Comparator<PackFile> SORT = new Comparator<PackFile>() {
-		@Override
 		public int compare(final PackFile a, final PackFile b) {
 			return b.packLastModified - a.packLastModified;
 		}
@@ -293,7 +292,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 *
 	 * @see PackIndex#iterator()
 	 */
-	@Override
 	public Iterator<PackIndex.MutableEntry> iterator() {
 		try {
 			return idx().iterator();

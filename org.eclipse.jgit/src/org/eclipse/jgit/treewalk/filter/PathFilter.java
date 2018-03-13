@@ -113,7 +113,6 @@ public class PathFilter extends TreeFilter {
 		return this;
 	}
 
-	@Override
 	@SuppressWarnings("nls")
 	public String toString() {
 		return "PATH(\"" + pathStr + "\")";

@@ -363,7 +363,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 		overflow.write(last.buffer, 0, last.count);
 	}
 
-	@Override
 	public void close() throws IOException {
 		if (overflow != null) {
 			try {
@@ -442,13 +441,11 @@ public abstract class TemporaryBuffer extends OutputStream {
 			this.directory = directory;
 		}
 
-		@Override
 		protected OutputStream overflow() throws IOException {
 			onDiskFile = File.createTempFile("jgit_", ".buf", directory); //$NON-NLS-1$ //$NON-NLS-2$
 			return new BufferedOutputStream(new FileOutputStream(onDiskFile));
 		}
 
-		@Override
 		public long length() {
 			if (onDiskFile == null) {
 				return super.length();
@@ -456,7 +453,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 			return onDiskFile.length();
 		}
 
-		@Override
 		public byte[] toByteArray() throws IOException {
 			if (onDiskFile == null) {
 				return super.toByteArray();
@@ -475,7 +471,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 			return out;
 		}
 
-		@Override
 		public void writeTo(final OutputStream os, ProgressMonitor pm)
 				throws IOException {
 			if (onDiskFile == null) {

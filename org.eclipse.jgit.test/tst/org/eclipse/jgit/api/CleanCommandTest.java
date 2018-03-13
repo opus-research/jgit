@@ -64,7 +64,6 @@ import org.junit.Test;
 public class CleanCommandTest extends RepositoryTestCase {
 	private Git git;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

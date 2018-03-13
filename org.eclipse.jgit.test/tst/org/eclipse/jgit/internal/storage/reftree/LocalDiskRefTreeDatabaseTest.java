@@ -77,7 +77,6 @@ public class LocalDiskRefTreeDatabaseTest extends LocalDiskRepositoryTestCase {
 	private RevCommit A;
 	private RevCommit B;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		FileRepository init = createWorkRepository();
