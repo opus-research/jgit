@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2010, 2012 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2008-2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +43,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.IOException;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.junit.JGitTestUtil;
 
-public class RmCommandTest extends RepositoryTestCase {
-
-	private Git git;
-
-	private static final String FILE = "test.txt";
-
+/** Test case which includes C Git generated pack files for testing. */
+public abstract class SampleDataRepositoryTestCase extends RepositoryTestCase {
 	@Override
-	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		git = new Git(db);
-		// commit something
-		writeTrashFile(FILE, "Hello world");
-		git.add().addFilepattern(FILE).call();
-		git.commit().setMessage("Initial commit").call();
-	}
 
-	@Test
-	public void testRemove() throws JGitInternalException,
-			IllegalStateException, IOException, GitAPIException {
-		assertEquals("[test.txt, mode:100644, content:Hello world]",
-				indexState(CONTENT));
-		RmCommand command = git.rm();
-		command.addFilepattern(FILE);
-		command.call();
-		assertEquals("", indexState(CONTENT));
-	}
+		final String[] packs = {
+				"pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f",
+				"pack-df2982f284bbabb6bdb59ee3fcc6eb0983e20371",
+				"pack-9fb5b411fe6dfa89cc2e6b89d2bd8e5de02b5745",
+				"pack-546ff360fe3488adb20860ce3436a2d6373d2796",
+				"pack-cbdeda40019ae0e6e789088ea0f51f164f489d14",
+				"pack-e6d07037cbcf13376308a0a995d1fa48f8f76aaa",
+				"pack-3280af9c07ee18a87705ef50b0cc4cd20266cf12"
+		};
+		final File packDir = new File(db.getObjectDatabase().getDirectory(), "pack");
+		for (String n : packs) {
+			copyFile(JGitTestUtil.getTestResourceFile(n + ".pack"), new File(packDir, n + ".pack"));
+			copyFile(JGitTestUtil.getTestResourceFile(n + ".idx"), new File(packDir, n + ".idx"));
+		}
 
-	@Test
-	public void testRemoveCached() throws Exception {
-		File newFile = writeTrashFile("new.txt", "new");
-		git.add().addFilepattern(newFile.getName()).call();
-		assertEquals("[new.txt, mode:100644][test.txt, mode:100644]",
-				indexState(0));
-
-		git.rm().setCached(true).addFilepattern(newFile.getName()).call();
-
-		assertEquals("[test.txt, mode:100644]", indexState(0));
-		assertTrue("File should not have been removed.", newFile.exists());
+		copyFile(JGitTestUtil.getTestResourceFile("packed-refs"), new File(db
+				.getDirectory(), "packed-refs"));
 	}
 }
