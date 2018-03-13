@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2009, JetBrains s.r.o.
- * Copyright (C) 2009, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,37 +40,67 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.merge;
 
-package org.eclipse.jgit.transport;
+import java.util.List;
 
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
 
 /**
- * The base class for transports that use HTTP as underlying protocol. This class
- * allows customizing HTTP connection settings.
+ * Formatter for constructing the commit message for a squashed commit.
+ * <p>
+ * The format should be the same as C Git does it, for compatibility.
  */
-public abstract class HttpTransport extends Transport {
-	/**
-	 * Create a new transport instance.
-	 *
-	 * @param local
-	 *            the repository this instance will fetch into, or push out of.
-	 *            This must be the repository passed to
-	 *            {@link #open(Repository, URIish)}.
-	 * @param uri
-	 *            the URI used to access the remote repository. This must be the
-	 *            URI passed to {@link #open(Repository, URIish)}.
-	 */
-	protected HttpTransport(Repository local, URIish uri) {
-		super(local, uri);
-	}
+public class SquashMessageFormatter {
+
+	private GitDateFormatter dateFormatter;
 
 	/**
-	 * Create a minimal HTTP transport instance not tied to a single repository.
-	 *
-	 * @param uri
+	 * Create a new squash message formatter.
 	 */
-	protected HttpTransport(URIish uri) {
-		super(uri);
+	public SquashMessageFormatter() {
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+	}
+	/**
+	 * Construct the squashed commit message.
+	 *
+	 * @param squashedCommits
+	 *            the squashed commits
+	 * @param target
+	 *            the target branch
+	 * @return squashed commit message
+	 */
+	public String format(List<RevCommit> squashedCommits, Ref target) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("Squashed commit of the following:\n");
+		for (RevCommit c : squashedCommits) {
+			sb.append("\ncommit ");
+			sb.append(c.getName());
+			sb.append("\n");
+			sb.append(toString(c.getAuthorIdent()));
+			sb.append("\n\t");
+			sb.append(c.getShortMessage());
+			sb.append("\n");
+		}
+		return sb.toString();
+	}
+
+	private String toString(PersonIdent author) {
+		final StringBuilder a = new StringBuilder();
+
+		a.append("Author: ");
+		a.append(author.getName());
+		a.append(" <");
+		a.append(author.getEmailAddress());
+		a.append(">\n");
+		a.append("Date:   ");
+		a.append(dateFormatter.formatDate(author));
+		a.append("\n");
+
+		return a.toString();
 	}
 }
