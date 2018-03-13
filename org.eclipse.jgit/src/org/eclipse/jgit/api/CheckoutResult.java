@@ -54,19 +54,18 @@ public class CheckoutResult {
 	/**
 	 * The {@link Status#OK} result;
 	 */
-	public static final CheckoutResult OK_RESULT = new CheckoutResult(
-			Status.OK, null);
+	public static CheckoutResult OK_RESULT = new CheckoutResult(Status.OK, null);
 
 	/**
 	 * The {@link Status#ERROR} result;
 	 */
-	public static final CheckoutResult ERROR_RESULT = new CheckoutResult(
+	public static CheckoutResult ERROR_RESULT = new CheckoutResult(
 			Status.ERROR, null);
 
 	/**
 	 * The {@link Status#NOT_TRIED} result;
 	 */
-	public static final CheckoutResult NOT_TRIED_RESULT = new CheckoutResult(
+	public static CheckoutResult NOT_TRIED_RESULT = new CheckoutResult(
 			Status.NOT_TRIED, null);
 
 	/**
