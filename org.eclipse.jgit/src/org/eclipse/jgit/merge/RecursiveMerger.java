@@ -196,22 +196,25 @@ public class RecursiveMerger extends ResolveMerger {
 				if (mergeTrees(
 						openTree(getBaseCommit(currentBase, nextBase,
 								callDepth + 1).getTree()),
-						currentBase.getTree(),
-						nextBase.getTree()))
+						currentBase.getTree(), nextBase.getTree(), true))
 					currentBase = createCommitForTree(resultTree, parents);
 				else
 					throw new NoMergeBaseException(
 							NoMergeBaseException.MergeBaseFailureReason.CONFLICTS_DURING_MERGE_BASE_CALCULATION,
 							MessageFormat.format(
-									JGitText.get().mergeRecursiveTooManyMergeBasesFor,
-									Integer.valueOf(MAX_BASES), a.name(),
-									b.name(),
-									Integer.valueOf(baseCommits.size())));
+									JGitText.get().mergeRecursiveConflictsWhenMergingCommonAncestors,
+									currentBase.getName(), nextBase.getName()));
 			}
 		} finally {
 			inCore = oldIncore;
 			dircache = oldDircache;
 			workingTreeIterator = oldWTreeIt;
+			toBeCheckedOut.clear();
+			toBeDeleted.clear();
+			modifiedFiles.clear();
+			unmergedPaths.clear();
+			mergeResults.clear();
+			failingPaths.clear();
 		}
 		return currentBase;
 	}
