@@ -236,19 +236,10 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			ProcessBuilder pb = new ProcessBuilder();
 			pb.command(args);
 
-			File gitDir = local.getGitDir();
-			if (gitDir != null) {
+			File directory = local.getDirectory();
+			if (directory != null)
 				pb.environment().put(Constants.GIT_DIR_KEY,
-						gitDir.getPath());
-			}
-
-			if (local.isGitCommonDir()) {
-				File gitCommonDir = local.getGitCommonDir();
-				if (gitCommonDir != null) {
-					pb.environment().put(Constants.GIT_COMMON_DIR_KEY,
-							gitCommonDir.getPath());
-				}
-			}
+						directory.getPath());
 
 			try {
 				return pb.start();

@@ -189,7 +189,7 @@ public class FileRepository extends Repository {
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
 		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
-				getGitCommonDir(), Constants.CONFIG),
+				getDirectory(), Constants.CONFIG),
 				getFS());
 
 		loadSystemConfig();
@@ -222,7 +222,7 @@ public class FileRepository extends Repository {
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
 				getFS(), //
-				new File(getGitCommonDir(), Constants.SHALLOW));
+				new File(getDirectory(), Constants.SHALLOW));
 
 		if (objectDatabase.exists()) {
 			if (repositoryFormatVersion > 1)
@@ -283,21 +283,21 @@ public class FileRepository extends Repository {
 		final FileBasedConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
 			throw new IllegalStateException(MessageFormat.format(
-					JGitText.get().repositoryAlreadyExists, getGitDir()));
+					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
-		FileUtils.mkdirs(getGitDir(), true);
+		FileUtils.mkdirs(getDirectory(), true);
 		HideDotFiles hideDotFiles = getConfig().getEnum(
 				ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
 				HideDotFiles.DOTGITONLY);
 		if (hideDotFiles != HideDotFiles.FALSE && !isBare()
-				&& getGitDir().getName().startsWith(".")) //$NON-NLS-1$
-			getFS().setHidden(getGitDir(), true);
+				&& getDirectory().getName().startsWith(".")) //$NON-NLS-1$
+			getFS().setHidden(getDirectory(), true);
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getGitDir(), "branches")); //$NON-NLS-1$
-		FileUtils.mkdir(new File(getGitDir(), "hooks")); //$NON-NLS-1$
+		FileUtils.mkdir(new File(getDirectory(), "branches")); //$NON-NLS-1$
+		FileUtils.mkdir(new File(getDirectory(), "hooks")); //$NON-NLS-1$
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -305,7 +305,7 @@ public class FileRepository extends Repository {
 
 		final boolean fileMode;
 		if (getFS().supportsExecute()) {
-			File tmp = File.createTempFile("try", "execute", getGitDir()); //$NON-NLS-1$ //$NON-NLS-2$
+			File tmp = File.createTempFile("try", "execute", getDirectory()); //$NON-NLS-1$ //$NON-NLS-2$
 
 			getFS().setExecute(tmp, true);
 			final boolean on = getFS().canExecute(tmp);
@@ -321,7 +321,7 @@ public class FileRepository extends Repository {
 
 		SymLinks symLinks = SymLinks.FALSE;
 		if (getFS().supportsSymlinks()) {
-			File tmp = new File(getGitDir(), "tmplink"); //$NON-NLS-1$
+			File tmp = new File(getDirectory(), "tmplink"); //$NON-NLS-1$
 			try {
 				getFS().createSymLink(tmp, "target"); //$NON-NLS-1$
 				symLinks = null;
@@ -349,7 +349,7 @@ public class FileRepository extends Repository {
 					ConfigConstants.CONFIG_KEY_PRECOMPOSEUNICODE, true);
 		if (!bare) {
 			File workTree = getWorkTree();
-			if (!getGitDir().getParentFile().equals(workTree)) {
+			if (!getDirectory().getParentFile().equals(workTree)) {
 				cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,
 						ConfigConstants.CONFIG_KEY_WORKTREE, getWorkTree()
 								.getAbsolutePath());
@@ -358,7 +358,7 @@ public class FileRepository extends Repository {
 				try {
 					if (dotGitLockFile.lock()) {
 						dotGitLockFile.write(Constants.encode(Constants.GITDIR
-								+ getGitDir().getAbsolutePath()));
+								+ getDirectory().getAbsolutePath()));
 						dotGitLockFile.commit();
 					}
 				} finally {

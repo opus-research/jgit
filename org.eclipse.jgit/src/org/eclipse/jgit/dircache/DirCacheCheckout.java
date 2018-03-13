@@ -1265,11 +1265,7 @@ public class DirCacheCheckout {
 					.runInShell(smudgeFilterCommand, new String[0]);
 			filterProcessBuilder.directory(repo.getWorkTree());
 			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-					repo.getGitDir().getAbsolutePath());
-			if (repo.isGitCommonDir()) {
-				filterProcessBuilder.environment().put(Constants.GIT_COMMON_DIR_KEY,
-						repo.getGitCommonDir().getAbsolutePath());
-			}
+					repo.getDirectory().getAbsolutePath());
 			ExecutionResult result;
 			int rc;
 			try {
