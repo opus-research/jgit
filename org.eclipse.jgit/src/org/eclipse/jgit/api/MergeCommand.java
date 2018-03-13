@@ -110,9 +110,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * @return the result of the merge
 	 */
 	public MergeResult call() throws NoHeadException,
-			ConcurrentRefUpdateException, InvalidMergeHeadsException,
-			WrongRepositoryStateException, NoMessageException,
-			CheckoutConflictException {
+			ConcurrentRefUpdateException, CheckoutConflictException,
+			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
 		checkCallable();
 
 		if (commits.size() != 1)
