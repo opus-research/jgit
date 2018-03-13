@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -57,7 +56,8 @@ import org.eclipse.jgit.revwalk.RevWalk;
 /**
  * A class used to execute a {@code Log} command. It has setters for all
  * supported options and arguments of this command and a {@link #call()} method
- * to finally execute the command.
+ * to finally execute the command. Each instance of this class should only be
+ * used for one invocation of the command (means: one call to {@link #call()})
  * <p>
  * This is currently a very basic implementation which takes only one starting
  * revision as option.
@@ -67,62 +67,47 @@ import org.eclipse.jgit.revwalk.RevWalk;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-log.html"
  *      >Git documentation about Log</a>
  */
-public class LogCommand implements Callable<Iterable<RevCommit>> {
-	private final Repository repo;
-
-	private ObjectId start;
-
+public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	private RevWalk walk;
 
+	private boolean startSpecified = false;
+
 	/**
-	 * @param git
+	 * @param repo
 	 */
-	protected LogCommand(Git git) {
-		repo = git.getRepository();
+	protected LogCommand(Repository repo) {
+		super(repo);
 		walk = new RevWalk(repo);
 	}
 
 	/**
-	 * Sets default values for not explicitly specified options. Then validates
-	 * that all required data has been provided.
+	 * Executes the {@code Log} command with all the options and parameters
+	 * collected by the setter methods (e.g. {@link #add(AnyObjectId)},
+	 * {@link #not(AnyObjectId)}, ..) of this class. Each instance of this class
+	 * should only be used for one invocation of the command. Don't call this
+	 * method twice on an instance.
 	 *
-	 * @throws IllegalArgumentException
-	 *             if an error situation is detected
-	 * @throws IOException
-	 *             for I/O error or unexpected object type.
+	 * @return an iteration over RevCommits
 	 */
-	private void processOptions() throws IllegalArgumentException, IOException {
-		if (start == null) {
-			start = repo.resolve(Constants.HEAD);
-			if (start == null)
-				throw new IllegalStateException("Cannot resolve "
-						+ Constants.HEAD);
+	public Iterable<RevCommit> call() throws NoHeadException,
+			JGitInternalException {
+		checkState();
+		if (!startSpecified) {
+			try {
+				ObjectId headId = repo.resolve(Constants.HEAD);
+				if (headId == null)
+					throw new NoHeadException(
+							"No HEAD exists and no explicit starting revision was specified");
+				add(headId);
+			} catch (IOException e) {
+				// all exceptions thrown by add() shouldn't occur and represent
+				// severe low-level exception which are therefore wrapped
+				throw new JGitInternalException(
+						"An exception occured while trying to add the Id of HEAD",
+						e);
+			}
 		}
-	}
-
-	/**
-	 * @return a list of RevCommits
-	 * @throws IllegalStateException
-	 *             The current HEAD could not be resolved
-	 * @throws MissingObjectException
-	 *             the commit supplied is not available from the object
-	 *             database. This usually indicates the supplied commit is
-	 *             invalid, but the reference was constructed during an earlier
-	 *             invocation to {@link RevWalk#lookupCommit(AnyObjectId)}.
-	 * @throws IncorrectObjectTypeException
-	 *             the object was not parsed yet and it was discovered during
-	 *             parsing that it is not actually a commit. This usually
-	 *             indicates the caller supplied a non-commit SHA-1 to
-	 *             {@link RevWalk#lookupCommit(AnyObjectId)}.
-	 * @throws IOException
-	 *             a pack file or loose object could not be read.
-	 */
-	public Iterable<RevCommit> call() throws IllegalStateException,
-			MissingObjectException, IncorrectObjectTypeException, IOException {
-		processOptions();
-
-		walk = new RevWalk(repo);
-		walk.markStart(walk.parseCommit(start));
+		setState(false);
 		return walk;
 	}
 
@@ -142,11 +127,16 @@ public class LogCommand implements Callable<Iterable<RevCommit>> {
 	 *             parsing that it is not actually a commit. This usually
 	 *             indicates the caller supplied a non-commit SHA-1 to
 	 *             {@link RevWalk#lookupCommit(AnyObjectId)}.
-	 * @throws IOException
-	 *             a pack file or loose object could not be read.
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped. Subclasses of
+	 *             {@link IOException} (e.g. {@link MissingObjectException}) are
+	 *             typically not wrapped here but thrown as original exception
 	 */
-	public LogCommand add(ObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
+	public LogCommand add(AnyObjectId start) throws MissingObjectException,
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(true, start);
 	}
 
@@ -165,16 +155,21 @@ public class LogCommand implements Callable<Iterable<RevCommit>> {
 	 *             parsing that it is not actually a commit. This usually
 	 *             indicates the caller supplied a non-commit SHA-1 to
 	 *             {@link RevWalk#lookupCommit(AnyObjectId)}.
-	 * @throws IOException
-	 *             a pack file or loose object could not be read.
-	 * */
-	public LogCommand not(ObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped. Subclasses of
+	 *             {@link IOException} (e.g. {@link MissingObjectException}) are
+	 *             typically not wrapped here but thrown as original exception
+	 */
+	public LogCommand not(AnyObjectId start) throws MissingObjectException,
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(false, start);
 	}
 
 	/**
-	 * Adds the range {@code p..q}
+	 * Adds the range {@code since..until}
 	 *
 	 * @param since
 	 * @param until
@@ -189,22 +184,39 @@ public class LogCommand implements Callable<Iterable<RevCommit>> {
 	 *             parsing that it is not actually a commit. This usually
 	 *             indicates the caller supplied a non-commit SHA-1 to
 	 *             {@link RevWalk#lookupCommit(AnyObjectId)}.
-	 * @throws IOException
-	 *             a pack file or loose object could not be read.
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped. Subclasses of
+	 *             {@link IOException} (e.g. {@link MissingObjectException}) are
+	 *             typically not wrapped here but thrown as original exception
 	 */
-	public LogCommand addRange(ObjectId since, ObjectId until)
+	public LogCommand addRange(AnyObjectId since, AnyObjectId until)
 			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException {
+			JGitInternalException {
 		return not(since).add(until);
 	}
 
-	private LogCommand add(boolean include, ObjectId start)
+	private LogCommand add(boolean include, AnyObjectId start)
 			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException {
-		if (include)
-			walk.markStart(walk.lookupCommit(start));
-		else
-			walk.markUninteresting(walk.lookupCommit(start));
-		return this;
+			JGitInternalException {
+		checkState();
+		try {
+			if (include) {
+				walk.markStart(walk.lookupCommit(start));
+				startSpecified = true;
+			} else
+				walk.markUninteresting(walk.lookupCommit(start));
+			return this;
+		} catch (MissingObjectException e) {
+			throw e;
+		} catch (IncorrectObjectTypeException e) {
+			throw e;
+		} catch (IOException e) {
+			throw new JGitInternalException(
+					"Exception occured during adding of " + start
+							+ " as option to a Log command", e);
+		}
 	}
 }

@@ -55,12 +55,12 @@ import org.eclipse.jgit.lib.Repository;
  * Example: this class offers a {@code commit()} method returning an instance of
  * the {@code CommitCommand} class. The {@code CommitCommand} class has setters
  * for all the arguments and options. The {@code CommitCommand} class also has a
- * {@code run} method to actually execute the commit. The following code show's
+ * {@code call} method to actually execute the commit. The following code show's
  * how to do a simple commit:
  *
  * <pre>
  * Git git = new Git(myRepo);
- * git.commit().setMessage(&quot;Fix393&quot;).setAuthor(developerIdent).run();
+ * git.commit().setMessage(&quot;Fix393&quot;).setAuthor(developerIdent).call();
  * </pre>
  *
  * All mandatory parameters for commands have to be specified in the methods of
@@ -84,9 +84,12 @@ public class Git {
 	 * will always interact with this git repository.
 	 *
 	 * @param repo
-	 *            the git repository this class is interacting with
+	 *            the git repository this class is interacting with.
+	 *            {@code null} is not allowed
 	 */
 	public Git(Repository repo) {
+		if (repo == null)
+			throw new NullPointerException();
 		this.repo = repo;
 	}
 
@@ -100,7 +103,7 @@ public class Git {
 	 *         and to finally execute the {@code Commit} command
 	 */
 	public CommitCommand commit() {
-		return new CommitCommand(this);
+		return new CommitCommand(repo);
 	}
 
 	/**
@@ -113,7 +116,7 @@ public class Git {
 	 *         to finally execute the {@code Log} command
 	 */
 	public LogCommand log() {
-		return new LogCommand(this);
+		return new LogCommand(repo);
 	}
 
 	/**

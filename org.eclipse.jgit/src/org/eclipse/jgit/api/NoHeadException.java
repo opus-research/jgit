@@ -35,31 +35,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.api.CommitCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.PersonIdent;
-import org.kohsuke.args4j.Option;
+/**
+ * Exception thrown when a command expected the {@code HEAD} reference to exist
+ * but couldn't find such a reference
+ */
+public class NoHeadException extends GitAPIException {
+	private static final long serialVersionUID = 1L;
 
-@Command(common = true, usage = "Record changes to the repository")
-class Commit extends TextBuiltin {
-	// I don't support setting the committer, because also the native git
-	// command doesn't allow this.
+	NoHeadException(String message, Throwable cause) {
+		super(message, cause);
+	}
 
-	@Option(name = "--author", metaVar="author", usage = "Override the author name used in the commit. You can use the standard A U Thor <author@example.com> format.")
-	String author;
-
-	@Option(name = "--message", aliases = { "-m" }, metaVar="msg", usage="Use the given <msg> as the commit message", required=true)
-	String message;
-
-	@Override
-	protected void run() throws Exception {
-		CommitCommand commitCmd=new Git(db).commit();
-		if (author!=null)
-			commitCmd.setAuthor(new PersonIdent(author));
-		if (message!=null)
-			commitCmd.setMessage(message);
-		commitCmd.call();
+	NoHeadException(String message) {
+		super(message);
 	}
 }

@@ -43,11 +43,8 @@
 package org.eclipse.jgit.api;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.concurrent.Callable;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
@@ -56,6 +53,7 @@ import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -69,103 +67,114 @@ import org.eclipse.jgit.revwalk.RevWalk;
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-commit.html"
  *      >Git documentation about Commit</a>
  */
-public class CommitCommand implements Callable<RevCommit> {
-	/**
-	 * Text for {@link IllegalStateException} when trying to commit without a
-	 * HEAD
-	 */
-	public static final String CANNOT_COMMIT_WITHOUT_A_HEAD = "Cannot commit without a HEAD";
-
-	/**
-	 * Message text of the exception telling that no commit message was
-	 * specified
-	 */
-	public static final String COMMIT_MESSAGE_NOT_SPECIFIED = "commit message not specified";
-
+public class CommitCommand extends GitCommand<RevCommit> {
 	private PersonIdent author;
 
 	private PersonIdent committer;
 
 	private String message;
 
-	private final Repository repo;
-
 	/**
-	 * @param git
+	 * @param repo
 	 */
-	protected CommitCommand(Git git) {
-		repo = git.getRepository();
+	protected CommitCommand(Repository repo) {
+		super(repo);
 	}
 
 	/**
 	 * Executes the {@code commit} command with all the options and parameters
-	 * collected by the setter methods of this class.
-	 * <p>
-	 * You may call run() multiple times on one instance of this class. If you
-	 * don't specify additional parameters or options between the two calls to
-	 * run() the commit will be executed with exactly the same parameters.
+	 * collected by the setter methods of this class. Each instance of this
+	 * class should only be used for one invocation of the command (means: one
+	 * call to {@link #call()})
 	 *
-	 * @return a {@link Commit} object representing the succesfull commit
-	 * @throws CorruptObjectException
+	 * @return a {@link Commit} object representing the successful commit
+	 * @throws NoHeadException
+	 *             when called on a git repo without a HEAD reference
+	 * @throws NoMessageException
+	 *             when called without specifying a commit message
 	 * @throws UnmergedPathException
-	 * @throws IOException
-	 * @throws IllegalArgumentException
-	 *             thrown if no commit message was specified. Exception text
-	 *             would be {@link CommitCommand#COMMIT_MESSAGE_NOT_SPECIFIED}
+	 *             when the current index contained unmerged pathes (conflicts)
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped. Subclasses of
+	 *             {@link IOException} (e.g. {@link UnmergedPathException}) are
+	 *             typically not wrapped here but thrown as original exception
 	 */
-	public RevCommit call() throws CorruptObjectException,
-			UnmergedPathException, IOException, IllegalArgumentException {
+	public RevCommit call() throws NoHeadException, NoMessageException,
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException {
+		checkState();
 		processOptions();
 
 		// determine the current HEAD and the commit it is referring to
-		Ref head = repo.getRef(Constants.HEAD);
-		if (head == null)
-			throw new IllegalStateException(CANNOT_COMMIT_WITHOUT_A_HEAD);
-		ObjectId parentID = repo.resolve(Constants.HEAD + "^{commit}");
-
-		// lock the index
-		DirCache index = DirCache.lock(repo);
+		Ref head;
+		ObjectId parentID;
 		try {
-			ObjectWriter repoWriter = new ObjectWriter(repo);
+			head = repo.getRef(Constants.HEAD);
+			if (head == null)
+				throw new NoHeadException(
+						"Commit on repo without HEAD currently not supported");
+			parentID = repo.resolve(Constants.HEAD + "^{commit}");
 
-			// Write the index as tree to the object database. This may fail for
-			// example when the index contains unmerged pathes (unresolved
-			// conflicts)
-			ObjectId indexTreeId = index.writeTree(repoWriter);
-			// Create a Commit object, populate it and write it
-			Commit commit = new Commit(repo);
-			Date currentDate = new Date();
-			PersonIdent currentCommitter = committer == null ? new PersonIdent(
-					repo)
-					: new PersonIdent(committer, currentDate);
-			commit.setCommitter(currentCommitter);
-			commit.setAuthor(author == null ? currentCommitter
-					: new PersonIdent(author, currentDate));
-			commit.setMessage(message);
-			if (parentID != null)
-				commit.setParentIds(new ObjectId[] { parentID });
-			commit.setTreeId(indexTreeId);
-			ObjectId commitId = repoWriter.writeCommit(commit);
-			commit.setCommitId(commitId);
+			// lock the index
+			DirCache index = DirCache.lock(repo);
+			try {
+				ObjectWriter repoWriter = new ObjectWriter(repo);
 
-			RevCommit revCommit = new RevWalk(repo).parseCommit(commitId);
-			RefUpdate ru = repo.updateRef(Constants.HEAD);
-			ru.setNewObjectId(commitId);
-			ru.setRefLogMessage("commit : " + revCommit.getShortMessage(),
-					false);
+				// Write the index as tree to the object database. This may fail
+				// for example when the index contains unmerged pathes
+				// (unresolved conflicts)
+				ObjectId indexTreeId = index.writeTree(repoWriter);
 
-			ru.setExpectedOldObjectId(parentID);
-			switch (ru.update()) {
-			case NEW:
-			case FAST_FORWARD:
-				return revCommit;
-			default:
-				throw new IllegalStateException("Updating the ref "
-						+ Constants.HEAD + " to " + commitId.toString()
-						+ " failed");
+				// Create a Commit object, populate it and write it
+				Commit commit = new Commit(repo);
+				commit.setCommitter(committer);
+				commit.setAuthor(author);
+				commit.setMessage(message);
+				if (parentID != null)
+					commit.setParentIds(new ObjectId[] { parentID });
+				commit.setTreeId(indexTreeId);
+				ObjectId commitId = repoWriter.writeCommit(commit);
+
+				RevCommit revCommit = new RevWalk(repo).parseCommit(commitId);
+				RefUpdate ru = repo.updateRef(Constants.HEAD);
+				ru.setNewObjectId(commitId);
+				ru.setRefLogMessage("commit : " + revCommit.getShortMessage(),
+						false);
+
+				ru.setExpectedOldObjectId(parentID);
+				Result rc = ru.update();
+				switch (rc) {
+				case NEW:
+				case FAST_FORWARD:
+					setState(false);
+					return revCommit;
+				case REJECTED:
+				case LOCK_FAILURE:
+					throw new ConcurrentRefUpdateException(
+							"Could lock HEAD during commit", ru.getRef(), rc);
+				default:
+					throw new JGitInternalException(
+							"Updating the ref "
+									+ Constants.HEAD
+									+ " to "
+									+ commitId.toString()
+									+ " failed. ReturnCode from RefUpdate.update() was "
+									+ rc);
+				}
+			} finally {
+				index.unlock();
 			}
-		} finally {
-			index.unlock();
+		} catch (UnmergedPathException e) {
+			// since UnmergedPathException is a subclass of IOException
+			// which should not be wrapped by a JGitInternalException we
+			// have to catch and re-throw it here
+			throw e;
+		} catch (IOException e) {
+			throw new JGitInternalException(
+					"Exception caught during execution of commit command", e);
 		}
 	}
 
@@ -173,14 +182,18 @@ public class CommitCommand implements Callable<RevCommit> {
 	 * Sets default values for not explicitly specified options. Then validates
 	 * that all required data has been provided.
 	 *
-	 * @throws IllegalArgumentException
+	 * @throws NoMessageException
 	 *             if the commit message has not been specified
 	 */
-	private void processOptions() throws IllegalArgumentException {
+	private void processOptions() throws NoMessageException {
 		if (message == null)
 			// as long as we don't suppport -C option we have to have
 			// an explicit message
-			throw new IllegalArgumentException(COMMIT_MESSAGE_NOT_SPECIFIED);
+			throw new NoMessageException("commit message not specified");
+		if (committer == null)
+			committer = new PersonIdent(repo);
+		if (author == null)
+			author = committer;
 	}
 
 	/**
@@ -189,6 +202,7 @@ public class CommitCommand implements Callable<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setMessage(String message) {
+		checkState();
 		this.message = message;
 		return this;
 	}
@@ -211,6 +225,7 @@ public class CommitCommand implements Callable<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setCommitter(PersonIdent committer) {
+		checkState();
 		this.committer = committer;
 		return this;
 	}
@@ -228,14 +243,15 @@ public class CommitCommand implements Callable<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setCommitter(String name, String email) {
-		this.committer = new PersonIdent(name, email);
-		return this;
+		checkState();
+		return setCommitter(new PersonIdent(name, email));
 	}
 
 	/**
-	 * @return the committer used for the {@code commit}. The timestamp in the
-	 *         returned value is not accurate, because the timestamp will be
-	 *         updated just before doing the {@code commit}
+	 * @return the committer used for the {@code commit}. If no committer was
+	 *         specified {@code null} is returned and the default
+	 *         {@link PersonIdent} of this repo is used during execution of the
+	 *         command
 	 */
 	public PersonIdent getCommitter() {
 		return committer;
@@ -251,6 +267,7 @@ public class CommitCommand implements Callable<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setAuthor(PersonIdent author) {
+		checkState();
 		this.author = author;
 		return this;
 	}
@@ -267,14 +284,15 @@ public class CommitCommand implements Callable<RevCommit> {
 	 * @return {@code this}
 	 */
 	public CommitCommand setAuthor(String name, String email) {
-		this.author = new PersonIdent(name, email);
-		return this;
+		checkState();
+		return setAuthor(new PersonIdent(name, email));
 	}
 
 	/**
-	 * @return the author used for the {@code commit}. The timestamp in the
-	 *         returned value is not accurate, because the timestamp will be
-	 *         updated just before doing the {@code commit}
+	 * @return the author used for the {@code commit}. If no author was
+	 *         specified {@code null} is returned and the default
+	 *         {@link PersonIdent} of this repo is used during execution of the
+	 *         command
 	 */
 	public PersonIdent getAuthor() {
 		return author;
