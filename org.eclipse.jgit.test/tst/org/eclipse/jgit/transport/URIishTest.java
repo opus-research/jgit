@@ -88,7 +88,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals(str, u.getRawPath());
 		assertEquals(str, u.getPath());
 		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
@@ -100,7 +99,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals(str, u.getRawPath());
 		assertEquals(str, u.getPath());
 		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
@@ -112,7 +110,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("D:\\m y", u.getRawPath());
 		assertEquals("D:\\m y", u.getPath());
 		assertEquals("D:\\m y", u.toString());
 		assertEquals(u, new URIish(str));
@@ -124,7 +121,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals(str, u.getRawPath());
 		assertEquals(str, u.getPath());
 		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
@@ -136,7 +132,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("\\\\some\\place", u.getRawPath());
 		assertEquals("\\\\some\\place", u.getPath());
 		assertEquals("\\\\some\\place", u.toString());
 		assertEquals(u, new URIish(str));
@@ -148,45 +143,8 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("file", u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("/home/m y", u.getRawPath());
 		assertEquals("/home/m y", u.getPath());
-		assertEquals("file:///home/m%20y", u.toString());
-		assertEquals(u, new URIish(str));
-	}
-
-	@Test
-	public void testURIEncode_00() throws Exception {
-		final String str = "file:///home/m%00y";
-		URIish u = new URIish(str);
-		assertEquals("file", u.getScheme());
-		assertFalse(u.isRemote());
-		assertEquals("/home/m%00y", u.getRawPath());
-		assertEquals("/home/m\u0000y", u.getPath());
-		assertEquals("file:///home/m%00y", u.toString());
-		assertEquals(u, new URIish(str));
-	}
-
-	@Test
-	public void testURIEncode_0a() throws Exception {
-		final String str = "file:///home/m%0ay";
-		URIish u = new URIish(str);
-		assertEquals("file", u.getScheme());
-		assertFalse(u.isRemote());
-		assertEquals("/home/m%0ay", u.getRawPath());
-		assertEquals("/home/m\ny", u.getPath());
-		assertEquals("file:///home/m%0ay", u.toString());
-		assertEquals(u, new URIish(str));
-	}
-
-	@Test
-	public void testURIEncode_unicode() throws Exception {
-		final String str = "file:///home/m%c3%a5y";
-		URIish u = new URIish(str);
-		assertEquals("file", u.getScheme());
-		assertFalse(u.isRemote());
-		assertEquals("/home/m%c3%a5y", u.getRawPath());
-		assertEquals("/home/m\u00e5y", u.getPath());
-		assertEquals("file:///home/m%c3%a5y", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -196,9 +154,8 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("file", u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("D:/m y", u.getRawPath());
 		assertEquals("D:/m y", u.getPath());
-		assertEquals("file:///D:/m%20y", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -209,9 +166,8 @@ public class URIishTest {
 		assertEquals("git", u.getScheme());
 		assertTrue(u.isRemote());
 		assertEquals("example.com", u.getHost());
-		assertEquals("/home/m y", u.getRawPath());
 		assertEquals("/home/m y", u.getPath());
-		assertEquals("git://example.com/home/m%20y", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -222,10 +178,9 @@ public class URIishTest {
 		assertEquals("git", u.getScheme());
 		assertTrue(u.isRemote());
 		assertEquals("example.com", u.getHost());
-		assertEquals("/home/m y", u.getRawPath());
 		assertEquals("/home/m y", u.getPath());
 		assertEquals(333, u.getPort());
-		assertEquals("git://example.com:333/home/m%20y", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -235,11 +190,10 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("git", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("D:/m y", u.getRawPath());
 		assertEquals("D:/m y", u.getPath());
 		assertEquals(338, u.getPort());
 		assertEquals("example.com", u.getHost());
-		assertEquals("git://example.com:338/D:/m%20y", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -249,22 +203,7 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("git", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("D:/m y", u.getRawPath());
 		assertEquals("D:/m y", u.getPath());
-		assertEquals("example.com", u.getHost());
-		assertEquals(-1, u.getPort());
-		assertEquals("git://example.com/D:/m%20y", u.toString());
-		assertEquals(u, new URIish(str));
-	}
-
-	@Test
-	public void testScpStyleNoURIDecoding() throws Exception {
-		final String str = "example.com:some/p%20ath";
-		URIish u = new URIish(str);
-		assertNull(u.getScheme());
-		assertTrue(u.isRemote());
-		assertEquals("some/p%20ath", u.getRawPath());
-		assertEquals("some/p%20ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
 		assertEquals(str, u.toString());
@@ -277,7 +216,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("some/p ath", u.getRawPath());
 		assertEquals("some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
@@ -291,7 +229,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
@@ -305,7 +242,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("some/p ath", u.getRawPath());
 		assertEquals("some/p ath", u.getPath());
 		assertEquals("user", u.getUser());
 		assertEquals("example.com", u.getHost());
@@ -320,11 +256,10 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("git+ssh", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
-		assertEquals("git+ssh://example.com/some/p%20ath", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -334,11 +269,10 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("ssh+git", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
-		assertEquals("ssh+git://example.com/some/p%20ath", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -348,11 +282,10 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("ssh", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
-		assertEquals("ssh://example.com/some/p%20ath", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -362,13 +295,12 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("ssh", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals("user", u.getUser());
 		assertNull(u.getPass());
 		assertEquals(33, u.getPort());
-		assertEquals("ssh://user@example.com:33/some/p%20ath", u.toString());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -378,14 +310,12 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("ssh", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals("user", u.getUser());
 		assertEquals("pass", u.getPass());
 		assertEquals(33, u.getPort());
-		assertEquals("ssh://user:pass@example.com:33/some/p%20ath",
-				u.toPrivateString());
+		assertEquals(str, u.toPrivateString());
 		assertEquals(u.setPass(null).toPrivateString(), u.toString());
 		assertEquals(u, new URIish(str));
 	}
@@ -396,51 +326,12 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("ssh", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
 		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals("DOMAIN\\user", u.getUser());
 		assertEquals("pass", u.getPass());
 		assertEquals(33, u.getPort());
-		assertEquals("ssh://DOMAIN\\user:pass@example.com:33/some/p%20ath",
-				u.toPrivateString());
-		assertEquals(u.setPass(null).toPrivateString(), u.toString());
-		assertEquals(u, new URIish(str));
-	}
-
-	@Test
-	public void testSshProtoWithEscapedADUserPassAndPort() throws Exception {
-		final String str = "ssh://DOMAIN%5cuser:pass@example.com:33/some/p ath";
-		URIish u = new URIish(str);
-		assertEquals("ssh", u.getScheme());
-		assertTrue(u.isRemote());
-		assertEquals("/some/p ath", u.getRawPath());
-		assertEquals("/some/p ath", u.getPath());
-		assertEquals("example.com", u.getHost());
-		assertEquals("DOMAIN\\user", u.getUser());
-		assertEquals("pass", u.getPass());
-		assertEquals(33, u.getPort());
-		assertEquals("ssh://DOMAIN\\user:pass@example.com:33/some/p%20ath",
-				u.toPrivateString());
-		assertEquals(u.setPass(null).toPrivateString(), u.toString());
-		assertEquals(u, new URIish(str));
-	}
-
-	@Test
-	public void testURIEncodeDecode() throws Exception {
-		final String str = "ssh://%3ax%25:%40%41x@example.com:33/some%c3%a5/p%20a th";
-		URIish u = new URIish(str);
-		assertEquals("ssh", u.getScheme());
-		assertTrue(u.isRemote());
-		assertEquals("/some%c3%a5/p%20a th", u.getRawPath());
-		assertEquals("/some\u00e5/p a th", u.getPath());
-		assertEquals("example.com", u.getHost());
-		assertEquals(":x%", u.getUser());
-		assertEquals("@Ax", u.getPass());
-		assertEquals(33, u.getPort());
-		assertEquals(
-				"ssh://%3ax%25:%40Ax@example.com:33/some%c3%a5/p%20a%20th",
-				u.toPrivateString());
+		assertEquals(str, u.toPrivateString());
 		assertEquals(u.setPass(null).toPrivateString(), u.toString());
 		assertEquals(u, new URIish(str));
 	}
@@ -451,13 +342,12 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("git", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("~some/p ath", u.getRawPath());
 		assertEquals("~some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertNull(u.getUser());
 		assertNull(u.getPass());
 		assertEquals(-1, u.getPort());
-		assertEquals("git://example.com/~some/p%20ath", u.toPrivateString());
+		assertEquals(str, u.toPrivateString());
 		assertEquals(u.setPass(null).toPrivateString(), u.toString());
 		assertEquals(u, new URIish(str));
 	}
@@ -469,7 +359,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("git", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("~some/p ath", u.getRawPath());
 		assertEquals("~some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertNull(u.getUser());
@@ -486,7 +375,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("/~some/p ath", u.getRawPath());
 		assertEquals("/~some/p ath", u.getPath());
 		assertNull(u.getHost());
 		assertNull(u.getUser());
@@ -649,7 +537,6 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertEquals("http", u.getScheme());
 		assertTrue(u.isRemote());
-		assertEquals("/some/path", u.getRawPath());
 		assertEquals("/some/path", u.getPath());
 		assertEquals("host.xy", u.getHost());
 		assertEquals(80, u.getPort());
@@ -669,27 +556,6 @@ public class URIishTest {
 		assertEquals(u, new URIish(str));
 	}
 
-	/**
-	 * Exemplify what happens with the special case of encoding '/' as %2F. Web
-	 * services in general parse path components before decoding the characters.
-	 *
-	 * @throws URISyntaxException
-	 */
-	@Test
-	public void testPathSeparator() throws URISyntaxException {
-		String str = "http://user:secret@host.xy:80/some%2Fpath";
-		URIish u = new URIish(str);
-		assertEquals("http", u.getScheme());
-		assertTrue(u.isRemote());
-		assertEquals("/some%2Fpath", u.getRawPath());
-		assertEquals("/some/path", u.getPath());
-		assertEquals("host.xy", u.getHost());
-		assertEquals(80, u.getPort());
-		assertEquals("user", u.getUser());
-		assertEquals("secret", u.getPass());
-		assertEquals(u, new URIish(str));
-	}
-
 	@Test
 	public void testFileProtocol() throws IllegalArgumentException,
 			URISyntaxException, IOException {
@@ -699,7 +565,6 @@ public class URIishTest {
 		assertFalse(u.isRemote());
 		assertNull(u.getHost());
 		assertNull(u.getPass());
-		assertEquals("/a/b.txt", u.getRawPath());
 		assertEquals("/a/b.txt", u.getPath());
 		assertEquals(-1, u.getPort());
 		assertNull(u.getUser());
@@ -721,7 +586,6 @@ public class URIishTest {
 		assertFalse(u.isRemote());
 		assertNull(u.getHost());
 		assertNull(u.getPass());
-		assertEquals("/a/b.txt", u.getRawPath());
 		assertEquals("/a/b.txt", u.getPath());
 		assertEquals(-1, u.getPort());
 		assertNull(u.getUser());
