@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014, André de Oliveira <andre.oliveira@liferay.com>
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,57 +40,27 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import java.io.IOException;
-import java.io.OutputStream;
+package org.eclipse.jgit.util;
+
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FS.FSFactory;
+import org.eclipse.jgit.util.SystemReader;
 
 /**
- * An output stream which is aware of newlines and can be asked to begin a new
- * line if not already in one.
+ * A factory for creating FS instances on Java7
  */
-class EolAwareOutputStream extends OutputStream {
-	private final OutputStream out;
-
-	private boolean bol = true;
-
-	/**
-	 * Initialize a new EOL aware stream.
-	 *
-	 * @param out
-	 *            stream to output all writes to.
-	 */
-	EolAwareOutputStream(OutputStream out) {
-		this.out = out;
-	}
-
-	/**
-	 * Begin a new line if not already in one.
-	 *
-	 * @exception IOException
-	 *                if an I/O error occurs.
-	 */
-	void beginln() throws IOException {
-		if (!bol)
-			write('\n');
-	}
-
-	/** @return true if a new line has just begun. */
-	boolean isBeginln() {
-		return bol;
-	}
-
+public class Java7FSFactory extends FSFactory {
 	@Override
-	public void write(int val) throws IOException {
-		out.write(val);
-		bol = (val == '\n');
-	}
-
-	@Override
-	public void write(byte[] buf, int pos, int cnt) throws IOException {
-		if (cnt > 0) {
-			out.write(buf, pos, cnt);
-			bol = (buf[pos + (cnt - 1)] == '\n');
-		}
+	public FS detect(Boolean cygwinUsed) {
+		if (SystemReader.getInstance().isWindows()) {
+			if (cygwinUsed == null)
+				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
+			if (cygwinUsed.booleanValue())
+				return new FS_Win32_Java7Cygwin();
+			else
+				return new FS_Win32_Java7();
+		} else
+			return new FS_POSIX_Java7();
 	}
 }

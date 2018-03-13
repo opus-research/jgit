@@ -102,9 +102,10 @@ public abstract class FS {
 					return new FS_Win32_Cygwin();
 				else
 					return new FS_Win32();
-			} else {
-				return new FS_POSIX();
-			}
+			} else if (FS_POSIX_Java6.hasExecute())
+				return new FS_POSIX_Java6();
+			else
+				return new FS_POSIX_Java5();
 		}
 	}
 
@@ -147,7 +148,22 @@ public abstract class FS {
 	 */
 	public static FS detect(Boolean cygwinUsed) {
 		if (factory == null) {
-			factory = new FS.FSFactory();
+			try {
+				Class<?> activatorClass = Class
+						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
+				// found Java7
+				factory = (FSFactory) activatorClass.newInstance();
+			} catch (ClassNotFoundException e) {
+				// Java7 module not found
+				// Silently ignore failure to find Java7 FS factory
+				factory = new FS.FSFactory();
+			} catch (UnsupportedClassVersionError e) {
+				factory = new FS.FSFactory();
+			} catch (InstantiationException e) {
+				factory = new FS.FSFactory();
+			} catch (IllegalAccessException e) {
+				factory = new FS.FSFactory();
+			}
 		}
 		return factory.detect(cygwinUsed);
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Ericsson
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,14 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.util;
+
+import java.io.File;
+
 
 /**
- * Thrown when a thread executing a diff is interrupted
+ * FS implementaton for Java5
  *
- * @see org.eclipse.jgit.diff.MyersDiff
- * @since 4.0
+ * @since 3.0
  */
-public class DiffInterruptedException extends RuntimeException {
-	private static final long serialVersionUID = 1L;
+public class FS_POSIX_Java5 extends FS_POSIX {
+	/**
+	 * Constructor
+	 */
+	public FS_POSIX_Java5() {
+		super();
+	}
+
+	/**
+	 * Constructor
+	 *
+	 * @param src
+	 *            instance whose attributes to copy
+	 */
+	public FS_POSIX_Java5(FS src) {
+		super(src);
+	}
+
+	@Override
+	public FS newInstance() {
+		return new FS_POSIX_Java5(this);
+	}
+
+	public boolean supportsExecute() {
+		return false;
+	}
+
+	public boolean canExecute(final File f) {
+		return false;
+	}
+
+	public boolean setExecute(final File f, final boolean canExec) {
+		return false;
+	}
+
+	@Override
+	public boolean retryFailedLockFileCommit() {
+		return false;
+	}
 }
