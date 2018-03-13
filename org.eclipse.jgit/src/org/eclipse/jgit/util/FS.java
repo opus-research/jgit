@@ -1051,10 +1051,10 @@ public abstract class FS {
 		pool.shutdown(); // Disable new tasks from being submitted
 		try {
 			// Wait a while for existing tasks to terminate
-			if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+			if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
 				pool.shutdownNow(); // Cancel currently executing tasks
 				// Wait a while for tasks to respond to being canceled
-				if (!pool.awaitTermination(5, TimeUnit.SECONDS))
+				if (!pool.awaitTermination(60, TimeUnit.SECONDS))
 					hasShutdown = false;
 			}
 		} catch (InterruptedException ie) {
@@ -1100,10 +1100,9 @@ public abstract class FS {
 		try {
 			int rc = runProcess(pb, stdout, stderr, in);
 			return new ExecutionResult(stdout, stderr, rc);
-		} catch (Exception e) {
+		} finally {
 			stdout.close();
 			stderr.close();
-			throw e;
 		}
 	}
 

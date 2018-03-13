@@ -413,7 +413,6 @@ public class IndexDiff {
 				treeWalk.addTree(new EmptyTreeIterator());
 			treeWalk.addTree(new DirCacheIterator(dirCache));
 			treeWalk.addTree(initialWorkingTreeIterator);
-			initialWorkingTreeIterator.setDirCacheIterator(treeWalk, 1);
 			Collection<TreeFilter> filters = new ArrayList<TreeFilter>(4);
 
 			if (monitor != null) {
