@@ -167,14 +167,14 @@ public class RepoProject implements Comparable<RepoProject> {
 	 *            a SHA-1 or branch name or tag name
 	 * @param remote
 	 *            name of the remote definition
-	 * @param groupsParam
+	 * @param groups
 	 *            comma separated group list
 	 */
 	public RepoProject(String name, String path, String revision,
-			String remote, String groupsParam) {
+			String remote, String groups) {
 		this(name, path, revision, remote, new HashSet<String>(), null);
-		if (groupsParam != null && groupsParam.length() > 0)
-			this.setGroups(groupsParam);
+		if (groups != null && groups.length() > 0)
+			this.setGroups(groups);
 	}
 
 	/**
@@ -191,14 +191,14 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Set the url of the sub repo.
 	 *
-	 * @param groupsParam
+	 * @param groups
 	 *            comma separated group list
 	 * @return this for chaining.
 	 * @since 4.4
 	 */
-	public RepoProject setGroups(String groupsParam) {
+	public RepoProject setGroups(String groups) {
 		this.groups.clear();
-		this.groups.addAll(Arrays.asList(groupsParam.split(","))); //$NON-NLS-1$
+		this.groups.addAll(Arrays.asList(groups.split(","))); //$NON-NLS-1$
 		return this;
 	}
 
