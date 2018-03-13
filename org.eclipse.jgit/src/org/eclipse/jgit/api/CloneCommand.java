@@ -139,9 +139,9 @@ public class CloneCommand implements Callable<Git> {
 		config.update(repo.getConfig());
 
 		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branch, ConfigConstants.CONFIG_KEY_REMOTE, remote);
+				branch, ConfigConstants.CONFIG_REMOTE_SECTION, remote);
 		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branch, ConfigConstants.CONFIG_KEY_MERGE, branch);
+				branch, ConfigConstants.CONFIG_KEY_MERGE, branch); //$NON-NLS-1$ //$NON-NLS-2$
 
 		repo.getConfig().save();
 
