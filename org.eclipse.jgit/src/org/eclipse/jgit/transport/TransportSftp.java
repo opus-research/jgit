@@ -456,7 +456,7 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 			}
 
 			throw new TransportException(
-					MessageFormat.format(JGitText.get().badRef, name, line)); // $NON-NLS-2$
+					MessageFormat.format(JGitText.get().badRef, name, line));
 		}
 
 		private Storage loose(final Ref r) {
