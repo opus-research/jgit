@@ -51,7 +51,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
-import org.eclipse.jgit.awtui.AwtSshSessionFactory;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
@@ -89,7 +88,6 @@ public class Main {
 		final Main me = new Main();
 		try {
 			AwtAuthenticator.install();
-			AwtSshSessionFactory.install();
 			configureHttpProxy();
 			me.execute(argv);
 		} catch (Die err) {
