@@ -163,6 +163,9 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private static final int APP_FLAGS = -1 & ~((1 << RESERVED_FLAGS) - 1);
 
+	/** Exists <b>ONLY</b> to support legacy Tag and Commit objects. */
+	final Repository repository;
+
 	final ObjectReader reader;
 
 	final MutableObjectId idBuffer;
@@ -200,7 +203,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            released by the caller.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo.newObjectReader());
+		this(repo, repo.newObjectReader());
 	}
 
 	/**
@@ -212,6 +215,11 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            required.
 	 */
 	public RevWalk(ObjectReader or) {
+		this(null, or);
+	}
+
+	private RevWalk(final Repository repo, final ObjectReader or) {
+		repository = repo;
 		reader = or;
 		idBuffer = new MutableObjectId();
 		objects = new ObjectIdOwnerMap<RevObject>();
