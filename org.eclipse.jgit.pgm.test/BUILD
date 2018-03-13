@@ -13,6 +13,7 @@ junit_tests(
     tags = ["pgm"],
     deps = [
         ":helpers",
+        "//lib:args4j",
         "//lib:commons-compress",
         "//lib:javaewah",
         "//lib:junit",
@@ -23,7 +24,6 @@ junit_tests(
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit:junit",
         "//org.eclipse.jgit.pgm:pgm",
-        "@args4j//jar",
     ],
 )
 
