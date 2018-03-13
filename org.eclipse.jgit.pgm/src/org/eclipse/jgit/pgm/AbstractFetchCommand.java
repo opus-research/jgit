@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
-
 import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -57,7 +55,7 @@ import org.eclipse.jgit.transport.TrackingRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 
 abstract class AbstractFetchCommand extends TextBuiltin {
-	@Option(name = "--verbose", aliases = { "-v" }, usage = "beMoreVerbose")
+	@Option(name = "--verbose", aliases = { "-v" }, usage = "be more verbose")
 	private boolean verbose;
 
 	protected void showFetchResult(final Transport tn, final FetchResult r) {
@@ -72,7 +70,9 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			final String dst = abbreviateRef(u.getLocalName(), true);
 
 			if (!shownURI) {
-				out.println(MessageFormat.format(CLIText.get().fromURI, tn.getURI()));
+				out.print("From ");
+				out.print(tn.getURI());
+				out.println();
 				shownURI = true;
 			}
 
@@ -95,14 +95,14 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			else if (0 <= cr)
 				s = cr;
 			else {
-				System.err.println(MessageFormat.format(CLIText.get().remoteMessage, pkt));
+				System.err.println("remote: " + pkt);
 				break;
 			}
 
 			if (pkt.charAt(s) == '\r')
-				System.err.print(MessageFormat.format(CLIText.get().remoteMessage, pkt.substring(0, s)) + "\r");
+				System.err.print("remote: " + pkt.substring(0, s) + "\r");
 			else
-				System.err.println(MessageFormat.format(CLIText.get().remoteMessage, pkt.substring(0, s)));
+				System.err.println("remote: " + pkt.substring(0, s));
 
 			pkt = pkt.substring(s + 1);
 		}

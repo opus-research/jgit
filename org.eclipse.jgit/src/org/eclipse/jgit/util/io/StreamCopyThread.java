@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Thread to copy from an input stream to an output stream. */
 public class StreamCopyThread extends Thread {
@@ -56,7 +57,7 @@ public class StreamCopyThread extends Thread {
 
 	private final OutputStream dst;
 
-	private volatile boolean doFlush;
+	private final AtomicInteger flushCounter = new AtomicInteger(0);
 
 	/**
 	 * Create a thread to copy data from an input stream to an output stream.
@@ -82,10 +83,8 @@ public class StreamCopyThread extends Thread {
 	 * the request.
 	 */
 	public void flush() {
-		if (!doFlush) {
-			doFlush = true;
-			interrupt();
-		}
+		flushCounter.incrementAndGet();
+		interrupt();
 	}
 
 	@Override
@@ -94,20 +93,32 @@ public class StreamCopyThread extends Thread {
 			final byte[] buf = new byte[BUFFER_SIZE];
 			for (;;) {
 				try {
-					if (doFlush) {
-						doFlush = false;
+					if (needFlush())
 						dst.flush();
-					}
 
 					final int n;
 					try {
 						n = src.read(buf);
 					} catch (InterruptedIOException wakey) {
-						continue;
+						if (flushCounter.get() > 0)
+							continue;
+						else
+							throw wakey;
 					}
 					if (n < 0)
 						break;
-					dst.write(buf, 0, n);
+
+					for (;;) {
+						try {
+							dst.write(buf, 0, n);
+						} catch (InterruptedIOException wakey) {
+							if (flushCounter.get() > 0)
+								continue;
+							else
+								throw wakey;
+						}
+						break;
+					}
 				} catch (IOException e) {
 					break;
 				}
@@ -124,5 +135,14 @@ public class StreamCopyThread extends Thread {
 				// Ignore IO errors on close
 			}
 		}
+	}
+
+	private boolean needFlush() {
+		int i = flushCounter.get();
+		if (i > 0) {
+			flushCounter.decrementAndGet();
+			return true;
+		}
+		return false;
 	}
 }

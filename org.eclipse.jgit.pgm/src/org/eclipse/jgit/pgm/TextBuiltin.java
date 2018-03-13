@@ -53,7 +53,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.util.ResourceBundle;
 
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.Option;
@@ -76,7 +75,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 public abstract class TextBuiltin {
 	private String commandName;
 
-	@Option(name = "--help", usage = "displayThisHelpText", aliases = { "-h" })
+	@Option(name = "--help", usage = "display this help text", aliases = { "-h" })
 	private boolean help;
 
 	/** Stream to output to, typically this is standard output. */
@@ -185,24 +184,14 @@ public abstract class TextBuiltin {
 		System.err.println(message);
 		System.err.print("jgit ");
 		System.err.print(commandName);
-		OutputStreamWriter writer = new OutputStreamWriter(System.err);
-		ResourceBundle resourceBundle = getResourceBundle();
-		clp.printSingleLineUsage(writer, resourceBundle);
+		clp.printSingleLineUsage(System.err);
 		System.err.println();
 
 		System.err.println();
-		clp.printUsage(writer, resourceBundle);
+		clp.printUsage(System.err);
 		System.err.println();
 
 		System.exit(1);
-	}
-
-	/**
-	 * @return the resource bundle that will used passed to args4j for purpose
-	 *         of string localization
-	 */
-	protected ResourceBundle getResourceBundle() {
-		return CLIText.get().resourceBundle();
 	}
 
 	/**
