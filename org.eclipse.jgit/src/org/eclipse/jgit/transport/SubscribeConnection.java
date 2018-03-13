@@ -63,7 +63,7 @@ public interface SubscribeConnection extends Connection {
 	 * @param subscriber
 	 * @throws IOException
 	 */
-	void doSubscribeAdvertisment(Subscriber subscriber) throws IOException;
+	void doSubscribeAdvertisement(Subscriber subscriber) throws IOException;
 
 	/**
 	 * Subscribe using this connection.

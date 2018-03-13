@@ -794,12 +794,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		@Override
-		public void doSubscribeAdvertisment(Subscriber subscriber)
+		public void doSubscribeAdvertisement(Subscriber subscriber)
 				throws IOException {
 			Service svc = new LongPollService(SVC_PUBLISH_SUBSCRIBE);
 			svc.setHandleAuth(true);
 			start(svc.getInputStream(), svc.getOutputStream());
-			super.doSubscribeAdvertisment(subscriber);
+			super.doSubscribeAdvertisement(subscriber);
 		}
 
 		@Override
