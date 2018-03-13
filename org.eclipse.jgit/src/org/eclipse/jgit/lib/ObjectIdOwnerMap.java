@@ -341,7 +341,7 @@ public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry>
 
 	/** Type of entry stored in the {@link ObjectIdOwnerMap}. */
 	public static abstract class Entry extends ObjectId {
-		transient Entry next;
+		Entry next;
 
 		/**
 		 * Initialize this entry with a specific ObjectId.
