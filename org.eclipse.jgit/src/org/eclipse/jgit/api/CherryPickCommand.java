@@ -82,8 +82,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about cherry-pick</a>
  */
 public class CherryPickCommand extends GitCommand<CherryPickResult> {
-	private String reflogPrefix = "cherry-pick:"; //$NON-NLS-1$
-
 	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
@@ -169,8 +167,9 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
-							.setReflogComment(reflogPrefix + " " //$NON-NLS-1$
-									+ srcCommit.getShortMessage())
+							.setReflogComment(
+									"cherry-pick: " //$NON-NLS-1$
+											+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
@@ -241,21 +240,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 */
 	public CherryPickCommand setOurCommitName(String ourCommitName) {
 		this.ourCommitName = ourCommitName;
-		return this;
-	}
-
-	/**
-	 * Set the prefix to use in the reflog.
-	 * <p>
-	 * This is primarily needed for implementing rebase in terms of
-	 * cherry-picking
-	 *
-	 * @param prefix
-	 *            including ":"
-	 * @return {@code this}
-	 */
-	public CherryPickCommand setReflogPrefix(final String prefix) {
-		this.reflogPrefix = prefix;
 		return this;
 	}
 
