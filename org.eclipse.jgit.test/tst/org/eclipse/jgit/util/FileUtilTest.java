@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +40,56 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+package org.eclipse.jgit.util;
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
+import java.io.File;
+import java.io.IOException;
+
+import junit.framework.TestCase;
+
+public class FileUtilTest extends TestCase {
+	public void testDeleteFile() throws IOException {
+		File f = new File("test");
+		assertTrue(f.createNewFile());
+		FileUtils.delete(f);
+		assertFalse(f.exists());
+
+		try {
+			FileUtils.delete(f);
+			fail("deletion of non-existing file must fail");
+		} catch (IOException e) {
+			// expected
 		}
-	};
 
-	private final boolean fileMode;
-
-	private final AutoCRLF autoCRLF;
-
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean("core", "filemode", true);
-		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
+		try {
+			FileUtils.delete(f, FileUtils.SKIP_MISSING);
+		} catch (IOException e) {
+			fail("deletion of non-existing file must not fail with option SKIP_MISSING");
+		}
 	}
 
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
-	}
+	public void testDeleteRecursive() throws IOException {
+		File f1 = new File("test/test/a");
+		f1.mkdirs();
+		f1.createNewFile();
+		File f2 = new File("test/test/b");
+		f2.createNewFile();
+		File d = new File("test");
+		FileUtils.delete(d, FileUtils.RECURSIVE);
+		assertFalse(d.exists());
 
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+		try {
+			FileUtils.delete(d, FileUtils.RECURSIVE);
+			fail("recursive deletion of non-existing directory must fail");
+		} catch (IOException e) {
+			// expected
+		}
+
+		try {
+			FileUtils.delete(d, FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
+		} catch (IOException e) {
+			fail("recursive deletion of non-existing directory must not fail with option SKIP_MISSING");
+		}
 	}
 }
