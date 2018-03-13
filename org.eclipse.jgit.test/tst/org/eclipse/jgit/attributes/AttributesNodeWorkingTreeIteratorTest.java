@@ -75,16 +75,13 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 	private static Attribute EOL_LF = new Attribute("eol", "lf");
 
-	private static Attribute EOL_CRLF = new Attribute("eol", "crlf");
-
-	private static Attribute CUSTOM_VALUE = new Attribute("custom", "value");
-
 	private static Attribute DELTA_UNSET = new Attribute("delta", State.UNSET);
 
 	private TreeWalk walk;
 
 	@Test
 	public void testRules() throws Exception {
+
 		File customAttributeFile = File.createTempFile("tmp_",
 				"customAttributeFile", null);
 		customAttributeFile.deleteOnExit();
@@ -108,21 +105,19 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		walk = beginWalk();
 
 		assertIteration(F, ".gitattributes");
-		assertIteration(F, "global.txt", asList(EOL_LF, CUSTOM_VALUE));
-		assertIteration(F, "readme.txt", asList(EOL_LF, CUSTOM_VALUE));
+		assertIteration(F, "global.txt", asList(EOL_LF));
+		assertIteration(F, "readme.txt", asList(EOL_LF));
 
 		assertIteration(D, "src");
 
 		assertIteration(D, "src/config");
 		assertIteration(F, "src/config/.gitattributes");
-		assertIteration(F, "src/config/readme.txt",
-				asList(DELTA_UNSET, EOL_LF, CUSTOM_VALUE));
-		assertIteration(F, "src/config/windows.file", asList(EOL_CRLF));
-		assertIteration(F, "src/config/windows.txt",
-				asList(DELTA_UNSET, EOL_CRLF, CUSTOM_VALUE));
+		assertIteration(F, "src/config/readme.txt", asList(DELTA_UNSET));
+		assertIteration(F, "src/config/windows.file", null);
+		assertIteration(F, "src/config/windows.txt", asList(DELTA_UNSET));
 
-		assertIteration(F, "windows.file", asList(EOL_CRLF));
-		assertIteration(F, "windows.txt", asList(EOL_CRLF, CUSTOM_VALUE));
+		assertIteration(F, "windows.file", null);
+		assertIteration(F, "windows.txt", asList(EOL_LF));
 
 		endWalk();
 	}
@@ -216,24 +211,38 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		WorkingTreeIterator itr = walk.getTree(0, WorkingTreeIterator.class);
 		assertNotNull("has tree", itr);
 
-		assertAttributes(pathName, nodeAttrs);
+		AttributesNode attributesNode = itr.getEntryAttributesNode();
+		assertAttributesNode(pathName, attributesNode, nodeAttrs);
 		if (D.equals(type))
 			walk.enterSubtree();
 
 	}
 
-	private void assertAttributes(String pathName, List<Attribute> nodeAttrs) {
-		Attributes entryAttributes = walk.getAttributes();
-		if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
-			for (Attribute attribute : nodeAttrs) {
-				assertThat(entryAttributes.getAll(), hasItem(attribute));
+	private void assertAttributesNode(String pathName,
+			AttributesNode attributesNode, List<Attribute> nodeAttrs)
+					throws IOException {
+		if (attributesNode == null)
+			assertTrue(nodeAttrs == null || nodeAttrs.isEmpty());
+		else {
+
+			Attributes entryAttributes = new Attributes();
+			new AttributesHandler(walk).mergeAttributes(attributesNode,
+					pathName, false,
+					entryAttributes);
+
+			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
+				for (Attribute attribute : nodeAttrs) {
+					assertThat(entryAttributes.getAll(),
+							hasItem(attribute));
+				}
+			} else {
+				assertTrue(
+						"The entry "
+								+ pathName
+								+ " should not have any attributes. Instead, the following attributes are applied to this file "
+								+ entryAttributes.toString(),
+						entryAttributes.isEmpty());
 			}
-		} else {
-			assertTrue(
-					"The entry " + pathName
-							+ " should not have any attributes. Instead, the following attributes are applied to this file "
-							+ entryAttributes.toString(),
-					entryAttributes.isEmpty());
 		}
 	}
 
