@@ -278,8 +278,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						sb.append(" ");
 						sb.append(step.commit.name());
 						sb.append(" ");
-						sb.append(RawParseUtils.decode(step.shortMessage)
-								.trim());
+						sb.append(new String(step.shortMessage,
+								Constants.CHARACTER_ENCODING).trim());
 						fw.write(sb.toString());
 						fw.newLine();
 					}
@@ -822,11 +822,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					ProgressMonitor.UNKNOWN);
 
 			DirCacheCheckout dco;
-			if (commitId == null)
-				throw new JGitInternalException(
-						JGitText.get().abortingRebaseFailedNoOrigHead);
-			ObjectId id = repo.resolve(commitId);
-			RevCommit commit = walk.parseCommit(id);
+			RevCommit commit = walk.parseCommit(repo.resolve(commitId));
 			if (result.getStatus().equals(Status.FAILED)) {
 				RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
 				dco = new DirCacheCheckout(repo, head.getTree(),
