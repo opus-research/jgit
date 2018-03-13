@@ -623,11 +623,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Caution: we are unsmudging just by setting the length of the
 			// in-memory entry object. It's the callers task to detect that we
 			// have modified the entry and to persist the modified index.
-			try {
-				entry.setLength((int) getEntryLength());
-			} catch (UnsupportedOperationException e) {
-				// ignore
-			}
+			entry.setLength((int) getEntryLength());
+
 			return false;
 		} else {
 			// Content differs: that's a real change!
