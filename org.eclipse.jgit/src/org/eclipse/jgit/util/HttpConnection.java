@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport.http;
+package org.eclipse.jgit.util;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,15 +56,12 @@ import java.util.Map;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.KeyManager;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 
 /**
  * The interface of connections used during HTTP communication. This interface
  * is that subset of the interface exposed by {@link HttpURLConnection} which is
  * used by JGit
- *
- * @since 3.3
  */
 public interface HttpConnection {
 	/**
@@ -261,8 +258,6 @@ public interface HttpConnection {
 	 *            that is used when making trust decisions, and for deciding
 	 *            whether credentials presented by a peer should be accepted.
 	 * @param random
-	 *            the source of randomness for this generator or null. See
-	 *            {@link SSLContext#init(KeyManager[], TrustManager[], SecureRandom)}
 	 * @throws NoSuchAlgorithmException
 	 * @throws KeyManagementException
 	 */

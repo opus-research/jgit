@@ -119,12 +119,8 @@ public class PlotCommitList<L extends PlotLane> extends
 		setupChildren(currCommit);
 
 		final int nChildren = currCommit.getChildCount();
-		if (nChildren == 0) {
-			currCommit.lane = nextFreeLane();
-			activeLanes.add(currCommit.lane);
-			closeLane(currCommit.lane);
+		if (nChildren == 0)
 			return;
-		}
 
 		if (nChildren == 1 && currCommit.children[0].getParentCount() < 2) {
 			// Only one child, child has only us as their parent.

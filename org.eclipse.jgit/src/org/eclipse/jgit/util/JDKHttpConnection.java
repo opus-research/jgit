@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport.http;
+package org.eclipse.jgit.util;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,8 +65,6 @@ import javax.net.ssl.TrustManager;
 /**
  * A {@link HttpConnection} which simply delegates every call to a
  * {@link HttpURLConnection}. This is the default implementation used by JGit
- *
- * @since 3.3
  */
 public class JDKHttpConnection implements HttpConnection {
 	HttpURLConnection wrappedUrlConnection;

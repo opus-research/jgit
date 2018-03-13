@@ -102,9 +102,11 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.transport.http.HttpConnection;
+import org.eclipse.jgit.util.HttpConnection;
+import org.eclipse.jgit.util.HttpConnectionFactory;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.JDKHttpConnectionFactory;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
@@ -128,6 +130,7 @@ import org.eclipse.jgit.util.io.UnionInputStream;
  */
 public class TransportHttp extends HttpTransport implements WalkTransport,
 		PackTransport {
+	private HttpConnectionFactory connFact = new JDKHttpConnectionFactory();
 
 	private static final String SVC_UPLOAD_PACK = "git-upload-pack"; //$NON-NLS-1$
 
@@ -502,19 +505,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		return httpOpen(METHOD_GET, u);
 	}
 
-	/**
-	 * Open an HTTP connection.
-	 * 
-	 * @param method
-	 * @param u
-	 * @return the connection
-	 * @throws IOException
-	 * @since 3.3
-	 */
-	protected HttpConnection httpOpen(String method, URL u)
-			throws IOException {
+	final HttpConnection httpOpen(String method, URL u) throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
-		HttpConnection conn = connectionFactory.create(u, proxy);
+		HttpConnection conn = connFact.create(u, proxy);
 
 		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			disableSslVerify(conn);
@@ -995,5 +988,23 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			// always accept
 			return true;
 		}
+	}
+
+	/**
+	 * @return the {@link HttpConnectionFactory} used when new connections are
+	 *         created
+	 */
+	public HttpConnectionFactory getConnectionFactory() {
+		return connFact;
+	}
+
+	/**
+	 * Set the {@link HttpConnectionFactory} to be used to create new
+	 * connections
+	 *
+	 * @param connFact
+	 */
+	public void setConnectionFactory(HttpConnectionFactory connFact) {
+		this.connFact = connFact;
 	}
 }

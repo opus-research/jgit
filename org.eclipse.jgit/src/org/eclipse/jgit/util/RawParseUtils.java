@@ -1058,7 +1058,7 @@ public final class RawParseUtils {
 	/**
 	 * Locate the end of a paragraph.
 	 * <p>
-	 * A paragraph is ended by two consecutive LF bytes or CRLF pairs
+	 * A paragraph is ended by two consecutive LF bytes.
 	 *
 	 * @param b
 	 *            buffer to scan.
@@ -1072,11 +1072,9 @@ public final class RawParseUtils {
 	public static final int endOfParagraph(final byte[] b, final int start) {
 		int ptr = start;
 		final int sz = b.length;
-		while (ptr < sz && (b[ptr] != '\n' && b[ptr] != '\r'))
+		while (ptr < sz && b[ptr] != '\n')
 			ptr = nextLF(b, ptr);
-		if (ptr > start && b[ptr - 1] == '\n')
-			ptr--;
-		if (ptr > start && b[ptr - 1] == '\r')
+		while (0 < ptr && start < ptr && b[ptr - 1] == '\n')
 			ptr--;
 		return ptr;
 	}
