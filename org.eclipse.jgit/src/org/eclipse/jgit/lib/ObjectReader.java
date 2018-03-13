@@ -50,7 +50,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
@@ -423,17 +422,6 @@ public abstract class ObjectReader implements AutoCloseable {
 	}
 
 	/**
-	 * @return the {@link ObjectInserter} from which this reader was created
-	 *         using {@code inserter.newReader()}, or null if this reader was not
-	 *         created from an inserter.
-	 * @since 4.4
-	 */
-	@Nullable
-	public ObjectInserter getCreatedFromInserter() {
-		return null;
-	}
-
-	/**
 	 * Release any resources used by this reader.
 	 * <p>
 	 * A reader that has been released can be used again, but may need to be
@@ -534,11 +522,6 @@ public abstract class ObjectReader implements AutoCloseable {
 		@Override
 		public BitmapIndex getBitmapIndex() throws IOException {
 			return delegate().getBitmapIndex();
-		}
-
-		@Override
-		public ObjectInserter getCreatedFromInserter() {
-			return delegate().getCreatedFromInserter();
 		}
 
 		@Override
