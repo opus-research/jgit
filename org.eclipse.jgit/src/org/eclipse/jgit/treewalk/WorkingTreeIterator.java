@@ -972,9 +972,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private static String readContentAsNormalizedString(DirCacheEntry entry,
-			ObjectReader reader) throws MissingObjectException, IOException {
-		ObjectLoader open = reader.open(entry.getObjectId());
+	private String readContentAsNormalizedString(DirCacheEntry entry)
+			throws MissingObjectException, IOException {
+		ObjectLoader open = repository.open(entry.getObjectId());
 		byte[] cachedBytes = open.getCachedBytes();
 		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
 	}
