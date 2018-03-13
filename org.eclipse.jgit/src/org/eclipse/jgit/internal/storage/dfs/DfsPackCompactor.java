@@ -179,8 +179,11 @@ public class DfsPackCompactor {
 	 */
 	public DfsPackCompactor exclude(DfsPackFile pack) throws IOException {
 		final PackIndex idx;
-		try (DfsReader ctx = (DfsReader) repo.newObjectReader()) {
+		DfsReader ctx = (DfsReader) repo.newObjectReader();
+		try {
 			idx = pack.getPackIndex(ctx);
+		} finally {
+			ctx.release();
 		}
 		return exclude(new PackWriter.ObjectIdSet() {
 			public boolean contains(AnyObjectId id) {
@@ -203,7 +206,8 @@ public class DfsPackCompactor {
 			pm = NullProgressMonitor.INSTANCE;
 
 		DfsObjDatabase objdb = repo.getObjectDatabase();
-		try (DfsReader ctx = (DfsReader) objdb.newReader()) {
+		DfsReader ctx = (DfsReader) objdb.newReader();
+		try {
 			PackConfig pc = new PackConfig(repo);
 			pc.setIndexVersion(2);
 			pc.setDeltaCompress(false);
@@ -232,7 +236,7 @@ public class DfsPackCompactor {
 					writeIndex(objdb, pack, pw);
 
 					PackWriter.Statistics stats = pw.getStatistics();
-					pw.close();
+					pw.release();
 					pw = null;
 
 					pack.setPackStats(stats);
@@ -246,10 +250,11 @@ public class DfsPackCompactor {
 				}
 			} finally {
 				if (pw != null)
-					pw.close();
+					pw.release();
 			}
 		} finally {
 			rw = null;
+			ctx.release();
 		}
 	}
 

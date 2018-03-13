@@ -183,7 +183,8 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	private Ref doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
-		try (RevWalk rw = new RevWalk(repository)) {
+		RevWalk rw = new RevWalk(repository);
+		try {
 			RevObject obj = rw.parseAny(leaf.getObjectId());
 			if (obj instanceof RevTag) {
 				return new ObjectIdRef.PeeledTag(
@@ -197,6 +198,8 @@ public abstract class DfsRefDatabase extends RefDatabase {
 						leaf.getName(),
 						leaf.getObjectId());
 			}
+		} finally {
+			rw.release();
 		}
 	}
 

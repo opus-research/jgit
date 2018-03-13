@@ -120,11 +120,11 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@After
 	public void tearDown() throws Exception {
 		if (writer != null) {
-			writer.close();
+			writer.release();
 			writer = null;
 		}
 		if (inserter != null) {
-			inserter.close();
+			inserter.release();
 			inserter = null;
 		}
 		super.tearDown();
@@ -514,26 +514,26 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private static PackIndex writePack(FileRepository repo,
 			Set<? extends ObjectId> want, Set<ObjectIdSet> excludeObjects)
 			throws IOException {
-		try (PackWriter pw = new PackWriter(repo)) {
-			pw.setDeltaBaseAsOffset(true);
-			pw.setReuseDeltaCommits(false);
-			for (ObjectIdSet idx : excludeObjects)
-				pw.excludeObjects(idx);
-			pw.preparePack(NullProgressMonitor.INSTANCE, want,
-					Collections.<ObjectId> emptySet());
-			String id = pw.computeName().getName();
-			File packdir = new File(repo.getObjectsDirectory(), "pack");
-			File packFile = new File(packdir, "pack-" + id + ".pack");
-			FileOutputStream packOS = new FileOutputStream(packFile);
-			pw.writePack(NullProgressMonitor.INSTANCE,
-					NullProgressMonitor.INSTANCE, packOS);
-			packOS.close();
-			File idxFile = new File(packdir, "pack-" + id + ".idx");
-			FileOutputStream idxOS = new FileOutputStream(idxFile);
-			pw.writeIndex(idxOS);
-			idxOS.close();
-			return PackIndex.open(idxFile);
-		}
+		PackWriter pw = new PackWriter(repo);
+		pw.setDeltaBaseAsOffset(true);
+		pw.setReuseDeltaCommits(false);
+		for (ObjectIdSet idx : excludeObjects)
+			pw.excludeObjects(idx);
+		pw.preparePack(NullProgressMonitor.INSTANCE, want,
+				Collections.<ObjectId> emptySet());
+		String id = pw.computeName().getName();
+		File packdir = new File(repo.getObjectsDirectory(), "pack");
+		File packFile = new File(packdir, "pack-" + id + ".pack");
+		FileOutputStream packOS = new FileOutputStream(packFile);
+		pw.writePack(NullProgressMonitor.INSTANCE,
+				NullProgressMonitor.INSTANCE, packOS);
+		packOS.close();
+		File idxFile = new File(packdir, "pack-" + id + ".idx");
+		FileOutputStream idxOS = new FileOutputStream(idxFile);
+		pw.writeIndex(idxOS);
+		idxOS.close();
+		pw.release();
+		return PackIndex.open(idxFile);
 	}
 
 	// TODO: testWritePackDeltasCycle()
@@ -639,7 +639,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		writer.setIgnoreMissingUninteresting(ignoreMissingUninteresting);
 		writer.preparePack(m, interestings, uninterestings);
 		writer.writePack(m, m, os);
-		writer.close();
+		writer.release();
 		verifyOpenPack(thin);
 	}
 
@@ -650,7 +650,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		writer.preparePack(objectSource.iterator());
 		assertEquals(objectSource.size(), writer.getObjectCount());
 		writer.writePack(m, m, os);
-		writer.close();
+		writer.release();
 		verifyOpenPack(false);
 	}
 
