@@ -92,6 +92,9 @@ class WriteReftable extends TextBuiltin {
 	@Option(name = "--reflog-in")
 	private String reflogIn;
 
+	@Option(name = "--no-index-objects")
+	private boolean noIndexObjects;
+
 	@Argument(index = 0)
 	private String in;
 
@@ -107,6 +110,7 @@ class WriteReftable extends TextBuiltin {
 		ReftableWriter.Stats stats;
 		try (OutputStream os = new FileOutputStream(out)) {
 			ReftableConfig cfg = new ReftableConfig();
+			cfg.setIndexObjects(!noIndexObjects);
 			if (refBlockSize > 0) {
 				cfg.setRefBlockSize(refBlockSize);
 			}

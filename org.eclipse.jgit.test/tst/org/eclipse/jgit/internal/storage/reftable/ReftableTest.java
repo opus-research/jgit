@@ -138,7 +138,7 @@ public class ReftableTest {
 	@Test
 	public void estimateCurrentBytes() throws IOException {
 		Ref exp = ref(MASTER, 1);
-		int expBytes = 24 + 4 + 3 + MASTER.length() + 20 + 6 + 68;
+		int expBytes = 24 + 4 + 3 + MASTER.length() + 20 + 5 + 68;
 
 		byte[] table;
 		ReftableConfig cfg = new ReftableConfig();
@@ -159,7 +159,7 @@ public class ReftableTest {
 	public void oneIdRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 3 + MASTER.length() + 20 + 6 + 68, table.length);
+		assertEquals(24 + 4 + 3 + MASTER.length() + 20 + 5 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -188,7 +188,7 @@ public class ReftableTest {
 	public void oneTagRef() throws IOException {
 		Ref exp = tag(V1_0, 1, 2);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 2 + V1_0.length() + 40 + 6 + 68, table.length);
+		assertEquals(24 + 4 + 2 + V1_0.length() + 40 + 5 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -209,7 +209,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				24 + 4 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 6 + 68,
+				24 + 4 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 5 + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -236,7 +236,7 @@ public class ReftableTest {
 		byte[] table = buffer.toByteArray();
 
 		assertEquals(
-				24 + 4 + 2 + "MERGE_HEAD".length() + 1 + 82 + 6 + 68,
+				24 + 4 + 2 + "MERGE_HEAD".length() + 1 + 82 + 5 + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -260,7 +260,7 @@ public class ReftableTest {
 		byte[] table = buffer.toByteArray();
 
 		assertEquals(
-				24 + 4 + 2 + "SAVE".length() + 1 + "content".length() + 6 + 68,
+				24 + 4 + 2 + "SAVE".length() + 1 + "content".length() + 5 + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -280,43 +280,11 @@ public class ReftableTest {
 	}
 
 	@Test
-	public void resolveSymbolicRef() throws IOException {
-		Reftable t = read(write(
-				sym(HEAD, "refs/heads/tmp"),
-				sym("refs/heads/tmp", MASTER),
-				ref(MASTER, 1)));
-
-		Ref head = t.exactRef(HEAD);
-		assertNull(head.getObjectId());
-		assertEquals("refs/heads/tmp", head.getTarget().getName());
-
-		head = t.resolve(head);
-		assertNotNull(head);
-		assertEquals(id(1), head.getObjectId());
-	}
-
-	@Test
-	public void failChainOfSymbolicRef() throws IOException {
-		Reftable t = read(write(
-				sym(HEAD, "refs/heads/1"),
-				sym("refs/heads/1", "refs/heads/2"),
-				sym("refs/heads/2", "refs/heads/3"),
-				sym("refs/heads/3", "refs/heads/4"),
-				sym("refs/heads/4", "refs/heads/5"),
-				sym("refs/heads/5", MASTER),
-				ref(MASTER, 1)));
-
-		Ref head = t.exactRef(HEAD);
-		assertNull(head.getObjectId());
-		assertNull(t.resolve(head));
-	}
-
-	@Test
 	public void oneDeletedRef() throws IOException {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
 		byte[] table = write(exp);
-		assertEquals(24 + 4 + 2 + name.length() + 6 + 68, table.length);
+		assertEquals(24 + 4 + 2 + name.length() + 5 + 68, table.length);
 
 		ReftableReader t = read(table);
 		try (RefCursor rc = t.allRefs()) {
@@ -511,7 +479,7 @@ public class ReftableTest {
 		writer.finish();
 		byte[] table = buffer.toByteArray();
 		stats = writer.getStats();
-		assertEquals(169, table.length);
+		assertEquals(170, table.length);
 		assertEquals(0, stats.refCount());
 		assertEquals(0, stats.refBlockCount());
 		assertEquals(0, stats.refBytes());
