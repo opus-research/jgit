@@ -116,13 +116,13 @@ class Clone extends AbstractFetchCommand {
 		boolean msgs = quiet == null || !quiet.booleanValue();
 		if (msgs) {
 			command.setProgressMonitor(new TextProgressMonitor(errw));
-			outw.println(MessageFormat.format(
-					CLIText.get().cloningInto, localName));
+			outw.println(
+					MessageFormat.format(CLIText.get().cloningInto, localName));
 			outw.flush();
 		}
 		try {
 			db = command.call().getRepository();
-			if (msgs && db.resolve(Constants.HEAD) == null)
+			if (db.resolve(Constants.HEAD) == null && msgs)
 				outw.println(CLIText.get().clonedEmptyRepository);
 		} catch (InvalidRemoteException e) {
 			throw die(MessageFormat.format(CLIText.get().doesNotExist,
