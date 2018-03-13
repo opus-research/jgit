@@ -42,12 +42,8 @@
 
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.CoreConfig.EolStreamType.AUTO_CRLF;
-import static org.eclipse.jgit.lib.CoreConfig.EolStreamType.AUTO_LF;
-import static org.eclipse.jgit.lib.CoreConfig.EolStreamType.DIRECT;
-import static org.eclipse.jgit.lib.CoreConfig.EolStreamType.TEXT_CRLF;
-import static org.eclipse.jgit.lib.CoreConfig.EolStreamType.TEXT_LF;
 import static org.junit.Assert.assertArrayEquals;
+import static org.eclipse.jgit.lib.CoreConfig.EolStreamType.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

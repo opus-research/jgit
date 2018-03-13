@@ -46,7 +46,6 @@ package org.eclipse.jgit.junit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -104,6 +103,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Wrapper to make creating test data easier.
@@ -885,14 +885,14 @@ public class TestRepository<R extends Repository> {
 
 				pack = nameFor(odb, name, ".pack");
 				try (OutputStream out =
-						new BufferedOutputStream(new FileOutputStream(pack))) {
+						new SafeBufferedOutputStream(new FileOutputStream(pack))) {
 					pw.writePack(m, m, out);
 				}
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
 				try (OutputStream out =
-						new BufferedOutputStream(new FileOutputStream(idx))) {
+						new SafeBufferedOutputStream(new FileOutputStream(idx))) {
 					pw.writeIndex(out);
 				}
 				idx.setReadOnly();
