@@ -229,14 +229,20 @@ class SimilarityRenameDetector {
 		// later find the best matches.
 		//
 		int mNext = 0;
-		SRC: for (int srcIdx = 0; srcIdx < srcs.size(); srcIdx++) {
+		for (int srcIdx = 0; srcIdx < srcs.size(); srcIdx++) {
 			DiffEntry srcEnt = srcs.get(srcIdx);
 			if (!isFile(srcEnt.oldMode)) {
 				pm.update(dsts.size());
 				continue;
 			}
 
-			SimilarityIndex s = null;
+			SimilarityIndex s;
+			try {
+				s = hash(OLD, srcEnt);
+			} catch (TableFullException tableFull) {
+				tableOverflow = true;
+				continue;
+			}
 
 			for (int dstIdx = 0; dstIdx < dsts.size(); dstIdx++) {
 				DiffEntry dstEnt = dsts.get(dstIdx);
@@ -274,15 +280,6 @@ class SimilarityRenameDetector {
 					// Cannot possibly match, as the file sizes are so different
 					pm.update(1);
 					continue;
-				}
-
-				if (s == null) {
-					try {
-						s = hash(OLD, srcEnt);
-					} catch (TableFullException tableFull) {
-						tableOverflow = true;
-						continue SRC;
-					}
 				}
 
 				SimilarityIndex d;
