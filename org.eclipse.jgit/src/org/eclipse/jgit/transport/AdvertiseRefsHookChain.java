@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,19 +43,19 @@
 
 package org.eclipse.jgit.transport;
 
-import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.lib.ObjectId;
-
 /**
- * {@link PreUploadHook} that delegates to a list of other hooks.
+ * {@link AdvertiseRefsHook} that delegates to a list of other hooks.
  * <p>
- * Hooks are run in the order passed to the constructor. If running a method on
- * one hook throws an exception, execution of remaining hook methods is aborted.
+ * Hooks are run in the order passed to the constructor. A hook may inspect or
+ * modify the results of the previous hooks in the chain by calling
+ * {@link UploadPack#getAdvertisedRefs()}, or
+ * {@link ReceivePack#getAdvertisedRefs()} or
+ * {@link ReceivePack#getAdvertisedObjects()}.
  */
-public class PreUploadHookChain implements PreUploadHook {
-	private final PreUploadHook[] hooks;
+public class AdvertiseRefsHookChain implements AdvertiseRefsHook {
+	private final AdvertiseRefsHook[] hooks;
 	private final int count;
 
 	/**
@@ -65,50 +65,33 @@ public class PreUploadHookChain implements PreUploadHook {
 	 *            hooks to execute, in order.
 	 * @return a new hook chain of the given hooks.
 	 */
-	public static PreUploadHook newChain(List<? extends PreUploadHook> hooks) {
-		PreUploadHook[] newHooks = new PreUploadHook[hooks.size()];
+	public static AdvertiseRefsHook newChain(List<? extends AdvertiseRefsHook> hooks) {
+		AdvertiseRefsHook[] newHooks = new AdvertiseRefsHook[hooks.size()];
 		int i = 0;
-		for (PreUploadHook hook : hooks)
-			if (hook != PreUploadHook.NULL)
+		for (AdvertiseRefsHook hook : hooks)
+			if (hook != AdvertiseRefsHook.DEFAULT)
 				newHooks[i++] = hook;
 		if (i == 0)
-			return PreUploadHook.NULL;
+			return AdvertiseRefsHook.DEFAULT;
 		else if (i == 1)
 			return newHooks[0];
 		else
-			return new PreUploadHookChain(newHooks, i);
+			return new AdvertiseRefsHookChain(newHooks, i);
 	}
 
-	public void onPreAdvertiseRefs(UploadPack up)
+	public void advertiseRefs(ReceivePack rp)
 			throws ServiceMayNotContinueException {
 		for (int i = 0; i < count; i++)
-			hooks[i].onPreAdvertiseRefs(up);
+			hooks[i].advertiseRefs(rp);
 	}
 
-	public void onBeginNegotiateRound(UploadPack up,
-			Collection<? extends ObjectId> wants, int cntOffered)
+	public void advertiseRefs(UploadPack rp)
 			throws ServiceMayNotContinueException {
 		for (int i = 0; i < count; i++)
-			hooks[i].onBeginNegotiateRound(up, wants, cntOffered);
+			hooks[i].advertiseRefs(rp);
 	}
 
-	public void onEndNegotiateRound(UploadPack up,
-			Collection<? extends ObjectId> wants, int cntCommon,
-			int cntNotFound, boolean ready)
-			throws ServiceMayNotContinueException {
-		for (int i = 0; i < count; i++)
-			hooks[i].onEndNegotiateRound(up, wants, cntCommon, cntNotFound, ready);
-	}
-
-	public void onSendPack(UploadPack up,
-			Collection<? extends ObjectId> wants,
-			Collection<? extends ObjectId> haves)
-			throws ServiceMayNotContinueException {
-		for (int i = 0; i < count; i++)
-			hooks[i].onSendPack(up, wants, haves);
-	}
-
-	private PreUploadHookChain(PreUploadHook[] hooks, int count) {
+	private AdvertiseRefsHookChain(AdvertiseRefsHook[] hooks, int count) {
 		this.hooks = hooks;
 		this.count = count;
 	}
