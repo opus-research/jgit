@@ -496,17 +496,14 @@ public abstract class Repository {
 					if (!Character.isDigit(rev[l]))
 						break;
 				}
+				String distnum = new String(rev, i + 1, l - i - 1);
 				int dist;
-				if (l - i > 1) {
-					String distnum = new String(rev, i + 1, l - i - 1);
-					try {
-						dist = Integer.parseInt(distnum);
-					} catch (NumberFormatException e) {
-						throw new RevisionSyntaxException(
-								JGitText.get().invalidAncestryLength, revstr);
-					}
-				} else
-					dist = 1;
+				try {
+					dist = Integer.parseInt(distnum);
+				} catch (NumberFormatException e) {
+					throw new RevisionSyntaxException(
+							JGitText.get().invalidAncestryLength, revstr);
+				}
 				while (dist > 0) {
 					RevCommit commit = (RevCommit) ref;
 					if (commit.getParentCount() == 0) {
