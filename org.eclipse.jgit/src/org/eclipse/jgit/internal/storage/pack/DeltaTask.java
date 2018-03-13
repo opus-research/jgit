@@ -127,7 +127,6 @@ final class DeltaTask implements Callable<Object> {
 			for (int i = beginIndex; i < endIndex;) {
 				DeltaTask task = new DeltaTask(this);
 				long w = 0;
-				boolean doNotAttemptDelta = true;
 
 				// Assign the thread one top path.
 				if (topPathItr.hasNext()) {
@@ -136,11 +135,9 @@ final class DeltaTask implements Callable<Object> {
 					task.add(p.slice);
 				}
 
-				// Assign the task thread ~average weight, making sure there is
-				// at least one delta to attempt.
+				// Assign the task thread ~average weight.
 				int s = i;
-				while ((w < weightPerThread || doNotAttemptDelta)
-						&& i < endIndex) {
+				for (; w < weightPerThread && i < endIndex;) {
 					if (nextTop < topPaths.size()
 							&& i == topPaths.get(nextTop).slice.beginIndex) {
 						if (s < i) {
@@ -148,7 +145,6 @@ final class DeltaTask implements Callable<Object> {
 						}
 						s = i = topPaths.get(nextTop++).slice.endIndex;
 					} else {
-						doNotAttemptDelta &= list[i].doNotAttemptDelta();
 						w += list[i++].getWeight();
 					}
 				}
@@ -161,7 +157,7 @@ final class DeltaTask implements Callable<Object> {
 							i++;
 						} else {
 							break;
-					}
+						}
 					}
 					task.add(new Slice(s, i));
 				}
@@ -183,13 +179,12 @@ final class DeltaTask implements Callable<Object> {
 			ArrayList<WeightedPath> topPaths = new ArrayList<WeightedPath>(
 					threads);
 			int cp = beginIndex;
-			ObjectToPack o = list[cp];
-			int ch = o.getPathHash();
-			long cw = o.isEdge() || o.doNotAttemptDelta() ? 0 : o.getWeight();
-			totalWeight = cw;
+			int ch = list[cp].getPathHash();
+			long cw = list[cp].getWeight();
+			totalWeight = list[cp].getWeight();
 
 			for (int i = cp + 1; i < endIndex; i++) {
-				o = list[i];
+				ObjectToPack o = list[i];
 				if (ch != o.getPathHash()) {
 					if (MIN_TOP_PATH < cw) {
 						if (topPaths.size() < threads) {
