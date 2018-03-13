@@ -368,7 +368,6 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			git.stashApply().call();
 			fail("Exception not thrown");
 		} catch (StashApplyFailureException e) {
-			// expected
  		}
 		assertEquals("content3", read(PATH));
 	}
@@ -399,7 +398,6 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			git.stashApply().call();
 			fail("Expected conflict");
 		} catch (StashApplyFailureException e) {
-			// expected
 		}
 		Status status = new StatusCommand(db).call();
 		assertEquals(1, status.getConflicting().size());
@@ -448,7 +446,6 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 			git.stashApply().call();
 			fail("Exception not thrown");
 		} catch (StashApplyFailureException e) {
-			// expected
 		}
 		assertEquals("content2", read(PATH));
 	}
@@ -545,20 +542,5 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		} catch (InvalidRefNameException e) {
 			assertNotNull(e.getMessage());
 		}
-	}
-
-	@Test
-	public void testApplyStashWithDeletedFile() throws Exception {
-		File file = writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("x").call();
-		file.delete();
-		git.rm().addFilepattern("file").call();
-		git.stashCreate().call();
-		file.delete();
-
-		git.stashApply().setStashRef("stash@{0}").call();
-
-		assertFalse(file.exists());
 	}
 }

@@ -52,16 +52,14 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -85,7 +83,7 @@ class Clone extends AbstractFetchCommand {
 	@Argument(index = 1, metaVar = "metaVar_directory")
 	private String localName;
 
-	private Repository dst;
+	private FileRepository dst;
 
 	@Override
 	protected final boolean requiresRepository() {
@@ -108,9 +106,9 @@ class Clone extends AbstractFetchCommand {
 		if (gitdir == null)
 			gitdir = new File(localName, Constants.DOT_GIT).getAbsolutePath();
 
-		dst = new FileRepositoryBuilder().setGitDir(new File(gitdir)).build();
+		dst = new FileRepository(gitdir);
 		dst.create();
-		final StoredConfig dstcfg = dst.getConfig();
+		final FileBasedConfig dstcfg = dst.getConfig();
 		dstcfg.setBoolean("core", null, "bare", false); //$NON-NLS-1$ //$NON-NLS-2$
 		dstcfg.save();
 		db = dst;
@@ -136,7 +134,7 @@ class Clone extends AbstractFetchCommand {
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,
 			IOException {
-		final StoredConfig dstcfg = dst.getConfig();
+		final FileBasedConfig dstcfg = dst.getConfig();
 		final RemoteConfig rc = new RemoteConfig(dstcfg, remoteName);
 		rc.addURI(uri);
 		rc.addFetchRefSpec(new RefSpec().setForceUpdate(true)

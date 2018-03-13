@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2011, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,85 +41,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
-
-import java.io.File;
-import java.io.IOException;
+package org.eclipse.jgit.internal.storage.file;
 
 /**
- * FS for Java7 on Windows with Cygwin
+ * Parsed information about a checkout.
  */
-public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
+public class CheckoutEntry {
+	static final String CHECKOUT_MOVING_FROM = "checkout: moving from "; //$NON-NLS-1$
 
-	FS_Win32_Java7Cygwin(FS src) {
-		super(src);
+	private String from;
+
+	private String to;
+
+	CheckoutEntry(ReflogEntry reflogEntry) {
+		String comment = reflogEntry.getComment();
+		int p1 = CHECKOUT_MOVING_FROM.length();
+		int p2 = comment.indexOf(" to ", p1); //$NON-NLS-1$
+		int p3 = comment.length();
+		from = comment.substring(p1,p2);
+		to = comment.substring(p2 + " to ".length(), p3); //$NON-NLS-1$
 	}
 
-	FS_Win32_Java7Cygwin() {
+	/**
+	 * @return the name of the branch before checkout
+	 */
+	public String getFromBranch() {
+		return from;
 	}
 
-	@Override
-	public FS newInstance() {
-		return new FS_Win32_Java7Cygwin(this);
-	}
-
-	@Override
-	public boolean supportsSymlinks() {
-		return true;
-	}
-
-	@Override
-	public boolean isSymLink(File path) throws IOException {
-		return FileUtil.isSymlink(path);
-	}
-
-	@Override
-	public long lastModified(File path) throws IOException {
-		return FileUtil.lastModified(path);
-	}
-
-	@Override
-	public void setLastModified(File path, long time) throws IOException {
-		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public long length(File f) throws IOException {
-		return FileUtil.getLength(f);
-	}
-
-	@Override
-	public boolean exists(File path) {
-		return FileUtil.exists(path);
-	}
-
-	@Override
-	public boolean isDirectory(File path) {
-		return FileUtil.isDirectory(path);
-	}
-
-	@Override
-	public boolean isFile(File path) {
-		return FileUtil.isFile(path);
-	}
-
-	@Override
-	public boolean isHidden(File path) throws IOException {
-		return FileUtil.isHidden(path);
-	}
-
-	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtil.setHidden(path, hidden);
-	}
-
-	@Override
-	public String readSymLink(File path) throws IOException {
-		return FileUtil.readSymlink(path);
-	}
-
-	@Override
-	public void createSymLink(File path, String target) throws IOException {
-		FileUtil.createSymLink(path, target);
+	/**
+	 * @return the name of the branch after checkout
+	 */
+	public String getToBranch() {
+		return to;
 	}
 }

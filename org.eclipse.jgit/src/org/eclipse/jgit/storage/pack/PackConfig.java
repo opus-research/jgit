@@ -169,7 +169,6 @@ public class PackConfig {
 
 	private boolean buildBitmaps = DEFAULT_BUILD_BITMAPS;
 
-	private boolean cutDeltaChains;
 
 	/** Create a default configuration. */
 	public PackConfig() {
@@ -222,7 +221,6 @@ public class PackConfig {
 		this.executor = cfg.executor;
 		this.indexVersion = cfg.indexVersion;
 		this.buildBitmaps = cfg.buildBitmaps;
-		this.cutDeltaChains = cfg.cutDeltaChains;
 	}
 
 	/**
@@ -373,33 +371,6 @@ public class PackConfig {
 	 */
 	public void setMaxDeltaDepth(int maxDeltaDepth) {
 		this.maxDeltaDepth = maxDeltaDepth;
-	}
-
-	/**
-	 * @return true if existing delta chains should be cut at
-	 *         {@link #getMaxDeltaDepth()}. Default is false, allowing existing
-	 *         chains to be of any length.
-	 * @since 3.0
-	 */
-	public boolean getCutDeltaChains() {
-		return cutDeltaChains;
-	}
-
-	/**
-	 * Enable cutting existing delta chains at {@link #getMaxDeltaDepth()}.
-	 *
-	 * By default this is disabled and existing chains are kept at whatever
-	 * length a prior packer was configured to create. This allows objects to be
-	 * packed one with a large depth (for example 250), and later to quickly
-	 * repack the repository with a shorter depth (such as 50), but reusing the
-	 * complete delta chains created by the earlier 250 depth.
-	 *
-	 * @param cut
-	 *            true to cut existing chains.
-	 * @since 3.0
-	 */
-	public void setCutDeltaChains(boolean cut) {
-		cutDeltaChains = cut;
 	}
 
 	/**
@@ -715,8 +686,6 @@ public class PackConfig {
 		setReuseObjects(rc.getBoolean("pack", "reuseobjects", isReuseObjects())); //$NON-NLS-1$ //$NON-NLS-2$
 		setDeltaCompress(rc.getBoolean(
 				"pack", "deltacompression", isDeltaCompress())); //$NON-NLS-1$ //$NON-NLS-2$
-		setCutDeltaChains(rc.getBoolean(
-				"pack", "cutdeltachains", getCutDeltaChains())); //$NON-NLS-1$ //$NON-NLS-2$
 		setBuildBitmaps(rc.getBoolean("pack", "buildbitmaps", isBuildBitmaps())); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
