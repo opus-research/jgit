@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,48 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.errors.MissingObjectException;
 
 /**
- * An expected object is missing.
+ * Queue to examine object sizes asynchronously.
+ *
+ * A queue may perform background lookup of object sizes and supply them
+ * (possibly out-of-order) to the application.
+ *
+ * @param <T>
+ *            type of identifier supplied to the call that made the queue.
  */
-public class MissingObjectException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private final ObjectId missing;
+public interface AsyncObjectSizeQueue<T extends ObjectId> extends
+		AsyncOperation {
 
 	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
+	 * Position this queue onto the next available result.
 	 *
-	 * @param id SHA-1
-	 * @param type object type
+	 * @return true if there is a result available; false if the queue has
+	 *         finished its input iteration.
+	 * @throws MissingObjectException
+	 *             the object does not exist. If the implementation is retaining
+	 *             the application's objects {@link #getCurrent()} will be the
+	 *             current object that is missing. There may be more results
+	 *             still available, so the caller should continue invoking next
+	 *             to examine another result.
+	 * @throws IOException
+	 *             the object store cannot be accessed.
 	 */
-	public MissingObjectException(final ObjectId id, final String type) {
-		super(MessageFormat.format(JGitText.get().missingObject, type, id.name()));
-		missing = id.copy();
-	}
+	public boolean next() throws MissingObjectException, IOException;
 
 	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
-	 *
-	 * @param id SHA-1
-	 * @param type object type
+	 * @return the current object, null if the implementation lost track.
+	 *         Implementations may for performance reasons discard the caller's
+	 *         ObjectId and provider their own through {@link #getObjectId()}.
 	 */
-	public MissingObjectException(final ObjectId id, final int type) {
-		this(id, Constants.typeString(type));
-	}
+	public T getCurrent();
 
-	/** @return the ObjectId that was not found. */
-	public ObjectId getObjectId() {
-		return missing;
-	}
+	/** @return the ObjectId of the current object. Never null. */
+	public ObjectId getObjectId();
+
+	/** @return the size of the current object. */
+	public long getSize();
 }
