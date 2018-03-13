@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,64 +41,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.internal.storage.dfs;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.ResetCommand;
-import org.eclipse.jgit.api.ResetCommand.ResetType;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
+import org.eclipse.jgit.internal.storage.reftable.Reftable;
 
-@Command(common = true, usage = "usage_reset")
-class Reset extends TextBuiltin {
-
-	@Option(name = "--soft", usage = "usage_resetSoft")
-	private boolean soft = false;
-
-	@Option(name = "--mixed", usage = "usage_resetMixed")
-	private boolean mixed = false;
-
-	@Option(name = "--hard", usage = "usage_resetHard")
-	private boolean hard = false;
-
-	@Argument(required = false, index = 0, metaVar = "metaVar_commitish", usage = "usage_resetReference")
-	private String commit;
-
-	@Argument(required = false, index = 1, metaVar = "metaVar_paths")
-	@Option(name = "--", metaVar = "metaVar_paths", handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<>();
-
-	@Override
-	protected void run() throws Exception {
-		try (Git git = new Git(db)) {
-			ResetCommand command = git.reset();
-			command.setRef(commit);
-			if (paths.size() > 0) {
-				for (String path : paths)
-					command.addPath(path);
-			} else {
-				ResetType mode = null;
-				if (soft)
-					mode = selectMode(mode, ResetType.SOFT);
-				if (mixed)
-					mode = selectMode(mode, ResetType.MIXED);
-				if (hard)
-					mode = selectMode(mode, ResetType.HARD);
-				if (mode == null)
-					throw die("no reset mode set"); //$NON-NLS-1$
-				command.setMode(mode);
+/** Tracks multiple open {@link Reftable} instances. */
+public class ReftableStack implements AutoCloseable {
+	/**
+	 * Opens a stack of tables for reading.
+	 *
+	 * @param ctx
+	 *            context to read the tables with. This {@code ctx} will be
+	 *            retained by the stack and each of the table readers.
+	 * @param tables
+	 *            the tables to open.
+	 * @return stack reference to close the tables.
+	 * @throws IOException
+	 *             a table could not be opened
+	 */
+	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
+			throws IOException {
+		ReftableStack stack = new ReftableStack(tables.size());
+		boolean close = true;
+		try {
+			for (DfsReftable t : tables) {
+				stack.tables.add(t.open(ctx));
 			}
-			command.call();
+			close = false;
+			return stack;
+		} finally {
+			if (close) {
+				stack.close();
+			}
 		}
 	}
 
-	private static ResetType selectMode(ResetType mode, ResetType want) {
-		if (mode != null)
-			throw die("reset modes are mutually exclusive, select one"); //$NON-NLS-1$
-		return want;
+	private final List<Reftable> tables;
+
+	private ReftableStack(int tableCnt) {
+		this.tables = new ArrayList<>(tableCnt);
+	}
+
+	/**
+	 * @return unmodifiable list of tables, in the same order the files were
+	 *         passed to {@link #open(DfsReader, List)}.
+	 */
+	public List<Reftable> readers() {
+		return Collections.unmodifiableList(tables);
+	}
+
+	@Override
+	public void close() {
+		for (Reftable t : tables) {
+			try {
+				t.close();
+			} catch (IOException e) {
+				// Ignore close failures.
+			}
+		}
 	}
 }

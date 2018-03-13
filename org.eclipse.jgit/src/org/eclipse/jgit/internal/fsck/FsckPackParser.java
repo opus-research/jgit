@@ -49,7 +49,6 @@ import java.nio.channels.Channels;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.zip.CRC32;
 
@@ -65,6 +64,7 @@ import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectDatabase;
+import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
@@ -172,6 +172,7 @@ public class FsckPackParser extends PackParser {
 
 	@Override
 	protected void onPackFooter(byte[] hash) throws IOException {
+		// Do nothing.
 	}
 
 	@Override
@@ -183,6 +184,7 @@ public class FsckPackParser extends PackParser {
 
 	@Override
 	protected void onEndThinPack() throws IOException {
+		// Do nothing.
 	}
 
 	@Override
@@ -219,12 +221,12 @@ public class FsckPackParser extends PackParser {
 		if (bytes == null) {
 			return -1;
 		}
-		int offset = (int) (channelPosition - block * blockSize);
-		int bytesToCopy = Math.min(cnt, bytes.length - offset);
+		int offs = (int) (channelPosition - block * blockSize);
+		int bytesToCopy = Math.min(cnt, bytes.length - offs);
 		if (bytesToCopy < 1) {
 			return -1;
 		}
-		System.arraycopy(bytes, offset, dst, pos, bytesToCopy);
+		System.arraycopy(bytes, offs, dst, pos, bytesToCopy);
 		return bytesToCopy;
 	}
 
@@ -253,6 +255,7 @@ public class FsckPackParser extends PackParser {
 	@Override
 	protected void onStoreStream(byte[] raw, int pos, int len)
 			throws IOException {
+		// Do nothing.
 	}
 
 	/**
@@ -265,25 +268,26 @@ public class FsckPackParser extends PackParser {
 	/**
 	 * Verify the existing index file with all objects from the pack.
 	 *
-	 * @param entries
-	 *            all the entries that are expected in the index file
 	 * @param idx
 	 *            index file associate with the pack
 	 * @throws CorruptPackIndexException
 	 *             when the index file is corrupt.
 	 */
-	public void verifyIndex(List<PackedObjectInfo> entries, PackIndex idx)
+	public void verifyIndex(PackIndex idx)
 			throws CorruptPackIndexException {
-		Set<String> all = new HashSet<>();
-		for (PackedObjectInfo entry : entries) {
-			all.add(entry.getName());
-			long offset = idx.findOffset(entry);
-			if (offset == -1) {
+		ObjectIdOwnerMap<ObjFromPack> inPack = new ObjectIdOwnerMap<>();
+		for (int i = 0; i < getObjectCount(); i++) {
+			PackedObjectInfo entry = getObject(i);
+			inPack.add(new ObjFromPack(entry));
+
+			long offs = idx.findOffset(entry);
+			if (offs == -1) {
 				throw new CorruptPackIndexException(
 						MessageFormat.format(JGitText.get().missingObject,
-								entry.getType(), entry.getName()),
+								Integer.valueOf(entry.getType()),
+								entry.getName()),
 						ErrorType.MISSING_OBJ);
-			} else if (offset != entry.getOffset()) {
+			} else if (offs != entry.getOffset()) {
 				throw new CorruptPackIndexException(MessageFormat
 						.format(JGitText.get().mismatchOffset, entry.getName()),
 						ErrorType.MISMATCH_OFFSET);
@@ -305,7 +309,7 @@ public class FsckPackParser extends PackParser {
 		}
 
 		for (MutableEntry entry : idx) {
-			if (!all.contains(entry.name())) {
+			if (!inPack.contains(entry.toObjectId())) {
 				throw new CorruptPackIndexException(MessageFormat.format(
 						JGitText.get().unknownObjectInIndex, entry.name()),
 						ErrorType.UNKNOWN_OBJ);
@@ -317,10 +321,16 @@ public class FsckPackParser extends PackParser {
 	 * Set the object count for overwriting the expected object count from pack
 	 * header.
 	 *
-	 * @param expectedObjectCount
+	 * @param objectCount
 	 *            the actual expected object count.
 	 */
-	public void overwriteObjectCount(long expectedObjectCount) {
-		this.expectedObjectCount = expectedObjectCount;
+	public void overwriteObjectCount(long objectCount) {
+		this.expectedObjectCount = objectCount;
+	}
+
+	static class ObjFromPack extends ObjectIdOwnerMap.Entry {
+		ObjFromPack(AnyObjectId id) {
+			super(id);
+		}
 	}
 }
