@@ -187,10 +187,4 @@ public class RecordingLogger implements Logger {
 	public void ignore(Throwable arg0) {
 		// Ignore (not relevant to test failures)
 	}
-
-	@Override
-	public void debug(String msg, long value) {
-		// TODO Auto-generated method stub
-
-	}
 }
