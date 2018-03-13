@@ -129,8 +129,9 @@ public class ReftableTest {
 		int expBytes = 8 + 4 + 3 + MASTER.length() + 20 + 6 + 52;
 
 		byte[] table;
-		ReftableWriter writer = new ReftableWriter();
-		writer.setIndexObjects(false);
+		ReftableConfig cfg = new ReftableConfig();
+		cfg.setIndexObjects(false);
+		ReftableWriter writer = new ReftableWriter().setConfig(cfg);
 		try (ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
 			writer.begin(buf);
 			assertEquals(8 + 52, writer.estimateTotalBytes());
@@ -436,10 +437,12 @@ public class ReftableTest {
 	@SuppressWarnings("boxing")
 	@Test
 	public void logScan() throws IOException {
+		ReftableConfig cfg = new ReftableConfig();
+		cfg.setLogBlockSize(2048);
+
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		ReftableWriter writer = new ReftableWriter();
-		writer.setLogBlockSize(2048);
-		writer.begin(buffer);
+		writer.setConfig(cfg).begin(buffer);
 
 		List<Ref> refs = new ArrayList<>();
 		for (int i = 1; i <= 567; i++) {

@@ -103,6 +103,20 @@ public class ReftableReader extends Reftable {
 		this.src = src;
 	}
 
+	/**
+	 * @return the block size in bytes chosen for this file by the writer. Most
+	 *         reads from the {@link BlockSource} will be aligned to the block
+	 *         size.
+	 * @throws IOException
+	 *             file cannot be read.
+	 */
+	public int blockSize() throws IOException {
+		if (blockSize == 0) {
+			readFileHeader();
+		}
+		return blockSize;
+	}
+
 	@Override
 	public RefCursor allRefs() throws IOException {
 		if (blockSize == 0) {
