@@ -90,13 +90,12 @@ class Update extends RefUpdate {
 		batch = new Batch(refdb);
 		try (RevWalk rw = new RevWalk(getRepository())) {
 			batch.init(rw);
-		}
-
-		oldRef = batch.exactRef(getName());
-		if (oldRef != null && oldRef.getObjectId() != null) {
-			setOldObjectId(oldRef.getObjectId());
-		} else {
-			setOldObjectId(ObjectId.zeroId());
+			oldRef = batch.exactRef(rw.getObjectReader(), getName());
+			if (oldRef != null && oldRef.getObjectId() != null) {
+				setOldObjectId(oldRef.getObjectId());
+			} else {
+				setOldObjectId(ObjectId.zeroId());
+			}
 		}
 		return true;
 	}

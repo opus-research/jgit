@@ -45,27 +45,35 @@ package org.eclipse.jgit.internal.storage.reftree;
 
 import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN;
 import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN_COMMITTED;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.HIDDEN_REJECT;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.UNION;
+import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
+import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_NONFASTFORWARD;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
+import static org.eclipse.jgit.transport.ReceiveCommand.Type.UPDATE;
+import static org.eclipse.jgit.transport.ReceiveCommand.Type.UPDATE_NONFASTFORWARD;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
@@ -89,10 +97,34 @@ class Batch extends BatchRefUpdate {
 	public void execute(RevWalk rw, ProgressMonitor monitor)
 			throws IOException {
 		List<Command> forTree = new ArrayList<>(getCommands().size());
-		List<ReceiveCommand> forStore = new ArrayList<>();
+		List<ReceiveCommand> forBootstrap = new ArrayList<>();
+		BootstrapBehavior behavior = refdb.getBehavior();
 		for (ReceiveCommand c : getCommands()) {
-			if (c.getRefName().startsWith(R_TXN)) {
-				forStore.add(c);
+			if (c.getResult() != NOT_ATTEMPTED) {
+				reject(JGitText.get().transactionAborted);
+				return;
+			}
+
+			if (behavior == HIDDEN_REJECT && c.getRefName().startsWith(R_TXN)) {
+				c.setResult(REJECTED_OTHER_REASON, MessageFormat
+						.format(JGitText.get().invalidRefName, c.getRefName()));
+				reject(JGitText.get().transactionAborted);
+				return;
+			}
+
+			if (!isAllowNonFastForwards()) {
+				if (c.getType() == UPDATE) {
+					c.updateType(rw);
+				}
+				if (c.getType() == UPDATE_NONFASTFORWARD) {
+					c.setResult(REJECTED_NONFASTFORWARD);
+					reject(JGitText.get().transactionAborted);
+					return;
+				}
+			}
+
+			if (behavior == UNION && c.getRefName().startsWith(R_TXN)) {
+				forBootstrap.add(c);
 			} else {
 				forTree.add(new Command(rw, c));
 			}
@@ -106,13 +138,13 @@ class Batch extends BatchRefUpdate {
 				return;
 			} else if (nextId != null) {
 				commit = new ReceiveCommand(parentId, nextId, R_TXN_COMMITTED);
-				forStore.add(commit);
+				forBootstrap.add(commit);
 			}
 		}
 
-		if (!forStore.isEmpty()) {
+		if (!forBootstrap.isEmpty()) {
 			BatchRefUpdate u = newBootstrapBatch();
-			u.addCommand(forStore);
+			u.addCommand(forBootstrap);
 			u.execute(rw, monitor);
 			if (commit != null) {
 				if (commit.getResult() == OK) {
@@ -146,23 +178,23 @@ class Batch extends BatchRefUpdate {
 	}
 
 	void init(RevWalk rw) throws IOException {
-		src = refdb.exactRef(R_TXN_COMMITTED);
+		src = refdb.getBootstrap().exactRef(R_TXN_COMMITTED);
 		if (src != null && src.getObjectId() != null) {
 			RevCommit c = rw.parseCommit(src.getObjectId());
 			parentId = c;
 			parentTree = c.getTree();
-			tree = RefTree.readTree(rw.getObjectReader(), parentTree);
+			tree = RefTree.read(rw.getObjectReader(), c.getTree());
 		} else {
 			tree = RefTree.newEmptyTree();
 			parentId = ObjectId.zeroId();
 			parentTree = new ObjectInserter.Formatter()
-					.idFor(new TreeFormatter());
+					.idFor(OBJ_TREE, new byte[] {});
 		}
 	}
 
 	@Nullable
-	Ref exactRef(String name) throws IOException {
-		return tree.exactRef(name);
+	Ref exactRef(ObjectReader reader, String name) throws IOException {
+		return tree.exactRef(reader, name);
 	}
 
 	void execute(RevWalk rw, List<Command> todo) throws IOException {
@@ -205,7 +237,7 @@ class Batch extends BatchRefUpdate {
 	}
 
 	private void commit(RevWalk rw) throws IOException {
-		RefUpdate u = refdb.newUpdate(R_TXN_COMMITTED, false);
+		RefUpdate u = refdb.getBootstrap().newUpdate(R_TXN_COMMITTED, false);
 		u.setExpectedOldObjectId(parentId);
 		u.setNewObjectId(nextId);
 		u.setRefLogIdent(author);

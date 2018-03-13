@@ -43,10 +43,14 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.HIDDEN_REJECT;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.UNION;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -75,34 +79,69 @@ import org.eclipse.jgit.util.RefMap;
 public class RefTreeDb extends RefDatabase {
 	static final String R_TXN = "refs/txn/"; //$NON-NLS-1$
 	static final String R_TXN_COMMITTED = "refs/txn/committed"; //$NON-NLS-1$
-	static final int MAX_SYMREF_DEPTH = MAX_SYMBOLIC_REF_DEPTH;
+
+	/** How the RefTreeDb should handle the bootstrap layer. */
+	public enum BootstrapBehavior {
+		/** Union the bootstrap references into the same namespace. */
+		UNION,
+
+		/** Hide bootstrap references, but reject updates in namespace. */
+		HIDDEN_REJECT,
+
+		/** Hide the bootstrap references. */
+		HIDDEN;
+	}
 
 	private final Repository repo;
 	private final RefDatabase bootstrap;
+	private final BootstrapBehavior behavior;
 	private volatile Scanner.Result refs;
 
 	/**
 	 * Create a RefTreeDb for a repository.
 	 *
 	 * @param repo
+	 *            the repository using references in this database.
 	 * @param bootstrap
+	 *            bootstrap reference database storing the references that
+	 *            anchor the {@link RefTree}.
+	 * @param behavior
+	 *            how this database should expose the bootstrap references.
 	 */
-	public RefTreeDb(Repository repo, RefDatabase bootstrap) {
+	public RefTreeDb(Repository repo, RefDatabase bootstrap,
+			BootstrapBehavior behavior) {
 		this.repo = repo;
 		this.bootstrap = bootstrap;
+		this.behavior = behavior;
 	}
 
 	Repository getRepository() {
 		return repo;
 	}
 
-	RefDatabase getBootstrap() {
+	/** @return how the bootstrap layer is treated by this database. */
+	public BootstrapBehavior getBehavior() {
+		return behavior;
+	}
+
+	/** @return the bootstrap reference database. */
+	public RefDatabase getBootstrap() {
 		return bootstrap;
 	}
 
 	@Override
 	public void create() throws IOException {
 		bootstrap.create();
+	}
+
+	@Override
+	public boolean performsAtomicTransactions() {
+		return true;
+	}
+
+	@Override
+	public void refresh() {
+		bootstrap.refresh();
 	}
 
 	@Override
@@ -118,7 +157,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public Ref exactRef(String name) throws IOException {
-		if (name.startsWith(R_TXN)) {
+		if (behavior == UNION && name.startsWith(R_TXN)) {
 			return bootstrap.exactRef(name);
 		}
 
@@ -153,13 +192,16 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public Map<String, Ref> getRefs(String prefix) throws IOException {
-		if (prefix.startsWith(R_TXN)) {
+		if (behavior == UNION && prefix.startsWith(R_TXN)) {
 			return bootstrap.getRefs(prefix);
+		}
+		if (!prefix.isEmpty() && prefix.charAt(prefix.length() - 1) != '/') {
+			return new HashMap<>(0);
 		}
 
 		RefList<Ref> txn;
 		Ref src;
-		if (prefix.isEmpty()) {
+		if (behavior == UNION && prefix.isEmpty()) {
 			txn = listRefsTxn();
 			src = txn.get(R_TXN_COMMITTED);
 		} else {
@@ -194,7 +236,10 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public List<Ref> getAdditionalRefs() throws IOException {
-		return bootstrap.getAdditionalRefs();
+		if (behavior == UNION) {
+			return bootstrap.getAdditionalRefs();
+		}
+		return Collections.emptyList();
 	}
 
 	@Override
@@ -225,21 +270,11 @@ public class RefTreeDb extends RefDatabase {
 	}
 
 	@Override
-	public void refresh() {
-		bootstrap.refresh();
-	}
-
-	@Override
 	public boolean isNameConflicting(String name) throws IOException {
-		if (name.startsWith(R_TXN)) {
+		if (behavior == UNION && name.startsWith(R_TXN)) {
 			return bootstrap.isNameConflicting(name);
 		}
 		return !getConflictingNames(name).isEmpty();
-	}
-
-	@Override
-	public boolean performsAtomicTransactions() {
-		return true;
 	}
 
 	@Override
@@ -250,7 +285,11 @@ public class RefTreeDb extends RefDatabase {
 	@Override
 	public RefUpdate newUpdate(String name, boolean detach) throws IOException {
 		if (name.startsWith(R_TXN)) {
-			return bootstrap.newUpdate(name, detach);
+			if (behavior == UNION) {
+				return bootstrap.newUpdate(name, detach);
+			} else if (behavior == HIDDEN_REJECT) {
+				return new FailUpdate(this, name);
+			}
 		}
 
 		Ref r = exactRef(name);
@@ -273,7 +312,8 @@ public class RefTreeDb extends RefDatabase {
 	@Override
 	public RefRename newRename(String fromName, String toName)
 			throws IOException {
-		if (fromName.startsWith(R_TXN) && toName.startsWith(R_TXN)) {
+		if (behavior == UNION && fromName.startsWith(R_TXN)
+				&& toName.startsWith(R_TXN)) {
 			return bootstrap.newRename(fromName, toName);
 		}
 

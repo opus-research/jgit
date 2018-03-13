@@ -112,9 +112,9 @@ class RebuildRefTree extends TextBuiltin {
 
 	private RefTree rebuild(Map<String, Ref> refMap) {
 		RefTree tree = RefTree.newEmptyTree();
-		List<org.eclipse.jgit.internal.storage.reftree.Command> cmds;
+		List<org.eclipse.jgit.internal.storage.reftree.Command> cmds
+			= new ArrayList<>();
 
-		cmds = new ArrayList<>();
 		for (Ref r : refMap.values()) {
 			if (refName.equals(r.getName())) {
 				continue;

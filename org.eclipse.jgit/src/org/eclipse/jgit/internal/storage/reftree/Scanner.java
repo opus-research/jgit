@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.MAX_SYMREF_DEPTH;
+import static org.eclipse.jgit.lib.RefDatabase.MAX_SYMBOLIC_REF_DEPTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.R_REFS;
 import static org.eclipse.jgit.lib.Constants.encode;
@@ -106,8 +106,19 @@ class Scanner {
 		}
 
 		RefList<Ref> aList = all.toRefList();
-		for (int i = 0; i < sym.size(); i++) {
-			sym.set(i, resolve(sym.get(i), 0, aList));
+		for (int idx = 0; idx < sym.size();) {
+			Ref s = sym.get(idx);
+			Ref r = resolve(s, 0, aList);
+			if (r != null) {
+				sym.set(idx++, r);
+			} else {
+				// Remove broken symbolic reference, they don't exist.
+				sym.remove(idx);
+				int rm = aList.find(s.getName());
+				if (0 <= rm) {
+					aList = aList.remove(rm);
+				}
+			}
 		}
 		return new Result(srcId, aList, sym.toRefList());
 	}
@@ -154,7 +165,11 @@ class Scanner {
 			return new CanonicalTreeParser(BINARY_R_REFS, reader, root);
 		}
 
-		TreeWalk tw = TreeWalk.forPath(reader, prefix, root);
+		String dir = prefix;
+		if (dir.charAt(dir.length() - 1) == '/') {
+			dir = dir.substring(0, dir.length() - 1);
+		}
+		TreeWalk tw = TreeWalk.forPath(reader, RefTree.refPath(dir), root);
 		if (tw == null || !tw.isSubtree()) {
 			return null;
 		}
@@ -165,14 +180,22 @@ class Scanner {
 
 	private static Ref resolve(Ref ref, int depth, RefList<Ref> refs)
 			throws IOException {
-		if (ref != null && ref.isSymbolic() && depth < MAX_SYMREF_DEPTH) {
-			Ref r = refs.get(ref.getTarget().getName());
-			Ref dst = resolve(r, depth + 1, refs);
-			if (dst != null) {
-				return new SymbolicRef(ref.getName(), dst);
-			}
+		if (!ref.isSymbolic()) {
+			return ref;
+		} else if (MAX_SYMBOLIC_REF_DEPTH <= depth) {
+			return null;
 		}
-		return ref;
+
+		Ref r = refs.get(ref.getTarget().getName());
+		if (r == null) {
+			return ref;
+		}
+
+		Ref dst = resolve(r, depth + 1, refs);
+		if (dst == null) {
+			return null;
+		}
+		return new SymbolicRef(ref.getName(), dst);
 	}
 
 	@SuppressWarnings("resource")
