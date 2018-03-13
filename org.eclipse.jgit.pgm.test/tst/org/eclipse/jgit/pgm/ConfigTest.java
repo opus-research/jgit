@@ -42,15 +42,10 @@
  */
 package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import static org.junit.Assert.assertArrayEquals;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,22 +62,12 @@ public class ConfigTest extends CLIRepositoryTestCase {
 	public void testListConfig() throws Exception {
 		boolean isWindows = SystemReader.getInstance().getProperty("os.name")
 				.startsWith("Windows");
-		boolean isMac = SystemReader.getInstance().getProperty("os.name")
-				.equals("Mac OS X");
 
 		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<String>();
-		expect.add("core.filemode=" + !isWindows);
-		expect.add("core.logallrefupdates=true");
-		if (isMac)
-			expect.add("core.precomposeunicode=true");
-		expect.add("core.repositoryformatversion=0");
-		if (!FS.DETECTED.supportsSymlinks())
-			expect.add("core.symlinks=false");
-		expect.add(""); // ends with LF (last line empty)
-		assertEquals("expected default configuration",
-				Arrays.asList(expect.toArray()).toString(),
-				Arrays.asList(output).toString());
+		assertArrayEquals("expected default configuration", //
+				new String[] { "core.filemode=" + !isWindows, //
+						"core.logallrefupdates=true", //
+						"core.repositoryformatversion=0", //
+						"" /* ends with LF (last line empty) */}, output);
 	}
-
 }

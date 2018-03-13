@@ -216,7 +216,6 @@ public class IO {
 		if (last < 0)
 			return ByteBuffer.wrap(out, 0, pos);
 
-		@SuppressWarnings("resource" /* java 7 */)
 		TemporaryBuffer.Heap tmp = new TemporaryBuffer.Heap(Integer.MAX_VALUE);
 		tmp.write(out);
 		tmp.write(last);
@@ -317,7 +316,7 @@ public class IO {
 	 * @param fd
 	 *            the stream to skip bytes from.
 	 * @param toSkip
-	 *            total number of bytes to be discarded. Must be &gt;= 0.
+	 *            total number of bytes to be discarded. Must be >= 0.
 	 * @throws EOFException
 	 *             the stream ended before the requested number of bytes were
 	 *             skipped.

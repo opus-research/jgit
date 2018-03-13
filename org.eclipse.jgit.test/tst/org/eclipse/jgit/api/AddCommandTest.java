@@ -57,12 +57,12 @@ import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -631,11 +631,6 @@ public class AddCommandTest extends RepositoryTestCase {
 			public boolean canExecute(File f) {
 				return true;
 			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
 		};
 
 		Git git = Git.open(db.getDirectory(), executableFs);
@@ -676,11 +671,6 @@ public class AddCommandTest extends RepositoryTestCase {
 			public boolean canExecute(File f) {
 				return false;
 			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
 		};
 
 		config = db.getConfig();
@@ -697,7 +687,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
 	}
 
-	private static DirCacheEntry addEntryToBuilder(String path, File file,
+	private DirCacheEntry addEntryToBuilder(String path, File file,
 			ObjectInserter newObjectInserter, DirCacheBuilder builder, int stage)
 			throws IOException {
 		FileInputStream inputStream = new FileInputStream(file);

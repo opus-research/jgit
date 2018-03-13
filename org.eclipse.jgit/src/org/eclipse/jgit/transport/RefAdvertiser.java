@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_SYMREF;
-
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -148,27 +146,6 @@ public abstract class RefAdvertiser {
 	}
 
 	/**
-	 * Add a symbolic ref to capabilities.
-	 * <p>
-	 * This method must be invoked prior to any of the following:
-	 * <ul>
-	 * <li>{@link #send(Map)}
-	 * <li>{@link #advertiseHave(AnyObjectId)}
-	 * </ul>
-	 *
-	 * @param from
-	 *            The symbolic ref, e.g. "HEAD"
-	 * @param to
-	 *            The real ref it points to, e.g. "refs/heads/master"
-	 *
-	 * @since 3.6
-	 */
-	public void addSymref(String from, String to) {
-		String symref = String.format("%s=%s:%s", OPTION_SYMREF, from, to); //$NON-NLS-1$
-		advertiseCapability(symref);
-	}
-
-	/**
 	 * Format an advertisement for the supplied refs.
 	 *
 	 * @param refs
@@ -197,7 +174,7 @@ public abstract class RefAdvertiser {
 			}
 
 			if (ref.getPeeledObjectId() != null)
-				advertiseAny(ref.getPeeledObjectId(), ref.getName() + "^{}"); //$NON-NLS-1$
+				advertiseAny(ref.getPeeledObjectId(), ref.getName() + "^{}");
 		}
 		return sent;
 	}
@@ -224,7 +201,7 @@ public abstract class RefAdvertiser {
 	 *             advertisement record.
 	 */
 	public void advertiseHave(AnyObjectId id) throws IOException {
-		advertiseAnyOnce(id, ".have"); //$NON-NLS-1$
+		advertiseAnyOnce(id, ".have");
 	}
 
 	/** @return true if no advertisements have been sent yet. */

@@ -37,7 +37,8 @@
  */
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.Matchers.startsWith;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -48,13 +49,11 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.InvalidPathException;
 import org.eclipse.jgit.junit.MockSystemReader;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
-
 	protected ObjectId theHead;
 	protected ObjectId theMerge;
 
@@ -186,7 +185,10 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 
 	@Test
 	public void testMaliciousGitPathEndSpaceUnixOk() throws Exception {
-		testMaliciousPathBadFirstCheckout(".git ", "konfig");
+		if (File.separatorChar == '\\')
+			return; // cannot emulate Unix on Windows for this test
+		((MockSystemReader) SystemReader.getInstance()).setUnix();
+		testMaliciousPathGoodFirstCheckout(".git ", "konfig");
 	}
 
 	@Test
@@ -209,7 +211,10 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 
 	@Test
 	public void testMaliciousGitPathEndDotUnixOk() throws Exception {
-		testMaliciousPathBadFirstCheckout(".git.", "konfig");
+		if (File.separatorChar == '\\')
+			return; // cannot emulate Unix on Windows for this test
+		((MockSystemReader) SystemReader.getInstance()).setUnix();
+		testMaliciousPathGoodFirstCheckout(".git.", "konfig");
 	}
 
 	@Test
@@ -225,14 +230,8 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testMaliciousPathEmptyUnix() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setUnix();
-		testMaliciousPathBadFirstCheckout("", "no");
-	}
-
-	@Test
-	public void testMaliciousPathEmptyWindows() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setWindows();
+	public void testMaliciousPathEmpty() throws Exception {
+		((MockSystemReader) SystemReader.getInstance()).setCurrentPlatform();
 		testMaliciousPathBadFirstCheckout("", "no");
 	}
 
@@ -399,7 +398,7 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 		} catch (InvalidPathException e) {
 			if (good)
 				throw e;
-			assertTrue(e.getMessage().startsWith("Invalid path"));
+			assertThat(e.getMessage(), startsWith("Invalid path: "));
 		}
 	}
 

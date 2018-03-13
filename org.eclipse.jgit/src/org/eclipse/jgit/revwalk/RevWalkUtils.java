@@ -45,12 +45,10 @@ package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.Ref;
 
 /**
  * Utility methods for {@link RevWalk}.
@@ -126,55 +124,4 @@ public final class RevWalkUtils {
 			commits.add(c);
 		return commits;
 	}
-
-	/**
-	 * Find the list of branches a given commit is reachable from when following
-	 * parent.s
-	 * <p>
-	 * Note that this method calls {@link RevWalk#reset()} at the beginning.
-	 * <p>
-	 * In order to improve performance this method assumes clock skew among
-	 * committers is never larger than 24 hours.
-	 *
-	 * @param commit
-	 *            the commit we are looking at
-	 * @param revWalk
-	 *            The RevWalk to be used.
-	 * @param refs
-	 *            the set of branches we want to see reachability from
-	 * @return the list of branches a given commit is reachable from
-	 * @throws MissingObjectException
-	 * @throws IncorrectObjectTypeException
-	 * @throws IOException
-	 */
-	public static List<Ref> findBranchesReachableFrom(RevCommit commit,
-			RevWalk revWalk, Collection<Ref> refs)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException {
-
-		// Make sure commit is from the same RevWalk
-		commit = revWalk.parseCommit(commit.getId());
-		revWalk.reset();
-		List<Ref> result = new ArrayList<Ref>();
-
-		final int SKEW = 24*3600; // one day clock skew
-
-		for (Ref ref : refs) {
-			RevObject maybehead = revWalk.parseAny(ref.getObjectId());
-			if (!(maybehead instanceof RevCommit))
-				continue;
-			RevCommit headCommit = (RevCommit) maybehead;
-
-			// if commit is in the ref branch, then the tip of ref should be
-			// newer than the commit we are looking for. Allow for a large
-			// clock skew.
-			if (headCommit.getCommitTime() + SKEW < commit.getCommitTime())
-				continue;
-
-			if (revWalk.isMergedInto(commit, headCommit))
-				result.add(ref);
-		}
-		return result;
-	}
-
 }

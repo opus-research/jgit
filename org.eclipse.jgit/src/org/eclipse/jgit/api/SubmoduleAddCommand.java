@@ -93,7 +93,6 @@ public class SubmoduleAddCommand extends
 	 * Set repository-relative path of submodule
 	 *
 	 * @param path
-	 *            (with <code>/</code> as separator)
 	 * @return this command
 	 */
 	public SubmoduleAddCommand setPath(final String path) {
@@ -136,17 +135,6 @@ public class SubmoduleAddCommand extends
 		return SubmoduleWalk.forIndex(repo).setFilter(filter).next();
 	}
 
-	/**
-	 * Executes the {@code SubmoduleAddCommand}
-	 *
-	 * The {@code Repository} instance returned by this command needs to be
-	 * closed by the caller to free resources held by the {@code Repository}
-	 * instance. It is recommended to call this method as soon as you don't need
-	 * a reference to this {@code Repository} instance anymore.
-	 *
-	 * @return the newly created {@link Repository}
-	 * @throws GitAPIException
-	 */
 	public Repository call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)

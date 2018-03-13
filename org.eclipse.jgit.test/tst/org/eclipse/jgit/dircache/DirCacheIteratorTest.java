@@ -53,9 +53,8 @@ import java.io.File;
 import java.util.Collections;
 
 import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FS;
@@ -85,7 +84,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 	public void testNoSubtree_NoTreeWalk() throws Exception {
 		final DirCache dc = DirCache.newInCore();
 
-		final String[] paths = { "a-", "a0b" };
+		final String[] paths = { "a.", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);
@@ -111,7 +110,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 	public void testNoSubtree_WithTreeWalk() throws Exception {
 		final DirCache dc = DirCache.newInCore();
 
-		final String[] paths = { "a-", "a0b" };
+		final String[] paths = { "a.", "a0b" };
 		final FileMode[] modes = { FileMode.EXECUTABLE_FILE, FileMode.GITLINK };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
@@ -144,7 +143,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 	public void testSingleSubtree_NoRecursion() throws Exception {
 		final DirCache dc = DirCache.newInCore();
 
-		final String[] paths = { "a-", "a/b", "a/c", "a/d", "a0b" };
+		final String[] paths = { "a.", "a/b", "a/c", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);
@@ -156,7 +155,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 			b.add(ents[i]);
 		b.finish();
 
-		final String[] expPaths = { "a-", "a", "a0b" };
+		final String[] expPaths = { "a.", "a", "a0b" };
 		final FileMode[] expModes = { FileMode.REGULAR_FILE, FileMode.TREE,
 				FileMode.REGULAR_FILE };
 		final int expPos[] = { 0, -1, 4 };
@@ -189,7 +188,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 		final DirCache dc = DirCache.newInCore();
 
 		final FileMode mode = FileMode.REGULAR_FILE;
-		final String[] paths = { "a-", "a/b", "a/c", "a/d", "a0b" };
+		final String[] paths = { "a.", "a/b", "a/c", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);
@@ -224,7 +223,7 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 		final DirCache dc = DirCache.newInCore();
 
 		final FileMode mode = FileMode.REGULAR_FILE;
-		final String[] paths = { "a-", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
+		final String[] paths = { "a.", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);
@@ -254,138 +253,11 @@ public class DirCacheIteratorTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testReset() throws Exception {
-		final DirCache dc = DirCache.newInCore();
-
-		final FileMode mode = FileMode.REGULAR_FILE;
-		final String[] paths = { "a-", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
-		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
-			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(mode);
-		}
-
-		final DirCacheBuilder b = dc.builder();
-		for (int i = 0; i < ents.length; i++)
-			b.add(ents[i]);
-		b.finish();
-
-		DirCacheIterator dci = new DirCacheIterator(dc);
-		assertFalse(dci.eof());
-		assertEquals("a-", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a0b", dci.getEntryPathString());
-		dci.next(1);
-		assertTrue(dci.eof());
-
-		// same entries the second time
-		dci.reset();
-		assertFalse(dci.eof());
-		assertEquals("a-", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a0b", dci.getEntryPathString());
-		dci.next(1);
-		assertTrue(dci.eof());
-
-		// Step backwards
-		dci.back(1);
-		assertFalse(dci.eof());
-		assertEquals("a0b", dci.getEntryPathString());
-		dci.back(1);
-		assertFalse(dci.eof());
-		assertEquals("a", dci.getEntryPathString());
-		dci.back(1);
-		assertFalse(dci.eof());
-		assertEquals("a-", dci.getEntryPathString());
-		assertTrue(dci.first());
-
-		// forward
-		assertFalse(dci.eof());
-		assertEquals("a-", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a0b", dci.getEntryPathString());
-		dci.next(1);
-		assertTrue(dci.eof());
-
-		// backwqrd halways, and forward again
-		dci.back(1);
-		assertFalse(dci.eof());
-		assertEquals("a0b", dci.getEntryPathString());
-		dci.back(1);
-		assertFalse(dci.eof());
-		assertEquals("a", dci.getEntryPathString());
-
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("a0b", dci.getEntryPathString());
-		dci.next(1);
-		assertTrue(dci.eof());
-
-		dci.reset(); // a.
-		dci.next(1); // a
-		AbstractTreeIterator sti = dci.createSubtreeIterator(null);
-		assertEquals("a/b", sti.getEntryPathString());
-		sti.next(1);
-		assertEquals("a/c", sti.getEntryPathString());
-		sti.next(1);
-		assertEquals("a/d", sti.getEntryPathString());
-		sti.back(2);
-		assertEquals("a/b", sti.getEntryPathString());
-
-	}
-
-	@Test
-	public void testBackBug396127() throws Exception {
-		final DirCache dc = DirCache.newInCore();
-
-		final FileMode mode = FileMode.REGULAR_FILE;
-		final String[] paths = { "git-gui/po/fr.po",
-				"git_remote_helpers/git/repo.py" };
-		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
-			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(mode);
-		}
-
-		final DirCacheBuilder b = dc.builder();
-		for (int i = 0; i < ents.length; i++)
-			b.add(ents[i]);
-		b.finish();
-
-		DirCacheIterator dci = new DirCacheIterator(dc);
-		assertFalse(dci.eof());
-		assertEquals("git-gui", dci.getEntryPathString());
-		dci.next(1);
-		assertFalse(dci.eof());
-		assertEquals("git_remote_helpers", dci.getEntryPathString());
-		dci.back(1);
-		assertFalse(dci.eof());
-		assertEquals("git-gui", dci.getEntryPathString());
-		dci.next(1);
-		assertEquals("git_remote_helpers", dci.getEntryPathString());
-		dci.next(1);
-		assertTrue(dci.eof());
-
-	}
-
-	@Test
 	public void testTwoLevelSubtree_FilterPath() throws Exception {
 		final DirCache dc = DirCache.newInCore();
 
 		final FileMode mode = FileMode.REGULAR_FILE;
-		final String[] paths = { "a-", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
+		final String[] paths = { "a.", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
 			ents[i] = new DirCacheEntry(paths[i]);

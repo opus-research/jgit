@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,9 +44,7 @@
 package org.eclipse.jgit.lib;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.junit.Test;
@@ -107,60 +104,7 @@ public class BranchConfigTest {
 		assertNull(branchConfig.getRemoteTrackingBranch());
 	}
 
-	@Test
-	public void getTrackingBranchShouldReturnMergeBranchForLocalBranch() {
-		Config c = parse("" //
-				+ "[remote \"origin\"]\n"
-				+ "  fetch = +refs/heads/*:refs/remotes/origin/*\n"
-				+ "[branch \"master\"]\n"
-				+ "  remote = .\n"
-				+ "  merge = refs/heads/master\n");
-
-		BranchConfig branchConfig = new BranchConfig(c, "master");
-		assertEquals("refs/heads/master",
-				branchConfig.getTrackingBranch());
-	}
-
-	@Test
-	public void getTrackingBranchShouldReturnNullWithoutMergeBranchForLocalBranch() {
-		Config c = parse("" //
-				+ "[remote \"origin\"]\n"
-				+ "  fetch = +refs/heads/onlyone:refs/remotes/origin/onlyone\n"
-				+ "[branch \"master\"]\n" //
-				+ "  remote = .\n");
-		BranchConfig branchConfig = new BranchConfig(c, "master");
-		assertNull(branchConfig.getTrackingBranch());
-	}
-
-	@Test
-	public void getTrackingBranchShouldHandleNormalCaseForRemoteTrackingBranch() {
-		Config c = parse("" //
-				+ "[remote \"origin\"]\n"
-				+ "  fetch = +refs/heads/*:refs/remotes/origin/*\n"
-				+ "[branch \"master\"]\n"
-				+ "  remote = origin\n"
-				+ "  merge = refs/heads/master\n");
-
-		BranchConfig branchConfig = new BranchConfig(c, "master");
-		assertEquals("refs/remotes/origin/master",
-				branchConfig.getTrackingBranch());
-	}
-
-	@Test
-	public void isRebase() {
-		Config c = parse("" //
-				+ "[branch \"undefined\"]\n"
-				+ "[branch \"false\"]\n"
-				+ "  rebase = false\n"
-				+ "[branch \"true\"]\n"
-				+ "  rebase = true\n");
-
-		assertFalse(new BranchConfig(c, "undefined").isRebase());
-		assertFalse(new BranchConfig(c, "false").isRebase());
-		assertTrue(new BranchConfig(c, "true").isRebase());
-	}
-
-	private static Config parse(final String content) {
+	private Config parse(final String content) {
 		final Config c = new Config(null);
 		try {
 			c.fromText(content);

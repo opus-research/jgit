@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2013 Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -70,23 +70,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 
 	private boolean detectBinary;
 
-	private boolean abortIfBinary;
-
-	/**
-	 * A special exception thrown when {@link EolCanonicalizingInputStream} is
-	 * told to throw an exception when attempting to read a binary file. The
-	 * exception may be thrown at any stage during reading.
-	 *
-	 * @since 3.3
-	 */
-	public static class IsBinaryException extends IOException {
-		private static final long serialVersionUID = 1L;
-
-		IsBinaryException() {
-			super();
-		}
-	}
-
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
 	 *
@@ -97,25 +80,8 @@ public class EolCanonicalizingInputStream extends InputStream {
 	 * @since 2.0
 	 */
 	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary) {
-		this(in, detectBinary, false);
-	}
-
-	/**
-	 * Creates a new InputStream, wrapping the specified stream
-	 *
-	 * @param in
-	 *            raw input stream
-	 * @param detectBinary
-	 *            whether binaries should be detected
-	 * @param abortIfBinary
-	 *            throw an IOException if the file is binary
-	 * @since 3.3
-	 */
-	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary,
-			boolean abortIfBinary) {
 		this.in = in;
 		this.detectBinary = detectBinary;
-		this.abortIfBinary = abortIfBinary;
 	}
 
 	@Override
@@ -125,17 +91,17 @@ public class EolCanonicalizingInputStream extends InputStream {
 	}
 
 	@Override
-	public int read(byte[] bs, final int off, final int len) throws IOException {
+	public int read(byte[] bs, int off, int len) throws IOException {
 		if (len == 0)
 			return 0;
 
 		if (cnt == -1)
 			return -1;
 
-		int i = off;
+		final int startOff = off;
 		final int end = off + len;
 
-		while (i < end) {
+		while (off < end) {
 			if (ptr == cnt && !fillBuffer()) {
 				break;
 			}
@@ -143,31 +109,23 @@ public class EolCanonicalizingInputStream extends InputStream {
 			byte b = buf[ptr++];
 			if (isBinary || b != '\r') {
 				// Logic for binary files ends here
-				bs[i++] = b;
+				bs[off++] = b;
 				continue;
 			}
 
 			if (ptr == cnt && !fillBuffer()) {
-				bs[i++] = '\r';
+				bs[off++] = '\r';
 				break;
 			}
 
 			if (buf[ptr] == '\n') {
-				bs[i++] = '\n';
+				bs[off++] = '\n';
 				ptr++;
 			} else
-				bs[i++] = '\r';
+				bs[off++] = '\r';
 		}
 
-		return i == off ? -1 : i - off;
-	}
-
-	/**
-	 * @return true if the stream has detected as a binary so far
-	 * @since 3.3
-	 */
-	public boolean isBinary() {
-		return isBinary;
+		return startOff == off ? -1 : off - startOff;
 	}
 
 	@Override
@@ -182,8 +140,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 		if (detectBinary) {
 			isBinary = RawText.isBinary(buf, cnt);
 			detectBinary = false;
-			if (isBinary && abortIfBinary)
-				throw new IsBinaryException();
 		}
 		ptr = 0;
 		return true;

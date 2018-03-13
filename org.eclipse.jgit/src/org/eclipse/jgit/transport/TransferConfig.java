@@ -43,19 +43,11 @@
 
 package org.eclipse.jgit.transport;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
- * The standard "transfer", "fetch", "receive", and "uploadpack" configuration
- * parameters.
+ * The standard "transfer", "fetch" and "receive" configuration parameters.
  */
 public class TransferConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
@@ -65,94 +57,16 @@ public class TransferConfig {
 		}
 	};
 
-	private final boolean checkReceivedObjects;
-	private final boolean allowLeadingZeroFileMode;
-	private final boolean safeForWindows;
-	private final boolean safeForMacOS;
-	private final boolean allowTipSha1InWant;
-	private final String[] hideRefs;
-
-	TransferConfig(final Repository db) {
-		this(db.getConfig());
-	}
+	private final boolean fsckObjects;
 
 	private TransferConfig(final Config rc) {
-		checkReceivedObjects = rc.getBoolean(
-				"fetch", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
-				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
-		allowLeadingZeroFileMode = checkReceivedObjects
-				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
-		safeForWindows = checkReceivedObjects
-				&& rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
-						SystemReader.getInstance().isWindows());
-		safeForMacOS = checkReceivedObjects
-				&& rc.getBoolean("fsck", "safeForMacOS", //$NON-NLS-1$ //$NON-NLS-2$
-						SystemReader.getInstance().isMacOS());
-
-		allowTipSha1InWant = rc.getBoolean(
-				"uploadpack", "allowtipsha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
-		hideRefs = rc.getStringList("uploadpack", null, "hiderefs"); //$NON-NLS-1$ //$NON-NLS-2$
+		fsckObjects = rc.getBoolean("receive", "fsckobjects", false);
 	}
 
 	/**
 	 * @return strictly verify received objects?
-	 * @deprecated use {@link #newObjectChecker()} instead.
 	 */
-	@Deprecated
 	public boolean isFsckObjects() {
-		return checkReceivedObjects;
-	}
-
-	/**
-	 * @return checker to verify fetched objects, or null if checking is not
-	 *         enabled in the repository configuration.
-	 * @since 3.6
-	 */
-	public ObjectChecker newObjectChecker() {
-		if (!checkReceivedObjects)
-			return null;
-		return new ObjectChecker()
-			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
-			.setSafeForWindows(safeForWindows)
-			.setSafeForMacOS(safeForMacOS);
-	}
-
-	/**
-	 * @return allow clients to request non-advertised tip SHA-1s?
-	 * @since 3.1
-	 */
-	public boolean isAllowTipSha1InWant() {
-		return allowTipSha1InWant;
-	}
-
-	/**
-	 * @return {@link RefFilter} respecting configured hidden refs.
-	 * @since 3.1
-	 */
-	public RefFilter getRefFilter() {
-		if (hideRefs.length == 0)
-			return RefFilter.DEFAULT;
-
-		return new RefFilter() {
-			public Map<String, Ref> filter(Map<String, Ref> refs) {
-				Map<String, Ref> result = new HashMap<String, Ref>();
-				for (Map.Entry<String, Ref> e : refs.entrySet()) {
-					boolean add = true;
-					for (String hide : hideRefs) {
-						if (e.getKey().equals(hide) || prefixMatch(hide, e.getKey())) {
-							add = false;
-							break;
-						}
-					}
-					if (add)
-						result.put(e.getKey(), e.getValue());
-				}
-				return result;
-			}
-
-			private boolean prefixMatch(String p, String s) {
-				return p.charAt(p.length() - 1) == '/' && s.startsWith(p);
-			}
-		};
+		return fsckObjects;
 	}
 }

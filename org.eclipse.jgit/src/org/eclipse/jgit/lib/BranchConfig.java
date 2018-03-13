@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -54,14 +53,6 @@ import org.eclipse.jgit.transport.RemoteConfig;
  */
 public class BranchConfig {
 
-	/**
-	 * The value that means "local repository" for {@link #getRemote()}:
-	 * {@value}
-	 *
-	 * @since 3.5
-	 */
-	public static final String LOCAL_REPOSITORY = "."; //$NON-NLS-1$
-
 	private final Config config;
 	private final String branchName;
 
@@ -80,84 +71,15 @@ public class BranchConfig {
 	}
 
 	/**
-	 * @return the full tracking branch name or <code>null</code> if it could
-	 *         not be determined
-	 */
-	public String getTrackingBranch() {
-		String remote = getRemoteOrDefault();
-		String mergeRef = getMerge();
-		if (remote == null || mergeRef == null)
-			return null;
-
-		if (isRemoteLocal())
-			return mergeRef;
-
-		return findRemoteTrackingBranch(remote, mergeRef);
-	}
-
-	/**
-	 * @return the full remote-tracking branch name or {@code null} if it could
-	 *         not be determined. If you also want local tracked branches use
-	 *         {@link #getTrackingBranch()} instead.
+	 * @return the full remote-tracking branch name or <code>null</code> if it
+	 *         could not be determined
 	 */
 	public String getRemoteTrackingBranch() {
-		String remote = getRemoteOrDefault();
-		String mergeRef = getMerge();
+		String remote = getRemote();
+		String mergeRef = getMergeBranch();
 		if (remote == null || mergeRef == null)
 			return null;
 
-		return findRemoteTrackingBranch(remote, mergeRef);
-	}
-
-	/**
-	 * @return {@code true} if the "remote" setting points to the local
-	 *         repository (with {@value #LOCAL_REPOSITORY}), false otherwise
-	 * @since 3.5
-	 */
-	public boolean isRemoteLocal() {
-		return LOCAL_REPOSITORY.equals(getRemote());
-	}
-
-	/**
-	 * @return the remote this branch is configured to fetch from/push to, or
-	 *         {@code null} if not defined
-	 * @since 3.5
-	 */
-	public String getRemote() {
-		return config.getString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branchName, ConfigConstants.CONFIG_KEY_REMOTE);
-	}
-
-	/**
-	 * @return the name of the upstream branch as it is called on the remote, or
-	 *         {@code null} if not defined
-	 * @since 3.5
-	 */
-	public String getMerge() {
-		return config.getString(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branchName, ConfigConstants.CONFIG_KEY_MERGE);
-	}
-
-	/**
-	 * @return {@code true} if the branch is configured to be rebased
-	 * @since 3.5
-	 */
-	public boolean isRebase() {
-		return config.getBoolean(ConfigConstants.CONFIG_BRANCH_SECTION,
-				branchName, ConfigConstants.CONFIG_KEY_REBASE, false);
-	}
-
-	/**
-	 * Finds the tracked remote tracking branch
-	 *
-	 * @param remote
-	 *            Remote name
-	 * @param mergeRef
-	 *            merge Ref of the local branch tracking the remote tracking
-	 *            branch
-	 * @return full remote tracking branch name or null
-	 */
-	private String findRemoteTrackingBranch(String remote, String mergeRef) {
 		RemoteConfig remoteConfig;
 		try {
 			remoteConfig = new RemoteConfig(config, remote);
@@ -173,11 +95,20 @@ public class BranchConfig {
 		return null;
 	}
 
-	private String getRemoteOrDefault() {
-		String remote = getRemote();
-		if (remote == null)
+	private String getRemote() {
+		String remoteName = config.getString(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_REMOTE);
+		if (remoteName == null)
 			return Constants.DEFAULT_REMOTE_NAME;
 		else
-			return remote;
+			return remoteName;
+	}
+
+	private String getMergeBranch() {
+		String mergeRef = config.getString(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_MERGE);
+		return mergeRef;
 	}
 }

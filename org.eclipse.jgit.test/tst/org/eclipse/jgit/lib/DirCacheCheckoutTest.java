@@ -71,9 +71,6 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -215,23 +212,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertIndex(mkmap("x", "x"));
 	}
 
-	/**
-	 * Test first checkout in a repo
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testInitialCheckout() throws Exception {
-		Git git = new Git(db);
-
-		TestRepository<Repository> db_t = new TestRepository<Repository>(db);
-		BranchBuilder master = db_t.branch("master");
-		master.commit().add("f", "1").message("m0").create();
-		assertFalse(new File(db.getWorkTree(), "f").exists());
-		git.checkout().setName("master").call();
-		assertTrue(new File(db.getWorkTree(), "f").exists());
-	}
-
 	private DirCacheCheckout resetHard(RevCommit commit)
 			throws NoWorkTreeException,
 			CorruptObjectException, IOException {
@@ -281,10 +261,11 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		merge = buildTree(mkmap("foo", "a"));
 		tw = TreeWalk.forPath(db, "foo", merge);
+		ObjectId anotherId = tw.getObjectId(0);
 
 		prescanTwoTrees(head, merge);
 
-		assertConflict("foo");
+		assertEquals(anotherId, getUpdated().get("foo"));
 	}
 
 	void setupCase(HashMap<String, String> headEntries, HashMap<String, String> mergeEntries, HashMap<String, String> indexEntries) throws IOException {
@@ -483,12 +464,10 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	 *     ------------------------------------------------------------------
 	 *1    D        D       F       Y         N       Y       N           Update
 	 *2    D        D       F       N         N       Y       N           Conflict
-	 *3    D        F       D                 Y       N       N           Keep
-	 *4    D        F       D                 N       N       N           Conflict
+	 *3    D        F       D                 Y       N       N           Update
+	 *4    D        F       D                 N       N       N           Update
 	 *5    D        F       F       Y         N       N       Y           Keep
-	 *5b   D        F       F       Y         N       N       N           Conflict
 	 *6    D        F       F       N         N       N       Y           Keep
-	 *6b   D        F       F       N         N       N       N           Conflict
 	 *7    F        D       F       Y         Y       N       N           Update
 	 *8    F        D       F       N         Y       N       N           Conflict
 	 *9    F        D       F       Y         N       N       N           Update
@@ -543,16 +522,18 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testDirectoryFileConflicts_3() throws Exception {
-		// 3
+		// 3 - the first to break!
 		doit(mk("DF/DF"), mk("DF/DF"), mk("DF"));
-		assertNoConflicts();
+		assertUpdated("DF/DF");
+		assertRemoved("DF");
 	}
 
 	@Test
 	public void testDirectoryFileConflicts_4() throws Exception {
 		// 4 (basically same as 3, just with H and M different)
 		doit(mk("DF/DF"), mkmap("DF/DF", "foo"), mk("DF"));
-		assertConflict("DF/DF");
+		assertUpdated("DF/DF");
+		assertRemoved("DF");
 
 	}
 
@@ -561,17 +542,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		// 5
 		doit(mk("DF/DF"), mk("DF"), mk("DF"));
 		assertRemoved("DF/DF");
-		assertEquals(0, dco.getConflicts().size());
-		assertEquals(0, dco.getUpdated().size());
-	}
 
-	@Test
-	public void testDirectoryFileConflicts_5b() throws Exception {
-		// 5
-		doit(mk("DF/DF"), mkmap("DF", "different"), mk("DF"));
-		assertRemoved("DF/DF");
-		assertConflict("DF");
-		assertEquals(0, dco.getUpdated().size());
 	}
 
 	@Test
@@ -581,19 +552,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		writeTrashFile("DF", "different");
 		go();
 		assertRemoved("DF/DF");
-		assertEquals(0, dco.getConflicts().size());
-		assertEquals(0, dco.getUpdated().size());
-	}
-
-	@Test
-	public void testDirectoryFileConflicts_6b() throws Exception {
-		// 6
-		setupCase(mk("DF/DF"), mk("DF"), mkmap("DF", "different"));
-		writeTrashFile("DF", "again different");
-		go();
-		assertRemoved("DF/DF");
-		assertConflict("DF");
-		assertEquals(0, dco.getUpdated().size());
 	}
 
 	@Test
@@ -638,7 +596,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testDirectoryFileConflicts_9() throws Exception {
 		// 9
-		doit(mkmap("DF", "QP"), mkmap("DF", "QP"), mkmap("DF/DF", "DF/DF"));
+		doit(mk("DF"), mkmap("DF", "QP"), mk("DF/DF"));
 		assertRemoved("DF/DF");
 		assertUpdated("DF");
 	}
@@ -980,41 +938,9 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		} catch (CheckoutConflictException e) {
 			assertIndex(mk("foo"));
 			assertWorkDir(mkmap("foo", "different"));
-			assertEquals(Arrays.asList("foo"), getConflicts());
+			assertTrue(getConflicts().equals(Arrays.asList("foo")));
 			assertTrue(new File(trash, "foo").isFile());
 		}
-	}
-
-	@Test
-	public void testOverwriteUntrackedIgnoredFile() throws IOException,
-			GitAPIException {
-		String fname="file.txt";
-		Git git = Git.wrap(db);
-
-		// Add a file
-		writeTrashFile(fname, "a");
-		git.add().addFilepattern(fname).call();
-		git.commit().setMessage("create file").call();
-
-		// Create branch
-		git.branchCreate().setName("side").call();
-
-		// Modify file
-		writeTrashFile(fname, "b");
-		git.add().addFilepattern(fname).call();
-		git.commit().setMessage("modify file").call();
-
-		// Switch branches
-		git.checkout().setName("side").call();
-		git.rm().addFilepattern(fname).call();
-		writeTrashFile(".gitignore", fname);
-		git.add().addFilepattern(".gitignore").call();
-		git.commit().setMessage("delete and ignore file").call();
-
-		writeTrashFile(fname, "Something different");
-		git.checkout().setName("master").call();
-		assertWorkDir(mkmap(fname, "b"));
-		assertTrue(git.status().call().isClean());
 	}
 
 	@Test

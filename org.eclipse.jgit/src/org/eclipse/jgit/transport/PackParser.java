@@ -62,8 +62,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TooLargeObjectInPackException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.PackLock;
-import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
@@ -80,6 +78,8 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.storage.file.PackLock;
+import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
@@ -134,6 +134,8 @@ public abstract class PackParser {
 	private ObjectChecker objCheck;
 
 	private boolean allowThin;
+
+	private boolean checkObjectCollisions;
 
 	private boolean needBaseObjectIds;
 
@@ -204,6 +206,7 @@ public abstract class PackParser {
 		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
+		checkObjectCollisions = true;
 	}
 
 	/** @return true if a thin pack (missing base objects) is permitted. */
@@ -222,6 +225,35 @@ public abstract class PackParser {
 	 */
 	public void setAllowThin(final boolean allow) {
 		allowThin = allow;
+	}
+
+	/** @return if true received objects are verified to prevent collisions. */
+	public boolean isCheckObjectCollisions() {
+		return checkObjectCollisions;
+	}
+
+	/**
+	 * Enable checking for collisions with existing objects.
+	 * <p>
+	 * By default PackParser looks for each received object in the repository.
+	 * If the object already exists, the existing object is compared
+	 * byte-for-byte with the newly received copy to ensure they are identical.
+	 * The receive is aborted with an exception if any byte differs. This check
+	 * is necessary to prevent an evil attacker from supplying a replacement
+	 * object into this repository in the event that a discovery enabling SHA-1
+	 * collisions is made.
+	 * <p>
+	 * This check may be very costly to perform, and some repositories may have
+	 * other ways to segregate newly received object data. The check is enabled
+	 * by default, but can be explicitly disabled if the implementation can
+	 * provide the same guarantee, or is willing to accept the risks associated
+	 * with bypassing the check.
+	 *
+	 * @param check
+	 *            true to enable collision checking (strongly encouraged).
+	 */
+	public void setCheckObjectCollisions(boolean check) {
+		checkObjectCollisions = check;
 	}
 
 	/**
@@ -419,20 +451,6 @@ public abstract class PackParser {
 	}
 
 	/**
-	 * Get the size of the parsed pack.
-	 *
-	 * This will also include the pack index size if an index was created. This
-	 * method should only be called after pack parsing is finished.
-	 *
-	 * @return the pack size (including the index size) or -1 if the size cannot
-	 *         be determined
-	 * @since 3.3
-	 */
-	public long getPackSize() {
-		return -1;
-	}
-
-	/**
 	 * Parse the pack stream.
 	 *
 	 * @param progress
@@ -442,7 +460,6 @@ public abstract class PackParser {
 	 *         {@link #setLockMessage(String)}.
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
-	 * @since 3.0
 	 */
 	public final PackLock parse(ProgressMonitor progress) throws IOException {
 		return parse(progress, progress);
@@ -461,7 +478,6 @@ public abstract class PackParser {
 	 *         {@link #setLockMessage(String)}.
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
-	 * @since 3.0
 	 */
 	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
 			throws IOException {
@@ -862,13 +878,13 @@ public abstract class PackParser {
 		if (bAvail != 0 && !expectDataAfterPackFooter)
 			throw new CorruptObjectException(MessageFormat.format(
 					JGitText.get().expectedEOFReceived,
-					"\\x" + Integer.toHexString(buf[bOffset] & 0xff))); //$NON-NLS-1$
+					"\\x" + Integer.toHexString(buf[bOffset] & 0xff)));
 		if (isCheckEofAfterPackFooter()) {
 			int eof = in.read();
 			if (0 <= eof)
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
+						"\\x" + Integer.toHexString(eof)));
 		} else if (bAvail > 0 && expectDataAfterPackFooter) {
 			in.reset();
 			IO.skipFully(in, bOffset);
@@ -988,7 +1004,8 @@ public abstract class PackParser {
 			}
 			inf.close();
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			checkContentLater = readCurs.has(tempObjectId);
+			checkContentLater = isCheckObjectCollisions()
+					&& readCurs.has(tempObjectId);
 			data = null;
 
 		} else {
@@ -1014,25 +1031,25 @@ public abstract class PackParser {
 			try {
 				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().invalidObject,
-						Constants.typeString(type),
-						readCurs.abbreviate(id, 10).name(),
-						e.getMessage()), e);
+				throw new IOException(MessageFormat.format(
+						JGitText.get().invalidObject, Constants
+								.typeString(type), id.name(), e.getMessage()));
 			}
 		}
 
-		try {
-			final ObjectLoader ldr = readCurs.open(id, type);
-			final byte[] existingData = ldr.getCachedBytes(data.length);
-			if (!Arrays.equals(data, existingData)) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, id.name()));
+		if (isCheckObjectCollisions()) {
+			try {
+				final ObjectLoader ldr = readCurs.open(id, type);
+				final byte[] existingData = ldr.getCachedBytes(data.length);
+				if (!Arrays.equals(data, existingData)) {
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, id.name()));
+				}
+			} catch (MissingObjectException notLocal) {
+				// This is OK, we don't have a copy of the object locally
+				// but the API throws when we try to read it as usually its
+				// an error to read something that doesn't exist.
 			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
 		}
 	}
 
@@ -1135,8 +1152,7 @@ public abstract class PackParser {
 				break;
 			}
 			if (next <= 0)
-				throw new EOFException(
-						JGitText.get().packfileIsTruncatedNoParam);
+				throw new EOFException(JGitText.get().packfileIsTruncated);
 			bAvail += next;
 		}
 		return bOffset;
@@ -1654,19 +1670,24 @@ public abstract class PackParser {
 				int n = 0;
 				while (n < cnt) {
 					int r = inf.inflate(dst, pos + n, cnt - n);
-					n += r;
-					if (inf.finished())
-						break;
-					if (inf.needsInput()) {
-						onObjectData(src, buf, p, bAvail);
-						use(bAvail);
+					if (r == 0) {
+						if (inf.finished())
+							break;
+						if (inf.needsInput()) {
+							onObjectData(src, buf, p, bAvail);
+							use(bAvail);
 
-						p = fill(src, 1);
-						inf.setInput(buf, p, bAvail);
-					} else if (r == 0) {
-						throw new CorruptObjectException(MessageFormat.format(
-								JGitText.get().packfileCorruptionDetected,
-								JGitText.get().unknownZlibError));
+							p = fill(src, 1);
+							inf.setInput(buf, p, bAvail);
+						} else {
+							throw new CorruptObjectException(
+									MessageFormat
+											.format(
+													JGitText.get().packfileCorruptionDetected,
+													JGitText.get().unknownZlibError));
+						}
+					} else {
+						n += r;
 					}
 				}
 				actualSize += n;

@@ -50,10 +50,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
-import java.text.MessageFormat;
 import java.util.List;
-
-import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Mutable builder to construct a commit recording the state of a project.
@@ -69,15 +66,15 @@ import org.eclipse.jgit.internal.JGitText;
 public class CommitBuilder {
 	private static final ObjectId[] EMPTY_OBJECTID_LIST = new ObjectId[0];
 
-	private static final byte[] htree = Constants.encodeASCII("tree"); //$NON-NLS-1$
+	private static final byte[] htree = Constants.encodeASCII("tree");
 
-	private static final byte[] hparent = Constants.encodeASCII("parent"); //$NON-NLS-1$
+	private static final byte[] hparent = Constants.encodeASCII("parent");
 
-	private static final byte[] hauthor = Constants.encodeASCII("author"); //$NON-NLS-1$
+	private static final byte[] hauthor = Constants.encodeASCII("author");
 
-	private static final byte[] hcommitter = Constants.encodeASCII("committer"); //$NON-NLS-1$
+	private static final byte[] hcommitter = Constants.encodeASCII("committer");
 
-	private static final byte[] hencoding = Constants.encodeASCII("encoding"); //$NON-NLS-1$
+	private static final byte[] hencoding = Constants.encodeASCII("encoding");
 
 	private ObjectId treeId;
 
@@ -169,11 +166,7 @@ public class CommitBuilder {
 	 *            branch being merged into the current branch.
 	 */
 	public void setParentIds(AnyObjectId parent1, AnyObjectId parent2) {
-		if (!parent1.equals(parent2))
-			parentIds = new ObjectId[] { parent1.copy(), parent2.copy() };
-		else
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().duplicateParents, parent1.getName()));
+		parentIds = new ObjectId[] { parent1.copy(), parent2.copy() };
 	}
 
 	/**
@@ -183,18 +176,9 @@ public class CommitBuilder {
 	 *            the entire list of parents for this commit.
 	 */
 	public void setParentIds(ObjectId... newParents) {
-		ObjectId[] tmpIds = new ObjectId[newParents.length];
-
-		int newParentCount = 0;
-		for (int i = 0; i < newParents.length; i++) {
-			for (int j = 0; j < newParentCount; j++)
-				if (tmpIds[j].equals(newParents[i]))
-					throw new IllegalArgumentException(MessageFormat.format(
-							JGitText.get().duplicateParents,
-							tmpIds[j].getName()));
-			tmpIds[newParentCount++] = newParents[i].copy();
-		}
-		parentIds = tmpIds;
+		parentIds = new ObjectId[newParents.length];
+		for (int i = 0; i < newParents.length; i++)
+			parentIds[i] = newParents[i].copy();
 	}
 
 	/**
@@ -204,18 +188,9 @@ public class CommitBuilder {
 	 *            the entire list of parents for this commit.
 	 */
 	public void setParentIds(List<? extends AnyObjectId> newParents) {
-		ObjectId[] tmpIds = new ObjectId[newParents.size()];
-
-		int newParentCount = 0;
-		for (AnyObjectId newId : newParents) {
-			for (int j = 0; j < newParentCount; j++)
-				if (tmpIds[j].equals(newId))
-					throw new IllegalArgumentException(MessageFormat.format(
-							JGitText.get().duplicateParents,
-							tmpIds[j].getName()));
-			tmpIds[newParentCount++] = newId.copy();
-		}
-		parentIds = tmpIds;
+		parentIds = new ObjectId[newParents.size()];
+		for (int i = 0; i < newParents.size(); i++)
+			parentIds[i] = newParents.get(i).copy();
 	}
 
 	/**
@@ -228,11 +203,6 @@ public class CommitBuilder {
 		if (parentIds.length == 0) {
 			setParentId(additionalParent);
 		} else {
-			for (int i = 0; i < parentIds.length; i++)
-				if (parentIds[i].equals(additionalParent))
-					throw new IllegalArgumentException(MessageFormat.format(
-							JGitText.get().duplicateParents,
-							parentIds[i].getName()));
 			ObjectId[] newParents = new ObjectId[parentIds.length + 1];
 			System.arraycopy(parentIds, 0, newParents, 0, parentIds.length);
 			newParents[parentIds.length] = additionalParent.copy();
@@ -352,7 +322,6 @@ public class CommitBuilder {
 		return build();
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();

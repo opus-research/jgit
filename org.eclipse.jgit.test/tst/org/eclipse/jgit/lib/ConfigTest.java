@@ -48,7 +48,6 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -63,25 +62,16 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.junit.MockSystemReader;
-import org.eclipse.jgit.merge.MergeConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
-import org.junit.After;
 import org.junit.Test;
 
 /**
  * Test reading of git config
  */
 public class ConfigTest {
-
-	@After
-	public void tearDown() {
-		SystemReader.setInstance(null);
-	}
-
 	@Test
 	public void test001_ReadBareKey() throws ConfigInvalidException {
 		final Config c = parse("[foo]\nbar\n");
@@ -127,7 +117,7 @@ public class ConfigTest {
 
 		final Object[] expArr = values.toArray();
 		final String[] actArr = c.getStringList("my", null, "somename");
-		assertArrayEquals(expArr, actArr);
+		assertTrue(Arrays.equals(expArr, actArr));
 
 		final String expText = "[my]\n\tsomename = value1\n\tsomename = value2\n";
 		assertEquals(expText, c.toText());
@@ -186,9 +176,6 @@ public class ConfigTest {
 		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the values are defined in the global configuration
-		// first clear environment variables since they would override
-		// configuration files
-		mockSystemReader.clearProperties();
 		userGitConfig.setString("user", null, "name", "global username");
 		userGitConfig.setString("user", null, "email", "author@globalemail");
 		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
@@ -214,34 +201,6 @@ public class ConfigTest {
 		assertEquals("author@localemail", authorEmail);
 		assertFalse(localConfig.get(UserConfig.KEY).isCommitterNameImplicit());
 		assertFalse(localConfig.get(UserConfig.KEY).isCommitterEmailImplicit());
-
-		// also git environment variables are defined
-		mockSystemReader.setProperty(Constants.GIT_AUTHOR_NAME_KEY,
-				"git author name");
-		mockSystemReader.setProperty(Constants.GIT_AUTHOR_EMAIL_KEY,
-				"author@email");
-		localConfig.setString("user", null, "name", "local username");
-		localConfig.setString("user", null, "email", "author@localemail");
-		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
-		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
-		assertEquals("git author name", authorName);
-		assertEquals("author@email", authorEmail);
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
-		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
-	}
-
-	@Test
-	public void testReadUserConfigWithInvalidCharactersStripped() {
-		final MockSystemReader mockSystemReader = new MockSystemReader();
-		final Config localConfig = new Config(mockSystemReader.openUserConfig(
-				null, FS.DETECTED));
-
-		localConfig.setString("user", null, "name", "foo<bar");
-		localConfig.setString("user", null, "email", "baz>\nqux@example.com");
-
-		UserConfig userConfig = localConfig.get(UserConfig.KEY);
-		assertEquals("foobar", userConfig.getAuthorName());
-		assertEquals("bazqux@example.com", userConfig.getAuthorEmail());
 	}
 
 	@Test
@@ -329,28 +288,6 @@ public class ConfigTest {
 
 		c = parse("[s \"b\"]\n\tc = one two\n");
 		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
-
-		c = parse("[s \"b\"]\n\tc = one-two\n");
-		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
-	}
-
-	@Test
-	public void testGetInvalidEnum() throws ConfigInvalidException {
-		Config c = parse("[a]\n\tb = invalid\n");
-		try {
-			c.getEnum("a", null, "b", TestEnum.ONE_TWO);
-			fail();
-		} catch (IllegalArgumentException e) {
-			assertEquals("Invalid value: a.b=invalid", e.getMessage());
-		}
-
-		c = parse("[a \"b\"]\n\tc = invalid\n");
-		try {
-			c.getEnum("a", "b", "c", TestEnum.ONE_TWO);
-			fail();
-		} catch (IllegalArgumentException e) {
-			assertEquals("Invalid value: a.b.c=invalid", e.getMessage());
-		}
 	}
 
 	@Test
@@ -358,120 +295,6 @@ public class ConfigTest {
 		final Config c = new Config();
 		c.setEnum("s", "b", "c", TestEnum.ONE_TWO);
 		assertEquals("[s \"b\"]\n\tc = one two\n", c.toText());
-	}
-
-	@Test
-	public void testGetFastForwardMergeoptions() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		assertSame(FastForwardMode.FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS, FastForwardMode.FF));
-		MergeConfig mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF, mergeConfig.getFastForwardMode());
-		c = parse("[branch \"side\"]\n\tmergeoptions = --ff-only\n");
-		assertSame(FastForwardMode.FF_ONLY, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS,
-				FastForwardMode.FF_ONLY));
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF_ONLY, mergeConfig.getFastForwardMode());
-		c = parse("[branch \"side\"]\n\tmergeoptions = --ff\n");
-		assertSame(FastForwardMode.FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS, FastForwardMode.FF));
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF, mergeConfig.getFastForwardMode());
-		c = parse("[branch \"side\"]\n\tmergeoptions = --no-ff\n");
-		assertSame(FastForwardMode.NO_FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS, FastForwardMode.NO_FF));
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.NO_FF, mergeConfig.getFastForwardMode());
-	}
-
-	@Test
-	public void testSetFastForwardMergeoptions() {
-		final Config c = new Config();
-		c.setEnum("branch", "side", "mergeoptions", FastForwardMode.FF);
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --ff\n", c.toText());
-		c.setEnum("branch", "side", "mergeoptions", FastForwardMode.FF_ONLY);
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --ff-only\n",
-				c.toText());
-		c.setEnum("branch", "side", "mergeoptions", FastForwardMode.NO_FF);
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --no-ff\n",
-				c.toText());
-	}
-
-	@Test
-	public void testGetFastForwardMerge() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		assertSame(FastForwardMode.Merge.TRUE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.TRUE));
-		MergeConfig mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF, mergeConfig.getFastForwardMode());
-		c = parse("[merge]\n\tff = only\n");
-		assertSame(FastForwardMode.Merge.ONLY, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.ONLY));
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF_ONLY, mergeConfig.getFastForwardMode());
-		c = parse("[merge]\n\tff = true\n");
-		assertSame(FastForwardMode.Merge.TRUE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.TRUE));
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF, mergeConfig.getFastForwardMode());
-		c = parse("[merge]\n\tff = false\n");
-		assertSame(FastForwardMode.Merge.FALSE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.FALSE));
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.NO_FF, mergeConfig.getFastForwardMode());
-	}
-
-	@Test
-	public void testCombinedMergeOptions() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		MergeConfig mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF, mergeConfig.getFastForwardMode());
-		assertTrue(mergeConfig.isCommit());
-		assertFalse(mergeConfig.isSquash());
-		// branch..mergeoptions should win over merge.ff
-		c = parse("[merge]\n\tff = false\n"
-				+ "[branch \"side\"]\n\tmergeoptions = --ff-only\n");
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF_ONLY, mergeConfig.getFastForwardMode());
-		assertTrue(mergeConfig.isCommit());
-		assertFalse(mergeConfig.isSquash());
-		// merge.ff used for ff setting if not set via mergeoptions
-		c = parse("[merge]\n\tff = only\n"
-				+ "[branch \"side\"]\n\tmergeoptions = --squash\n");
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF_ONLY, mergeConfig.getFastForwardMode());
-		assertTrue(mergeConfig.isCommit());
-		assertTrue(mergeConfig.isSquash());
-		// mergeoptions wins if it has ff options amongst other options
-		c = parse("[merge]\n\tff = false\n"
-				+ "[branch \"side\"]\n\tmergeoptions = --ff-only --no-commit\n");
-		mergeConfig = c.get(MergeConfig.getParser("side"));
-		assertSame(FastForwardMode.FF_ONLY, mergeConfig.getFastForwardMode());
-		assertFalse(mergeConfig.isCommit());
-		assertFalse(mergeConfig.isSquash());
-	}
-
-	@Test
-	public void testSetFastForwardMerge() {
-		final Config c = new Config();
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.FF));
-		assertEquals("[merge]\n\tff = true\n", c.toText());
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.FF_ONLY));
-		assertEquals("[merge]\n\tff = only\n", c.toText());
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.NO_FF));
-		assertEquals("[merge]\n\tff = false\n", c.toText());
 	}
 
 	@Test
@@ -598,31 +421,6 @@ public class ConfigTest {
 	}
 
 	@Test
-	public void test_ReadNamesInSectionRecursive()
-			throws ConfigInvalidException {
-		String baseConfigString = "[core]\n" + "logAllRefUpdates = true\n";
-		String configString = "[core]\n" + "repositoryFormatVersion = 0\n"
-				+ "filemode = false\n";
-		final Config c = parse(configString, parse(baseConfigString));
-		Set<String> names = c.getNames("core", true);
-		assertEquals("Core section size", 3, names.size());
-		assertTrue("Core section should contain \"filemode\"",
-				names.contains("filemode"));
-		assertTrue("Core section should contain \"repositoryFormatVersion\"",
-				names.contains("repositoryFormatVersion"));
-		assertTrue("Core section should contain \"logAllRefUpdates\"",
-				names.contains("logAllRefUpdates"));
-		assertTrue("Core section should contain \"logallrefupdates\"",
-				names.contains("logallrefupdates"));
-
-		Iterator<String> itr = names.iterator();
-		assertEquals("filemode", itr.next());
-		assertEquals("repositoryFormatVersion", itr.next());
-		assertEquals("logAllRefUpdates", itr.next());
-		assertFalse(itr.hasNext());
-	}
-
-	@Test
 	public void test010_readNamesInSubSection() throws ConfigInvalidException {
 		String configString = "[a \"sub1\"]\n"//
 				+ "x = 0\n" //
@@ -641,30 +439,6 @@ public class ConfigTest {
 		assertEquals("Subsection size", 2, names.size());
 		assertTrue("Subsection should contain \"a\"", names.contains("a"));
 		assertTrue("Subsection should contain \"b\"", names.contains("b"));
-	}
-
-	@Test
-	public void readNamesInSubSectionRecursive() throws ConfigInvalidException {
-		String baseConfigString = "[a \"sub1\"]\n"//
-				+ "x = 0\n" //
-				+ "y = false\n"//
-				+ "[a \"sub2\"]\n"//
-				+ "A=0\n";//
-		String configString = "[a \"sub1\"]\n"//
-				+ "z = true\n"//
-				+ "[a \"sub2\"]\n"//
-				+ "B=1\n";
-		final Config c = parse(configString, parse(baseConfigString));
-		Set<String> names = c.getNames("a", "sub1", true);
-		assertEquals("Subsection size", 3, names.size());
-		assertTrue("Subsection should contain \"x\"", names.contains("x"));
-		assertTrue("Subsection should contain \"y\"", names.contains("y"));
-		assertTrue("Subsection should contain \"z\"", names.contains("z"));
-		names = c.getNames("a", "sub2", true);
-		assertEquals("Subsection size", 2, names.size());
-		assertTrue("Subsection should contain \"A\"", names.contains("A"));
-		assertTrue("Subsection should contain \"a\"", names.contains("a"));
-		assertTrue("Subsection should contain \"B\"", names.contains("B"));
 	}
 
 	@Test
@@ -690,33 +464,18 @@ public class ConfigTest {
 		assertEquals(result, config.toText());
 	}
 
-	@Test
-	public void testNoFinalNewline() throws ConfigInvalidException {
-		Config c = parse("[a]\n"
-				+ "x = 0\n"
-				+ "y = 1");
-		assertEquals("0", c.getString("a", null, "x"));
-		assertEquals("1", c.getString("a", null, "y"));
-	}
-
-	private static void assertReadLong(long exp) throws ConfigInvalidException {
+	private void assertReadLong(long exp) throws ConfigInvalidException {
 		assertReadLong(exp, String.valueOf(exp));
 	}
 
-	private static void assertReadLong(long exp, String act)
+	private void assertReadLong(long exp, String act)
 			throws ConfigInvalidException {
 		final Config c = parse("[s]\na = " + act + "\n");
 		assertEquals(exp, c.getLong("s", null, "a", 0L));
 	}
 
-	private static Config parse(final String content)
-			throws ConfigInvalidException {
-		return parse(content, null);
-	}
-
-	private static Config parse(final String content, Config baseConfig)
-			throws ConfigInvalidException {
-		final Config c = new Config(baseConfig);
+	private Config parse(final String content) throws ConfigInvalidException {
+		final Config c = new Config(null);
 		c.fromText(content);
 		return c;
 	}

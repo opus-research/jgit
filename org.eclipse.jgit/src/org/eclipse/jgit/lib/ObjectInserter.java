@@ -66,7 +66,7 @@ import org.eclipse.jgit.transport.PackParser;
  * {@link #release()} or {@link #flush()} prior to updating references or
  * otherwise making the returned ObjectIds visible to other code.
  */
-public abstract class ObjectInserter implements AutoCloseable {
+public abstract class ObjectInserter {
 	/** An inserter that can be used for formatting and id generation only. */
 	public static class Formatter extends ObjectInserter {
 		@Override
@@ -77,11 +77,6 @@ public abstract class ObjectInserter implements AutoCloseable {
 
 		@Override
 		public PackParser newPackParser(InputStream in) throws IOException {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public ObjectReader newReader() {
 			throw new UnsupportedOperationException();
 		}
 
@@ -139,10 +134,6 @@ public abstract class ObjectInserter implements AutoCloseable {
 
 		public PackParser newPackParser(InputStream in) throws IOException {
 			return delegate().newPackParser(in);
-		}
-
-		public ObjectReader newReader() {
-			return delegate().newReader();
 		}
 
 		public void flush() throws IOException {
@@ -390,21 +381,6 @@ public abstract class ObjectInserter implements AutoCloseable {
 	public abstract PackParser newPackParser(InputStream in) throws IOException;
 
 	/**
-	 * Open a reader for objects that may have been written by this inserter.
-	 * <p>
-	 * The returned reader allows the calling thread to read back recently
-	 * inserted objects without first calling {@code flush()} to make them
-	 * visible to the repository. The returned reader should only be used from
-	 * the same thread as the inserter. Objects written by this inserter may not
-	 * be visible to {@code this.newReader().newReader()}.
-	 *
-	 * @since 3.5
-	 * @return reader for any object, including an object recently inserted by
-	 *         this inserter since the last flush.
-	 */
-	public abstract ObjectReader newReader();
-
-	/**
 	 * Make all inserted objects visible.
 	 * <p>
 	 * The flush may take some period of time to make the objects available to
@@ -420,21 +396,7 @@ public abstract class ObjectInserter implements AutoCloseable {
 	 * Release any resources used by this inserter.
 	 * <p>
 	 * An inserter that has been released can be used again, but may need to be
-	 * released after the subsequent usage. Use {@link #close()} instead
-	 */
-	@Deprecated
-	public abstract void release();
-
-	/**
-	 * Release any resources used by this inserter.
-	 * <p>
-	 * An inserter that has been released can be used again, but may need to be
 	 * released after the subsequent usage.
-	 *
-	 * @since 4.0
 	 */
-	@Override
-	public void close() {
-		release();
-	}
+	public abstract void release();
 }

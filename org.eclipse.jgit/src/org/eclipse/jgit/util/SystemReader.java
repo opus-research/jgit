@@ -49,17 +49,13 @@ package org.eclipse.jgit.util;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ObjectChecker;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
 /**
  * Interface to read values from the system.
@@ -70,14 +66,7 @@ import org.eclipse.jgit.lib.ObjectChecker;
  * </p>
  */
 public abstract class SystemReader {
-	private static final SystemReader DEFAULT;
-	static {
-		SystemReader r = new Default();
-		r.init();
-		DEFAULT = r;
-	}
-
-	private static class Default extends SystemReader {
+	private static SystemReader INSTANCE = new SystemReader() {
 		private volatile String hostname;
 
 		public String getenv(String variable) {
@@ -102,14 +91,14 @@ public abstract class SystemReader {
 					}
 				};
 			}
-			File etc = fs.resolve(prefix, "etc"); //$NON-NLS-1$
-			File config = fs.resolve(etc, "gitconfig"); //$NON-NLS-1$
+			File etc = fs.resolve(prefix, "etc");
+			File config = fs.resolve(etc, "gitconfig");
 			return new FileBasedConfig(parent, config, fs);
 		}
 
 		public FileBasedConfig openUserConfig(Config parent, FS fs) {
 			final File home = fs.userHome();
-			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs); //$NON-NLS-1$
+			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs);
 		}
 
 		public String getHostname() {
@@ -119,7 +108,7 @@ public abstract class SystemReader {
 					hostname = localMachine.getCanonicalHostName();
 				} catch (UnknownHostException e) {
 					// we do nothing
-					hostname = "localhost"; //$NON-NLS-1$
+					hostname = "localhost";
 				}
 				assert hostname != null;
 			}
@@ -135,9 +124,7 @@ public abstract class SystemReader {
 		public int getTimezone(long when) {
 			return getTimeZone().getOffset(when) / (60 * 1000);
 		}
-	}
-
-	private static SystemReader INSTANCE = DEFAULT;
+	};
 
 	/** @return the live instance to read system properties. */
 	public static SystemReader getInstance() {
@@ -146,36 +133,10 @@ public abstract class SystemReader {
 
 	/**
 	 * @param newReader
-	 *            the new instance to use when accessing properties, or null for
-	 *            the default instance.
+	 *            the new instance to use when accessing properties.
 	 */
 	public static void setInstance(SystemReader newReader) {
-		if (newReader == null)
-			INSTANCE = DEFAULT;
-		else {
-			newReader.init();
-			INSTANCE = newReader;
-		}
-	}
-
-	private ObjectChecker platformChecker;
-
-	private void init() {
-		// Creating ObjectChecker must be deferred. Unit tests change
-		// behavior of is{Windows,MacOS} in constructor of subclass.
-		if (platformChecker == null)
-			setPlatformChecker();
-	}
-
-	/**
-	 * Should be used in tests when the platform is explicitly changed.
-	 *
-	 * @since 3.6
-	 */
-	protected final void setPlatformChecker() {
-		platformChecker = new ObjectChecker()
-			.setSafeForWindows(isWindows())
-			.setSafeForMacOS(isMacOS());
+		INSTANCE = newReader;
 	}
 
 	/**
@@ -261,21 +222,6 @@ public abstract class SystemReader {
 	}
 
 	/**
-	 * Returns a simple date format instance as specified by the given pattern.
-	 *
-	 * @param pattern
-	 *            the pattern as defined in
-	 *            {@link SimpleDateFormat#SimpleDateFormat(String)}
-	 * @param locale
-	 *            locale to be used for the {@code SimpleDateFormat}
-	 * @return the simple date format
-	 * @since 3.2
-	 */
-	public SimpleDateFormat getSimpleDateFormat(String pattern, Locale locale) {
-		return new SimpleDateFormat(pattern, locale);
-	}
-
-	/**
 	 * Returns a date/time format instance for the given styles.
 	 *
 	 * @param dateStyle
@@ -291,42 +237,4 @@ public abstract class SystemReader {
 		return DateFormat.getDateTimeInstance(dateStyle, timeStyle);
 	}
 
-	/**
-	 * @return true if we are running on a Windows.
-	 */
-	public boolean isWindows() {
-		String osDotName = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return getProperty("os.name"); //$NON-NLS-1$
-					}
-				});
-		return osDotName.startsWith("Windows"); //$NON-NLS-1$
-	}
-
-	/**
-	 * @return true if we are running on Mac OS X
-	 */
-	public boolean isMacOS() {
-		String osDotName = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return getProperty("os.name"); //$NON-NLS-1$
-					}
-				});
-		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName); //$NON-NLS-1$ //$NON-NLS-2$
-	}
-
-	/**
-	 * Check tree path entry for validity.
-	 * <p>
-	 * Scans a multi-directory path string such as {@code "src/main.c"}.
-	 *
-	 * @param path path string to scan.
-	 * @throws CorruptObjectException path is invalid.
-	 * @since 3.6
-	 */
-	public void checkPath(String path) throws CorruptObjectException {
-		platformChecker.checkPath(path);
-	}
 }

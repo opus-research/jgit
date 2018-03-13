@@ -52,17 +52,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.ReflogEntry;
-import org.eclipse.jgit.lib.ReflogReader;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.ReflogEntry;
+import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
@@ -80,8 +79,6 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 
 	private File committedFile;
 
-	private File untrackedFile;
-
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -90,24 +87,15 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		head = git.commit().setMessage("add file").call();
 		assertNotNull(head);
-		untrackedFile = writeTrashFile("untracked.txt", "content");
-	}
-
-	private void validateStashedCommit(final RevCommit commit)
-			throws IOException {
-		validateStashedCommit(commit, 2);
 	}
 
 	/**
 	 * Core validation to be performed on all stashed commits
 	 *
 	 * @param commit
-	 * @param parentCount
-	 *            number of parent commits required
 	 * @throws IOException
 	 */
-	private void validateStashedCommit(final RevCommit commit,
-			int parentCount)
+	private void validateStashedCommit(final RevCommit commit)
 			throws IOException {
 		assertNotNull(commit);
 		Ref stashRef = db.getRef(Constants.R_STASH);
@@ -115,7 +103,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals(commit, stashRef.getObjectId());
 		assertNotNull(commit.getAuthorIdent());
 		assertEquals(commit.getAuthorIdent(), commit.getCommitterIdent());
-		assertEquals(parentCount, commit.getParentCount());
+		assertEquals(2, commit.getParentCount());
 
 		// Load parents
 		RevWalk walk = new RevWalk(db);
@@ -166,18 +154,6 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	private List<DiffEntry> diffIndexAgainstWorking(final RevCommit commit)
-			throws IOException {
-		TreeWalk walk = createTreeWalk();
-		try {
-			walk.addTree(commit.getParent(1).getTree());
-			walk.addTree(commit.getTree());
-			return DiffEntry.scan(walk);
-		} finally {
-			walk.release();
-		}
-	}
-
 	@Test
 	public void noLocalChanges() throws Exception {
 		assertNull(git.stashCreate().call());
@@ -215,26 +191,6 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals(1, diffs.size());
 		assertEquals(DiffEntry.ChangeType.ADD, diffs.get(0).getChangeType());
 		assertEquals("file2.txt", diffs.get(0).getNewPath());
-	}
-
-	@Test
-	public void newFileInIndexThenModifiedInWorkTree() throws Exception {
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		writeTrashFile("file", "content2");
-		RevCommit stashedWorkTree = Git.wrap(db).stashCreate().call();
-		validateStashedCommit(stashedWorkTree);
-		RevWalk walk = new RevWalk(db);
-		RevCommit stashedIndex = stashedWorkTree.getParent(1);
-		walk.parseBody(stashedIndex);
-		walk.parseBody(stashedIndex.getTree());
-		walk.parseBody(stashedIndex.getParent(0));
-		List<DiffEntry> workTreeStashAgainstWorkTree = diffWorkingAgainstHead(stashedWorkTree);
-		assertEquals(1, workTreeStashAgainstWorkTree.size());
-		List<DiffEntry> workIndexAgainstWorkTree = diffIndexAgainstHead(stashedWorkTree);
-		assertEquals(1, workIndexAgainstWorkTree.size());
-		List<DiffEntry> indexStashAgainstWorkTree = diffIndexAgainstWorking(stashedWorkTree);
-		assertEquals(1, indexStashAgainstWorkTree.size());
 	}
 
 	@Test
@@ -335,7 +291,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals("content", read(committedFile));
 		validateStashedCommit(stashed);
 
-		assertEquals(stashed.getParent(1).getTree(), stashed.getTree());
+		assertTrue(stashed.getTree().equals(stashed.getParent(1).getTree()));
 
 		List<DiffEntry> workingDiffs = diffWorkingAgainstHead(stashed);
 		assertEquals(1, workingDiffs.size());
@@ -370,7 +326,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 
 		validateStashedCommit(stashed);
 
-		assertEquals(stashed.getParent(1).getTree(), stashed.getTree());
+		assertTrue(stashed.getTree().equals(stashed.getParent(1).getTree()));
 
 		List<DiffEntry> workingDiffs = diffWorkingAgainstHead(stashed);
 		assertEquals(1, workingDiffs.size());
@@ -452,7 +408,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals("content", read(committedFile));
 		validateStashedCommit(stashed);
 
-		ReflogReader reader = git.getRepository().getReflogReader(
+		ReflogReader reader = new ReflogReader(git.getRepository(),
 				Constants.R_STASH);
 		ReflogEntry entry = reader.getLastEntry();
 		assertNotNull(entry);
@@ -460,46 +416,5 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals(stashed, entry.getNewId());
 		assertEquals(who, entry.getWho());
 		assertEquals(stashed.getFullMessage(), entry.getComment());
-	}
-
-	@Test(expected = UnmergedPathsException.class)
-	public void unmergedPathsShouldCauseException() throws Exception {
-		commitFile("file.txt", "master", "base");
-		RevCommit side = commitFile("file.txt", "side", "side");
-		commitFile("file.txt", "master", "master");
-		git.merge().include(side).call();
-
-		git.stashCreate().call();
-	}
-
-	@Test
-	public void untrackedFileIncluded() throws Exception {
-		String trackedPath = "tracked.txt";
-		writeTrashFile(trackedPath, "content2");
-		git.add().addFilepattern(trackedPath).call();
-
-		RevCommit stashed = git.stashCreate()
-				.setIncludeUntracked(true).call();
-		validateStashedCommit(stashed, 3);
-
-		assertEquals(
-				"Expected commits for workingDir,stashedIndex and untrackedFiles.",
-				3, stashed.getParentCount());
-		assertFalse("untracked file should be deleted.", untrackedFile.exists());
-	}
-
-	@Test
-	public void untrackedFileNotIncluded() throws Exception {
-		String trackedPath = "tracked.txt";
-		// at least one modification needed
-		writeTrashFile(trackedPath, "content2");
-		git.add().addFilepattern(trackedPath).call();
-
-		RevCommit stashed = git.stashCreate().call();
-		validateStashedCommit(stashed);
-
-		assertTrue("untracked file should be left untouched.",
-				untrackedFile.exists());
-		assertEquals("content", read(untrackedFile));
 	}
 }

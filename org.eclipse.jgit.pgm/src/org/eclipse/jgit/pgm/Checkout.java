@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,23 +43,10 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
 
 @Command(common = true, usage = "usage_checkout")
 class Checkout extends TextBuiltin {
@@ -71,65 +57,15 @@ class Checkout extends TextBuiltin {
 	@Option(name = "--force", aliases = { "-f" }, usage = "usage_forceCheckout")
 	private boolean force = false;
 
-	@Option(name = "--orphan", usage = "usage_orphan")
-	private boolean orphan = false;
-
-	@Argument(required = true, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
+	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_checkout")
 	private String name;
-
-	@Argument(index = 1)
-	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
-		if (createBranch) {
-			final ObjectId head = db.resolve(Constants.HEAD);
-			if (head == null)
-				throw die(CLIText.get().onBranchToBeBorn);
-		}
-
 		CheckoutCommand command = new Git(db).checkout();
-		if (paths.size() > 0) {
-			command.setStartPoint(name);
-			for (String path : paths)
-				command.addPath(path);
-		} else {
-			command.setCreateBranch(createBranch);
-			command.setName(name);
-			command.setForce(force);
-			command.setOrphan(orphan);
-		}
-		try {
-			String oldBranch = db.getBranch();
-			Ref ref = command.call();
-			if (ref == null)
-				return;
-			if (Repository.shortenRefName(ref.getName()).equals(oldBranch)) {
-				outw.println(MessageFormat.format(
-						CLIText.get().alreadyOnBranch,
-						name));
-				return;
-			}
-			if (createBranch || orphan)
-				outw.println(MessageFormat.format(
-						CLIText.get().switchedToNewBranch, name));
-			else
-				outw.println(MessageFormat.format(
-						CLIText.get().switchedToBranch,
-						Repository.shortenRefName(ref.getName())));
-		} catch (RefNotFoundException e) {
-			outw.println(MessageFormat.format(
-					CLIText.get().pathspecDidNotMatch,
-					name));
-		} catch (RefAlreadyExistsException e) {
-			throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
-					name));
-		} catch (CheckoutConflictException e) {
-			outw.println(CLIText.get().checkoutConflict);
-			for (String path : e.getConflictingPaths())
-				outw.println(MessageFormat.format(
-						CLIText.get().checkoutConflictPathLine, path));
-		}
+		command.setCreateBranch(createBranch);
+		command.setName(name);
+		command.setForce(force);
+		command.call();
 	}
 }

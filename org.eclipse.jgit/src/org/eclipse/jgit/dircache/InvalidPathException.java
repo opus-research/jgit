@@ -60,10 +60,6 @@ public class InvalidPathException extends IllegalArgumentException {
 	 * @param path
 	 */
 	public InvalidPathException(String path) {
-		this(JGitText.get().invalidPath, path);
-	}
-
-	InvalidPathException(String messagePattern, Object... arguments) {
-		super(MessageFormat.format(messagePattern, arguments));
+		super(MessageFormat.format(JGitText.get().invalidPath, path));
 	}
 }
