@@ -403,7 +403,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
-	/***/ public String invalidShallowObject;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
