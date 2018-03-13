@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,60 +41,51 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.glue;
+package org.eclipse.jgit.storage.dfs;
 
-import java.io.IOException;
-import java.text.MessageFormat;
+/** A description of a Git repository on a DFS. */
+public class DfsRepositoryDescription {
+	private final String repositoryName;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-
-import org.eclipse.jgit.http.server.HttpServerText;
-
-/**
- * Switch servlet path and path info to use another regex match group.
- * <p>
- * This filter is meant to be installed in the middle of a pipeline created by
- * {@link MetaServlet#serveRegex(String)}. The passed request's servlet path is
- * updated to be all text up to the start of the designated capture group, and
- * the path info is changed to the contents of the capture group.
- **/
-public class RegexGroupFilter implements Filter {
-	private final int groupIdx;
+	/** Initialize a new, empty repository description. */
+	public DfsRepositoryDescription() {
+		this(null);
+	}
 
 	/**
-	 * @param groupIdx
-	 *            capture group number, 1 through the number of groups.
+	 * Initialize a new repository description.
+	 *
+	 * @param repositoryName
+	 *             the name of the repository.
 	 */
-	public RegexGroupFilter(final int groupIdx) {
-		if (groupIdx < 1)
-			throw new IllegalArgumentException(MessageFormat.format(HttpServerText.get().invalidIndex, groupIdx));
-		this.groupIdx = groupIdx - 1;
+	public DfsRepositoryDescription(String repositoryName) {
+		this.repositoryName = repositoryName;
 	}
 
-	public void init(FilterConfig config) throws ServletException {
-		// Do nothing.
+	/** @return the name of the repository. */
+	public String getRepositoryName() {
+		return repositoryName;
 	}
 
-	public void destroy() {
-		// Do nothing.
+	@Override
+	public int hashCode() {
+		if (getRepositoryName() != null)
+			return getRepositoryName().hashCode();
+		return System.identityHashCode(this);
 	}
 
-	public void doFilter(final ServletRequest request,
-			final ServletResponse rsp, final FilterChain chain)
-			throws IOException, ServletException {
-		final WrappedRequest[] g = groupsFor(request);
-		if (groupIdx < g.length)
-			chain.doFilter(g[groupIdx], rsp);
-		else
-			throw new ServletException(MessageFormat.format(HttpServerText.get().invalidRegexGroup, (groupIdx + 1)));
+	@Override
+	public boolean equals(Object b) {
+		if (b instanceof DfsRepositoryDescription){
+			String name = getRepositoryName();
+			String otherName = ((DfsRepositoryDescription) b).getRepositoryName();
+			return name != null ? name.equals(otherName) : this == b;
+		}
+		return false;
 	}
 
-	private static WrappedRequest[] groupsFor(final ServletRequest r) {
-		return (WrappedRequest[]) r.getAttribute(MetaFilter.REGEX_GROUPS);
+	@Override
+	public String toString() {
+		return "DfsRepositoryDescription[" + getRepositoryName() + "]";
 	}
 }

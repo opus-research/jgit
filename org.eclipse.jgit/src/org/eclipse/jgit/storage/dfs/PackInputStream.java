@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,60 +41,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.glue;
+package org.eclipse.jgit.storage.dfs;
 
 import java.io.IOException;
-import java.text.MessageFormat;
+import java.io.InputStream;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
+final class PackInputStream extends InputStream {
+	private final DfsReader ctx;
 
-import org.eclipse.jgit.http.server.HttpServerText;
+	private final DfsPackFile pack;
 
-/**
- * Switch servlet path and path info to use another regex match group.
- * <p>
- * This filter is meant to be installed in the middle of a pipeline created by
- * {@link MetaServlet#serveRegex(String)}. The passed request's servlet path is
- * updated to be all text up to the start of the designated capture group, and
- * the path info is changed to the contents of the capture group.
- **/
-public class RegexGroupFilter implements Filter {
-	private final int groupIdx;
+	private long pos;
 
-	/**
-	 * @param groupIdx
-	 *            capture group number, 1 through the number of groups.
-	 */
-	public RegexGroupFilter(final int groupIdx) {
-		if (groupIdx < 1)
-			throw new IllegalArgumentException(MessageFormat.format(HttpServerText.get().invalidIndex, groupIdx));
-		this.groupIdx = groupIdx - 1;
+	PackInputStream(DfsPackFile pack, long pos, DfsReader ctx)
+			throws IOException {
+		this.pack = pack;
+		this.pos = pos;
+		this.ctx = ctx;
+
+		// Pin the first window, to ensure the pack is open and valid.
+		//
+		ctx.pin(pack, pos);
 	}
 
-	public void init(FilterConfig config) throws ServletException {
-		// Do nothing.
+	@Override
+	public int read(byte[] b, int off, int len) throws IOException {
+		int n = ctx.copy(pack, pos, b, off, len);
+		pos += n;
+		return n;
 	}
 
-	public void destroy() {
-		// Do nothing.
+	@Override
+	public int read() throws IOException {
+		byte[] buf = new byte[1];
+		int n = read(buf, 0, 1);
+		return n == 1 ? buf[0] & 0xff : -1;
 	}
 
-	public void doFilter(final ServletRequest request,
-			final ServletResponse rsp, final FilterChain chain)
-			throws IOException, ServletException {
-		final WrappedRequest[] g = groupsFor(request);
-		if (groupIdx < g.length)
-			chain.doFilter(g[groupIdx], rsp);
-		else
-			throw new ServletException(MessageFormat.format(HttpServerText.get().invalidRegexGroup, (groupIdx + 1)));
-	}
-
-	private static WrappedRequest[] groupsFor(final ServletRequest r) {
-		return (WrappedRequest[]) r.getAttribute(MetaFilter.REGEX_GROUPS);
+	@Override
+	public void close() {
+		ctx.release();
 	}
 }
