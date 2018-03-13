@@ -40,6 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+// Copyright 2011 Google Inc. All Rights Reserved.
 
 package org.eclipse.jgit.storage.dfs;
 
@@ -69,9 +70,8 @@ public class DfsRepositoryDescription {
 
 	@Override
 	public int hashCode() {
-		if (getRepositoryName() != null)
-			return getRepositoryName().hashCode();
-		return System.identityHashCode(this);
+		return getRepositoryName() != null ? getRepositoryName().hashCode() :
+				System.identityHashCode(this);
 	}
 
 	@Override
