@@ -143,8 +143,7 @@ public class BlameGenerator {
 	private int remaining;
 
 	/** Blame is currently assigned to this source. */
-	private Candidate outCandidate;
-	private Region outRegion;
+	private Candidate currentSource;
 
 	/**
 	 * Create a blame generator for the repository and path (relative to
@@ -467,19 +466,19 @@ public class BlameGenerator {
 	 */
 	public boolean next() throws IOException {
 		// If there is a source still pending, produce the next region.
-		if (outRegion != null) {
-			Region r = outRegion;
+		if (currentSource != null) {
+			Region r = currentSource.regionList;
+			Region n = r.next;
 			remaining -= r.length;
-			if (r.next != null) {
-				outRegion = r.next;
+			if (n != null) {
+				currentSource.regionList = n;
 				return true;
 			}
 
-			if (outCandidate.queueNext != null)
-				return result(outCandidate.queueNext);
+			if (currentSource.queueNext != null)
+				return result(currentSource.queueNext);
 
-			outCandidate = null;
-			outRegion = null;
+			currentSource = null;
 		}
 
 		// If there are no lines remaining, the entire result is done,
@@ -521,8 +520,7 @@ public class BlameGenerator {
 	private boolean result(Candidate n) throws IOException {
 		if (n.sourceCommit != null)
 			revPool.parseBody(n.sourceCommit);
-		outCandidate = n;
-		outRegion = n.regionList;
+		currentSource = n;
 		return true;
 	}
 
@@ -849,12 +847,12 @@ public class BlameGenerator {
 	 * @return current revision being blamed.
 	 */
 	public RevCommit getSourceCommit() {
-		return outCandidate.sourceCommit;
+		return currentSource.sourceCommit;
 	}
 
 	/** @return current author being blamed. */
 	public PersonIdent getSourceAuthor() {
-		return outCandidate.getAuthor();
+		return currentSource.getAuthor();
 	}
 
 	/** @return current committer being blamed. */
@@ -865,12 +863,12 @@ public class BlameGenerator {
 
 	/** @return path of the file being blamed. */
 	public String getSourcePath() {
-		return outCandidate.sourcePath.getPath();
+		return currentSource.sourcePath.getPath();
 	}
 
 	/** @return rename score if a rename occurred in {@link #getSourceCommit}. */
 	public int getRenameScore() {
-		return outCandidate.renameScore;
+		return currentSource.renameScore;
 	}
 
 	/**
@@ -880,7 +878,7 @@ public class BlameGenerator {
 	 *         {@link #getSourcePath()}.
 	 */
 	public int getSourceStart() {
-		return outRegion.sourceStart;
+		return currentSource.regionList.sourceStart;
 	}
 
 	/**
@@ -890,7 +888,7 @@ public class BlameGenerator {
 	 *         {@link #getSourcePath()}.
 	 */
 	public int getSourceEnd() {
-		Region r = outRegion;
+		Region r = currentSource.regionList;
 		return r.sourceStart + r.length;
 	}
 
@@ -899,7 +897,7 @@ public class BlameGenerator {
 	 *         blamed for providing. Line numbers use 0 based indexing.
 	 */
 	public int getResultStart() {
-		return outRegion.resultStart;
+		return currentSource.regionList.resultStart;
 	}
 
 	/**
@@ -910,7 +908,7 @@ public class BlameGenerator {
 	 *         than {@link #getResultStart()}.
 	 */
 	public int getResultEnd() {
-		Region r = outRegion;
+		Region r = currentSource.regionList;
 		return r.resultStart + r.length;
 	}
 
@@ -921,7 +919,7 @@ public class BlameGenerator {
 	 *         {@code getSourceEnd() - getSourceStart()}.
 	 */
 	public int getRegionLength() {
-		return outRegion.length;
+		return currentSource.regionList.length;
 	}
 
 	/**
@@ -932,7 +930,7 @@ public class BlameGenerator {
 	 *         applications will want the result contents for display to users.
 	 */
 	public RawText getSourceContents() {
-		return outCandidate.sourceText;
+		return currentSource.sourceText;
 	}
 
 	/**
@@ -953,8 +951,7 @@ public class BlameGenerator {
 	public void release() {
 		revPool.release();
 		queue = null;
-		outCandidate = null;
-		outRegion = null;
+		currentSource = null;
 	}
 
 	private boolean find(RevCommit commit, PathFilter path) throws IOException {
