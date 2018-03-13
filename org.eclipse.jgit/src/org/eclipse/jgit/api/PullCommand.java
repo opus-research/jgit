@@ -197,6 +197,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 * @throws GitAPIException
 	 */
+	@Override
 	public PullResult call() throws GitAPIException,
 			WrongRepositoryStateException, InvalidConfigurationException,
 			DetachedHeadException, InvalidRemoteException, CanceledException,
@@ -418,7 +419,7 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 *
 	 * @param tagOpt
 	 * @return {@code this}
-	 * @Since 4.7
+	 * @since 4.7
 	 */
 	public PullCommand setTagOpt(TagOpt tagOpt) {
 		checkCallable();
