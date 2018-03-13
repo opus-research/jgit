@@ -564,8 +564,7 @@ public class PackWriter implements AutoCloseable {
 	 * Configure this pack for a shallow clone.
 	 *
 	 * @param depth
-	 *            maximum depth of history to return. 1 means return only the
-	 *            "wants".
+	 *            maximum depth to traverse the commit graph
 	 * @param unshallow
 	 *            objects which used to be shallow on the client, but are being
 	 *            extended as part of this fetch
@@ -712,7 +711,7 @@ public class PackWriter implements AutoCloseable {
 			@NonNull Set<? extends ObjectId> have) throws IOException {
 		ObjectWalk ow;
 		if (shallowPack)
-			ow = new DepthWalk.ObjectWalk(reader, depth - 1);
+			ow = new DepthWalk.ObjectWalk(reader, depth);
 		else
 			ow = new ObjectWalk(reader);
 		preparePack(countingMonitor, ow, want, have);
@@ -753,8 +752,7 @@ public class PackWriter implements AutoCloseable {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
 		if (shallowPack && !(walk instanceof DepthWalk.ObjectWalk))
-			throw new IllegalArgumentException(
-					JGitText.get().shallowPacksRequireDepthWalk);
+			walk = new DepthWalk.ObjectWalk(reader, depth);
 		findObjectsToPack(countingMonitor, walk, interestingObjects,
 				uninterestingObjects);
 	}
@@ -1656,7 +1654,7 @@ public class PackWriter implements AutoCloseable {
 		List<RevTag> wantTags = new ArrayList<RevTag>(want.size());
 
 		// Retrieve the RevWalk's versions of "want" and "have" objects to
-		// maintain any state previously set in the RevWalk.
+		// maintain any flags previously set in the RevWalk.
 		AsyncRevObjectQueue q = walker.parseAny(all, true);
 		try {
 			for (;;) {
