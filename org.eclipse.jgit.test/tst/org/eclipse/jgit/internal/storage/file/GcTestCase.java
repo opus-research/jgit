@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,75 +41,73 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.internal.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
 import java.io.IOException;
 
+import org.eclipse.jgit.internal.storage.file.GC.RepoStatistics;
+import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.junit.TestRepository.CommitBuilder;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
 
-public class FSJava7Test {
-	private File trash;
+public abstract class GcTestCase extends LocalDiskRepositoryTestCase {
+	protected TestRepository<FileRepository> tr;
+	protected FileRepository repo;
+	protected GC gc;
+	protected RepoStatistics stats;
 
 	@Before
 	public void setUp() throws Exception {
-		trash = File.createTempFile("tmp_", "");
-		trash.delete();
-		assertTrue("mkdir " + trash, trash.mkdir());
+		super.setUp();
+		repo = createWorkRepository();
+		tr = new TestRepository<FileRepository>((repo));
+		gc = new GC(repo);
 	}
 
 	@After
 	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+		super.tearDown();
 	}
 
 	/**
-	 * The old File methods traverse symbolic links and look at the targets.
-	 * With symbolic links we usually want to modify/look at the link. For some
-	 * reason the executable attribute seems to always look at the target, but
-	 * for the other attributes like lastModified, hidden and exists we must
-	 * differ between the link and the target.
+	 * Create a chain of commits of given depth.
+	 * <p>
+	 * Each commit contains one file named "a" containing the index of the
+	 * commit in the chain as its content. The created commit chain is
+	 * referenced from any ref.
+	 * <p>
+	 * A chain of depth = N will create 3*N objects in Gits object database. For
+	 * each depth level three objects are created: the commit object, the
+	 * top-level tree object and a blob for the content of the file "a".
 	 *
-	 * @throws IOException
-	 * @throws InterruptedException
+	 * @param depth
+	 *            the depth of the commit chain.
+	 * @return the commit that is the tip of the commit chain
+	 * @throws Exception
 	 */
-	@Test
-	public void testSymlinkAttributes() throws IOException, InterruptedException {
-		FS fs = FS.DETECTED;
-		File link = new File(trash, "x");
-		File target = new File(trash, "y");
-		fs.createSymLink(link, "y");
-		assertTrue(fs.exists(link));
-		String targetName = fs.readSymLink(link);
-		assertEquals("y", targetName);
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.exists(link));
-		assertFalse(fs.canExecute(link));
-		assertEquals(1, fs.length(link));
-		assertFalse(fs.exists(target));
-		assertFalse(fs.isFile(target));
-		assertFalse(fs.isDirectory(target));
-		assertFalse(fs.canExecute(target));
-
-		RepositoryTestCase.fsTick(link);
-		// Now create the link target
-		FileUtils.createNewFile(target);
-		assertTrue(fs.exists(link));
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.lastModified(target) > fs.lastModified(link));
-		assertFalse(fs.canExecute(link));
-		fs.setExecute(target, true);
-		assertFalse(fs.canExecute(link));
-		assertTrue(fs.canExecute(target));
+	protected RevCommit commitChain(int depth) throws Exception {
+		if (depth <= 0)
+			throw new IllegalArgumentException("Chain depth must be > 0");
+		CommitBuilder cb = tr.commit();
+		RevCommit tip;
+		do {
+			--depth;
+			tip = cb.add("a", "" + depth).message("" + depth).create();
+			cb = cb.child();
+		} while (depth > 0);
+		return tip;
 	}
 
+	protected long lastModified(AnyObjectId objectId) {
+		return repo.getObjectDatabase().fileFor(objectId).lastModified();
+	}
+
+	protected static void fsTick() throws InterruptedException, IOException {
+		RepositoryTestCase.fsTick(null);
+	}
 }

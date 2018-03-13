@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,50 +40,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.internal.storage.file;
 
-import java.util.Arrays;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.util.GitDateFormatter;
-import org.eclipse.jgit.util.GitDateFormatter.Format;
-import org.junit.Before;
+import java.util.Collections;
+
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.revwalk.RevBlob;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.junit.Test;
 
-/**
- * Test construction of squash message by {@link SquashMessageFormatterTest}.
- */
-public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
-	private GitDateFormatter dateFormatter;
-	private SquashMessageFormatter msgFormatter;
-	private RevCommit revCommit;
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		dateFormatter = new GitDateFormatter(Format.DEFAULT);
-		msgFormatter = new SquashMessageFormatter();
+public class GcTagTest extends GcTestCase {
+	@Test
+	public void lightweightTag_objectNotPruned() throws Exception {
+		RevBlob a = tr.blob("a");
+		tr.lightweightTag("t", a);
+		gc.setExpireAgeMillis(0);
+		fsTick();
+		gc.prune(Collections.<ObjectId> emptySet());
+		assertTrue(repo.hasObject(a));
 	}
 
 	@Test
-	public void testCommit() throws Exception {
-		Git git = new Git(db);
-		revCommit = git.commit().setMessage("squash_me").call();
+	public void annotatedTag_objectNotPruned() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevTag t = tr.tag("t", a); // this doesn't create the refs/tags/t ref
+		tr.lightweightTag("t", t);
 
-		Ref master = db.getRef("refs/heads/master");
-		String message = msgFormatter.format(Arrays.asList(revCommit), master);
-		assertEquals(
-				"Squashed commit of the following:\n\ncommit "
-						+ revCommit.getName() + "\nAuthor: "
-						+ revCommit.getAuthorIdent().getName() + " <"
-						+ revCommit.getAuthorIdent().getEmailAddress()
-						+ ">\nDate:   " + dateFormatter.formatDate(author)
-						+ "\n\n\tsquash_me\n", message);
+		gc.setExpireAgeMillis(0);
+		fsTick();
+		gc.prune(Collections.<ObjectId> emptySet());
+		assertTrue(repo.hasObject(t));
+		assertTrue(repo.hasObject(a));
 	}
 }

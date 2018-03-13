@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,75 +41,64 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.internal.storage.file;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.Iterator;
 
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.After;
-import org.junit.Before;
+import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
+import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.junit.Test;
 
-public class FSJava7Test {
-	private File trash;
-
-	@Before
-	public void setUp() throws Exception {
-		trash = File.createTempFile("tmp_", "");
-		trash.delete();
-		assertTrue("mkdir " + trash, trash.mkdir());
-	}
-
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
-	}
-
-	/**
-	 * The old File methods traverse symbolic links and look at the targets.
-	 * With symbolic links we usually want to modify/look at the link. For some
-	 * reason the executable attribute seems to always look at the target, but
-	 * for the other attributes like lastModified, hidden and exists we must
-	 * differ between the link and the target.
-	 *
-	 * @throws IOException
-	 * @throws InterruptedException
-	 */
+public class GcKeepFilesTest extends GcTestCase {
 	@Test
-	public void testSymlinkAttributes() throws IOException, InterruptedException {
-		FS fs = FS.DETECTED;
-		File link = new File(trash, "x");
-		File target = new File(trash, "y");
-		fs.createSymLink(link, "y");
-		assertTrue(fs.exists(link));
-		String targetName = fs.readSymLink(link);
-		assertEquals("y", targetName);
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.exists(link));
-		assertFalse(fs.canExecute(link));
-		assertEquals(1, fs.length(link));
-		assertFalse(fs.exists(target));
-		assertFalse(fs.isFile(target));
-		assertFalse(fs.isDirectory(target));
-		assertFalse(fs.canExecute(target));
+	public void testKeepFiles() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		bb.commit().add("A", "A").add("B", "B").create();
+		stats = gc.getStatistics();
+		assertEquals(4, stats.numberOfLooseObjects);
+		assertEquals(0, stats.numberOfPackedObjects);
+		assertEquals(0, stats.numberOfPackFiles);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(4, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
 
-		RepositoryTestCase.fsTick(link);
-		// Now create the link target
-		FileUtils.createNewFile(target);
-		assertTrue(fs.exists(link));
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.lastModified(target) > fs.lastModified(link));
-		assertFalse(fs.canExecute(link));
-		fs.setExecute(target, true);
-		assertFalse(fs.canExecute(link));
-		assertTrue(fs.canExecute(target));
+		Iterator<PackFile> packIt = repo.getObjectDatabase().getPacks()
+				.iterator();
+		PackFile singlePack = packIt.next();
+		assertFalse(packIt.hasNext());
+		File keepFile = new File(singlePack.getPackFile().getPath() + ".keep");
+		assertFalse(keepFile.exists());
+		assertTrue(keepFile.createNewFile());
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		stats = gc.getStatistics();
+		assertEquals(4, stats.numberOfLooseObjects);
+		assertEquals(4, stats.numberOfPackedObjects);
+		assertEquals(1, stats.numberOfPackFiles);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		assertEquals(8, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
+
+		// check that no object is packed twice
+		Iterator<PackFile> packs = repo.getObjectDatabase().getPacks()
+				.iterator();
+		PackIndex ind1 = packs.next().getIndex();
+		assertEquals(4, ind1.getObjectCount());
+		PackIndex ind2 = packs.next().getIndex();
+		assertEquals(4, ind2.getObjectCount());
+		for (MutableEntry e: ind1)
+			if (ind2.hasObject(e.toObjectId()))
+				assertFalse(
+						"the following object is in both packfiles: "
+								+ e.toObjectId(),
+						ind2.hasObject(e.toObjectId()));
 	}
-
 }
