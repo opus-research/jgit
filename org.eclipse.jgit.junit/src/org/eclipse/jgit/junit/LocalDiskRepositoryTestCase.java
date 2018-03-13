@@ -364,7 +364,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		FileRepository db = new FileRepository(gitdir);
 		assertFalse(gitdir.exists());
 		db.create(bare);
-		addRepoToClose(db);
+		toClose.add(db);
 		return db;
 	}
 
