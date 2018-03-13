@@ -57,8 +57,6 @@ import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
 import org.eclipse.jgit.storage.pack.PackConfig;
 
 final class DeltaTask implements Callable<Object> {
-	static final long MAX_METER = 9 << 20;
-
 	static final class Block {
 		private static final int MIN_TOP_PATH = 50 << 20;
 
@@ -73,7 +71,6 @@ final class DeltaTask implements Callable<Object> {
 		final int endIndex;
 
 		private long totalWeight;
-		private long bytesPerUnit;
 
 		Block(int threads, PackConfig config, ObjectReader reader,
 				DeltaCache dc, ThreadSafeProgressMonitor pm,
@@ -89,14 +86,7 @@ final class DeltaTask implements Callable<Object> {
 			this.endIndex = end;
 		}
 
-		int cost() {
-			int d = (int) (totalWeight / bytesPerUnit);
-			if (totalWeight % bytesPerUnit != 0)
-				d++;
-			return d;
-		}
-
-		synchronized DeltaWindow stealWork(DeltaTask forThread) {
+		synchronized Slice stealWork() {
 			for (;;) {
 				DeltaTask maxTask = null;
 				Slice maxSlice = null;
@@ -113,13 +103,13 @@ final class DeltaTask implements Callable<Object> {
 				if (maxTask == null)
 					return null;
 				if (maxTask.tryStealWork(maxSlice))
-					return forThread.initWindow(maxSlice);
+					return maxSlice;
 			}
 		}
 
 		void partitionTasks() {
-			ArrayList<WeightedPath> topPaths = computeTopPaths();
-			Iterator<WeightedPath> topPathItr = topPaths.iterator();
+			ArrayList<TopPath> topPaths = computeTopPaths();
+			Iterator<TopPath> topPathItr = topPaths.iterator();
 			int nextTop = 0;
 			long weightPerThread = totalWeight / threads;
 			for (int i = beginIndex; i < endIndex;) {
@@ -128,7 +118,7 @@ final class DeltaTask implements Callable<Object> {
 
 				// Assign the thread one top path.
 				if (topPathItr.hasNext()) {
-					WeightedPath p = topPathItr.next();
+					TopPath p = topPathItr.next();
 					w += p.weight;
 					task.add(p.slice);
 				}
@@ -160,7 +150,7 @@ final class DeltaTask implements Callable<Object> {
 					tasks.add(task);
 			}
 			while (topPathItr.hasNext()) {
-				WeightedPath p = topPathItr.next();
+				TopPath p = topPathItr.next();
 				DeltaTask task = new DeltaTask(this);
 				task.add(p.slice);
 				tasks.add(task);
@@ -169,9 +159,8 @@ final class DeltaTask implements Callable<Object> {
 			topPaths = null;
 		}
 
-		private ArrayList<WeightedPath> computeTopPaths() {
-			ArrayList<WeightedPath> topPaths = new ArrayList<WeightedPath>(
-					threads);
+		private ArrayList<TopPath> computeTopPaths() {
+			ArrayList<TopPath> topPaths = new ArrayList<TopPath>(threads);
 			int cp = beginIndex;
 			int ch = list[cp].getPathHash();
 			long cw = list[cp].getWeight();
@@ -182,13 +171,12 @@ final class DeltaTask implements Callable<Object> {
 				if (ch != o.getPathHash()) {
 					if (MIN_TOP_PATH < cw) {
 						if (topPaths.size() < threads) {
-							Slice s = new Slice(cp, i);
-							topPaths.add(new WeightedPath(cw, s));
+							TopPath p = new TopPath(cw, ch, new Slice(cp, i));
+							topPaths.add(p);
 							if (topPaths.size() == threads)
 								Collections.sort(topPaths);
 						} else if (topPaths.get(0).weight < cw) {
-							Slice s = new Slice(cp, i);
-							WeightedPath p = new WeightedPath(cw, s);
+							TopPath p = new TopPath(cw, ch, new Slice(cp, i));
 							topPaths.set(0, p);
 							if (p.compareTo(topPaths.get(1)) > 0)
 								Collections.sort(topPaths);
@@ -205,29 +193,27 @@ final class DeltaTask implements Callable<Object> {
 			}
 
 			// Sort by starting index to identify gaps later.
-			Collections.sort(topPaths, new Comparator<WeightedPath>() {
-				public int compare(WeightedPath a, WeightedPath b) {
+			Collections.sort(topPaths, new Comparator<TopPath>() {
+				public int compare(TopPath a, TopPath b) {
 					return a.slice.beginIndex - b.slice.beginIndex;
 				}
 			});
-
-			bytesPerUnit = 1;
-			while (MAX_METER <= (totalWeight / bytesPerUnit))
-				bytesPerUnit <<= 10;
 			return topPaths;
 		}
 	}
 
-	static final class WeightedPath implements Comparable<WeightedPath> {
+	static final class TopPath implements Comparable<TopPath> {
 		final long weight;
+		final int pathHash;
 		final Slice slice;
 
-		WeightedPath(long weight, Slice s) {
+		TopPath(long weight, int pathHash, Slice s) {
 			this.weight = weight;
+			this.pathHash = pathHash;
 			this.slice = s;
 		}
 
-		public int compareTo(WeightedPath o) {
+		public int compareTo(TopPath o) {
 			int cmp = Long.signum(weight - o.weight);
 			if (cmp != 0)
 				return cmp;
@@ -251,8 +237,6 @@ final class DeltaTask implements Callable<Object> {
 
 	private final Block block;
 	private final LinkedList<Slice> slices;
-
-	private ObjectReader or;
 	private DeltaWindow dw;
 
 	DeltaTask(Block b) {
@@ -273,44 +257,36 @@ final class DeltaTask implements Callable<Object> {
 	}
 
 	public Object call() throws Exception {
-		or = block.templateReader.newReader();
+		ObjectReader or = block.templateReader.newReader();
 		try {
-			DeltaWindow w;
 			for (;;) {
+				Slice s;
 				synchronized (this) {
 					if (slices.isEmpty())
 						break;
-					w = initWindow(slices.removeFirst());
+					s = slices.removeFirst();
 				}
-				runWindow(w);
+				doSlice(or, s);
 			}
-			while ((w = block.stealWork(this)) != null)
-				runWindow(w);
+			for (Slice s = block.stealWork(); s != null; s = block.stealWork())
+				doSlice(or, s);
 		} finally {
-			block.pm.endWorker();
 			or.release();
-			or = null;
+			block.pm.endWorker();
 		}
 		return null;
 	}
 
-	DeltaWindow initWindow(Slice s) {
+	private void doSlice(ObjectReader or, Slice s) throws IOException {
 		DeltaWindow w = new DeltaWindow(block.config, block.dc,
-				or, block.pm, block.bytesPerUnit,
+				or, block.pm,
 				block.list, s.beginIndex, s.endIndex);
 		synchronized (this) {
 			dw = w;
 		}
-		return w;
-	}
-
-	private void runWindow(DeltaWindow w) throws IOException {
-		try {
-			w.search();
-		} finally {
-			synchronized (this) {
-				dw = null;
-			}
+		w.search();
+		synchronized (this) {
+			dw = null;
 		}
 	}
 
