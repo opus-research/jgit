@@ -235,14 +235,17 @@ public class UploadPack implements UploadSession {
 		refFilter = RefFilter.DEFAULT;
 	}
 
+	/** @return the repository this upload is reading from. */
 	public final Repository getRepository() {
 		return db;
 	}
 
+	/** @return the RevWalk instance used by this connection. */
 	public final RevWalk getRevWalk() {
 		return walk;
 	}
 
+	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		if (refs == null)
 			setAdvertisedRefs(db.getAllRefs());
@@ -260,6 +263,7 @@ public class UploadPack implements UploadSession {
 		refs = refFilter.filter(allRefs);
 	}
 
+	/** @return timeout (in seconds) before aborting an IO operation. */
 	public int getTimeout() {
 		return timeout;
 	}
@@ -276,6 +280,10 @@ public class UploadPack implements UploadSession {
 		timeout = seconds;
 	}
 
+	/**
+	 * @return true if this class expects a bi-directional pipe opened between
+	 *         the client and itself. The default is true.
+	 */
 	public boolean isBiDirectionalPipe() {
 		return biDirectionalPipe;
 	}
@@ -295,6 +303,7 @@ public class UploadPack implements UploadSession {
 			requestPolicy = RequestPolicy.REACHABLE_COMMIT;
 	}
 
+	/** @return policy used by the service to validate client requests. */
 	public RequestPolicy getRequestPolicy() {
 		return requestPolicy;
 	}
@@ -312,6 +321,7 @@ public class UploadPack implements UploadSession {
 		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
 	}
 
+	/** @return the filter used while advertising the refs to the client */
 	public RefFilter getRefFilter() {
 		return refFilter;
 	}
@@ -331,6 +341,7 @@ public class UploadPack implements UploadSession {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
+	/** @return the configured upload hook. */
 	public PreUploadHook getPreUploadHook() {
 		return preUploadHook;
 	}
@@ -356,6 +367,7 @@ public class UploadPack implements UploadSession {
 		this.packConfig = pc;
 	}
 
+	/** @return the configured logger. */
 	public UploadPackLogger getLogger() {
 		return logger;
 	}
@@ -419,6 +431,13 @@ public class UploadPack implements UploadSession {
 		}
 	}
 
+	/**
+	 * Get the PackWriter's statistics if a pack was sent to the client.
+	 *
+	 * @return statistics about pack output, if a pack was sent. Null if no pack
+	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         connection, or if the client was already up-to-date.
+	 */
 	public PackWriter.Statistics getPackStatistics() {
 		return statistics;
 	}
