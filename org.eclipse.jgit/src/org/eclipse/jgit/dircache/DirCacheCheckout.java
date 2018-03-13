@@ -80,7 +80,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.util.BuiltinCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.FileUtils;
@@ -719,10 +718,23 @@ public class DirCacheCheckout {
 			return;
 		}
 
-		// if we have no file at all then there is nothing to do
-		if ((ffMask & 0x222) == 0
-				&& (f == null || FileMode.TREE.equals(f.getEntryFileMode())))
-			return;
+		if ((ffMask & 0x222) == 0) {
+			// HEAD, MERGE and index don't contain a file (e.g. all contain a
+			// folder)
+			if (f == null || FileMode.TREE.equals(f.getEntryFileMode())) {
+				// the workingtree entry doesn't exist or also contains a folder
+				// -> no problem
+				return;
+			} else {
+				// the workingtree entry exists and is not a folder
+				if (!idEqual(h, m)) {
+					// Because HEAD and MERGE differ we will try to update the
+					// workingtree with a folder -> return a conflict
+					conflict(name, null, null, null);
+				}
+				return;
+			}
+		}
 
 		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
 			// File/Directory conflict case #20
@@ -1005,6 +1017,17 @@ public class DirCacheCheckout {
 		}
 	}
 
+	private static boolean idEqual(AbstractTreeIterator a,
+			AbstractTreeIterator b) {
+		if (a == b) {
+			return true;
+		}
+		if (a == null || b == null) {
+			return false;
+		}
+		return a.getEntryObjectId().equals(b.getEntryObjectId());
+	}
+
 	/**
 	 * A conflict is detected - add the three different stages to the index
 	 * @param path the path of the conflicting entry
@@ -1280,48 +1303,45 @@ public class DirCacheCheckout {
 		} else {
 			nonNullEolStreamType = EolStreamType.DIRECT;
 		}
-		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
-				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
-			if (checkoutMetadata.smudgeFilterCommand != null) {
-				if (repo
-						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
-					BuiltinCommand command = repo.getCommand(
-							checkoutMetadata.smudgeFilterCommand, repo,
-							ol.openStream(), channel);
-					while (command.run() != -1)
-						;
-				} else {
-					ProcessBuilder filterProcessBuilder = fs.runInShell(
-							checkoutMetadata.smudgeFilterCommand, new String[0]);
-					filterProcessBuilder.directory(repo.getWorkTree());
-					filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-							repo.getDirectory().getAbsolutePath());
-					ExecutionResult result;
-					int rc;
-					try {
-						// TODO: wire correctly with AUTOCRLF
-						result = fs.execute(filterProcessBuilder, ol.openStream());
-						rc = result.getRc();
-						if (rc == 0) {
-							result.getStdout().writeTo(channel,
-									NullProgressMonitor.INSTANCE);
-						}
-					} catch (IOException | InterruptedException e) {
-						throw new IOException(new FilterFailedException(e,
-								checkoutMetadata.smudgeFilterCommand,
-								entry.getPathString()));
-					}
-					if (rc != 0) {
-						throw new IOException(new FilterFailedException(rc,
-								checkoutMetadata.smudgeFilterCommand,
-								entry.getPathString(),
-								result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-								RawParseUtils.decode(result.getStderr()
-										.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-					}
+		OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
+				new FileOutputStream(tmpFile), nonNullEolStreamType);
+		if (checkoutMetadata.smudgeFilterCommand != null) {
+			ProcessBuilder filterProcessBuilder = fs.runInShell(
+					checkoutMetadata.smudgeFilterCommand, new String[0]);
+			filterProcessBuilder.directory(repo.getWorkTree());
+			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+					repo.getDirectory().getAbsolutePath());
+			ExecutionResult result;
+			int rc;
+			try {
+				// TODO: wire correctly with AUTOCRLF
+				result = fs.execute(filterProcessBuilder, ol.openStream());
+				rc = result.getRc();
+				if (rc == 0) {
+					result.getStdout().writeTo(channel,
+							NullProgressMonitor.INSTANCE);
 				}
-			} else {
+			} catch (IOException | InterruptedException e) {
+				throw new IOException(new FilterFailedException(e,
+						checkoutMetadata.smudgeFilterCommand,
+						entry.getPathString()));
+
+			} finally {
+				channel.close();
+			}
+			if (rc != 0) {
+				throw new IOException(new FilterFailedException(rc,
+						checkoutMetadata.smudgeFilterCommand,
+						entry.getPathString(),
+						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+						RawParseUtils.decode(result.getStderr()
+								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+			}
+		} else {
+			try {
 				ol.copyTo(channel);
+			} finally {
+				channel.close();
 			}
 		}
 		// The entry needs to correspond to the on-disk filesize. If the content
