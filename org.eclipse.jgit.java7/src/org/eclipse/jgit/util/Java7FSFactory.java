@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Ericsson
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,14 +41,26 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.util;
+
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FS.FSFactory;
+import org.eclipse.jgit.util.SystemReader;
 
 /**
- * Thrown when a thread executing a diff is interrupted
- *
- * @see org.eclipse.jgit.diff.MyersDiff
- * @since 4.0
+ * A factory for creating FS instances on Java7
  */
-public class DiffInterruptedException extends RuntimeException {
-	private static final long serialVersionUID = 1L;
+public class Java7FSFactory extends FSFactory {
+	@Override
+	public FS detect(Boolean cygwinUsed) {
+		if (SystemReader.getInstance().isWindows()) {
+			if (cygwinUsed == null)
+				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
+			if (cygwinUsed.booleanValue())
+				return new FS_Win32_Java7Cygwin();
+			else
+				return new FS_Win32_Java7();
+		} else
+			return new FS_POSIX_Java7();
+	}
 }

@@ -71,9 +71,6 @@ public final class Tbz2Format extends BaseFormat implements
 				Collections.<String, Object> emptyMap());
 	}
 
-	/**
-	 * @since 4.0
-	 */
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s,
 			Map<String, Object> o) throws IOException {
 		BZip2CompressorOutputStream out = new BZip2CompressorOutputStream(s);

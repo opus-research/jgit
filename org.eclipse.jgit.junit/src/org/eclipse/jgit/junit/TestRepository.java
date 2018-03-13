@@ -58,7 +58,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -128,8 +127,6 @@ public class TestRepository<R extends Repository> {
 
 	private final R db;
 
-	private final Git git;
-
 	private final RevWalk pool;
 
 	private final ObjectInserter inserter;
@@ -158,7 +155,6 @@ public class TestRepository<R extends Repository> {
 	 */
 	public TestRepository(R db, RevWalk rw) throws IOException {
 		this.db = db;
-		this.git = Git.wrap(db);
 		this.pool = rw;
 		this.inserter = db.newObjectInserter();
 		this.now = 1236977987000L;
@@ -172,14 +168,6 @@ public class TestRepository<R extends Repository> {
 	/** @return get the RevWalk pool all objects are allocated through. */
 	public RevWalk getRevWalk() {
 		return pool;
-	}
-
-	/**
-	 * @return an API wrapper for the underlying repository. This wrapper does
-	 *         not allocate any new resources and need not be closed (but closing
-	 *         it is harmless). */
-	public Git git() {
-		return git;
 	}
 
 	/** @return current time adjusted by {@link #tick(int)}. */
