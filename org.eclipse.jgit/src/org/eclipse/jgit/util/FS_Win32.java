@@ -128,6 +128,15 @@ public class FS_Win32 extends FS {
 		return null;
 	}
 
+	private static File resolveGrandparentFile(File grandchild) {
+		if (grandchild != null) {
+			File parent = grandchild.getParentFile();
+			if (parent != null)
+				return parent.getParentFile();
+		}
+		return null;
+	}
+
 	@Override
 	protected File userHomeImpl() {
 		String home = SystemReader.getInstance().getenv("HOME"); //$NON-NLS-1$

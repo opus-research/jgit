@@ -507,15 +507,6 @@ public abstract class FS {
 	/** @return the $prefix directory C Git would use. */
 	protected abstract File discoverGitPrefix();
 
-	protected static File resolveGrandparentFile(File grandchild) {
-		if (grandchild != null) {
-			File parent = grandchild.getParentFile();
-			if (parent != null)
-				return parent.getParentFile();
-		}
-		return null;
-	}
-
 	/**
 	 * Set the $prefix directory C Git uses.
 	 *
