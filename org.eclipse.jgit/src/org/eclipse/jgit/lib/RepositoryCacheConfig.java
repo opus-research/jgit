@@ -133,11 +133,11 @@ public class RepositoryCacheConfig {
 	 */
 	public RepositoryCacheConfig fromConfig(Config config) {
 		setExpireAfter(
-				config.getLong("core", null, "repositoryCacheExpireAfter", //$NON-NLS-1$ //$NON-NLS-2$
-						getExpireAfter()));
+				config.getTimeUnit("core", null, "repositoryCacheExpireAfter", //$NON-NLS-1$//$NON-NLS-2$
+						getExpireAfter(), TimeUnit.MILLISECONDS));
 		setCleanupDelay(
-				config.getLong("core", null, "repositoryCacheCleanupDelay", //$NON-NLS-1$ //$NON-NLS-2$
-						AUTO_CLEANUP_DELAY));
+				config.getTimeUnit("core", null, "repositoryCacheCleanupDelay", //$NON-NLS-1$ //$NON-NLS-2$
+						AUTO_CLEANUP_DELAY, TimeUnit.MILLISECONDS));
 		return this;
 	}
 

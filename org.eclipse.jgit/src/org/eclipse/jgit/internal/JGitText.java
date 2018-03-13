@@ -245,7 +245,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectTruncatedInObjectId;
 	/***/ public String corruptObjectZeroId;
 	/***/ public String corruptPack;
-	/***/ public String corruptUseCnt;
 	/***/ public String couldNotCheckOutBecauseOfConflicts;
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
