@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -82,12 +81,9 @@ import org.eclipse.jgit.treewalk.WorkingTreeIterator;
  * - uses "Lists" instead of Arrays for chained types
  *
  * - recursively merges the merge bases together to compute a usable base
- *
+ * @since 3.0
  */
-
 public class RecursiveMerger extends ResolveMerger {
-	static Logger log = Logger.getLogger(RecursiveMerger.class.toString());
-
 	/**
 	 * The maximum number of merge bases. This merge will stop when the number
 	 * of merge bases exceeds this value

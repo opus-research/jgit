@@ -186,6 +186,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
 	/***/ public String couldNotGetAdvertisedRef;
+	/***/ public String couldNotGetRepoStatistics;
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
 	/***/ public String couldNotReadObjectWhileParsingCommit;
@@ -241,7 +242,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
-	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCherryPickCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
