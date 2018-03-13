@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +41,37 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.IOException;
 
-/**
- * Translation bundle for JGit http server
- */
-public class HttpServerText extends TranslationBundle {
+/** Indicates UploadPack may not continue execution. */
+public class UploadPackMayNotContinueException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static HttpServerText get() {
-		return NLS.getBundleFor(HttpServerText.class);
+	private boolean output;
+
+	/** Initialize with no message. */
+	public UploadPackMayNotContinueException() {
+		// Do not set a message.
 	}
 
-	/***/ public String alreadyInitializedByContainer;
-	/***/ public String cannotGetLengthOf;
-	/***/ public String encodingNotSupportedByThisLibrary;
-	/***/ public String expectedRepositoryAttribute;
-	/***/ public String filterMustNotBeNull;
-	/***/ public String internalErrorDuringReceivePack;
-	/***/ public String internalErrorDuringUploadPack;
-	/***/ public String internalServerErrorRequestAttributeWasAlreadySet;
-	/***/ public String invalidBoolean;
-	/***/ public String invalidIndex;
-	/***/ public String invalidRegexGroup;
-	/***/ public String noResolverAvailable;
-	/***/ public String parameterNotSet;
-	/***/ public String pathForParamNotFound;
-	/***/ public String pathNotSupported;
-	/***/ public String repositoryAccessForbidden;
-	/***/ public String repositoryNotFound;
-	/***/ public String servletAlreadyInitialized;
-	/***/ public String servletMustNotBeNull;
-	/***/ public String servletWasAlreadyBound;
-	/***/ public String unexpectedeOFOn;
+	/**
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
+	 */
+	public UploadPackMayNotContinueException(String msg) {
+		super(msg);
+	}
+
+	/** @return true if the message was already output to the client. */
+	public boolean isOutput() {
+		return output;
+	}
+
+	/** Mark this message has being sent to the client. */
+	public void setOutput() {
+		output = true;
+	}
 }
