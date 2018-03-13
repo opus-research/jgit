@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,53 +44,68 @@
 
 package org.eclipse.jgit.diff;
 
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
+
 /**
- * Equivalence function for a {@link Sequence} compared by difference algorithm.
- *
- * Difference algorithms can use a comparator to compare portions of two
- * sequences and discover the minimal edits required to transform from one
- * sequence to the other sequence.
- *
- * Indexes within a sequence are zero-based.
- *
- * @param <S>
- *            type of sequence the comparator supports.
+ * A version of {@link RawText} that ignores trailing whitespace.
  */
-public abstract class SequenceComparator<S extends Sequence> {
-	/**
-	 * Compare two items to determine if they are equivalent.
-	 *
-	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}).
-	 *
-	 * @param a
-	 *            the first sequence.
-	 * @param ai
-	 *            item of {@code ai} to compare.
-	 * @param b
-	 *            the second sequence.
-	 * @param bi
-	 *            item of {@code bi} to compare.
-	 * @return true if the two items are identical according to this function's
-	 *         equivalence rule.
-	 */
-	public abstract boolean equals(S a, int ai, S b, int bi);
+public class RawTextIgnoreTrailingWhitespace extends RawText {
+	/** Creates RawText that ignores only trailing whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreTrailingWhitespace(input);
+		}
+	};
 
 	/**
-	 * Get a hash value for an item in a sequence.
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
 	 *
-	 * If two items are equal according to this comparator's
-	 * {@link #equals(Sequence, int, Sequence, int)} method, then this hash
-	 * method must produce the same integer result for both items.
-	 *
-	 * It is not required for two items to have different hash values if they
-	 * are are unequal according to the {@code equals()} method.
-	 *
-	 * @param seq
-	 *            the sequence.
-	 * @param ptr
-	 *            the item to obtain the hash for.
-	 * @return hash the hash value.
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
 	 */
-	public abstract int hash(S seq, int ptr);
+	public RawTextIgnoreTrailingWhitespace(byte[] input) {
+		super(input);
+	}
+
+	@Override
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
+
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes[ai] != b.hashes[bi])
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		ae = trimTrailingWhitespace(a.content, as, ae);
+		be = trimTrailingWhitespace(b.content, bs, be);
+
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		end = trimTrailingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
+	}
 }

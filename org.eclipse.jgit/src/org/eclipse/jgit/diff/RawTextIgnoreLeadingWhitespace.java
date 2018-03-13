@@ -1,8 +1,6 @@
 /*
- * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,64 +42,70 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.diff;
 
-import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
-
-import org.eclipse.jgit.lib.Config.SectionParser;
+import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
 
 /**
- * This class keeps git repository core parameters.
+ * A version of {@link RawText} that ignores leading whitespace.
  */
-public class CoreConfig {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
-		public CoreConfig parse(final Config cfg) {
-			return new CoreConfig(cfg);
+public class RawTextIgnoreLeadingWhitespace extends RawText {
+	/** Creates RawText that ignores only leading whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreLeadingWhitespace(input);
 		}
 	};
 
-	private final int compression;
-
-	private final int packIndexVersion;
-
-	private final boolean logAllRefUpdates;
-
-	private final boolean autoCRLF;
-
-	private CoreConfig(final Config rc) {
-		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt("pack", "indexversion", 2);
-		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		autoCRLF = rc.getBoolean("core", "autocrlf", false);
+	/**
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
+	 *
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
+	 */
+	public RawTextIgnoreLeadingWhitespace(byte[] input) {
+		super(input);
 	}
 
-	/**
-	 * @return The compression level to use when storing loose objects
-	 */
-	public int getCompression() {
-		return compression;
+	@Override
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
 	}
 
-	/**
-	 * @return the preferred pack index file format; 0 for oldest possible.
-	 * @see org.eclipse.jgit.transport.IndexPack
-	 */
-	public int getPackIndexVersion() {
-		return packIndexVersion;
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes[ai] != b.hashes[bi])
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		as = trimLeadingWhitespace(a.content, as, ae);
+		bs = trimLeadingWhitespace(b.content, bs, be);
+
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
 	}
 
-	/**
-	 * @return whether to log all refUpdates
-	 */
-	public boolean isLogAllRefUpdates() {
-		return logAllRefUpdates;
-	}
-
-	/**
-	 * @return whether automatic CRLF conversion has been configured
-	 */
-	public boolean isAutoCRLF() {
-		return autoCRLF;
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		ptr = trimLeadingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
 	}
 }
