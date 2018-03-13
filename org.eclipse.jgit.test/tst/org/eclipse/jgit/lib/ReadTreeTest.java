@@ -600,6 +600,15 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		}
 	}
 
+	public void testCheckoutUncachedChanges() throws IOException {
+		setupCase(mk("foo"), mk("foo"), mk("foo"));
+		writeTrashFile("foo", "otherData");
+		checkout();
+		assertIndex(mk("foo"));
+		assertWorkDir(mkmap("foo", "otherData"));
+		assertTrue(new File(trash, "foo").isFile());
+	}
+
 	/**
 	 * The interface these tests need from a class implementing a checkout
 	 */
