@@ -40,40 +40,55 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.attributes;
 
-package org.eclipse.jgit.revwalk;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import static org.junit.Assert.assertNull;
+/**
+ * An abstraction for JGit's builtin implementations for hooks and filters.
+ * Instead of spawning an external processes to start a filter/hook and to pump
+ * data from/to stdin/stdout these builtin commmands may be used. They are
+ * constructed by {@link FilterCommandFactory}.
+ *
+ * @since 4.6
+ */
+public abstract class FilterCommand {
+	/**
+	 * The {@link InputStream} this command should read from
+	 */
+	protected InputStream in;
 
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
+	/**
+	 * The {@link OutputStream} this command should write to
+	 */
+	protected OutputStream out;
 
-@RunWith(Theories.class)
-public class RevWalkCommitsSameDateTest extends RevWalkTestCase {
-	@DataPoints
-	public static int[] deltaBetweenCommits = { 1, 0 };
-
-	@Theory
-	public void testRevwalkOnMergedCommits_SameDate(int delta)
-			throws Exception {
-		final RevCommit a = commit(delta);
-		final RevCommit b = commit(delta, a);
-		// add some content to make sure this commit doesn't get the same
-		// commitid as the previous
-		final RevCommit c = commit(delta, tree(file("f", blob("b"))), a);
-		final RevCommit d = commit(delta, c);
-		final RevCommit e = commit(delta, b, d);
-
-		System.out.println("a:" + a.getId().abbreviate(6) + ", b:"
-				+ b.getId().abbreviate(6) + ", c:" + c.getId().abbreviate(6)
-				+ ", d:" + d.getId().abbreviate(6) + ", e:"
-				+ e.getId().abbreviate(6));
-
-		markStart(d);
-		markUninteresting(e);
-		assertNull("Found an unexpected commit. Delta between commits was "
-				+ delta, rw.next());
+	/**
+	 * @param in
+	 *            The {@link InputStream} this command should read from
+	 * @param out
+	 *            The {@link OutputStream} this command should write to
+	 */
+	public FilterCommand(InputStream in, OutputStream out) {
+		this.in = in;
+		this.out = out;
 	}
+
+	/**
+	 * Execute the command. The command is supposed to read data from
+	 * {@link #in} and to write the result to {@link #out}. It returns the
+	 * number of bytes it read from {@link #in}. It should be called in a loop
+	 * until it returns -1 signaling that the {@link InputStream} is completely
+	 * processed.
+	 *
+	 * @return the number of bytes read from the {@link InputStream} or -1. -1
+	 *         means that the {@link InputStream} is completely processed.
+	 * @throws IOException
+	 *             when {@link IOException} occured while reading from
+	 *             {@link #in} or writing to {@link #out}
+	 *
+	 */
+	public abstract int run() throws IOException;
 }

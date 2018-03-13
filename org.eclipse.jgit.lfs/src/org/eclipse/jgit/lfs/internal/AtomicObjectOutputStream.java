@@ -40,33 +40,89 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server.internal;
+package org.eclipse.jgit.lfs.internal;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Path;
+import java.security.DigestOutputStream;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.storage.file.LockFile;
+import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
+import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
+import org.eclipse.jgit.lfs.lib.Constants;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
 
 /**
- * Translation bundle for JGit LFS server
+ * Output stream writing content to a {@link LockFile} which is committed on
+ * close(). The stream checks if the hash of the stream content matches the
+ * id.
  */
-public class LfsServerText extends TranslationBundle {
+public class AtomicObjectOutputStream extends OutputStream {
+
+	private LockFile locked;
+
+	private DigestOutputStream out;
+
+	private boolean aborted;
+
+	private AnyLongObjectId id;
 
 	/**
-	 * @return an instance of this translation bundle
+	 * @param path
+	 * @param id
+	 * @throws IOException
 	 */
-	public static LfsServerText get() {
-		return NLS.getBundleFor(LfsServerText.class);
+	public AtomicObjectOutputStream(Path path, AnyLongObjectId id)
+			throws IOException {
+		locked = new LockFile(path.toFile());
+		locked.lock();
+		this.id = id;
+		out = new DigestOutputStream(locked.getOutputStream(),
+				Constants.newMessageDigest());
 	}
 
-	// @formatter:off
-	/***/ public String failedToCalcSignature;
-	/***/ public String invalidPathInfo;
-	/***/ public String objectNotFound;
-	/***/ public String undefinedS3AccessKey;
-	/***/ public String undefinedS3Bucket;
-	/***/ public String undefinedS3Region;
-	/***/ public String undefinedS3SecretKey;
-	/***/ public String undefinedS3StorageClass;
-	/***/ public String unparsableEndpoint;
-	/***/ public String unsupportedOperation;
-	/***/ public String unsupportedUtf8;
+	@Override
+	public void write(int b) throws IOException {
+		out.write(b);
+	}
+
+	@Override
+	public void write(byte[] b) throws IOException {
+		out.write(b);
+	}
+
+	@Override
+	public void write(byte[] b, int off, int len) throws IOException {
+		out.write(b, off, len);
+	}
+
+	@Override
+	public void close() throws IOException {
+		out.close();
+		if (!aborted) {
+			verifyHash();
+			locked.commit();
+		}
+	}
+
+	private void verifyHash() {
+		AnyLongObjectId contentHash = LongObjectId
+				.fromRaw(out.getMessageDigest().digest());
+		if (!contentHash.equals(id)) {
+			abort();
+			throw new CorruptLongObjectException(id, contentHash,
+					MessageFormat.format(LfsText.get().corruptLongObject,
+							contentHash, id));
+		}
+	}
+
+	/**
+	 * Aborts the stream. Temporary file will be deleted
+	 */
+	public void abort() {
+		locked.unlock();
+		aborted = true;
+	}
 }

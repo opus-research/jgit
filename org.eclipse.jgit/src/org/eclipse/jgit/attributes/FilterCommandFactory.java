@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,82 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server.fs;
+package org.eclipse.jgit.attributes;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Path;
-import java.security.DigestOutputStream;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.storage.file.LockFile;
-import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
-import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
-import org.eclipse.jgit.lfs.lib.Constants;
-import org.eclipse.jgit.lfs.lib.LongObjectId;
-import org.eclipse.jgit.lfs.server.internal.LfsServerText;
+import org.eclipse.jgit.lib.Repository;
 
 /**
- * Output stream writing content to a {@link LockFile} which is committed on
- * close(). The stream checks if the hash of the stream content matches the
- * id.
+ * The factory responsible for creating instances of {@link FilterCommand}.
+ *
+ * @since 4.6
  */
-class AtomicObjectOutputStream extends OutputStream {
+public interface FilterCommandFactory {
+	/**
+	 * Create a new {@link FilterCommand}.
+	 *
+	 * @param db
+	 *            the repository this command should work on
+	 * @param in
+	 *            the {@link InputStream} this command should read from
+	 * @param out
+	 *            the {@link OutputStream} this command should write to
+	 * @return the created {@link FilterCommand}
+	 * @throws IOException
+	 *             thrown when the command constructor throws an IOException
+	 */
+	public FilterCommand create(Repository db, InputStream in,
+			OutputStream out) throws IOException;
 
-	private LockFile locked;
-
-	private DigestOutputStream out;
-
-	private boolean aborted;
-
-	private AnyLongObjectId id;
-
-	AtomicObjectOutputStream(Path path, AnyLongObjectId id)
-			throws IOException {
-		locked = new LockFile(path.toFile());
-		locked.lock();
-		this.id = id;
-		out = new DigestOutputStream(locked.getOutputStream(),
-				Constants.newMessageDigest());
-	}
-
-	@Override
-	public void write(int b) throws IOException {
-		out.write(b);
-	}
-
-	@Override
-	public void write(byte[] b) throws IOException {
-		out.write(b);
-	}
-
-	@Override
-	public void write(byte[] b, int off, int len) throws IOException {
-		out.write(b, off, len);
-	}
-
-	@Override
-	public void close() throws IOException {
-		out.close();
-		if (!aborted) {
-			verifyHash();
-			locked.commit();
-		}
-	}
-
-	private void verifyHash() {
-		AnyLongObjectId contentHash = LongObjectId
-				.fromRaw(out.getMessageDigest().digest());
-		if (!contentHash.equals(id)) {
-			abort();
-			throw new CorruptLongObjectException(id, contentHash,
-					MessageFormat.format(LfsServerText.get().corruptLongObject,
-							contentHash, id));
-		}
-	}
-
-	void abort() {
-		locked.unlock();
-		aborted = true;
-	}
 }
