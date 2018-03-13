@@ -57,7 +57,6 @@ import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 
 abstract class FileObjectDatabase extends ObjectDatabase {
@@ -77,8 +76,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
 			throws IOException;
-
-	abstract Repository getRepository();
 
 	abstract Config getConfig();
 
