@@ -47,6 +47,7 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
+import java.util.Arrays;
 
 import javaewah.EWAHCompressedBitmap;
 
@@ -56,46 +57,59 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.NB;
 
 /**
- * Support for the pack index vE003 format, which contains experimental support
- * for bitmaps, based on the v2 format.
+ * Support for the pack bitmpa index v1 format, which contains experimental
+ * support for bitmaps.
  *
  * @see PackBitmapIndex
  */
-class PackIndexVE003 extends PackIndexV2 {
+class PackBitmapIndexV1 extends BasePackBitmapIndex {
 	static final int OPT_FULL = 1;
 
 	private static final int MAX_XOR_OFFSET = 126;
 
+	private final PackIndex packIndex;
+	private final PackReverseIndex reverseIndex;
 	private final EWAHCompressedBitmap commits;
-
 	private final EWAHCompressedBitmap trees;
-
 	private final EWAHCompressedBitmap blobs;
-
 	private final EWAHCompressedBitmap tags;
 
 	private final ObjectIdOwnerMap<StoredBitmap> bitmaps;
 
-	PackIndexVE003(final InputStream fd) throws IOException {
-		super(fd);
+	PackBitmapIndexV1(final InputStream fd, PackIndex packIndex,
+			PackReverseIndex reverseIndex) throws IOException {
+		super(new ObjectIdOwnerMap<StoredBitmap>());
+		this.packIndex = packIndex;
+		this.reverseIndex = reverseIndex;
+		this.bitmaps = getBitmaps();
 
-		// Build up the index by offset
-		if (getObjectCount() > Integer.MAX_VALUE)
-			throw new IOException(JGitText.get().indexFileIsTooLargeForJgit);
+		// Read the version
+		final byte[] hdr = new byte[25];
+		IO.readFully(fd, hdr, 0, hdr.length);
+		final int v = NB.decodeInt32(hdr, 4);
+		if (v != 1)
+			throw new IOException(MessageFormat.format(
+					JGitText.get().unsupportedPackIndexVersion,
+					Integer.valueOf(v)));
 
 		// Read the options (1 byte)
-		int options = fd.read();
-		switch (options) {
+		switch (hdr[4]) {
 		case OPT_FULL:
 			// Bitmaps are self contained within this file.
 			break;
 		default:
 			throw new IOException(MessageFormat.format(
 					JGitText.get().expectedGot, Integer.valueOf(OPT_FULL),
-					Integer.valueOf(options)));
+					Integer.valueOf(hdr[4])));
 		}
+
+		// Checksum applied on the bottom of the corresponding pack file.
+		this.packChecksum = new byte[20];
+		System.arraycopy(hdr, 5, packChecksum, 0, packChecksum.length);
 
 		// Read the bitmaps for the Git types
 		SimpleDataInput dataInput = new SimpleDataInput(fd);
@@ -103,6 +117,9 @@ class PackIndexVE003 extends PackIndexV2 {
 		this.trees = readBitmap(dataInput);
 		this.blobs = readBitmap(dataInput);
 		this.tags = readBitmap(dataInput);
+
+		// TODO(cranger): should this go before builtin bitmap reading so it can
+		// be picked up in a single read?
 
 		// Read the number of entries (1 int32)
 		long numEntries = dataInput.readUnsignedInt();
@@ -112,7 +129,6 @@ class PackIndexVE003 extends PackIndexV2 {
 		// An entry is object id, xor offset, and a length encoded bitmap.
 		// the object id is an int32 of the nth position sorted by name.
 		// the xor offset is a single byte offset back in the list of entries.
-		bitmaps = new ObjectIdOwnerMap<StoredBitmap>();
 		StoredBitmap[] recentBitmaps = new StoredBitmap[MAX_XOR_OFFSET];
 		for (int i = 0; i < (int) numEntries; i++) {
 			int nthObjectId = dataInput.readInt();
@@ -135,7 +151,7 @@ class PackIndexVE003 extends PackIndexV2 {
 						JGitText.get().expectedLessThanGot, String.valueOf(i),
 						String.valueOf(xorOffset)));
 
-			ObjectId objectId = getObjectId(nthObjectId);
+			ObjectId objectId = packIndex.getObjectId(nthObjectId);
 			StoredBitmap xorBitmap = null;
 			if (xorOffset > 0) {
 				int index = (i - xorOffset);
@@ -153,13 +169,57 @@ class PackIndexVE003 extends PackIndexV2 {
 	}
 
 	@Override
-	public boolean hasBitmapIndex() {
-		return true;
+	public int findPosition(AnyObjectId objectId) {
+		long offset = packIndex.findOffset(objectId);
+		if (offset == -1)
+			return -1;
+		return reverseIndex.findPostion(offset);
 	}
 
 	@Override
-	public PackBitmapIndex getBitmapIndex(PackReverseIndex reverseIndex) {
-		return new PackBitmapIndexImpl(reverseIndex);
+	public ObjectId getObject(int position) throws IllegalArgumentException {
+		ObjectId objectId = reverseIndex.findObjectByPosition(position);
+		if (objectId == null)
+			throw new IllegalArgumentException();
+		return objectId;
+	}
+
+	@Override
+	public int getObjectCount() {
+		return (int) packIndex.getObjectCount();
+	}
+
+	@Override
+	public EWAHCompressedBitmap ofObjectType(
+			EWAHCompressedBitmap bitmap, int type) {
+		switch (type) {
+		case Constants.OBJ_BLOB:
+			return blobs.and(bitmap);
+		case Constants.OBJ_TREE:
+			return trees.and(bitmap);
+		case Constants.OBJ_COMMIT:
+			return commits.and(bitmap);
+		case Constants.OBJ_TAG:
+			return tags.and(bitmap);
+		}
+		throw new IllegalArgumentException();
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		// TODO(cranger): compare the pack checksum?
+		if (o instanceof PackBitmapIndexV1)
+			return getPackIndex() == ((PackBitmapIndexV1) o).getPackIndex();
+		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return getPackIndex().hashCode();
+	}
+
+	PackIndex getPackIndex() {
+		return packIndex;
 	}
 
 	private static EWAHCompressedBitmap readBitmap(DataInput dataInput)
@@ -167,69 +227,5 @@ class PackIndexVE003 extends PackIndexV2 {
 		EWAHCompressedBitmap bitmap = new EWAHCompressedBitmap();
 		bitmap.deserialize(dataInput);
 		return bitmap;
-	}
-
-	private final class PackBitmapIndexImpl extends BasePackBitmapIndex {
-		private final PackReverseIndex reverseIndex;
-
-		private PackBitmapIndexImpl(PackReverseIndex reverseIndex) {
-			super(bitmaps);
-			this.reverseIndex = reverseIndex;
-		}
-
-		@Override
-		public int findPosition(AnyObjectId objectId) {
-			long offset = findOffset(objectId);
-			if (offset == -1)
-				return -1;
-			return reverseIndex.findPostion(offset);
-		}
-
-		@Override
-		public ObjectId getObject(int position)
-				throws IllegalArgumentException {
-			ObjectId objectId = reverseIndex.findObjectByPosition(position);
-			if (objectId == null)
-				throw new IllegalArgumentException();
-			return objectId;
-		}
-
-		@Override
-		public int getObjectCount() {
-			return (int) PackIndexVE003.this.getObjectCount();
-		}
-
-		@Override
-		public EWAHCompressedBitmap ofObjectType(
-				EWAHCompressedBitmap bitmap, int type) {
-			switch (type) {
-			case Constants.OBJ_BLOB:
-				return blobs.and(bitmap);
-			case Constants.OBJ_TREE:
-				return trees.and(bitmap);
-			case Constants.OBJ_COMMIT:
-				return commits.and(bitmap);
-			case Constants.OBJ_TAG:
-				return tags.and(bitmap);
-			}
-			throw new IllegalArgumentException();
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (o instanceof PackBitmapIndexImpl)
-				return getPackIndex()
-						== ((PackBitmapIndexImpl) o).getPackIndex();
-			return false;
-		}
-
-		@Override
-		public int hashCode() {
-			return getPackIndex().hashCode();
-		}
-
-		PackIndex getPackIndex() {
-			return PackIndexVE003.this;
-		}
 	}
 }

@@ -43,59 +43,91 @@
 
 package org.eclipse.jgit.storage.file;
 
+import java.io.BufferedOutputStream;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.DigestOutputStream;
 import java.text.MessageFormat;
+import java.util.List;
 
 import javaewah.EWAHCompressedBitmap;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.storage.file.PackBitmapIndexBuilder.StoredEntry;
+import org.eclipse.jgit.transport.PackedObjectInfo;
+import org.eclipse.jgit.util.NB;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
- * Creates the version E003 pack table of contents files.
+ * Creates the version 1 pack bitmap index files.
  *
- * @see PackIndexWriter
- * @see PackIndexVE003
+ * @see PackBitmapIndexV1
  */
-class PackIndexWriterVE003 extends PackIndexWriterV2 {
+public class PackBitmapIndexWriterV1 {
+	private final DigestOutputStream out;
 	private final DataOutput dataOutput;
 
-	PackIndexWriterVE003(final OutputStream dst) {
-		super(dst);
+	public PackBitmapIndexWriterV1(final OutputStream dst) {
+		out = new DigestOutputStream(dst instanceof BufferedOutputStream ? dst
+				: new SafeBufferedOutputStream(dst),
+				Constants.newMessageDigest());
 		dataOutput = new SimpleDataOutput(out);
 	}
 
-	@Override
-	protected void writeImpl() throws IOException {
-		if (bitmaps == null)
+	/**
+	 * Write all object entries to the index stream.
+	 * <p>
+	 * After writing the stream passed to the factory is flushed but remains
+	 * open. Callers are always responsible for closing the output stream.
+	 *
+	 * @param bitmaps
+	 *            the index data for the bitmaps
+	 * @param packDataChecksum
+	 *            checksum signature of the entire pack data content. This is
+	 *            traditionally the last 20 bytes of the pack file's own stream.
+	 * @throws IOException
+	 *             an error occurred while writing to the output stream, or this
+	 *             index format cannot store the object data supplied.
+	 */
+	public void write(PackBitmapIndexBuilder bitmaps, byte[] packDataChecksum)
+			throws IOException {
+		if (bitmaps == null || packDataChecksum.length != 20)
 			throw new IllegalStateException();
 
-		writeTOC(0xE003);
-		writeV2Body();
-		writeVE003Body();
-		writeChecksumFooter();
+		// Write the header
+
+		writeHeader(bitmaps.getOptions(), packDataChecksum);
+		writeBody(bitmaps);
+		writeFooter();
+
+		out.flush();
 	}
 
-	private void writeVE003Body() throws IOException {
-		writeOptions();
+	private void writeHeader(byte options, byte[] packDataChecksum)
+			throws IOException {
+		byte[] tmp = new byte[4];
+		NB.encodeInt32(tmp, 0, 1);
+		out.write(tmp, 0, 4);
+		out.write(options);
+		out.write(packDataChecksum);
+	}
+
+	private void writeBody(PackBitmapIndexBuilder bitmaps) throws IOException {
 		writeBitmap(bitmaps.getCommits());
 		writeBitmap(bitmaps.getTrees());
 		writeBitmap(bitmaps.getBlobs());
 		writeBitmap(bitmaps.getTags());
-		writeBitmaps();
-	}
-
-	private void writeOptions() throws IOException {
-		out.write(bitmaps.getOptions());
+		writeBitmaps(bitmaps);
 	}
 
 	private void writeBitmap(EWAHCompressedBitmap bitmap) throws IOException {
 		bitmap.serialize(dataOutput);
 	}
 
-	private void writeBitmaps() throws IOException {
+	private void writeBitmaps(PackBitmapIndexBuilder bitmaps)
+			throws IOException {
 		// Write number of entries
 		int expectedBitmapCount = bitmaps.getBitmapCount();
 		dataOutput.writeInt(expectedBitmapCount);
@@ -118,5 +150,10 @@ class PackIndexWriterVE003 extends PackIndexWriterV2 {
 		dataOutput.writeInt((int) entry.getObjectId());
 		out.write(entry.getXorOffset());
 		writeBitmap(entry.getBitmap());
+	}
+
+	private void writeFooter() throws IOException {
+		out.on(false);
+		out.write(out.getMessageDigest().digest());
 	}
 }

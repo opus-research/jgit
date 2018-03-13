@@ -216,7 +216,7 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 
 	/** @return the index storage options. */
 	public byte getOptions() {
-		return PackIndexVE003.OPT_FULL;
+		return PackBitmapIndexV1.OPT_FULL;
 	}
 
 	/** @return the number of bitmaps. */
