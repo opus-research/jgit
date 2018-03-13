@@ -45,6 +45,7 @@ package org.eclipse.jgit.lfs;
 import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
+import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -287,12 +288,15 @@ public class SmudgeFilter extends FilterCommand {
 		URL url = new URL(lfsEndpoint + "/info/lfs/objects/batch"); //$NON-NLS-1$
 		HttpConnection connection = HttpTransport.getConnectionFactory().create(
 				url, HttpSupport.proxyFor(ProxySelector.getDefault(), url));
+		connection.setDoOutput(true);
 		if (url.getProtocol().equals("https")
 				&& !config.getBoolean("http", "sslVerify", true)) {
 			HttpSupport.disableSslVerify(connection);
 		}
 		connection.setRequestMethod(method);
 		connection.setRequestProperty(HDR_ACCEPT,
+				Protocol.CONTENTTYPE_VND_GIT_LFS_JSON);
+		connection.setRequestProperty(HDR_CONTENT_TYPE,
 				Protocol.CONTENTTYPE_VND_GIT_LFS_JSON);
 		return connection;
 	}
