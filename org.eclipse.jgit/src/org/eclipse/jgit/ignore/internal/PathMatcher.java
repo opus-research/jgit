@@ -227,32 +227,29 @@ public class PathMatcher extends AbstractMatcher {
 			int left = right;
 			right = path.indexOf(slash, right);
 			if (right == -1) {
-				if (left < endExcl) {
+				if (left < endExcl)
 					match = matches(matcher, path, left, endExcl,
 							assumeDirectory);
-				} else {
-					// a/** should not match a/ or a
-					// a/*  should not match a/ or a
-					// a/x  should not match a/ or a
-					match = false;
-				}
 				if (match) {
+					if (matcher == matchers.size() - 2
+							&& matchers.get(matcher + 1) == WILD)
+						// ** can match *nothing*: a/b/** match also a/b
+						return true;
 					if (matcher < matchers.size() - 1
 							&& matchers.get(matcher) == WILD) {
 						// ** can match *nothing*: a/**/b match also a/b
 						matcher++;
 						match = matches(matcher, path, left, endExcl,
 								assumeDirectory);
-					} else if (dirOnly && !assumeDirectory) {
+					} else if (dirOnly && !assumeDirectory)
 						// Directory expectations not met
 						return false;
-					}
 				}
 				return match && matcher + 1 == matchers.size();
 			}
-			if (right - left > 0) {
+			if (right - left > 0)
 				match = matches(matcher, path, left, right, assumeDirectory);
-			} else {
+			else {
 				// path starts with slash???
 				right++;
 				continue;
@@ -264,16 +261,12 @@ public class PathMatcher extends AbstractMatcher {
 					right = left - 1;
 				}
 				matcher++;
-				if (matcher == matchers.size()) {
-					return (right == -1) || // and we've reached the end of input
-							(right == Strings.stripTrailing(path.substring(startIncl, endExcl), slash).length()) || // or only slashes are remaining
-							(lastWildmatch == matcher - 1); // or the pattern ends with /**
-				}
-			} else if (lastWildmatch != -1) {
+				if (matcher == matchers.size())
+					return true;
+			} else if (lastWildmatch != -1)
 				matcher = lastWildmatch + 1;
-			} else {
+			else
 				return false;
-			}
 			right++;
 		}
 	}

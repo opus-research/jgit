@@ -58,7 +58,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -324,11 +323,9 @@ public class BatchRefUpdate {
 	/**
 	 * Gets the list of option strings associated with this update.
 	 *
-	 * @return push options that were passed to {@link #execute}; prior to calling
-	 *         {@link #execute}, always returns null.
+	 * @return pushOptions
 	 * @since 4.5
 	 */
-	@Nullable
 	public List<String> getPushOptions() {
 		return pushOptions;
 	}
