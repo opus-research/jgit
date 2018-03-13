@@ -941,7 +941,7 @@ public class DiffFormatter implements AutoCloseable {
 		RawText b;
 	}
 
-	protected FormatResult createFormatResult(DiffEntry ent) throws IOException,
+	private FormatResult createFormatResult(DiffEntry ent) throws IOException,
 			CorruptObjectException, MissingObjectException {
 		final FormatResult res = new FormatResult();
 		ByteArrayOutputStream buf = new ByteArrayOutputStream();
