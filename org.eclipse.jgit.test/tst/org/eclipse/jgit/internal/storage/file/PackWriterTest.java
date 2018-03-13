@@ -43,12 +43,13 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
+import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
+import static org.eclipse.jgit.internal.storage.pack.PackWriter.NONE;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -67,13 +68,12 @@ import java.util.Set;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.pack.PackWriter.ObjectIdSet;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -88,9 +88,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class PackWriterTest extends SampleDataRepositoryTestCase {
-
-	private static final Set<ObjectId> EMPTY_SET_OBJECT = Collections
-			.<ObjectId> emptySet();
 
 	private static final List<RevObject> EMPTY_LIST_REVS = Collections
 			.<RevObject> emptyList();
@@ -172,7 +169,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testWriteEmptyPack1() throws IOException {
-		createVerifyOpenPack(EMPTY_SET_OBJECT, EMPTY_SET_OBJECT, false, false);
+		createVerifyOpenPack(NONE, NONE, false, false);
 
 		assertEquals(0, writer.getObjectCount());
 		assertEquals(0, pack.getObjectCount());
@@ -205,8 +202,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
 		try {
-			createVerifyOpenPack(EMPTY_SET_OBJECT, Collections.singleton(
-					nonExisting), false, false);
+			createVerifyOpenPack(NONE, Collections.singleton(nonExisting),
+					false, false);
 			fail("Should have thrown MissingObjectException");
 		} catch (MissingObjectException x) {
 			// expected
@@ -222,8 +219,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	public void testIgnoreNonExistingObjects() throws IOException {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
-		createVerifyOpenPack(EMPTY_SET_OBJECT, Collections.singleton(
-				nonExisting), false, true);
+		createVerifyOpenPack(NONE, Collections.singleton(nonExisting),
+				false, true);
 		// shouldn't throw anything
 	}
 
@@ -241,8 +238,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
 		new GC(db).gc();
-		createVerifyOpenPack(EMPTY_SET_OBJECT,
-				Collections.singleton(nonExisting), false, true, true);
+		createVerifyOpenPack(NONE, Collections.singleton(nonExisting), false,
+				true, true);
 		// shouldn't throw anything
 	}
 
@@ -345,12 +342,13 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 				ObjectId.fromString("902d5476fa249b7abc9d84c611577a81381f0327"),
 				ObjectId.fromString("5b6e7c66c276e7610d4a73c70ec1a1f7c1003259"),
 				ObjectId.fromString("6ff87c4664981e4397625791c8ea3bbb5f2279a3") };
-		final RevWalk parser = new RevWalk(db);
-		final RevObject forcedOrderRevs[] = new RevObject[forcedOrder.length];
-		for (int i = 0; i < forcedOrder.length; i++)
-			forcedOrderRevs[i] = parser.parseAny(forcedOrder[i]);
+		try (final RevWalk parser = new RevWalk(db)) {
+			final RevObject forcedOrderRevs[] = new RevObject[forcedOrder.length];
+			for (int i = 0; i < forcedOrder.length; i++)
+				forcedOrderRevs[i] = parser.parseAny(forcedOrder[i]);
 
-		createVerifyOpenPack(Arrays.asList(forcedOrderRevs));
+			createVerifyOpenPack(Arrays.asList(forcedOrderRevs));
+		}
 
 		assertEquals(forcedOrder.length, writer.getObjectCount());
 		verifyObjectsOrder(forcedOrder);
@@ -528,7 +526,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		RevCommit c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
 		PackIndex pf2 = writePack(repo, Collections.singleton(c2),
-				Collections.singleton(objectIdSet(pf1)));
+				Collections.<ObjectIdSet> singleton(pf1));
 		assertContent(
 				pf2,
 				Arrays.asList(c2.getId(), c2.getTree().getId(),
@@ -553,8 +551,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 			pw.setReuseDeltaCommits(false);
 			for (ObjectIdSet idx : excludeObjects)
 				pw.excludeObjects(idx);
-			pw.preparePack(NullProgressMonitor.INSTANCE, want,
-					Collections.<ObjectId> emptySet());
+			pw.preparePack(NullProgressMonitor.INSTANCE, want, NONE);
 			String id = pw.computeName().getName();
 			File packdir = new File(repo.getObjectsDirectory(), "pack");
 			File packFile = new File(packdir, "pack-" + id + ".pack");
@@ -577,7 +574,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		final HashSet<ObjectId> interestings = new HashSet<ObjectId>();
 		interestings.add(ObjectId
 				.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"));
-		createVerifyOpenPack(interestings, EMPTY_SET_OBJECT, false, false);
+		createVerifyOpenPack(interestings, NONE, false, false);
 
 		final ObjectId expectedOrder[] = new ObjectId[] {
 				ObjectId.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"),
@@ -732,13 +729,5 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		for (MutableEntry me : entries) {
 			assertEquals(objectsOrder[i++].toObjectId(), me.toObjectId());
 		}
-	}
-
-	private static ObjectIdSet objectIdSet(final PackIndex idx) {
-		return new ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return idx.hasObject(objectId);
-			}
-		};
 	}
 }

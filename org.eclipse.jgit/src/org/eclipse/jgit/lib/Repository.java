@@ -115,9 +115,6 @@ public abstract class Repository implements AutoCloseable {
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
 
-	/** $GIT_COMMON_DIR */
-	private final File gitCommonDir;
-
 	/** File abstraction used to resolve paths. */
 	private final FS fs;
 
@@ -137,7 +134,6 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	protected Repository(final BaseRepositoryBuilder options) {
 		gitDir = options.getGitDir();
-		gitCommonDir = options.getGitCommonDir();
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
@@ -191,7 +187,6 @@ public abstract class Repository implements AutoCloseable {
 
 	/**
 	 * @return local metadata directory; {@code null} if repository isn't local.
-	 *  @deprecated
 	 */
 	/*
 	 * TODO This method should be annotated as Nullable, because in some
@@ -201,18 +196,7 @@ public abstract class Repository implements AutoCloseable {
 	 * directory can never be null.
 	 */
 	public File getDirectory() {
-		return getGitDir(false);
-	}
-
-	/** @return local metadata directory; null if repository isn't local.
-	 * */
-	public File getGitDir(boolean preferCommonDir) {
-		return preferCommonDir && gitCommonDir != null ? gitCommonDir : gitDir;
-	}
-
-	/** @return $GIT_COMMON_DIR */
-	public File getGitCommonDir() {
-		return gitCommonDir;
+		return gitDir;
 	}
 
 	/**
@@ -897,9 +881,9 @@ public abstract class Repository implements AutoCloseable {
 	@SuppressWarnings("nls")
 	public String toString() {
 		String desc;
-		File gitDir = getGitDir(false);
-		if (gitDir != null)
-			desc = gitDir.getPath();
+		File directory = getDirectory();
+		if (directory != null)
+			desc = directory.getPath();
 		else
 			desc = getClass().getSimpleName() + "-" //$NON-NLS-1$
 					+ System.identityHashCode(this);
@@ -1188,31 +1172,30 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@NonNull
 	public RepositoryState getRepositoryState() {
-		final File directory = getGitDir(false);
-		if (isBare() || directory == null)
+		if (isBare() || getDirectory() == null)
 			return RepositoryState.BARE;
 
 		// Pre Git-1.6 logic
 		if (new File(getWorkTree(), ".dotest").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING;
-		if (new File(directory, ".dotest-merge").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(), ".dotest-merge").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_INTERACTIVE;
 
 		// From 1.6 onwards
-		if (new File(directory,"rebase-apply/rebasing").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply/rebasing").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_REBASING;
-		if (new File(directory,"rebase-apply/applying").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply/applying").exists()) //$NON-NLS-1$
 			return RepositoryState.APPLY;
-		if (new File(directory,"rebase-apply").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING;
 
-		if (new File(directory,"rebase-merge/interactive").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-merge/interactive").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_INTERACTIVE;
-		if (new File(directory,"rebase-merge").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-merge").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
-		if (new File(directory, Constants.MERGE_HEAD).exists()) {
+		if (new File(getDirectory(), Constants.MERGE_HEAD).exists()) {
 			// we are merging - now check whether we have unmerged paths
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
@@ -1227,10 +1210,10 @@ public abstract class Repository implements AutoCloseable {
 			return RepositoryState.MERGING;
 		}
 
-		if (new File(directory, "BISECT_LOG").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(), "BISECT_LOG").exists()) //$NON-NLS-1$
 			return RepositoryState.BISECTING;
 
-		if (new File(directory, Constants.CHERRY_PICK_HEAD).exists()) {
+		if (new File(getDirectory(), Constants.CHERRY_PICK_HEAD).exists()) {
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
 					// no unmerged paths
@@ -1243,7 +1226,7 @@ public abstract class Repository implements AutoCloseable {
 			return RepositoryState.CHERRY_PICKING;
 		}
 
-		if (new File(directory, Constants.REVERT_HEAD).exists()) {
+		if (new File(getDirectory(), Constants.REVERT_HEAD).exists()) {
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
 					// no unmerged paths
@@ -1532,7 +1515,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	public List<ObjectId> readMergeHeads() throws IOException, NoWorkTreeException {
-		if (isBare() || getGitDir(false) == null)
+		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
 		byte[] raw = readGitDirectoryFile(Constants.MERGE_HEAD);
@@ -1577,7 +1560,7 @@ public abstract class Repository implements AutoCloseable {
 	@Nullable
 	public ObjectId readCherryPickHead() throws IOException,
 			NoWorkTreeException {
-		if (isBare() || getGitDir(false) == null)
+		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
 		byte[] raw = readGitDirectoryFile(Constants.CHERRY_PICK_HEAD);
@@ -1600,7 +1583,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	public ObjectId readRevertHead() throws IOException, NoWorkTreeException {
-		if (isBare() || getGitDir(false) == null)
+		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
 		byte[] raw = readGitDirectoryFile(Constants.REVERT_HEAD);
@@ -1666,7 +1649,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	public ObjectId readOrigHead() throws IOException, NoWorkTreeException {
-		if (isBare() || getGitDir(false) == null)
+		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
 		byte[] raw = readGitDirectoryFile(Constants.ORIG_HEAD);
@@ -1709,10 +1692,10 @@ public abstract class Repository implements AutoCloseable {
 
 	@Nullable
 	private String readCommitMsgFile(String msgFilename) throws IOException {
-		if (isBare() || getGitDir(false) == null)
+		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
-		File mergeMsgFile = new File(getGitDir(false), msgFilename);
+		File mergeMsgFile = new File(getDirectory(), msgFilename);
 		try {
 			return RawParseUtils.decode(IO.readFully(mergeMsgFile));
 		} catch (FileNotFoundException e) {
@@ -1747,7 +1730,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	private byte[] readGitDirectoryFile(String filename) throws IOException {
-		File file = new File(getGitDir(false), filename);
+		File file = new File(getDirectory(), filename);
 		try {
 			byte[] raw = IO.readFully(file);
 			return raw.length > 0 ? raw : null;
@@ -1771,7 +1754,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	private void writeHeadsFile(List<? extends ObjectId> heads, String filename)
 			throws FileNotFoundException, IOException {
-		File headsFile = new File(getGitDir(false), filename);
+		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
 			BufferedOutputStream bos = new SafeBufferedOutputStream(
 					new FileOutputStream(headsFile));
