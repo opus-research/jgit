@@ -42,18 +42,12 @@
  */
 package org.eclipse.jgit.ignore.internal;
 
-import static org.eclipse.jgit.ignore.internal.Strings.checkWildCards;
-import static org.eclipse.jgit.ignore.internal.Strings.count;
-import static org.eclipse.jgit.ignore.internal.Strings.getPathSeparator;
-import static org.eclipse.jgit.ignore.internal.Strings.isWildCard;
-import static org.eclipse.jgit.ignore.internal.Strings.split;
+import static org.eclipse.jgit.ignore.internal.Strings.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
-import org.eclipse.jgit.ignore.internal.Strings.PatternState;
 
 /**
  * Matcher built by patterns consists of multiple path segments.
@@ -134,18 +128,9 @@ public class PathMatcher extends AbstractMatcher {
 		if (WildMatcher.WILDMATCH.equals(segment)
 				|| WildMatcher.WILDMATCH2.equals(segment))
 			return WILD;
-
-		PatternState state = checkWildCards(segment);
-		switch (state) {
-		case LEADING_ASTERISK_ONLY:
-			return new LeadingAsteriskMatcher(segment, pathSeparator, dirOnly);
-		case TRAILING_ASTERISK_ONLY:
-			return new TrailingAsteriskMatcher(segment, pathSeparator, dirOnly);
-		case COMPLEX:
+		if (isWildCard(segment))
 			return new WildCardMatcher(segment, pathSeparator, dirOnly);
-		default:
-			return new NameMatcher(segment, pathSeparator, dirOnly);
-		}
+		return new NameMatcher(segment, pathSeparator, dirOnly);
 	}
 
 	public boolean matches(String path, boolean assumeDirectory) {

@@ -42,14 +42,15 @@
  */
 package org.eclipse.jgit.ignore;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.Arrays;
 
+import org.eclipse.jgit.ignore.FastIgnoreRule;
+import org.eclipse.jgit.ignore.IgnoreRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.runners.*;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
@@ -60,14 +61,14 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class IgnoreMatcherParametrizedTest {
 
-	@Parameters(name = "OldRule? {0}")
+	@Parameters(name = "JGit? {0}")
 	public static Iterable<Boolean[]> data() {
 		return Arrays.asList(new Boolean[][] { { Boolean.FALSE },
 				{ Boolean.TRUE } });
 	}
 
 	@Parameter
-	public Boolean useOldRule;
+	public Boolean useJGitRule;
 
 	@Test
 	public void testBasic() {
@@ -355,7 +356,7 @@ public class IgnoreMatcherParametrizedTest {
 	 */
 	private boolean match(String pattern, String target) {
 		boolean isDirectory = target.endsWith("/");
-		if (useOldRule.booleanValue()) {
+		if (useJGitRule.booleanValue()) {
 			IgnoreRule r = new IgnoreRule(pattern);
 			// If speed of this test is ever an issue, we can use a presetRule
 			// field
