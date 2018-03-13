@@ -88,7 +88,6 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
-		streamFileThreshold = WindowCache.getStreamFileThreshold();
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {
@@ -324,6 +323,10 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			window = null;
 			window = WindowCache.get(pack, position);
 		}
+	}
+
+	int getStreamFileThreshold() {
+		return WindowCache.getStreamFileThreshold();
 	}
 
 	/** Release the current window cursor. */

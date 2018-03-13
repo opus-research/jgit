@@ -109,7 +109,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	DfsReader(DfsObjDatabase db) {
 		this.db = db;
-		streamFileThreshold = db.getReaderOptions().getStreamFileThreshold();
 	}
 
 	DfsReaderOptions getOptions() {
@@ -120,6 +119,10 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (baseCache == null)
 			baseCache = new DeltaBaseCache(this);
 		return baseCache;
+	}
+
+	int getStreamFileThreshold() {
+		return getOptions().getStreamFileThreshold();
 	}
 
 	@Override
@@ -473,7 +476,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		PackIndex idx = pack.getPackIndex(this);
 		for (ObjectToPack otp : objects) {
 			long p = idx.findOffset(otp);
-			if (0 < p && !pack.isCorrupt(p)) {
+			if (0 < p) {
 				otp.setOffset(p);
 				tmp.add((DfsObjectToPack) otp);
 			}

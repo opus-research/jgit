@@ -110,8 +110,7 @@ public abstract class Repository implements AutoCloseable {
 		return globalListeners;
 	}
 
-	/** Use counter */
-	final AtomicInteger useCnt = new AtomicInteger(1);
+	private final AtomicInteger useCnt = new AtomicInteger(1);
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -865,7 +864,6 @@ public abstract class Repository implements AutoCloseable {
 	public void close() {
 		if (useCnt.decrementAndGet() == 0) {
 			doClose();
-			RepositoryCache.unregister(this);
 		}
 	}
 
