@@ -196,10 +196,8 @@ public class FileUtils {
 			if (src.renameTo(dst))
 				return;
 			try {
-				if (dst.isDirectory())
+				if (!dst.delete())
 					delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
-				else
-					delete(dst, 0);
 				// On *nix there is no try, you do or do not
 				if (src.renameTo(dst))
 					return;
