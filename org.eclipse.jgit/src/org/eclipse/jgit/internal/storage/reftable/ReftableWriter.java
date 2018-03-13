@@ -70,7 +70,8 @@ import org.eclipse.jgit.util.NB;
  */
 public class ReftableWriter {
 	private int refBlockSize = 4 << 10;
-	private int logBlockSize = 8 << 10;
+
+	private int logBlockSize;
 	private int restartInterval;
 
 	private ReftableOutputStream out;
@@ -157,7 +158,6 @@ public class ReftableWriter {
 
 		int ri = restartInterval;
 		refIndex = new BlockWriter(INDEX_BLOCK_TYPE, refBlockSize, ri);
-		logIndex = new BlockWriter(INDEX_BLOCK_TYPE, logBlockSize, ri);
 		out = new ReftableOutputStream(os, refBlockSize);
 		writeFileHeader();
 		return this;
@@ -208,6 +208,12 @@ public class ReftableWriter {
 	private void beginLog() throws IOException {
 		if (logOffset == 0) {
 			finishRef(); // close prior ref blocks and their index, if present.
+
+			if (logBlockSize == 0) {
+				logBlockSize = refBlockSize * 2;
+			}
+			logIndex = new BlockWriter(INDEX_BLOCK_TYPE, logBlockSize,
+					restartInterval);
 			out.setBlockSize(logBlockSize);
 			logOffset = out.size();
 		}
@@ -341,7 +347,7 @@ public class ReftableWriter {
 		private final int refIndexKeys;
 		private final int refIndexSize;
 
-		Stats(ReftableWriter w, ReftableOutputStream o, BlockWriter idx) {
+		Stats(ReftableWriter w, ReftableOutputStream o, BlockWriter refIdx) {
 			hash = w.hash;
 			refBlockSize = w.refBlockSize;
 			logBlockSize = w.logBlockSize;
@@ -353,7 +359,7 @@ public class ReftableWriter {
 			totalBytes = o.size();
 			refBlocks = w.refBlocks;
 
-			refIndexKeys = w.refIndexOffset > 0 ? idx.entryCount() : 0;
+			refIndexKeys = w.refIndexOffset > 0 ? refIdx.entryCount() : 0;
 			refIndexSize = w.refIndexSize;
 		}
 
