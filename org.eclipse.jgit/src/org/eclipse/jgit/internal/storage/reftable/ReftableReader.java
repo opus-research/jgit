@@ -44,12 +44,14 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.internal.storage.reftable.BlockReader.decodeIndexSize;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.isFileHeaderMagic;
+import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -60,8 +62,11 @@ import java.util.zip.CRC32;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
+import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -70,30 +75,23 @@ import org.eclipse.jgit.util.NB;
  * {@code ReftableReader} is not thread-safe. Concurrent readers need their own
  * instance to read from the same file.
  */
-public class ReftableReader implements AutoCloseable {
+public class ReftableReader extends Reftable {
 	private final BlockSource src;
 
 	private int blockSize;
 	private long refEnd;
-
+	private long objOffset;
+	private long objEnd;
 	private long logOffset;
 	private long logEnd;
 
 	private long refIndexOffset = -1;
+	private long objIndexOffset = -1;
 	private long logIndexOffset = -1;
 
 	private BlockReader refIndex;
+	private BlockReader objIndex;
 	private BlockReader logIndex;
-	private BlockReader block;
-
-	private byte blockType;
-	private long scanEnd;
-	private boolean includeDeletes;
-
-	private byte[] match;
-	private Ref ref;
-	private long logTimeUsec;
-	private ReflogEntry log;
 
 	/**
 	 * Initialize a new reftable reader.
@@ -105,128 +103,99 @@ public class ReftableReader implements AutoCloseable {
 		this.src = src;
 	}
 
-	/**
-	 * @param deletes
-	 *            if {@code true} deleted references will be returned. If
-	 *            {@code false} (default behavior), deleted references will be
-	 *            skipped, and not returned.
-	 */
-	public void setIncludeDeletes(boolean deletes) {
-		includeDeletes = deletes;
-	}
-
-	/**
-	 * Seek to the first reference in the file, to iterate in order.
-	 *
-	 * @throws IOException
-	 *             reftable cannot be read.
-	 */
-	public void seekToFirstRef() throws IOException {
+	@Override
+	public RefCursor allRefs() throws IOException {
 		if (blockSize == 0) {
 			readFileHeader();
 		}
+
 		long end = refEnd > 0 ? refEnd : (src.size() - FILE_FOOTER_LEN);
-		initScan(REF_BLOCK_TYPE, end);
 		src.adviseSequentialRead(0, end);
-		block = readBlock(0);
+
+		RefCursorImpl i = new RefCursorImpl(end, null, false);
+		i.block = readBlock(0, end);
+		return i;
 	}
 
-	/**
-	 * Seek either to a reference, or a reference subtree.
-	 * <p>
-	 * If {@code refName} ends with {@code "/"} the method will seek to the
-	 * subtree of all references starting with {@code refName} as a prefix.
-	 * <p>
-	 * Otherwise, only {@code refName} will be found, if present.
-	 *
-	 * @param refName
-	 *            reference name or subtree to find.
-	 * @throws IOException
-	 *             reftable cannot be read.
-	 */
-	public void seek(String refName) throws IOException {
-		byte[] rn = refName.getBytes(UTF_8);
-		byte[] key = rn;
-		if (key[key.length - 1] == '/') {
+	@Override
+	public RefCursor seek(String refName) throws IOException {
+		initRefIndex();
+
+		byte[] match = refName.getBytes(UTF_8);
+		boolean prefix = match[match.length - 1] == '/';
+		byte[] key = match;
+		if (prefix) {
 			key = Arrays.copyOf(key, key.length + 1);
 			key[key.length - 1] = '\1';
 		}
 
-		initRefIndex();
-		initScan(REF_BLOCK_TYPE, refEnd);
-		match = rn;
-		seek(key, refIndex, 0, refEnd);
+		RefCursorImpl i = new RefCursorImpl(refEnd, match, prefix);
+		i.block = seek(REF_BLOCK_TYPE, key, refIndex, 0, refEnd);
+		return i;
 	}
 
-	/**
-	 * Seek reader to read log records.
-	 *
-	 * @throws IOException
-	 *             reftable cannot be read.
-	 */
-	public void seekToFirstLog() throws IOException {
+	@Override
+	public RefCursor byObjectId(AnyObjectId id) throws IOException {
+		initObjIndex();
+		ObjCursorImpl i = new ObjCursorImpl(refEnd, id);
+		if (objIndex != null) {
+			i.initSeek();
+		} else {
+			i.initScan();
+		}
+		return i;
+	}
+
+	@Override
+	public LogCursor allLogs() throws IOException {
 		initLogIndex();
-		initScan(LOG_BLOCK_TYPE, logEnd);
 		if (logOffset > 0) {
 			src.adviseSequentialRead(logOffset, logEnd);
-			block = readBlock(logOffset);
+			LogCursorImpl i = new LogCursorImpl(logEnd, null);
+			i.block = readBlock(logOffset, logEnd);
+			return i;
 		}
+		return new EmptyLogCursor();
 	}
 
-	/**
-	 * Seek to a timestamp in a reference's log.
-	 *
-	 * @param refName
-	 *            exact name of the reference whose log to read.
-	 * @param timeUsec
-	 *            time in microseconds since the epoch to scan backwards from.
-	 *            Records at this time and older will be returned.
-	 * @throws IOException
-	 *             reftable cannot be read.
-	 */
-	public void seekLog(String refName, long timeUsec) throws IOException {
-		byte[] key = LogEntry.key(refName, timeUsec);
-
+	@Override
+	public LogCursor seekLog(String refName, long timeUsec) throws IOException {
 		initLogIndex();
-		initScan(LOG_BLOCK_TYPE, logEnd);
-		match = refName.getBytes(UTF_8);
 		if (logOffset > 0) {
-			seek(key, logIndex, logOffset, logEnd);
+			byte[] key = LogEntry.key(refName, timeUsec);
+			byte[] match = refName.getBytes(UTF_8);
+			LogCursorImpl i = new LogCursorImpl(logEnd, match);
+			i.block = seek(LOG_BLOCK_TYPE, key, logIndex, logOffset, logEnd);
+			return i;
 		}
+		return new EmptyLogCursor();
 	}
 
-	private void initScan(byte bt, long end) {
-		blockType = bt;
-		scanEnd = end;
-		block = null;
-		match = null;
-		ref = null;
-		log = null;
-	}
-
-	private void seek(byte[] key, BlockReader idx, long start, long end)
-			throws IOException {
+	private BlockReader seek(byte blockType, byte[] key, BlockReader idx,
+			long start, long end) throws IOException {
 		if (idx != null) {
-			long blockOffset = idx.seek(key) <= 0
+			long blockOffset = idx.seekKey(key) <= 0
 					? idx.readIndex()
 					: ((blocksIn(start, end) - 1) * blockSize);
-			block = readBlock(blockOffset);
-			block.seek(key);
+			BlockReader block = readBlock(blockOffset, end);
+			block.seekKey(key);
+			return block;
 		}
-		binarySearch(key, start, end);
+		return binarySearch(blockType, key, start, end);
 	}
 
-	private void binarySearch(byte[] name, long startPos, long endPos)
-			throws IOException {
+	private BlockReader binarySearch(byte blockType, byte[] name,
+			long startPos, long endPos) throws IOException {
 		int low = (int) (startPos / blockSize);
 		int end = blocksIn(startPos, endPos);
+		BlockReader block = null;
 		do {
 			int mid = (low + end) >>> 1;
-			block = readBlock(((long) mid) * blockSize);
+			block = readBlock(((long) mid) * blockSize, endPos);
 			if (blockType != block.type()) {
-				break;
+				return null;
 			}
-			int cmp = block.seek(name);
+			int cmp = block.seekKey(name);
 			if (cmp < 0) {
 				end = mid;
 			} else if (cmp == 0) {
@@ -235,76 +204,7 @@ public class ReftableReader implements AutoCloseable {
 				low = mid + 1;
 			}
 		} while (low < end);
-	}
-
-	/**
-	 * Check if another reference is available.
-	 *
-	 * @return {@code true} if there is another reference.
-	 * @throws IOException
-	 *             reftable cannot be read.
-	 */
-	public boolean next() throws IOException {
-		for (;;) {
-			if (block == null || blockType != block.type()) {
-				return done();
-			} else if (!block.next()) {
-				long p = block.blockEndPosition();
-				if (p >= scanEnd) {
-					return done();
-				}
-				block = readBlock(p);
-				continue;
-			}
-
-			block.parseEntryName();
-			if (match != null && !block.checkNameMatches(match)) {
-				block.skipValue();
-				return done();
-			} else if (blockType == REF_BLOCK_TYPE) {
-				ref = block.readRef();
-				if (!includeDeletes && wasDeleted()) {
-					continue;
-				}
-			} else if (blockType == LOG_BLOCK_TYPE) {
-				logTimeUsec = block.readLogTimeUsec();
-				log = block.readLog(logTimeUsec);
-			}
-			return true;
-		}
-	}
-
-	private boolean done() {
-		block = null;
-		ref = null;
-		log = null;
-		return false;
-	}
-
-	/** @return {@code true} if the current reference was deleted. */
-	public boolean wasDeleted() {
-		Ref r = getRef();
-		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
-	}
-
-	/** @return reference at the current position. */
-	public Ref getRef() {
-		return ref;
-	}
-
-	/** @return name of the current reference. */
-	public String getRefName() {
-		return ref != null ? ref.getName() : block.name();
-	}
-
-	/** @return time of reflog entry, microseconds since the epoch. */
-	public long getReflogTimeUsec() {
-		return logTimeUsec;
-	}
-
-	/** @return current log entry. */
-	public ReflogEntry getReflogEntry() {
-		return log;
+		return block;
 	}
 
 	private void readFileHeader() throws IOException {
@@ -322,15 +222,29 @@ public class ReftableReader implements AutoCloseable {
 		}
 
 		refIndexOffset = NB.decodeInt64(ftr, 8);
-		logOffset = NB.decodeInt64(ftr, 16);
-		logIndexOffset = NB.decodeInt64(ftr, 24);
+		objOffset = NB.decodeInt64(ftr, 16);
+		objIndexOffset = NB.decodeInt64(ftr, 24);
+		logOffset = NB.decodeInt64(ftr, 32);
+		logIndexOffset = NB.decodeInt64(ftr, 40);
 
 		if (refIndexOffset > 0) {
 			refEnd = refIndexOffset;
+		} else if (objOffset > 0) {
+			refEnd = objOffset;
 		} else if (logOffset > 0) {
 			refEnd = logOffset;
 		} else {
 			refEnd = src.size() - ftrLen;
+		}
+
+		if (objOffset > 0) {
+			if (objIndexOffset > 0) {
+				objEnd = objIndexOffset;
+			} else if (logOffset > 0) {
+				objEnd = logOffset;
+			} else {
+				objEnd = src.size() - ftrLen;
+			}
 		}
 
 		if (logOffset > 0) {
@@ -373,14 +287,16 @@ public class ReftableReader implements AutoCloseable {
 			readFileFooter();
 		}
 		if (refIndex == null && refIndexOffset > 0) {
-			long guessedEnd = logOffset > 0
-					? logOffset
-					: (src.size() - FILE_FOOTER_LEN);
-			int guessedSize = (int) (guessedEnd - refIndexOffset);
+			refIndex = readIndex(refIndexOffset);
+		}
+	}
 
-			refIndex = new BlockReader();
-			refIndex.readFrom(src, refIndexOffset, guessedSize);
-			refIndex.verifyIndex();
+	private void initObjIndex() throws IOException {
+		if (blockSize == 0 || objIndexOffset < 0) {
+			readFileFooter();
+		}
+		if (objIndex == null && objIndexOffset > 0) {
+			objIndex = readIndex(objIndexOffset);
 		}
 	}
 
@@ -389,24 +305,42 @@ public class ReftableReader implements AutoCloseable {
 			readFileFooter();
 		}
 		if (logIndex == null && logIndexOffset > 0) {
-			long guessedEnd = (src.size() - FILE_FOOTER_LEN);
-			int guessedSize = (int) (guessedEnd - logIndexOffset);
-
-			logIndex = new BlockReader();
-			logIndex.readFrom(src, logIndexOffset, guessedSize);
-			logIndex.verifyIndex();
+			logIndex = readIndex(logIndexOffset);
 		}
 	}
 
-	private BlockReader readBlock(long position) throws IOException {
-		long end = scanEnd;
+	private BlockReader readIndex(long pos) throws IOException {
+		int sz = readIndexSize(pos);
+		BlockReader i = new BlockReader();
+		i.readBlock(src, pos, sz);
+		i.verifyIndex();
+		return i;
+	}
+
+	private int readIndexSize(long pos) throws IOException {
+		ByteBuffer tmp = src.read(pos, 4);
+		if (tmp.position() < 4) {
+			throw new IOException(JGitText.get().invalidReftableFile);
+		}
+		byte[] buf;
+		if (tmp.hasArray() && tmp.arrayOffset() == 0) {
+			buf = tmp.array();
+		} else {
+			buf = new byte[4];
+			tmp.flip();
+			tmp.get(buf, 0, 4);
+		}
+		return decodeIndexSize(NB.decodeInt32(buf, 0));
+	}
+
+	private BlockReader readBlock(long position, long end) throws IOException {
 		int sz = blockSize;
 		if (position + sz > end) {
 			sz = (int) (end - position); // last block may omit padding.
 		}
 
 		BlockReader b = new BlockReader();
-		b.readFrom(src, position, sz);
+		b.readBlock(src, position, sz);
 		return b;
 	}
 
@@ -418,5 +352,208 @@ public class ReftableReader implements AutoCloseable {
 	@Override
 	public void close() throws IOException {
 		src.close();
+	}
+
+	private class RefCursorImpl extends RefCursor {
+		private final long scanEnd;
+		private final byte[] match;
+		private final boolean prefix;
+
+		private Ref ref;
+		BlockReader block;
+
+		RefCursorImpl(long scanEnd, byte[] match, boolean prefix) {
+			this.scanEnd = scanEnd;
+			this.match = match;
+			this.prefix = prefix;
+		}
+
+		@Override
+		public boolean next() throws IOException {
+			for (;;) {
+				if (block == null || block.type() != REF_BLOCK_TYPE) {
+					return false;
+				} else if (!block.next()) {
+					long p = block.endPosition();
+					if (p >= scanEnd) {
+						return false;
+					}
+					block = readBlock(p, scanEnd);
+					continue;
+				}
+
+				block.parseKey();
+				if (match != null && !block.match(match, prefix)) {
+					block.skipValue();
+					return false;
+				}
+
+				ref = block.readRef();
+				if (!includeDeletes && wasDeleted()) {
+					continue;
+				}
+				return true;
+			}
+		}
+
+		@Override
+		public Ref getRef() {
+			return ref;
+		}
+
+		@Override
+		public void close() {
+			// Do nothing.
+		}
+	}
+
+	private class LogCursorImpl extends LogCursor {
+		private final long scanEnd;
+		private final byte[] match;
+
+		private String refName;
+		private long timeUsec;
+		private ReflogEntry entry;
+		BlockReader block;
+
+		LogCursorImpl(long scanEnd, byte[] match) {
+			this.scanEnd = scanEnd;
+			this.match = match;
+		}
+
+		@Override
+		public boolean next() throws IOException {
+			for (;;) {
+				if (block == null || block.type() != LOG_BLOCK_TYPE) {
+					return false;
+				} else if (!block.next()) {
+					long p = block.endPosition();
+					if (p >= scanEnd) {
+						return false;
+					}
+					block = readBlock(p, scanEnd);
+					continue;
+				}
+
+				block.parseKey();
+				if (match != null && !block.match(match, false)) {
+					block.skipValue();
+					return false;
+				}
+
+				refName = block.name();
+				timeUsec = block.readLogTimeUsec();
+				entry = block.readLog(timeUsec);
+				return true;
+			}
+		}
+
+		@Override
+		public String getRefName() {
+			return refName;
+		}
+
+		@Override
+		public long getReflogTimeUsec() {
+			return timeUsec;
+		}
+
+		@Override
+		public ReflogEntry getReflogEntry() {
+			return entry;
+		}
+
+		@Override
+		public void close() {
+			// Do nothing.
+		}
+	}
+
+	private class ObjCursorImpl extends RefCursor {
+		private final long scanEnd;
+		private final ObjectId match;
+
+		private Ref ref;
+		private int listIdx;
+		private IntList blockList;
+		private BlockReader block;
+
+		ObjCursorImpl(long scanEnd, AnyObjectId id) {
+			this.scanEnd = scanEnd;
+			this.match = id.copy();
+		}
+
+		void initSeek() throws IOException {
+			byte[] key = new byte[OBJECT_ID_LENGTH];
+			match.copyRawTo(key, 0);
+
+			long blockOffset = objIndex.seekAbbrevId(key) <= 0
+					? objIndex.readIndex()
+					: ((blocksIn(objOffset, objEnd) - 1) * blockSize);
+			BlockReader b = readBlock(blockOffset, objEnd);
+			b.seekAbbrevId(key);
+			while (b.next()) {
+				b.parseKey();
+				if (b.matchAbbrevId(key)) {
+					blockList = b.readBlockList();
+					break;
+				}
+				b.skipValue();
+			}
+			if (blockList == null) {
+				blockList = new IntList(0);
+			}
+			if (blockList.size() > 0) {
+				int blockIdx = blockList.get(listIdx++);
+				block = readBlock(blockIdx * blockSize, scanEnd);
+			}
+		}
+
+		void initScan() throws IOException {
+			block = readBlock(0, scanEnd);
+		}
+
+		@Override
+		public boolean next() throws IOException {
+			for (;;) {
+				if (block == null || block.type() != REF_BLOCK_TYPE) {
+					return false;
+				} else if (!block.next()) {
+					long p;
+					if (blockList != null) {
+						if (listIdx >= blockList.size()) {
+							return false;
+						}
+						int blockIdx = blockList.get(listIdx++);
+						p = blockIdx * blockSize;
+					} else {
+						p = block.endPosition();
+					}
+					if (p >= scanEnd) {
+						return false;
+					}
+					block = readBlock(p, scanEnd);
+					continue;
+				}
+
+				block.parseKey();
+				ref = block.readRef();
+				ObjectId id = ref.getObjectId();
+				if (id != null && match.equals(id)
+						&& (includeDeletes || !wasDeleted())) {
+					return true;
+				}
+			}
+		}
+
+		@Override
+		public Ref getRef() {
+			return ref;
+		}
+
+		@Override
+		public void close() {
+			// Do nothing.
+		}
 	}
 }
