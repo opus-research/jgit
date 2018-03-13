@@ -57,7 +57,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.SimpleTimeZone;
 import java.util.SortedMap;
@@ -248,7 +247,7 @@ class SignerV4 {
 		for (String header : sortedHeaders) {
 			if (buffer.length() > 0)
 				buffer.append(";"); //$NON-NLS-1$
-			buffer.append(header.toLowerCase(Locale.ROOT));
+			buffer.append(header.toLowerCase());
 		}
 
 		return buffer.toString();
@@ -266,8 +265,7 @@ class SignerV4 {
 
 		StringBuilder buffer = new StringBuilder();
 		for (String key : sortedHeaders) {
-			buffer.append(
-					key.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ") + ":" //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			buffer.append(key.toLowerCase().replaceAll("\\s+", " ") + ":" //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 					+ headers.get(key).replaceAll("\\s+", " ")); //$NON-NLS-1$//$NON-NLS-2$
 			buffer.append("\n"); //$NON-NLS-1$
 		}

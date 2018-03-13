@@ -53,7 +53,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -103,8 +102,8 @@ class Log extends RevWalkTextBuiltin {
 
 	@Option(name = "--date", usage = "usage_date")
 	void dateFormat(String date) {
-		if (date.toLowerCase(Locale.ROOT).equals(date))
-			date = date.toUpperCase(Locale.ROOT);
+		if (date.toLowerCase().equals(date))
+			date = date.toUpperCase();
 		dateFormatter = new GitDateFormatter(Format.valueOf(date));
 	}
 
