@@ -72,6 +72,11 @@ public class FileUtils {
 	public static final int RETRY = 2;
 
 	/**
+	 * Option to skip deletion if file doesn't exist
+	 */
+	public static final int SKIP_MISSING = 4;
+
+	/**
 	 * Delete file or empty folder
 	 *
 	 * @param f
@@ -103,6 +108,9 @@ public class FileUtils {
 	 *             concurrent threads all try to delete the same file.
 	 */
 	public static void delete(final File f, int options) throws IOException {
+		if ((options & SKIP_MISSING) != 0 && !f.exists())
+			return;
+
 		if ((options & RECURSIVE) != 0 && f.isDirectory()) {
 			final File[] items = f.listFiles();
 			if (items != null) {
@@ -127,4 +135,88 @@ public class FileUtils {
 		}
 	}
 
+	/**
+	 * Creates the directory named by this abstract pathname.
+	 *
+	 * @param d
+	 *            directory to be created
+	 * @throws IOException
+	 *             if creation of {@code d} fails. This may occur if {@code d}
+	 *             did exist when the method was called. This can therefore
+	 *             cause IOExceptions during race conditions when multiple
+	 *             concurrent threads all try to create the same directory.
+	 */
+	public static void mkdir(final File d)
+			throws IOException {
+		mkdir(d, false);
+	}
+
+	/**
+	 * Creates the directory named by this abstract pathname.
+	 *
+	 * @param d
+	 *            directory to be created
+	 * @param skipExisting
+	 *            if {@code true} skip creation of the given directory if it
+	 *            already exists in the file system
+	 * @throws IOException
+	 *             if creation of {@code d} fails. This may occur if {@code d}
+	 *             did exist when the method was called. This can therefore
+	 *             cause IOExceptions during race conditions when multiple
+	 *             concurrent threads all try to create the same directory.
+	 */
+	public static void mkdir(final File d, boolean skipExisting)
+			throws IOException {
+		if (!d.mkdir()) {
+			if (skipExisting && d.isDirectory())
+				return;
+			throw new IOException(MessageFormat.format(
+					JGitText.get().mkDirFailed, d.getAbsolutePath()));
+		}
+	}
+
+	/**
+	 * Creates the directory named by this abstract pathname, including any
+	 * necessary but nonexistent parent directories. Note that if this operation
+	 * fails it may have succeeded in creating some of the necessary parent
+	 * directories.
+	 *
+	 * @param d
+	 *            directory to be created
+	 * @throws IOException
+	 *             if creation of {@code d} fails. This may occur if {@code d}
+	 *             did exist when the method was called. This can therefore
+	 *             cause IOExceptions during race conditions when multiple
+	 *             concurrent threads all try to create the same directory.
+	 */
+	public static void mkdirs(final File d) throws IOException {
+		mkdirs(d, false);
+	}
+
+	/**
+	 * Creates the directory named by this abstract pathname, including any
+	 * necessary but nonexistent parent directories. Note that if this operation
+	 * fails it may have succeeded in creating some of the necessary parent
+	 * directories.
+	 *
+	 * @param d
+	 *            directory to be created
+	 * @param skipExisting
+	 *            if {@code true} skip creation of the given directory if it
+	 *            already exists in the file system
+	 * @throws IOException
+	 *             if creation of {@code d} fails. This may occur if {@code d}
+	 *             did exist when the method was called. This can therefore
+	 *             cause IOExceptions during race conditions when multiple
+	 *             concurrent threads all try to create the same directory.
+	 */
+	public static void mkdirs(final File d, boolean skipExisting)
+			throws IOException {
+		if (!d.mkdirs()) {
+			if (skipExisting && d.isDirectory())
+				return;
+			throw new IOException(MessageFormat.format(
+					JGitText.get().mkDirsFailed, d.getAbsolutePath()));
+		}
+	}
 }
