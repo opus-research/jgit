@@ -74,8 +74,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  * @see SideBandOutputStream
  */
 class SideBandInputStream extends InputStream {
-	private static final String PFX_REMOTE = "remote: ";
-
 	static final int CH_DATA = 1;
 
 	static final int CH_PROGRESS = 2;
@@ -163,7 +161,7 @@ class SideBandInputStream extends InputStream {
 				continue;
 			case CH_ERROR:
 				eof = true;
-				throw new TransportException(PFX_REMOTE + readString(available));
+				throw new TransportException("remote: " + readString(available));
 			default:
 				throw new PackProtocolException("Invalid channel " + channel);
 			}
@@ -203,7 +201,8 @@ class SideBandInputStream extends InputStream {
 			if (!currentTask.equals(taskname)) {
 				currentTask = taskname;
 				lastCnt = 0;
-				beginTask(Integer.parseInt(matcher.group(3)));
+				final int tot = Integer.parseInt(matcher.group(3));
+				monitor.beginTask(currentTask, tot);
 			}
 			final int cnt = Integer.parseInt(matcher.group(2));
 			monitor.update(cnt - lastCnt);
@@ -217,7 +216,7 @@ class SideBandInputStream extends InputStream {
 			if (!currentTask.equals(taskname)) {
 				currentTask = taskname;
 				lastCnt = 0;
-				beginTask(ProgressMonitor.UNKNOWN);
+				monitor.beginTask(currentTask, ProgressMonitor.UNKNOWN);
 			}
 			final int cnt = Integer.parseInt(matcher.group(2));
 			monitor.update(cnt - lastCnt);
@@ -226,10 +225,6 @@ class SideBandInputStream extends InputStream {
 		}
 
 		return false;
-	}
-
-	private void beginTask(final int totalWorkUnits) {
-		monitor.beginTask(PFX_REMOTE + currentTask, totalWorkUnits);
 	}
 
 	private String readString(final int len) throws IOException {
