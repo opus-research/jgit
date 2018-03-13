@@ -282,7 +282,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	public TreeWalk(final Repository repo) {
 		this(repo.newObjectReader(), true);
 		config = repo.getConfig();
-		attributesNodeProvider = repo.newAttributesNodeProvider();
+		attributesNodeProvider = repo.createAttributesNodeProvider();
 	}
 
 	/**
@@ -422,11 +422,11 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * {@link #TreeWalk(Repository)} constructor, the
 	 * {@link AttributesNodeProvider} has already been set. Indeed,the
 	 * {@link Repository} can provide an {@link AttributesNodeProvider} using
-	 * {@link Repository#newAttributesNodeProvider()} method. Otherwise you
+	 * {@link Repository#createAttributesNodeProvider()} method. Otherwise you
 	 * should provide one.
 	 * </p>
 	 *
-	 * @see Repository#newAttributesNodeProvider()
+	 * @see Repository#createAttributesNodeProvider()
 	 * @param provider
 	 * @since 4.2
 	 */
@@ -1093,13 +1093,13 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
-	 * Retrieves the git attributes for the current entry.
+	 * Retrieve the git attributes for the current entry.
 	 *
 	 * <h4>Git attribute computation</h4>
 	 *
 	 * <ul>
-	 * <li>Gets the attributes matching the current path entry from the info
-	 * file (see {@link AttributesNodeProvider#getInfoAttributesNode()}).</li>
+	 * <li>Get the attributes matching the current path entry from the info file
+	 * (see {@link AttributesNodeProvider#getInfoAttributesNode()}).</li>
 	 * <li>Completes the list of attributes using the .gitattributes files
 	 * located on the current path (the further the directory that contains
 	 * .gitattributes is from the path in question, the lower its precedence).
@@ -1120,7 +1120,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * In order to have a correct list of attributes for the current entry, this
 	 * {@link TreeWalk} requires to have at least one
 	 * {@link AttributesNodeProvider} and a {@link DirCacheIterator} set up. An
-	 * {@link AttributesNodeProvider} is used to retrieves the attributes from
+	 * {@link AttributesNodeProvider} is used to retrieve the attributes from
 	 * the info attributes file and the global attributes file. The
 	 * {@link DirCacheIterator} is used to retrieve the .gitattributes files
 	 * stored in the index. A {@link WorkingTreeIterator} can also be provided
@@ -1183,7 +1183,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
-	 * Gets the attributes located on the current entry path.
+	 * Get the attributes located on the current entry path.
 	 *
 	 * @param path
 	 *            current entry path
@@ -1247,9 +1247,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
-	 * Gets the {@link AttributesNode} for the current entry.
+	 * Get the {@link AttributesNode} for the current entry.
 	 * <p>
-	 * This method implement the fallback mechanism between the index and the
+	 * This method implements the fallback mechanism between the index and the
 	 * working tree depending on the operation type
 	 * </p>
 	 *
@@ -1303,7 +1303,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			break;
 		default:
 			throw new IllegalStateException(
-					"The only operation type handled are:" //$NON-NLS-1$
+					"The only supported operation types are:" //$NON-NLS-1$
 							+ OperationType.CHECKIN_OP + "," //$NON-NLS-1$
 							+ OperationType.CHECKOUT_OP);
 		}
