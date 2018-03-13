@@ -260,7 +260,7 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	public final int hashCode() {
-		return (int) (w2);
+		return (int) (w1 >> 32);
 	}
 
 	/**

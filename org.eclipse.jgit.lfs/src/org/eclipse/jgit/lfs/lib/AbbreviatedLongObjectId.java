@@ -329,7 +329,7 @@ public final class AbbreviatedLongObjectId implements Serializable {
 
 	@Override
 	public int hashCode() {
-		return (int) (w2 >>> 32);
+		return (int) (w1 >> 32);
 	}
 
 	@Override
