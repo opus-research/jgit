@@ -117,9 +117,7 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 
 	protected static void fsck(Repository db, RevObject... tips)
 			throws Exception {
-		TestRepository<? extends Repository> tr =
-				new TestRepository<Repository>(db);
-		tr.fsck(tips);
+		new TestRepository(db).fsck(tips);
 	}
 
 	protected static Set<RefSpec> mirror(String... refs) {
