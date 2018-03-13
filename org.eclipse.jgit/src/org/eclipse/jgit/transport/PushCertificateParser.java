@@ -40,6 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.transport.BaseReceivePack.parseCommand;
@@ -280,7 +281,7 @@ public class PushCertificateParser {
 				|| !s.startsWith(header)
 				|| s.charAt(header.length()) != ' ') {
 			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidField, header));
+					JGitText.get().pushCertificateInvalidHeader, header));
 		}
 		return s.substring(header.length() + 1);
 	}
@@ -307,14 +308,11 @@ public class PushCertificateParser {
 	 */
 	public void receiveHeader(PacketLineIn pckIn, boolean stateless)
 			throws IOException {
-		receiveHeader(new PacketLineReader(pckIn));
-		nonceStatus = nonceGenerator != null
-				? nonceGenerator.verify(
-					receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
-				: NonceStatus.UNSOLICITED;
+		receiveHeader(new PacketLineReader(pckIn), stateless);
 	}
 
-	private void receiveHeader(StringReader reader) throws IOException {
+	private void receiveHeader(StringReader reader, boolean stateless)
+			throws IOException {
 		try {
 			try {
 				version = parseHeader(reader, VERSION);
@@ -335,6 +333,10 @@ public class PushCertificateParser {
 			}
 			pushee = parseHeader(reader, PUSHEE);
 			receivedNonce = parseHeader(reader, NONCE);
+			nonceStatus = nonceGenerator != null
+					? nonceGenerator.verify(
+						receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
+					: NonceStatus.UNSOLICITED;
 			// An empty line.
 			if (!reader.read().isEmpty()) {
 				throw new PackProtocolException(
