@@ -72,9 +72,6 @@ import org.xml.sax.helpers.XMLReaderFactory;
  *
  * This will parse a repo XML manifest, convert it into .gitmodules file and the
  * repository config file.
- *
- * @see <a href="https://code.google.com/p/git-repo/">git-repo project page</a>
- * @since 3.4
  */
 public class RepoCommand extends GitCommand<Void> {
 
@@ -122,10 +119,8 @@ public class RepoCommand extends GitCommand<Void> {
 			try {
 				xr.parse(new InputSource(in));
 			} catch (SAXException e) {
-				IOException error = new IOException(MessageFormat.format(
-							RepoText.get().errorParsingManifestFile, filename));
-				error.initCause(e);
-				throw error;
+				throw new IOException(MessageFormat.format(
+							RepoText.get().errorParsingFromFile, filename), e);
 			} finally {
 				in.close();
 			}
@@ -137,13 +132,14 @@ public class RepoCommand extends GitCommand<Void> {
 				String localName,
 				String qName,
 				Attributes attributes) throws SAXException {
-			if ("project".equals(qName)) //$NON-NLS-1$
-				projects.add(new Project(attributes.getValue("name"), attributes.getValue("path"))); //$NON-NLS-1$ //$NON-NLS-2$
-			else if ("remote".equals(qName)) //$NON-NLS-1$
-				remotes.put(attributes.getValue("name"), attributes.getValue("fetch")); //$NON-NLS-1$ //$NON-NLS-2$
-			else if ("default".equals(qName)) //$NON-NLS-1$
-				defaultRemote = attributes.getValue("remote"); //$NON-NLS-1$
-			else if ("copyfile".equals(qName)) { //$NON-NLS-1$
+			if ("project".equals(qName)) {
+				projects.add(new Project(attributes.getValue("name"), attributes.getValue("path")));
+			} else if ("remote".equals(qName)) {
+				remotes.put(attributes.getValue("name"),
+						attributes.getValue("fetch"));
+			} else if ("default".equals(qName)) {
+				defaultRemote = attributes.getValue("remote");
+			} else if ("copyfile".equals(qName)) {
 				// TODO(fishywang): Handle copyfile. Do nothing for now.
 			}
 		}
@@ -156,7 +152,7 @@ public class RepoCommand extends GitCommand<Void> {
 			}
 			final String remoteUrl;
 			try {
-				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote))); //$NON-NLS-1$
+				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote)));
 				remoteUrl = uri.normalize().toString();
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
@@ -208,7 +204,7 @@ public class RepoCommand extends GitCommand<Void> {
 	 * The progress monitor associated with the clone operation. By default,
 	 * this is set to <code>NullProgressMonitor</code>
 	 *
-	 * @see org.eclipse.jgit.lib.NullProgressMonitor
+	 * @see NullProgressMonitor
 	 * @param monitor
 	 * @return this command
 	 */
@@ -217,7 +213,6 @@ public class RepoCommand extends GitCommand<Void> {
 		return this;
 	}
 
-	@Override
 	public Void call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)
@@ -237,10 +232,8 @@ public class RepoCommand extends GitCommand<Void> {
 
 	private void addSubmodule(String url, String name) throws SAXException {
 		SubmoduleAddCommand add = new SubmoduleAddCommand(repo);
-		if (monitor != null)
-			add.setProgressMonitor(monitor);
 		try {
-			add.setPath(name).setURI(url).call();
+			Repository sub = add.setPath(name).setURI(url).call();
 		} catch (GitAPIException e) {
 			throw new SAXException(e);
 		}

@@ -224,8 +224,6 @@ public class Main {
 		} finally {
 			if (cmd.outw != null)
 				cmd.outw.flush();
-			if (cmd.errw != null)
-				cmd.errw.flush();
 		}
 	}
 
