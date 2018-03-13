@@ -50,25 +50,25 @@ import static org.eclipse.jgit.lib.FileMode.GITLINK;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collection;
 import java.util.List;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.HunkHeader;
 import org.eclipse.jgit.patch.FileHeader.PatchType;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 
@@ -88,7 +88,7 @@ public class DiffFormatter {
 
 	private RawText.Factory rawTextFactory = RawText.FACTORY;
 
-	private long bigFileThreshold = 50 * 1024 * 1024;
+	private int bigFileThreshold = 50 * 1024 * 1024;
 
 	/**
 	 * Create a new formatter with a default level of context.
@@ -176,7 +176,7 @@ public class DiffFormatter {
 	 * @param bigFileThreshold
 	 *            the limit, in bytes.
 	 */
-	public void setBigFileThreshold(long bigFileThreshold) {
+	public void setBigFileThreshold(int bigFileThreshold) {
 		this.bigFileThreshold = bigFileThreshold;
 	}
 
@@ -219,8 +219,18 @@ public class DiffFormatter {
 		if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
 			writeGitLinkDiffText(out, ent);
 		} else {
-			byte[] aRaw = open(ent.getOldMode(), ent.getOldId());
-			byte[] bRaw = open(ent.getNewMode(), ent.getNewId());
+			if (db == null)
+				throw new IllegalStateException(
+						JGitText.get().repositoryIsRequired);
+
+			ObjectReader reader = db.newObjectReader();
+			byte[] aRaw, bRaw;
+			try {
+				aRaw = open(reader, ent.getOldMode(), ent.getOldId());
+				bRaw = open(reader, ent.getNewMode(), ent.getNewId());
+			} finally {
+				reader.release();
+			}
 
 			if (RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
 				out.write(encodeASCII("Binary files differ\n"));
@@ -347,45 +357,26 @@ public class DiffFormatter {
 		return ('"' + name + '"').equals(q) ? name : q;
 	}
 
-	private byte[] open(FileMode mode, AbbreviatedObjectId id)
-			throws IOException {
+	private byte[] open(ObjectReader reader, FileMode mode,
+			AbbreviatedObjectId id) throws IOException {
 		if (mode == FileMode.MISSING)
 			return new byte[] {};
 
 		if (mode.getObjectType() != Constants.OBJ_BLOB)
 			return new byte[] {};
 
-		if (db == null)
-			throw new IllegalStateException(JGitText.get().repositoryIsRequired);
-
-		if (id.isComplete()) {
-			ObjectLoader ldr = db.open(id.toObjectId());
-			if (!ldr.isLarge())
-				return ldr.getCachedBytes();
-
-			long sz = ldr.getSize();
-			if (sz < bigFileThreshold && sz < Integer.MAX_VALUE) {
-				byte[] buf;
-				try {
-					buf = new byte[(int) sz];
-				} catch (OutOfMemoryError noMemory) {
-					LargeObjectException e;
-
-					e = new LargeObjectException(id.toObjectId());
-					e.initCause(noMemory);
-					throw e;
-				}
-				InputStream in = ldr.openStream();
-				try {
-					IO.readFully(in, buf, 0, buf.length);
-				} finally {
-					in.close();
-				}
-				return buf;
-			}
+		if (!id.isComplete()) {
+			Collection<ObjectId> ids = reader.resolve(id);
+			if (ids.size() == 1)
+				id = AbbreviatedObjectId.fromObjectId(ids.iterator().next());
+			else if (ids.size() == 0)
+				throw new MissingObjectException(id, Constants.OBJ_BLOB);
+			else
+				throw new AmbiguousObjectException(id, ids);
 		}
 
-		return new byte[] {};
+		ObjectLoader ldr = reader.open(id.toObjectId());
+		return ldr.getCachedBytes(bigFileThreshold);
 	}
 
 	/**
@@ -625,8 +616,17 @@ public class DiffFormatter {
 			editList = new EditList();
 			type = PatchType.UNIFIED;
 		} else {
-			byte[] aRaw = open(ent.getOldMode(), ent.getOldId());
-			byte[] bRaw = open(ent.getNewMode(), ent.getNewId());
+			if (db == null)
+				throw new IllegalStateException(
+						JGitText.get().repositoryIsRequired);
+			ObjectReader reader = db.newObjectReader();
+			byte[] aRaw, bRaw;
+			try {
+				aRaw = open(reader, ent.getOldMode(), ent.getOldId());
+				bRaw = open(reader, ent.getNewMode(), ent.getNewId());
+			} finally {
+				reader.release();
+			}
 
 			if (RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
 				buf.write(encodeASCII("Binary files differ\n"));
