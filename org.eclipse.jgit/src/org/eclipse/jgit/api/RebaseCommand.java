@@ -62,6 +62,7 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseResult.Status;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -219,8 +220,18 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (monitor.isCancelled())
 				return abort(RebaseResult.ABORTED_RESULT);
 
-			if (operation == Operation.CONTINUE)
+			if (operation == Operation.CONTINUE) {
 				newHead = continueRebase();
+
+				if (newHead == null) {
+					// continueRebase() returns null only if no commit was
+					// neccessary. This means that no changes where left over
+					// after resolving all conflicts. In this case, cgit stops
+					// and displays a nice message to the user, telling him to
+					// either do changes or skip the commit instead of continue.
+					return RebaseResult.NOTHING_TO_COMMIT_RESULT;
+				}
+			}
 
 			if (operation == Operation.SKIP)
 				newHead = checkoutCurrentHead();
@@ -675,6 +686,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} catch (RefNotFoundException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		} catch (InvalidRefNameException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		} catch (CheckoutConflictException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 	}
