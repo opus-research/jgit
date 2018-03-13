@@ -58,6 +58,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
@@ -160,7 +161,7 @@ class Push extends TextBuiltin {
 				printRefUpdateResult(reader, uri, result, rru);
 		}
 
-		AbstractFetchCommand.showRemoteMessages(result.getMessages());
+		AbstractFetchCommand.showRemoteMessages(errw, result.getMessages());
 		if (everythingUpToDate)
 			outw.println(CLIText.get().everythingUpToDate);
 	}

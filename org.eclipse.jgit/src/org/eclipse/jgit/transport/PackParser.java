@@ -62,6 +62,8 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TooLargeObjectInPackException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.PackLock;
+import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
@@ -78,8 +80,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.storage.file.PackLock;
-import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
@@ -419,6 +419,20 @@ public abstract class PackParser {
 	}
 
 	/**
+	 * Get the size of the parsed pack.
+	 *
+	 * This will also include the pack index size if an index was created. This
+	 * method should only be called after pack parsing is finished.
+	 *
+	 * @return the pack size (including the index size) or -1 if the size cannot
+	 *         be determined
+	 * @since 3.3
+	 */
+	public long getPackSize() {
+		return -1;
+	}
+
+	/**
 	 * Parse the pack stream.
 	 *
 	 * @param progress
@@ -428,6 +442,7 @@ public abstract class PackParser {
 	 *         {@link #setLockMessage(String)}.
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
+	 * @since 3.0
 	 */
 	public final PackLock parse(ProgressMonitor progress) throws IOException {
 		return parse(progress, progress);
@@ -446,6 +461,7 @@ public abstract class PackParser {
 	 *         {@link #setLockMessage(String)}.
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
+	 * @since 3.0
 	 */
 	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
 			throws IOException {
@@ -998,9 +1014,11 @@ public abstract class PackParser {
 			try {
 				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().invalidObject, Constants
-								.typeString(type), id.name(), e.getMessage()));
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().invalidObject,
+						Constants.typeString(type),
+						readCurs.abbreviate(id, 10).name(),
+						e.getMessage()), e);
 			}
 		}
 

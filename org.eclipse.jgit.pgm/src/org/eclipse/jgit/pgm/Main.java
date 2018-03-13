@@ -59,6 +59,7 @@ import org.eclipse.jgit.awtui.AwtCredentialsProvider;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.pgm.opt.SubcommandHandler;
 import org.eclipse.jgit.util.CachedAuthenticator;
@@ -71,6 +72,9 @@ import org.kohsuke.args4j.Option;
 public class Main {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
+
+	@Option(name = "--version", usage = "usage_displayVersion")
+	private boolean version;
 
 	@Option(name = "--show-stack-trace", usage = "usage_displayThejavaStackTraceOnExceptions")
 	private boolean showStackTrace;
@@ -119,6 +123,8 @@ public class Main {
 			configureHttpProxy();
 			execute(argv);
 		} catch (Die err) {
+			if (err.isAborted())
+				System.exit(1);
 			System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 			if (showStackTrace)
 				err.printStackTrace();
@@ -166,7 +172,7 @@ public class Main {
 		try {
 			clp.parseArgument(argv);
 		} catch (CmdLineException err) {
-			if (argv.length > 0 && !help) {
+			if (argv.length > 0 && !help && !version) {
 				writer.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 				writer.flush();
 				System.exit(1);
@@ -203,6 +209,11 @@ public class Main {
 			System.exit(1);
 		}
 
+		if (version) {
+			String cmdId = Version.class.getSimpleName().toLowerCase();
+			subcommand = CommandCatalog.get(cmdId).create();
+		}
+
 		final TextBuiltin cmd = subcommand;
 		if (cmd.requiresRepository())
 			cmd.init(openGitDir(gitdir), null);
@@ -213,6 +224,8 @@ public class Main {
 		} finally {
 			if (cmd.outw != null)
 				cmd.outw.flush();
+			if (cmd.errw != null)
+				cmd.errw.flush();
 		}
 	}
 

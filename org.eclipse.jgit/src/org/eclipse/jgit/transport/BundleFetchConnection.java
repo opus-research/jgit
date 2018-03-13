@@ -47,6 +47,8 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,6 +67,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -76,7 +79,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -242,7 +244,13 @@ class BundleFetchConnection extends BaseFetchConnection {
 				throw new MissingBundlePrerequisiteException(transport.uri,
 						missing);
 
-			for (final Ref r : transport.local.getAllRefs().values()) {
+			Map<String, Ref> localRefs;
+			try {
+				localRefs = transport.local.getRefDatabase().getRefs(ALL);
+			} catch (IOException e) {
+				throw new TransportException(transport.uri, e.getMessage(), e);
+			}
+			for (final Ref r : localRefs.values()) {
 				try {
 					rw.markStart(rw.parseCommit(r.getObjectId()));
 				} catch (IOException readError) {

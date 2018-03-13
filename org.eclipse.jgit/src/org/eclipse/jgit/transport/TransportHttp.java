@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -61,12 +62,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URL;
-import java.net.URLConnection;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
@@ -83,8 +82,8 @@ import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
@@ -93,6 +92,7 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.RefDirectory;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
@@ -102,7 +102,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.storage.file.RefDirectory;
+import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -128,6 +128,7 @@ import org.eclipse.jgit.util.io.UnionInputStream;
  */
 public class TransportHttp extends HttpTransport implements WalkTransport,
 		PackTransport {
+
 	private static final String SVC_UPLOAD_PACK = "git-upload-pack"; //$NON-NLS-1$
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack"; //$NON-NLS-1$
@@ -302,7 +303,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			NotSupportedException {
 		final String service = SVC_UPLOAD_PACK;
 		try {
-			final HttpURLConnection c = connect(service);
+			final HttpConnection c = connect(service);
 			final InputStream in = openInputStream(c);
 			try {
 				if (isSmartHttp(c, service)) {
@@ -343,10 +344,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			// is not there) download HEAD by itself as a loose file and do
 			// the resolution by hand.
 			//
-			HttpURLConnection conn = httpOpen(new URL(baseUrl, Constants.HEAD));
+			HttpConnection conn = httpOpen(new URL(baseUrl, Constants.HEAD));
 			int status = HttpSupport.response(conn);
 			switch (status) {
-			case HttpURLConnection.HTTP_OK: {
+			case HttpConnection.HTTP_OK: {
 				br = toBufferedReader(openInputStream(conn));
 				try {
 					String line = br.readLine();
@@ -368,7 +369,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				break;
 			}
 
-			case HttpURLConnection.HTTP_NOT_FOUND:
+			case HttpConnection.HTTP_NOT_FOUND:
 				break;
 
 			default:
@@ -392,7 +393,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			TransportException {
 		final String service = SVC_RECEIVE_PACK;
 		try {
-			final HttpURLConnection c = connect(service);
+			final HttpConnection c = connect(service);
 			final InputStream in = openInputStream(c);
 			try {
 				if (isSmartHttp(c, service)) {
@@ -424,7 +425,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		// No explicit connections are maintained.
 	}
 
-	private HttpURLConnection connect(final String service)
+	private HttpConnection connect(final String service)
 			throws TransportException, NotSupportedException {
 		final URL u;
 		try {
@@ -449,7 +450,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		try {
 			int authAttempts = 1;
 			for (;;) {
-				final HttpURLConnection conn = httpOpen(u);
+				final HttpConnection conn = httpOpen(u);
 				if (useSmartHttp) {
 					String exp = "application/x-" + service + "-advertisement"; //$NON-NLS-1$ //$NON-NLS-2$
 					conn.setRequestProperty(HDR_ACCEPT, exp + ", */*"); //$NON-NLS-1$
@@ -458,28 +459,30 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				}
 				final int status = HttpSupport.response(conn);
 				switch (status) {
-				case HttpURLConnection.HTTP_OK:
+				case HttpConnection.HTTP_OK:
 					return conn;
 
-				case HttpURLConnection.HTTP_NOT_FOUND:
+				case HttpConnection.HTTP_NOT_FOUND:
 					throw new NoRemoteRepositoryException(uri,
 							MessageFormat.format(JGitText.get().uriNotFound, u));
 
-				case HttpURLConnection.HTTP_UNAUTHORIZED:
+				case HttpConnection.HTTP_UNAUTHORIZED:
 					authMethod = HttpAuthMethod.scanResponse(conn);
 					if (authMethod == HttpAuthMethod.NONE)
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
-					if (1 < authAttempts
-							|| !authMethod.authorize(uri,
-									getCredentialsProvider())) {
+					CredentialsProvider credentialsProvider = getCredentialsProvider();
+					if (authAttempts > 1)
+						credentialsProvider.reset(uri);
+					if (3 < authAttempts
+							|| !authMethod.authorize(uri, credentialsProvider)) {
 						throw new TransportException(uri,
 								JGitText.get().notAuthorized);
 					}
 					authAttempts++;
 					continue;
 
-				case HttpURLConnection.HTTP_FORBIDDEN:
+				case HttpConnection.HTTP_FORBIDDEN:
 					throw new TransportException(uri, MessageFormat.format(
 							JGitText.get().serviceNotPermitted, service));
 
@@ -497,13 +500,23 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	final HttpURLConnection httpOpen(URL u) throws IOException {
+	final HttpConnection httpOpen(URL u) throws IOException {
 		return httpOpen(METHOD_GET, u);
 	}
 
-	final HttpURLConnection httpOpen(String method, URL u) throws IOException {
+	/**
+	 * Open an HTTP connection.
+	 *
+	 * @param method
+	 * @param u
+	 * @return the connection
+	 * @throws IOException
+	 * @since 3.3
+	 */
+	protected HttpConnection httpOpen(String method, URL u)
+			throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
-		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
+		HttpConnection conn = connectionFactory.create(u, proxy);
 
 		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			disableSslVerify(conn);
@@ -524,14 +537,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		return conn;
 	}
 
-	private void disableSslVerify(URLConnection conn)
+	private void disableSslVerify(HttpConnection conn)
 			throws IOException {
 		final TrustManager[] trustAllCerts = new TrustManager[] { new DummyX509TrustManager() };
 		try {
-			SSLContext ctx = SSLContext.getInstance("SSL"); //$NON-NLS-1$
-			ctx.init(null, trustAllCerts, null);
-			final HttpsURLConnection sslConn = (HttpsURLConnection) conn;
-			sslConn.setSSLSocketFactory(ctx.getSocketFactory());
+			conn.configure(null, trustAllCerts, null);
+			conn.setHostnameVerifier(new DummyHostnameVerifier());
 		} catch (KeyManagementException e) {
 			throw new IOException(e.getMessage());
 		} catch (NoSuchAlgorithmException e) {
@@ -539,7 +550,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	final InputStream openInputStream(HttpURLConnection conn)
+	final InputStream openInputStream(HttpConnection conn)
 			throws IOException {
 		InputStream input = conn.getInputStream();
 		if (ENCODING_GZIP.equals(conn.getHeaderField(HDR_CONTENT_ENCODING)))
@@ -552,7 +563,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		return new TransportException(uri, why);
 	}
 
-	private boolean isSmartHttp(final HttpURLConnection c, final String service) {
+	private boolean isSmartHttp(final HttpConnection c, final String service) {
 		final String expType = "application/x-" + service + "-advertisement"; //$NON-NLS-1$ //$NON-NLS-2$
 		final String actType = c.getContentType();
 		return expType.equals(actType);
@@ -648,13 +659,13 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		FileStream open(final String path) throws IOException {
 			final URL base = objectsUrl;
 			final URL u = new URL(base, path);
-			final HttpURLConnection c = httpOpen(u);
+			final HttpConnection c = httpOpen(u);
 			switch (HttpSupport.response(c)) {
-			case HttpURLConnection.HTTP_OK:
+			case HttpConnection.HTTP_OK:
 				final InputStream in = openInputStream(c);
 				final int len = c.getContentLength();
 				return new FileStream(in, len);
-			case HttpURLConnection.HTTP_NOT_FOUND:
+			case HttpConnection.HTTP_NOT_FOUND:
 				throw new FileNotFoundException(u.toString());
 			default:
 				throw new IOException(u.toString() + ": " //$NON-NLS-1$
@@ -735,12 +746,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		protected void doFetch(final ProgressMonitor monitor,
-				final Collection<Ref> want, final Set<ObjectId> have)
-				throws TransportException {
+				final Collection<Ref> want, final Set<ObjectId> have,
+				final OutputStream outputStream) throws TransportException {
 			try {
 				svc = new MultiRequestService(SVC_UPLOAD_PACK);
 				init(svc.getInputStream(), svc.getOutputStream());
-				super.doFetch(monitor, want, have);
+				super.doFetch(monitor, want, have, outputStream);
 			} finally {
 				svc = null;
 			}
@@ -764,11 +775,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		protected void doPush(final ProgressMonitor monitor,
-				final Map<String, RemoteRefUpdate> refUpdates)
-				throws TransportException {
+				final Map<String, RemoteRefUpdate> refUpdates,
+				OutputStream outputStream) throws TransportException {
 			final Service svc = new MultiRequestService(SVC_RECEIVE_PACK);
 			init(svc.getInputStream(), svc.getOutputStream());
-			super.doPush(monitor, refUpdates);
+			super.doPush(monitor, refUpdates, outputStream);
 		}
 	}
 
@@ -780,7 +791,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		protected final String responseType;
 
-		protected HttpURLConnection conn;
+		protected HttpConnection conn;
 
 		protected HttpOutputStream out;
 
@@ -835,7 +846,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		void openResponse() throws IOException {
 			final int status = HttpSupport.response(conn);
-			if (status != HttpURLConnection.HTTP_OK) {
+			if (status != HttpConnection.HTTP_OK) {
 				throw new TransportException(uri, status + " " //$NON-NLS-1$
 						+ conn.getResponseMessage());
 			}
@@ -978,6 +989,13 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		public void checkServerTrusted(X509Certificate[] certs, String authType) {
 			// no check
+		}
+	}
+
+	private static class DummyHostnameVerifier implements HostnameVerifier {
+		public boolean verify(String hostname, SSLSession session) {
+			// always accept
+			return true;
 		}
 	}
 }

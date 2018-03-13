@@ -86,6 +86,7 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -109,6 +110,8 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	/**
 	 * string versions of a list of commit SHA1s
+	 *
+	 * @since 3.0
 	 */
 	protected String commitNames[];
 
@@ -126,6 +129,8 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	/**
 	 * merge result as tree
+	 *
+	 * @since 3.0
 	 */
 	protected ObjectId resultTree;
 
@@ -149,6 +154,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * created as temporary files and a new empty, in-memory dircache will be
 	 * used instead the repo's one. Often used for bare repos where the repo
 	 * doesn't even have a workingtree and dircache.
+	 * @since 3.0
 	 */
 	protected boolean inCore;
 
@@ -157,22 +163,26 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * repository and should handle locking and unlocking of the dircache. If
 	 * this merger should work in-core or if an explicit dircache was specified
 	 * during construction then this field is set to false.
+	 * @since 3.0
 	 */
 	protected boolean implicitDirCache;
 
 	/**
 	 * Directory cache
+	 * @since 3.0
 	 */
 	protected DirCache dircache;
 
 	/**
 	 * The iterator to access the working tree. If set to <code>null</code> this
 	 * merger will not touch the working tree.
+	 * @since 3.0
 	 */
 	protected WorkingTreeIterator workingTreeIterator;
 
 	/**
 	 * our merge algorithm
+	 * @since 3.0
 	 */
 	protected MergeAlgorithm mergeAlgorithm;
 
@@ -235,8 +245,9 @@ public class ResolveMerger extends ThreeWayMerger {
 				String fileName = toBeDeleted.get(i);
 				File f = new File(db.getWorkTree(), fileName);
 				if (!f.delete())
-					failingPaths.put(fileName,
-							MergeFailureReason.COULD_NOT_DELETE);
+					if (!f.isDirectory())
+						failingPaths.put(fileName,
+								MergeFailureReason.COULD_NOT_DELETE);
 				modifiedFiles.add(fileName);
 			}
 		} finally {
@@ -245,11 +256,11 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void createDir(File f) throws IOException {
-		if (!f.isDirectory() && !f.mkdirs()) {
+		if (!db.getFS().isDirectory(f) && !f.mkdirs()) {
 			File p = f;
-			while (p != null && !p.exists())
+			while (p != null && !db.getFS().exists(p))
 				p = p.getParentFile();
-			if (p == null || p.isDirectory())
+			if (p == null || db.getFS().isDirectory(p))
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 			FileUtils.delete(p);
 			if (!f.mkdirs())
@@ -428,7 +439,7 @@ public class ResolveMerger extends ThreeWayMerger {
 					else {
 						// the preferred version THEIRS has a different mode
 						// than ours. Check it out!
-						if (isWorktreeDirty(work))
+						if (isWorktreeDirty(work, ourDce))
 							return false;
 						// we know about length and lastMod only after we have written the new content.
 						// This will happen later. Set these values to 0 for know.
@@ -466,7 +477,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// THEIRS. THEIRS is chosen.
 
 			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty(work))
+			if (isWorktreeDirty(work, ourDce))
 				return false;
 			if (nonTree(modeT)) {
 				// we know about length and lastMod only after we have written
@@ -479,7 +490,11 @@ public class ResolveMerger extends ThreeWayMerger {
 				return true;
 			} else if (modeT == 0 && modeB != 0) {
 				// we want THEIRS ... but THEIRS contains the deletion of the
-				// file
+				// file. Also, do not complain if the file is already deleted
+				// locally. This complements the test in isWorktreeDirty() for
+				// the same case.
+				if (tw.getTreeCount() > T_FILE && tw.getRawMode(T_FILE) == 0)
+					return true;
 				toBeDeleted.add(tw.getPathString());
 				return true;
 			}
@@ -520,7 +535,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		if (nonTree(modeO) && nonTree(modeT)) {
 			// Check worktree before modifying files
-			if (isWorktreeDirty(work))
+			if (isWorktreeDirty(work, ourDce))
 				return false;
 
 			// Don't attempt to resolve submodule link conflicts
@@ -551,7 +566,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				// OURS was deleted checkout THEIRS
 				if (modeO == 0) {
 					// Check worktree before checking out THEIRS
-					if (isWorktreeDirty(work))
+					if (isWorktreeDirty(work, ourDce))
 						return false;
 					if (nonTree(modeT)) {
 						if (e != null)
@@ -610,7 +625,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		return isDirty;
 	}
 
-	private boolean isWorktreeDirty(WorkingTreeIterator work) {
+	private boolean isWorktreeDirty(WorkingTreeIterator work,
+			DirCacheEntry ourDce) throws IOException {
 		if (work == null)
 			return false;
 
@@ -618,10 +634,19 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		boolean isDirty = work.isModeDifferent(modeO);
-		if (!isDirty && nonTree(modeF))
-			isDirty = !tw.idEqual(T_FILE, T_OURS);
+		boolean isDirty;
+		if (ourDce != null)
+			isDirty = work.isModified(ourDce, true, reader);
+		else {
+			isDirty = work.isModeDifferent(modeO);
+			if (!isDirty && nonTree(modeF))
+				isDirty = !tw.idEqual(T_FILE, T_OURS);
+		}
 
+		// Ignore existing empty directories
+		if (isDirty && modeF == FileMode.TYPE_TREE
+				&& modeO == FileMode.TYPE_MISSING)
+			isDirty = false;
 		if (isDirty)
 			failingPaths.put(tw.getPathString(),
 					MergeFailureReason.DIRTY_WORKTREE);
@@ -702,9 +727,10 @@ public class ResolveMerger extends ThreeWayMerger {
 				// support write operations
 				throw new UnsupportedOperationException();
 
+			FS fs = db.getFS();
 			of = new File(workTree, tw.getPathString());
 			File parentFolder = of.getParentFile();
-			if (!parentFolder.exists())
+			if (!fs.exists(parentFolder))
 				parentFolder.mkdirs();
 			fos = new FileOutputStream(of);
 			try {
@@ -890,6 +916,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @param mergeTree
 	 * @return whether the trees merged cleanly
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	protected boolean mergeTrees(AbstractTreeIterator baseTree,
 			RevTree headTree, RevTree mergeTree) throws IOException {
