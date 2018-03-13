@@ -58,8 +58,6 @@ import org.eclipse.jgit.util.RawParseUtils;
 /**
  * Offers methods to read and write files formatted like the git-rebase-todo
  * file
- *
- * @since 3.2
  */
 public class RebaseTodoFile {
 	private Repository repo;
@@ -197,8 +195,6 @@ public class RebaseTodoFile {
 			}
 			tokenCount++;
 		}
-		if (tokenCount == 2)
-			return new RebaseTodoLine(action, commit, ""); //$NON-NLS-1$
 		return null;
 	}
 

@@ -85,32 +85,9 @@ public class RebaseResult {
 			}
 		},
 		/**
-		 * Stopped for editing in the context of an interactive rebase
-		 *
-		 * @since 3.2
-		 */
-		EDIT {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
 		 * Failed; the original HEAD was restored
 		 */
 		FAILED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
-		 * The repository contains uncommitted changes and the rebase is not a
-		 * fast-forward
-		 *
-		 * @since 3.2
-		 */
-		UNCOMMITTED_CHANGES {
 			@Override
 			public boolean isSuccessful() {
 				return false;
@@ -158,24 +135,11 @@ public class RebaseResult {
 
 		/**
 		 * Interactive rebase has been prepared
-		 * @since 3.2
 		 */
 		INTERACTIVE_PREPARED {
 			@Override
 			public boolean isSuccessful() {
 				return false;
-			}
-		},
-
-		/**
-		 * Applying stash resulted in conflicts
-		 *
-		 * @since 3.2
-		 */
-		STASH_APPLY_CONFLICTS {
-			@Override
-			public boolean isSuccessful() {
-				return true;
 			}
 		};
 
@@ -201,9 +165,6 @@ public class RebaseResult {
 	static final RebaseResult INTERACTIVE_PREPARED_RESULT =  new RebaseResult(
 			Status.INTERACTIVE_PREPARED);
 
-	static final RebaseResult STASH_APPLY_CONFLICTS_RESULT = new RebaseResult(
-			Status.STASH_APPLY_CONFLICTS);
-
 	private final Status status;
 
 	private final RevCommit currentCommit;
@@ -212,29 +173,20 @@ public class RebaseResult {
 
 	private List<String> conflicts;
 
-	private List<String> uncommittedChanges;
-
 	private RebaseResult(Status status) {
 		this.status = status;
 		currentCommit = null;
 	}
 
-	private RebaseResult(Status status, RevCommit commit) {
-		this.status = status;
-		currentCommit = commit;
-	}
-
 	/**
-	 * Create <code>RebaseResult</code>
+	 * Create <code>RebaseResult</code> with status {@link Status#STOPPED}
 	 *
-	 * @param status
 	 * @param commit
 	 *            current commit
-	 * @return the RebaseResult
 	 */
-	static RebaseResult result(RebaseResult.Status status,
-			RevCommit commit) {
-		return new RebaseResult(status, commit);
+	RebaseResult(RevCommit commit) {
+		status = Status.STOPPED;
+		currentCommit = commit;
 	}
 
 	/**
@@ -242,13 +194,11 @@ public class RebaseResult {
 	 *
 	 * @param failingPaths
 	 *            list of paths causing this rebase to fail
-	 * @return the RebaseResult
 	 */
-	static RebaseResult failed(
-			Map<String, MergeFailureReason> failingPaths) {
-		RebaseResult result = new RebaseResult(Status.FAILED);
-		result.failingPaths = failingPaths;
-		return result;
+	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
+		status = Status.FAILED;
+		currentCommit = null;
+		this.failingPaths = failingPaths;
 	}
 
 	/**
@@ -256,26 +206,11 @@ public class RebaseResult {
 	 *
 	 * @param conflicts
 	 *            the list of conflicting paths
-	 * @return the RebaseResult
 	 */
-	static RebaseResult conflicts(List<String> conflicts) {
-		RebaseResult result = new RebaseResult(Status.CONFLICTS);
-		result.conflicts = conflicts;
-		return result;
-	}
-
-	/**
-	 * Create <code>RebaseResult</code> with status
-	 * {@link Status#UNCOMMITTED_CHANGES}
-	 *
-	 * @param uncommittedChanges
-	 *            the list of paths
-	 * @return the RebaseResult
-	 */
-	static RebaseResult uncommittedChanges(List<String> uncommittedChanges) {
-		RebaseResult result = new RebaseResult(Status.UNCOMMITTED_CHANGES);
-		result.uncommittedChanges = uncommittedChanges;
-		return result;
+	RebaseResult(List<String> conflicts) {
+		status = Status.CONFLICTS;
+		currentCommit = null;
+		this.conflicts = conflicts;
 	}
 
 	/**
@@ -308,15 +243,4 @@ public class RebaseResult {
 	public List<String> getConflicts() {
 		return conflicts;
 	}
-
-	/**
-	 * @return the list of uncommitted changes if status is
-	 *         {@link Status#UNCOMMITTED_CHANGES}
-	 *
-	 * @since 3.2
-	 */
-	public List<String> getUncommittedChanges() {
-		return uncommittedChanges;
-	}
-
 }

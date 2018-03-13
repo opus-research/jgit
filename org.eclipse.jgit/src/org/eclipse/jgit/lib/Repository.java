@@ -257,10 +257,9 @@ public abstract class Repository {
 	 * @param objectId
 	 *            identity of the object to open.
 	 * @param typeHint
-	 *            hint about the type of object being requested, e.g.
-	 *            {@link Constants#OBJ_BLOB}; {@link ObjectReader#OBJ_ANY} if
-	 *            the object type is not known, or does not matter to the
-	 *            caller.
+	 *            hint about the type of object being requested;
+	 *            {@link ObjectReader#OBJ_ANY} if the object type is not known,
+	 *            or does not matter to the caller.
 	 * @return a {@link ObjectLoader} for accessing the object.
 	 * @throws MissingObjectException
 	 *             the object does not exist.
@@ -1576,7 +1575,6 @@ public abstract class Repository {
 	 *            <code>true</code> if also comments should be reported
 	 * @return the list of steps
 	 * @throws IOException
-	 * @since 3.2
 	 */
 	public List<RebaseTodoLine> readRebaseTodo(String path,
 			boolean includeComments)
@@ -1595,7 +1593,6 @@ public abstract class Repository {
 	 * @param append
 	 *            whether to append to an existing file or to write a new file
 	 * @throws IOException
-	 * @since 3.2
 	 */
 	public void writeRebaseTodoFile(String path, List<RebaseTodoLine> steps,
 			boolean append)

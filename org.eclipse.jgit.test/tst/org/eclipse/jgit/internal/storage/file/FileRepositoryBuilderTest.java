@@ -129,8 +129,7 @@ public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
 		builder.setMustExist(true);
 		Repository repo2 = builder.build();
 
-		assertEquals(repo1.getDirectory().getAbsolutePath(), repo2
-				.getDirectory().getAbsolutePath());
+		assertEquals(repo1.getDirectory(), repo2.getDirectory());
 		assertEquals(dir, repo2.getWorkTree());
 	}
 
@@ -168,8 +167,7 @@ public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
 
 		builder.setWorkTree(dir);
 		builder.findGitDir(dir);
-		assertEquals(repo1.getDirectory().getAbsolutePath(), builder
-				.getGitDir().getAbsolutePath());
+		assertEquals(repo1.getDirectory(), builder.getGitDir());
 		builder.setMustExist(true);
 		Repository repo2 = builder.build();
 
