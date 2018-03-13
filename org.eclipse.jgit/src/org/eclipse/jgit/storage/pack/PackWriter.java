@@ -799,7 +799,7 @@ public class PackWriter {
 	}
 
 	private void beginPhase(PackingPhase phase, ProgressMonitor monitor,
-			long cnt) {
+			int cnt) {
 		state.phase = phase;
 		String task;
 		switch (phase) {
@@ -822,7 +822,7 @@ public class PackWriter {
 			throw new IllegalArgumentException(
 					MessageFormat.format(JGitText.get().illegalPackingPhase, phase));
 		}
-		monitor.beginTask(task, (int) cnt);
+		monitor.beginTask(task, cnt);
 	}
 
 	private void endPhase(ProgressMonitor monitor) {
@@ -888,7 +888,7 @@ public class PackWriter {
 
 		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
-		beginPhase(PackingPhase.WRITING, writeMonitor, objCnt);
+		beginPhase(PackingPhase.WRITING, writeMonitor, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
@@ -956,7 +956,7 @@ public class PackWriter {
 	}
 
 	private void searchForReuse(ProgressMonitor monitor) throws IOException {
-		long cnt = 0;
+		int cnt = 0;
 		cnt += objectsLists[Constants.OBJ_COMMIT].size();
 		cnt += objectsLists[Constants.OBJ_TREE].size();
 		cnt += objectsLists[Constants.OBJ_BLOB].size();
@@ -967,7 +967,7 @@ public class PackWriter {
 
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
-			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>((int) cnt);
+			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>(cnt);
 			tmp.addAll(objectsLists[Constants.OBJ_TAG]);
 			tmp.addAll(objectsLists[Constants.OBJ_COMMIT]);
 			tmp.addAll(objectsLists[Constants.OBJ_TREE]);
