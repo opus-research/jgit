@@ -72,6 +72,9 @@ public final class BitmapWalker {
 
 	private long countOfBitmapIndexMisses;
 
+	/**
+	 * Create a BitmapWalker.
+	 */
 	public BitmapWalker(
 			ObjectWalk walker, BitmapIndex bitmapIndex, ProgressMonitor pm) {
 		this.walker = walker;
@@ -79,10 +82,17 @@ public final class BitmapWalker {
 		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
 	}
 
+	/**
+	 * Return the number of objects that had to be walked because they were not covered by a
+	 * bitmap.
+	 */
 	public long getCountOfBitmapIndexMisses() {
 		return countOfBitmapIndexMisses;
 	}
 
+	/**
+	 * Return, as a bitmap, the objects reachable from the objects in start.
+	 */
 	public BitmapBuilder findObjects(Iterable<? extends ObjectId> start, BitmapBuilder seen,
 			boolean ignoreMissing)
 			throws MissingObjectException, IncorrectObjectTypeException,
@@ -206,6 +216,9 @@ public final class BitmapWalker {
 	public static class AddToBitmapFilter extends RevFilter {
 		private final BitmapBuilder bitmap;
 
+		/**
+		 * Create a filter that adds visited commits to the given bitmap.
+		 */
 		public AddToBitmapFilter(BitmapBuilder bitmap) {
 			this.bitmap = bitmap;
 		}
@@ -261,6 +274,10 @@ public final class BitmapWalker {
 		private final BitmapBuilder seen;
 		private final BitmapBuilder bitmap;
 
+		/**
+		 * Create a filter that adds visited commits to the given bitmap, but does not walk
+		 * through the objects in {@code seen}.
+		 */
 		public AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
 			this.seen = seen;
 			this.bitmap = bitmapResult;
