@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2017, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,20 +41,29 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.errors;
 
-import java.util.concurrent.atomic.AtomicLong;
+import java.io.IOException;
+import java.text.MessageFormat;
 
-final class DfsPackKey {
-	final int hash;
+import org.eclipse.jgit.internal.JGitText;
 
-	final AtomicLong cachedSize;
+/**
+ * Thrown when a PackFile uses a pack version not supported by JGit.
+ *
+ * @since 4.5
+ */
+public class UnsupportedPackVersionException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	DfsPackKey() {
-		// Multiply by 31 here so we can more directly combine with another
-		// value without doing the multiply there.
-		//
-		hash = System.identityHashCode(this) * 31;
-		cachedSize = new AtomicLong();
+	/**
+	 * Construct an exception.
+	 *
+	 * @param version
+	 *            pack version
+	 */
+	public UnsupportedPackVersionException(final long version) {
+		super(MessageFormat.format(JGitText.get().unsupportedPackVersion,
+				Long.valueOf(version)));
 	}
 }
