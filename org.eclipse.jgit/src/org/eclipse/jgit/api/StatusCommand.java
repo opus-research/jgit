@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,82 +42,62 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.Callable;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.IndexDiff;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
- * Create an empty git repository or reinitalize an existing one
+ * A class used to execute a {@code Status} command. It has setters for all
+ * supported options and arguments of this command and a {@link #call()} method
+ * to finally execute the command. Each instance of this class should only be
+ * used for one invocation of the command (means: one call to {@link #call()})
  *
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
- *      >Git documentation about init</a>
+ * @see <a
+ *      href="http://www.kernel.org/pub/software/scm/git/docs/git-status.html"
+ *      >Git documentation about Status</a>
  */
-public class InitCommand implements Callable<Git> {
-	private File directory;
-
-	private boolean bare;
+public class StatusCommand extends GitCommand<Status> {
+	private WorkingTreeIterator workingTreeIt;
 
 	/**
-	 * Executes the {@code Init} command.
+	 * @param repo
+	 */
+	protected StatusCommand(Repository repo) {
+		super(repo);
+		// TODO Auto-generated constructor stub
+	}
+
+	/**
+	 * Executes the {@code Status} command with all the options and parameters
+	 * collected by the setter methods of this class. Each instance of this
+	 * class should only be used for one invocation of the command. Don't call
+	 * this method twice on an instance.
 	 *
-	 * @throws JGitInternalException
-	 *             if the repository can't be created
-	 * @return the newly created {@code Git} object with associated repository
+	 * @return a {@link Status} object telling about each path where working
+	 *         tree, index or HEAD differ from each other.
 	 */
-	public Git call() throws JGitInternalException {
-		try {
-			RepositoryBuilder builder = new RepositoryBuilder();
-			if (bare)
-				builder.setBare();
-			builder.readEnvironment();
-			if (directory != null) {
-				File d = directory;
-				if (!bare)
-					d = new File(d, Constants.DOT_GIT);
-				builder.setGitDir(d);
-			} else if (builder.getGitDir() == null) {
-				File d = new File(".");
-				if (d.getParentFile() != null)
-					d = d.getParentFile();
-				if (!bare)
-					d = new File(d, Constants.DOT_GIT);
-				builder.setGitDir(d);
-			}
-			Repository repository = builder.build();
-			if (!repository.getObjectDatabase().exists())
-				repository.create(bare);
-			return new Git(repository);
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
+	public Status call() throws IOException, NoWorkTreeException {
+		if (workingTreeIt == null)
+			workingTreeIt = new FileTreeIterator(repo);
+
+		IndexDiff diff = new IndexDiff(repo, Constants.HEAD, workingTreeIt);
+		diff.diff();
+
+		return new Status(diff);
 	}
 
 	/**
-	 * The optional directory associated with the init operation. If no
-	 * directory is set, we'll use the current directory
+	 * To set the {@link WorkingTreeIterator} which should be used. If this
+	 * method is not called a standard {@link FileTreeIterator} is used.
 	 *
-	 * @param directory
-	 *            the directory to init to
-	 * @return this instance
+	 * @param workingTreeIt
 	 */
-	public InitCommand setDirectory(File directory) {
-		this.directory = directory;
-		return this;
+	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
+		this.workingTreeIt = workingTreeIt;
 	}
-
-	/**
-	 * @param bare
-	 *            whether the repository is bare or not
-	 * @return this instance
-	 */
-	public InitCommand setBare(boolean bare) {
-		this.bare = bare;
-		return this;
-	}
-
 }

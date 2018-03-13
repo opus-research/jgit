@@ -491,15 +491,22 @@ public class RefDirectory extends RefDatabase {
 
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
+		boolean detachingSymbolicRef = false;
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = readRef(name, packed);
 		if (ref != null)
 			ref = resolve(ref, 0, null, null, packed);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
-		else if (detach && ref.isSymbolic())
-			ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
-		return new RefDirectoryUpdate(this, ref);
+		else {
+			detachingSymbolicRef = detach && ref.isSymbolic();
+			if (detachingSymbolicRef)
+				ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
+		}
+		RefDirectoryUpdate refDirUpdate = new RefDirectoryUpdate(this, ref);
+		if (detachingSymbolicRef)
+			refDirUpdate.setDetachingSymbolicRef();
+		return refDirUpdate;
 	}
 
 	@Override
@@ -839,10 +846,9 @@ public class RefDirectory extends RefDatabase {
 		} else if (modified == 0)
 			return null;
 
-		final int limit = 4096;
 		final byte[] buf;
 		try {
-			buf = IO.readSome(path, limit);
+			buf = IO.readFully(path, 4096);
 		} catch (FileNotFoundException noFile) {
 			return null; // doesn't exist; not a reference.
 		}
@@ -852,9 +858,6 @@ public class RefDirectory extends RefDatabase {
 			return null; // empty file; not a reference.
 
 		if (isSymRef(buf, n)) {
-			if (n == limit)
-				return null; // possibly truncated ref
-
 			// trim trailing whitespace
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
