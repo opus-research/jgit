@@ -67,7 +67,7 @@ import com.google.gson.GsonBuilder;
 /**
  * LFS protocol handler implementing the LFS batch API [1]
  *
- * [1] https://github.com/github/git-lfs/blob/master/docs/api/v1/http-v1-batch.md
+ * [1] https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md
  *
  * @since 4.3
  */
@@ -82,55 +82,38 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	/**
 	 * Get the large file repository
 	 *
-	 * @param request
-	 *            the request
-	 * @param path
-	 *            the path
-	 *
-	 * @return the large file repository storing large files or null if the
-	 *         request is not supported.
+	 * @return the large file repository storing large files
 	 */
-	protected abstract LargeFileRepository getLargeFileRepository(
-			LfsRequest request, String path);
-
-	/** LFS request. */
-	protected static class LfsRequest {
-		private String operation;
-
-		private List<LfsObject> objects;
-
-		/**
-		 * Get the LFS operation.
-		 *
-		 * @return the operation
-		 */
-		public String getOperation() {
-			return operation;
-		}
-	}
+	protected abstract LargeFileRepository getLargeFileRepository();
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse res)
 			throws ServletException, IOException {
+		res.setStatus(SC_OK);
+		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
+
 		Writer w = new BufferedWriter(
 				new OutputStreamWriter(res.getOutputStream(), UTF_8));
 
 		Reader r = new BufferedReader(new InputStreamReader(req.getInputStream(), UTF_8));
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
-		String path = req.getPathInfo();
 
-		LargeFileRepository repo = getLargeFileRepository(request, path);
+		LargeFileRepository repo = getLargeFileRepository();
 		if (repo == null) {
 			res.setStatus(SC_SERVICE_UNAVAILABLE);
 			return;
 		}
 
-		res.setStatus(SC_OK);
-		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 		TransferHandler handler = TransferHandler
 				.forOperation(request.operation, repo, request.objects);
 		gson.toJson(handler.process(), w);
 		w.flush();
+	}
+
+	private static class LfsRequest {
+		String operation;
+
+		List<LfsObject> objects;
 	}
 
 	private static Gson createGson() {
