@@ -152,10 +152,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	private AbstractTreeIterator resolveOldTree(RevWalk rw)
 			throws NoHeadException, IOException {
-		if (oldTree != null && oldTreeish != null) {
-			// The setter for each clears the other.
-			throw new AssertionError();
-		} else if (oldTree != null) {
+		if (oldTree != null) {
 			return oldTree;
 		} else if (oldTreeish != null) {
 			return getTreeIterator(rw, oldTreeish);
@@ -171,10 +168,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	}
 
 	private AbstractTreeIterator resolveNewTree(RevWalk rw) throws IOException {
-		if (newTree != null && newTreeish != null) {
-			// The setter for each clears the other.
-			throw new AssertionError();
-		} if (cached) {
+		if (cached) {
 			return new DirCacheIterator(repo.readDirCache());
 		} else if (newTree != null) {
 			return newTree;
@@ -216,8 +210,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	/**
 	 * @param oldTreeish
-	 *            ID of the previous state; use {@code Repository#resolve(string)}
-	 *            to get an ID of an arbitrary string.
+	 *            id of the previous state
 	 * @return this instance
 	 * @since 4.3
 	 */
@@ -240,8 +233,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	/**
 	 * @param newTreeish
-	 *            ID of the updated state; use {@code Repository#resolve(string)}
-	 *            to get an ID of an arbitrary string.
+	 *            id of the updated state
 	 * @return this instance
 	 * @since 4.3
 	 */
