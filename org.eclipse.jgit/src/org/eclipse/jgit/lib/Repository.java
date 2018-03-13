@@ -73,7 +73,7 @@ import org.eclipse.jgit.util.FS;
  * Represents a Git repository.
  * <p>
  * A repository holds all objects and refs used for managing source code (could
- * by any type of file, but source code is what SCM's are typically used for).
+ * be any type of file, but source code is what SCM's are typically used for).
  * <p>
  * This class is thread-safe.
  */
