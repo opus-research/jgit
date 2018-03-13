@@ -174,24 +174,26 @@ public class MergedReftable extends Reftable {
 		}
 
 		void add(RefQueueEntry t) throws IOException {
+			// Common case is many iterations over the same RefQueueEntry
+			// for the bottom of the stack (scanning all refs). Its almost
+			// always less than the top of the queue. Avoid the queue's
+			// O(log N) insertion and removal costs for this common case.
 			if (!t.rc.next()) {
 				t.rc.close();
-				return;
-			}
-			if (head == null && (queue.isEmpty()
-					|| RefQueueEntry.compare(t, queue.peek()) < 0)) {
-				// Common case is many iterations over the same RefQueueEntry
-				// for the bottom of the stack (scanning all refs). Its almost
-				// always less than the top of the queue. Avoid the queue's
-				// O(log N) insertion and removal costs for this common case.
-				head = t;
-				return;
-			}
-			if (head != null) {
+			} else if (head == null) {
+				if (queue.isEmpty()
+						|| RefQueueEntry.compare(t, queue.peek()) < 0) {
+					head = t;
+				} else {
+					head = queue.poll();
+					queue.add(t);
+				}
+			} else if (RefQueueEntry.compare(t, head) > 0) {
+				queue.add(t);
+			} else {
 				queue.add(head);
-				head = null;
+				head = t;
 			}
-			queue.add(t);
 		}
 
 		@Override
