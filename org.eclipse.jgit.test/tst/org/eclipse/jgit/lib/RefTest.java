@@ -58,7 +58,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Map;
-import java.util.TreeSet;
 
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate.Result;
@@ -92,40 +91,14 @@ public class RefTest extends SampleDataRepositoryTestCase {
 		config.setBoolean(ConfigConstants.CONFIG_REMOTE_SECTION,
 				"ab/c", "dummy", true);
 		config.save();
-		assertEquals("[ab/c, origin]",
-				new TreeSet<String>(db.getRemoteNames()).toString());
-
-		// one-level deep remote branch
 		assertEquals("master",
 				db.shortenRemoteBranchName("refs/remotes/origin/master"));
-		assertEquals("origin", db.getRemoteName("refs/remotes/origin/master"));
-
-		// two-level deep remote branch
 		assertEquals("masta/r",
 				db.shortenRemoteBranchName("refs/remotes/origin/masta/r"));
-		assertEquals("origin", db.getRemoteName("refs/remotes/origin/masta/r"));
-
-		// Remote with slash and one-level deep branch name
 		assertEquals("xmaster",
 				db.shortenRemoteBranchName("refs/remotes/ab/c/xmaster"));
-		assertEquals("ab/c", db.getRemoteName("refs/remotes/ab/c/xmaster"));
-
-		// Remote with slash and two-level deep branch name
 		assertEquals("xmasta/r",
 				db.shortenRemoteBranchName("refs/remotes/ab/c/xmasta/r"));
-		assertEquals("ab/c", db.getRemoteName("refs/remotes/ab/c/xmasta/r"));
-
-		// no such remote
-		assertNull(db.getRemoteName("refs/remotes/nosuchremote/x"));
-		assertNull(db.shortenRemoteBranchName("refs/remotes/nosuchremote/x"));
-
-		// no such remote too, no branch name either
-		assertNull(db.getRemoteName("refs/remotes/abranch"));
-		assertNull(db.shortenRemoteBranchName("refs/remotes/abranch"));
-
-		// // local branch
-		assertNull(db.getRemoteName("refs/heads/abranch"));
-		assertNull(db.shortenRemoteBranchName("refs/heads/abranch"));
 	}
 
 	@Test
