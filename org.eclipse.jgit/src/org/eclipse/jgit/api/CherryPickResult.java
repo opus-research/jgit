@@ -51,8 +51,7 @@ import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
- * Encapsulates the result of a {@link CherryPickCommand} or a
- * {@link RevertCommand}
+ * Encapsulates the result of a {@link CherryPickCommand}.
  */
 public class CherryPickResult {
 
