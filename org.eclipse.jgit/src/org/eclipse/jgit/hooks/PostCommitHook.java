@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.errors;
+package org.eclipse.jgit.hooks;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.text.MessageFormat;
+import java.io.PrintStream;
 
-import org.eclipse.jgit.lfs.internal.LfsText;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.lib.Repository;
 
 /**
- * Thrown when a LFS mediafile is found which doesn't have the expected size
+ * The <code>post-commit</code> hook implementation. This hook is run after the
+ * commit was successfully executed.
  *
  * @since 4.5
  */
-public class CorruptMediaFile extends IOException {
-	private static final long serialVersionUID = 1L;
+public class PostCommitHook extends GitHook<Void> {
 
-	private Path mediaFile;
-
-	private long expectedSize;
-
-	private long size;
+	/** The post-commit hook name. */
+	public static final String NAME = "post-commit"; //$NON-NLS-1$
 
 	/**
-	 * @param mediaFile
-	 * @param expectedSize
-	 * @param size
+	 * @param repo
+	 *            The repository
+	 * @param outputStream
+	 *            The output stream the hook must use. {@code null} is allowed,
+	 *            in which case the hook will use {@code System.out}.
 	 */
-	@SuppressWarnings("boxing")
-	public CorruptMediaFile(Path mediaFile, long expectedSize,
-			long size) {
-		super(MessageFormat.format(LfsText.get().inconsistentMediafileLength,
-				mediaFile, expectedSize, size));
-		this.mediaFile = mediaFile;
-		this.expectedSize = expectedSize;
-		this.size = size;
+	protected PostCommitHook(Repository repo, PrintStream outputStream) {
+		super(repo, outputStream);
 	}
 
-	/**
-	 * @return the media file which seems to be corrupt
-	 */
-	public Path getMediaFile() {
-		return mediaFile;
+	@Override
+	public Void call() throws IOException, AbortedByHookException {
+		doRun();
+		return null;
 	}
 
-	/**
-	 * @return the expected size of the media file
-	 */
-	public long getExpectedSize() {
-		return expectedSize;
+	@Override
+	public String getHookName() {
+		return NAME;
 	}
 
-	/**
-	 * @return the actual size of the media file in the file system
-	 */
-	public long getSize() {
-		return size;
-	}
 }
