@@ -186,7 +186,7 @@ public class MyersDiffPerformanceTest extends TestCase {
 		return ret;
 	}
 
-	static class CharArray extends Sequence {
+	private static class CharArray extends Sequence {
 		final char[] array;
 
 		public CharArray(String s) {
@@ -199,7 +199,7 @@ public class MyersDiffPerformanceTest extends TestCase {
 		}
 	}
 
-	static class CharCmp extends SequenceComparator<CharArray> {
+	private static class CharCmp extends SequenceComparator<CharArray> {
 		@Override
 		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
 			return a.array[ai] == b.array[bi];
