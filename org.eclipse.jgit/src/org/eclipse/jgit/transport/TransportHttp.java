@@ -514,12 +514,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache"); //$NON-NLS-1$
 		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
-		int timeOut = getTimeout();
-		if (timeOut != -1) {
-			int effTimeOut = timeOut * 1000;
-			conn.setConnectTimeout(effTimeOut);
-			conn.setReadTimeout(effTimeOut);
-		}
+		conn.setConnectTimeout(getTimeout() * 1000);
+		conn.setReadTimeout(getTimeout() * 1000);
 		authMethod.configureRequest(conn);
 		return conn;
 	}

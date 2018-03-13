@@ -245,29 +245,29 @@ class DiffAlgorithms extends TextBuiltin {
 			File parent = db.getDirectory().getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
-			outw.println(name + ": start at " + startId.name());
+			out.println(name + ": start at " + startId.name());
 		}
 
-		outw.format("  %12d files,     %8d commits\n", files, commits);
-		outw.format("  N=%10d min lines, %8d max lines\n", minN, maxN);
+		out.format("  %12d files,     %8d commits\n", files, commits);
+		out.format("  N=%10d min lines, %8d max lines\n", minN, maxN);
 
-		outw.format("%-25s %12s ( %12s  %12s )\n", //
+		out.format("%-25s %12s ( %12s  %12s )\n", //
 				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
-		outw.format("%-25s %12s ( %12s  %12s )\n", //
+		out.format("%-25s %12s ( %12s  %12s )\n", //
 				"", "", "N=" + minN, "N=" + maxN);
-		outw.println("-----------------------------------------------------"
+		out.println("-----------------------------------------------------"
 				+ "----------------");
 
 		for (Test test : all) {
-			outw.format("%-25s %12d ( %12d  %12d )", //
+			out.format("%-25s %12d ( %12d  %12d )", //
 					test.algorithm.name, //
 					test.runningTimeNanos, //
 					test.minN.runningTimeNanos, //
 					test.maxN.runningTimeNanos);
-			outw.println();
+			out.println();
 		}
-		outw.println();
-		outw.flush();
+		out.println();
+		out.flush();
 	}
 
 	private static boolean isFile(TreeWalk tw, int ithTree) {

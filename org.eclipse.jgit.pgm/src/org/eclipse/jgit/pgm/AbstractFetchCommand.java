@@ -63,7 +63,7 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 	@Option(name = "--verbose", aliases = { "-v" }, usage = "usage_beMoreVerbose")
 	private boolean verbose;
 
-	protected void showFetchResult(final FetchResult r) throws IOException {
+	protected void showFetchResult(final FetchResult r) {
 		ObjectReader reader = db.newObjectReader();
 		try {
 			boolean shownURI = false;
@@ -77,13 +77,13 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 				final String dst = abbreviateRef(u.getLocalName(), true);
 
 				if (!shownURI) {
-					outw.println(MessageFormat.format(CLIText.get().fromURI,
+					out.println(MessageFormat.format(CLIText.get().fromURI,
 							r.getURI()));
 					shownURI = true;
 				}
 
-				outw.format(" %c %-17s %-10s -> %s", type, longType, src, dst);
-				outw.println();
+				out.format(" %c %-17s %-10s -> %s", type, longType, src, dst);
+				out.println();
 			}
 		} finally {
 			reader.release();
