@@ -53,7 +53,7 @@ class Repo extends TextBuiltin {
 	private String uri;
 
 	@Option(name = "--groups", aliases = { "-g" }, usage = "usage_groups")
-	private String groups = "default"; //$NON-NLS-1$
+	private String groups = "default";
 
 	@Argument(required = true, usage = "usage_pathToXml")
 	private String path;
