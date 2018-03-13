@@ -944,32 +944,33 @@ public class IndexPack {
 	private void skipInflateFromInput(long sz) throws IOException {
 		final Inflater inf = inflater;
 		try {
-			long n = 0;
-			int p = fillFromInput(24);
-			inf.setInput(buf, p, bAvail);
-			do {
-				int r = inf.inflate(objectData, 0, objectData.length);
-				if (r == 0) {
-					if (inf.finished())
-						break;
-					if (inf.needsInput()) {
-						if (p >= 0) {
-							crc.update(buf, p, bAvail);
-							use(bAvail);
-						}
-						p = fillFromInput(24);
-						inf.setInput(buf, p, bAvail);
-					} else
-						throw new DataFormatException();
+			final byte[] dst = objectData;
+			int n = 0;
+			int p = -1;
+			while (!inf.finished()) {
+				if (inf.needsInput()) {
+					if (p >= 0) {
+						crc.update(buf, p, bAvail);
+						use(bAvail);
+					}
+					p = fillFromInput(1);
+					inf.setInput(buf, p, bAvail);
 				}
-				n += r;
-			} while (n < sz);
-			if (!inf.finished() || n != sz)
+
+				int free = dst.length - n;
+				if (free < 8) {
+					sz -= n;
+					n = 0;
+					free = dst.length;
+				}
+				n += inf.inflate(dst, n, free);
+			}
+			if (n != sz)
 				throw new DataFormatException(JGitText.get().wrongDecompressedLength);
-			int r = bAvail - inf.getRemaining();
-			if (r > 0) {
-				crc.update(buf, p, r);
-				use(r);
+			n = bAvail - inf.getRemaining();
+			if (n > 0) {
+				crc.update(buf, p, n);
+				use(n);
 			}
 		} catch (DataFormatException dfe) {
 			throw corrupt(dfe);
@@ -983,26 +984,20 @@ public class IndexPack {
 		final Inflater inf = inflater;
 		try {
 			int n = 0;
-			int p = fillFromInput(24);
-			inf.setInput(buf, p, bAvail);
-			do {
-				int r = inf.inflate(dst, n, dst.length - n);
-				if (r == 0) {
-					if (inf.finished())
-						break;
-					if (inf.needsInput()) {
-						if (p >= 0) {
-							crc.update(buf, p, bAvail);
-							use(bAvail);
-						}
-						p = fillFromInput(24);
-						inf.setInput(buf, p, bAvail);
-					} else
-						throw new DataFormatException();
+			int p = -1;
+			while (!inf.finished()) {
+				if (inf.needsInput()) {
+					if (p >= 0) {
+						crc.update(buf, p, bAvail);
+						use(bAvail);
+					}
+					p = fillFromInput(1);
+					inf.setInput(buf, p, bAvail);
 				}
-				n += r;
-			} while (n < sz);
-			if (!inf.finished() || n != sz)
+
+				n += inf.inflate(dst, n, dst.length - n);
+			}
+			if (n != sz)
 				throw new DataFormatException(JGitText.get().wrongDecompressedLength);
 			n = bAvail - inf.getRemaining();
 			if (n > 0) {
@@ -1022,25 +1017,18 @@ public class IndexPack {
 		try {
 			final byte[] dst = new byte[sz];
 			int n = 0;
-			int p = fillFromFile(24);
-			inf.setInput(buf, p, bAvail);
-			do {
-				int r = inf.inflate(dst, n, dst.length - n);
-				if (r == 0) {
-					if (inf.finished())
-						break;
-					if (inf.needsInput()) {
-						if (p >= 0) {
-							crc.update(buf, p, bAvail);
-							use(bAvail);
-						}
-						p = fillFromFile(24);
-						inf.setInput(buf, p, bAvail);
-					} else
-						throw new DataFormatException();
+			int p = -1;
+			while (!inf.finished()) {
+				if (inf.needsInput()) {
+					if (p >= 0) {
+						crc.update(buf, p, bAvail);
+						use(bAvail);
+					}
+					p = fillFromFile(1);
+					inf.setInput(buf, p, bAvail);
 				}
-				n += r;
-			} while (n < sz);
+				n += inf.inflate(dst, n, sz - n);
+			}
 			n = bAvail - inf.getRemaining();
 			if (n > 0) {
 				crc.update(buf, p, n);
