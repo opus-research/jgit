@@ -44,52 +44,73 @@
 package org.eclipse.jgit.diff;
 
 /**
- * Equivalence function for a {@link Sequence} compared by difference algorithm.
+ * Wraps two {@link Sequence} instances to cache their element hash codes.
  *
- * Difference algorithms can use a comparator to compare portions of two
- * sequences and discover the minimal edits required to transform from one
- * sequence to the other sequence.
- *
- * Indexes within a sequence are zero-based.
+ * This pair wraps two sequences that contain cached hash codes for the
+ * specified region of each input sequence.
  *
  * @param <S>
- *            type of sequence the comparator supports.
+ *            the base sequence type.
  */
-public abstract class SequenceComparator<S extends Sequence> {
-	/**
-	 * Compare two items to determine if they are equivalent.
-	 *
-	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}).
-	 *
-	 * @param a
-	 *            the first sequence.
-	 * @param ai
-	 *            item of {@code ai} to compare.
-	 * @param b
-	 *            the second sequence.
-	 * @param bi
-	 *            item of {@code bi} to compare.
-	 * @return true if the two items are identical according to this function's
-	 *         equivalence rule.
-	 */
-	public abstract boolean equals(S a, int ai, S b, int bi);
+public class HashedSequencePair<S extends Sequence> {
+	private final SequenceComparator<? super S> cmp;
+
+	private final S baseA;
+
+	private final S baseB;
+
+	private final Edit region;
+
+	private HashedSequence<S> cachedA;
+
+	private HashedSequence<S> cachedB;
 
 	/**
-	 * Get a hash value for an item in a sequence.
+	 * Construct a pair to provide fast hash codes.
 	 *
-	 * If two items are equal according to this comparator's
-	 * {@link #equals(Sequence, int, Sequence, int)} method, then this hash
-	 * method must produce the same integer result for both items.
-	 *
-	 * It is not required for two items to have different hash values if they
-	 * are are unequal according to the {@code equals()} method.
-	 *
-	 * @param seq
-	 *            the sequence.
-	 * @param ptr
-	 *            the item to obtain the hash for.
-	 * @return hash the hash value.
+	 * @param cmp
+	 *            the base comparator for the sequence elements.
+	 * @param a
+	 *            the A sequence.
+	 * @param b
+	 *            the B sequence.
+	 * @param region
+	 *            a range of elements in each sequence that should be hashed.
+	 *            Only these elements are accessible.
 	 */
-	public abstract int hash(S seq, int ptr);
+	public HashedSequencePair(SequenceComparator<? super S> cmp, S a, S b,
+			Edit region) {
+		this.cmp = cmp;
+		this.baseA = a;
+		this.baseB = b;
+		this.region = region;
+	}
+
+	/** @return obtain a comparator that uses the cached hash codes. */
+	public HashedSequenceComparator<S> getComparator() {
+		return new HashedSequenceComparator<S>(cmp);
+	}
+
+	/** @return wrapper around A that includes cached hash codes. */
+	public HashedSequence<S> getA() {
+		if (cachedA == null)
+			cachedA = wrap(baseA, region.beginA, region.endA);
+		return cachedA;
+	}
+
+	/** @return wrapper around B that includes cached hash codes. */
+	public HashedSequence<S> getB() {
+		if (cachedB == null)
+			cachedB = wrap(baseB, region.beginB, region.endB);
+		return cachedB;
+	}
+
+	private HashedSequence<S> wrap(S base, int ptr, int end) {
+		final int begin = ptr;
+		int[] hashes = new int[end - ptr];
+		int i = 0;
+		while (ptr < end)
+			hashes[i++] = cmp.hash(base, ptr++);
+		return new HashedSequence<S>(base, hashes, begin);
+	}
 }

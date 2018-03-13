@@ -44,52 +44,32 @@
 package org.eclipse.jgit.diff;
 
 /**
- * Equivalence function for a {@link Sequence} compared by difference algorithm.
+ * Wraps a {@link Sequence} to assign hash codes to elements.
  *
- * Difference algorithms can use a comparator to compare portions of two
- * sequences and discover the minimal edits required to transform from one
- * sequence to the other sequence.
+ * This sequence acts as a proxy for the real sequence, caching element hash
+ * codes so they don't need to be recomputed each time. Sequences of this type
+ * must be used with a {@link HashedSequenceComparator}.
  *
- * Indexes within a sequence are zero-based.
+ * To construct an instance of this type use {@link HashedSequencePair}.
  *
  * @param <S>
- *            type of sequence the comparator supports.
+ *            the base sequence type.
  */
-public abstract class SequenceComparator<S extends Sequence> {
-	/**
-	 * Compare two items to determine if they are equivalent.
-	 *
-	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}).
-	 *
-	 * @param a
-	 *            the first sequence.
-	 * @param ai
-	 *            item of {@code ai} to compare.
-	 * @param b
-	 *            the second sequence.
-	 * @param bi
-	 *            item of {@code bi} to compare.
-	 * @return true if the two items are identical according to this function's
-	 *         equivalence rule.
-	 */
-	public abstract boolean equals(S a, int ai, S b, int bi);
+public final class HashedSequence<S extends Sequence> extends Sequence {
+	final S base;
 
-	/**
-	 * Get a hash value for an item in a sequence.
-	 *
-	 * If two items are equal according to this comparator's
-	 * {@link #equals(Sequence, int, Sequence, int)} method, then this hash
-	 * method must produce the same integer result for both items.
-	 *
-	 * It is not required for two items to have different hash values if they
-	 * are are unequal according to the {@code equals()} method.
-	 *
-	 * @param seq
-	 *            the sequence.
-	 * @param ptr
-	 *            the item to obtain the hash for.
-	 * @return hash the hash value.
-	 */
-	public abstract int hash(S seq, int ptr);
+	final int[] hashes;
+
+	final int begin;
+
+	HashedSequence(S base, int[] hashes, int begin) {
+		this.base = base;
+		this.hashes = hashes;
+		this.begin = begin;
+	}
+
+	@Override
+	public int size() {
+		return base.size();
+	}
 }

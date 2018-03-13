@@ -44,52 +44,34 @@
 package org.eclipse.jgit.diff;
 
 /**
- * Equivalence function for a {@link Sequence} compared by difference algorithm.
+ * Wrap another comparator for use with {@link HashedSequence}.
  *
- * Difference algorithms can use a comparator to compare portions of two
- * sequences and discover the minimal edits required to transform from one
- * sequence to the other sequence.
+ * This comparator acts as a proxy for the real comparator, translating element
+ * indexes on the fly by adding the subsequence's begin offset to them.
+ * Comparators of this type must be used with a {@link HashedSequence}.
  *
- * Indexes within a sequence are zero-based.
+ * To construct an instance of this type use {@link HashedSequencePair}.
  *
  * @param <S>
- *            type of sequence the comparator supports.
+ *            the base sequence type.
  */
-public abstract class SequenceComparator<S extends Sequence> {
-	/**
-	 * Compare two items to determine if they are equivalent.
-	 *
-	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}).
-	 *
-	 * @param a
-	 *            the first sequence.
-	 * @param ai
-	 *            item of {@code ai} to compare.
-	 * @param b
-	 *            the second sequence.
-	 * @param bi
-	 *            item of {@code bi} to compare.
-	 * @return true if the two items are identical according to this function's
-	 *         equivalence rule.
-	 */
-	public abstract boolean equals(S a, int ai, S b, int bi);
+public final class HashedSequenceComparator<S extends Sequence> extends
+		SequenceComparator<HashedSequence<S>> {
+	private final SequenceComparator<? super S> cmp;
 
-	/**
-	 * Get a hash value for an item in a sequence.
-	 *
-	 * If two items are equal according to this comparator's
-	 * {@link #equals(Sequence, int, Sequence, int)} method, then this hash
-	 * method must produce the same integer result for both items.
-	 *
-	 * It is not required for two items to have different hash values if they
-	 * are are unequal according to the {@code equals()} method.
-	 *
-	 * @param seq
-	 *            the sequence.
-	 * @param ptr
-	 *            the item to obtain the hash for.
-	 * @return hash the hash value.
-	 */
-	public abstract int hash(S seq, int ptr);
+	HashedSequenceComparator(SequenceComparator<? super S> cmp) {
+		this.cmp = cmp;
+	}
+
+	@Override
+	public boolean equals(HashedSequence<S> a, int ai, //
+			HashedSequence<S> b, int bi) {
+		return a.hashes[ai - a.begin] == b.hashes[bi - b.begin]
+				&& cmp.equals(a.base, ai, b.base, bi);
+	}
+
+	@Override
+	public int hash(HashedSequence<S> seq, int ptr) {
+		return seq.hashes[ptr - seq.begin];
+	}
 }
