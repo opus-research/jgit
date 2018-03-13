@@ -47,7 +47,7 @@ import org.eclipse.jgit.nls.NLS;
 import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * Translation bundle for JGit repo command
+ * Translation bundle for repo command
  */
 public class RepoText extends TranslationBundle {
 
@@ -60,6 +60,6 @@ public class RepoText extends TranslationBundle {
 
 	// @formatter:off
 	/***/ public String errorNoDefault;
-	/***/ public String errorParsingFromFile;
+	/***/ public String errorParsingManifestFile;
 	/***/ public String invalidManifest;
 }
