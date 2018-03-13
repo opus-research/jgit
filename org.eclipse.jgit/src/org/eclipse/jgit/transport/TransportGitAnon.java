@@ -45,11 +45,7 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -140,13 +136,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 			super(TransportGitAnon.this);
 			sock = openConnection();
 			try {
-				InputStream sIn = sock.getInputStream();
-				OutputStream sOut = sock.getOutputStream();
-
-				sIn = new BufferedInputStream(sIn);
-				sOut = new BufferedOutputStream(sOut);
-
-				init(sIn, sOut);
+				init(sock.getInputStream(), sock.getOutputStream());
 				service("git-upload-pack", pckOut);
 			} catch (IOException err) {
 				close();
@@ -179,13 +169,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 			super(TransportGitAnon.this);
 			sock = openConnection();
 			try {
-				InputStream sIn = sock.getInputStream();
-				OutputStream sOut = sock.getOutputStream();
-
-				sIn = new BufferedInputStream(sIn);
-				sOut = new BufferedOutputStream(sOut);
-
-				init(sIn, sOut);
+				init(sock.getInputStream(), sock.getOutputStream());
 				service("git-receive-pack", pckOut);
 			} catch (IOException err) {
 				close();

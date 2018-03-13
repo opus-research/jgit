@@ -86,15 +86,11 @@ class BasePackPushConnection extends BasePackConnection implements
 
 	static final String CAPABILITY_OFS_DELTA = "ofs-delta";
 
-	static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k";
-
 	private final boolean thinPack;
 
 	private boolean capableDeleteRefs;
 
 	private boolean capableReport;
-
-	private boolean capableSideBand;
 
 	private boolean capableOfsDelta;
 
@@ -147,21 +143,8 @@ class BasePackPushConnection extends BasePackConnection implements
 			writeCommands(refUpdates.values(), monitor);
 			if (writePack)
 				writePack(refUpdates, monitor);
-			if (sentCommand) {
-				if (capableReport)
-					readStatusReport(refUpdates);
-				if (capableSideBand) {
-					// Ensure the data channel is at EOF, so we know we have
-					// read all side-band data from all channels and have a
-					// complete copy of the messages (if any) buffered from
-					// the other data channels.
-					//
-					int b = in.read();
-					if (0 <= b)
-						throw new TransportException(uri, "expected EOF;"
-								+ " received '" + (char) b + "' instead");
-				}
-			}
+			if (sentCommand && capableReport)
+				readStatusReport(refUpdates);
 		} catch (TransportException e) {
 			throw e;
 		} catch (Exception e) {
@@ -173,7 +156,7 @@ class BasePackPushConnection extends BasePackConnection implements
 
 	private void writeCommands(final Collection<RemoteRefUpdate> refUpdates,
 			final ProgressMonitor monitor) throws IOException {
-		final String capabilities = enableCapabilities(monitor);
+		final String capabilities = enableCapabilities();
 		for (final RemoteRefUpdate rru : refUpdates) {
 			if (!capableDeleteRefs && rru.isDelete()) {
 				rru.setStatus(Status.REJECTED_NODELETE);
@@ -206,18 +189,11 @@ class BasePackPushConnection extends BasePackConnection implements
 		outNeedsEnd = false;
 	}
 
-	private String enableCapabilities(final ProgressMonitor monitor) {
+	private String enableCapabilities() {
 		final StringBuilder line = new StringBuilder();
 		capableReport = wantCapability(line, CAPABILITY_REPORT_STATUS);
 		capableDeleteRefs = wantCapability(line, CAPABILITY_DELETE_REFS);
 		capableOfsDelta = wantCapability(line, CAPABILITY_OFS_DELTA);
-
-		capableSideBand = wantCapability(line, CAPABILITY_SIDE_BAND_64K);
-		if (capableSideBand) {
-			in = new SideBandInputStream(in, monitor, getMessageWriter());
-			pckIn = new PacketLineIn(in);
-		}
-
 		if (line.length() > 0)
 			line.setCharAt(0, '\0');
 		return line.toString();
@@ -244,7 +220,6 @@ class BasePackPushConnection extends BasePackConnection implements
 		writer.preparePack(newObjects, remoteObjects);
 		final long start = System.currentTimeMillis();
 		writer.writePack(out);
-		out.flush();
 		packTransferTime = System.currentTimeMillis() - start;
 	}
 
