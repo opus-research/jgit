@@ -44,6 +44,7 @@
 package org.eclipse.jgit.lib;
 
 import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -61,6 +62,7 @@ import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.junit.Test;
 
+@SuppressWarnings("boxing")
 public class RepositoryCacheTest extends RepositoryTestCase {
 	@Test
 	public void testNonBareFileKey() throws IOException {
@@ -152,7 +154,7 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 
 	@Test
 	public void testGetRegisteredWhenEmpty() {
-		assertEquals(0, RepositoryCache.getRegisteredKeys().size());
+		assertThat(RepositoryCache.getRegisteredKeys().size(), is(0));
 	}
 
 	@Test
@@ -161,7 +163,7 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 
 		assertThat(RepositoryCache.getRegisteredKeys(),
 				hasItem(FileKey.exact(db.getDirectory(), db.getFS())));
-		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
+		assertThat(RepositoryCache.getRegisteredKeys().size(), is(1));
 	}
 
 	@Test
@@ -170,7 +172,28 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		RepositoryCache
 				.unregister(FileKey.exact(db.getDirectory(), db.getFS()));
 
-		assertEquals(0, RepositoryCache.getRegisteredKeys().size());
+		assertThat(RepositoryCache.getRegisteredKeys().size(), is(0));
 	}
 
+	@Test
+	public void testRepositoryUsageCount() throws Exception {
+		FileKey loc = FileKey.exact(db.getDirectory(), db.getFS());
+		Repository d2 = RepositoryCache.open(loc);
+		assertEquals(1, d2.useCnt.get());
+		RepositoryCache.open(FileKey.exact(loc.getFile(), db.getFS()));
+		assertEquals(2, d2.useCnt.get());
+		d2.close();
+		assertEquals(1, d2.useCnt.get());
+		d2.close();
+		assertEquals(0, d2.useCnt.get());
+	}
+
+	@Test
+	public void testRepositoryUsageCountWithRegisteredRepository() {
+		assertEquals(1, ((Repository) db).useCnt.get());
+		RepositoryCache.register(db);
+		assertEquals(1, ((Repository) db).useCnt.get());
+		db.close();
+		assertEquals(0, ((Repository) db).useCnt.get());
+	}
 }
