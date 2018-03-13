@@ -43,12 +43,8 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import static org.eclipse.jgit.internal.ketch.KetchConstants.ACCEPTED;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.COMMITTED;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.CONFIG_KEY_TYPE;
 import static org.eclipse.jgit.internal.ketch.KetchConstants.CONFIG_SECTION_KETCH;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.DEFAULT_TXN_NAMESPACE;
-import static org.eclipse.jgit.internal.ketch.KetchConstants.STAGE;
+import static org.eclipse.jgit.internal.ketch.KetchReplica.Type.NONE;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_NAME;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_REMOTE;
 
@@ -70,15 +66,7 @@ import org.eclipse.jgit.transport.URIish;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Ketch system-wide configuration.
- * <p>
- * This class provides useful defaults for testing and small proof of concepts.
- * Full scale installations are expected to subclass and override methods to
- * provide consistent configuration across all managed repositories.
- * <p>
- * Servers should configure their own {@link ScheduledExecutorService}.
- */
+/** Ketch system-wide configuration. */
 public class KetchSystem {
 	private static final Random RNG = new Random();
 
@@ -88,32 +76,18 @@ public class KetchSystem {
 	}
 
 	private final ScheduledExecutorService executor;
-	private final String txnNamespace;
-	private final String txnAccepted;
-	private final String txnCommitted;
-	private final String txnStage;
 
 	/** Create a default system with a thread pool of 1 thread per CPU. */
 	public KetchSystem() {
-		this(defaultExecutor(), DEFAULT_TXN_NAMESPACE);
+		this(defaultExecutor());
 	}
 
 	/**
-	 * Create a Ketch system with the provided executor service.
-	 *
 	 * @param executor
 	 *            thread pool to run background operations.
-	 * @param txnNamespace
-	 *            reference namespace for the RefTree graph and associated
-	 *            transaction state. Must begin with {@code "refs/"} and end
-	 *            with {@code '/'}, for example {@code "refs/txn/"}.
 	 */
-	public KetchSystem(ScheduledExecutorService executor, String txnNamespace) {
+	public KetchSystem(ScheduledExecutorService executor) {
 		this.executor = executor;
-		this.txnNamespace = txnNamespace;
-		this.txnAccepted = txnNamespace + ACCEPTED;
-		this.txnCommitted = txnNamespace + COMMITTED;
-		this.txnStage = txnNamespace + STAGE;
 	}
 
 	/** @return executor to perform background operations. */
@@ -127,22 +101,7 @@ public class KetchSystem {
 	 * @return reference namespace such as {@code "refs/txn/"}.
 	 */
 	public String getTxnNamespace() {
-		return txnNamespace;
-	}
-
-	/** @return name of the accepted RefTree graph. */
-	public String getTxnAccepted() {
-		return txnAccepted;
-	}
-
-	/** @return name of the committed RefTree graph. */
-	public String getTxnCommitted() {
-		return txnCommitted;
-	}
-
-	/** @return prefix for staged objects, e.g. {@code "refs/txn/stage/"}. */
-	public String getTxnStage() {
-		return txnStage;
+		return "refs/txn/"; //$NON-NLS-1$
 	}
 
 	/** @return identity line for the committer header of a RefTreeGraph. */
@@ -215,17 +174,17 @@ public class KetchSystem {
 	 */
 	protected List<KetchReplica> createReplicas(KetchLeader leader,
 			Repository repo) throws URISyntaxException {
-		List<KetchReplica> replicas = new ArrayList<>();
+		List<KetchReplica> remotes = new ArrayList<>();
 		Config cfg = repo.getConfig();
 		String localName = getLocalName(cfg);
 		for (String name : cfg.getSubsections(CONFIG_KEY_REMOTE)) {
-			if (!hasParticipation(cfg, name)) {
+			ReplicaConfig kc = new ReplicaConfig().fromConfig(cfg, name);
+			if (kc.getType() == NONE) {
 				continue;
 			}
 
-			ReplicaConfig kc = ReplicaConfig.newFromConfig(cfg, name);
 			if (name.equals(localName)) {
-				replicas.add(new LocalReplica(leader, name, kc));
+				remotes.add(new LocalReplica(leader, name, kc));
 				continue;
 			}
 
@@ -236,14 +195,10 @@ public class KetchSystem {
 			}
 			for (URIish uri : uris) {
 				String n = uris.size() == 1 ? name : uri.getHost();
-				replicas.add(new RemoteGitReplica(leader, n, uri, kc, rc));
+				remotes.add(new RemoteGitReplica(leader, n, uri, kc, rc));
 			}
 		}
-		return replicas;
-	}
-
-	private static boolean hasParticipation(Config cfg, String name) {
-		return cfg.getString(CONFIG_KEY_REMOTE, name, CONFIG_KEY_TYPE) != null;
+		return remotes;
 	}
 
 	private static String getLocalName(Config cfg) {
@@ -257,7 +212,7 @@ public class KetchSystem {
 		private static ScheduledExecutorService create() {
 			int cores = Runtime.getRuntime().availableProcessors();
 			int threads = Math.max(5, cores);
-			log.info("Using {} threads", Integer.valueOf(threads)); //$NON-NLS-1$
+			log.debug("Using {} threads", Integer.valueOf(threads)); //$NON-NLS-1$
 			return Executors.newScheduledThreadPool(
 				threads,
 				new ThreadFactory() {

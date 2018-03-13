@@ -48,11 +48,11 @@ import static org.eclipse.jgit.internal.ketch.Proposal.State.EXECUTED;
 import static org.eclipse.jgit.internal.ketch.Proposal.State.NEW;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
+import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.reftree.Command;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -68,20 +69,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.PushCertificate;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/**
- * A proposal to be applied in a Ketch system.
- * <p>
- * Pushing to a Ketch leader results in the leader making a proposal. The
- * proposal includes the list of reference updates. The leader attempts to send
- * the proposal to a quorum of replicas by pushing the proposal to a "staging"
- * area under the {@code refs/txn/stage/} namespace. If the proposal succeeds
- * then the changes are durable and the leader can commit the proposal.
- * <p>
- * Proposals are executed by {@link KetchLeader#queueProposal(Proposal)}, which
- * runs them asynchronously in the background. Proposals are thread-safe futures
- * allowing callers to {@link #await()} for results or be notified by callback
- * using {@link #addListener(Runnable)}.
- */
+/** Proposal to be applied in a Ketch system. */
 public class Proposal {
 	/** Current state of the proposal. */
 	public enum State {
@@ -89,7 +77,7 @@ public class Proposal {
 		NEW(false),
 
 		/**
-		 * Proposal was validated and has entered the queue, but a round
+		 * Proposal was preflighted and entered the queue, but a round
 		 * containing this proposal has not started yet.
 		 */
 		QUEUED(false),
@@ -108,7 +96,6 @@ public class Proposal {
 		ABORTED(true);
 
 		private final boolean done;
-
 		private State(boolean done) {
 			this.done = done;
 		}
@@ -133,7 +120,7 @@ public class Proposal {
 	 *            prepared list of commands.
 	 */
 	public Proposal(List<Command> cmds) {
-		commands = Collections.unmodifiableList(new ArrayList<>(cmds));
+		this.commands = cmds;
 	}
 
 	/**
@@ -150,7 +137,7 @@ public class Proposal {
 	 */
 	public Proposal(RevWalk rw, Collection<ReceiveCommand> cmds)
 			throws MissingObjectException, IOException {
-		commands = asCommandList(rw, cmds);
+		this(asCommandList(rw, cmds));
 	}
 
 	private static List<Command> asCommandList(RevWalk rw,
@@ -160,7 +147,7 @@ public class Proposal {
 		for (ReceiveCommand cmd : cmds) {
 			commands.add(new Command(rw, cmd));
 		}
-		return Collections.unmodifiableList(commands);
+		return commands;
 	}
 
 	/** @return commands from this proposal. */
@@ -168,17 +155,17 @@ public class Proposal {
 		return commands;
 	}
 
-	/** @return optional author of the proposal. */
+	/** @return optional author of the reference update. */
 	@Nullable
 	public PersonIdent getAuthor() {
 		return author;
 	}
 
 	/**
-	 * Set the author for the proposal.
+	 * Set the author for the reference update.
 	 *
 	 * @param who
-	 *            optional identity of the author of the proposal.
+	 *            optional identity of the author of the reference update.
 	 * @return {@code this}
 	 */
 	public Proposal setAuthor(@Nullable PersonIdent who) {
@@ -186,7 +173,7 @@ public class Proposal {
 		return this;
 	}
 
-	/** @return optional message for the commit log of the RefTree. */
+	/** @return optional message for the log. */
 	@Nullable
 	public String getMessage() {
 		return message;
@@ -223,15 +210,12 @@ public class Proposal {
 	}
 
 	/**
-	 * Add a callback to be invoked when the proposal is done.
+	 * Add a callback to be invoked when the proposal is finished.
 	 * <p>
-	 * A proposal is done when it has entered either {@link State#EXECUTED} or
-	 * {@link State#ABORTED} state. If the proposal is already done
-	 * {@code callback.run()} is immediately invoked on the caller's thread.
+	 * If the proposal is already completed the callback is run immediately.
 	 *
 	 * @param callback
-	 *            method to run after the proposal is done. The callback may be
-	 *            run on a Ketch system thread and should be completed quickly.
+	 *            method to run after the callback is done.
 	 */
 	public void addListener(Runnable callback) {
 		boolean runNow = false;
@@ -259,7 +243,23 @@ public class Proposal {
 
 	/** Mark commands as "transaction aborted". */
 	void abort() {
-		Command.abort(commands, null);
+		abort(JGitText.get().transactionAborted);
+	}
+
+	/**
+	 * Abort the proposal with the specified reason.
+	 *
+	 * @param msg
+	 *            message to apply on first failed reference. Other references
+	 *            will use the generic {@code "transaction aborted"} text.
+	 */
+	void abort(String msg) {
+		for (Command cmd : commands) {
+			if (cmd.getResult() == NOT_ATTEMPTED) {
+				cmd.setResult(REJECTED_OTHER_REASON, msg);
+				msg = JGitText.get().transactionAborted;
+			}
+		}
 		notifyState(ABORTED);
 	}
 
@@ -269,10 +269,9 @@ public class Proposal {
 	}
 
 	/**
-	 * @return {@code true} if the proposal was attempted. A true value does not
-	 *         mean consensus was reached, only that the proposal was considered
-	 *         and will not be making any more progress beyond its current
-	 *         state.
+	 * @return true if the proposal was attempted. A true value does not mean
+	 *         consensus was reached, only that the proposal was considered and
+	 *         will not be making any more progress beyond its current state.
 	 */
 	public boolean isDone() {
 		return state.get().isDone();
@@ -363,9 +362,9 @@ public class Proposal {
 		}
 		for (Command c : commands) {
 			s.append("  "); //$NON-NLS-1$
-			format(s, c.getOldRef(), "CREATE"); //$NON-NLS-1$
+			append(s, c.getOldRef(), "CREATE"); //$NON-NLS-1$
 			s.append(' ');
-			format(s, c.getNewRef(), "DELETE"); //$NON-NLS-1$
+			append(s, c.getNewRef(), "DELETE"); //$NON-NLS-1$
 			s.append(' ').append(c.getRefName());
 			if (c.getResult() != ReceiveCommand.Result.NOT_ATTEMPTED) {
 				s.append(' ').append(c.getResult()); // $NON-NLS-1$
@@ -376,16 +375,14 @@ public class Proposal {
 		return s.toString();
 	}
 
-	private static void format(StringBuilder s, @Nullable Ref r, String n) {
+	private static void append(StringBuilder s, @Nullable Ref r, String n) {
 		if (r == null) {
 			s.append(n);
 		} else if (r.isSymbolic()) {
 			s.append(r.getTarget().getName());
 		} else {
 			ObjectId id = r.getObjectId();
-			if (id != null) {
-				s.append(id.abbreviate(8).name());
-			}
+			s.append(id != null ? id.abbreviate(8).name() : ""); //$NON-NLS-1$
 		}
 	}
 }

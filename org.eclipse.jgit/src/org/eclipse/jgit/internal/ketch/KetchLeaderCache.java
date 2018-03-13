@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,16 +49,11 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.Repository;
 
-/**
- * A cache of live leader instances, keyed by repository.
- * <p>
- * Ketch only assigns a leader to a repository when needed. If
- * {@link #get(Repository)} is called for a repository that does not have a
- * leader, the leader is created and added to the cache.
- */
+/** Cache of live leader instances. */
 public class KetchLeaderCache {
 	private final KetchSystem system;
 	private final ConcurrentMap<String, KetchLeader> leaders;
@@ -77,17 +72,20 @@ public class KetchLeaderCache {
 	}
 
 	/**
-	 * Lookup the leader instance for a given repository.
+	 * Lookup the leader instance.
 	 *
+	 * @param id
+	 *            identifier for the repository. If null it will be
+	 *            automatically derived from the repository (if possible).
 	 * @param repo
 	 *            repository to get the leader for.
 	 * @return the leader instance for the repository.
 	 * @throws URISyntaxException
 	 *             remote configuration contains an invalid URL.
 	 */
-	public KetchLeader get(Repository repo)
+	public KetchLeader get(@Nullable String id, Repository repo)
 			throws URISyntaxException {
-		String key = computeKey(repo);
+		String key = computeId(id, repo);
 		KetchLeader leader = leaders.get(key);
 		if (leader != null) {
 			return leader;
@@ -111,16 +109,19 @@ public class KetchLeaderCache {
 		}
 	}
 
-	private static String computeKey(Repository repo) {
-		if (repo instanceof DfsRepository) {
+	private static String computeId(@Nullable String id, Repository repo) {
+		if (id != null) {
+			return id;
+
+		} else if (repo instanceof DfsRepository) {
 			DfsRepository dfs = (DfsRepository) repo;
 			return dfs.getDescription().getRepositoryName();
-		}
 
-		if (repo.getDirectory() != null) {
+		} else if (repo.getDirectory() != null) {
 			return repo.getDirectory().toURI().toString();
-		}
 
-		throw new IllegalArgumentException();
+		} else {
+			throw new IllegalArgumentException();
+		}
 	}
 }

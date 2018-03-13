@@ -43,6 +43,7 @@
 
 package org.eclipse.jgit.internal.ketch;
 
+import static org.eclipse.jgit.internal.ketch.KetchConstants.*;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod.ALL_REFS;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.LOCK_FAILURE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
@@ -50,12 +51,10 @@ import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_NODELETE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_NONFASTFORWARD;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
-import static org.eclipse.jgit.lib.Ref.Storage.NETWORK;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,13 +62,12 @@ import java.util.Map;
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.PushConnection;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -78,11 +76,9 @@ import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
 
 /**
- * Representation of a Git repository on a remote replica system.
+ * Representation of a Git repository on a remote follower system.
  * <p>
- * {@link KetchLeader} will contact the replica using the Git wire protocol.
- * <p>
- * The remote replica may be fully Ketch-aware, or a standard Git server.
+ * {@link KetchLeader} will contact the follower using the Git wire protocol.
  */
 public class RemoteGitReplica extends KetchReplica {
 	private final URIish uri;
@@ -127,7 +123,7 @@ public class RemoteGitReplica extends KetchReplica {
 	}
 
 	@Override
-	protected void startPush(final ReplicaPushRequest req) {
+	protected void start(final ReplicaPushRequest req) {
 		getSystem().getExecutor().execute(new Runnable() {
 			@Override
 			public void run() {
@@ -149,13 +145,16 @@ public class RemoteGitReplica extends KetchReplica {
 			throws NotSupportedException, TransportException, IOException {
 		Map<String, Ref> adv;
 		List<RemoteCommand> cmds = asUpdateList(req.getCommands());
-		try (Transport transport = Transport.open(repo, uri)) {
+		Transport tn = Transport.open(repo, uri);
+		try {
 			RemoteConfig rc = getRemoteConfig();
 			if (rc != null) {
-				transport.applyConfig(rc);
+				tn.applyConfig(rc);
 			}
-			transport.setPushAtomic(true);
-			adv = push(repo, transport, cmds);
+			tn.setPushAtomic(true);
+			adv = push(repo, tn, cmds);
+		} finally {
+			tn.close();
 		}
 		for (RemoteCommand c : cmds) {
 			c.copyStatusToResult();
@@ -163,34 +162,37 @@ public class RemoteGitReplica extends KetchReplica {
 		req.setRefs(adv);
 	}
 
-	private Map<String, Ref> push(Repository git, Transport transport,
-			List<RemoteCommand> cmds) throws IOException {
+	private Map<String, Ref> push(Repository git, Transport tn,
+			List<RemoteCommand> cmds) throws NotSupportedException,
+					TransportException, IOException {
 		Map<String, RemoteRefUpdate> updates = asUpdateMap(cmds);
-		try (PushConnection connection = transport.openPush()) {
+		PushConnection connection = tn.openPush();
+		try {
+			String txnNamespace = getTxnNamespace();
 			Map<String, Ref> adv = connection.getRefsMap();
-			RemoteRefUpdate accepted = updates.get(getSystem().getTxnAccepted());
-			if (accepted != null && !isExpectedValue(adv, accepted)) {
-				abort(cmds);
+			RemoteRefUpdate accepted = updates.get(txnNamespace + ACCEPTED);
+			if (accepted != null && !check(adv, accepted)) {
+				reject(cmds);
 				return adv;
 			}
 
-			RemoteRefUpdate committed = updates.get(getSystem().getTxnCommitted());
-			if (committed != null && !isExpectedValue(adv, committed)) {
-				abort(cmds);
+			RemoteRefUpdate committed = updates.get(txnNamespace + COMMITTED);
+			if (committed != null && !check(adv, committed)) {
+				reject(cmds);
 				return adv;
 			}
 			if (committed != null && getCommitMethod() == ALL_REFS) {
-				prepareCommit(git, cmds, updates, adv,
-						committed.getNewObjectId());
+				commit(git, cmds, updates, adv, committed.getNewObjectId());
 			}
 
 			connection.push(NullProgressMonitor.INSTANCE, updates);
 			return adv;
+		} finally {
+			connection.close();
 		}
 	}
 
-	private static boolean isExpectedValue(Map<String, Ref> adv,
-			RemoteRefUpdate u) {
+	private static boolean check(Map<String, Ref> adv, RemoteRefUpdate u) {
 		Ref r = adv.get(u.getRemoteName());
 		if (!AnyObjectId.equals(getId(r), u.getExpectedOldObjectId())) {
 			((RemoteCommand) u).cmd.setResult(LOCK_FAILURE);
@@ -199,10 +201,20 @@ public class RemoteGitReplica extends KetchReplica {
 		return true;
 	}
 
-	private void prepareCommit(Repository git, List<RemoteCommand> cmds,
+	private static void reject(List<RemoteCommand> cmds) {
+		for (RemoteCommand cmd : cmds) {
+			if (cmd.cmd.getResult() == NOT_ATTEMPTED) {
+				cmd.cmd.setResult(
+					REJECTED_OTHER_REASON,
+					JGitText.get().transactionAborted);
+			}
+		}
+	}
+
+	private void commit(Repository git, List<RemoteCommand> cmds,
 			Map<String, RemoteRefUpdate> updates, Map<String, Ref> adv,
 			ObjectId committed) throws IOException {
-		for (ReceiveCommand cmd : prepareCommit(git, adv, committed)) {
+		for (ReceiveCommand cmd : commit(git, adv, committed)) {
 			RemoteCommand c = new RemoteCommand(cmd);
 			cmds.add(c);
 			updates.put(c.getRemoteName(), c);
@@ -226,51 +238,10 @@ public class RemoteGitReplica extends KetchReplica {
 	private static Map<String, RemoteRefUpdate> asUpdateMap(
 			List<RemoteCommand> cmds) {
 		Map<String, RemoteRefUpdate> m = new LinkedHashMap<>();
-		for (RemoteCommand cmd : cmds) {
-			m.put(cmd.getRemoteName(), cmd);
+		for (RemoteCommand c : cmds) {
+			m.put(c.getRemoteName(), c);
 		}
 		return m;
-	}
-
-	private static void abort(List<RemoteCommand> cmds) {
-		List<ReceiveCommand> tmp = new ArrayList<>(cmds.size());
-		for (RemoteCommand cmd : cmds) {
-			tmp.add(cmd.cmd);
-		}
-		ReceiveCommand.abort(tmp);
-	}
-
-	protected void blockingFetch(Repository repo, ReplicaFetchRequest req)
-			throws NotSupportedException, TransportException {
-		try (Transport transport = Transport.open(repo, uri)) {
-			RemoteConfig rc = getRemoteConfig();
-			if (rc != null) {
-				transport.applyConfig(rc);
-			}
-			fetch(transport, req);
-		}
-	}
-
-	private void fetch(Transport transport, ReplicaFetchRequest req)
-			throws NotSupportedException, TransportException {
-		try (FetchConnection conn = transport.openFetch()) {
-			Map<String, Ref> remoteRefs = conn.getRefsMap();
-			req.setRefs(remoteRefs);
-
-			List<Ref> want = new ArrayList<>();
-			for (String name : req.getWantRefs()) {
-				Ref ref = remoteRefs.get(name);
-				if (ref != null && ref.getObjectId() != null) {
-					want.add(ref);
-				}
-			}
-			for (ObjectId id : req.getWantObjects()) {
-				want.add(new ObjectIdRef.Unpeeled(NETWORK, id.name(), id));
-			}
-
-			conn.fetch(NullProgressMonitor.INSTANCE, want,
-					Collections.<ObjectId> emptySet());
-		}
 	}
 
 	static class RemoteCommand extends RemoteRefUpdate {

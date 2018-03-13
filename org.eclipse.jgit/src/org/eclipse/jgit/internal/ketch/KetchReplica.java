@@ -44,9 +44,13 @@
 package org.eclipse.jgit.internal.ketch;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.eclipse.jgit.internal.ketch.KetchConstants.ACCEPTED;
+import static org.eclipse.jgit.internal.ketch.KetchConstants.*;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitSpeed.BATCHED;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitSpeed.FAST;
+import static org.eclipse.jgit.internal.ketch.KetchReplica.State.AHEAD;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.State.CURRENT;
+import static org.eclipse.jgit.internal.ketch.KetchReplica.State.DIVERGENT;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.State.LAGGING;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.State.OFFLINE;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.State.UNKNOWN;
@@ -69,51 +73,34 @@ import java.util.concurrent.Future;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.reftree.RefTree;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.SystemReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * A Ketch replica, either {@link LocalReplica} or {@link RemoteGitReplica}.
- * <p>
- * Replicas can be either a stock Git replica, or a Ketch-aware replica.
- * <p>
- * A stock Git replica has no special knowledge of Ketch and simply stores
- * objects and references. Ketch communicates with the stock Git replica using
- * the Git push wire protocol. The {@link KetchLeader} commits an agreed upon
- * state by pushing all references to the Git replica, for example
- * {@code "refs/heads/master"} is pushed during commit. Stock Git replicas use
- * {@link CommitMethod#ALL_REFS} to record the final state.
- * <p>
- * Ketch-aware replicas understand the {@code RefTree} sent during the proposal
- * and during commit are able to update their own reference space to match the
- * state represented by the {@code RefTree}. Ketch-aware replicas typically use
- * a {@link org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase} and
- * {@link CommitMethod#TXN_COMMITTED} to record the final state.
- * <p>
- * KetchReplica instances are tightly coupled with a single {@link KetchLeader}.
- * Some state may be accessed by the leader thread and uses the leader's own
- * {@link KetchLeader#lock} to protect shared data.
- */
+/** Any Ketch replica, either {@link LocalReplica} or {@link RemoteGitReplica}. */
 public abstract class KetchReplica {
 	static final Logger log = LoggerFactory.getLogger(KetchReplica.class);
-	private static final byte[] PEEL = { ' ', '^' };
+	private static final byte[] PEEL = { '^', '{', '}' };
 
-	/** Participation of a replica in establishing consensus. */
-	public enum Participation {
+	/** Type of behavior for this replica. */
+	public enum Type {
+		/** Replica is not a participant in the Ketch system. */
+		NONE,
+
 		/** Replica can vote. */
-		FULL,
+		VOTER,
 
 		/** Replica does not vote, but tracks leader. */
-		FOLLOWER_ONLY;
+		FOLLOWER;
 	}
 
 	/** How this replica wants to receive Ketch commit operations. */
@@ -125,23 +112,16 @@ public abstract class KetchReplica {
 		TXN_COMMITTED;
 	}
 
-	/** Delay before committing to a replica. */
+	/** When does this replica commit? */
 	public enum CommitSpeed {
-		/**
-		 * Send the commit immediately, even if it could be batched with the
-		 * next proposal.
-		 */
+		/** Send commit immediately, may run concurrently with next proposal. */
 		FAST,
 
-		/**
-		 * If the next proposal is available, batch the commit with it,
-		 * otherwise just send the commit. This generates less network use, but
-		 * may provide slower consistency on the replica.
-		 */
+		/** Batch commit with next proposal. */
 		BATCHED;
 	}
 
-	/** Current state of a replica. */
+	/** Current state of this remote. */
 	public enum State {
 		/** Leader has not yet contacted the replica. */
 		UNKNOWN,
@@ -158,13 +138,13 @@ public abstract class KetchReplica {
 		/** Replica's history contains the leader's history. */
 		AHEAD,
 
-		/** Replica can not be contacted. */
+		/** Connectivity with the replica is not working. */
 		OFFLINE;
 	}
 
 	private final KetchLeader leader;
-	private final String replicaName;
-	private final Participation participation;
+	private final String name;
+	private final Type type;
 	private final CommitMethod commitMethod;
 	private final CommitSpeed commitSpeed;
 	private final long minRetryMillis;
@@ -190,7 +170,7 @@ public abstract class KetchReplica {
 	 */
 	private ObjectId txnCommitted;
 
-	/** What is happening with this replica. */
+	/** What is happening with this remote. */
 	private State state = UNKNOWN;
 	private String error;
 
@@ -205,14 +185,14 @@ public abstract class KetchReplica {
 	 * @param leader
 	 *            instance this replica follows.
 	 * @param name
-	 *            unique-ish name identifying this replica for debugging.
+	 *            unique-ish name identifying this remote for debugging.
 	 * @param cfg
 	 *            how Ketch should treat the replica.
 	 */
 	protected KetchReplica(KetchLeader leader, String name, ReplicaConfig cfg) {
 		this.leader = leader;
-		this.replicaName = name;
-		this.participation = cfg.getParticipation();
+		this.name = name;
+		this.type = cfg.getType();
 		this.commitMethod = cfg.getCommitMethod();
 		this.commitSpeed = cfg.getCommitSpeed();
 		this.minRetryMillis = cfg.getMinRetry(MILLISECONDS);
@@ -235,17 +215,17 @@ public abstract class KetchReplica {
 
 	/** @return unique-ish name for debugging. */
 	public String getName() {
-		return replicaName;
+		return name;
 	}
 
-	/** @return description of this replica for error/debug logging purposes. */
+	/** @return describe this replica for error/debug logging purposes. */
 	protected String describeForLog() {
 		return getName();
 	}
 
-	/** @return how the replica participates in this Ketch system. */
-	public Participation getParticipation() {
-		return participation;
+	/** @return configured Ketch behavior of the repository. */
+	public Type getType() {
+		return type;
 	}
 
 	/** @return how Ketch will commit to the repository. */
@@ -258,11 +238,13 @@ public abstract class KetchReplica {
 		return commitSpeed;
 	}
 
+	/** @return reference namespace storing transaction refs. */
+	protected String getTxnNamespace() {
+		return getSystem().getTxnNamespace();
+	}
+
 	/**
 	 * Called by leader to perform graceful shutdown.
-	 * <p>
-	 * Default implementation cancels any scheduled retry. Subclasses may add
-	 * additional logic before or after calling {@code super.shutdown()}.
 	 * <p>
 	 * Called with {@link KetchLeader#lock} held by caller.
 	 */
@@ -274,42 +256,27 @@ public abstract class KetchReplica {
 		}
 	}
 
-	ReplicaSnapshot snapshot() {
-		ReplicaSnapshot s = new ReplicaSnapshot(this);
-		s.accepted = txnAccepted;
-		s.committed = txnCommitted;
+	Snapshot.Replica snapshot() {
+		Snapshot.Replica s = new Snapshot.Replica();
+		s.name = name;
+		s.type = type;
+		s.txnAccepted = txnAccepted;
+		s.txnCommitted = txnCommitted;
 		s.state = state;
 		s.error = error;
 		s.retryAtMillis = waitingForRetry() ? retryAtMillis : 0;
 		return s;
 	}
 
-	/**
-	 * Update the leader's view of the replica after a poll.
-	 * <p>
-	 * Called with {@link KetchLeader#lock} held by caller.
-	 *
-	 * @param refs
-	 *            map of refs from the replica.
-	 */
-	void initialize(Map<String, Ref> refs) {
-		if (txnAccepted == null) {
-			txnAccepted = getId(refs.get(getSystem().getTxnAccepted()));
-		}
-		if (txnCommitted == null) {
-			txnCommitted = getId(refs.get(getSystem().getTxnCommitted()));
-		}
-	}
-
 	ObjectId getTxnAccepted() {
 		return txnAccepted;
 	}
 
-	boolean hasAccepted(LogIndex id) {
+	boolean hasAccepted(LogId id) {
 		return equals(txnAccepted, id);
 	}
 
-	private static boolean equals(@Nullable ObjectId a, LogIndex b) {
+	private static boolean equals(@Nullable ObjectId a, LogId b) {
 		return a != null && b != null && AnyObjectId.equals(a, b);
 	}
 
@@ -321,26 +288,25 @@ public abstract class KetchReplica {
 	 * @param round
 	 *            current round being run by the leader.
 	 */
-	void pushTxnAcceptedAsync(Round round) {
+	void acceptAsync(Round round) {
 		List<ReceiveCommand> cmds = new ArrayList<>();
 		if (commitSpeed == BATCHED) {
-			LogIndex committedIndex = leader.getCommitted();
-			if (equals(txnAccepted, committedIndex)
-					&& !equals(txnCommitted, committedIndex)) {
-				prepareTxnCommitted(cmds, committedIndex);
+			LogId c = leader.getCommitted();
+			if (equals(txnAccepted, c) && !equals(txnCommitted, c)) {
+				commit(cmds, c);
 			}
 		}
 
 		// TODO(sop) Lagging replicas should build accept on the fly.
 		if (round.stageCommands != null) {
-			for (ReceiveCommand cmd : round.stageCommands) {
-				// TODO(sop): Do not send certain object graphs to replica.
-				cmds.add(copy(cmd));
+			for (ReceiveCommand c : round.stageCommands) {
+				// TODO(sop): Do not send certain object graphs to remote.
+				cmds.add(copy(c));
 			}
 		}
 		cmds.add(new ReceiveCommand(
-				round.acceptedOldIndex, round.acceptedNewIndex,
-				getSystem().getTxnAccepted()));
+round.acceptedOld, round.acceptedNew,
+				getTxnNamespace() + ACCEPTED));
 		pushAsync(new ReplicaPushRequest(this, cmds));
 	}
 
@@ -348,22 +314,18 @@ public abstract class KetchReplica {
 		return new ReceiveCommand(c.getOldId(), c.getNewId(), c.getRefName());
 	}
 
-	boolean shouldPushUnbatchedCommit(LogIndex committed, boolean leaderIdle) {
-		return (leaderIdle || commitSpeed == FAST) && hasAccepted(committed);
+	void commitAsync(ObjectId committed, boolean leaderIsIdle) {
+		if (leaderIsIdle || commitSpeed == FAST) {
+			List<ReceiveCommand> cmds = new ArrayList<>();
+			commit(cmds, committed);
+			pushAsync(new ReplicaPushRequest(this, cmds));
+		}
 	}
 
-	void pushCommitAsync(LogIndex committed) {
-		List<ReceiveCommand> cmds = new ArrayList<>();
-		prepareTxnCommitted(cmds, committed);
-		pushAsync(new ReplicaPushRequest(this, cmds));
-	}
-
-	private void prepareTxnCommitted(List<ReceiveCommand> cmds,
-			ObjectId committed) {
+	private void commit(List<ReceiveCommand> cmds, ObjectId committed) {
 		removeStaged(cmds, committed);
-		cmds.add(new ReceiveCommand(
-				txnCommitted, committed,
-				getSystem().getTxnCommitted()));
+		cmds.add(new ReceiveCommand(txnCommitted, committed,
+				getTxnNamespace() + COMMITTED));
 	}
 
 	private void removeStaged(List<ReceiveCommand> cmds, ObjectId committed) {
@@ -371,20 +333,21 @@ public abstract class KetchReplica {
 		if (a != null) {
 			delete(cmds, a);
 		}
-		if (staged.isEmpty() || !(committed instanceof LogIndex)) {
+		if (staged.isEmpty() || !(committed instanceof LogId)) {
 			return;
 		}
 
-		LogIndex committedIndex = (LogIndex) committed;
-		Iterator<Map.Entry<ObjectId, List<ReceiveCommand>>> itr = staged
-				.entrySet().iterator();
-		while (itr.hasNext()) {
-			Map.Entry<ObjectId, List<ReceiveCommand>> e = itr.next();
-			if (e.getKey() instanceof LogIndex) {
-				LogIndex stagedIndex = (LogIndex) e.getKey();
-				if (stagedIndex.isBefore(committedIndex)) {
+		long n = ((LogId) committed).index;
+		Iterator<Map.Entry<ObjectId, List<ReceiveCommand>>> i;
+
+		i = staged.entrySet().iterator();
+		while (i.hasNext()) {
+			Map.Entry<ObjectId, List<ReceiveCommand>> e = i.next();
+			if (e.getKey() instanceof LogId) {
+				LogId k = (LogId) e.getKey();
+				if (k.index <= n) {
 					delete(cmds, e.getValue());
-					itr.remove();
+					i.remove();
 				}
 			}
 		}
@@ -392,30 +355,17 @@ public abstract class KetchReplica {
 
 	private static void delete(List<ReceiveCommand> cmds,
 			List<ReceiveCommand> createCmds) {
-		for (ReceiveCommand cmd : createCmds) {
-			ObjectId id = cmd.getNewId();
-			String name = cmd.getRefName();
-			cmds.add(new ReceiveCommand(id, ObjectId.zeroId(), name));
+		for (ReceiveCommand c : createCmds) {
+			ObjectId id = c.getNewId();
+			String n = c.getRefName();
+			cmds.add(new ReceiveCommand(id, ObjectId.zeroId(), n));
 		}
 	}
 
-	/**
-	 * Determine the next push for this replica (if any) and start it.
-	 * <p>
-	 * If the replica has successfully accepted the committed state of the
-	 * leader, this method will push all references to the replica using the
-	 * configured {@link CommitMethod}.
-	 * <p>
-	 * If the replica is {@link State#LAGGING} this method will begin catch up
-	 * by sending a more recent {@code refs/txn/accepted}.
-	 * <p>
-	 * Must be invoked with {@link KetchLeader#lock} held by caller.
-	 */
-	private void runNextPushRequest() {
-		LogIndex committed = leader.getCommitted();
-		if (!equals(txnCommitted, committed)
-				&& shouldPushUnbatchedCommit(committed, leader.isIdle())) {
-			pushCommitAsync(committed);
+	private void nextPush() {
+		LogId c = leader.getCommitted();
+		if (equals(txnAccepted, c) && !equals(txnCommitted, c)) {
+			commitAsync(c, leader.isIdle());
 		}
 
 		if (queued.isEmpty() || !running.isEmpty() || waitingForRetry()) {
@@ -425,39 +375,37 @@ public abstract class KetchReplica {
 		// Collapse all queued requests into a single request.
 		Map<String, ReceiveCommand> cmdMap = new HashMap<>();
 		for (ReplicaPushRequest req : queued) {
-			for (ReceiveCommand cmd : req.getCommands()) {
-				String name = cmd.getRefName();
-				ReceiveCommand old = cmdMap.remove(name);
-				if (old != null) {
-					cmd = new ReceiveCommand(
-							old.getOldId(), cmd.getNewId(),
-							name);
+			for (ReceiveCommand n : req.getCommands()) {
+				String rn = n.getRefName();
+				ReceiveCommand o = cmdMap.remove(rn);
+				if (o != null) {
+					n = new ReceiveCommand(o.getOldId(), n.getNewId(), rn);
 				}
-				cmdMap.put(name, cmd);
+				cmdMap.put(rn, n);
 			}
 		}
 		queued.clear();
 		waiting.clear();
 
 		List<ReceiveCommand> next = new ArrayList<>(cmdMap.values());
-		for (ReceiveCommand cmd : next) {
-			running.put(cmd.getRefName(), cmd);
+		for (ReceiveCommand r : next) {
+			running.put(r.getRefName(), r);
 		}
-		startPush(new ReplicaPushRequest(this, next));
+		start(new ReplicaPushRequest(this, next));
 	}
 
 	private void pushAsync(ReplicaPushRequest req) {
 		if (defer(req)) {
 			// TODO(sop) Collapse during long retry outage.
-			for (ReceiveCommand cmd : req.getCommands()) {
-				waiting.put(cmd.getRefName(), cmd);
+			for (ReceiveCommand c : req.getCommands()) {
+				waiting.put(c.getRefName(), c);
 			}
 			queued.add(req);
 		} else {
-			for (ReceiveCommand cmd : req.getCommands()) {
-				running.put(cmd.getRefName(), cmd);
+			for (ReceiveCommand c : req.getCommands()) {
+				running.put(c.getRefName(), c);
 			}
-			startPush(req);
+			start(req);
 		}
 	}
 
@@ -467,14 +415,14 @@ public abstract class KetchReplica {
 			return true;
 		}
 
-		for (ReceiveCommand nextCmd : req.getCommands()) {
-			ReceiveCommand priorCmd = waiting.get(nextCmd.getRefName());
-			if (priorCmd == null) {
-				priorCmd = running.get(nextCmd.getRefName());
+		for (ReceiveCommand n : req.getCommands()) {
+			ReceiveCommand o = waiting.get(n.getRefName());
+			if (o == null) {
+				o = running.get(n.getRefName());
 			}
-			if (priorCmd != null) {
+			if (o != null) {
 				// Another request pending on same ref; that must go first.
-				// Verify priorCmd.newId == nextCmd.oldId?
+				// Verify o.newId == n.oldId? o finishes before n starts.
 				return true;
 			}
 		}
@@ -488,10 +436,10 @@ public abstract class KetchReplica {
 
 	private void retryLater(ReplicaPushRequest req) {
 		Collection<ReceiveCommand> cmds = req.getCommands();
-		for (ReceiveCommand cmd : cmds) {
-			cmd.setResult(NOT_ATTEMPTED, null);
-			if (!waiting.containsKey(cmd.getRefName())) {
-				waiting.put(cmd.getRefName(), cmd);
+		for (ReceiveCommand c : cmds) {
+			c.setResult(NOT_ATTEMPTED, null);
+			if (!waiting.containsKey(c.getRefName())) {
+				waiting.put(c.getRefName(), c);
 			}
 		}
 		queued.add(0, new ReplicaPushRequest(this, cmds));
@@ -505,16 +453,16 @@ public abstract class KetchReplica {
 						describeForLog(), Long.valueOf(delay));
 			}
 			lastRetryMillis = delay;
-			retryAtMillis = SystemReader.getInstance().getCurrentTime() + delay;
+			retryAtMillis = System.currentTimeMillis() + delay;
 			retryFuture = getSystem().getExecutor()
-					.schedule(new WeakRetryPush(this), delay, MILLISECONDS);
+					.schedule(new WeakRetry(this), delay, MILLISECONDS);
 		}
 	}
 
 	/** Weakly holds a retrying replica, allowing it to garbage collect. */
-	static class WeakRetryPush extends WeakReference<KetchReplica>
+	static class WeakRetry extends WeakReference<KetchReplica>
 			implements Callable<Void> {
-		WeakRetryPush(KetchReplica r) {
+		WeakRetry(KetchReplica r) {
 			super(r);
 		}
 
@@ -522,17 +470,17 @@ public abstract class KetchReplica {
 		public Void call() throws Exception {
 			KetchReplica r = get();
 			if (r != null) {
-				r.doRetryPush();
+				r.doRetry();
 			}
 			return null;
 		}
 	}
 
-	private void doRetryPush() {
+	private void doRetry() {
 		leader.lock.lock();
 		try {
 			retryFuture = null;
-			runNextPushRequest();
+			nextPush();
 		} finally {
 			leader.lock.unlock();
 		}
@@ -547,56 +495,58 @@ public abstract class KetchReplica {
 	 * @param req
 	 *            the request to send to the replica.
 	 */
-	protected abstract void startPush(ReplicaPushRequest req);
+	protected abstract void start(ReplicaPushRequest req);
 
 	/**
-	 * Callback from {@link ReplicaPushRequest} upon success or failure.
+	 * Update the leader's view of the replica after a poll.
 	 * <p>
-	 * Acquires the {@link KetchLeader#lock} and updates the leader's internal
-	 * knowledge about this replica to reflect what has been learned during a
-	 * push to the replica. In some cases of divergence this method may take
-	 * some time to determine how the replica has diverged; to reduce contention
-	 * this is evaluated before acquiring the leader lock.
+	 * Called with {@link KetchLeader#lock} held by caller.
 	 *
-	 * @param repo
-	 *            local repository instance used by the push thread.
-	 * @param req
-	 *            push request just attempted.
+	 * @param refs
+	 *            map of refs from the replica.
 	 */
+	protected void initialize(Map<String, Ref> refs) {
+		if (txnAccepted == null) {
+			txnAccepted = getId(refs.get(getTxnNamespace() + ACCEPTED));
+		}
+		if (txnCommitted == null) {
+			txnCommitted = getId(refs.get(getTxnNamespace() + COMMITTED));
+		}
+	}
+
 	void afterPush(@Nullable Repository repo, ReplicaPushRequest req) {
+		Collection<ReceiveCommand> cmds = req.getCommands();
 		ReceiveCommand acceptCmd = null;
 		ReceiveCommand commitCmd = null;
 		List<ReceiveCommand> stages = null;
 
-		for (ReceiveCommand cmd : req.getCommands()) {
-			String name = cmd.getRefName();
-			if (name.equals(getSystem().getTxnAccepted())) {
-				acceptCmd = cmd;
-			} else if (name.equals(getSystem().getTxnCommitted())) {
-				commitCmd = cmd;
-			} else if (cmd.getResult() == OK && cmd.getType() == CREATE
-					&& name.startsWith(getSystem().getTxnStage())) {
+		String acceptedRefName = getTxnNamespace() + ACCEPTED;
+		String committedRefName = getTxnNamespace() + COMMITTED;
+		String stageNamespace = getTxnNamespace() + STAGE;
+
+		for (ReceiveCommand c : cmds) {
+			if (acceptedRefName.equals(c.getRefName())) {
+				acceptCmd = c;
+			} else if (committedRefName.equals(c.getRefName())) {
+				commitCmd = c;
+			} else if (c.getResult() == OK
+					&& c.getType() == CREATE
+					&& c.getRefName().startsWith(stageNamespace)) {
 				if (stages == null) {
 					stages = new ArrayList<>();
 				}
-				stages.add(cmd);
+				stages.add(c);
 			}
 		}
 
-		State newState = null;
-		ObjectId acceptId = readId(req, acceptCmd);
-		if (repo != null && acceptCmd != null && acceptCmd.getResult() != OK
-				&& req.getException() == null) {
-			try (LagCheck lag = new LagCheck(this, repo)) {
-				newState = lag.check(acceptId, acceptCmd);
-				acceptId = lag.getRemoteId();
-			}
+		if (repo != null && acceptCmd != null && acceptCmd.getResult() != OK) {
+			checkLagging(repo, acceptCmd, req);
 		}
 
 		leader.lock.lock();
 		try {
-			for (ReceiveCommand cmd : req.getCommands()) {
-				running.remove(cmd.getRefName());
+			for (ReceiveCommand c : cmds) {
+				running.remove(c.getRefName());
 			}
 
 			Throwable err = req.getException();
@@ -610,38 +560,71 @@ public abstract class KetchReplica {
 
 			lastRetryMillis = 0;
 			error = null;
-			updateView(req, acceptId, commitCmd);
+			updateView(req, acceptCmd, commitCmd);
 
 			if (acceptCmd != null && acceptCmd.getResult() == OK) {
 				state = hasAccepted(leader.getHead()) ? CURRENT : LAGGING;
 				if (stages != null) {
 					staged.put(acceptCmd.getNewId(), stages);
 				}
-			} else if (newState != null) {
-				state = newState;
 			}
 
 			leader.onReplicaUpdate(this);
-			runNextPushRequest();
+			nextPush();
 		} finally {
 			leader.lock.unlock();
 		}
 	}
 
-	private void updateView(ReplicaPushRequest req, @Nullable ObjectId acceptId,
+	private void checkLagging(Repository repo,
+			ReceiveCommand acceptCmd,
+			ReplicaPushRequest req) {
+		ObjectId id = readId(req, acceptCmd);
+		if (id == null) {
+			return;
+		} else if (AnyObjectId.equals(id, ObjectId.zeroId())) {
+			state = LAGGING;
+			return;
+		}
+
+		try (RevWalk rw = new RevWalk(repo)) {
+			rw.setRetainBody(false);
+			RevCommit remote;
+			try {
+				remote = rw.parseCommit(id);
+			} catch (MissingObjectException notLocal) {
+				state = DIVERGENT;
+				return;
+			}
+
+			RevCommit head = rw.parseCommit(acceptCmd.getNewId());
+			if (rw.isMergedInto(remote, head)) {
+				state = LAGGING;
+			} else if (rw.isMergedInto(head, remote)) {
+				state = AHEAD;
+			} else {
+				state = DIVERGENT;
+			}
+		} catch (IOException err) {
+			log.error("Cannot compare " + acceptCmd.getRefName(), err); //$NON-NLS-1$
+		}
+	}
+
+	private void updateView(ReplicaPushRequest req, ReceiveCommand acceptCmd,
 			ReceiveCommand commitCmd) {
-		if (acceptId != null) {
-			txnAccepted = acceptId;
+		ObjectId accepted = readId(req, acceptCmd);
+		if (accepted != null) {
+			txnAccepted = accepted;
 		}
 
 		ObjectId committed = readId(req, commitCmd);
 		if (committed != null) {
 			txnCommitted = committed;
-		} else if (acceptId != null && txnCommitted == null) {
+		} else if (acceptCmd != null && txnCommitted == null) {
 			// Initialize during first conversation.
 			Map<String, Ref> adv = req.getRefs();
 			if (adv != null) {
-				Ref refs = adv.get(getSystem().getTxnCommitted());
+				Ref refs = adv.get(getTxnNamespace() + COMMITTED);
 				txnCommitted = getId(refs);
 			}
 		}
@@ -664,21 +647,6 @@ public abstract class KetchReplica {
 	}
 
 	/**
-	 * Fetch objects from the remote using the calling thread.
-	 * <p>
-	 * Called without {@link KetchLeader#lock}.
-	 *
-	 * @param repo
-	 *            local repository to fetch objects into.
-	 * @param req
-	 *            the request to fetch from a replica.
-	 * @throws IOException
-	 *             communication with the replica was not possible.
-	 */
-	protected abstract void blockingFetch(Repository repo,
-			ReplicaFetchRequest req) throws IOException;
-
-	/**
 	 * Build a list of commands to commit {@link CommitMethod#ALL_REFS}.
 	 *
 	 * @param git
@@ -692,7 +660,7 @@ public abstract class KetchReplica {
 	 * @throws IOException
 	 *             cannot read the committed state.
 	 */
-	protected Collection<ReceiveCommand> prepareCommit(Repository git,
+	protected Collection<ReceiveCommand> commit(Repository git,
 			Map<String, Ref> current, ObjectId committed) throws IOException {
 		List<ReceiveCommand> delta = new ArrayList<>();
 		Map<String, Ref> remote = new HashMap<>(current);
@@ -702,50 +670,41 @@ public abstract class KetchReplica {
 			tw.addTree(rw.parseCommit(committed).getTree());
 			while (tw.next()) {
 				if (tw.getRawMode(0) != TYPE_GITLINK
-						|| tw.isPathSuffix(PEEL, 2)) {
+						|| tw.isPathSuffix(PEEL, 3)) {
 					// Symbolic references cannot be pushed.
 					// Caching peeled values is handled remotely.
 					continue;
 				}
 
-				// TODO(sop) Do not send certain ref names to replica.
-				String name = RefTree.refName(tw.getPathString());
-				Ref oldRef = remote.remove(name);
+				// TODO(sop) Do not send certain ref names to remote.
+				String n = RefTree.refName(tw.getPathString());
+				Ref oldRef = remote.remove(n);
 				ObjectId oldId = getId(oldRef);
 				ObjectId newId = tw.getObjectId(0);
 				if (!AnyObjectId.equals(oldId, newId)) {
-					delta.add(new ReceiveCommand(oldId, newId, name));
+					delta.add(new ReceiveCommand(oldId, newId, n));
 				}
 			}
 		}
 
 		// Delete any extra references not in the committed state.
-		for (Ref ref : remote.values()) {
-			if (canDelete(ref)) {
+		for (Ref r : remote.values()) {
+			// TODO(sop) Do not delete precious names from remote.
+			if (!r.getName().startsWith(getTxnNamespace())
+					&& !HEAD.equals(r.getName())) {
 				delta.add(new ReceiveCommand(
-					ref.getObjectId(), ObjectId.zeroId(),
-					ref.getName()));
+					r.getObjectId(),
+					ObjectId.zeroId(),
+					r.getName()));
 			}
 		}
 		return delta;
 	}
 
-	boolean canDelete(Ref ref) {
-		String name = ref.getName();
-		if (HEAD.equals(name)) {
-			return false;
-		}
-		if (name.startsWith(getSystem().getTxnNamespace())) {
-			return false;
-		}
-		// TODO(sop) Do not delete precious names from replica.
-		return true;
-	}
-
 	@NonNull
-	static ObjectId getId(@Nullable Ref ref) {
-		if (ref != null) {
-			ObjectId id = ref.getObjectId();
+	static ObjectId getId(@Nullable Ref r) {
+		if (r != null) {
+			ObjectId id = r.getObjectId();
 			if (id != null) {
 				return id;
 			}
