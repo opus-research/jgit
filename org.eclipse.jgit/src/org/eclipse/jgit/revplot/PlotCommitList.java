@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>,
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -69,17 +68,17 @@ public class PlotCommitList<L extends PlotLane> extends
 		RevCommitList<PlotCommit<L>> {
 	static final int MAX_LENGTH = 25;
 
-	private int positionsAllocated;
+	private int lanesAllocated;
 
-	private final TreeSet<Integer> freePositions = new TreeSet<Integer>();
+	private final TreeSet<Integer> freeLanes = new TreeSet<Integer>();
 
 	private final HashSet<PlotLane> activeLanes = new HashSet<PlotLane>(32);
 
 	@Override
 	public void clear() {
 		super.clear();
-		positionsAllocated = 0;
-		freePositions.clear();
+		lanesAllocated = 0;
+		freeLanes.clear();
 		activeLanes.clear();
 	}
 
@@ -145,35 +144,12 @@ public class PlotCommitList<L extends PlotLane> extends
 			// Use a different lane.
 			//
 
-			PlotLane reserverdLane = null;
 			for (int i = 0; i < nChildren; i++) {
 				final PlotCommit c = currCommit.children[i];
-				// don't forget to position all of your children if they are
-				// not already positioned. They
-				if (c.lane == null) {
-					c.lane = nextFreeLane();
-					if (reserverdLane != null) {
-						recycleLane((L) c.lane);
-						freePositions
-								.add(Integer.valueOf(c.lane.getPosition()));
-					} else {
-						reserverdLane = c.lane;
-					}
-				} else {
-					if (reserverdLane == null && activeLanes.contains(c.lane)) {
-						reserverdLane = c.lane;
-					} else {
-						if (activeLanes.remove(c.lane)) {
-							recycleLane((L) c.lane);
-							freePositions.add(Integer.valueOf(c.lane
-									.getPosition()));
-						}
-					}
+				if (activeLanes.remove(c.lane)) {
+					recycleLane((L) c.lane);
+					freeLanes.add(Integer.valueOf(c.lane.getPosition()));
 				}
-			}
-			if (reserverdLane != null) {
-				recycleLane((L) reserverdLane);
-				freePositions.add(Integer.valueOf(reserverdLane.getPosition()));
 			}
 
 			currCommit.lane = nextFreeLane();
@@ -199,12 +175,12 @@ public class PlotCommitList<L extends PlotLane> extends
 
 	private PlotLane nextFreeLane() {
 		final PlotLane p = createLane();
-		if (freePositions.isEmpty()) {
-			p.position = positionsAllocated++;
+		if (freeLanes.isEmpty()) {
+			p.position = lanesAllocated++;
 		} else {
-			final Integer min = freePositions.first();
+			final Integer min = freeLanes.first();
 			p.position = min.intValue();
-			freePositions.remove(min);
+			freeLanes.remove(min);
 		}
 		return p;
 	}
