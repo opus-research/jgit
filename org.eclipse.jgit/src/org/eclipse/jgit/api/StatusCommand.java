@@ -69,6 +69,7 @@ public class StatusCommand extends GitCommand<Status> {
 	 */
 	protected StatusCommand(Repository repo) {
 		super(repo);
+		// TODO Auto-generated constructor stub
 	}
 
 	/**
