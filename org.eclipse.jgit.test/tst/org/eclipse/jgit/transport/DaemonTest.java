@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2017 Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,51 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.lib.SubmoduleConfig.FetchRecurseSubmodulesMode;
+import java.net.InetSocketAddress;
+
 import org.junit.Test;
 
-public class SubmoduleConfigTest {
+/**
+ * Daemon tests.
+ */
+public class DaemonTest {
+
 	@Test
-	public void fetchRecurseMatch() throws Exception {
-		assertTrue(FetchRecurseSubmodulesMode.YES.matchConfigValue("yes"));
-		assertTrue(FetchRecurseSubmodulesMode.YES.matchConfigValue("YES"));
-		assertTrue(FetchRecurseSubmodulesMode.YES.matchConfigValue("true"));
-		assertTrue(FetchRecurseSubmodulesMode.YES.matchConfigValue("TRUE"));
-
-		assertTrue(FetchRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("on-demand"));
-		assertTrue(FetchRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("ON-DEMAND"));
-		assertTrue(FetchRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("on_demand"));
-		assertTrue(FetchRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("ON_DEMAND"));
-
-		assertTrue(FetchRecurseSubmodulesMode.NO.matchConfigValue("no"));
-		assertTrue(FetchRecurseSubmodulesMode.NO.matchConfigValue("NO"));
-		assertTrue(FetchRecurseSubmodulesMode.NO.matchConfigValue("false"));
-		assertTrue(FetchRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
+	public void testDaemonStop() throws Exception {
+		Daemon d = new Daemon();
+		d.start();
+		InetSocketAddress address = d.getAddress();
+		assertTrue("Port should be allocated", address.getPort() > 0);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000); // Give it time to enter accept()
+		d.stopAndWait();
+		// Try to start a new Daemon again on the same port
+		d = new Daemon(address);
+		d.start();
+		InetSocketAddress newAddress = d.getAddress();
+		assertEquals("New daemon should run on the same port", address,
+				newAddress);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000);
+		d.stopAndWait();
 	}
 
 	@Test
-	public void fetchRecurseNoMatch() throws Exception {
-		assertFalse(FetchRecurseSubmodulesMode.YES.matchConfigValue("Y"));
-		assertFalse(FetchRecurseSubmodulesMode.NO.matchConfigValue("N"));
-		assertFalse(FetchRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("ONDEMAND"));
-		assertFalse(FetchRecurseSubmodulesMode.YES.matchConfigValue(""));
-		assertFalse(FetchRecurseSubmodulesMode.YES.matchConfigValue(null));
-	}
-
-	@Test
-	public void fetchRecurseToConfigValue() {
-		assertEquals("on-demand",
-				FetchRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+	public void testDaemonRestart() throws Exception {
+		Daemon d = new Daemon();
+		d.start();
+		InetSocketAddress address = d.getAddress();
+		assertTrue("Port should be allocated", address.getPort() > 0);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000);
+		d.stopAndWait();
+		// Re-start the same daemon
+		d.start();
+		InetSocketAddress newAddress = d.getAddress();
+		assertEquals("Daemon should again run on the same port", address,
+				newAddress);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000);
+		d.stopAndWait();
 	}
 }
