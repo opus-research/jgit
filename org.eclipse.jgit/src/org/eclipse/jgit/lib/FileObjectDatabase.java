@@ -45,14 +45,8 @@ package org.eclipse.jgit.lib;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 
 abstract class FileObjectDatabase extends ObjectDatabase {
-	@Override
-	public ObjectReader newReader() {
-		return new WindowCursor(this);
-	}
-
 	/**
 	 * Does the requested object exist in this database?
 	 * <p>
@@ -104,8 +98,8 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 	 *         object, or null if the object does not exist.
 	 * @throws IOException
 	 */
-	ObjectLoader openObject(final WindowCursor curs, final AnyObjectId objectId)
-			throws IOException {
+	public ObjectLoader openObject(final WindowCursor curs,
+			final AnyObjectId objectId) throws IOException {
 		ObjectLoader ldr;
 
 		ldr = openObjectImpl1(curs, objectId);
@@ -160,10 +154,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 		return null;
 	}
 
-	void openObjectInAllPacks(Collection<PackedObjectLoader> reuseLoaders,
-			WindowCursor windowCursor, AnyObjectId otp) throws IOException {
-	}
-
 	abstract File getDirectory();
 
 	abstract AlternateHandle[] myAlternates();
@@ -198,7 +188,7 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 		final FileRepository repository;
 
 		AlternateRepository(FileRepository r) {
-			super((FileObjectDatabase)r.getObjectDatabase());
+			super(r.getObjectDatabase());
 			repository = r;
 		}
 

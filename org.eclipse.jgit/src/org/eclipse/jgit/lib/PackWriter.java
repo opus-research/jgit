@@ -179,7 +179,7 @@ public class PackWriter {
 
 	private final byte[] buf = new byte[16384]; // 16 KB
 
-	private final WindowCursor windowCursor;
+	private final WindowCursor windowCursor = new WindowCursor();
 
 	private List<ObjectToPack> sortedByName;
 
@@ -236,13 +236,12 @@ public class PackWriter {
 	public PackWriter(final Repository repo, final ProgressMonitor imonitor,
 			final ProgressMonitor wmonitor) {
 		this.db = repo;
-		windowCursor = new WindowCursor((ObjectDirectory) repo
-				.getObjectDatabase());
-
 		initMonitor = imonitor == null ? NullProgressMonitor.INSTANCE : imonitor;
 		writeMonitor = wmonitor == null ? NullProgressMonitor.INSTANCE : wmonitor;
-		this.deflater = new Deflater(db.getConfig().getCore().getCompression());
-		outputVersion = repo.getConfig().getCore().getPackIndexVersion();
+
+		final CoreConfig coreConfig = db.getConfig().get(CoreConfig.KEY);
+		this.deflater = new Deflater(coreConfig.getCompression());
+		outputVersion = coreConfig.getPackIndexVersion();
 	}
 
 	/**
@@ -622,7 +621,7 @@ public class PackWriter {
 	private void searchForReuse(
 			final Collection<PackedObjectLoader> reuseLoaders,
 			final ObjectToPack otp) throws IOException {
-		windowCursor.openObjectInAllPacks(otp, reuseLoaders);
+		db.openObjectInAllPacks(otp, reuseLoaders, windowCursor);
 		if (reuseDeltas) {
 			selectDeltaReuseForObject(otp, reuseLoaders);
 		}
