@@ -63,6 +63,7 @@ import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexBuilder;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexRemapper;
+import org.eclipse.jgit.internal.storage.pack.PackWriterBitmapWalker.AddUnseenToBitmapFilter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -262,7 +263,7 @@ class PackWriterBitmapPreparer {
 				BitmapBuilder fullBitmap = commitBitmapIndex.newBitmapBuilder();
 				rw.reset();
 				rw.markStart(c);
-				rw.setRevFilter(PackWriterBitmapWalker.newRevFilter(
+				rw.setRevFilter(new AddUnseenToBitmapFilter(
 						selectionHelper.reusedCommitsBitmap, fullBitmap));
 
 				while (rw.next() != null) {
@@ -410,7 +411,7 @@ class PackWriterBitmapPreparer {
 
 			BitmapBuilder bitmap = commitBitmapIndex.newBitmapBuilder();
 			bitmap.or(reuse);
-			bitmap.add(rc, Constants.OBJ_COMMIT);
+			bitmap.addObject(rc, Constants.OBJ_COMMIT);
 			tipCommitBitmaps.add(new BitmapBuilderEntry(rc, bitmap));
 		}
 
@@ -429,7 +430,7 @@ class PackWriterBitmapPreparer {
 					continue;
 				}
 				for (RevCommit c : rc.getParents()) {
-					bitmap.add(c, Constants.OBJ_COMMIT);
+					bitmap.addObject(c, Constants.OBJ_COMMIT);
 				}
 			}
 			pm.update(1);
