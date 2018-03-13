@@ -665,6 +665,7 @@ public class UploadPack {
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
 
+			RevWalk rw = walk;
 			if (wantAll.isEmpty()) {
 				pw.preparePack(pm, wantIds, commonBase);
 			} else {
@@ -672,13 +673,14 @@ public class UploadPack {
 
 				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
 				pw.preparePack(pm, ow, wantAll, commonBase);
+				rw = ow;
 			}
 
 			if (options.contains(OPTION_INCLUDE_TAG)) {
 				for (final Ref r : refs.values()) {
 					final RevObject o;
 					try {
-						o = walk.parseAny(r.getObjectId());
+						o = rw.parseAny(r.getObjectId());
 					} catch (IOException e) {
 						continue;
 					}
