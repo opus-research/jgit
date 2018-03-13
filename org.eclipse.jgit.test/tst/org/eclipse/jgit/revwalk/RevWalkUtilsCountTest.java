@@ -41,64 +41,63 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.revwalk;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.junit.Test;
 
-public class BranchTrackingStatusTest extends RepositoryTestCase {
-	private TestRepository<Repository> util;
+public class RevWalkUtilsCountTest extends RevWalkTestCase {
 
-	protected RevWalk rw;
+	@Test
+	public void shouldWorkForNormalCase() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
-		util = new TestRepository<Repository>(db);
-		StoredConfig config = util.getRepository().getConfig();
-		config.setString(ConfigConstants.CONFIG_BRANCH_SECTION, "master",
-				ConfigConstants.CONFIG_KEY_REMOTE, "origin");
-		config.setString(ConfigConstants.CONFIG_BRANCH_SECTION, "master",
-				ConfigConstants.CONFIG_KEY_MERGE, "refs/heads/master");
-		config.setString(ConfigConstants.CONFIG_REMOTE_SECTION, "origin",
-				"fetch", "+refs/heads/*:refs/remotes/origin/*");
+		assertEquals(1, count(b, a));
 	}
 
 	@Test
-	public void shouldWorkInNormalCase() throws Exception {
-		RevCommit remoteTracking = util.branch("refs/remotes/origin/master")
-				.commit().create();
-		util.branch("master").commit().parent(remoteTracking).create();
-		util.branch("master").commit().create();
-
-		BranchTrackingStatus status = BranchTrackingStatus.of(
-				util.getRepository(), "master");
-		assertEquals(2, status.getAheadCount());
-		assertEquals(0, status.getBehindCount());
-		assertEquals("refs/remotes/origin/master",
-				status.getRemoteTrackingBranch());
+	public void shouldReturnZeroOnSameCommit() throws Exception {
+		final RevCommit c1 = commit(commit(commit()));
+		assertEquals(0, count(c1, c1));
 	}
 
 	@Test
-	public void shouldWorkWithoutMergeBase() throws Exception {
-		util.branch("refs/remotes/origin/master").commit().create();
-		util.branch("master").commit().create();
+	public void shouldReturnZeroWhenMergedInto() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-		BranchTrackingStatus status = BranchTrackingStatus.of(util.getRepository(), "master");
-		assertEquals(1, status.getAheadCount());
-		assertEquals(1, status.getBehindCount());
+		assertEquals(0, count(a, b));
 	}
 
 	@Test
-	public void shouldReturnNullWhenBranchDoesntExist() throws Exception {
-		BranchTrackingStatus status = BranchTrackingStatus.of(
-				util.getRepository(), "doesntexist");
+	public void shouldWorkWithMerges() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b1 = commit(a);
+		final RevCommit b2 = commit(a);
+		final RevCommit c = commit(b1, b2);
 
-		assertNull(status);
+		assertEquals(3, count(c, a));
+	}
+
+	@Test
+	public void shouldWorkWithoutCommonAncestor() throws Exception {
+		final RevCommit a1 = commit();
+		final RevCommit a2 = commit();
+		final RevCommit b = commit(a1);
+
+		assertEquals(2, count(b, a2));
+	}
+
+	@Test
+	public void shouldWorkWithZeroAsEnd() throws Exception {
+		final RevCommit c = commit(commit());
+
+		assertEquals(2, count(c, null));
+	}
+
+	private int count(RevCommit start, RevCommit end) throws Exception {
+		return RevWalkUtils.count(rw, start, end);
 	}
 }

@@ -43,57 +43,54 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.assertEquals;
+import java.io.IOException;
 
-import org.junit.Test;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 
-public class RevWalkCountTest extends RevWalkTestCase {
+/**
+ * Utility methods for {@link RevWalk}.
+ */
+public final class RevWalkUtils {
 
-	@Test
-	public void shouldWorkForNormalCase() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b = commit(a);
-
-		assertEquals(1, rw.count(b, a));
+	private RevWalkUtils() {
+		// Utility class
 	}
 
-	@Test
-	public void shouldReturnZeroOnSameCommit() throws Exception {
-		final RevCommit c1 = commit(commit(commit()));
-		assertEquals(0, rw.count(c1, c1));
-	}
+	/**
+	 * Count the number of commits that are reachable from <code>start</code>
+	 * until a commit that is reachable from <code>end</code> is encountered. In
+	 * other words, count the number of commits that are in <code>start</code>,
+	 * but not in <code>end</code>.
+	 * <p>
+	 * Note that this method calls {@link RevWalk#reset()} at the beginning.
+	 * Also note that the existing rev filter on the walk is left as-is, so be
+	 * sure to set the right rev filter before calling this method.
+	 *
+	 * @param walk
+	 *            the rev walk to use
+	 * @param start
+	 *            the commit to start counting from
+	 * @param end
+	 *            the commit where counting should end, or null if counting
+	 *            should be done until there are no more commits
+	 *
+	 * @return the number of commits
+	 * @throws MissingObjectException
+	 * @throws IncorrectObjectTypeException
+	 * @throws IOException
+	 */
+	public static int count(final RevWalk walk, final RevCommit start,
+			final RevCommit end) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		walk.reset();
+		walk.markStart(start);
+		if (end != null)
+			walk.markUninteresting(end);
 
-	@Test
-	public void shouldReturnZeroWhenMergedInto() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b = commit(a);
-
-		assertEquals(0, rw.count(a, b));
-	}
-
-	@Test
-	public void shouldWorkWithMerges() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b1 = commit(a);
-		final RevCommit b2 = commit(a);
-		final RevCommit c = commit(b1, b2);
-
-		assertEquals(3, rw.count(c, a));
-	}
-
-	@Test
-	public void shouldWorkWithoutCommonAncestor() throws Exception {
-		final RevCommit a1 = commit();
-		final RevCommit a2 = commit();
-		final RevCommit b = commit(a1);
-
-		assertEquals(2, rw.count(b, a2));
-	}
-
-	@Test
-	public void shouldWorkWithZeroAsEnd() throws Exception {
-		final RevCommit c = commit(commit());
-
-		assertEquals(2, rw.count(c, null));
+		int count = 0;
+		for (RevCommit c = walk.next(); c != null; c = walk.next())
+			count++;
+		return count;
 	}
 }
