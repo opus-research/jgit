@@ -47,8 +47,6 @@ import static org.eclipse.jgit.ignore.internal.IMatcher.NO_MATCH;
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.ignore.internal.IMatcher;
 import org.eclipse.jgit.ignore.internal.PathMatcher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * "Fast" (compared with IgnoreRule) git ignore rule implementation supporting
@@ -59,8 +57,6 @@ import org.slf4j.LoggerFactory;
  * @since 3.6
  */
 public class FastIgnoreRule {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(FastIgnoreRule.class);
 
 	/**
 	 * Character used as default path separator for ignore entries
@@ -102,32 +98,24 @@ public class FastIgnoreRule {
 		if (pattern.charAt(0) == '#') {
 			this.matcher = NO_MATCH;
 			dirOnly = false;
-			return;
-		}
-		if (pattern.charAt(0) == '\\' && pattern.length() > 1) {
-			char next = pattern.charAt(1);
-			if (next == '!' || next == '#') {
-				// remove backslash escaping first special characters
-				pattern = pattern.substring(1);
+		} else {
+			dirOnly = pattern.charAt(pattern.length() - 1) == PATH_SEPARATOR;
+			if (dirOnly) {
+				pattern = stripTrailing(pattern, PATH_SEPARATOR);
+				if (pattern.length() == 0) {
+					this.matcher = NO_MATCH;
+					return;
+				}
 			}
-		}
-		dirOnly = pattern.charAt(pattern.length() - 1) == PATH_SEPARATOR;
-		if (dirOnly) {
-			pattern = stripTrailing(pattern, PATH_SEPARATOR);
-			if (pattern.length() == 0) {
-				this.matcher = NO_MATCH;
-				return;
+			IMatcher m;
+			try {
+				m = PathMatcher.createPathMatcher(pattern,
+						Character.valueOf(PATH_SEPARATOR), dirOnly);
+			} catch (InvalidPatternException e) {
+				m = NO_MATCH;
 			}
+			this.matcher = m;
 		}
-		IMatcher m;
-		try {
-			m = PathMatcher.createPathMatcher(pattern,
-					Character.valueOf(PATH_SEPARATOR), dirOnly);
-		} catch (InvalidPatternException e) {
-			m = NO_MATCH;
-			LOG.error(e.getMessage(), e);
-		}
-		this.matcher = m;
 	}
 
 	/**
@@ -186,14 +174,6 @@ public class FastIgnoreRule {
 	 */
 	public boolean getResult() {
 		return !inverse;
-	}
-
-	/**
-	 * @return true if the rule never matches (comment line or broken pattern)
-	 * @since 4.1
-	 */
-	public boolean isEmpty() {
-		return matcher == NO_MATCH;
 	}
 
 	@Override

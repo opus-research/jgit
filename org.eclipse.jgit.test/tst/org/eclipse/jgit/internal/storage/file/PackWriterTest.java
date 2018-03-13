@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -67,19 +66,19 @@ import java.util.Set;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.internal.storage.pack.PackWriter.ObjectIdSet;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.transport.PackParser;
 import org.junit.After;
@@ -121,11 +120,11 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@After
 	public void tearDown() throws Exception {
 		if (writer != null) {
-			writer.close();
+			writer.release();
 			writer = null;
 		}
 		if (inserter != null) {
-			inserter.close();
+			inserter.release();
 			inserter = null;
 		}
 		super.tearDown();
@@ -439,38 +438,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
-	public void testDeltaStatistics() throws Exception {
-		config.setDeltaCompress(true);
-		FileRepository repo = createBareRepository();
-		TestRepository<FileRepository> testRepo = new TestRepository<FileRepository>(repo);
-		ArrayList<RevObject> blobs = new ArrayList<>();
-		blobs.add(testRepo.blob(genDeltableData(1000)));
-		blobs.add(testRepo.blob(genDeltableData(1005)));
-
-		try (PackWriter pw = new PackWriter(repo)) {
-			NullProgressMonitor m = NullProgressMonitor.INSTANCE;
-			pw.preparePack(blobs.iterator());
-			pw.writePack(m, m, os);
-			PackStatistics stats = pw.getStatistics();
-			assertEquals(1, stats.getTotalDeltas());
-			assertTrue("Delta bytes not set.",
-					stats.byObjectType(OBJ_BLOB).getDeltaBytes() > 0);
-		}
-	}
-
-	// Generate consistent junk data for building files that delta well
-	private String genDeltableData(int length) {
-		assertTrue("Generated data must have a length > 0", length > 0);
-		char[] data = {'a', 'b', 'c', '\n'};
-		StringBuilder builder = new StringBuilder(length);
-		for (int i = 0; i < length; i++) {
-			builder.append(data[i % 4]);
-		}
-		return builder.toString();
-	}
-
-
-	@Test
 	public void testWriteIndex() throws Exception {
 		config.setIndexVersion(2);
 		writeVerifyPack4(false);
@@ -527,7 +494,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		RevCommit c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
 		PackIndex pf2 = writePack(repo, Collections.singleton(c2),
-				Collections.<ObjectIdSet> singleton(pf1));
+				Collections.singleton(objectIdSet(pf1)));
 		assertContent(
 				pf2,
 				Arrays.asList(c2.getId(), c2.getTree().getId(),
@@ -547,26 +514,26 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private static PackIndex writePack(FileRepository repo,
 			Set<? extends ObjectId> want, Set<ObjectIdSet> excludeObjects)
 			throws IOException {
-		try (PackWriter pw = new PackWriter(repo)) {
-			pw.setDeltaBaseAsOffset(true);
-			pw.setReuseDeltaCommits(false);
-			for (ObjectIdSet idx : excludeObjects)
-				pw.excludeObjects(idx);
-			pw.preparePack(NullProgressMonitor.INSTANCE, want,
-					Collections.<ObjectId> emptySet());
-			String id = pw.computeName().getName();
-			File packdir = new File(repo.getObjectsDirectory(), "pack");
-			File packFile = new File(packdir, "pack-" + id + ".pack");
-			FileOutputStream packOS = new FileOutputStream(packFile);
-			pw.writePack(NullProgressMonitor.INSTANCE,
-					NullProgressMonitor.INSTANCE, packOS);
-			packOS.close();
-			File idxFile = new File(packdir, "pack-" + id + ".idx");
-			FileOutputStream idxOS = new FileOutputStream(idxFile);
-			pw.writeIndex(idxOS);
-			idxOS.close();
-			return PackIndex.open(idxFile);
-		}
+		PackWriter pw = new PackWriter(repo);
+		pw.setDeltaBaseAsOffset(true);
+		pw.setReuseDeltaCommits(false);
+		for (ObjectIdSet idx : excludeObjects)
+			pw.excludeObjects(idx);
+		pw.preparePack(NullProgressMonitor.INSTANCE, want,
+				Collections.<ObjectId> emptySet());
+		String id = pw.computeName().getName();
+		File packdir = new File(repo.getObjectsDirectory(), "pack");
+		File packFile = new File(packdir, "pack-" + id + ".pack");
+		FileOutputStream packOS = new FileOutputStream(packFile);
+		pw.writePack(NullProgressMonitor.INSTANCE,
+				NullProgressMonitor.INSTANCE, packOS);
+		packOS.close();
+		File idxFile = new File(packdir, "pack-" + id + ".idx");
+		FileOutputStream idxOS = new FileOutputStream(idxFile);
+		pw.writeIndex(idxOS);
+		idxOS.close();
+		pw.release();
+		return PackIndex.open(idxFile);
 	}
 
 	// TODO: testWritePackDeltasCycle()
@@ -672,7 +639,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		writer.setIgnoreMissingUninteresting(ignoreMissingUninteresting);
 		writer.preparePack(m, interestings, uninterestings);
 		writer.writePack(m, m, os);
-		writer.close();
+		writer.release();
 		verifyOpenPack(thin);
 	}
 
@@ -683,7 +650,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		writer.preparePack(objectSource.iterator());
 		assertEquals(objectSource.size(), writer.getObjectCount());
 		writer.writePack(m, m, os);
-		writer.close();
+		writer.release();
 		verifyOpenPack(false);
 	}
 
@@ -731,5 +698,13 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		for (MutableEntry me : entries) {
 			assertEquals(objectsOrder[i++].toObjectId(), me.toObjectId());
 		}
+	}
+
+	private static ObjectIdSet objectIdSet(final PackIndex idx) {
+		return new ObjectIdSet() {
+			public boolean contains(AnyObjectId objectId) {
+				return idx.hasObject(objectId);
+			}
+		};
 	}
 }

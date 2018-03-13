@@ -67,7 +67,6 @@ import org.junit.Test;
 public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 	@Test
 	public void testFileModeSymLinkIsNotATree() throws IOException {
-		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		FS fs = db.getFS();
 		// mål = target in swedish, just to get som unicode in here
 		writeTrashFile("mål/data", "targetdata");
@@ -90,19 +89,20 @@ public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 		DirCacheEditor dce = dc.editor();
 		final String UNNORMALIZED = "target/";
 		final byte[] UNNORMALIZED_BYTES = Constants.encode(UNNORMALIZED);
-		try (ObjectInserter oi = db.newObjectInserter()) {
-			final ObjectId linkid = oi.insert(Constants.OBJ_BLOB,
-					UNNORMALIZED_BYTES, 0, UNNORMALIZED_BYTES.length);
-			dce.add(new DirCacheEditor.PathEdit("link") {
-				@Override
-				public void apply(DirCacheEntry ent) {
-					ent.setFileMode(FileMode.SYMLINK);
-					ent.setObjectId(linkid);
-					ent.setLength(UNNORMALIZED_BYTES.length);
-				}
-			});
-			assertTrue(dce.commit());
-		}
+		ObjectInserter oi = db.newObjectInserter();
+		final ObjectId linkid = oi.insert(Constants.OBJ_BLOB,
+				UNNORMALIZED_BYTES, 0,
+				UNNORMALIZED_BYTES.length);
+		oi.release();
+		dce.add(new DirCacheEditor.PathEdit("link") {
+			@Override
+			public void apply(DirCacheEntry ent) {
+				ent.setFileMode(FileMode.SYMLINK);
+				ent.setObjectId(linkid);
+				ent.setLength(UNNORMALIZED_BYTES.length);
+			}
+		});
+		assertTrue(dce.commit());
 		new Git(db).commit().setMessage("Adding link").call();
 		new Git(db).reset().setMode(ResetType.HARD).call();
 		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
@@ -129,19 +129,19 @@ public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 		DirCacheEditor dce = dc.editor();
 		final String NORMALIZED = "target";
 		final byte[] NORMALIZED_BYTES = Constants.encode(NORMALIZED);
-		try (ObjectInserter oi = db.newObjectInserter()) {
-			final ObjectId linkid = oi.insert(Constants.OBJ_BLOB,
-					NORMALIZED_BYTES, 0, NORMALIZED_BYTES.length);
-			dce.add(new DirCacheEditor.PathEdit("link") {
-				@Override
-				public void apply(DirCacheEntry ent) {
-					ent.setFileMode(FileMode.SYMLINK);
-					ent.setObjectId(linkid);
-					ent.setLength(NORMALIZED_BYTES.length);
-				}
-			});
-			assertTrue(dce.commit());
-		}
+		ObjectInserter oi = db.newObjectInserter();
+		final ObjectId linkid = oi.insert(Constants.OBJ_BLOB, NORMALIZED_BYTES,
+				0, NORMALIZED_BYTES.length);
+		oi.release();
+		dce.add(new DirCacheEditor.PathEdit("link") {
+			@Override
+			public void apply(DirCacheEntry ent) {
+				ent.setFileMode(FileMode.SYMLINK);
+				ent.setObjectId(linkid);
+				ent.setLength(NORMALIZED_BYTES.length);
+			}
+		});
+		assertTrue(dce.commit());
 		new Git(db).commit().setMessage("Adding link").call();
 		new Git(db).reset().setMode(ResetType.HARD).call();
 		DirCacheIterator dci = new DirCacheIterator(db.readDirCache());
@@ -164,24 +164,23 @@ public class FileTreeIteratorJava7Test extends RepositoryTestCase {
 	 */
 	@Test
 	public void testSymlinkActuallyModified() throws Exception {
-		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		final String NORMALIZED = "target";
 		final byte[] NORMALIZED_BYTES = Constants.encode(NORMALIZED);
-		try (ObjectInserter oi = db.newObjectInserter()) {
-			final ObjectId linkid = oi.insert(Constants.OBJ_BLOB,
-					NORMALIZED_BYTES, 0, NORMALIZED_BYTES.length);
-			DirCache dc = db.lockDirCache();
-			DirCacheEditor dce = dc.editor();
-			dce.add(new DirCacheEditor.PathEdit("link") {
-				@Override
-				public void apply(DirCacheEntry ent) {
-					ent.setFileMode(FileMode.SYMLINK);
-					ent.setObjectId(linkid);
-					ent.setLength(NORMALIZED_BYTES.length);
-				}
-			});
-			assertTrue(dce.commit());
-		}
+		ObjectInserter oi = db.newObjectInserter();
+		final ObjectId linkid = oi.insert(Constants.OBJ_BLOB, NORMALIZED_BYTES,
+				0, NORMALIZED_BYTES.length);
+		oi.release();
+		DirCache dc = db.lockDirCache();
+		DirCacheEditor dce = dc.editor();
+		dce.add(new DirCacheEditor.PathEdit("link") {
+			@Override
+			public void apply(DirCacheEntry ent) {
+				ent.setFileMode(FileMode.SYMLINK);
+				ent.setObjectId(linkid);
+				ent.setLength(NORMALIZED_BYTES.length);
+			}
+		});
+		assertTrue(dce.commit());
 		new Git(db).commit().setMessage("Adding link").call();
 		new Git(db).reset().setMode(ResetType.HARD).call();
 

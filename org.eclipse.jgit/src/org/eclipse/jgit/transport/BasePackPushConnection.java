@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
@@ -57,7 +55,6 @@ import java.util.Set;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.errors.TooLargePackException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
@@ -112,15 +109,17 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	public static final String CAPABILITY_SIDE_BAND_64K = GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 
 	private final boolean thinPack;
-	private final boolean atomic;
 
-	private boolean capableAtomic;
 	private boolean capableDeleteRefs;
+
 	private boolean capableReport;
+
 	private boolean capableSideBand;
+
 	private boolean capableOfsDelta;
 
 	private boolean sentCommand;
+
 	private boolean writePack;
 
 	/** Time in milliseconds spent transferring the pack data. */
@@ -135,7 +134,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	public BasePackPushConnection(final PackTransport packTransport) {
 		super(packTransport);
 		thinPack = transport.isPushThin();
-		atomic = transport.isPushAtomic();
 	}
 
 	public void push(final ProgressMonitor monitor,
@@ -225,11 +223,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	private void writeCommands(final Collection<RemoteRefUpdate> refUpdates,
 			final ProgressMonitor monitor, OutputStream outputStream) throws IOException {
 		final String capabilities = enableCapabilities(monitor, outputStream);
-		if (atomic && !capableAtomic) {
-			throw new TransportException(uri,
-					JGitText.get().atomicPushNotSupported);
-		}
-
 		for (final RemoteRefUpdate rru : refUpdates) {
 			if (!capableDeleteRefs && rru.isDelete()) {
 				rru.setStatus(Status.REJECTED_NODELETE);
@@ -237,14 +230,9 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			}
 
 			final StringBuilder sb = new StringBuilder();
-			ObjectId oldId = rru.getExpectedOldObjectId();
-			if (oldId == null) {
-				final Ref advertised = getRef(rru.getRemoteName());
-				oldId = advertised != null ? advertised.getObjectId() : null;
-				if (oldId == null) {
-					oldId = ObjectId.zeroId();
-				}
-			}
+			final Ref advertisedRef = getRef(rru.getRemoteName());
+			final ObjectId oldId = (advertisedRef == null ? ObjectId.zeroId()
+					: advertisedRef.getObjectId());
 			sb.append(oldId.name());
 			sb.append(' ');
 			sb.append(rru.getNewObjectId().name());
@@ -270,8 +258,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	private String enableCapabilities(final ProgressMonitor monitor,
 			OutputStream outputStream) {
 		final StringBuilder line = new StringBuilder();
-		if (atomic)
-			capableAtomic = wantCapability(line, CAPABILITY_ATOMIC);
 		capableReport = wantCapability(line, CAPABILITY_REPORT_STATUS);
 		capableDeleteRefs = wantCapability(line, CAPABILITY_DELETE_REFS);
 		capableOfsDelta = wantCapability(line, CAPABILITY_OFS_DELTA);
@@ -282,7 +268,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					outputStream);
 			pckIn = new PacketLineIn(in);
 		}
-		addUserAgentCapability(line);
 
 		if (line.length() > 0)
 			line.setCharAt(0, '\0');
@@ -328,9 +313,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		if (!unpackLine.startsWith("unpack ")) //$NON-NLS-1$
 			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().unexpectedReportLine, unpackLine));
 		final String unpackStatus = unpackLine.substring("unpack ".length()); //$NON-NLS-1$
-		if (unpackStatus.startsWith("error Pack exceeds the limit of")) //$NON-NLS-1$
-			throw new TooLargePackException(uri,
-					unpackStatus.substring("error ".length())); //$NON-NLS-1$
 		if (!unpackStatus.equals("ok")) //$NON-NLS-1$
 			throw new TransportException(uri, MessageFormat.format(
 					JGitText.get().errorOccurredDuringUnpackingOnTheRemoteEnd, unpackStatus));
@@ -385,8 +367,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		final int oldTimeout = timeoutIn.getTimeout();
 		final int sendTime = (int) Math.min(packTransferTime, 28800000L);
 		try {
-			int timeout = 10 * Math.max(sendTime, oldTimeout);
-			timeoutIn.setTimeout((timeout < 0) ? Integer.MAX_VALUE : timeout);
+			timeoutIn.setTimeout(10 * Math.max(sendTime, oldTimeout));
 			return pckIn.readString();
 		} finally {
 			timeoutIn.setTimeout(oldTimeout);

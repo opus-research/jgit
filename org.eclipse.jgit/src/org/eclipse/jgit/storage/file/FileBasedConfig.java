@@ -163,9 +163,6 @@ public class FileBasedConfig extends StoredConfig {
 				hash = newHash;
 			}
 		} catch (FileNotFoundException noFile) {
-			if (configFile.exists()) {
-				throw noFile;
-			}
 			clear();
 			snapshot = newSnapshot;
 		} catch (IOException e) {

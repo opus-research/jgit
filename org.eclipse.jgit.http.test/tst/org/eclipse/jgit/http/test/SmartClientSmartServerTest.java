@@ -59,11 +59,9 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -74,6 +72,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.RemoteRepositoryException;
@@ -186,8 +185,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			public void destroy() {
 				//
 			}
-		}), "/" + srcName + "/git-upload-pack",
-				EnumSet.of(DispatcherType.REQUEST));
+		}), "/" + srcName + "/git-upload-pack", FilterMapping.DEFAULT);
 		broken.addServlet(new ServletHolder(gs), "/*");
 
 		server.setUp();
@@ -296,7 +294,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(dst.hasObject(A_txt));
-		assertEquals(B, dst.exactRef(master).getObjectId());
+		assertEquals(B, dst.getRef(master).getObjectId());
 		fsck(dst, B);
 
 		List<AccessEvent> requests = getRequests();
@@ -337,7 +335,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		} finally {
 			t.close();
 		}
-		assertEquals(B, dst.getRepository().exactRef(master).getObjectId());
+		assertEquals(B, dst.getRepository().getRef(master).getObjectId());
 		List<AccessEvent> cloneRequests = getRequests();
 
 		// Only create a few new commits.
@@ -358,7 +356,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		} finally {
 			t.close();
 		}
-		assertEquals(Z, dst.getRepository().exactRef(master).getObjectId());
+		assertEquals(Z, dst.getRepository().getRef(master).getObjectId());
 
 		List<AccessEvent> requests = getRequests();
 		requests.removeAll(cloneRequests);
@@ -400,7 +398,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		} finally {
 			t.close();
 		}
-		assertEquals(B, dst.getRepository().exactRef(master).getObjectId());
+		assertEquals(B, dst.getRepository().getRef(master).getObjectId());
 		List<AccessEvent> cloneRequests = getRequests();
 
 		// Force enough into the local client that enumeration will
@@ -424,7 +422,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		} finally {
 			t.close();
 		}
-		assertEquals(Z, dst.getRepository().exactRef(master).getObjectId());
+		assertEquals(Z, dst.getRepository().getRef(master).getObjectId());
 
 		List<AccessEvent> requests = getRequests();
 		requests.removeAll(cloneRequests);
@@ -482,7 +480,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			} catch (TransportException err) {
 				String exp = brokenURI + ": expected"
 						+ " Content-Type application/x-git-upload-pack-result;"
-						+ " received Content-Type text/plain; charset=UTF-8";
+						+ " received Content-Type text/plain;charset=UTF-8";
 				assertEquals(exp, err.getMessage());
 			}
 		} finally {
@@ -506,8 +504,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(join(brokenURI, "git-upload-pack"), service.getPath());
 		assertEquals(0, service.getParameters().size());
 		assertEquals(200, service.getStatus());
-		assertEquals("text/plain; charset=UTF-8",
-				service.getResponseHeader(HDR_CONTENT_TYPE));
+		assertEquals("text/plain;charset=UTF-8", service
+				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
 	@Test
@@ -579,8 +577,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(remoteRepository.hasObject(Q_txt));
-		assertNotNull("has " + dstName, remoteRepository.exactRef(dstName));
-		assertEquals(Q, remoteRepository.exactRef(dstName).getObjectId());
+		assertNotNull("has " + dstName, remoteRepository.getRef(dstName));
+		assertEquals(Q, remoteRepository.getRef(dstName).getObjectId());
 		fsck(remoteRepository, Q);
 
 		final ReflogReader log = remoteRepository.getReflogReader(dstName);
@@ -657,8 +655,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(remoteRepository.hasObject(Q_bin));
-		assertNotNull("has " + dstName, remoteRepository.exactRef(dstName));
-		assertEquals(Q, remoteRepository.exactRef(dstName).getObjectId());
+		assertNotNull("has " + dstName, remoteRepository.getRef(dstName));
+		assertEquals(Q, remoteRepository.getRef(dstName).getObjectId());
 		fsck(remoteRepository, Q);
 
 		List<AccessEvent> requests = getRequests();

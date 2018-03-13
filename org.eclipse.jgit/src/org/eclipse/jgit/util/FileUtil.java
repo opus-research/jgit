@@ -46,24 +46,51 @@ package org.eclipse.jgit.util;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
+import java.nio.file.attribute.PosixFilePermission;
+import java.text.Normalizer;
+import java.text.Normalizer.Form;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FS.Attributes;
 
 /**
  * File utilities using Java 7 NIO2
  */
-@Deprecated
 public class FileUtil {
+
+	static class Java7BasicAttributes extends Attributes {
+
+		Java7BasicAttributes(FS fs, File fPath, boolean exists,
+				boolean isDirectory, boolean isExecutable,
+				boolean isSymbolicLink, boolean isRegularFile,
+				long creationTime, long lastModifiedTime, long length) {
+			super(fs, fPath, exists, isDirectory, isExecutable, isSymbolicLink,
+					isRegularFile, creationTime, lastModifiedTime, length);
+		}
+	}
 
 	/**
 	 * @param path
 	 * @return target path of the symlink
 	 * @throws IOException
-	 * @deprecated use {@link FileUtils#readSymLink(File)} instead
 	 */
-	@Deprecated
 	public static String readSymlink(File path) throws IOException {
-		return FileUtils.readSymLink(path);
+		Path nioPath = path.toPath();
+		Path target = Files.readSymbolicLink(nioPath);
+		String targetString = target.toString();
+		if (SystemReader.getInstance().isWindows())
+			targetString = targetString.replace('\\', '/');
+		else if (SystemReader.getInstance().isMacOS())
+			targetString = Normalizer.normalize(targetString, Form.NFC);
+		return targetString;
 	}
 
 	/**
@@ -72,168 +99,232 @@ public class FileUtil {
 	 * @param target
 	 *            target of the symlink to be created
 	 * @throws IOException
-	 * @deprecated use {@link FileUtils#createSymLink(File, String)} instead
 	 */
-	@Deprecated
 	public static void createSymLink(File path, String target)
 			throws IOException {
-		FileUtils.createSymLink(path, target);
+		Path nioPath = path.toPath();
+		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS))
+			Files.delete(nioPath);
+		if (SystemReader.getInstance().isWindows())
+			target = target.replace('/', '\\');
+		Path nioTarget = new File(target).toPath();
+		Files.createSymbolicLink(nioPath, nioTarget);
 	}
 
 	/**
 	 * @param path
 	 * @return {@code true} if the passed path is a symlink
-	 * @deprecated Use {@link Files#isSymbolicLink(java.nio.file.Path)} instead
 	 */
-	@Deprecated
 	public static boolean isSymlink(File path) {
-		return FileUtils.isSymlink(path);
+		Path nioPath = path.toPath();
+		return Files.isSymbolicLink(nioPath);
 	}
 
 	/**
 	 * @param path
 	 * @return lastModified attribute for given path
 	 * @throws IOException
-	 * @deprecated Use
-	 *             {@link Files#getLastModifiedTime(java.nio.file.Path, java.nio.file.LinkOption...)}
-	 *             instead
 	 */
-	@Deprecated
 	public static long lastModified(File path) throws IOException {
-		return FileUtils.lastModified(path);
+		Path nioPath = path.toPath();
+		return Files.getLastModifiedTime(nioPath, LinkOption.NOFOLLOW_LINKS)
+				.toMillis();
 	}
 
 	/**
 	 * @param path
 	 * @param time
 	 * @throws IOException
-	 * @deprecated Use
-	 *             {@link Files#setLastModifiedTime(java.nio.file.Path, java.nio.file.attribute.FileTime)}
-	 *             instead
 	 */
-	@Deprecated
 	public static void setLastModified(File path, long time) throws IOException {
-		FileUtils.setLastModified(path, time);
+		Path nioPath = path.toPath();
+		Files.setLastModifiedTime(nioPath, FileTime.fromMillis(time));
 	}
 
 	/**
 	 * @param path
 	 * @return {@code true} if the given path exists
-	 * @deprecated Use
-	 *             {@link Files#exists(java.nio.file.Path, java.nio.file.LinkOption...)}
-	 *             instead
 	 */
-	@Deprecated
 	public static boolean exists(File path) {
-		return FileUtils.exists(path);
+		Path nioPath = path.toPath();
+		return Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS);
 	}
 
 	/**
 	 * @param path
 	 * @return {@code true} if the given path is hidden
 	 * @throws IOException
-	 * @deprecated Use {@link Files#isHidden(java.nio.file.Path)} instead
 	 */
-	@Deprecated
 	public static boolean isHidden(File path) throws IOException {
-		return FileUtils.isHidden(path);
+		Path nioPath = path.toPath();
+		return Files.isHidden(nioPath);
 	}
 
 	/**
 	 * @param path
 	 * @param hidden
 	 * @throws IOException
-	 * @deprecated Use {@link FileUtils#setHidden(File,boolean)} instead
 	 */
-	@Deprecated
 	public static void setHidden(File path, boolean hidden) throws IOException {
-		FileUtils.setHidden(path, hidden);
+		Path nioPath = path.toPath();
+		Files.setAttribute(nioPath, "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
+				LinkOption.NOFOLLOW_LINKS);
 	}
 
 	/**
 	 * @param path
 	 * @return length of the given file
 	 * @throws IOException
-	 * @deprecated Use {@link FileUtils#getLength(File)} instead
 	 */
-	@Deprecated
 	public static long getLength(File path) throws IOException {
-		return FileUtils.getLength(path);
+		Path nioPath = path.toPath();
+		if (Files.isSymbolicLink(nioPath))
+			return Files.readSymbolicLink(nioPath).toString()
+					.getBytes(Constants.CHARSET).length;
+		return Files.size(nioPath);
 	}
 
 	/**
 	 * @param path
 	 * @return {@code true} if the given file a directory
-	 * @deprecated Use
-	 *             {@link Files#isDirectory(java.nio.file.Path, java.nio.file.LinkOption...)}
-	 *             instead
 	 */
-	@Deprecated
 	public static boolean isDirectory(File path) {
-		return FileUtils.isDirectory(path);
+		Path nioPath = path.toPath();
+		return Files.isDirectory(nioPath, LinkOption.NOFOLLOW_LINKS);
 	}
 
 	/**
 	 * @param path
 	 * @return {@code true} if the given file is a file
-	 * @deprecated Use
-	 *             {@link Files#isRegularFile(java.nio.file.Path, java.nio.file.LinkOption...)}
-	 *             instead
 	 */
-	@Deprecated
 	public static boolean isFile(File path) {
-		return FileUtils.isFile(path);
+		Path nioPath = path.toPath();
+		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
 	}
 
 	/**
 	 * @param path
 	 * @return {@code true} if the given file can be executed
-	 * @deprecated Use {@link FileUtils#canExecute(File)} instead
+	 */
+	public static boolean canExecute(File path) {
+		if (!isFile(path))
+			return false;
+		return path.canExecute();
+	}
+
+	/**
+	 * @param path
+	 * @param executable
+	 * @return true if succeeded, false if not supported or failed
+	 * @deprecated the implementation is highly platform dependent, consider
+	 *             using {@link FS#setExecute(File, boolean)} instead
 	 */
 	@Deprecated
-	public static boolean canExecute(File path) {
-		return FileUtils.canExecute(path);
+	public static boolean setExecute(File path, boolean executable) {
+		if (!isFile(path))
+			return false;
+		return path.setExecutable(executable);
 	}
 
 	/**
 	 * @param path
 	 * @throws IOException
-	 * @deprecated use {@link FileUtils#delete(File)}
 	 */
-	@Deprecated
 	public static void delete(File path) throws IOException {
-		FileUtils.delete(path);
+		Path nioPath = path.toPath();
+		Files.delete(nioPath);
+	}
+
+	static Attributes getFileAttributesBasic(FS fs, File path) {
+		try {
+			Path nioPath = path.toPath();
+			BasicFileAttributes readAttributes = nioPath
+					.getFileSystem()
+					.provider()
+					.getFileAttributeView(nioPath,
+							BasicFileAttributeView.class,
+							LinkOption.NOFOLLOW_LINKS).readAttributes();
+			Attributes attributes = new FileUtil.Java7BasicAttributes(fs, path,
+					true,
+					readAttributes.isDirectory(),
+					fs.supportsExecute() ? path.canExecute() : false,
+					readAttributes.isSymbolicLink(),
+					readAttributes.isRegularFile(), //
+					readAttributes.creationTime().toMillis(), //
+					readAttributes.lastModifiedTime().toMillis(),
+					readAttributes.isSymbolicLink() ? Constants
+							.encode(FileUtils.readSymLink(path)).length
+							: readAttributes.size());
+			return attributes;
+		} catch (NoSuchFileException e) {
+			return new FileUtil.Java7BasicAttributes(fs, path, false, false,
+					false, false, false, 0L, 0L, 0L);
+		} catch (IOException e) {
+			return new Attributes(path, fs);
+		}
 	}
 
 	/**
 	 * @param fs
 	 * @param path
 	 * @return file system attributes for the given file
-	 * @deprecated Use {@link FileUtils#getFileAttributesPosix(FS,File)} instead
 	 */
-	@Deprecated
 	public static Attributes getFileAttributesPosix(FS fs, File path) {
-		return FileUtils.getFileAttributesPosix(fs, path);
+		try {
+			Path nioPath = path.toPath();
+			PosixFileAttributes readAttributes = nioPath
+					.getFileSystem()
+					.provider()
+					.getFileAttributeView(nioPath,
+							PosixFileAttributeView.class,
+							LinkOption.NOFOLLOW_LINKS).readAttributes();
+			Attributes attributes = new FileUtil.Java7BasicAttributes(
+					fs,
+					path,
+					true, //
+					readAttributes.isDirectory(), //
+					readAttributes.permissions().contains(
+							PosixFilePermission.OWNER_EXECUTE),
+					readAttributes.isSymbolicLink(),
+					readAttributes.isRegularFile(), //
+					readAttributes.creationTime().toMillis(), //
+					readAttributes.lastModifiedTime().toMillis(),
+					readAttributes.size());
+			return attributes;
+		} catch (NoSuchFileException e) {
+			return new FileUtil.Java7BasicAttributes(fs, path, false, false,
+					false, false, false, 0L, 0L, 0L);
+		} catch (IOException e) {
+			return new Attributes(path, fs);
+		}
 	}
 
 	/**
 	 * @param file
 	 * @return on Mac: NFC normalized {@link File}, otherwise the passed file
-	 * @deprecated Use {@link FileUtils#normalize(File)} instead
 	 */
-	@Deprecated
 	public static File normalize(File file) {
-		return FileUtils.normalize(file);
+		if (SystemReader.getInstance().isMacOS()) {
+			// TODO: Would it be faster to check with isNormalized first
+			// assuming normalized paths are much more common
+			String normalized = Normalizer.normalize(file.getPath(),
+					Normalizer.Form.NFC);
+			return new File(normalized);
+		}
+		return file;
 	}
 
 	/**
 	 * @param name
 	 * @return on Mac: NFC normalized form of given name
-	 * @deprecated Use {@link FileUtils#normalize(String)} instead
 	 */
-	@Deprecated
 	public static String normalize(String name) {
-		return FileUtils.normalize(name);
+		if (SystemReader.getInstance().isMacOS()) {
+			if (name == null)
+				return null;
+			return Normalizer.normalize(name, Normalizer.Form.NFC);
+		}
+		return name;
 	}
 
 }

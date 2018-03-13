@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,29 +41,28 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.annotations;
-
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+package org.eclipse.jgit.transport;
 
 /**
- * JGit's replacement for the {@code javax.annotation.Nonnull}.
- * <p>
- * Denotes that a local variable, parameter, field, method return value expected
- * to be non {@code null}.
+ * Indicates UploadPack may not continue execution.
  *
- * @since 4.2
+ * @deprecated use {@link ServiceMayNotContinueException} instead.
  */
-@Documented
-@Retention(RetentionPolicy.CLASS)
-@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
-public @interface NonNull {
-	// marker annotation with no members
+@Deprecated
+public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+	private static final long serialVersionUID = 1L;
+
+	/** Initialize with no message. */
+	public UploadPackMayNotContinueException() {
+		// Do not set a message.
+	}
+
+	/**
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
+	 */
+	public UploadPackMayNotContinueException(String msg) {
+		super(msg);
+	}
 }

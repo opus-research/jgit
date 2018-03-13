@@ -56,7 +56,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
+import java.security.MessageDigest;
 import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
@@ -464,39 +466,57 @@ public final class DfsPackFile {
 		return dstbuf;
 	}
 
-	void copyPackAsIs(PackOutputStream out, DfsReader ctx)
+	void copyPackAsIs(PackOutputStream out, boolean validate, DfsReader ctx)
 			throws IOException {
-		// If the length hasn't been determined yet, pin to set it.
-		if (length == -1) {
-			ctx.pin(this, 0);
-			ctx.unpin();
-		}
-		if (cache.shouldCopyThroughCache(length))
-			copyPackThroughCache(out, ctx);
+		MessageDigest md = initCopyPack(out, validate, ctx);
+		long p;
+		if (cache.copyThroughCache(length))
+			p = copyPackThroughCache(out, ctx, md);
 		else
-			copyPackBypassCache(out, ctx);
+			p = copyPackBypassCache(out, ctx, md);
+		verifyPackChecksum(p, md, ctx);
 	}
 
-	private void copyPackThroughCache(PackOutputStream out, DfsReader ctx)
-			throws IOException {
+	private MessageDigest initCopyPack(PackOutputStream out, boolean validate,
+			DfsReader ctx) throws IOException {
+		// If the length hasn't been determined yet, pin to set it.
+		if (length == -1)
+			ctx.pin(this, 0);
+		if (!validate) {
+			ctx.unpin();
+			return null;
+		}
+
+		int hdrlen = 12;
+		byte[] buf = out.getCopyBuffer();
+		int n = ctx.copy(this, 0, buf, 0, hdrlen);
+		ctx.unpin();
+		if (n != hdrlen)
+			throw packfileIsTruncated();
+		MessageDigest md = Constants.newMessageDigest();
+		md.update(buf, 0, hdrlen);
+		return md;
+	}
+
+	private long copyPackThroughCache(PackOutputStream out, DfsReader ctx,
+			MessageDigest md) throws IOException {
 		long position = 12;
 		long remaining = length - (12 + 20);
 		while (0 < remaining) {
 			DfsBlock b = cache.getOrLoad(this, position, ctx);
 			int ptr = (int) (position - b.start);
 			int n = (int) Math.min(b.size() - ptr, remaining);
-			b.write(out, position, n);
+			b.write(out, position, n, md);
 			position += n;
 			remaining -= n;
 		}
+		return position;
 	}
 
-	private long copyPackBypassCache(PackOutputStream out, DfsReader ctx)
-			throws IOException {
+	private long copyPackBypassCache(PackOutputStream out, DfsReader ctx,
+			MessageDigest md) throws IOException {
 		try (ReadableChannel rc = ctx.db.openFile(packDesc, PACK)) {
-			ByteBuffer buf = newCopyBuffer(out, rc);
-			if (ctx.getOptions().getStreamPackBufferSize() > 0)
-				rc.setReadAheadBytes(ctx.getOptions().getStreamPackBufferSize());
+			ByteBuffer buf = newCopyBuffer(out, rc, ctx);
 			long position = 12;
 			long remaining = length - (12 + 20);
 			while (0 < remaining) {
@@ -504,7 +524,7 @@ public final class DfsPackFile {
 				if (b != null) {
 					int ptr = (int) (position - b.start);
 					int n = (int) Math.min(b.size() - ptr, remaining);
-					b.write(out, position, n);
+					b.write(out, position, n, md);
 					position += n;
 					remaining -= n;
 					rc.position(position);
@@ -518,6 +538,8 @@ public final class DfsPackFile {
 				else if (n > remaining)
 					n = (int) remaining;
 				out.write(buf.array(), 0, n);
+				if (md != null)
+					md.update(buf.array(), 0, n);
 				position += n;
 				remaining -= n;
 			}
@@ -525,12 +547,33 @@ public final class DfsPackFile {
 		}
 	}
 
-	private ByteBuffer newCopyBuffer(PackOutputStream out, ReadableChannel rc) {
+	private ByteBuffer newCopyBuffer(PackOutputStream out, ReadableChannel rc,
+			DfsReader ctx) {
 		int bs = blockSize(rc);
+		int bufferSize = ctx.getOptions().getStreamPackBufferSize();
+		if (bufferSize > bs)
+			bs = (bufferSize / bs) * bs;
+
 		byte[] copyBuf = out.getCopyBuffer();
 		if (bs > copyBuf.length)
 			copyBuf = new byte[bs];
 		return ByteBuffer.wrap(copyBuf, 0, bs);
+	}
+
+	private void verifyPackChecksum(long position, MessageDigest md,
+			DfsReader ctx) throws IOException {
+		if (md != null) {
+			byte[] buf = new byte[20];
+			byte[] actHash = md.digest();
+			if (ctx.copy(this, position, buf, 0, 20) != 20)
+				throw packfileIsTruncated();
+			if (!Arrays.equals(actHash, buf)) {
+				invalid = true;
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packfileCorruptionDetected,
+						getPackName()));
+			}
+		}
 	}
 
 	void copyAsIs(PackOutputStream out, DfsObjectToPack src,
@@ -566,26 +609,22 @@ public final class DfsPackFile {
 				c = buf[headerCnt++] & 0xff;
 			} while ((c & 128) != 0);
 			if (validate) {
-				assert(crc1 != null && crc2 != null);
 				crc1.update(buf, 0, headerCnt);
 				crc2.update(buf, 0, headerCnt);
 			}
 		} else if (typeCode == Constants.OBJ_REF_DELTA) {
 			if (validate) {
-				assert(crc1 != null && crc2 != null);
 				crc1.update(buf, 0, headerCnt);
 				crc2.update(buf, 0, headerCnt);
 			}
 
 			readFully(src.offset + headerCnt, buf, 0, 20, ctx);
 			if (validate) {
-				assert(crc1 != null && crc2 != null);
 				crc1.update(buf, 0, 20);
 				crc2.update(buf, 0, 20);
 			}
 			headerCnt += 20;
 		} else if (validate) {
-			assert(crc1 != null && crc2 != null);
 			crc1.update(buf, 0, headerCnt);
 			crc2.update(buf, 0, headerCnt);
 		}
@@ -602,7 +641,6 @@ public final class DfsPackFile {
 			quickCopy = ctx.quickCopy(this, dataOffset, dataLength);
 
 			if (validate && idx(ctx).hasCRC32Support()) {
-				assert(crc1 != null);
 				// Index has the CRC32 code cached, validate the object.
 				//
 				expectedCRC = idx(ctx).findCRC32(src);
@@ -626,7 +664,6 @@ public final class DfsPackFile {
 							Long.valueOf(src.offset), getPackName()));
 				}
 			} else if (validate) {
-				assert(crc1 != null);
 				// We don't have a CRC32 code in the index, so compute it
 				// now while inflating the raw data to get zlib to tell us
 				// whether or not the data is safe.
@@ -685,7 +722,7 @@ public final class DfsPackFile {
 			// and we have it pinned.  Write this out without copying.
 			//
 			out.writeHeader(src, inflatedLength);
-			quickCopy.write(out, dataOffset, (int) dataLength);
+			quickCopy.write(out, dataOffset, (int) dataLength, null);
 
 		} else if (dataLength <= buf.length) {
 			// Tiny optimization: Lots of objects are very small deltas or
@@ -714,21 +751,16 @@ public final class DfsPackFile {
 			while (cnt > 0) {
 				final int n = (int) Math.min(cnt, buf.length);
 				readFully(pos, buf, 0, n, ctx);
-				if (validate) {
-					assert(crc2 != null);
+				if (validate)
 					crc2.update(buf, 0, n);
-				}
 				out.write(buf, 0, n);
 				pos += n;
 				cnt -= n;
 			}
-			if (validate) {
-				assert(crc2 != null);
-				if (crc2.getValue() != expectedCRC) {
-					throw new CorruptObjectException(MessageFormat.format(
-							JGitText.get().objectAtHasBadZlibStream,
-							Long.valueOf(src.offset), getPackName()));
-				}
+			if (validate && crc2.getValue() != expectedCRC) {
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().objectAtHasBadZlibStream,
+						Long.valueOf(src.offset), getPackName()));
 			}
 		}
 	}
@@ -943,7 +975,6 @@ public final class DfsPackFile {
 			if (data == null)
 				throw new LargeObjectException();
 
-			assert(delta != null);
 			do {
 				// Cache only the base immediately before desired object.
 				if (cached)

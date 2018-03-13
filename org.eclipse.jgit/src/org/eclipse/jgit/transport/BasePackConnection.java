@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -143,9 +141,7 @@ abstract class BasePackConnection extends BaseConnection {
 		final int timeout = transport.getTimeout();
 		if (timeout > 0) {
 			final Thread caller = Thread.currentThread();
-			if (myTimer == null) {
-				myTimer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
-			}
+			myTimer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
 			timeoutIn = new TimeoutInputStream(myIn, myTimer);
 			timeoutOut = new TimeoutOutputStream(myOut, myTimer);
 			timeoutIn.setTimeout(timeout * 1000);
@@ -277,18 +273,6 @@ abstract class BasePackConnection extends BaseConnection {
 		b.append(' ');
 		b.append(option);
 		return true;
-	}
-
-	protected void addUserAgentCapability(StringBuilder b) {
-		String a = UserAgent.get();
-		if (a != null && UserAgent.hasAgent(remoteCapablities)) {
-			b.append(' ').append(OPTION_AGENT).append('=').append(a);
-		}
-	}
-
-	@Override
-	public String getPeerUserAgent() {
-		return UserAgent.getAgent(remoteCapablities, super.getPeerUserAgent());
 	}
 
 	private PackProtocolException duplicateAdvertisement(final String name) {

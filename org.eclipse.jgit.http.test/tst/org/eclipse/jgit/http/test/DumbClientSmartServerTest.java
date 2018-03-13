@@ -199,8 +199,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 				.startsWith("JGit/"));
 		assertEquals("*/*", info.getRequestHeader(HDR_ACCEPT));
 		assertEquals(200, info.getStatus());
-		assertEquals("text/plain; charset=UTF-8",
-				info
+		assertEquals("text/plain;charset=UTF-8", info
 				.getResponseHeader(HDR_CONTENT_TYPE));
 
 		AccessEvent head = requests.get(1);
@@ -225,7 +224,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(dst.hasObject(A_txt));
-		assertEquals(B, dst.exactRef(master).getObjectId());
+		assertEquals(B, dst.getRef(master).getObjectId());
 		fsck(dst, B);
 
 		List<AccessEvent> loose = getRequests(loose(remoteURI, A_txt));
@@ -253,7 +252,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(dst.hasObject(A_txt));
-		assertEquals(B, dst.exactRef(master).getObjectId());
+		assertEquals(B, dst.getRef(master).getObjectId());
 		fsck(dst, B);
 
 		List<AccessEvent> req;
@@ -269,8 +268,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		assertEquals("GET", req.get(0).getMethod());
 		assertEquals(0, req.get(0).getParameters().size());
 		assertEquals(200, req.get(0).getStatus());
-		assertEquals("text/plain; charset=UTF-8",
-				req.get(0).getResponseHeader(
+		assertEquals("text/plain;charset=UTF-8", req.get(0).getResponseHeader(
 				HDR_CONTENT_TYPE));
 	}
 

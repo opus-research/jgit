@@ -477,10 +477,8 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 		checkoutBranch("refs/heads/master");
 
-		MergeResult result = g.merge()
-				.include(db.exactRef("refs/heads/branch1"))
-				.setSquash(true)
-				.call();
+		MergeResult result = g.merge().include(db.getRef("branch1"))
+				.setSquash(true).call();
 
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD_SQUASHED,
 				result.getMergeStatus());
@@ -539,10 +537,16 @@ public class ResetCommandTest extends RepositoryTestCase {
 	 */
 	private boolean inHead(String path) throws IOException {
 		ObjectId headId = db.resolve(Constants.HEAD);
-		try (RevWalk rw = new RevWalk(db);
-				TreeWalk tw = TreeWalk.forPath(db, path,
-						rw.parseTree(headId))) {
+		RevWalk rw = new RevWalk(db);
+		TreeWalk tw = null;
+		try {
+			tw = TreeWalk.forPath(db, path, rw.parseTree(headId));
 			return tw != null;
+		} finally {
+			rw.release();
+			rw.dispose();
+			if (tw != null)
+				tw.release();
 		}
 	}
 

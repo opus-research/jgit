@@ -66,11 +66,174 @@ import org.eclipse.jgit.lib.Repository;
  * @since 3.0
  */
 public class FS_POSIX extends FS {
-	private static final int DEFAULT_UMASK = 0022;
-	private volatile int umask = -1;
 
-	/** Default constructor. */
+	static {
+		String umask = readUmask();
+
+		// umask return value consists of 3 or 4 digits, like "002" or "0002"
+		if (umask != null && umask.length() > 0 && umask.matches("\\d{3,4}")) { //$NON-NLS-1$
+			EXECUTE_FOR_OTHERS = isGranted(PosixFilePermission.OTHERS_EXECUTE,
+					umask);
+			EXECUTE_FOR_GROUP = isGranted(PosixFilePermission.GROUP_EXECUTE,
+					umask);
+		} else {
+			EXECUTE_FOR_OTHERS = null;
+			EXECUTE_FOR_GROUP = null;
+		}
+	}
+
+	/**
+	 * @since 4.0
+	 */
+	protected static final Boolean EXECUTE_FOR_OTHERS;
+
+	/**
+	 * @since 4.0
+	 */
+	protected static final Boolean EXECUTE_FOR_GROUP;
+
+	@Override
+	public FS newInstance() {
+		return new FS_POSIX();
+	}
+
+	/**
+	 * Derives requested permission from given octal umask value as defined e.g.
+	 * in <a href="http://linux.die.net/man/2/umask">http://linux.die.net/man/2/
+	 * umask</a>.
+	 * <p>
+	 * The umask expected here must consist of 3 or 4 digits. Last three digits
+	 * are significant here because they represent file permissions granted to
+	 * the "owner", "group" and "others" (in this order).
+	 * <p>
+	 * Each single digit from the umask represents 3 bits of the mask standing
+	 * for "<b>r</b>ead, <b>w</b>rite, e<b>x</b>ecute" permissions (in this
+	 * order).
+	 * <p>
+	 * The possible umask values table:
+	 *
+	 * <pre>
+	 * Value : Bits:Abbr.: Permission
+	 *     0 : 000 :rwx  : read, write and execute
+	 *     1 : 001 :rw   : read and write
+	 *     2 : 010 :rx   : read and execute
+	 *     3 : 011 :r    : read only
+	 *     4 : 100 :wx   : write and execute
+	 *     5 : 101 :w    : write only
+	 *     6 : 110 :x    : execute only
+	 *     7 : 111 :     : no permissions
+	 * </pre>
+	 * <p>
+	 * Note, that umask value is used to "mask" the requested permissions on
+	 * file creation by combining the requested permission bit with the
+	 * <b>negated</b> value of the umask bit.
+	 * <p>
+	 * Simply speaking, if a bit is <b>not</b> set in the umask, then the
+	 * appropriate right <b>will</b> be granted <b>if</b> requested. If a bit is
+	 * set in the umask value, then the appropriate permission will be not
+	 * granted.
+	 * <p>
+	 * Example:
+	 * <li>umask 023 ("000 010 011" or rwx rx r) combined with the request to
+	 * create an executable file with full set of permissions for everyone (777)
+	 * results in the file with permissions 754 (rwx rx r).
+	 * <li>umask 002 ("000 000 010" or rwx rwx rx) combined with the request to
+	 * create an executable file with full set of permissions for everyone (777)
+	 * results in the file with permissions 775 (rwx rwx rx).
+	 * <li>umask 002 ("000 000 010" or rwx rwx rx) combined with the request to
+	 * create a file without executable rights for everyone (666) results in the
+	 * file with permissions 664 (rw rw r).
+	 *
+	 * @param p
+	 *            non null permission
+	 * @param umask
+	 *            octal umask value represented by at least three digits. The
+	 *            digits (read from the end to beginning of the umask) represent
+	 *            permissions for "others", "group" and "owner".
+	 *
+	 * @return true if the requested permission is set according to given umask
+	 * @since 4.0
+	 */
+	protected static Boolean isGranted(PosixFilePermission p, String umask) {
+		char val;
+		switch (p) {
+		case OTHERS_EXECUTE:
+			// Read last digit, because umask is ordered as: User/Group/Others.
+			val = umask.charAt(umask.length() - 1);
+			return isExecuteGranted(val);
+		case GROUP_EXECUTE:
+			val = umask.charAt(umask.length() - 2);
+			return isExecuteGranted(val);
+		default:
+			throw new UnsupportedOperationException(
+					"isGranted() for " + p + " is not implemented!"); //$NON-NLS-1$ //$NON-NLS-2$
+		}
+	}
+
+	/**
+	 * @param c
+	 *            character representing octal permission value from the table
+	 *            in {@link #isGranted(PosixFilePermission, String)}
+	 * @return true if the "execute" permission is granted according to given
+	 *         character
+	 */
+	private static Boolean isExecuteGranted(char c) {
+		if (c == '0' || c == '2' || c == '4' || c == '6')
+			return Boolean.TRUE;
+		return Boolean.FALSE;
+	}
+
+	/**
+	 * @return umask returned from running umask command in a shell
+	 * @since 4.0
+	 */
+	protected static String readUmask() {
+		Process p;
+		try {
+			p = Runtime.getRuntime().exec(
+					new String[] { "sh", "-c", "umask" }, null, null); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			try (BufferedReader lineRead = new BufferedReader(
+					new InputStreamReader(p.getInputStream(), Charset
+							.defaultCharset().name()))) {
+				p.waitFor();
+				return lineRead.readLine();
+			}
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	@Override
+	protected File discoverGitPrefix() {
+		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
+		File gitExe = searchPath(path, "git"); //$NON-NLS-1$
+		if (gitExe != null)
+			return gitExe.getParentFile().getParentFile();
+
+		if (SystemReader.getInstance().isMacOS()) {
+			// On MacOSX, PATH is shorter when Eclipse is launched from the
+			// Finder than from a terminal. Therefore try to launch bash as a
+			// login shell and search using that.
+			//
+			String w = readPipe(userHome(), //
+					new String[] { "bash", "--login", "-c", "which git" }, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+					Charset.defaultCharset().name());
+			if (w == null || w.length() == 0)
+				return null;
+			File parentFile = new File(w).getParentFile();
+			if (parentFile == null)
+				return null;
+			return parentFile.getParentFile();
+		}
+
+		return null;
+	}
+
+	/**
+	 * Default constructor
+	 */
 	protected FS_POSIX() {
+		super();
 	}
 
 	/**
@@ -81,79 +244,6 @@ public class FS_POSIX extends FS {
 	 */
 	protected FS_POSIX(FS src) {
 		super(src);
-		if (src instanceof FS_POSIX) {
-			umask = ((FS_POSIX) src).umask;
-		}
-	}
-
-	@Override
-	public FS newInstance() {
-		return new FS_POSIX(this);
-	}
-
-	/**
-	 * Set the umask, overriding any value observed from the shell.
-	 *
-	 * @param umask
-	 *            mask to apply when creating files.
-	 * @since 4.0
-	 */
-	public void setUmask(int umask) {
-		this.umask = umask;
-	}
-
-	private int umask() {
-		int u = umask;
-		if (u == -1) {
-			u = readUmask();
-			umask = u;
-		}
-		return u;
-	}
-
-	/** @return mask returned from running {@code umask} command in shell. */
-	private static int readUmask() {
-		try {
-			Process p = Runtime.getRuntime().exec(
-					new String[] { "sh", "-c", "umask" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-					null, null);
-			try (BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), Charset
-							.defaultCharset().name()))) {
-				if (p.waitFor() == 0) {
-					String s = lineRead.readLine();
-					if (s.matches("0?\\d{3}")) { //$NON-NLS-1$
-						return Integer.parseInt(s, 8);
-					}
-				}
-				return DEFAULT_UMASK;
-			}
-		} catch (Exception e) {
-			return DEFAULT_UMASK;
-		}
-	}
-
-	@Override
-	protected File discoverGitExe() {
-		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
-		File gitExe = searchPath(path, "git"); //$NON-NLS-1$
-
-		if (gitExe == null) {
-			if (SystemReader.getInstance().isMacOS()) {
-				if (searchPath(path, "bash") != null) { //$NON-NLS-1$
-					// On MacOSX, PATH is shorter when Eclipse is launched from the
-					// Finder than from a terminal. Therefore try to launch bash as a
-					// login shell and search using that.
-					String w = readPipe(userHome(),
-							new String[]{"bash", "--login", "-c", "which git"}, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-							Charset.defaultCharset().name());
-					if (!StringUtils.isEmptyOrNull(w))
-						gitExe = new File(w);
-				}
-			}
-		}
-
-		return gitExe;
 	}
 
 	@Override
@@ -168,47 +258,42 @@ public class FS_POSIX extends FS {
 
 	@Override
 	public boolean canExecute(File f) {
-		return FileUtils.canExecute(f);
+		return FileUtil.canExecute(f);
 	}
 
 	@Override
 	public boolean setExecute(File f, boolean canExecute) {
 		if (!isFile(f))
 			return false;
-		if (!canExecute)
-			return f.setExecutable(false);
+		// only if the execute has to be set, and we know the umask
+		if (canExecute && EXECUTE_FOR_OTHERS != null) {
+			try {
+				Path path = f.toPath();
+				Set<PosixFilePermission> pset = Files
+						.getPosixFilePermissions(path);
+				// user is always allowed to set execute
+				pset.add(PosixFilePermission.OWNER_EXECUTE);
 
-		try {
-			Path path = f.toPath();
-			Set<PosixFilePermission> pset = Files.getPosixFilePermissions(path);
+				if (EXECUTE_FOR_GROUP.booleanValue())
+					pset.add(PosixFilePermission.GROUP_EXECUTE);
 
-			// owner (user) is always allowed to execute.
-			pset.add(PosixFilePermission.OWNER_EXECUTE);
+				if (EXECUTE_FOR_OTHERS.booleanValue())
+					pset.add(PosixFilePermission.OTHERS_EXECUTE);
 
-			int mask = umask();
-			apply(pset, mask, PosixFilePermission.GROUP_EXECUTE, 1 << 3);
-			apply(pset, mask, PosixFilePermission.OTHERS_EXECUTE, 1);
-			Files.setPosixFilePermissions(path, pset);
-			return true;
-		} catch (IOException e) {
-			// The interface doesn't allow to throw IOException
-			final boolean debug = Boolean.parseBoolean(SystemReader
-					.getInstance().getProperty("jgit.fs.debug")); //$NON-NLS-1$
-			if (debug)
-				System.err.println(e);
-			return false;
+				Files.setPosixFilePermissions(path, pset);
+				return true;
+			} catch (IOException e) {
+				// The interface doesn't allow to throw IOException
+				final boolean debug = Boolean.parseBoolean(SystemReader
+						.getInstance().getProperty("jgit.fs.debug")); //$NON-NLS-1$
+				if (debug)
+					System.err.println(e);
+				return false;
+			}
 		}
-	}
-
-	private static void apply(Set<PosixFilePermission> set,
-			int umask, PosixFilePermission perm, int test) {
-		if ((umask & test) == 0) {
-			// If bit is clear in umask, permission is allowed.
-			set.add(perm);
-		} else {
-			// If bit is set in umask, permission is denied.
-			set.remove(perm);
-		}
+		// if umask is not working for some reason: fall back to default (buggy)
+		// implementation which does not consider umask: see bug 424395
+		return f.setExecutable(canExecute);
 	}
 
 	@Override
@@ -246,8 +331,63 @@ public class FS_POSIX extends FS {
 	}
 
 	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		// no action on POSIX
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 
 	/**
@@ -255,7 +395,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public Attributes getAttributes(File path) {
-		return FileUtils.getFileAttributesPosix(this, path);
+		return FileUtil.getFileAttributesPosix(this, path);
 	}
 
 	/**
@@ -263,7 +403,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public File normalize(File file) {
-		return FileUtils.normalize(file);
+		return FileUtil.normalize(file);
 	}
 
 	/**
@@ -271,7 +411,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public String normalize(String name) {
-		return FileUtils.normalize(name);
+		return FileUtil.normalize(name);
 	}
 
 	/**
@@ -280,9 +420,6 @@ public class FS_POSIX extends FS {
 	@Override
 	public File findHook(Repository repository, String hookName) {
 		final File gitdir = repository.getDirectory();
-		if (gitdir == null) {
-			return null;
-		}
 		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
 				.resolve(hookName);
 		if (Files.isExecutable(hookPath))

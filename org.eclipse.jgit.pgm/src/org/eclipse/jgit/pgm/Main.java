@@ -47,23 +47,20 @@ package org.eclipse.jgit.pgm;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.awtui.AwtAuthenticator;
-import org.eclipse.jgit.awtui.AwtCredentialsProvider;
+import org.eclipse.jgit.console.ConsoleAuthenticator;
+import org.eclipse.jgit.console.ConsoleCredentialsProvider;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.pgm.opt.SubcommandHandler;
-import org.eclipse.jgit.transport.HttpTransport;
-import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
 import org.eclipse.jgit.util.CachedAuthenticator;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -97,7 +94,6 @@ public class Main {
 	 *            arguments.
 	 */
 	public static void main(final String[] argv) {
-		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
 		new Main().run(argv);
 	}
 
@@ -119,10 +115,8 @@ public class Main {
 	 */
 	protected void run(final String[] argv) {
 		try {
-			if (!installConsole()) {
-				AwtAuthenticator.install();
-				AwtCredentialsProvider.install();
-			}
+			ConsoleAuthenticator.install();
+			ConsoleCredentialsProvider.install();
 			configureHttpProxy();
 			execute(argv);
 		} catch (Die err) {
@@ -170,7 +164,7 @@ public class Main {
 	}
 
 	private void execute(final String[] argv) throws Exception {
-		final CmdLineParser clp = new SubcommandLineParser(this);
+		final CmdLineParser clp = new CmdLineParser(this);
 		PrintWriter writer = new PrintWriter(System.err);
 		try {
 			clp.parseArgument(argv);
@@ -184,7 +178,7 @@ public class Main {
 
 		if (argv.length == 0 || help) {
 			final String ex = clp.printExample(ExampleMode.ALL, CLIText.get().resourceBundle());
-			writer.println("jgit" + ex + " command [ARG ...]"); //$NON-NLS-1$ //$NON-NLS-2$
+			writer.println("jgit" + ex + " command [ARG ...]"); //$NON-NLS-1$
 			if (help) {
 				writer.println();
 				clp.printUsage(writer, CLIText.get().resourceBundle());
@@ -252,102 +246,42 @@ public class Main {
 		return rb.build();
 	}
 
-	private static boolean installConsole() {
-		try {
-			install("org.eclipse.jgit.console.ConsoleAuthenticator"); //$NON-NLS-1$
-			install("org.eclipse.jgit.console.ConsoleCredentialsProvider"); //$NON-NLS-1$
-			return true;
-		} catch (ClassNotFoundException e) {
-			return false;
-		} catch (NoClassDefFoundError e) {
-			return false;
-		} catch (UnsupportedClassVersionError e) {
-			return false;
-
-		} catch (IllegalArgumentException e) {
-			throw new RuntimeException(CLIText.get().cannotSetupConsole, e);
-		} catch (SecurityException e) {
-			throw new RuntimeException(CLIText.get().cannotSetupConsole, e);
-		} catch (IllegalAccessException e) {
-			throw new RuntimeException(CLIText.get().cannotSetupConsole, e);
-		} catch (InvocationTargetException e) {
-			throw new RuntimeException(CLIText.get().cannotSetupConsole, e);
-		} catch (NoSuchMethodException e) {
-			throw new RuntimeException(CLIText.get().cannotSetupConsole, e);
-		}
-	}
-
-	private static void install(final String name)
-			throws IllegalAccessException, InvocationTargetException,
-			NoSuchMethodException, ClassNotFoundException {
-		try {
-		Class.forName(name).getMethod("install").invoke(null); //$NON-NLS-1$
-		} catch (InvocationTargetException e) {
-			if (e.getCause() instanceof RuntimeException)
-				throw (RuntimeException) e.getCause();
-			if (e.getCause() instanceof Error)
-				throw (Error) e.getCause();
-			throw e;
-		}
-	}
-
 	/**
 	 * Configure the JRE's standard HTTP based on <code>http_proxy</code>.
 	 * <p>
-	 * The popular libcurl library honors the <code>http_proxy</code>,
-	 * <code>https_proxy</code> environment variables as a means of specifying
-	 * an HTTP/S proxy for requests made behind a firewall. This is not natively
-	 * recognized by the JRE, so this method can be used by command line
-	 * utilities to configure the JRE before the first request is sent.
+	 * The popular libcurl library honors the <code>http_proxy</code>
+	 * environment variable as a means of specifying an HTTP proxy for requests
+	 * made behind a firewall. This is not natively recognized by the JRE, so
+	 * this method can be used by command line utilities to configure the JRE
+	 * before the first request is sent.
 	 *
 	 * @throws MalformedURLException
-	 *             the value in <code>http_proxy</code> or
-	 *             <code>https_proxy</code> is unsupportable.
+	 *             the value in <code>http_proxy</code> is unsupportable.
 	 */
 	private static void configureHttpProxy() throws MalformedURLException {
-		for (String protocol : new String[] { "http", "https" }) { //$NON-NLS-1$ //$NON-NLS-2$
-			final String s = System.getenv(protocol + "_proxy"); //$NON-NLS-1$
-			if (s == null || s.equals("")) //$NON-NLS-1$
-				return;
+		final String s = System.getenv("http_proxy"); //$NON-NLS-1$
+		if (s == null || s.equals("")) //$NON-NLS-1$
+			return;
 
-			final URL u = new URL(
-					(s.indexOf("://") == -1) ? protocol + "://" + s : s); //$NON-NLS-1$ //$NON-NLS-2$
-			if (!u.getProtocol().startsWith("http")) //$NON-NLS-1$
-				throw new MalformedURLException(MessageFormat.format(
-						CLIText.get().invalidHttpProxyOnlyHttpSupported, s));
+		final URL u = new URL((s.indexOf("://") == -1) ? "http://" + s : s); //$NON-NLS-1$ //$NON-NLS-2$
+		if (!"http".equals(u.getProtocol())) //$NON-NLS-1$
+			throw new MalformedURLException(MessageFormat.format(CLIText.get().invalidHttpProxyOnlyHttpSupported, s));
 
-			final String proxyHost = u.getHost();
-			final int proxyPort = u.getPort();
+		final String proxyHost = u.getHost();
+		final int proxyPort = u.getPort();
 
-			System.setProperty(protocol + ".proxyHost", proxyHost); //$NON-NLS-1$
-			if (proxyPort > 0)
-				System.setProperty(protocol + ".proxyPort", //$NON-NLS-1$
-						String.valueOf(proxyPort));
+		System.setProperty("http.proxyHost", proxyHost); //$NON-NLS-1$
+		if (proxyPort > 0)
+			System.setProperty("http.proxyPort", String.valueOf(proxyPort)); //$NON-NLS-1$
 
-			final String userpass = u.getUserInfo();
-			if (userpass != null && userpass.contains(":")) { //$NON-NLS-1$
-				final int c = userpass.indexOf(':');
-				final String user = userpass.substring(0, c);
-				final String pass = userpass.substring(c + 1);
-				CachedAuthenticator.add(
-						new CachedAuthenticator.CachedAuthentication(proxyHost,
-								proxyPort, user, pass));
-			}
-		}
-	}
-
-	/**
-	 * Parser for subcommands which doesn't stop parsing on help options and so
-	 * proceeds all specified options
-	 */
-	static class SubcommandLineParser extends CmdLineParser {
-		public SubcommandLineParser(Object bean) {
-			super(bean);
-		}
-
-		@Override
-		protected boolean containsHelp(String... args) {
-			return false;
+		final String userpass = u.getUserInfo();
+		if (userpass != null && userpass.contains(":")) { //$NON-NLS-1$
+			final int c = userpass.indexOf(':');
+			final String user = userpass.substring(0, c);
+			final String pass = userpass.substring(c + 1);
+			CachedAuthenticator
+					.add(new CachedAuthenticator.CachedAuthentication(
+							proxyHost, proxyPort, user, pass));
 		}
 	}
 }

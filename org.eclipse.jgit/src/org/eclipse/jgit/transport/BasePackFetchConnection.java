@@ -193,13 +193,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 
-	/**
-	 * The client supports fetching objects that are reachable from a tip of a
-	 * ref that is allowed to fetch.
-	 * @since 4.1
-	 */
-	public static final String OPTION_ALLOW_REACHABLE_SHA1_IN_WANT = GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
-
 	private final RevWalk walk;
 
 	/** All commits that are immediately reachable by a local ref. */
@@ -464,12 +457,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		final PacketLineOut p = statelessRPC ? pckState : pckOut;
 		boolean first = true;
 		for (final Ref r : want) {
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				continue;
-			}
 			try {
-				if (walk.parseAny(objectId).has(REACHABLE)) {
+				if (walk.parseAny(r.getObjectId()).has(REACHABLE)) {
 					// We already have this object. Asking for it is
 					// not a very good idea.
 					//
@@ -482,7 +471,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 			final StringBuilder line = new StringBuilder(46);
 			line.append("want "); //$NON-NLS-1$
-			line.append(objectId.name());
+			line.append(r.getObjectId().name());
 			if (first) {
 				line.append(enableCapabilities());
 				first = false;
@@ -532,7 +521,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					OPTION_MULTI_ACK_DETAILED));
 		}
 
-		addUserAgentCapability(line);
 		return line.toString();
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,24 +41,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.api;
 
-/**
- * Simple set of ObjectIds.
- * <p>
- * Usually backed by a read-only data structure such as
- * {@link org.eclipse.jgit.internal.storage.file.PackIndex}. Mutable types like
- * {@link ObjectIdOwnerMap} also implement the interface by checking keys.
- *
- * @since 4.2
- */
-public interface ObjectIdSet {
-	/**
-	 * Returns true if the objectId is contained within the collection.
-	 *
-	 * @param objectId
-	 *            the objectId to find
-	 * @return whether the collection contains the objectId.
-	 */
-	boolean contains(AnyObjectId objectId);
+import java.util.HashSet;
+import java.util.Set;
+
+class Sets {
+	static <T> Set<T> of(T... elements) {
+		Set<T> ret = new HashSet<T>();
+		for (T element : elements)
+			ret.add(element);
+		return ret;
+	}
 }
