@@ -967,7 +967,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		RefUpdate ru = db.updateRef(name);
 		ru.setNewObjectId(bad);
 		Result update = ru.update();
-		assertEquals(Result.REJECTED_MISSING_OBJECT, update);
+		assertEquals(Result.REJECTED, update);
 
 		Ref ref = db.exactRef(name);
 		assertNull(ref);
@@ -986,7 +986,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		ru = db.updateRef(name);
 		ru.setNewObjectId(bad);
 		update = ru.update();
-		assertEquals(Result.REJECTED_MISSING_OBJECT, update);
+		assertEquals(Result.REJECTED, update);
 
 		Ref ref = db.exactRef(name);
 		assertNotNull(ref);
@@ -1006,7 +1006,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		ru = db.updateRef(name);
 		ru.setNewObjectId(bad);
 		update = ru.forceUpdate();
-		assertEquals(Result.REJECTED_MISSING_OBJECT, update);
+		assertEquals(Result.REJECTED, update);
 
 		Ref ref = db.exactRef(name);
 		assertNotNull(ref);
