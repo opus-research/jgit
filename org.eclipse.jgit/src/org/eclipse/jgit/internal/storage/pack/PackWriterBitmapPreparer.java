@@ -363,9 +363,7 @@ class PackWriterBitmapPreparer {
 	private CommitSelectionHelper setupTipCommitBitmaps(RevWalk rw,
 			int expectedCommitCount) throws IncorrectObjectTypeException,
 					IOException, MissingObjectException {
-		final BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
-		rw.setRevFilter(new ExcludeBitmapRevFilter(reuse));
-
+		BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
 		List<BitmapCommit> reuseCommits = new ArrayList<BitmapCommit>();
 		for (PackBitmapIndexRemapper.Entry entry : bitmapRemapper) {
 			// More recent commits did not have the reuse flag set, so skip them
@@ -379,6 +377,7 @@ class PackWriterBitmapPreparer {
 
 			RevCommit rc = (RevCommit) ro;
 			reuseCommits.add(new BitmapCommit(rc, false, entry.getFlags()));
+			rw.markUninteresting(rc);
 			// PackBitmapIndexRemapper.ofObjectType() ties the underlying
 			// bitmap in the old pack into the new bitmap builder.
 			bitmapRemapper.ofObjectType(bitmapRemapper.getBitmap(rc),
@@ -410,6 +409,7 @@ class PackWriterBitmapPreparer {
 		// Create a list of commits in reverse order (older to newer).
 		// For each branch that contains the commit, mark its parents as being
 		// in the bitmap.
+		rw.setRevFilter(new ExcludeBitmapRevFilter(reuse));
 		RevCommit[] commits = new RevCommit[expectedCommitCount];
 		int pos = commits.length;
 		RevCommit rc;
