@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,80 +41,91 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lfs;
 
-package org.eclipse.jgit.internal.storage.dfs;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
+/**
+ * This interface describes the network protocol used between lfs client and lfs
+ * server
+ *
+ * @since 4.6
+ */
+public interface Protocol {
+	/** A request sent to an LFS server */
+	class Request {
+		/** The operation of this request */
+		public String operation;
 
-/** Tracks multiple open {@link Reftable} instances. */
-public class ReftableStack implements AutoCloseable {
-	/**
-	 * Opens a stack of tables for reading.
-	 *
-	 * @param ctx
-	 *            context to read the tables with. This {@code ctx} will be
-	 *            retained by the stack and each of the table readers.
-	 * @param files
-	 *            the tables to open.
-	 * @return stack reference to close the tables.
-	 * @throws IOException
-	 *             a table could not be opened
-	 */
-	public static ReftableStack open(DfsReader ctx, List<DfsReftable> files)
-			throws IOException {
-		ReftableStack stack = new ReftableStack(files.size());
-		boolean close = true;
-		try {
-			for (DfsReftable t : files) {
-				stack.files.add(t);
-				stack.tables.add(t.open(ctx));
-			}
-			close = false;
-			return stack;
-		} finally {
-			if (close) {
-				stack.close();
-			}
-		}
+		/** The objects of this request */
+		public List<ObjectSpec> objects;
 	}
 
-	private final List<DfsReftable> files;
-	private final List<Reftable> tables;
-
-	private ReftableStack(int tableCnt) {
-		this.files = new ArrayList<>(tableCnt);
-		this.tables = new ArrayList<>(tableCnt);
+	/** A response received from an LFS server */
+	class Response {
+		public List<ObjectInfo> objects;
 	}
 
 	/**
-	 * @return unmodifiable list of DfsRefatble files, in the same order the
-	 *         files were passed to {@link #open(DfsReader, List)}.
+	 * MetaData of an LFS object. Needs to be specified when requesting objects
+	 * from the LFS server and is also returned in the response
 	 */
-	public List<DfsReftable> files() {
-		return Collections.unmodifiableList(files);
+	class ObjectSpec {
+		public String oid; // the objectid
+
+		public long size; // the size of the object
 	}
 
 	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
+	 * Describes in a response all actions the LFS server offers for a single
+	 * object
 	 */
-	public List<Reftable> readers() {
-		return Collections.unmodifiableList(tables);
+	class ObjectInfo extends ObjectSpec {
+		public Map<String, Action> actions; // Maps operation to action
+
+		public Error error;
 	}
 
-	@Override
-	public void close() {
-		for (Reftable t : tables) {
-			try {
-				t.close();
-			} catch (IOException e) {
-				// Ignore close failures.
-			}
-		}
+	/**
+	 * Describes in a Response a single action the client can execute on a
+	 * single object
+	 */
+	class Action {
+		public String href;
+
+		public Map<String, String> header;
 	}
+
+	/** Describes an error to be returned by the LFS batch API */
+	class Error {
+		public int code;
+
+		public String message;
+	}
+
+	/**
+	 * The "download" operation
+	 */
+	String OPERATION_DOWNLOAD = "download"; //$NON-NLS-1$
+
+	/**
+	 * The "upload" operation
+	 */
+	String OPERATION_UPLOAD = "upload"; //$NON-NLS-1$
+
+	/**
+	 * The contenttype used in LFS requests
+	 */
+	String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
+
+	/**
+	 * Authorization header when auto-discovering via SSH.
+	 */
+	String HDR_AUTH = "Authorization"; //$NON-NLS-1$
+
+	/**
+	 * Prefix of authentication token obtained through SSH.
+	 */
+	String HDR_AUTH_SSH_PREFIX = "Ssh: "; //$NON-NLS-1$
 }
