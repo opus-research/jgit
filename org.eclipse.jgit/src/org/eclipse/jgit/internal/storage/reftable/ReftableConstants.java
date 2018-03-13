@@ -44,14 +44,13 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 class ReftableConstants {
-	static final byte[] FILE_HEADER_MAGIC = { '\1', 'R', 'E', 'F' };
+	static final byte[] FILE_HEADER_MAGIC = { 'R', 'E', 'F', 'T' };
 	static final byte VERSION_1 = (byte) 1;
 
-	static final int FILE_HEADER_LEN = 8;
-	static final int FILE_FOOTER_LEN = 52;
-	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
+	static final int FILE_HEADER_LEN = 24;
+	static final int FILE_FOOTER_LEN = 68;
 
-	static final byte FILE_BLOCK_TYPE = '\1';
+	static final byte FILE_BLOCK_TYPE = 'R';
 	static final byte REF_BLOCK_TYPE = 'r';
 	static final byte OBJ_BLOCK_TYPE = 'o';
 	static final byte LOG_BLOCK_TYPE = 'g';
@@ -61,10 +60,26 @@ class ReftableConstants {
 	static final int VALUE_1ID = 0x1;
 	static final int VALUE_2ID = 0x2;
 	static final int VALUE_TEXT = 0x3;
-	static final int VALUE_INDEX_RECORD = 0x4;
-	static final int VALUE_LOG_RECORD = 0x5;
 	static final int VALUE_TYPE_MASK = 0x7;
 
+	static final int LOG_NONE = 0x0;
+	static final int LOG_DATA = 0x1;
+
+	/**
+	 * Chained log records, reusing data from more recent record.
+	 *
+	 * <pre>
+	 * 100b -> chained ids, moreRecent old is this new (0x4)
+	 * 101b -> same committer (| 0x1)
+	 * 110b -> same message (| 0x2)
+	 * </pre>
+	 */
+	static final int LOG_CHAINED = 0x4;
+	static final int LOG_SAME_COMMITTER = 0x1;
+	static final int LOG_SAME_MESSAGE = 0x2;
+
+	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
+	static final int MAX_INDEX_SIZE = 0x7fffffff;
 	static final int MAX_RESTARTS = 65535;
 
 	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
@@ -75,7 +90,7 @@ class ReftableConstants {
 				&& buf[o + 3] == FILE_HEADER_MAGIC[3];
 	}
 
-	static long reverseTime(long time) {
+	static long reverseUpdateIndex(long time) {
 		return 0xffffffffffffffffL - time;
 	}
 

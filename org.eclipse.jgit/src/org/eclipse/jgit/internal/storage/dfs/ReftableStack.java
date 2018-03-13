@@ -41,103 +41,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.internal.storage.dfs;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.internal.storage.io.BlockSource;
+import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
 
-class MemoryReftable {
-	final int blockSize;
-	final List<byte[]> blocks;
-	long size;
-	byte[] buf;
-	int bufPtr;
-
-	MemoryReftable(int blockSize) {
-		this.blockSize = blockSize;
-
-		buf = new byte[blockSize];
-		blocks = new ArrayList<>();
-		blocks.add(buf);
-	}
-
-	void checkBuffer() {
-		if (bufPtr == blockSize) {
-			bufPtr = 0;
-			buf = new byte[blockSize];
-			blocks.add(buf);
+/** Tracks multiple open {@link ReftableReader} instances. */
+public class ReftableStack implements AutoCloseable {
+	/**
+	 * Opens a stack of tables for reading.
+	 *
+	 * @param ctx
+	 *            context to read the tables with. This {@code ctx} will be
+	 *            retained by the stack and each of the table readers.
+	 * @param tables
+	 *            the tables to open.
+	 * @return stack reference to close the tables.
+	 * @throws IOException
+	 *             a table could not be opened
+	 */
+	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
+			throws IOException {
+		ReftableStack stack = new ReftableStack(tables.size());
+		boolean close = true;
+		try {
+			for (DfsReftable t : tables) {
+				stack.tables.add(t.open(ctx));
+			}
+			close = false;
+			return stack;
+		} finally {
+			if (close) {
+				stack.close();
+			}
 		}
 	}
 
-	OutputStream getOutput() {
-		return new OutputStream() {
-			@Override
-			public void write(int b) {
-				checkBuffer();
-				buf[bufPtr++] = (byte) b;
-				size++;
-			}
+	private final List<ReftableReader> tables;
 
-			@Override
-			public void write(byte[] src, int p, int n) {
-				while (n > 0) {
-					checkBuffer();
-					int c = Math.min(n, blockSize - bufPtr);
-					System.arraycopy(src, p, buf, bufPtr, c);
-					bufPtr += c;
-					size += c;
-					n -= c;
-					p += c;
-				}
-			}
-		};
+	private ReftableStack(int tableCnt) {
+		this.tables = new ArrayList<>(tableCnt);
 	}
 
-	BlockSource getBlockSource() {
-		return new BlockSource() {
-			@Override
-			public ByteBuffer read(long pos, int sz) {
-				if (pos >= size) {
-					return ByteBuffer.allocate(0);
-				}
+	/**
+	 * @return unmodifiable list of table readers, in the same order the files
+	 *         were passed to {@link #open(DfsReader, List)}.
+	 */
+	public List<ReftableReader> readers() {
+		return Collections.unmodifiableList(tables);
+	}
 
-				int idx = (int) (pos / blockSize);
-				int ptr = (int) (pos - (idx * blockSize));
-				byte[] src = blocks.get(idx);
-				int len = src == buf ? bufPtr : blockSize;
-				if (ptr == 0 && sz <= len) {
-					ByteBuffer b = ByteBuffer.wrap(src);
-					b.position(Math.min(sz, len));
-					return b;
-				}
-
-				ByteBuffer b = ByteBuffer.allocate(sz);
-				while (pos < size && b.hasRemaining()) {
-					idx = (int) (pos / blockSize);
-					ptr = (int) (pos - (idx * blockSize));
-					src = blocks.get(idx);
-					len = src == buf ? bufPtr : blockSize;
-					int n = Math.min(b.remaining(), len);
-					b.put(src, ptr, n);
-					pos += n;
-				}
-				return b;
+	@Override
+	public void close() {
+		for (ReftableReader t : tables) {
+			try {
+				t.close();
+			} catch (IOException e) {
+				// Ignore close failures.
 			}
-
-			@Override
-			public long size() throws IOException {
-				return size;
-			}
-
-			@Override
-			public void close() {
-				// Do nothing.
-			}
-		};
+		}
 	}
 }

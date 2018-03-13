@@ -126,10 +126,11 @@ public class MergedReftable extends Reftable {
 	}
 
 	@Override
-	public LogCursor seekLog(String refName, long timeUsec) throws IOException {
+	public LogCursor seekLog(String refName, long updateIdx)
+			throws IOException {
 		MergedLogCursor m = new MergedLogCursor();
 		for (int i = 0; i < tables.length; i++) {
-			m.add(new LogQueueEntry(tables[i].seekLog(refName, timeUsec), i));
+			m.add(new LogQueueEntry(tables[i].seekLog(refName, updateIdx), i));
 		}
 		return m;
 	}
@@ -225,7 +226,7 @@ public class MergedReftable extends Reftable {
 	private class MergedLogCursor extends LogCursor {
 		private final PriorityQueue<LogQueueEntry> queue;
 		private String refName;
-		private long timeUsec;
+		private long updateIndex;
 		private ReflogEntry entry;
 
 		MergedLogCursor() {
@@ -247,11 +248,28 @@ public class MergedReftable extends Reftable {
 				if (t == null) {
 					return false;
 				}
+
 				refName = t.lc.getRefName();
-				timeUsec = t.lc.getReflogTimeUsec();
+				updateIndex = t.lc.getUpdateIndex();
 				entry = t.lc.getReflogEntry();
+				boolean include = includeDeletes || entry != null;
+				skipShadowed(refName, updateIndex);
 				add(t);
+				if (include) {
+					return true;
+				}
 				return true;
+			}
+		}
+
+		private void skipShadowed(String name, long index) throws IOException {
+			for (;;) {
+				LogQueueEntry t = queue.peek();
+				if (t != null && name.equals(t.name()) && index == t.index()) {
+					add(queue.remove());
+				} else {
+					break;
+				}
 			}
 		}
 
@@ -261,8 +279,8 @@ public class MergedReftable extends Reftable {
 		}
 
 		@Override
-		public long getReflogTimeUsec() {
-			return timeUsec;
+		public long getUpdateIndex() {
+			return updateIndex;
 		}
 
 		@Override
@@ -282,8 +300,8 @@ public class MergedReftable extends Reftable {
 		static int compare(LogQueueEntry a, LogQueueEntry b) {
 			int cmp = a.name().compareTo(b.name());
 			if (cmp == 0) {
-				// higher time sorts first.
-				cmp = Long.signum(b.time() - a.time());
+				// higher update index sorts first.
+				cmp = Long.signum(b.index() - a.index());
 			}
 			if (cmp == 0) {
 				// higher index comes first.
@@ -304,8 +322,8 @@ public class MergedReftable extends Reftable {
 			return lc.getRefName();
 		}
 
-		long time() {
-			return lc.getReflogTimeUsec();
+		long index() {
+			return lc.getUpdateIndex();
 		}
 	}
 }

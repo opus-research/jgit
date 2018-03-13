@@ -44,6 +44,7 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
@@ -91,6 +92,9 @@ class ReftableOutputStream extends OutputStream {
 
 	void setBlockSize(int bs) {
 		blockSize = bs;
+		if (blockSize > blockBuf.length) {
+			blockBuf = Arrays.copyOf(blockBuf, blockSize);
+		}
 	}
 
 	@Override
@@ -150,10 +154,13 @@ class ReftableOutputStream extends OutputStream {
 		cur += 2;
 	}
 
-	void writeInt32(int val) {
-		ensureBytesAvailableInBlockBuf(4);
-		NB.encodeInt32(blockBuf, cur, val);
-		cur += 4;
+	void reserve(int cnt) {
+		ensureBytesAvailableInBlockBuf(cnt);
+		cur += cnt;
+	}
+
+	void patchInt24(int ptr, int val) {
+		NB.encodeInt24(blockBuf, ptr, val);
 	}
 
 	void writeId(ObjectId id) {
@@ -175,6 +182,14 @@ class ReftableOutputStream extends OutputStream {
 		if (cur + cnt > blockBuf.length) {
 			int n = Math.max(cur + cnt, blockBuf.length * 2);
 			blockBuf = Arrays.copyOf(blockBuf, n);
+		}
+	}
+
+	void flushFileHeader() throws IOException {
+		if (cur == FILE_HEADER_LEN && out.getCount() == 0) {
+			// If the file will be a log only file, flush the file header.
+			out.write(blockBuf, 0, cur);
+			cur = 0;
 		}
 	}
 
