@@ -64,7 +64,6 @@ import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -75,8 +74,6 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.EolStreamTypeDetector;
-import org.eclipse.jgit.util.io.EolStreamTypeProvider;
 
 /**
  * Walks one or more {@link AbstractTreeIterator}s in parallel.
@@ -98,8 +95,7 @@ import org.eclipse.jgit.util.io.EolStreamTypeProvider;
  * Multiple simultaneous TreeWalk instances per {@link Repository} are
  * permitted, even from concurrent threads.
  */
-public class TreeWalk
-		implements AutoCloseable, AttributesProvider, EolStreamTypeProvider {
+public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private static final AbstractTreeIterator[] NO_TREES = {};
 
 	/**
@@ -274,9 +270,6 @@ public class TreeWalk
 
 	/** Cached attributes handler */
 	private AttributesHandler attributesHandler;
-
-	/** Cached EOL stream type detector */
-	private EolStreamTypeDetector eolStreamTypeDetector;
 
 	private Config config;
 
@@ -522,15 +515,6 @@ public class TreeWalk
 			throw new JGitInternalException("Error while parsing attributes", //$NON-NLS-1$
 					e);
 		}
-	}
-
-	@Override
-	public EolStreamType getEolStreamType() {
-		if (eolStreamTypeDetector == null) {
-			eolStreamTypeDetector = new EolStreamTypeDetector(
-					config.get(WorkingTreeOptions.KEY), operationType, this);
-		}
-		return eolStreamTypeDetector.getStreamType();
 	}
 
 	/** Reset this walker so new tree iterators can be added to it. */
