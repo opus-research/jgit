@@ -353,8 +353,7 @@ public class GitIndex {
 		if (filemode != null)
 			return filemode.booleanValue();
 		RepositoryConfig config = db.getConfig();
-		filemode = Boolean.valueOf(config.getBoolean("core", null, "filemode", true));
-		return filemode.booleanValue();
+		return config.getBoolean("core", null, "filemode", true);
 	}
 
 	/** An index entry */
