@@ -269,13 +269,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			final OutputStream out, final byte buf[], final WindowCursor curs)
 			throws IOException {
 		final long objectOffset = loader.objectOffset;
-		final long dataOffset = loader.dataOffset;
-		final int cnt = (int) (findEndOffset(objectOffset) - dataOffset);
+		final long dataOffset = objectOffset + loader.headerSize;
+		final long sz = findEndOffset(objectOffset) - dataOffset;
 		final PackIndex idx = idx();
 
 		if (idx.hasCRC32Support()) {
 			final CRC32 crc = new CRC32();
-			int headerCnt = (int) (dataOffset - objectOffset);
+			int headerCnt = loader.headerSize;
 			while (headerCnt > 0) {
 				final int toRead = Math.min(headerCnt, buf.length);
 				readFully(objectOffset, buf, 0, toRead, curs);
@@ -283,25 +283,25 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				headerCnt -= toRead;
 			}
 			final CheckedOutputStream crcOut = new CheckedOutputStream(out, crc);
-			copyToStream(dataOffset, buf, cnt, crcOut, curs);
+			copyToStream(dataOffset, buf, sz, crcOut, curs);
 			final long computed = crc.getValue();
 
 			final ObjectId id = findObjectForOffset(objectOffset);
 			final long expected = idx.findCRC32(id);
 			if (computed != expected)
-				throw new CorruptObjectException("Object at " + dataOffset
+				throw new CorruptObjectException("Object at " + objectOffset
 						+ " in " + getPackFile() + " has bad zlib stream");
 		} else {
 			try {
 				curs.inflateVerify(this, dataOffset);
 			} catch (DataFormatException dfe) {
 				final CorruptObjectException coe;
-				coe = new CorruptObjectException("Object at " + dataOffset
+				coe = new CorruptObjectException("Object at " + objectOffset
 						+ " in " + getPackFile() + " has bad zlib stream");
 				coe.initCause(dfe);
 				throw coe;
 			}
-			copyToStream(dataOffset, buf, cnt, out, curs);
+			copyToStream(dataOffset, buf, sz, out, curs);
 		}
 	}
 
@@ -455,10 +455,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private PackedObjectLoader reader(final WindowCursor curs,
 			final long objOffset) throws IOException {
-		long pos = objOffset;
 		int p = 0;
 		final byte[] ib = curs.tempId;
-		readFully(pos, ib, 0, 20, curs);
+		readFully(objOffset, ib, 0, 20, curs);
 		int c = ib[p++] & 0xff;
 		final int typeCode = (c >> 4) & 7;
 		long dataSize = c & 15;
@@ -468,19 +467,16 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			dataSize += (c & 0x7f) << shift;
 			shift += 7;
 		}
-		pos += p;
 
 		switch (typeCode) {
 		case Constants.OBJ_COMMIT:
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
-			return new WholePackedObjectLoader(this, pos, objOffset, typeCode,
+			return new WholePackedObjectLoader(this, objOffset, p, typeCode,
 					(int) dataSize);
 
 		case Constants.OBJ_OFS_DELTA: {
-			readFully(pos, ib, 0, 20, curs);
-			p = 0;
 			c = ib[p++] & 0xff;
 			long ofs = c & 127;
 			while ((c & 128) != 0) {
@@ -489,13 +485,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				ofs <<= 7;
 				ofs += (c & 127);
 			}
-			return new DeltaOfsPackedObjectLoader(this, pos + p, objOffset,
+			return new DeltaOfsPackedObjectLoader(this, objOffset, p,
 					(int) dataSize, objOffset - ofs);
 		}
 		case Constants.OBJ_REF_DELTA: {
-			readFully(pos, ib, 0, 20, curs);
-			return new DeltaRefPackedObjectLoader(this, pos + ib.length,
-					objOffset, (int) dataSize, ObjectId.fromRaw(ib));
+			readFully(objOffset + p, ib, 0, 20, curs);
+			return new DeltaRefPackedObjectLoader(this, objOffset, p + 20,
+					(int) dataSize, ObjectId.fromRaw(ib));
 		}
 		default:
 			throw new IOException("Unknown object type " + typeCode + ".");
