@@ -41,53 +41,48 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.util.StringUtils;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-/**
- * Submodule section of a Git configuration file.
- *
- * @since 4.7
- */
-public class SubmoduleConfig {
+import org.eclipse.jgit.transport.PushConfig.PushRecurseSubmodulesMode;
+import org.junit.Test;
 
-	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
-	 */
-	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("true"), //$NON-NLS-1$
+public class PushConfigTest {
+	@Test
+	public void pushRecurseSubmoduleMatch() throws Exception {
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("check"));
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("CHECK"));
 
-		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on-demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON-DEMAND"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on_demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON_DEMAND"));
 
-		/** Completely disable recursion. */
-		NO("false"); //$NON-NLS-1$
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("no"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("NO"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("false"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
+	}
 
-		private final String configValue;
+	@Test
+	public void pushRecurseSubmoduleNoMatch() throws Exception {
+		assertFalse(PushRecurseSubmodulesMode.NO.matchConfigValue("N"));
+		assertFalse(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ONDEMAND"));
+	}
 
-		private FetchRecurseSubmodulesMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			if (StringUtils.isEmptyOrNull(s)) {
-				return false;
-			}
-			s = s.replace('-', '_');
-			return name().equalsIgnoreCase(s)
-					|| configValue.equalsIgnoreCase(s);
-		}
+	@Test
+	public void pushRecurseSubmoduleToConfigValue() {
+		assertEquals("on-demand",
+				PushRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+		assertEquals("check", PushRecurseSubmodulesMode.CHECK.toConfigValue());
+		assertEquals("false", PushRecurseSubmodulesMode.NO.toConfigValue());
 	}
 }
