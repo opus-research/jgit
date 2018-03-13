@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server;
+package org.eclipse.jgit.lfs.server.fs;
 
 import static org.junit.Assert.assertEquals;
 
@@ -85,7 +85,7 @@ import org.junit.Before;
 @SuppressWarnings("restriction")
 public abstract class LfsServerTest {
 
-	private static final long timeout = /* 5 min */ 5 * 60 * 1000;
+	private static final long timeout = /* 10 sec */ 10 * 1000;
 
 	protected static final int MiB = 1024 * 1024;
 
@@ -96,9 +96,9 @@ public abstract class LfsServerTest {
 
 	private Path dir;
 
-	protected PlainFSRepository repository;
+	protected FileLfsRepository repository;
 
-	protected LargeObjectServlet servlet;
+	protected FileLfsServlet servlet;
 
 	public LfsServerTest() {
 		super();
@@ -118,8 +118,8 @@ public abstract class LfsServerTest {
 		server = new AppServer();
 		ServletContextHandler app = server.addContext("/lfs");
 		dir = Paths.get(tmp.toString(), "lfs");
-		this.repository = new PlainFSRepository(null, dir);
-		servlet = new LargeObjectServlet(repository, timeout);
+		this.repository = new FileLfsRepository(null, dir);
+		servlet = new FileLfsServlet(repository, timeout);
 		app.addServlet(new ServletHolder(servlet), "/objects/*");
 		server.setUp();
 	}

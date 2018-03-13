@@ -40,8 +40,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server;
+package org.eclipse.jgit.lfs.server.fs;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
@@ -51,32 +52,35 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.servlet.AsyncContext;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.WriteListener;
+import javax.servlet.ReadListener;
+import javax.servlet.ServletInputStream;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
+import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 import org.eclipse.jgit.lfs.lib.Constants;
-import org.eclipse.jgit.util.HttpSupport;
 
 /**
- * Handle asynchronous large object download
+ * Handle asynchronous object upload
  */
-class ObjectDownloadListener implements WriteListener {
+class ObjectUploadListener implements ReadListener {
 
 	private static Logger LOG = Logger
-			.getLogger(ObjectDownloadListener.class.getName());
+			.getLogger(ObjectUploadListener.class.getName());
 
 	private final AsyncContext context;
 
 	private final HttpServletResponse response;
 
-	private final ServletOutputStream out;
+	private FileLfsRepository repository;
 
-	private final ReadableByteChannel in;
+	private final ServletInputStream in;
 
-	private final WritableByteChannel outChannel;
+	private final ReadableByteChannel inChannel;
+
+	private WritableByteChannel out;
 
 	private final ByteBuffer buffer = ByteBuffer.allocateDirect(8192);
 
@@ -84,66 +88,87 @@ class ObjectDownloadListener implements WriteListener {
 	 * @param repository
 	 *            the repository storing large objects
 	 * @param context
-	 *            the servlet asynchronous context
+	 * @param request
 	 * @param response
-	 *            the servlet response
 	 * @param id
-	 *            id of the object to be downloaded
+	 * @throws FileNotFoundException
 	 * @throws IOException
 	 */
-	public ObjectDownloadListener(PlainFSRepository repository,
-			AsyncContext context, HttpServletResponse response,
-			AnyLongObjectId id) throws IOException {
+	public ObjectUploadListener(FileLfsRepository repository,
+			AsyncContext context, HttpServletRequest request,
+			HttpServletResponse response, AnyLongObjectId id)
+					throws FileNotFoundException, IOException {
+		this.repository = repository;
 		this.context = context;
 		this.response = response;
-		this.in = repository.getReadChannel(id);
-		this.out = response.getOutputStream();
-		this.outChannel = Channels.newChannel(out);
-
-		response.addHeader(HttpSupport.HDR_CONTENT_LENGTH,
-				String.valueOf(repository.getSize(id)));
-		response.setContentType(Constants.HDR_APPLICATION_OCTET_STREAM);
+		this.in = request.getInputStream();
+		this.inChannel = Channels.newChannel(in);
+		this.out = repository.getWriteChannel(id);
+		response.setContentType(Constants.CONTENT_TYPE_GIT_LFS_JSON);
 	}
 
 	/**
-	 * Write file content
+	 * Writes all the received data to the output channel
 	 *
 	 * @throws IOException
 	 */
 	@Override
-	public void onWritePossible() throws IOException {
-		while (out.isReady()) {
-			if (in.read(buffer) != -1) {
+	public void onDataAvailable() throws IOException {
+		while (in.isReady()) {
+			if (inChannel.read(buffer) > 0) {
 				buffer.flip();
-				outChannel.write(buffer);
+				out.write(buffer);
 				buffer.compact();
 			} else {
-				in.close();
 				buffer.flip();
-				while (out.isReady()) {
-					if (buffer.hasRemaining()) {
-						outChannel.write(buffer);
-					} else {
-						context.complete();
-					}
+				while (buffer.hasRemaining()) {
+					out.write(buffer);
 				}
+				close();
+				return;
 			}
 		}
 	}
 
 	/**
-	 * Handle errors
-	 *
+	 * @throws IOException
+	 */
+	@Override
+	public void onAllDataRead() throws IOException {
+		close();
+	}
+
+	protected void close() throws IOException {
+		try {
+			inChannel.close();
+			out.close();
+			// TODO check if status 200 is ok for PUT request, HTTP foresees 204
+			// for successful PUT without response body
+			response.setStatus(HttpServletResponse.SC_OK);
+		} finally {
+			context.complete();
+		}
+	}
+
+	/**
 	 * @param e
-	 *            the cause
+	 *            the exception that caused the problem
 	 */
 	@Override
 	public void onError(Throwable e) {
 		try {
-			LargeObjectServlet.sendError(response,
-					HttpStatus.SC_INTERNAL_SERVER_ERROR, e.getMessage());
-			context.complete();
-			in.close();
+			repository.abortWrite();
+			inChannel.close();
+			out.close();
+			int status;
+			if (e instanceof CorruptLongObjectException) {
+				status = HttpStatus.SC_BAD_REQUEST;
+				LOG.log(Level.WARNING, e.getMessage(), e);
+			} else {
+				status = HttpStatus.SC_INTERNAL_SERVER_ERROR;
+				LOG.log(Level.SEVERE, e.getMessage(), e);
+			}
+			FileLfsServlet.sendError(response, status, e.getMessage());
 		} catch (IOException ex) {
 			LOG.log(Level.SEVERE, ex.getMessage(), ex);
 		}

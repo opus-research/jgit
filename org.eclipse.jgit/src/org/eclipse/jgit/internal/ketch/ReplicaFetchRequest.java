@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,44 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.internal.ketch;
 
-/**
- * A tree entry representing a symbolic link.
- *
- * Note. Java cannot really handle these as file system objects.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
- */
-@Deprecated
-public class SymlinkTreeEntry extends TreeEntry {
+import java.util.Map;
+import java.util.Set;
+
+import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+
+/** A fetch request to obtain objects from a replica, and its result. */
+public class ReplicaFetchRequest {
+	private final Set<String> wantRefs;
+	private final Set<ObjectId> wantObjects;
+	private Map<String, Ref> refs;
 
 	/**
-	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
+	 * Construct a new fetch request for a replica.
 	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
+	 * @param wantRefs
+	 *            named references to be fetched.
+	 * @param wantObjects
+	 *            specific objects to be fetched.
 	 */
-	public SymlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
+	public ReplicaFetchRequest(Set<String> wantRefs,
+			Set<ObjectId> wantObjects) {
+		this.wantRefs = wantRefs;
+		this.wantObjects = wantObjects;
 	}
 
-	public FileMode getMode() {
-		return FileMode.SYMLINK;
+	/** @return references to be fetched. */
+	public Set<String> getWantRefs() {
+		return wantRefs;
 	}
 
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(" S "); //$NON-NLS-1$
-		r.append(getFullName());
-		return r.toString();
+	/** @return objects to be fetched. */
+	public Set<ObjectId> getWantObjects() {
+		return wantObjects;
+	}
+
+	/** @return remote references, usually from the advertisement. */
+	@Nullable
+	public Map<String, Ref> getRefs() {
+		return refs;
+	}
+
+	/**
+	 * @param refs
+	 *            references observed from the replica.
+	 */
+	public void setRefs(Map<String, Ref> refs) {
+		this.refs = refs;
 	}
 }

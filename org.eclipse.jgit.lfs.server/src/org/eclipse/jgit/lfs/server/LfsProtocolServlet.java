@@ -68,6 +68,8 @@ import com.google.gson.GsonBuilder;
  * LFS protocol handler implementing the LFS batch API [1]
  *
  * [1] https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md
+ *
+ * @since 4.3
  */
 public class LfsProtocolServlet extends HttpServlet {
 
@@ -82,6 +84,8 @@ public class LfsProtocolServlet extends HttpServlet {
 
 	private final LargeFileRepository repository;
 
+	private Gson gson;
+
 	/**
 	 * Constructs a LFS protocol handler.
 	 * <p>
@@ -95,6 +99,11 @@ public class LfsProtocolServlet extends HttpServlet {
 	 */
 	public LfsProtocolServlet(LargeFileRepository repository) {
 		this.repository = repository;
+		GsonBuilder gb = new GsonBuilder()
+				.setFieldNamingPolicy(
+						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+				.setPrettyPrinting().disableHtmlEscaping();
+		gson = gb.create();
 	}
 
 	/**
@@ -127,12 +136,6 @@ public class LfsProtocolServlet extends HttpServlet {
 		Writer w = new BufferedWriter(
 				new OutputStreamWriter(res.getOutputStream(), UTF_8));
 
-		GsonBuilder gb = new GsonBuilder()
-				.setFieldNamingPolicy(
-						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.setPrettyPrinting().disableHtmlEscaping();
-
-		Gson gson = gb.create();
 		Reader r = new BufferedReader(new InputStreamReader(req.getInputStream(), UTF_8));
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
 

@@ -59,9 +59,9 @@ import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.lfs.server.LargeFileRepository;
-import org.eclipse.jgit.lfs.server.LargeObjectServlet;
 import org.eclipse.jgit.lfs.server.LfsProtocolServlet;
-import org.eclipse.jgit.lfs.server.PlainFSRepository;
+import org.eclipse.jgit.lfs.server.fs.FileLfsServlet;
+import org.eclipse.jgit.lfs.server.fs.FileLfsRepository;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.kohsuke.args4j.Argument;
@@ -152,8 +152,8 @@ class LfsStore extends TextBuiltin {
 		}
 	}
 
-	static enum StoreType {
-		PLAINFS;
+	private static enum StoreType {
+		FS;
 	}
 
 	private static final String OBJECTS = "objects/"; //$NON-NLS-1$
@@ -162,14 +162,15 @@ class LfsStore extends TextBuiltin {
 
 	private static final String PROTOCOL_PATH = "/lfs/objects/batch"; //$NON-NLS-1$
 
-	@Option(name = "--port", aliases = { "-p" }, usage = "usage_LFSPort")
+	@Option(name = "--port", aliases = {"-p" }, metaVar = "metaVar_port",
+			usage = "usage_LFSPort")
 	int port;
 
 	@Option(name = "--store", metaVar = "metaVar_lfsStorage", usage = "usage_LFSRunStore")
 	StoreType storeType;
 
-	@Option(name = "--store-url", aliases = {
-			"-u" }, usage = "usage_LFSStoreUrl")
+	@Option(name = "--store-url", aliases = {"-u" }, metaVar = "metaVar_url",
+			usage = "usage_LFSStoreUrl")
 	String storeUrl;
 
 	@Argument(required = false, metaVar = "metaVar_directory", usage = "usage_LFSDirectory")
@@ -192,11 +193,11 @@ class LfsStore extends TextBuiltin {
 		LargeFileRepository repository;
 
 		switch (storeType) {
-		case PLAINFS:
+		case FS:
 			Path dir = Paths.get(directory);
-			PlainFSRepository plainFSRepo = new PlainFSRepository(
+			FileLfsRepository plainFSRepo = new FileLfsRepository(
 					getStoreUrl(server), dir);
-			LargeObjectServlet content = new LargeObjectServlet(plainFSRepo,
+			FileLfsServlet content = new FileLfsServlet(plainFSRepo,
 					30000);
 			app.addServlet(new ServletHolder(content), STORE_PATH);
 			repository = plainFSRepo;
@@ -213,7 +214,7 @@ class LfsStore extends TextBuiltin {
 		server.start();
 
 		outw.println("LFS protocol URL: " + getProtocolUrl(server)); //$NON-NLS-1$
-		if (storeType == StoreType.PLAINFS) {
+		if (storeType == StoreType.FS) {
 			outw.println("LFS objects located in: " + directory); //$NON-NLS-1$
 			outw.println("LFS store URL: " + getStoreUrl(server)); //$NON-NLS-1$
 		}
@@ -221,7 +222,7 @@ class LfsStore extends TextBuiltin {
 
 	private String getStoreUrl(AppServer server) {
 		if (storeUrl == null) {
-			if (storeType == StoreType.PLAINFS) {
+			if (storeType == StoreType.FS) {
 				storeUrl = server.getURI() + "/" + OBJECTS; //$NON-NLS-1$
 			} else {
 				die("Local store not running and no --store-url specified"); //$NON-NLS-1$

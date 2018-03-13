@@ -58,11 +58,9 @@ import org.eclipse.jgit.lfs.server.internal.LfsServerText;
 
 abstract class TransferHandler {
 
-	static final String DOWNLOAD = "download"; //$NON-NLS-1$
-
-	static final String UPLOAD = "upload"; //$NON-NLS-1$
-
-	static final String VERIFY = "verify"; //$NON-NLS-1$
+	private static final String DOWNLOAD = "download"; //$NON-NLS-1$
+	private static final String UPLOAD = "upload"; //$NON-NLS-1$
+	private static final String VERIFY = "verify"; //$NON-NLS-1$
 
 	static TransferHandler forOperation(String operation,
 			LargeFileRepository repository, List<LfsObject> objects) {
@@ -78,84 +76,93 @@ abstract class TransferHandler {
 		}
 	}
 
-	protected final LargeFileRepository repository;
-	protected final List<LfsObject> objects;
+	private static class Upload extends TransferHandler {
+		Upload(LargeFileRepository repository,
+				List<LfsObject> objects) {
+			super(repository, objects);
+		}
 
-	protected TransferHandler(LargeFileRepository repository,
+		@Override
+		Body process() throws IOException {
+			Response.Body body = new Response.Body();
+			if (objects.size() > 0) {
+				body.objects = new ArrayList<>();
+				for (LfsObject o : objects) {
+					addObjectInfo(body, o);
+				}
+			}
+			return body;
+		}
+
+		private void addObjectInfo(Response.Body body, LfsObject o)
+				throws IOException {
+			Response.ObjectInfo info = new Response.ObjectInfo();
+			body.objects.add(info);
+			info.oid = o.oid;
+			info.size = o.size;
+
+			LongObjectId oid = LongObjectId.fromString(o.oid);
+			if (repository.getSize(oid) == -1) {
+				info.actions = new HashMap<>();
+				info.actions.put(UPLOAD,
+						repository.getUploadAction(oid, o.size));
+				Action verify = repository.getVerifyAction(oid);
+				if (verify != null) {
+					info.actions.put(VERIFY, verify);
+				}
+			}
+		}
+	}
+
+	private static class Download extends TransferHandler {
+		Download(LargeFileRepository repository,
+				List<LfsObject> objects) {
+			super(repository, objects);
+		}
+
+		@Override
+		Body process() throws IOException {
+			Response.Body body = new Response.Body();
+			if (objects.size() > 0) {
+				body.objects = new ArrayList<>();
+				for (LfsObject o : objects) {
+					addObjectInfo(body, o);
+				}
+			}
+			return body;
+		}
+
+		private void addObjectInfo(Response.Body body, LfsObject o)
+				throws IOException {
+			Response.ObjectInfo info = new Response.ObjectInfo();
+			body.objects.add(info);
+			info.oid = o.oid;
+			info.size = o.size;
+
+			LongObjectId oid = LongObjectId.fromString(o.oid);
+			if (repository.getSize(oid) >= 0) {
+				info.actions = new HashMap<>();
+				info.actions.put(DOWNLOAD,
+						repository.getDownloadAction(oid));
+			} else {
+				info.error = new Response.Error();
+				info.error.code = SC_NOT_FOUND;
+				info.error.message = MessageFormat.format(
+						LfsServerText.get().objectNotFound,
+						oid.getName());
+			}
+		}
+	}
+
+	final LargeFileRepository repository;
+
+	final List<LfsObject> objects;
+
+	TransferHandler(LargeFileRepository repository,
 			List<LfsObject> objects) {
 		this.repository = repository;
 		this.objects = objects;
 	}
 
-	protected abstract Response.Body process() throws IOException;
-
-	private static class Upload extends TransferHandler {
-
-		protected Upload(LargeFileRepository repository,
-				List<LfsObject> objects) {
-			super(repository, objects);
-		}
-
-		@Override
-		protected Body process() throws IOException {
-			Response.Body body = new Response.Body();
-			if (objects.size() > 0) {
-				body.objects = new ArrayList<>();
-				for (LfsObject o : objects) {
-					Response.ObjectInfo info = new Response.ObjectInfo();
-					body.objects.add(info);
-					info.oid = o.oid;
-					info.size = o.size;
-
-					LongObjectId oid = LongObjectId.fromString(o.oid);
-					if (repository.getSize(oid) == -1) {
-						info.actions = new HashMap<>();
-						info.actions.put(UPLOAD,
-								repository.getUploadAction(oid, o.size));
-						Action verify = repository.getVerifyAction(oid);
-						if (verify != null) {
-							info.actions.put(VERIFY, verify);
-						}
-					}
-				}
-			}
-			return body;
-		}
-	}
-
-	private static class Download extends TransferHandler {
-
-		protected Download(LargeFileRepository repository,
-				List<LfsObject> objects) {
-			super(repository, objects);
-		}
-
-		@Override
-		protected Body process() throws IOException {
-			Response.Body body = new Response.Body();
-			if (objects.size() > 0) {
-				body.objects = new ArrayList<>();
-				for (LfsObject o : objects) {
-					Response.ObjectInfo info = new Response.ObjectInfo();
-					body.objects.add(info);
-					info.oid = o.oid;
-					info.size = o.size;
-
-					LongObjectId oid = LongObjectId.fromString(o.oid);
-					if (repository.getSize(oid) >= 0) {
-						info.actions = new HashMap<>();
-						info.actions.put(DOWNLOAD,
-								repository.getDownloadAction(oid));
-					} else {
-						info.error = new Response.Error();
-						info.error.code = SC_NOT_FOUND;
-						info.error.message = MessageFormat.format(
-								LfsServerText.get().objectNotFound,
-								oid.getName());
-					}
-				}
-			}
-			return body;
-		}
-	}
+	abstract Response.Body process() throws IOException;
 }

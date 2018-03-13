@@ -61,7 +61,7 @@ import org.eclipse.jgit.util.NB;
  *
  * Ported to SHA-256 from {@link AnyObjectId}
  *
- * @since 4.2
+ * @since 4.3
  */
 public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 
