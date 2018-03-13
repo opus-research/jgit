@@ -207,28 +207,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCheckoutLightweightTag() throws Exception {
-		git.tag().setAnnotated(false).setName("test-tag")
-				.setObjectId(initialCommit).call();
-		Ref result = git.checkout().setName("test-tag").call();
-
-		assertNull(result);
-		assertEquals(initialCommit.getId(), db.resolve(Constants.HEAD));
-		assertHeadDetached();
-	}
-
-	@Test
-	public void testCheckoutAnnotatedTag() throws Exception {
-		git.tag().setAnnotated(true).setName("test-tag")
-				.setObjectId(initialCommit).call();
-		Ref result = git.checkout().setName("test-tag").call();
-
-		assertNull(result);
-		assertEquals(initialCommit.getId(), db.resolve(Constants.HEAD));
-		assertHeadDetached();
-	}
-
-	@Test
 	public void testCheckoutRemoteTrackingWithUpstream() throws Exception {
 		Repository db2 = createRepositoryWithRemote();
 
@@ -348,7 +326,9 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		co = git.checkout();
 		co.setName(commitId).call();
 
-		assertHeadDetached();
+		Ref head = db.getRef(Constants.HEAD);
+		assertFalse(head.isSymbolic());
+		assertSame(head, head.getTarget());
 	}
 
 	@Test
@@ -439,12 +419,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 
 	private void assertNoHead() throws IOException {
 		assertNull(db.resolve("HEAD"));
-	}
-
-	private void assertHeadDetached() throws IOException {
-		Ref head = db.getRef(Constants.HEAD);
-		assertFalse(head.isSymbolic());
-		assertSame(head, head.getTarget());
 	}
 
 	private void assertRepositoryCondition(int files) throws GitAPIException {
