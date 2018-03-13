@@ -137,6 +137,9 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
+	/**
+	 * @since 3.4
+	 */
 	@Override
 	public PathMatcher getPathMatcher(String globPattern) {
 		return new PathMatcher_Java7(globPattern);

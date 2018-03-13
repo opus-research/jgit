@@ -52,8 +52,8 @@ import java.util.regex.Pattern;
  * "t/abc"; whereas <code>*&#47;*c</code> will match "t/abc" but not "abc".
  * <code>*.*</code> matches file names containing a dot and <code>a?c</code>
  * will match any file which names starts with 'a', finishes with 'c' and has
- * one character (any character) in between : it would match "abc" but not
- * "ac" or "abbc".
+ * one character (any character) in between : it would match "abc" but not "ac"
+ * or "abbc".
  * </p>
  * <p>
  * Java did not support the glob syntax until Java 7; this will convert glob
@@ -61,6 +61,8 @@ import java.util.regex.Pattern;
  * syntax : "**" to match over a whole hierarchy, "*" to match any sequence of
  * characters, "?" to match any single character.
  * </p>
+ * 
+ * @since 3.4
  */
 public class PathMatcher_Java5 implements PathMatcher {
 	/** The pattern against which we'll match paths. */

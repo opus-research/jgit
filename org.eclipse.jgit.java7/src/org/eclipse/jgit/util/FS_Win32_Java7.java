@@ -161,6 +161,9 @@ public class FS_Win32_Java7 extends FS_Win32 {
 		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
+	/**
+	 * @since 3.4
+	 */
 	@Override
 	public PathMatcher getPathMatcher(String globPattern) {
 		return new PathMatcher_Java7(globPattern);

@@ -1,5 +1,5 @@
-/*******************************************************************************
- * Copyright (C) 2014, Obeo
+/*
+ * Copyright (C) 2014, Sasa Zivkov <sasa.zivkov@sap.com>, SAP AG
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,35 +39,31 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *******************************************************************************/
-package org.eclipse.jgit.util;
+ */
 
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
+package org.eclipse.jgit.errors;
+
+import java.io.IOException;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.JGitText;
 
 /**
- * This path matcher will check whether a given path matches a glob pattern by
- * delegating to a java.nio.file.PathMatcher.
- * 
- * @see java.nio.file.FileSystem#getPathMatcher(String)
- * @since 3.4
+ * Thrown when a pack exceeds a given size limit
+ *
+ * @since 3.3
  */
-public class PathMatcher_Java7 implements PathMatcher {
-	/** The actual matcher we'll delegate to. */
-	private final java.nio.file.PathMatcher matcher;
+public class TooLargePackException extends IOException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param globPattern
-	 *            The pattern this instance should match against.
+	 * Construct a too large pack exception.
+	 *
+	 * @param packSizeLimit
+	 *            the pack size limit (in bytes) that was exceeded
 	 */
-	public PathMatcher_Java7(String globPattern) {
-		matcher = FileSystems.getDefault()
-				.getPathMatcher("glob:" + globPattern); //$NON-NLS-1$
-	}
-
-	@Override
-	public boolean matches(String pathString) {
-		final Path path = FileSystems.getDefault().getPath(pathString);
-		return matcher.matches(path);
+	public TooLargePackException(long packSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackTooLarge,
+				Long.valueOf(packSizeLimit)));
 	}
 }
