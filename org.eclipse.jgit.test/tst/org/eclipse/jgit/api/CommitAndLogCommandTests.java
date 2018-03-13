@@ -42,6 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -165,7 +169,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			JGitInternalException, WrongRepositoryStateException,
 			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
-		assertTrue(file.createNewFile());
+		file.createNewFile();
 		PrintWriter writer = new PrintWriter(file);
 		writer.print("content");
 		writer.close();

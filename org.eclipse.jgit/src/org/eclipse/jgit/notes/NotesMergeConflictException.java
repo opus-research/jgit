@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,31 +41,70 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.notes;
 
-import java.util.Date;
-import java.util.TimeZone;
+import java.io.IOException;
+import java.text.MessageFormat;
 
-import junit.framework.TestCase;
+import org.eclipse.jgit.JGitText;
 
-public class T0001_PersonIdent extends TestCase {
-	public void test001_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
-				p.toExternalString());
+/**
+ * This exception will be thrown from the {@link NoteMerger} when a conflict on
+ * Notes content is found during merge.
+ */
+public class NotesMergeConflictException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Construct a NotesMergeConflictException for the specified base, ours and
+	 * theirs note versions.
+	 *
+	 * @param base
+	 *            note version
+	 * @param ours
+	 *            note version
+	 * @param theirs
+	 *            note version
+	 */
+	public NotesMergeConflictException(Note base, Note ours, Note theirs) {
+		super(MessageFormat.format(JGitText.get().mergeConflictOnNotes,
+				noteOn(base, ours, theirs), noteData(base), noteData(ours),
+				noteData(theirs)));
 	}
 
-	public void test002_NewIdent() {
-		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
-				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
-		assertEquals("A U Thor", p.getName());
-		assertEquals("author@example.com", p.getEmailAddress());
-		assertEquals(1142878501000L, p.getWhen().getTime());
-		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
-				p.toExternalString());
+	/**
+	 * Constructs a NotesMergeConflictException for the specified base, ours and
+	 * theirs versions of the root note tree.
+	 *
+	 * @param base
+	 *            version of the root note tree
+	 * @param ours
+	 *            version of the root note tree
+	 * @param theirs
+	 *            version of the root note tree
+	 */
+	public NotesMergeConflictException(NonNoteEntry base, NonNoteEntry ours,
+			NonNoteEntry theirs) {
+		super(MessageFormat.format(
+				JGitText.get().mergeConflictOnNonNoteEntries, name(base),
+				name(ours), name(theirs)));
+	}
+
+	private static String noteOn(Note base, Note ours, Note theirs) {
+		if (base != null)
+			return base.name();
+		if (ours != null)
+			return ours.name();
+		return theirs.name();
+	}
+
+	private static String noteData(Note n) {
+		if (n != null)
+			return n.getData().name();
+		return "";
+	}
+
+	private static String name(NonNoteEntry e) {
+		return e != null ? e.name() : "";
 	}
 }

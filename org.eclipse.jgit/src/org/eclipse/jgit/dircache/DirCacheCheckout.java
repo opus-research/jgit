@@ -386,9 +386,6 @@ public class DirCacheCheckout {
 			if (!file.getParentFile().mkdirs()) {
 				// ignore
 			}
-			if (!file.createNewFile()) {
-				// ignore
-			}
 			DirCacheEntry entry = dc.getEntry(path);
 			checkoutEntry(repo, file, entry);
 		}
