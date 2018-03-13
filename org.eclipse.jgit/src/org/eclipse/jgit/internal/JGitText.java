@@ -448,7 +448,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packFileInvalid;
 	/***/ public String packfileIsTruncated;
-	/***/ public String packfileIsTruncatedNoParam;
 	/***/ public String packHasUnresolvedDeltas;
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;

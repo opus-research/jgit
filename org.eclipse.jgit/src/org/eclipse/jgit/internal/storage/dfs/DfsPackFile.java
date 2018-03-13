@@ -199,7 +199,7 @@ public final class DfsPackFile {
 		return key.cachedSize.get();
 	}
 
-	String getPackName() {
+	private String getPackName() {
 		return packDesc.getFileName(PACK);
 	}
 

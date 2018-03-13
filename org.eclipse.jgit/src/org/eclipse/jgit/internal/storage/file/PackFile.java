@@ -169,13 +169,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			try {
 				final PackIndex idx = PackIndex.open(extFile(INDEX));
 
-				if (packChecksum == null) {
+				if (packChecksum == null)
 					packChecksum = idx.packChecksum;
-				} else if (!Arrays.equals(packChecksum, idx.packChecksum)) {
-					throw new PackMismatchException(MessageFormat.format(
-							JGitText.get().packChecksumMismatch,
-							packFile.getPath()));
-				}
+				else if (!Arrays.equals(packChecksum, idx.packChecksum))
+					throw new PackMismatchException(JGitText.get().packChecksumMismatch);
+
 				loadedIdx = idx;
 			} catch (IOException e) {
 				invalid = true;
