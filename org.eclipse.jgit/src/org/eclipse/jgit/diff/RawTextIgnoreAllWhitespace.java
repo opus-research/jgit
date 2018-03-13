@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +42,79 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.diff;
+
+import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
 /**
- * This class passes information about a changed Git index to a
- * {@link RepositoryListener}
- *
- * Currently only a reference to the repository is passed.
+ * A version of {@link RawText} that ignores all whitespace.
  */
-public class IndexChangedEvent extends RepositoryChangedEvent {
-	IndexChangedEvent(final Repository repository) {
-		super(repository);
+public class RawTextIgnoreAllWhitespace extends RawText {
+
+	/**
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
+	 *
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
+	 */
+	public RawTextIgnoreAllWhitespace(byte[] input) {
+		super(input);
 	}
 
 	@Override
-	public String toString() {
-		return "IndexChangedEvent[" + getRepository() + "]";
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
+
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes.get(ai) != b.hashes.get(bi))
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		ae = trimTrailingWhitespace(a.content, as, ae);
+		be = trimTrailingWhitespace(b.content, bs, be);
+
+		while (as < ae && bs < be) {
+			byte ac = a.content[as];
+			byte bc = b.content[bs];
+
+			while (as < ae - 1 && isWhitespace(ac)) {
+				as++;
+				ac = a.content[as];
+			}
+
+			while (bs < be - 1 && isWhitespace(bc)) {
+				bs++;
+				bc = b.content[bs];
+			}
+
+			if (ac != bc)
+				return false;
+
+			as++;
+			bs++;
+		}
+
+		return as == ae && bs == be;
+	}
+
+	@Override
+	protected int hashLine(final byte[] raw, int ptr, final int end) {
+		int hash = 5381;
+		for (; ptr < end; ptr++) {
+			byte c = raw[ptr];
+			if (!isWhitespace(c))
+				hash = (hash << 5) ^ (c & 0xff);
+		}
+		return hash;
 	}
 }

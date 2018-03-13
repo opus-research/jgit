@@ -142,18 +142,7 @@ public abstract class AnyObjectId implements Comparable {
 		return compareTo(((ObjectId) other));
 	}
 
-	/**
-	 * Compare this ObjectId to a network-byte-order ObjectId.
-	 *
-	 * @param bs
-	 *            array containing the other ObjectId in network byte order.
-	 * @param p
-	 *            position within {@code bs} to start the compare at. At least
-	 *            20 bytes, starting at this position are required.
-	 * @return a negative integer, zero, or a positive integer as this object is
-	 *         less than, equal to, or greater than the specified object.
-	 */
-	public int compareTo(final byte[] bs, final int p) {
+	int compareTo(final byte[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, NB.decodeInt32(bs, p));
@@ -175,18 +164,7 @@ public abstract class AnyObjectId implements Comparable {
 		return NB.compareUInt32(w5, NB.decodeInt32(bs, p + 16));
 	}
 
-	/**
-	 * Compare this ObjectId to a network-byte-order ObjectId.
-	 *
-	 * @param bs
-	 *            array containing the other ObjectId in network byte order.
-	 * @param p
-	 *            position within {@code bs} to start the compare at. At least 5
-	 *            integers, starting at this position are required.
-	 * @return a negative integer, zero, or a positive integer as this object is
-	 *         less than, equal to, or greater than the specified object.
-	 */
-	public int compareTo(final int[] bs, final int p) {
+	int compareTo(final int[] bs, final int p) {
 		int cmp;
 
 		cmp = NB.compareUInt32(w1, bs[p]);

@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +42,55 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.diff;
 
-/**
- * This class passes information about a changed Git index to a
- * {@link RepositoryListener}
- *
- * Currently only a reference to the repository is passed.
- */
-public class IndexChangedEvent extends RepositoryChangedEvent {
-	IndexChangedEvent(final Repository repository) {
-		super(repository);
+import org.eclipse.jgit.lib.Constants;
+
+import junit.framework.TestCase;
+
+public class RawTextIgnoreAllWhitespaceTest extends TestCase {
+	public void testEqualsWithoutWhitespace() {
+		final RawText a = new RawTextIgnoreAllWhitespace(Constants
+				.encodeASCII("foo-a\nfoo-b\nfoo\n"));
+		final RawText b = new RawTextIgnoreAllWhitespace(Constants
+				.encodeASCII("foo-b\nfoo-c\nf\n"));
+
+		assertEquals(3, a.size());
+		assertEquals(3, b.size());
+
+		// foo-a != foo-b
+		assertFalse(a.equals(0, b, 0));
+		assertFalse(b.equals(0, a, 0));
+
+		// foo-b == foo-b
+		assertTrue(a.equals(1, b, 0));
+		assertTrue(b.equals(0, a, 1));
+
+		// foo != f
+		assertFalse(a.equals(2, b, 2));
+		assertFalse(b.equals(2, a, 2));
 	}
 
-	@Override
-	public String toString() {
-		return "IndexChangedEvent[" + getRepository() + "]";
+	public void testEqualsWithWhitespace() {
+		final RawText a = new RawTextIgnoreAllWhitespace(Constants
+				.encodeASCII("foo-a\n         \n a b c\na      \n"));
+		final RawText b = new RawTextIgnoreAllWhitespace(Constants
+				.encodeASCII("foo-a        b\n\nab  c\na\n"));
+
+		// "foo-a" != "foo-a        b"
+		assertFalse(a.equals(0, b, 0));
+		assertFalse(b.equals(0, a, 0));
+
+		// "         " == ""
+		assertTrue(a.equals(1, b, 1));
+		assertTrue(b.equals(1, a, 1));
+
+		// " a b c" == "ab  c"
+		assertTrue(a.equals(2, b, 2));
+		assertTrue(b.equals(2, a, 2));
+
+		// "a      " == "a"
+		assertTrue(a.equals(3, b, 3));
+		assertTrue(b.equals(3, a, 3));
 	}
 }
