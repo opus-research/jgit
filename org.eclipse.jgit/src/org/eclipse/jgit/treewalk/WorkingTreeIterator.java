@@ -73,11 +73,10 @@ import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -875,66 +874,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return false;
 		} else {
 			// Content differs: that's a real change!
-			switch (getOptions().getAutoCRLF()) {
-			case INPUT:
-			case TRUE:
-				InputStream dcIn = null;
-				try {
-					ObjectLoader loader = repository.open(entry.getObjectId());
-					// We need to compute the length, but only if it is not
-					// a binary stream.
-					dcIn = new EolCanonicalizingInputStream(
-							loader.openStream(), true, true /* abort if binary */);
-					long dcInLen;
-					try {
-						dcInLen = computeLength(dcIn);
-					} catch (EolCanonicalizingInputStream.IsBinaryException e) {
-						// ok, we know it's different so unsmudge the entry
-						entry.setLength(loader.getSize());
-						return true;
-					} finally {
-						dcIn.close();
-					}
-
-					dcIn = new EolCanonicalizingInputStream(
-							loader.openStream(), true);
-					byte[] autoCrLfHash = computeHash(dcIn, dcInLen);
-					boolean changed = getEntryObjectId().compareTo(
-							autoCrLfHash, 0) != 0;
-					if (!changed) {
-						// Unsmudge and update the index with the eol'ed
-						// hash, so we can detect the no-change faster
-						// next time.
-						entry.setLength((int) getEntryLength());
-						entry.setObjectIdFromRaw(autoCrLfHash, 0);
-					}
-					// Ok, we know it's different so unsmudge the dirache entry
-					entry.setLength(loader.getSize());
-					return changed;
-				} catch (IOException e) {
-					return true;
-				} finally {
-					if (dcIn != null)
-						try {
-							dcIn.close();
-						} catch (IOException e) {
-							// empty
-						}
-				}
-			case FALSE:
-				// Ok, we know it's different so unsmudge the dircache entry
-				try {
-					if (repository != null) {
-						ObjectId id = entry.getObjectId();
-						ObjectLoader loader = repository.open(id);
-						if (loader != null)
-							entry.setLength((int) loader.getSize());
-					}
-				} catch (IOException e) {
-					// panic, no, but don't unsmudge
-				}
-				break;
-			}
 			return true;
 		}
 	}
