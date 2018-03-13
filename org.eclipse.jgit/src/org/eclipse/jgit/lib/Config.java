@@ -388,12 +388,6 @@ public class Config {
 			return defaultValue;
 
 		String n = value.replace(' ', '_');
-
-		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
-		// the real world before its breakage was fully understood, we must
-		// also accept '-' as though it were ' '.
-		n = n.replace('-', '_');
-
 		T trueState = null;
 		T falseState = null;
 		for (T e : all) {
@@ -418,13 +412,11 @@ public class Config {
 		}
 
 		if (subsection != null)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().enumValueNotSupported3, section, subsection,
-					name, value));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().enumValueNotSupported3, section, name, value));
 		else
-			throw new IllegalArgumentException(
-					MessageFormat.format(JGitText.get().enumValueNotSupported2,
-							section, name, value));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().enumValueNotSupported2, section, name, value));
 	}
 
 	/**

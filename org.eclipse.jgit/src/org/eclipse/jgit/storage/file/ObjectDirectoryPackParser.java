@@ -479,7 +479,7 @@ public class ObjectDirectoryPackParser extends PackParser {
 		}
 
 		try {
-			newPack = db.openPack(finalPack);
+			newPack = db.openPack(finalPack, finalIdx);
 		} catch (IOException err) {
 			keep.unlock();
 			if (finalPack.exists())

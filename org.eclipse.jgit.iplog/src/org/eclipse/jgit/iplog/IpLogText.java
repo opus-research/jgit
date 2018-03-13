@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,17 +41,39 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.pack;
+package org.eclipse.jgit.iplog;
 
-/** Misc. constants used with pack files. */
-public class PackConstants {
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
-	/** A pack file extension. */
-	public static final String PACK_EXT = "pack"; //$NON-NLS-1$
+/**
+ * Translation bundle for JGit IP Log
+ */
+public class IpLogText extends TranslationBundle {
 
-	/** A pack index file extension. */
-	public static final String PACK_INDEX_EXT = "idx"; //$NON-NLS-1$
-
-	private PackConstants() {
+	/**
+	 * @return an instance of this translation bundle
+	 */
+	public static IpLogText get() {
+		return NLS.getBundleFor(IpLogText.class);
 	}
+
+	// @formatter:off
+	/***/ public String CQString;
+	/***/ public String CSVParsingError;
+	/***/ public String cannotLock;
+	/***/ public String cannotSerializeXML;
+	/***/ public String cannotWrite;
+	/***/ public String committerString;
+	/***/ public String configurationFileInCommitHasNoProjectsDeclared;
+	/***/ public String configurationFileInCommitIsInvalid;
+	/***/ public String contributorString;
+	/***/ public String incorrectlyScanned;
+	/***/ public String invalidDate;
+	/***/ public String invalidURIFormat;
+	/***/ public String loginFailed;
+	/***/ public String pageTitleWas;
+	/***/ public String projectString;
+	/***/ public String queryFailed;
+	/***/ public String responseNotHTMLAsExpected;
 }
