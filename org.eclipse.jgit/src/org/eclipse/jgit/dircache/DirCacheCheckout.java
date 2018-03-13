@@ -1379,7 +1379,7 @@ public class DirCacheCheckout {
 				FileUtils.delete(tmpFile);
 			}
 		}
-		entry.setLastModified(fs.lastModified(f));
+		entry.setLastModified(f.lastModified());
 	}
 
 	@SuppressWarnings("deprecation")
