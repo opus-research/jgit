@@ -73,6 +73,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.io.DisabledOutputStream;
 
 /**
  * Transport over the non-Git aware HTTP and FTP protocol.
@@ -387,15 +388,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				throws TransportException {
 			super(TransportHttp.this);
 
-			init(advertisement, new OutputStream() {
-				@Override
-				public void write(int b) throws IOException {
-					// We shouldn't be writing output at this stage, there
-					// is nobody listening to us.
-					//
-					throw new IllegalStateException("Writing not permitted");
-				}
-			});
+			init(advertisement, DisabledOutputStream.INSTANCE);
 			outNeedsEnd = false;
 			try {
 				readAdvertisedRefs();
@@ -417,11 +410,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				final HttpURLConnection conn;
 
 				conn = (HttpURLConnection) url.openConnection(proxy);
-				conn.setRequestMethod("POST");
+				conn.setRequestMethod(HttpSupport.METHOD_POST);
 				conn.setInstanceFollowRedirects(false);
 				conn.setDoOutput(true);
 				conn.setChunkedStreamingMode(0);
-				conn.setRequestProperty("Content-Type", REQ_TYPE);
+				conn.setRequestProperty(HttpSupport.HDR_CONTENT_TYPE, REQ_TYPE);
 
 				httpOut = new BufferedOutputStream(conn.getOutputStream());
 				httpIn = new HttpInputStream(conn, httpOut, RSP_TYPE);
@@ -434,7 +427,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	class HttpInputStream extends InputStream {
+	static class HttpInputStream extends InputStream {
 		private final HttpURLConnection conn;
 
 		private final OutputStream httpOut;
@@ -486,8 +479,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		public void close() throws IOException {
-			if (httpIn != null)
+			if (httpIn != null) {
 				httpIn.close();
+				httpIn = null;
+			}
 		}
 	}
 }

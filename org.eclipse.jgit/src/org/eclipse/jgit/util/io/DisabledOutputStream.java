@@ -41,28 +41,26 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.util.io;
 
-import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.UploadPack;
+/** An OutputStream which always throws IllegalStateExeption during write. */
+public final class DisabledOutputStream extends OutputStream {
+	/** The canonical instance which always throws IllegalStateException. */
+	public static final DisabledOutputStream INSTANCE = new DisabledOutputStream();
 
-/** Create and configure {@link UploadPack} service instance. */
-public interface UploadPackFactory {
-	/**
-	 * Create and configure a new UploadPack instance for a repository.
-	 * 
-	 * @param req
-	 *            current HTTP request, in case information from the request may
-	 *            help configure the UploadPack instance.
-	 * @param db
-	 *            the repository the upload would read from.
-	 * @return the newly configured UploadPack instance, must not be null.
-	 * @throws ServiceNotEnabledException
-	 *             this factory refuses to create the instance for this HTTP
-	 *             request and repository, such as due to a permission error.
-	 */
-	UploadPack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException;
+	private DisabledOutputStream() {
+		// Do nothing, but we want to hide our constructor to prevent
+		// more than one instance from being created.
+	}
+
+	@Override
+	public void write(int b) throws IOException {
+		// We shouldn't be writing output at this stage, there
+		// is nobody listening to us.
+		//
+		throw new IllegalStateException("Writing not permitted");
+	}
 }

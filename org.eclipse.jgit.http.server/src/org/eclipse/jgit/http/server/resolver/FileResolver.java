@@ -59,7 +59,7 @@ public class FileResolver implements RepositoryResolver {
 
 	/**
 	 * Create a new resolver for the given path.
-	 * 
+	 *
 	 * @param basePath
 	 *            the base path all repositories are rooted under.
 	 */
@@ -89,7 +89,7 @@ public class FileResolver implements RepositoryResolver {
 
 	/**
 	 * Check if this repository can be served over HTTP.
-	 * 
+	 *
 	 * @param req
 	 *            the current HTTP request.
 	 * @param repositoryName

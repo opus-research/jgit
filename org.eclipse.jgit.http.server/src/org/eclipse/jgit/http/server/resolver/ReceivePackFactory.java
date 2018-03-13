@@ -50,9 +50,17 @@ import org.eclipse.jgit.transport.ReceivePack;
 
 /** Create and configure {@link ReceivePack} service instance. */
 public interface ReceivePackFactory {
+	/** A factory disabling the ReceivePack service for all repositories. */
+	public static final ReceivePackFactory DISABLED = new ReceivePackFactory() {
+		public ReceivePack create(HttpServletRequest req, Repository db)
+				throws ServiceNotEnabledException {
+			throw new ServiceNotEnabledException();
+		}
+	};
+
 	/**
 	 * Create and configure a new ReceivePack instance for a repository.
-	 * 
+	 *
 	 * @param req
 	 *            current HTTP request, in case information from the request may
 	 *            help configure the ReceivePack instance.

@@ -43,6 +43,11 @@
 
 package org.eclipse.jgit.http.server;
 
+import static org.eclipse.jgit.util.HttpSupport.HDR_ETAG;
+import static org.eclipse.jgit.util.HttpSupport.HDR_IF_MODIFIED_SINCE;
+import static org.eclipse.jgit.util.HttpSupport.HDR_IF_NONE_MATCH;
+import static org.eclipse.jgit.util.HttpSupport.HDR_LAST_MODIFIED;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -135,21 +140,21 @@ abstract class ObjectFileServlet extends RepositoryServlet {
 			final String etag = etag(sender);
 			final long lastModified = sender.getLastModified() / 1000 * 1000;
 
-			String ifNoneMatch = req.getHeader("If-None-Match");
+			String ifNoneMatch = req.getHeader(HDR_IF_NONE_MATCH);
 			if (etag.equals(ifNoneMatch)) {
 				rsp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
 				return;
 			}
 
-			long ifModifiedSince = req.getDateHeader("If-Modified-Since");
+			long ifModifiedSince = req.getDateHeader(HDR_IF_MODIFIED_SINCE);
 			if (lastModified < ifModifiedSince) {
 				rsp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
 				return;
 			}
 
 			cacheForever(rsp);
-			rsp.setHeader("ETag", etag);
-			rsp.setDateHeader("Last-Modified", lastModified);
+			rsp.setHeader(HDR_ETAG, etag);
+			rsp.setDateHeader(HDR_LAST_MODIFIED, lastModified);
 			rsp.setContentType(contentType);
 			rsp.setContentLength(sender.getContentLength());
 			if (sendBody)
