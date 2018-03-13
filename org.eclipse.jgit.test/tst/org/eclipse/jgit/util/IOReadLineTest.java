@@ -45,40 +45,72 @@ package org.eclipse.jgit.util;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Collection;
 
 import org.eclipse.jgit.lib.Constants;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-public class IOTest {
+@RunWith(Parameterized.class)
+public class IOReadLineTest {
+	@Parameter(0)
+	public boolean buffered;
+
+	@Parameter(1)
+	public int sizeHint;
+
+	@SuppressWarnings("boxing")
+	@Parameters(name="buffered={0}, sizeHint={1}")
+	public static Collection<Object[]> getParameters() {
+		Boolean[] bv = {false, true};
+		Integer[] sv = {-1, 0, 1, 2, 3, 4, 64};
+		Collection<Object[]> params = new ArrayList<>(bv.length * sv.length);
+		for (boolean b : bv) {
+			for (Integer s : sv) {
+				params.add(new Object[]{b, s});
+			}
+		}
+		return params;
+	}
+
 	@Test
 	public void testReadLine() throws Exception {
 		Reader r = newReader("foo\nbar\nbaz\n");
-		assertEquals("foo\n", IO.readLine(r, 0));
-		assertEquals("bar\n", IO.readLine(r, 0));
-		assertEquals("baz\n", IO.readLine(r, 0));
+		assertEquals("foo\n", readLine(r));
+		assertEquals("bar\n", readLine(r));
+		assertEquals("baz\n", readLine(r));
+		assertEquals("", readLine(r));
 	}
 
 	@Test
-	public void testReadLineWithNoTrailingNewline() throws Exception {
+	public void testReadLineNoTrailingNewline() throws Exception {
 		Reader r = newReader("foo\nbar\nbaz");
-		assertEquals("foo\n", IO.readLine(r, 0));
-		assertEquals("bar\n", IO.readLine(r, 0));
-		assertEquals("baz", IO.readLine(r, 0));
+		assertEquals("foo\n", readLine(r));
+		assertEquals("bar\n", readLine(r));
+		assertEquals("baz", readLine(r));
+		assertEquals("", readLine(r));
 	}
 
-	@Test
-	public void testReadLineWithSizeHint() throws Exception {
-		Reader r = newReader("foo\nbar\nbaz\n");
-		assertEquals("foo\n", IO.readLine(r, 64));
-		assertEquals("bar\n", IO.readLine(r, 64));
-		assertEquals("baz\n", IO.readLine(r, 64));
+	private String readLine(Reader r) throws Exception {
+		return IO.readLine(r, sizeHint);
 	}
 
-	private static Reader newReader(String in) {
-		return new InputStreamReader(
+	private Reader newReader(String in) {
+		Reader r = new InputStreamReader(
 				new ByteArrayInputStream(Constants.encode(in)));
+		if (buffered) {
+			r = new BufferedReader(r);
+		}
+		assertEquals(Boolean.valueOf(buffered),
+				Boolean.valueOf(r.markSupported()));
+		return r;
 	}
 }
