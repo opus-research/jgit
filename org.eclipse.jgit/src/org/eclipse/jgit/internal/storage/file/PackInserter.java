@@ -206,7 +206,7 @@ class PackInserter extends ObjectInserter {
 	private static int writePackHeader(byte[] buf, int objectCount) {
 		System.arraycopy(Constants.PACK_SIGNATURE, 0, buf, 0, 4);
 		NB.encodeInt32(buf, 4, 2); // Always use pack version 2.
-		NB.encodeInt32(buf, 8, objectCount);
+		NB.encodeInt32(buf, 8, objectCount); // Always assume 1 object.
 		return 12;
 	}
 
