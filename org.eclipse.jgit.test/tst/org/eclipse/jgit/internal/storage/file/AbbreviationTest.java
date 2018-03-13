@@ -87,7 +87,7 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 		super.setUp();
 		db = createBareRepository();
 		reader = db.newObjectReader();
-		test = new TestRepository<>(db);
+		test = new TestRepository<Repository>(db);
 	}
 
 	@Override
@@ -171,7 +171,7 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 
 		ObjectId id = id("9d5b926ed164e8ee88d3b8b1e525d699adda01ba");
 		byte[] idBuf = toByteArray(id);
-		List<PackedObjectInfo> objects = new ArrayList<>();
+		List<PackedObjectInfo> objects = new ArrayList<PackedObjectInfo>();
 		for (int i = 0; i < 256; i++) {
 			idBuf[9] = (byte) i;
 			objects.add(new PackedObjectInfo(ObjectId.fromRaw(idBuf)));

@@ -58,7 +58,7 @@ abstract class ServletBinderImpl implements ServletBinder {
 	private HttpServlet httpServlet;
 
 	ServletBinderImpl() {
-		this.filters = new ArrayList<>();
+		this.filters = new ArrayList<Filter>();
 	}
 
 	@Override
