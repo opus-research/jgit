@@ -147,10 +147,7 @@ public class Config {
 	 *            the value to escape
 	 * @return the escaped value
 	 */
-	static String escapeValue(final String x) {
-		if (x.isEmpty()) {
-			return ""; //$NON-NLS-1$
-		}
+	private static String escapeValue(final String x) {
 		boolean inquote = false;
 		int lineStart = 0;
 		final StringBuilder r = new StringBuilder(x.length());
@@ -192,7 +189,8 @@ public class Config {
 				break;
 
 			case ' ':
-				if (!inquote && (r.length() == 0 || r.charAt(r.length() - 1) == ' ')) {
+				if (!inquote && r.length() > 0
+						&& r.charAt(r.length() - 1) == ' ') {
 					r.insert(lineStart, '"');
 					inquote = true;
 				}
@@ -204,20 +202,6 @@ public class Config {
 				break;
 			}
 		}
-
-		if (!inquote) {
-			// Ensure any trailing whitespace is quoted.
-			int s = x.length();
-			while (s > 0 && x.charAt(s - 1) == ' ') {
-				s--;
-			}
-			if (s != x.length()) {
-				// Can't insert at lineStart since there may be intervening quotes.
-				r.insert(s, '"');
-				inquote = true;
-			}
-		}
-
 		if (inquote) {
 			r.append('"');
 		}

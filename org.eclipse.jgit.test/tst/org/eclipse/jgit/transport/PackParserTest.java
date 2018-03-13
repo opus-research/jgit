@@ -47,6 +47,7 @@
 package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -269,7 +270,7 @@ public class PackParserTest extends RepositoryTestCase {
 			fail("PackParser should have failed");
 		} catch (TooLargeObjectInPackException e) {
 			assertTrue(e.getMessage().contains("13")); // max obj size
-			assertTrue(e.getMessage().contains("14")); // delta size
+			assertFalse(e.getMessage().contains("14")); // no delta size
 		}
 	}
 

@@ -197,14 +197,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	/**
-	 * @return the location of the <code>pack</code> directory.
-	 * @since 4.10
-	 */
-	public final File getPackDirectory() {
-		return packDirectory;
-	}
-
-	/**
 	 * @return the location of the <code>preserved</code> directory.
 	 */
 	public final File getPreservedDirectory() {
@@ -723,7 +715,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		try {
-			Files.move(FileUtils.toPath(tmp), FileUtils.toPath(dst),
+			Files.move(tmp.toPath(), dst.toPath(),
 					StandardCopyOption.ATOMIC_MOVE);
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
@@ -740,7 +732,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		//
 		FileUtils.mkdir(dst.getParentFile(), true);
 		try {
-			Files.move(FileUtils.toPath(tmp), FileUtils.toPath(dst),
+			Files.move(tmp.toPath(), dst.toPath(),
 					StandardCopyOption.ATOMIC_MOVE);
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
