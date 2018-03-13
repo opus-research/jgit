@@ -65,8 +65,8 @@ public class GitCloneTaskTest extends LocalDiskRepositoryTestCase {
 	public void before() {
 		project = new Project();
 		enableLogging();
-		task = new GitCloneTask();
-		task.setProject(project);
+		project.addTaskDefinition("git-clone", GitCloneTask.class);
+		task = (GitCloneTask) project.createTask("git-clone");
 	}
 
 	@Test(expected = BuildException.class)
