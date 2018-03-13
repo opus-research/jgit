@@ -134,9 +134,6 @@ public class ReceivePack {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
-	/** Hook used while advertising the refs to the client. */
-	private AdvertiseRefsHook advertiseRefsHook;
-
 	/** Filter used while advertising the refs to the client. */
 	private RefFilter refFilter;
 
@@ -214,7 +211,6 @@ public class ReceivePack {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
-		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
@@ -263,44 +259,19 @@ public class ReceivePack {
 	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		if (refs == null) {
-			setAdvertisedRefs(null, null);
+			refs = refFilter.filter(db.getAllRefs());
+
+			Ref head = refs.get(Constants.HEAD);
+			if (head != null && head.isSymbolic())
+				refs.remove(Constants.HEAD);
+
+			for (Ref ref : refs.values()) {
+				if (ref.getObjectId() != null)
+					advertisedHaves.add(ref.getObjectId());
+			}
+			advertisedHaves.addAll(db.getAdditionalHaves());
 		}
 		return refs;
-	}
-
-	/**
-	 * Set the refs advertised by this ReceivePack.
-	 * <p>
-	 * Intended to be called from a {@link PreReceiveHook}.
-	 *
-	 * @param allRefs
-	 *            explicit set of references to claim as advertised by this
-	 *            ReceivePack instance. This overrides any references that
-	 *            may exist in the source repository. The map is passed
-	 *            to the configured {@link #getRefFilter()}. If null, assumes
-	 *            all refs were advertised.
-	 * @param additionalHaves
-	 *            explicit set of additional haves to claim as advertised. If
-	 *            null, assumes the default set of additional haves from the
-	 *            repository.
-	 */
-	public void setAdvertisedRefs(Map<String, Ref> allRefs,
-			Set<ObjectId> additionalHaves) {
-		refs = allRefs != null ? allRefs : db.getAllRefs();
-		refs = refFilter.filter(refs);
-
-		Ref head = refs.get(Constants.HEAD);
-		if (head != null && head.isSymbolic())
-			refs.remove(Constants.HEAD);
-
-		for (Ref ref : refs.values()) {
-			if (ref.getObjectId() != null)
-				advertisedHaves.add(ref.getObjectId());
-		}
-		if (additionalHaves != null)
-			advertisedHaves.addAll(additionalHaves);
-		else
-			advertisedHaves.addAll(db.getAdditionalHaves());
 	}
 
 	/** @return the set of objects advertised as present in this repository. */
@@ -323,13 +294,13 @@ public class ReceivePack {
 	 * <p>
 	 * If enabled, this instance will verify that references to objects not
 	 * contained within the received pack are already reachable through at least
-	 * one other reference displayed as part of {@link #getAdvertisedRefs()}.
+	 * one other reference selected by the {@link #getRefFilter()} and displayed
+	 * as part of {@link #getAdvertisedRefs()}.
 	 * <p>
 	 * This feature is useful when the application doesn't trust the client to
 	 * not provide a forged SHA-1 reference to an object, in an attempt to
 	 * access parts of the DAG that they aren't allowed to see and which have
-	 * been hidden from them via the configured {@link AdvertiseRefsHook} or
-	 * {@link RefFilter}.
+	 * been hidden from them via the configured {@link RefFilter}.
 	 * <p>
 	 * Enabling this feature may imply at least some, if not all, of the same
 	 * functionality performed by {@link #setCheckReceivedObjects(boolean)}.
@@ -445,42 +416,18 @@ public class ReceivePack {
 		refLogIdent = pi;
 	}
 
-	/** @return the hook used while advertising the refs to the client */
-	public AdvertiseRefsHook getAdvertiseRefsHook() {
-		return advertiseRefsHook;
-	}
-
 	/** @return the filter used while advertising the refs to the client */
 	public RefFilter getRefFilter() {
 		return refFilter;
 	}
 
 	/**
-	 * Set the hook used while advertising the refs to the client.
-	 * <p>
-	 * If the {@link AdvertiseRefsHook} chooses to call
-	 * {@link #setAdvertisedRefs(Map,Set)}, only refs set by this hook
-	 * <em>and</em> selected by the {@link RefFilter} will be shown to the client.
-	 * Clients may still attempt to create or update a reference not advertised by
-	 * the configured {@link AdvertiseRefsHook}. These attempts should be rejected
-	 * by a matching {@link PreReceiveHook}.
-	 *
-	 * @param advertiseRefsHook
-	 *            the hook; may be null to show all refs.
-	 */
-	public void setAdvertiseRefsHook(final AdvertiseRefsHook advertiseRefsHook) {
-		if (advertiseRefsHook != null)
-			this.advertiseRefsHook = advertiseRefsHook;
-		else
-			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
-	}
-
-	/**
 	 * Set the filter used while advertising the refs to the client.
 	 * <p>
 	 * Only refs allowed by this filter will be shown to the client.
-	 * The filter is run against the refs specified by the
-	 * {@link AdvertiseRefsHook} (if applicable).
+	 * Clients may still attempt to create or update a reference hidden
+	 * by the configured {@link RefFilter}. These attempts should be
+	 * rejected by a matching {@link PreReceiveHook}.
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -595,12 +542,7 @@ public class ReceivePack {
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			try {
-				if (msgOut != null)
-					msgOut.write(Constants.encode("error: " + what + "\n"));
-			} catch (IOException e) {
-				// Ignore write failures.
-			}
+			sendBytes(Constants.encode("error: " + what + "\n"));
 		}
 	}
 
@@ -615,32 +557,47 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
+		sendBytes(Constants.encode(what + "\n"));
+	}
+
+	/**
+	 * @see #sendBytes(byte[], int, int)
+	 *
+	 * @param what
+	 *            bytes to send.
+	 */
+	public void sendBytes(final byte[] what) {
+		sendBytes(what, 0, what.length);
+	}
+
+	/**
+	 * Send raw bytes to the the client over the sideband, if supported.
+	 * <p>
+	 * If the client doesn't support receiving messages, the message will be
+	 * discarded, with no other indication to the caller or to the client.
+	 * <p>
+	 * When possible, prefer {@link #sendMessage(String)} or
+	 * {@link #sendError(String)}; this method is intended only for callers who
+	 * need to do their own
+	 * encoding.
+	 *
+	 * @param what
+	 *            bytes to send.
+	 * @param off
+	 *            array offset.
+	 * @param len
+	 *            number of bytes.
+	 */
+	public void sendBytes(final byte[] what, final int off, final int len) {
 		try {
 			if (msgOut != null)
-				msgOut.write(Constants.encode(what + "\n"));
+				msgOut.write(what, off, len);
 		} catch (IOException e) {
 			// Ignore write failures.
 		}
 	}
 
 	/**
-	 * Set a secondary "notice" channel for messages.
-	 * <p>
-	 * When run over SSH, for example, this should be tied back to the standard
-	 * error channel of the command execution. For most other network connections
-	 * this should be null.
-	 *
-	 * @param messages
-	 *            message output channel.
-	 */
-	public void setMessageOutputStream(final OutputStream messages) {
-		if (msgOut != null)
-			throw new IllegalStateException(
-					MessageFormat.format(JGitText.get().illegalStateExists, "msgOut"));
-		msgOut = messages;
-	}
-
-  /**
 	 * Execute the receive task on the socket.
 	 *
 	 * @param input
@@ -652,8 +609,10 @@ public class ReceivePack {
 	 *            the output is buffered, otherwise write performance may
 	 *            suffer.
 	 * @param messages
-	 *            secondary "notice" channel for messages; see
-	 *            {@link #setMessageOutputStream(OutputStream)}.
+	 *            secondary "notice" channel to send additional messages out
+	 *            through. When run over SSH this should be tied back to the
+	 *            standard error channel of the command execution. For most
+	 *            other network connections this should be null.
 	 * @throws IOException
 	 */
 	public void receive(final InputStream input, final OutputStream output,
@@ -661,7 +620,7 @@ public class ReceivePack {
 		try {
 			rawIn = input;
 			rawOut = output;
-			setMessageOutputStream(messages);
+			msgOut = messages;
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
@@ -801,24 +760,11 @@ public class ReceivePack {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
-	 * @throws ServiceMayNotContinueException
-	 *             the hook denied advertisement.
 	 */
-	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
-			 ServiceMayNotContinueException {
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
 		if (advertiseError != null) {
 			adv.writeOne("ERR " + advertiseError);
 			return;
-		}
-
-		try {
-			advertiseRefsHook.advertiseRefs(this);
-		} catch (ServiceMayNotContinueException fail) {
-			if (fail.getMessage() != null) {
-				adv.writeOne("ERR " + fail.getMessage());
-				fail.setOutput();
-			}
-			throw fail;
 		}
 
 		adv.init(db);
