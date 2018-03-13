@@ -67,7 +67,7 @@ public class ReflogReader {
 	 * @param refname
 	 */
 	public ReflogReader(Repository db, String refname) {
-		logName = new File(db.getDirectory(), Constants.LOGS + "/" + refname);
+		logName = new File(db.getDirectory(), Constants.LOGS + '/' + refname);
 	}
 
 	/**
