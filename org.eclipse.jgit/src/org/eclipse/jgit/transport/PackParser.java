@@ -58,10 +58,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TooLargeObjectInPackException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
@@ -681,7 +681,7 @@ public abstract class PackParser {
 		while ((c & 0x80) != 0) {
 			c = readFrom(Source.DATABASE);
 			hdrBuf[hdrPtr++] = (byte) c;
-			sz += ((long) (c & 0x7f)) << shift;
+			sz += (c & 0x7f) << shift;
 			shift += 7;
 		}
 		info.size = sz;
@@ -892,7 +892,7 @@ public abstract class PackParser {
 		while ((c & 0x80) != 0) {
 			c = readFrom(Source.INPUT);
 			hdrBuf[hdrPtr++] = (byte) c;
-			sz += ((long) (c & 0x7f)) << shift;
+			sz += (c & 0x7f) << shift;
 			shift += 7;
 		}
 

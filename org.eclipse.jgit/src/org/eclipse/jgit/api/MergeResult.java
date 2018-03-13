@@ -47,7 +47,7 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.merge.MergeChunk;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
@@ -78,7 +78,6 @@ public class MergeResult {
 		},
 		/** */
 		ALREADY_UP_TO_DATE {
-			@Override
 			public String toString() {
 				return "Already-up-to-date";
 			}
@@ -90,7 +89,6 @@ public class MergeResult {
 		},
 		/** */
 		FAILED {
-			@Override
 			public String toString() {
 				return "Failed";
 			}
@@ -102,7 +100,6 @@ public class MergeResult {
 		},
 		/** */
 		MERGED {
-			@Override
 			public String toString() {
 				return "Merged";
 			}
@@ -114,7 +111,6 @@ public class MergeResult {
 		},
 		/** */
 		CONFLICTING {
-			@Override
 			public String toString() {
 				return "Conflicting";
 			}
@@ -126,7 +122,6 @@ public class MergeResult {
 		},
 		/** */
 		NOT_SUPPORTED {
-			@Override
 			public String toString() {
 				return "Not-yet-supported";
 			}
