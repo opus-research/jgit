@@ -241,7 +241,6 @@ public abstract class TreeEntry implements Comparable {
 	 *
 	 * @param i
 	 * @return '/' for Tree entries and NUL for non-treeish objects
-	 * @deprecated since it depends on deprecated GitIndex, and internal
 	 */
 	final public static int lastChar(Entry i) {
 		// FIXME, gitlink etc. Currently Trees cannot appear in the
