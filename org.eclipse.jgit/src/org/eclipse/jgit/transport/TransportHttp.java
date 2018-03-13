@@ -248,6 +248,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private HttpAuthMethod authMethod = HttpAuthMethod.Type.NONE.method(null);
 
+	private Map<String, String> headers;
+
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
@@ -426,6 +428,18 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		// No explicit connections are maintained.
 	}
 
+	/**
+	 * Set additional headers on the HTTP connection
+	 *
+	 * @param headers
+	 *            a map of name:values that are to be set as headers on the HTTP
+	 *            connection
+	 * @since 3.4
+	 */
+	public void setAdditionalHeaders(Map<String, String> headers) {
+		this.headers = headers;
+	}
+
 	private HttpConnection connect(final String service)
 			throws TransportException, NotSupportedException {
 		final URL u;
@@ -466,9 +480,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					// That may not work for streaming requests and jgit
 					// explicit authentication would be required
 					if (authMethod.getType() == HttpAuthMethod.Type.NONE
-							&& conn.getHeaderField(HDR_WWW_AUTHENTICATE) != null) {
+							&& conn.getHeaderField(HDR_WWW_AUTHENTICATE) != null)
 						authMethod = HttpAuthMethod.scanResponse(conn);
-					}
 					return conn;
 
 				case HttpConnection.HTTP_NOT_FOUND:
@@ -480,9 +493,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					if (authMethod.getType() == HttpAuthMethod.Type.NONE)
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
-					if (1 < authAttempts
-							|| !authMethod.authorize(uri,
-									getCredentialsProvider())) {
+					CredentialsProvider credentialsProvider = getCredentialsProvider();
+					if (authAttempts > 1)
+						credentialsProvider.reset(uri);
+					if (3 < authAttempts
+							|| !authMethod.authorize(uri, credentialsProvider)) {
 						throw new TransportException(uri,
 								JGitText.get().notAuthorized);
 					}
@@ -539,6 +554,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			int effTimeOut = timeOut * 1000;
 			conn.setConnectTimeout(effTimeOut);
 			conn.setReadTimeout(effTimeOut);
+		}
+		if (this.headers != null && !this.headers.isEmpty()) {
+			for (Map.Entry<String, String> entry : this.headers.entrySet())
+				conn.setRequestProperty(entry.getKey(), entry.getValue());
 		}
 		authMethod.configureRequest(conn);
 		return conn;
