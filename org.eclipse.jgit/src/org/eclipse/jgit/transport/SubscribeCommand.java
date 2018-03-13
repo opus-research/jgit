@@ -86,6 +86,6 @@ public class SubscribeCommand {
 
 	@Override
 	public String toString() {
-		return "SubscribeCommand[" + command.toString() + " " + spec + "]";
+		return "SubscribeCommand[" + command + " " + spec + "]";
 	}
 }

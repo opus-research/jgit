@@ -84,8 +84,9 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		fc = db.getConfig();
 		fc.load();
 		rc = new RemoteConfig(fc, "origin");
-		rc.addFetchRefSpec(new RefSpec("refs/heads/master"));
-		rc.addFetchRefSpec(new RefSpec("refs/tags/*:refs/doesntmatter/*"));
+		rc.addFetchRefSpec(
+				new RefSpec("refs/heads/master:refs/remotes/origin/master"));
+		rc.addFetchRefSpec(new RefSpec("refs/tags/*:refs/tags/*"));
 		rc.addURI(new URIish("http://example.com/testrepository"));
 		rc.update(fc);
 		fc.save();
@@ -132,8 +133,9 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		FileBasedConfig fc = db.getConfig();
 		fc.load();
 		RemoteConfig rc = new RemoteConfig(fc, "origin");
-		rc.removeFetchRefSpec(new RefSpec("refs/tags/*:refs/doesntmatter/*"));
-		rc.addFetchRefSpec(new RefSpec("refs/heads/branch"));
+		rc.removeFetchRefSpec(new RefSpec("refs/tags/*:refs/tags/*"));
+		rc.addFetchRefSpec(
+				new RefSpec("refs/heads/branch:refs/remotes/origin/branch"));
 		rc.update(fc);
 		fc.save();
 		publisherConfig = new PubSubConfig.Publisher("http://example.com/");
@@ -196,28 +198,43 @@ public class SubscribeTest extends SampleDataRepositoryTestCase {
 		assertTrue(pubsubRefs.contains("refs/tags/A"));
 	}
 
+	/**
+	 * [remote "origin"]
+	 * fetch = refs/heads/master:refs/remotes/foo/master
+	 * fetch = refs/heads/branch1:refs/remotes/origin/branch1
+	 * fetch = refs/heads/*:refs/remotes/origin/*
+	 *
+	 * tracking -> remote -> pubsub
+	 * tracking -> remote using remote config
+	 * remote -> pubsub with remote name
+	 * @throws Exception
+	 */
 	@Test
 	public void testRefTranslate() throws Exception {
-		assertEquals("refs/pubsub/origin/heads/master",
+		FileBasedConfig fc = db.getConfig();
+		fc.load();
+		RemoteConfig rc = new RemoteConfig(fc, "self");
+
+		assertEquals("refs/pubsub/self/heads/master",
+				SubscribedRepository.getPubSubRefFromTracking(
+						rc, "refs/remotes/origin/master"));
+		assertEquals("refs/pubsub/self/heads/master",
 				SubscribedRepository.getPubSubRefFromRemote(
-						"origin", "refs/remotes/origin/master"));
-		assertEquals("refs/pubsub/origin/heads/master",
-				SubscribedRepository.getPubSubRefFromLocal(
-						"origin", "refs/heads/master"));
+						"self", "refs/heads/master"));
 		assertEquals("refs/remotes/origin/master",
+				SubscribedRepository.getTrackingRefFromPubSub(
+						rc, "refs/pubsub/self/heads/master"));
+		assertEquals("refs/heads/master",
+				SubscribedRepository.getRemoteRefFromTracking(
+						rc, "refs/remotes/origin/master"));
+		assertEquals("refs/remotes/origin/master",
+				SubscribedRepository.getTrackingRefFromRemote(
+						rc, "refs/heads/master"));
+		assertEquals("refs/heads/master",
+				SubscribedRepository.getRemoteRefFromTracking(
+						rc, "refs/remotes/origin/master"));
+		assertEquals("refs/heads/master",
 				SubscribedRepository.getRemoteRefFromPubSub(
-						"origin", "refs/pubsub/origin/heads/master"));
-		assertEquals("refs/heads/master",
-				SubscribedRepository.getLocalRefFromRemote(
-						"origin", "refs/remotes/origin/master"));
-		assertEquals("refs/remotes/origin/master",
-				SubscribedRepository.getRemoteRefFromLocal(
-						"origin", "refs/heads/master"));
-		assertEquals("refs/heads/master",
-				SubscribedRepository.getLocalRefFromRemote(
-						"origin", "refs/remotes/origin/master"));
-		assertEquals("refs/heads/master",
-				SubscribedRepository.getLocalRefFromPubSub(
-						"origin", "refs/pubsub/origin/heads/master"));
+						"self", "refs/pubsub/self/heads/master"));
 	}
 }

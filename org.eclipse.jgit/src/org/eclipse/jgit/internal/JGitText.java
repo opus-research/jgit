@@ -365,6 +365,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noApplyInDelete;
 	/***/ public String noClosingBracket;
 	/***/ public String noHEADExistsAndNoExplicitStartingRevisionWasSpecified;
+	/***/ public String noMatchingFetchSpec;
 	/***/ public String noHMACsupport;
 	/***/ public String noMergeHeadSpecified;
 	/***/ public String noSuchRef;
@@ -502,8 +503,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
-	/***/ public String subscribeError;
 	/***/ public String subscribeNewUpdate;
+	/***/ public String subscribeNotSupported;
 	/***/ public String subscribeStart;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;

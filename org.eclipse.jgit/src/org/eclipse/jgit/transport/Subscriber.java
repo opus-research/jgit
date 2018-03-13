@@ -44,6 +44,7 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -104,9 +105,11 @@ public class Subscriber {
 	 * @return Map of repository name to list of SubscribeCommands required to
 	 *         sync the existing state to the state of the publisher config.
 	 * @throws IOException
+	 * @throws URISyntaxException
 	 */
 	public Map<String, List<SubscribeCommand>> sync(
-			PubSubConfig.Publisher publisher) throws IOException {
+			PubSubConfig.Publisher publisher)
+			throws IOException, URISyntaxException {
 		config = publisher;
 		Map<String, List<SubscribeCommand>> subscribeCommands = new HashMap<
 				String, List<SubscribeCommand>>();
