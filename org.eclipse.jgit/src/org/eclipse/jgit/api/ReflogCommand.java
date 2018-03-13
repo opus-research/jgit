@@ -85,7 +85,7 @@ public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
 		return this;
 	}
 
-	public Collection<ReflogEntry> call() throws GitAPIException {
+	public Collection<ReflogEntry> call() throws GitAPIException, Exception {
 		checkCallable();
 
 		try {
