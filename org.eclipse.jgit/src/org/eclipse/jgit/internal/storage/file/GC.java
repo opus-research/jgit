@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -68,7 +67,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -80,18 +78,18 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.internal.storage.pack.PackWriter.ObjectIdSet;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogEntry;
-import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -177,17 +175,13 @@ public class GC {
 	/**
 	 * Delete old pack files. What is 'old' is defined by specifying a set of
 	 * old pack files and a set of new pack files. Each pack file contained in
-	 * old pack files but not contained in new pack files will be deleted. If an
-	 * expirationDate is set then pack files which are younger than the
-	 * expirationDate will not be deleted.
+	 * old pack files but not contained in new pack files will be deleted.
 	 *
 	 * @param oldPacks
 	 * @param newPacks
-	 * @throws ParseException
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
-			Collection<PackFile> newPacks) throws ParseException {
-		long expireDate = getExpireDate();
+			Collection<PackFile> newPacks) {
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old pack file is also among the list of new
@@ -196,8 +190,7 @@ public class GC {
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
 
-			if (!oldPack.shouldBeKept()
-					&& oldPack.getPackFile().lastModified() < expireDate) {
+			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
 				prunePack(oldName);
 			}
@@ -310,7 +303,22 @@ public class GC {
 	 */
 	public void prune(Set<ObjectId> objectsToKeep) throws IOException,
 			ParseException {
-		long expireDate = getExpireDate();
+		long expireDate = Long.MAX_VALUE;
+
+		if (expire == null && expireAgeMillis == -1) {
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
+			if (pruneExpireStr == null)
+				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
+			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
+					.getInstance().getLocale());
+			expireAgeMillis = -1;
+		}
+		if (expire != null)
+			expireDate = expire.getTime();
+		if (expireAgeMillis != -1)
+			expireDate = System.currentTimeMillis() - expireAgeMillis;
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -427,26 +435,6 @@ public class GC {
 		repo.getObjectDatabase().close();
 	}
 
-	private long getExpireDate() throws ParseException {
-		long expireDate = Long.MAX_VALUE;
-
-		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
-			if (pruneExpireStr == null)
-				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
-			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
-					.getInstance().getLocale());
-			expireAgeMillis = -1;
-		}
-		if (expire != null)
-			expireDate = expire.getTime();
-		if (expireAgeMillis != -1)
-			expireDate = System.currentTimeMillis() - expireAgeMillis;
-		return expireDate;
-	}
-
 	/**
 	 * Remove all entries from a map which key is the id of an object referenced
 	 * by the given ObjectWalk
@@ -484,10 +472,9 @@ public class GC {
 				return false;
 			return r1.getTarget().getName().equals(r2.getTarget().getName());
 		} else {
-			if (r2.isSymbolic()) {
+			if (r2.isSymbolic())
 				return false;
-			}
-			return Objects.equals(r1.getObjectId(), r2.getObjectId());
+			return r1.getObjectId().equals(r2.getObjectId());
 		}
 	}
 
@@ -552,7 +539,7 @@ public class GC {
 		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
 		for (final PackFile f : repo.getObjectDatabase().getPacks())
 			if (f.shouldBeKept())
-				excluded.add(f.getIndex());
+				excluded.add(objectIdSet(f.getIndex()));
 
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
@@ -564,7 +551,7 @@ public class GC {
 					tagTargets, excluded);
 			if (heads != null) {
 				ret.add(heads);
-				excluded.add(0, heads.getIndex());
+				excluded.add(0, objectIdSet(heads.getIndex()));
 			}
 		}
 		if (!nonHeads.isEmpty()) {
@@ -572,14 +559,7 @@ public class GC {
 			if (rest != null)
 				ret.add(rest);
 		}
-		try {
-			deleteOldPacks(toBeDeleted, ret);
-		} catch (ParseException e) {
-			// TODO: the exception has to be wrapped into an IOException because
-			// throwing the ParseException directly would break the API, instead
-			// we should throw a ConfigInvalidException
-			throw new IOException(e);
-		}
+		deleteOldPacks(toBeDeleted, ret);
 		prunePacked();
 
 		lastPackedRefs = refsBefore;
@@ -595,11 +575,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	private Set<ObjectId> listRefLogObjects(Ref ref, long minTime) throws IOException {
-		ReflogReader reflogReader = repo.getReflogReader(ref.getName());
-		if (reflogReader == null) {
-			return Collections.emptySet();
-		}
-		List<ReflogEntry> rlEntries = reflogReader
+		List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
@@ -642,7 +618,10 @@ public class GC {
 	 */
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
-		if (repo.isBare()) {
+		try {
+			if (repo.getIndexFile() == null)
+				return Collections.emptySet();
+		} catch (NoWorkTreeException e) {
 			return Collections.emptySet();
 		}
 		try (TreeWalk treeWalk = new TreeWalk(repo)) {
@@ -790,33 +769,39 @@ public class GC {
 						break;
 					}
 			tmpPack.setReadOnly();
+			boolean delete = true;
+			try {
+				FileUtils.rename(tmpPack, realPack);
+				delete = false;
+				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
+					File tmpExt = tmpEntry.getValue();
+					tmpExt.setReadOnly();
 
-			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
-			for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
-				File tmpExt = tmpEntry.getValue();
-				tmpExt.setReadOnly();
-
-				File realExt = nameFor(id,
-						"." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
-				try {
-					FileUtils.rename(tmpExt, realExt,
-							StandardCopyOption.ATOMIC_MOVE);
-				} catch (IOException e) {
-					File newExt = new File(realExt.getParentFile(),
-							realExt.getName() + ".new"); //$NON-NLS-1$
+					File realExt = nameFor(
+							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
 					try {
-						FileUtils.rename(tmpExt, newExt,
-								StandardCopyOption.ATOMIC_MOVE);
-					} catch (IOException e2) {
-						newExt = tmpExt;
-						e = e2;
+						FileUtils.rename(tmpExt, realExt);
+					} catch (IOException e) {
+						File newExt = new File(realExt.getParentFile(),
+								realExt.getName() + ".new"); //$NON-NLS-1$
+						if (!tmpExt.renameTo(newExt))
+							newExt = tmpExt;
+						throw new IOException(MessageFormat.format(
+								JGitText.get().panicCantRenameIndexFile, newExt,
+								realExt));
 					}
-					throw new IOException(MessageFormat.format(
-							JGitText.get().panicCantRenameIndexFile, newExt,
-							realExt), e);
+				}
+
+			} finally {
+				if (delete) {
+					if (tmpPack.exists())
+						tmpPack.delete();
+					for (File tmpExt : tmpExts.values()) {
+						if (tmpExt.exists())
+							tmpExt.delete();
+					}
 				}
 			}
-
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
 			if (tmpPack != null && tmpPack.exists())
@@ -875,11 +860,6 @@ public class GC {
 		 */
 		public long numberOfPackedRefs;
 
-		/**
-		 * The number of bitmaps in the bitmap indices.
-		 */
-		public long numberOfBitmaps;
-
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -889,15 +869,15 @@ public class GC {
 			b.append(", numberOfPackedRefs=").append(numberOfPackedRefs); //$NON-NLS-1$
 			b.append(", sizeOfLooseObjects=").append(sizeOfLooseObjects); //$NON-NLS-1$
 			b.append(", sizeOfPackedObjects=").append(sizeOfPackedObjects); //$NON-NLS-1$
-			b.append(", numberOfBitmaps=").append(numberOfBitmaps); //$NON-NLS-1$
 			return b.toString();
 		}
 	}
 
 	/**
-	 * Returns information about objects and pack files for a FileRepository.
+	 * Returns the number of objects stored in pack files. If an object is
+	 * contained in multiple pack files it is counted as often as it occurs.
 	 *
-	 * @return information about objects and pack files for a FileRepository
+	 * @return the number of objects stored in pack files
 	 * @throws IOException
 	 */
 	public RepoStatistics getStatistics() throws IOException {
@@ -907,8 +887,6 @@ public class GC {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
 			ret.numberOfPackFiles++;
 			ret.sizeOfPackedObjects += f.getPackFile().length();
-			if (f.getBitmapIndex() != null)
-				ret.numberOfBitmaps += f.getBitmapIndex().getBitmapCount();
 		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
@@ -993,5 +971,13 @@ public class GC {
 	public void setExpire(Date expire) {
 		this.expire = expire;
 		expireAgeMillis = -1;
+	}
+
+	private static ObjectIdSet objectIdSet(final PackIndex idx) {
+		return new ObjectIdSet() {
+			public boolean contains(AnyObjectId objectId) {
+				return idx.hasObject(objectId);
+			}
+		};
 	}
 }

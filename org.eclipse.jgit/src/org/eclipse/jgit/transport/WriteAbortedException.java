@@ -54,8 +54,6 @@ import java.io.IOException;
  * @since 4.1
  */
 public class WriteAbortedException extends IOException {
-	private static final long serialVersionUID = 1L;
-
 	/**
 	 * Construct a {@code WriteAbortedException}.
 	 */

@@ -195,7 +195,7 @@ public class MergeTest extends CLIRepositoryTestCase {
 	@Test
 	public void testNoFastForwardAndSquash() throws Exception {
 		assertEquals("fatal: You cannot combine --squash with --no-ff.",
-				executeUnchecked("git merge master --no-ff --squash")[0]);
+				execute("git merge master --no-ff --squash")[0]);
 	}
 
 	@Test
@@ -210,7 +210,7 @@ public class MergeTest extends CLIRepositoryTestCase {
 		git.commit().setMessage("commit#2").call();
 
 		assertEquals("fatal: Not possible to fast-forward, aborting.",
-				executeUnchecked("git merge master --ff-only")[0]);
+				execute("git merge master --ff-only")[0]);
 	}
 
 	@Test

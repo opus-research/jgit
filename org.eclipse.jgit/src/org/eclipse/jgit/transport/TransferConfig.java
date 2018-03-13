@@ -46,7 +46,6 @@ package org.eclipse.jgit.transport;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -66,29 +65,32 @@ public class TransferConfig {
 		}
 	};
 
-	private final boolean fetchFsck;
-	private final boolean receiveFsck;
+	private final boolean checkReceivedObjects;
 	private final boolean allowLeadingZeroFileMode;
 	private final boolean allowInvalidPersonIdent;
 	private final boolean safeForWindows;
 	private final boolean safeForMacOS;
 	private final boolean allowTipSha1InWant;
 	private final boolean allowReachableSha1InWant;
-	final String[] hideRefs;
+	private final String[] hideRefs;
 
 	TransferConfig(final Repository db) {
 		this(db.getConfig());
 	}
 
-	TransferConfig(final Config rc) {
-		boolean fsck = rc.getBoolean("transfer", "fsckobjects", false); //$NON-NLS-1$ //$NON-NLS-2$
-		fetchFsck = rc.getBoolean("fetch", "fsckobjects", fsck); //$NON-NLS-1$ //$NON-NLS-2$
-		receiveFsck = rc.getBoolean("receive", "fsckobjects", fsck); //$NON-NLS-1$ //$NON-NLS-2$
-		allowLeadingZeroFileMode = rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
-		allowInvalidPersonIdent = rc.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
-		safeForWindows = rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
+	private TransferConfig(final Config rc) {
+		checkReceivedObjects = rc.getBoolean(
+				"fetch", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
+				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
+		allowLeadingZeroFileMode = checkReceivedObjects
+				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
+		allowInvalidPersonIdent = checkReceivedObjects
+				&& rc.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
+		safeForWindows = checkReceivedObjects
+				&& rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
 						SystemReader.getInstance().isWindows());
-		safeForMacOS = rc.getBoolean("fsck", "safeForMacOS", //$NON-NLS-1$ //$NON-NLS-2$
+		safeForMacOS = checkReceivedObjects
+				&& rc.getBoolean("fsck", "safeForMacOS", //$NON-NLS-1$ //$NON-NLS-2$
 						SystemReader.getInstance().isMacOS());
 
 		allowTipSha1InWant = rc.getBoolean(
@@ -103,25 +105,9 @@ public class TransferConfig {
 	 *         enabled in the repository configuration.
 	 * @since 3.6
 	 */
-	@Nullable
 	public ObjectChecker newObjectChecker() {
-		return newObjectChecker(fetchFsck);
-	}
-
-	/**
-	 * @return checker to verify objects pushed into this repository, or null if
-	 *         checking is not enabled in the repository configuration.
-	 * @since 4.2
-	 */
-	@Nullable
-	public ObjectChecker newReceiveObjectChecker() {
-		return newObjectChecker(receiveFsck);
-	}
-
-	private ObjectChecker newObjectChecker(boolean check) {
-		if (!check) {
+		if (!checkReceivedObjects)
 			return null;
-		}
 		return new ObjectChecker()
 			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
 			.setAllowInvalidPersonIdent(allowInvalidPersonIdent)

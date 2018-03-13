@@ -79,7 +79,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
-	/***/ public String atomicPushNotSupported;
 	/***/ public String authenticationNotSupported;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;
@@ -105,7 +104,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
 	/***/ public String cannotChangeActionOnComment;
 	/***/ public String cannotChangeToComment;
-	/***/ public String cannotCheckoutFromUnbornBranch;
 	/***/ public String cannotCheckoutOursSwitchBranch;
 	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
@@ -148,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadCommit;
 	/***/ public String cannotReadFile;
 	/***/ public String cannotReadHEAD;
-	/***/ public String cannotReadIndex;
 	/***/ public String cannotReadObject;
 	/***/ public String cannotReadObjectsPath;
 	/***/ public String cannotReadTree;
@@ -158,7 +155,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotStoreObjects;
 	/***/ public String cannotResolveUniquelyAbbrevObjectId;
 	/***/ public String cannotUnloadAModifiedTree;
-	/***/ public String cannotUpdateUnbornBranch;
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
 	/***/ public String cannotWriteObjectsPath;
 	/***/ public String canOnlyCherryPickCommitsWithOneParent;
@@ -291,7 +287,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String emptyRef;
 	/***/ public String encryptionError;
-	/***/ public String encryptionOnlyPBE;
 	/***/ public String endOfFileInEscape;
 	/***/ public String entryNotFoundByPath;
 	/***/ public String enumValueNotSupported2;
@@ -305,6 +300,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
@@ -342,8 +338,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String fileIsTooBigForThisConvenienceMethod;
 	/***/ public String fileIsTooLarge;
 	/***/ public String fileModeNotSetForPath;
-	/***/ public String filterExecutionFailed;
-	/***/ public String filterExecutionFailedRc;
 	/***/ public String findingGarbage;
 	/***/ public String flagIsDisposed;
 	/***/ public String flagNotFromThis;
@@ -352,6 +346,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String gcFailed;
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
+	/***/ public String hiddenFilesStartWithDot;
 	/***/ public String hoursAgo;
 	/***/ public String hugeIndexesAreNotSupportedByJgitYet;
 	/***/ public String hunkBelongsToAnotherFile;
@@ -389,10 +384,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidGitdirRef;
 	/***/ public String invalidGitType;
 	/***/ public String invalidId;
-	/***/ public String invalidId0;
 	/***/ public String invalidIdLength;
 	/***/ public String invalidIgnoreParamSubmodule;
-	/***/ public String invalidIgnoreRule;
 	/***/ public String invalidIntegerValue;
 	/***/ public String invalidKey;
 	/***/ public String invalidLineInConfigFile;
@@ -409,14 +402,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
-	/***/ public String invalidShallowObject;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
-	/***/ public String invalidRepositoryStateNoHead;
 	/***/ public String invalidWindowSize;
 	/***/ public String isAStaticFlagAndHasNorevWalkInstance;
 	/***/ public String JRELacksMD5Implementation;
@@ -507,7 +498,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packChecksumMismatch;
 	/***/ public String packCorruptedWhileWritingToFilesystem;
 	/***/ public String packDoesNotMatchIndex;
-	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
 	/***/ public String packfileCorruptionDetected;
@@ -516,7 +506,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileIsTruncatedNoParam;
 	/***/ public String packHandleIsStale;
 	/***/ public String packHasUnresolvedDeltas;
-	/***/ public String packInaccessible;
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
 	/***/ public String packRefs;
@@ -633,9 +622,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
-	/***/ public String storePushCertMultipleRefs;
-	/***/ public String storePushCertOneRef;
-	/***/ public String storePushCertReflog;
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
@@ -664,7 +650,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
 	/***/ public String transportProtoTest;
-	/***/ public String transportProvidedRefWithNoObjectId;
 	/***/ public String transportSSHRetryInterrupt;
 	/***/ public String treeEntryAlreadyExists;
 	/***/ public String treeFilterMarkerTooManyFilters;

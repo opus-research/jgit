@@ -69,9 +69,9 @@ public class DirCacheEntryTest {
 		assertFalse(isValidPath("a\u0000b"));
 	}
 
-	private static boolean isValidPath(String path) {
+	private static boolean isValidPath(final String path) {
 		try {
-			new DirCacheEntry(path);
+			DirCacheCheckout.checkValidPath(path);
 			return true;
 		} catch (InvalidPathException e) {
 			return false;
