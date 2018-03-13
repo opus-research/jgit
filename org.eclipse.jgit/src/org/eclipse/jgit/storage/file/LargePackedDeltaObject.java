@@ -60,8 +60,6 @@ import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.storage.pack.DeltaStream;
 
 class LargePackedDeltaObject extends ObjectLoader {
-	private static final long SIZE_UNKNOWN = -1;
-
 	private int type;
 
 	private long size;
@@ -80,7 +78,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 			long baseOffset, int headerLength, PackFile pack,
 			FileObjectDatabase db) {
 		this.type = Constants.OBJ_BAD;
-		this.size = SIZE_UNKNOWN;
+		this.size = -1;
 		this.objectOffset = objectOffset;
 		this.baseOffset = baseOffset;
 		this.headerLength = headerLength;
@@ -116,7 +114,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 
 	@Override
 	public long getSize() {
-		if (size == SIZE_UNKNOWN) {
+		if (size < 0) {
 			WindowCursor wc = new WindowCursor(db);
 			try {
 				byte[] b = pack.getDeltaHeader(wc, objectOffset + headerLength);
@@ -190,7 +188,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 
 		final ObjectLoader base = pack.load(wc, baseOffset);
 		DeltaStream ds = new DeltaStream(delta) {
-			private long baseSize = SIZE_UNKNOWN;
+			private long baseSize = -1;
 
 			@Override
 			protected InputStream openBase() throws IOException {
@@ -199,7 +197,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 					in = ((LargePackedDeltaObject) base).open(wc);
 				else
 					in = base.openStream();
-				if (baseSize == SIZE_UNKNOWN) {
+				if (baseSize < 0) {
 					if (in instanceof DeltaStream)
 						baseSize = ((DeltaStream) in).getSize();
 					else if (in instanceof ObjectStream)
@@ -210,7 +208,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 
 			@Override
 			protected long getBaseSize() throws IOException {
-				if (baseSize == SIZE_UNKNOWN) {
+				if (baseSize < 0) {
 					// This code path should never be used as DeltaStream
 					// is supposed to open the stream first, which would
 					// initialize the size for us directly from the stream.
@@ -219,7 +217,7 @@ class LargePackedDeltaObject extends ObjectLoader {
 				return baseSize;
 			}
 		};
-		if (size == SIZE_UNKNOWN)
+		if (size < 0)
 			size = ds.getSize();
 		return ds;
 	}
