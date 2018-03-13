@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,28 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.hooks;
 
-import java.io.PrintStream;
+package org.eclipse.jgit.console;
 
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * Factory class for instantiating supported hooks.
- *
- * @since 4.0
+ * Translation bundle for JGit console
  */
-public class Hooks {
+public class ConsoleText extends TranslationBundle {
 
 	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The pre-commit hook for the given repository.
+	 * @return an instance of this translation bundle
 	 */
-	public static PreCommitHook preCommit(Repository repo,
-			PrintStream outputStream) {
-		return new PreCommitHook(repo, outputStream);
+	public static ConsoleText get() {
+		return NLS.getBundleFor(ConsoleText.class);
 	}
 
-	/**
-	 * @param repo
-	 * @param outputStream
-	 *            The output stream, or {@code null} to use {@code System.out}
-	 * @return The commit-msg hook for the given repository.
-	 */
-	public static CommitMsgHook commitMsg(Repository repo,
-			PrintStream outputStream) {
-		return new CommitMsgHook(repo, outputStream);
-	}
+	// @formatter:off
+	/***/ public String answerNo;
+	/***/ public String answerYes;
+	/***/ public String noSystemConsoleAvailable;
+	/***/ public String password;
+	/***/ public String usernameFor;
 }
