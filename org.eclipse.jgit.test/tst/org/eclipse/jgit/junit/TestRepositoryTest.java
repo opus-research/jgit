@@ -52,7 +52,6 @@ import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -65,12 +64,6 @@ public class TestRepositoryTest {
 		tr = new TestRepository<>(new InMemoryRepository(
 				new DfsRepositoryDescription("test")));
 		rw = tr.getRevWalk();
-	}
-
-	@After
-	public void tearDown() {
-		rw.close();
-		tr.getRepository().close();
 	}
 
 	@Test
