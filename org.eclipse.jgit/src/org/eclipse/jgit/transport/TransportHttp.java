@@ -45,9 +45,12 @@
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
+import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
+import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
+import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 import static org.eclipse.jgit.util.HttpSupport.METHOD_POST;
 
 import java.io.BufferedReader;
@@ -110,11 +113,24 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack";
 
+	private static final String userAgent = computeUserAgent();
+
 	static boolean canHandle(final URIish uri) {
 		if (!uri.isRemote())
 			return false;
 		final String s = uri.getScheme();
 		return "http".equals(s) || "https".equals(s) || "ftp".equals(s);
+	}
+
+	private static String computeUserAgent() {
+		String version;
+		final Package pkg = TransportHttp.class.getPackage();
+		if (pkg != null && pkg.getImplementationVersion() != null) {
+			version = pkg.getImplementationVersion();
+		} else {
+			version = "unknown"; //$NON-NLS-1$
+		}
+		return "JGit/" + version; //$NON-NLS-1$
 	}
 
 	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
@@ -139,8 +155,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private final ProxySelector proxySelector;
 
-	private boolean useSmartHttp = true;
-
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
@@ -155,20 +169,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 		http = local.getConfig().get(HTTP_KEY);
 		proxySelector = ProxySelector.getDefault();
-	}
-
-	/**
-	 * Toggle whether or not smart HTTP transport should be used.
-	 * <p>
-	 * This flag exists primarily to support backwards compatibility testing
-	 * within a testing framework, there is no need to modify it in most
-	 * applications.
-	 *
-	 * @param on
-	 *            if {@code true} (default), smart HTTP is enabled.
-	 */
-	public void setUseSmartHttp(final boolean on) {
-		useSmartHttp = on;
 	}
 
 	@Override
@@ -271,10 +271,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					readSmartHeaders(in, service);
 					return new SmartHttpPushConnection(in);
 
-				} else if (!useSmartHttp) {
-					final String msg = "smart HTTP push disabled";
-					throw new NotSupportedException(msg);
-
 				} else {
 					final String msg = "remote does not support smart HTTP push";
 					throw new NotSupportedException(msg);
@@ -307,11 +303,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				b.append('/');
 			b.append(Constants.INFO_REFS);
 
-			if (useSmartHttp) {
-				b.append(b.indexOf("?") < 0 ? '?' : '&');
-				b.append("service=");
-				b.append(service);
-			}
+			b.append(b.indexOf("?") < 0 ? '?' : '&');
+			b.append("service=");
+			b.append(service);
 
 			u = new URL(b.toString());
 		} catch (MalformedURLException e) {
@@ -320,6 +314,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		try {
 			final HttpURLConnection conn = httpOpen(u);
+			String expType = "application/x-" + service + "-advertisement";
+			conn.setRequestProperty(HDR_ACCEPT, expType + ", */*");
 			final int status = HttpSupport.response(conn);
 			switch (status) {
 			case HttpURLConnection.HTTP_OK:
@@ -348,6 +344,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
+		conn.setRequestProperty(HDR_PRAGMA, "no-cache");//$NON-NLS-1$
+		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
 		return conn;
 	}
 
@@ -636,6 +634,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
 			conn.setRequestProperty(HDR_CONTENT_TYPE, requestType);
+			conn.setRequestProperty(HDR_ACCEPT, responseType);
 		}
 
 		void execute() throws IOException {
@@ -661,7 +660,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 						buf = out;
 				} catch (IOException err) {
 					// Most likely caused by overflowing the buffer, meaning
-					// its larger if it were compressed.  Don't compress.
+					// its larger if it were compressed. Don't compress.
 					buf = out;
 				}
 
