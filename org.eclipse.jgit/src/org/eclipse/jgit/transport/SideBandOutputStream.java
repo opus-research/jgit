@@ -109,14 +109,10 @@ class SideBandOutputStream extends OutputStream {
 		cnt = HDR_SIZE;
 	}
 
-	void flushBuffer() throws IOException {
-		if (HDR_SIZE < cnt)
-			writeBuffer();
-	}
-
 	@Override
 	public void flush() throws IOException {
-		flushBuffer();
+		if (HDR_SIZE < cnt)
+			writeBuffer();
 		out.flush();
 	}
 
