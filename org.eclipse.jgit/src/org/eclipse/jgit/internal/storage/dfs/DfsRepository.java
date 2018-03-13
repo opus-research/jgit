@@ -79,6 +79,9 @@ public abstract class DfsRepository extends Repository {
 	@Override
 	public abstract DfsObjDatabase getObjectDatabase();
 
+	@Override
+	public abstract DfsRefDatabase getRefDatabase();
+
 	/** @return a description of this repository. */
 	public DfsRepositoryDescription getDescription() {
 		return description;
@@ -92,10 +95,7 @@ public abstract class DfsRepository extends Repository {
 	 *             the repository cannot be checked.
 	 */
 	public boolean exists() throws IOException {
-		if (getRefDatabase() instanceof DfsRefDatabase) {
-			return ((DfsRefDatabase) getRefDatabase()).exists();
-		}
-		return true;
+		return getRefDatabase().exists();
 	}
 
 	@Override
@@ -117,7 +117,7 @@ public abstract class DfsRepository extends Repository {
 
 	@Override
 	public void scanForRepoChanges() throws IOException {
-		getRefDatabase().refresh();
+		getRefDatabase().clearCache();
 		getObjectDatabase().clearCache();
 	}
 

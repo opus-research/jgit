@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackStatistics;
@@ -79,7 +78,9 @@ import org.eclipse.jgit.util.io.CountingOutputStream;
 /** Repack and garbage collect a repository. */
 public class DfsGarbageCollector {
 	private final DfsRepository repo;
-	private final RefDatabase refdb;
+
+	private final DfsRefDatabase refdb;
+
 	private final DfsObjDatabase objdb;
 
 	private final List<DfsPackDescription> newPackDesc;
@@ -194,7 +195,7 @@ public class DfsGarbageCollector {
 
 		ctx = (DfsReader) objdb.newReader();
 		try {
-			refdb.refresh();
+			refdb.clearCache();
 			objdb.clearCache();
 
 			refsBefore = refdb.getRefs(ALL);
