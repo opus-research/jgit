@@ -63,7 +63,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -98,6 +98,8 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  *
  * @see <a href="http://git-htmldocs.googlecode.com/git/git-archive.html"
  *      >Git documentation about archive</a>
+ *
+ * @since 3.0
  */
 public class ArchiveCommand extends GitCommand<OutputStream> {
 	/**
