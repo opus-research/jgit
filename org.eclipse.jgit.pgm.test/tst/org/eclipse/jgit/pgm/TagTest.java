@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,23 +49,25 @@ import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.junit.Before;
 import org.junit.Test;
 
-public class BranchTest extends CLIRepositoryTestCase {
+public class TagTest extends CLIRepositoryTestCase {
+	private Git git;
+
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
+		git = new Git(db);
+		git.commit().setMessage("initial commit").call();
 	}
 
 	@Test
-	public void testList() throws Exception {
-		assertEquals("* master 6fd41be initial commit",
-				execute("git branch -v")[0]);
-	}
+	public void testTagTwice() throws Exception {
+		git.tag().setName("test").call();
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		git.commit().setMessage("commit").call();
 
-	@Test
-	public void testExistingBranch() throws Exception {
-		assertEquals("fatal: A branch named 'master' already exists.",
-				execute("git branch master")[0]);
+		assertEquals("fatal: tag 'test' already exists",
+				execute("git tag test")[0]);
 	}
 }
