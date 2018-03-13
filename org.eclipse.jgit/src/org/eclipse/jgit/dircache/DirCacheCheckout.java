@@ -54,6 +54,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.errors.FilterFailedException;
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -80,7 +82,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.util.FilterCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.FileUtils;
@@ -1311,9 +1312,10 @@ public class DirCacheCheckout {
 		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
 				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
 			if (checkoutMetadata.smudgeFilterCommand != null) {
-				if (Repository
+				if (FilterCommandRegistry
 						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
-					runBuiltinFilterCommand(repo, checkoutMetadata, ol, channel);
+					runBuiltinFilterCommand(repo, checkoutMetadata, ol,
+							channel);
 				} else {
 					runExternalFilterCommand(repo, entry, checkoutMetadata, ol,
 							fs, channel);
@@ -1401,7 +1403,7 @@ public class DirCacheCheckout {
 			OutputStream channel) throws MissingObjectException, IOException {
 		FilterCommand command = null;
 		try {
-			command = Repository.getFilterCommand(
+			command = FilterCommandRegistry.createFilterCommand(
 					checkoutMetadata.smudgeFilterCommand, repo, ol.openStream(),
 					channel);
 		} catch (IOException e) {
@@ -1412,6 +1414,7 @@ public class DirCacheCheckout {
 		}
 		if (command != null) {
 			while (command.run() != -1) {
+				// loop as long as command.run() tells there is work to do
 			}
 		}
 	}
