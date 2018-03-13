@@ -152,7 +152,7 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * undefined behavior.
  * </p>
  */
-public class PackWriter implements AutoCloseable {
+public class PackWriter {
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	/** A collection of object ids. */
@@ -1085,22 +1085,9 @@ public class PackWriter implements AutoCloseable {
 		return state.snapshot();
 	}
 
-	/**
-	 * Release all resources used by this writer. Use {@link #close()} instead.
-	 */
-	@Deprecated
+	/** Release all resources used by this writer. */
 	public void release() {
-		close();
-	}
-
-	/**
-	 * Release all resources used by this writer.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
-		reader.close();
+		reader.release();
 		if (myDeflater != null) {
 			myDeflater.end();
 			myDeflater = null;

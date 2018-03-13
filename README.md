@@ -87,8 +87,7 @@ Warnings/Caveats
 - Only the timestamp of the index is used by jgit if the index is
   dirty.
 
-- Don't try the library with a JDK other than 1.7 (Java 7) unless you
-  are prepared to investigate problems yourself.
+- JGit requires at least a Java 7 JDK.
 
 - CRLF conversion is performed depending on the core.autocrlf setting,
   however Git for Windows by default stores that setting during
