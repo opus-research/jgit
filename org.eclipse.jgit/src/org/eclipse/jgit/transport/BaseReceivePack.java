@@ -924,8 +924,7 @@ public abstract class BaseReceivePack {
 			parser.setAllowThin(true);
 			parser.setNeedNewObjectIds(checkReferencedIsReachable);
 			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
-			parser.setCheckEofAfterPackFooter(!biDirectionalPipe
-					&& !isExpectDataAfterPackFooter());
+			parser.setCheckEofAfterPackFooter(!biDirectionalPipe);
 			parser.setExpectDataAfterPackFooter(isExpectDataAfterPackFooter());
 			parser.setObjectChecking(isCheckReceivedObjects());
 			parser.setLockMessage(lockMsg);
