@@ -66,9 +66,8 @@ import org.eclipse.jgit.lib.FileBasedConfig;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.WindowCache;
-import org.eclipse.jgit.storage.file.WindowCacheConfig;
+import org.eclipse.jgit.lib.WindowCache;
+import org.eclipse.jgit.lib.WindowCacheConfig;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -289,7 +288,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
 		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + Constants.DOT_GIT;
 		File gitdir = new File(trash, gitdirName).getCanonicalFile();
-		Repository db = new FileRepository(gitdir);
+		Repository db = new Repository(gitdir);
 
 		assertFalse(gitdir.exists());
 		db.create();

@@ -56,6 +56,7 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
+import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Ref;
@@ -63,7 +64,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.storage.file.ObjectDirectory;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -176,7 +176,7 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		// Verify the only storage of b is our packed delta above.
 		//
 		ObjectDirectory od = (ObjectDirectory) src.getObjectDatabase();
-		assertTrue("has b", src.hasObject(b));
+		assertTrue("has b", od.hasObject(b));
 		assertFalse("b not loose", od.fileFor(b).exists());
 
 		// Now use b but in a different commit than what is hidden.

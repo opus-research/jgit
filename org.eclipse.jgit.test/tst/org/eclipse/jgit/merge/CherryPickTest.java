@@ -44,8 +44,7 @@
 
 package org.eclipse.jgit.merge;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
+import java.io.ByteArrayInputStream;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -54,7 +53,7 @@ import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -94,7 +93,7 @@ public class CherryPickTest extends RepositoryTestCase {
 			t.finish();
 		}
 
-		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectWriter ow = new ObjectWriter(db);
 		final ObjectId B = commit(ow, treeB, new ObjectId[] {});
 		final ObjectId O = commit(ow, treeO, new ObjectId[] { B });
 		final ObjectId P = commit(ow, treeP, new ObjectId[] { B });
@@ -129,17 +128,15 @@ public class CherryPickTest extends RepositoryTestCase {
 				.getObjectId(0));
 	}
 
-	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
+	private ObjectId commit(final ObjectWriter ow, final DirCache treeB,
 			final ObjectId[] parentIds) throws Exception {
 		final Commit c = new Commit(db);
-		c.setTreeId(treeB.writeTree(odi));
+		c.setTreeId(treeB.writeTree(ow));
 		c.setAuthor(new PersonIdent("A U Thor", "a.u.thor", 1L, 0));
 		c.setCommitter(c.getAuthor());
 		c.setParentIds(parentIds);
 		c.setMessage("Tree " + c.getTreeId().name());
-		ObjectId id = odi.insert(OBJ_COMMIT, odi.format(c));
-		odi.flush();
-		return id;
+		return ow.writeCommit(c);
 	}
 
 	private DirCacheEntry makeEntry(final String path, final FileMode mode)
@@ -151,8 +148,9 @@ public class CherryPickTest extends RepositoryTestCase {
 			final String content) throws Exception {
 		final DirCacheEntry ent = new DirCacheEntry(path);
 		ent.setFileMode(mode);
-		ent.setObjectId(new ObjectInserter.Formatter().idFor(OBJ_BLOB,
-				Constants.encode(content)));
+		final byte[] contentBytes = Constants.encode(content);
+		ent.setObjectId(new ObjectWriter(db).computeBlobSha1(
+				contentBytes.length, new ByteArrayInputStream(contentBytes)));
 		return ent;
 	}
 }

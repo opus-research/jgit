@@ -61,12 +61,6 @@ import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.storage.file.ObjectDirectory;
-import org.eclipse.jgit.storage.file.PackFile;
-import org.eclipse.jgit.storage.file.PackIndexWriter;
-import org.eclipse.jgit.storage.file.PackedObjectLoader;
-import org.eclipse.jgit.storage.file.WholePackedObjectLoader;
-import org.eclipse.jgit.storage.file.WindowCursor;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.NB;
 
@@ -185,7 +179,7 @@ public class PackWriter {
 
 	private final byte[] buf = new byte[16384]; // 16 KB
 
-	private final WindowCursor windowCursor;
+	private final WindowCursor windowCursor = new WindowCursor();
 
 	private List<ObjectToPack> sortedByName;
 
@@ -242,9 +236,6 @@ public class PackWriter {
 	public PackWriter(final Repository repo, final ProgressMonitor imonitor,
 			final ProgressMonitor wmonitor) {
 		this.db = repo;
-		windowCursor = new WindowCursor((ObjectDirectory) repo
-				.getObjectDatabase());
-
 		initMonitor = imonitor == null ? NullProgressMonitor.INSTANCE : imonitor;
 		writeMonitor = wmonitor == null ? NullProgressMonitor.INSTANCE : wmonitor;
 		this.deflater = new Deflater(db.getConfig().getCore().getCompression());
@@ -628,7 +619,7 @@ public class PackWriter {
 	private void searchForReuse(
 			final Collection<PackedObjectLoader> reuseLoaders,
 			final ObjectToPack otp) throws IOException {
-		windowCursor.openObjectInAllPacks(otp, reuseLoaders);
+		db.openObjectInAllPacks(otp, reuseLoaders, windowCursor);
 		if (reuseDeltas) {
 			selectDeltaReuseForObject(otp, reuseLoaders);
 		}
@@ -828,7 +819,8 @@ public class PackWriter {
 			IncorrectObjectTypeException {
 		final ObjectWalk walker = new ObjectWalk(db);
 		walker.setRetainBody(false);
-		walker.sort(RevSort.COMMIT_TIME_DESC);
+		walker.sort(RevSort.TOPO);
+		walker.sort(RevSort.COMMIT_TIME_DESC, true);
 		if (thin)
 			walker.sort(RevSort.BOUNDARY, true);
 
