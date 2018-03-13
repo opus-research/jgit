@@ -274,8 +274,7 @@ public class GC {
 		ObjectReader reader = repo.newObjectReader();
 		ObjectDirectory dir = repo.getObjectDatabase();
 		ObjectDirectoryInserter inserter = dir.newInserter();
-		boolean shouldLoosen = !"now".equals(getPruneExpireStr()) && //$NON-NLS-1$
-			getExpireDate() < Long.MAX_VALUE;
+		boolean shouldLoosen = getExpireDate() < Long.MAX_VALUE;
 
 		prunePreserved();
 		long packExpireDate = getPackExpireDate();
@@ -298,7 +297,6 @@ public class GC {
 				prunePack(oldName);
 			}
 		}
-
 		// close the complete object database. That's my only chance to force
 		// rescanning and to detect that certain pack files are now deleted.
 		repo.getObjectDatabase().close();
@@ -453,7 +451,7 @@ public class GC {
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
-		Map<ObjectId, File> deletionCandidates = new HashMap<>();
+		Map<ObjectId, File> deletionCandidates = new HashMap<ObjectId, File>();
 		Set<ObjectId> indexObjects = null;
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
@@ -601,7 +599,9 @@ public class GC {
 		long expireDate = Long.MAX_VALUE;
 
 		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = getPruneExpireStr();
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 			if (pruneExpireStr == null)
 				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
 			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
@@ -613,12 +613,6 @@ public class GC {
 		if (expireAgeMillis != -1)
 			expireDate = System.currentTimeMillis() - expireAgeMillis;
 		return expireDate;
-	}
-
-	private String getPruneExpireStr() {
-		return repo.getConfig().getString(
-                        ConfigConstants.CONFIG_GC_SECTION, null,
-                        ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 	}
 
 	private long getPackExpireDate() throws ParseException {
@@ -694,7 +688,7 @@ public class GC {
 	 */
 	public void packRefs() throws IOException {
 		Collection<Ref> refs = repo.getRefDatabase().getRefs(Constants.R_REFS).values();
-		List<String> refsToBePacked = new ArrayList<>(refs.size());
+		List<String> refsToBePacked = new ArrayList<String>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
 			for (Ref ref : refs) {
@@ -729,10 +723,10 @@ public class GC {
 		long time = System.currentTimeMillis();
 		Collection<Ref> refsBefore = getAllRefs();
 
-		Set<ObjectId> allHeads = new HashSet<>();
-		Set<ObjectId> nonHeads = new HashSet<>();
-		Set<ObjectId> txnHeads = new HashSet<>();
-		Set<ObjectId> tagTargets = new HashSet<>();
+		Set<ObjectId> allHeads = new HashSet<ObjectId>();
+		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
+		Set<ObjectId> txnHeads = new HashSet<ObjectId>();
+		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
 		RefDatabase refdb = repo.getRefDatabase();
 
@@ -751,7 +745,7 @@ public class GC {
 				tagTargets.add(ref.getPeeledObjectId());
 		}
 
-		List<ObjectIdSet> excluded = new LinkedList<>();
+		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
 		for (final PackFile f : repo.getObjectDatabase().getPacks()) {
 			checkCancelled();
 			if (f.shouldBeKept())
@@ -761,7 +755,7 @@ public class GC {
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
-		List<PackFile> ret = new ArrayList<>(2);
+		List<PackFile> ret = new ArrayList<PackFile>(2);
 		PackFile heads = null;
 		if (!allHeads.isEmpty()) {
 			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
@@ -863,7 +857,7 @@ public class GC {
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
-		Set<ObjectId> ret = new HashSet<>();
+		Set<ObjectId> ret = new HashSet<ObjectId>();
 		for (ReflogEntry e : rlEntries) {
 			if (e.getWho().getWhen().getTime() < minTime)
 				break;
@@ -932,7 +926,7 @@ public class GC {
 
 			treeWalk.setFilter(TreeFilter.ANY_DIFF);
 			treeWalk.setRecursive(true);
-			Set<ObjectId> ret = new HashSet<>();
+			Set<ObjectId> ret = new HashSet<ObjectId>();
 
 			while (treeWalk.next()) {
 				checkCancelled();
@@ -965,9 +959,8 @@ public class GC {
 			List<ObjectIdSet> excludeObjects) throws IOException {
 		checkCancelled();
 		File tmpPack = null;
-		Map<PackExt, File> tmpExts = new TreeMap<>(
+		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
 				new Comparator<PackExt>() {
-					@Override
 					public int compare(PackExt o1, PackExt o2) {
 						// INDEX entries must be returned last, so the pack
 						// scanner does pick up the new pack until all the
@@ -1166,7 +1159,6 @@ public class GC {
 		 */
 		public long numberOfBitmaps;
 
-		@Override
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -1400,7 +1392,6 @@ public class GC {
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
 				new DirectoryStream.Filter<Path>() {
 
-					@Override
 					public boolean accept(Path file) throws IOException {
 						Path fileName = file.getFileName();
 						return Files.isRegularFile(file) && fileName != null

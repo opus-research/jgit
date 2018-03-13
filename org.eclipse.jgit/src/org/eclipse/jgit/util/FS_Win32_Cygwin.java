@@ -77,7 +77,6 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	public static boolean isCygwin() {
 		final String path = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getProperty("java.library.path"); //$NON-NLS-1$
 					}
@@ -107,12 +106,10 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		super(src);
 	}
 
-	@Override
 	public FS newInstance() {
 		return new FS_Win32_Cygwin(this);
 	}
 
-	@Override
 	public File resolve(final File dir, final String pn) {
 		String useCygPath = System.getProperty("jgit.usecygpath"); //$NON-NLS-1$
 		if (useCygPath != null && useCygPath.equals("true")) { //$NON-NLS-1$
@@ -136,7 +133,6 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getenv("HOME"); //$NON-NLS-1$
 					}
@@ -148,7 +144,7 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<>(4 + args.length);
+		List<String> argv = new ArrayList<String>(4 + args.length);
 		argv.add("sh.exe"); //$NON-NLS-1$
 		argv.add("-c"); //$NON-NLS-1$
 		argv.add(cmd + " \"$@\""); //$NON-NLS-1$

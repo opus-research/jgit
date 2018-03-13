@@ -149,7 +149,7 @@ class Branch extends TextBuiltin {
 	@Argument(metaVar = "metaVar_name")
 	private String branch;
 
-	private final Map<String, Ref> printRefs = new LinkedHashMap<>();
+	private final Map<String, Ref> printRefs = new LinkedHashMap<String, Ref>();
 
 	/** Only set for verbose branch listing at-the-moment */
 	private RevWalk rw;

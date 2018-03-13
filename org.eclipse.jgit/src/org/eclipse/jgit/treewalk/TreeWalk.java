@@ -128,7 +128,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * The filter command as defined in gitattributes. The keys are
 	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
 	 */
-	private Map<String, String> filterCommandsByNameDotType = new HashMap<>();
+	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
 
 	/**
 	 * @param operationType
@@ -559,7 +559,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
 	 * @since 4.2
 	 */
-	@Override
 	public Attributes getAttributes() {
 		if (attrs != null)
 			return attrs;
