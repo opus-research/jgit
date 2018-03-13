@@ -242,21 +242,19 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			}
 		}
 
-		String upstreamName = "branch \'"
-				+ Repository.shortenRefName(remoteBranchName) + "\' of "
-				+ remoteUri;
-
 		PullResult result;
 		if (doRebase) {
 			RebaseCommand rebase = new RebaseCommand(repo);
 			RebaseResult rebaseRes = rebase.setUpstream(commitToMerge)
-					.setUpstreamName(upstreamName)
 					.setProgressMonitor(monitor).setOperation(Operation.BEGIN)
 					.call();
 			result = new PullResult(fetchRes, remote, rebaseRes);
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
-			merge.include(upstreamName, commitToMerge);
+			String name = "branch \'"
+					+ Repository.shortenRefName(remoteBranchName) + "\' of "
+					+ remoteUri;
+			merge.include(name, commitToMerge);
 			MergeResult mergeRes = merge.call();
 			monitor.update(1);
 			result = new PullResult(fetchRes, remote, mergeRes);

@@ -137,8 +137,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private static final String ONTO = "onto";
 
-	private static final String ONTO_NAME = "onto-name";
-
 	private static final String PATCH = "patch";
 
 	private static final String REBASE_HEAD = "head";
@@ -168,8 +166,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private Operation operation = Operation.BEGIN;
 
 	private RevCommit upstreamCommit;
-
-	private String upstreamCommitName;
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
@@ -215,16 +211,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case SKIP:
 				// fall through
 			case CONTINUE:
-				String upstreamCommitId = readFile(rebaseDir, ONTO);
-				try {
-					upstreamCommitName = readFile(rebaseDir, ONTO_NAME);
-				} catch (FileNotFoundException e) {
-					// Fall back to commit ID if file doesn't exist (e.g. rebase
-					// was started by C Git)
-					upstreamCommitName = upstreamCommitId;
-				}
+				String upstreamCommitName = readFile(rebaseDir, ONTO);
 				this.upstreamCommit = walk.parseCommit(repo
-						.resolve(upstreamCommitId));
+						.resolve(upstreamCommitName));
 				break;
 			case BEGIN:
 				RebaseResult res = initFilesAndRewind();
@@ -278,10 +267,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						// TODO if the content of this commit is already merged
 						// here we should skip this step in order to avoid
 						// confusing pseudo-changed
-						String ourCommitName = getOurCommitName();
 						CherryPickResult cherryPickResult = new Git(repo)
-								.cherryPick().include(commitToPick)
-								.setOurCommitName(ourCommitName).call();
+								.cherryPick().include(commitToPick).call();
 						switch (cherryPickResult.getStatus()) {
 						case FAILED:
 							if (operation == Operation.BEGIN)
@@ -311,14 +298,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
-	}
-
-	private String getOurCommitName() {
-		// If onto is different from upstream, this should say "onto", but
-		// RebaseCommand doesn't support a different "onto" at the moment.
-		String ourCommitName = "Upstream, based on "
-				+ Repository.shortenRefName(upstreamCommitName);
-		return ourCommitName;
 	}
 
 	private void updateHead(String headName, RevCommit newHead)
@@ -605,7 +584,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		createFile(rebaseDir, REBASE_HEAD, headId.name());
 		createFile(rebaseDir, HEAD_NAME, headName);
 		createFile(rebaseDir, ONTO, upstreamCommit.name());
-		createFile(rebaseDir, ONTO_NAME, upstreamCommitName);
 		createFile(rebaseDir, INTERACTIVE, "");
 		BufferedWriter fw = new BufferedWriter(new OutputStreamWriter(
 				new FileOutputStream(new File(rebaseDir, GIT_REBASE_TODO)),
@@ -723,9 +701,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			// these operations are only possible while in a rebasing state
 			switch (repo.getRepositoryState()) {
 			case REBASING_INTERACTIVE:
-			case REBASING:
-			case REBASING_REBASING:
-			case REBASING_MERGE:
 				break;
 			default:
 				throw new WrongRepositoryStateException(MessageFormat.format(
@@ -909,7 +884,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 */
 	public RebaseCommand setUpstream(RevCommit upstream) {
 		this.upstreamCommit = upstream;
-		this.upstreamCommitName = upstream.name();
 		return this;
 	}
 
@@ -921,7 +895,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	public RebaseCommand setUpstream(AnyObjectId upstream) {
 		try {
 			this.upstreamCommit = walk.parseCommit(upstream);
-			this.upstreamCommitName = upstream.name();
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().couldNotReadObjectWhileParsingCommit,
@@ -944,28 +917,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				throw new RefNotFoundException(MessageFormat.format(JGitText
 						.get().refNotResolved, upstream));
 			upstreamCommit = walk.parseCommit(repo.resolve(upstream));
-			upstreamCommitName = upstream;
 			return this;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
-	}
-
-	/**
-	 * Optionally override the name of the upstream. If this is used, it has to
-	 * come after any {@link #setUpstream} call.
-	 *
-	 * @param upstreamName
-	 *            the name which will be used to refer to upstream in conflicts
-	 * @return {@code this}
-	 */
-	public RebaseCommand setUpstreamName(String upstreamName) {
-		if (upstreamCommit == null) {
-			throw new IllegalStateException(
-					"setUpstreamName must be called after setUpstream.");
-		}
-		this.upstreamCommitName = upstreamName;
-		return this;
 	}
 
 	/**
