@@ -46,7 +46,9 @@ package org.eclipse.jgit.http.server;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.http.server.ServletUtils.send;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import javax.servlet.Filter;
@@ -88,14 +90,13 @@ abstract class SmartServiceInfoRefs implements Filter {
 			final HttpServletResponse rsp = (HttpServletResponse) response;
 			try {
 				final Repository db = getRepository(req);
-				rsp.setContentType("application/x-" + svc + "-advertisement");
-
-				final SmartOutputStream buf = new SmartOutputStream(req, rsp);
+				final ByteArrayOutputStream buf = new ByteArrayOutputStream();
 				final PacketLineOut out = new PacketLineOut(buf);
 				out.writeString("# service=" + svc + "\n");
 				out.end();
 				advertise(req, db, new PacketLineOutRefAdvertiser(out));
-				buf.close();
+				rsp.setContentType("application/x-" + svc + "-advertisement");
+				send(buf.toByteArray(), req, rsp);
 			} catch (ServiceNotAuthorizedException e) {
 				rsp.sendError(SC_UNAUTHORIZED);
 
