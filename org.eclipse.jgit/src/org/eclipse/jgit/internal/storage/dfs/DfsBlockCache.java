@@ -274,7 +274,7 @@ public final class DfsBlockCache {
 		int slot = slot(key, position);
 		HashEntry e1 = table.get(slot);
 		DfsBlock v = scan(e1, key, position);
-		if (v != null && v.contains(key, requestedPosition)) {
+		if (v != null) {
 			ctx.stats.blockCacheHit++;
 			statHit.incrementAndGet();
 			return v;
