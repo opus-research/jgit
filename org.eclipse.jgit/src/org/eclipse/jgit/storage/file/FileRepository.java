@@ -343,12 +343,8 @@ public class FileRepository extends Repository {
 				Repository repo;
 
 				repo = ((AlternateRepository) d).repository;
-				for (Ref ref : repo.getAllRefs().values()) {
-					if (ref.getObjectId() != null)
-						r.add(ref.getObjectId());
-					if (ref.getPeeledObjectId() != null)
-						r.add(ref.getPeeledObjectId());
-				}
+				for (Ref ref : repo.getAllRefs().values())
+					r.add(ref.getObjectId());
 				r.addAll(repo.getAdditionalHaves());
 			}
 		}

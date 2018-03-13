@@ -694,7 +694,8 @@ public class ReceivePack {
 			return;
 		}
 
-		adv.init(db);
+		final RevFlag advertised = walk.newFlag("ADVERTISED");
+		adv.init(walk, advertised);
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
