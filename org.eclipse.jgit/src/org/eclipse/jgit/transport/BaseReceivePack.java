@@ -1058,6 +1058,14 @@ public abstract class BaseReceivePack {
 			rawOut = o;
 		}
 
+		if (maxPackSizeLimit >= 0)
+			rawIn = new LimitedInputStream(rawIn, maxPackSizeLimit) {
+				@Override
+				protected void limitExceeded() throws TooLargePackException {
+					throw new TooLargePackException(limit);
+				}
+			};
+
 		pckIn = new PacketLineIn(rawIn);
 		pckOut = new PacketLineOut(rawOut);
 		pckOut.setFlushOnEnd(false);
@@ -1361,7 +1369,7 @@ public abstract class BaseReceivePack {
 			if (getRefLogIdent() != null)
 				lockMsg += " from " + getRefLogIdent().toExternalString(); //$NON-NLS-1$
 
-			parser = ins.newPackParser(packInputStream());
+			parser = ins.newPackParser(rawIn);
 			parser.setAllowThin(true);
 			parser.setNeedNewObjectIds(checkReferencedIsReachable);
 			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
@@ -1379,19 +1387,6 @@ public abstract class BaseReceivePack {
 
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(timeout * 1000);
-	}
-
-	private InputStream packInputStream() {
-		InputStream packIn = rawIn;
-		if (maxPackSizeLimit >= 0) {
-			packIn = new LimitedInputStream(packIn, maxPackSizeLimit) {
-				@Override
-				protected void limitExceeded() throws TooLargePackException {
-					throw new TooLargePackException(limit);
-				}
-			};
-		}
-		return packIn;
 	}
 
 	private boolean needCheckConnectivity() {
