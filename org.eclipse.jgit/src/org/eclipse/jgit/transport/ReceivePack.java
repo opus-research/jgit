@@ -157,6 +157,8 @@ public class ReceivePack {
 
 	private OutputStream msgOut;
 
+	private final MessageOutputWrapper msgOutWrapper = new MessageOutputWrapper();
+
 	private PacketLineIn pckIn;
 
 	private PacketLineOut pckOut;
@@ -243,6 +245,52 @@ public class ReceivePack {
 					"denynonfastforwards", false);
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset",
 					true);
+		}
+	}
+
+	/**
+	 * Output stream that wraps the current {@link #msgOut}.
+	 * <p>
+	 * We don't want to expose {@link #msgOut} directly because it can change
+	 * several times over the course of a session.
+	 */
+	private class MessageOutputWrapper extends OutputStream {
+		@Override
+		public void write(int ch) {
+			if (msgOut != null) {
+				try {
+					msgOut.write(ch);
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+
+		@Override
+		public void write(byte[] b, int off, int len) {
+			if (msgOut != null) {
+				try {
+					msgOut.write(b, off, len);
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
+		}
+
+		@Override
+		public void write(byte[] b) {
+			write(b, 0, b.length);
+		}
+
+		@Override
+		public void flush() {
+			if (msgOut != null) {
+				try {
+					msgOut.flush();
+				} catch (IOException e) {
+					// Ignore write failures.
+				}
+			}
 		}
 	}
 
@@ -436,7 +484,7 @@ public class ReceivePack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return the hook invoked before updates occur. */
+	/** @return get the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -459,7 +507,7 @@ public class ReceivePack {
 		preReceive = h != null ? h : PreReceiveHook.NULL;
 	}
 
-	/** @return the hook invoked after updates occur. */
+	/** @return get the hook invoked after updates occur. */
 	public PostReceiveHook getPostReceiveHook() {
 		return postReceive;
 	}
@@ -542,7 +590,7 @@ public class ReceivePack {
 				advertiseError = new StringBuilder();
 			advertiseError.append(what).append('\n');
 		} else {
-			sendBytes(Constants.encode("error: " + what + "\n"));
+			msgOutWrapper.write(Constants.encode("error: " + what + "\n"));
 		}
 	}
 
@@ -557,43 +605,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		sendBytes(Constants.encode(what + "\n"));
+		msgOutWrapper.write(Constants.encode(what + "\n"));
 	}
 
-	/**
-	 * @see #sendBytes(byte[], int, int)
-	 *
-	 * @param what
-	 *            bytes to send.
-	 */
-	public void sendBytes(final byte[] what) {
-		sendBytes(what, 0, what.length);
-	}
-
-	/**
-	 * Send raw bytes to the the client over the sideband, if supported.
-	 * <p>
-	 * If the client doesn't support receiving messages, the message will be
-	 * discarded, with no other indication to the caller or to the client.
-	 * <p>
-	 * When possible, prefer {@link #sendMessage(String)} or
-	 * {@link #sendError(String)}; this method is intended only for callers who
-	 * need to do their own encoding.
-	 *
-	 * @param what
-	 *            bytes to send.
-	 * @param off
-	 *            array offset.
-	 * @param len
-	 *            number of bytes.
-	 */
-	public void sendBytes(final byte[] what, final int off, final int len) {
-		try {
-			if (msgOut != null)
-				msgOut.write(what, off, len);
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+	/** @return an underlying stream for sending messages to the client. */
+	public OutputStream getMessageOutputStream() {
+		return msgOutWrapper;
 	}
 
 	/**
