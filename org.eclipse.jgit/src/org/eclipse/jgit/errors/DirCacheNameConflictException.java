@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,34 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.errors;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+/**
+ * Thrown by DirCache code when entries overlap in impossible way.
+ *
+ * @since 4.2
+ */
+public class DirCacheNameConflictException extends IllegalStateException {
+	private static final long serialVersionUID = 1L;
 
-public class TagTest extends CLIRepositoryTestCase {
-	private Git git;
+	private final String path1;
+	private final String path2;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		git.commit().setMessage("initial commit").call();
+	/**
+	 * Construct an exception for a specific path.
+	 *
+	 * @param path1
+	 *            one path that conflicts.
+	 * @param path2
+	 *            another path that conflicts.
+	 */
+	public DirCacheNameConflictException(String path1, String path2) {
+		super(path1 + ' ' + path2);
+		this.path1 = path1;
+		this.path2 = path2;
 	}
 
-	@Test
-	public void testTagTwice() throws Exception {
-		git.tag().setName("test").call();
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("commit").call();
+	/** @return one of the paths that has a conflict. */
+	public String getPath1() {
+		return path1;
+	}
 
-		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
+	/** @return another path that has a conflict. */
+	public String getPath2() {
+		return path2;
 	}
 }

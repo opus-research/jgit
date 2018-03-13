@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,34 +40,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
-
-public class TagTest extends CLIRepositoryTestCase {
-	private Git git;
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		git.commit().setMessage("initial commit").call();
-	}
-
-	@Test
-	public void testTagTwice() throws Exception {
-		git.tag().setName("test").call();
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("commit").call();
-
-		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
-	}
+/**
+ * Simple set of ObjectIds.
+ * <p>
+ * Usually backed by a read-only data structure such as
+ * {@link org.eclipse.jgit.internal.storage.file.PackIndex}. Mutable types like
+ * {@link ObjectIdOwnerMap} also implement the interface by checking keys.
+ *
+ * @since 4.2
+ */
+public interface ObjectIdSet {
+	/**
+	 * Returns true if the objectId is contained within the collection.
+	 *
+	 * @param objectId
+	 *            the objectId to find
+	 * @return whether the collection contains the objectId.
+	 */
+	boolean contains(AnyObjectId objectId);
 }
