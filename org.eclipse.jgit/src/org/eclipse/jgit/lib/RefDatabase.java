@@ -86,23 +86,20 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the database could not be created.
 	 */
-	public abstract void create() throws IOException;
+	public void create() throws IOException {
+		// Assume no action is required.
+	}
 
 	/** Close any resources held by this database. */
-	public abstract void close();
+	public void close() {
+		// Assume no action is required.
+	}
 
 	/**
 	 * Determine if a proposed reference name overlaps with an existing one.
 	 * <p>
-	 * Reference names use '/' as a component separator, and may be stored in a
-	 * hierarchical storage such as a directory on the local filesystem.
-	 * <p>
-	 * If the reference "refs/heads/foo" exists then "refs/heads/foo/bar" must
-	 * not exist, as a reference cannot have a value and also be a container for
-	 * other references at the same time.
-	 * <p>
-	 * If the reference "refs/heads/foo/bar" exists than the reference
-	 * "refs/heads/foo" cannot exist, for the same reason.
+	 * Reference names use '/' as a component separator. If the reference
+	 * "refs/heads/foo" exists then "refs/heads/foo/bar" must not exist.
 	 *
 	 * @param name
 	 *            proposed name.
@@ -111,7 +108,24 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the database could not be read to check for conflicts.
 	 */
-	public abstract boolean isNameConflicting(String name) throws IOException;
+	public boolean isNameConflicting(final String name) throws IOException {
+		Map<String, Ref> all = getRefs(ALL);
+
+		int lastSlash = name.lastIndexOf('/');
+		while (0 < lastSlash) {
+			if (all.containsKey(name.substring(0, lastSlash)))
+				return true;
+			lastSlash = name.lastIndexOf('/', lastSlash - 1);
+		}
+
+		final String rName = name + '/';
+		for (String other : all.keySet()) {
+			if (other.startsWith(rName))
+				return true;
+		}
+
+		return false;
+	}
 
 	/**
 	 * Create a symbolic reference from one name to another.

@@ -64,14 +64,10 @@ public interface RepositoryResolver {
 	 * @throws RepositoryNotFoundException
 	 *             the repository does not exist or the name is incorrectly
 	 *             formatted as a repository name.
-	 * @throws ServiceNotAuthorizedException
-	 *             the repository exists, but HTTP access is not allowed for the
-	 *             current user.
 	 * @throws ServiceNotEnabledException
-	 *             the repository exists, but HTTP access is not allowed on the
-	 *             target repository, by any user.
+	 *             the repository exists, but the current request is not
+	 *             authorized to access it.
 	 */
 	Repository open(HttpServletRequest req, String name)
-			throws RepositoryNotFoundException, ServiceNotAuthorizedException,
-			ServiceNotEnabledException;
+			throws RepositoryNotFoundException, ServiceNotEnabledException;
 }

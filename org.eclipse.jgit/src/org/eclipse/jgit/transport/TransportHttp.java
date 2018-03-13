@@ -44,15 +44,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.util.HttpSupport.ENCODING_GZIP;
-import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
-import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
-import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
-import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
-import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
-import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
-import static org.eclipse.jgit.util.HttpSupport.METHOD_POST;
-
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -70,8 +61,6 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
@@ -83,7 +72,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDirectory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.lib.Config.SectionParser;
@@ -116,24 +104,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack";
 
-	private static final String userAgent = computeUserAgent();
-
 	static boolean canHandle(final URIish uri) {
 		if (!uri.isRemote())
 			return false;
 		final String s = uri.getScheme();
 		return "http".equals(s) || "https".equals(s) || "ftp".equals(s);
-	}
-
-	private static String computeUserAgent() {
-		String version;
-		final Package pkg = TransportHttp.class.getPackage();
-		if (pkg != null && pkg.getImplementationVersion() != null) {
-			version = pkg.getImplementationVersion();
-		} else {
-			version = "unknown"; //$NON-NLS-1$
-		}
-		return "JGit/" + version; //$NON-NLS-1$
 	}
 
 	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
@@ -196,7 +171,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final String service = SVC_UPLOAD_PACK;
 		try {
 			final HttpURLConnection c = connect(service);
-			final InputStream in = openInputStream(c);
+			final InputStream in = c.getInputStream();
 			try {
 				if (isSmartHttp(c, service)) {
 					readSmartHeaders(in, service);
@@ -240,18 +215,18 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			int status = HttpSupport.response(conn);
 			switch (status) {
 			case HttpURLConnection.HTTP_OK: {
-				br = toBufferedReader(openInputStream(conn));
+				br = toBufferedReader(conn.getInputStream());
 				try {
 					String line = br.readLine();
-					if (line != null && line.startsWith(RefDirectory.SYMREF)) {
-						String target = line.substring(RefDirectory.SYMREF.length());
+					if (line != null && line.startsWith("ref: ")) {
+						final String target = line.substring(5);
 						Ref r = refs.get(target);
 						if (r == null)
-							r = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, target, null);
-						r = new SymbolicRef(Constants.HEAD, r);
+							r = new ObjectIdRef(Ref.Storage.NEW, target, null);
+						r = new SymbolicRef(r, Constants.HEAD);
 						refs.put(r.getName(), r);
 					} else if (line != null && ObjectId.isId(line)) {
-						Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.NETWORK,
+						Ref r = new ObjectIdRef(Ref.Storage.NETWORK,
 								Constants.HEAD, ObjectId.fromString(line));
 						refs.put(r.getName(), r);
 					}
@@ -285,7 +260,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final String service = SVC_RECEIVE_PACK;
 		try {
 			final HttpURLConnection c = connect(service);
-			final InputStream in = openInputStream(c);
+			final InputStream in = c.getInputStream();
 			try {
 				if (isSmartHttp(c, service)) {
 					readSmartHeaders(in, service);
@@ -340,12 +315,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		try {
 			final HttpURLConnection conn = httpOpen(u);
-			if (useSmartHttp) {
-				String expType = "application/x-" + service + "-advertisement";
-				conn.setRequestProperty(HDR_ACCEPT, expType + ", */*");
-			} else {
-				conn.setRequestProperty(HDR_ACCEPT, "*/*");
-			}
 			final int status = HttpSupport.response(conn);
 			switch (status) {
 			case HttpURLConnection.HTTP_OK:
@@ -372,19 +341,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	final HttpURLConnection httpOpen(final URL u) throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
-		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
-		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
-		conn.setRequestProperty(HDR_PRAGMA, "no-cache");//$NON-NLS-1$
-		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
-		return conn;
-	}
-
-	final InputStream openInputStream(HttpURLConnection conn)
-			throws IOException {
-		InputStream input = conn.getInputStream();
-		if (ENCODING_GZIP.equals(conn.getHeaderField(HDR_CONTENT_ENCODING)))
-			input = new GZIPInputStream(input);
-		return input;
+		return (HttpURLConnection) u.openConnection(proxy);
 	}
 
 	IOException wrongContentType(String expType, String actType) {
@@ -493,7 +450,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			final HttpURLConnection c = httpOpen(u);
 			switch (HttpSupport.response(c)) {
 			case HttpURLConnection.HTTP_OK:
-				final InputStream in = openInputStream(c);
+				final InputStream in = c.getInputStream();
 				final int len = c.getContentLength();
 				return new FileStream(in, len);
 			case HttpURLConnection.HTTP_NOT_FOUND:
@@ -531,11 +488,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					if (prior.getPeeledObjectId() != null)
 						throw duplicateAdvertisement(name + "^{}");
 
-					avail.put(name, new ObjectIdRef.PeeledTag(
-							Ref.Storage.NETWORK, name,
-							prior.getObjectId(), id));
+					avail.put(name, new ObjectIdRef(Ref.Storage.NETWORK, name,
+							prior.getObjectId(), id, true));
 				} else {
-					Ref prior = avail.put(name, new ObjectIdRef.PeeledNonTag(
+					final Ref prior = avail.put(name, new ObjectIdRef(
 							Ref.Storage.NETWORK, name, id));
 					if (prior != null)
 						throw duplicateAdvertisement(name);
@@ -661,11 +617,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		void openStream() throws IOException {
 			conn = httpOpen(new URL(baseUrl, serviceName));
-			conn.setRequestMethod(METHOD_POST);
+			conn.setRequestMethod(HttpSupport.METHOD_POST);
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
-			conn.setRequestProperty(HDR_CONTENT_TYPE, requestType);
-			conn.setRequestProperty(HDR_ACCEPT, responseType);
+			conn.setRequestProperty(HttpSupport.HDR_CONTENT_TYPE, requestType);
 		}
 
 		void execute() throws IOException {
@@ -680,28 +635,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 							+ " without written request data pending"
 							+ " is not supported");
 				}
-
-				// Try to compress the content, but only if that is smaller.
-				TemporaryBuffer buf = new TemporaryBuffer.Heap(http.postBuffer);
-				try {
-					GZIPOutputStream gzip = new GZIPOutputStream(buf);
-					out.writeTo(gzip, null);
-					gzip.close();
-					if (out.length() < buf.length())
-						buf = out;
-				} catch (IOException err) {
-					// Most likely caused by overflowing the buffer, meaning
-					// its larger if it were compressed. Don't compress.
-					buf = out;
-				}
-
 				openStream();
-				if (buf != out)
-					conn.setRequestProperty(HDR_CONTENT_ENCODING, ENCODING_GZIP);
-				conn.setFixedLengthStreamingMode((int) buf.length());
+				conn.setFixedLengthStreamingMode((int) out.length());
 				final OutputStream httpOut = conn.getOutputStream();
 				try {
-					buf.writeTo(httpOut, null);
+					out.writeTo(httpOut, null);
 				} finally {
 					httpOut.close();
 				}
@@ -715,13 +653,14 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 						+ conn.getResponseMessage());
 			}
 
+			httpIn.add(conn.getInputStream());
+
 			final String contentType = conn.getContentType();
 			if (!responseType.equals(contentType)) {
-				conn.getInputStream().close();
+				httpIn.close();
 				throw wrongContentType(responseType, contentType);
 			}
 
-			httpIn.add(openInputStream(conn));
 			conn = null;
 		}
 

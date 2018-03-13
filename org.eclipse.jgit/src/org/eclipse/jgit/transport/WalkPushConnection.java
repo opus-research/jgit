@@ -325,8 +325,8 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 	private void updateCommand(final RemoteRefUpdate u) {
 		try {
 			dest.writeRef(u.getRemoteName(), u.getNewObjectId());
-			newRefs.put(u.getRemoteName(), new ObjectIdRef.Unpeeled(
-					Storage.LOOSE, u.getRemoteName(), u.getNewObjectId()));
+			newRefs.put(u.getRemoteName(), new ObjectIdRef(Storage.LOOSE, u
+					.getRemoteName(), u.getNewObjectId()));
 			u.setStatus(Status.OK);
 		} catch (IOException e) {
 			u.setStatus(Status.REJECTED_OTHER_REASON);

@@ -149,9 +149,6 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 	/** Marks a commit known to both sides of the connection. */
 	final RevFlag COMMON;
 
-	/** Like {@link #COMMON} but means its also in {@link #pckState}. */
-	private final RevFlag STATE;
-
 	/** Marks a commit listed in the advertised refs. */
 	final RevFlag ADVERTISED;
 
@@ -186,7 +183,6 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 		reachableCommits = new RevCommitList<RevCommit>();
 		REACHABLE = walk.newFlag("REACHABLE");
 		COMMON = walk.newFlag("COMMON");
-		STATE = walk.newFlag("STATE");
 		ADVERTISED = walk.newFlag("ADVERTISED");
 
 		walk.carry(COMMON);
@@ -591,7 +587,7 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 
 	private void markCommon(final RevObject obj, final AckNackResult anr)
 			throws IOException {
-		if (statelessRPC && anr == AckNackResult.ACK_COMMON && !obj.has(STATE)) {
+		if (statelessRPC && anr == AckNackResult.ACK_COMMON && !obj.has(COMMON)) {
 			StringBuilder s;
 
 			s = new StringBuilder(6 + Constants.OBJECT_ID_STRING_LENGTH);
@@ -599,7 +595,6 @@ abstract class BasePackFetchConnection extends BasePackConnection implements
 			s.append(obj.name());
 			s.append('\n');
 			pckState.writeString(s.toString());
-			obj.add(STATE);
 		}
 		obj.add(COMMON);
 		if (obj instanceof RevCommit)

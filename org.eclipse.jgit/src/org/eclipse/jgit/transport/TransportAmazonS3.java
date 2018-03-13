@@ -307,15 +307,15 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 				if (r == null)
 					r = readRef(avail, target);
 				if (r == null)
-					r = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, target, null);
-				r = new SymbolicRef(rn, r);
+					r = new ObjectIdRef(Ref.Storage.NEW, target, null);
+				r = new SymbolicRef(r, rn);
 				avail.put(r.getName(), r);
 				return r;
 			}
 
 			if (ObjectId.isId(s)) {
-				final Ref r = new ObjectIdRef.Unpeeled(loose(avail.get(rn)),
-						rn, ObjectId.fromString(s));
+				final Ref r = new ObjectIdRef(loose(avail.get(rn)), rn,
+						ObjectId.fromString(s));
 				avail.put(r.getName(), r);
 				return r;
 			}

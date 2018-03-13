@@ -85,7 +85,7 @@ class RefDirectoryRename extends RefRename {
 
 	@Override
 	protected Result doRename() throws IOException {
-		if (source.getRef().isSymbolic())
+		if (source.getRef() instanceof SymbolicRef)
 			return Result.IO_FAILURE; // not supported
 
 		final RevWalk rw = new RevWalk(refdb.getRepository());

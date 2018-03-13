@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
-import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
-import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -145,22 +141,12 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		assertEquals(join(remoteURI, "info/refs"), info.getPath());
 		assertEquals(1, info.getParameters().size());
 		assertEquals("git-upload-pack", info.getParameter("service"));
-		assertEquals("no-cache", info.getRequestHeader(HDR_PRAGMA));
-		assertNotNull("has user-agent", info.getRequestHeader(HDR_USER_AGENT));
-		assertTrue("is jgit agent", info.getRequestHeader(HDR_USER_AGENT)
-				.startsWith("JGit/"));
-		assertEquals("application/x-git-upload-pack-advertisement, */*", info
-				.getRequestHeader(HDR_ACCEPT));
 		assertEquals(200, info.getStatus());
 
 		AccessEvent head = requests.get(1);
 		assertEquals("GET", head.getMethod());
 		assertEquals(join(remoteURI, "HEAD"), head.getPath());
 		assertEquals(0, head.getParameters().size());
-		assertEquals("no-cache", head.getRequestHeader(HDR_PRAGMA));
-		assertNotNull("has user-agent", head.getRequestHeader(HDR_USER_AGENT));
-		assertTrue("is jgit agent", head.getRequestHeader(HDR_USER_AGENT)
-				.startsWith("JGit/"));
 		assertEquals(200, head.getStatus());
 	}
 
@@ -204,25 +190,18 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		fsck(dst, B);
 
 		List<AccessEvent> req;
-		AccessEvent event;
 
 		req = getRequests(loose(remoteURI, B));
 		assertEquals(1, req.size());
-		event = req.get(0);
-		assertEquals("GET", event.getMethod());
-		assertEquals(0, event.getParameters().size());
-		assertEquals(404, event.getStatus());
+		assertEquals("GET", req.get(0).getMethod());
+		assertEquals(0, req.get(0).getParameters().size());
+		assertEquals(404, req.get(0).getStatus());
 
 		req = getRequests(join(remoteURI, "objects/info/packs"));
 		assertEquals(1, req.size());
-		event = req.get(0);
-		assertEquals("GET", event.getMethod());
-		assertEquals(0, event.getParameters().size());
-		assertEquals("no-cache", event.getRequestHeader(HDR_PRAGMA));
-		assertNotNull("has user-agent", event.getRequestHeader(HDR_USER_AGENT));
-		assertTrue("is jgit agent", event.getRequestHeader(HDR_USER_AGENT)
-				.startsWith("JGit/"));
-		assertEquals(200, event.getStatus());
+		assertEquals("GET", req.get(0).getMethod());
+		assertEquals(0, req.get(0).getParameters().size());
+		assertEquals(200, req.get(0).getStatus());
 	}
 
 	public void testPushNotSupported() throws Exception {

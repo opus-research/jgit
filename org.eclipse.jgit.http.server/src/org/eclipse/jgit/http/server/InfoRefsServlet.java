@@ -47,6 +47,7 @@ import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 import static org.eclipse.jgit.http.server.ServletUtils.send;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 import javax.servlet.http.HttpServlet;
@@ -59,7 +60,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.RefAdvertiser;
-import org.eclipse.jgit.util.HttpSupport;
 
 /** Send a complete list of current refs, including peeled values for tags. */
 class InfoRefsServlet extends HttpServlet {
@@ -70,7 +70,7 @@ class InfoRefsServlet extends HttpServlet {
 		// Assume a dumb client and send back the dumb client
 		// version of the info/refs file.
 		final byte[] raw = dumbHttp(req);
-		rsp.setContentType(HttpSupport.TEXT_PLAIN);
+		rsp.setContentType("text/plain");
 		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
 		send(raw, req, rsp);
 	}
@@ -97,7 +97,7 @@ class InfoRefsServlet extends HttpServlet {
 		adv.init(walk, ADVERTISED);
 		adv.setDerefTags(true);
 
-		Map<String, Ref> refs = db.getAllRefs();
+		Map<String, Ref> refs = new HashMap<String, Ref>(db.getAllRefs());
 		refs.remove(Constants.HEAD);
 		adv.send(refs.values());
 		return out.toString().getBytes(Constants.CHARACTER_ENCODING);

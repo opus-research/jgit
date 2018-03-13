@@ -46,10 +46,10 @@ package org.eclipse.jgit.lib;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.FileLock;
@@ -69,9 +69,9 @@ public class LockFile {
 	static final String SUFFIX = ".lock"; //$NON-NLS-1$
 
 	/** Filter to skip over active lock files when listing a directory. */
-	static final FilenameFilter FILTER = new FilenameFilter() {
-		public boolean accept(File dir, String name) {
-			return !name.endsWith(SUFFIX);
+	static final FileFilter FILTER = new FileFilter() {
+		public boolean accept(File path) {
+			return !path.getName().endsWith(SUFFIX);
 		}
 	};
 

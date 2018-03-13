@@ -308,7 +308,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		assertEquals(ppid, db.resolve("HEAD"));
 		Ref ref = db.getRef("HEAD");
 		assertEquals("HEAD", ref.getName());
-		assertTrue("is detached", !ref.isSymbolic());
+		assertTrue("is detached", ref instanceof ObjectIdRef);
 
 		// the branch HEAD referred to is left untouched
 		assertEquals(pid, db.resolve("refs/heads/master"));
@@ -337,7 +337,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		assertEquals(ppid, db.resolve("HEAD"));
 		Ref ref = db.getRef("HEAD");
 		assertEquals("HEAD", ref.getName());
-		assertTrue("is detached", !ref.isSymbolic());
+		assertTrue("is detached", ref instanceof ObjectIdRef);
 
 		// the branch HEAD referred to is left untouched
 		assertNull(db.resolve("refs/heads/unborn"));
@@ -420,8 +420,8 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Ref head = allRefs.get("HEAD");
 		assertEquals("refs/heads/master", master.getName());
 		assertEquals("HEAD", head.getName());
-		assertTrue("is symbolic reference", head.isSymbolic());
-		assertSame(master, head.getTarget());
+		assertTrue("is symbolic reference", head instanceof SymbolicRef);
+		assertSame(master, ((SymbolicRef)head).getTarget());
 	}
 
 	/**
@@ -449,8 +449,8 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Ref newref = allRefs.get("refs/heads/newref");
 		assertEquals("refs/heads/newref", newref.getName());
 		assertEquals("HEAD", head.getName());
-		assertTrue("is symbolic reference", head.isSymbolic());
-		assertSame(newref, head.getTarget());
+		assertTrue("is symbolic reference", head instanceof SymbolicRef);
+		assertSame(newref, ((SymbolicRef)head).getTarget());
 	}
 
 	/**
@@ -631,7 +631,8 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		updateRef.setForceUpdate(true);
 		Result update = updateRef.update();
 		assertEquals("internal check new ref is loose", Result.FORCED, update);
-		assertEquals(Ref.Storage.LOOSE, db.getRef("refs/heads/b").getStorage());
+		assertEquals(Ref.Storage.LOOSE_PACKED, db.getRef("refs/heads/b")
+				.getStorage());
 		writeReflog(db, rb, rb, "Just a message", "refs/heads/b");
 		assertTrue("log on old branch", new File(db.getDirectory(),
 				"logs/refs/heads/b").exists());

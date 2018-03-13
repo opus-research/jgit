@@ -143,7 +143,7 @@ abstract class ObjectFileServlet extends HttpServlet {
 
 		try {
 			final String etag = etag(sender);
-			final long lastModified = (sender.getLastModified() / 1000) * 1000;
+			final long lastModified = sender.getLastModified() / 1000 * 1000;
 
 			String ifNoneMatch = req.getHeader(HDR_IF_NONE_MATCH);
 			if (etag != null && etag.equals(ifNoneMatch)) {
