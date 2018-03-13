@@ -58,14 +58,13 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * The configuration file that is stored in the file of the file system.
  */
-public class FileBasedConfig extends StoredConfig {
+public class FileBasedConfig extends Config {
 	private final File configFile;
 	private volatile long lastModified;
 
@@ -108,7 +107,6 @@ public class FileBasedConfig extends StoredConfig {
 	 * @throws ConfigInvalidException
 	 *             the file is not a properly formatted configuration file.
 	 */
-	@Override
 	public void load() throws IOException, ConfigInvalidException {
 		lastModified = getFile().lastModified();
 		try {
