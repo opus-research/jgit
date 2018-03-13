@@ -48,10 +48,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 
 /**
- * Provides content blocks from a file.
+ * Provides content blocks of file.
  * <p>
  * {@code BlockSource} implementations must decide if they will be thread-safe,
  * or not.
@@ -60,27 +61,26 @@ public abstract class BlockSource implements AutoCloseable {
 	/**
 	 * Wrap a byte array as a {@code BlockSource}.
 	 *
-	 * @param table
+	 * @param content
 	 *            input file.
-	 * @return block source to read from {@code table}.
+	 * @return block source to read from {@code content}.
 	 */
-	public static BlockSource from(byte[] table) {
+	public static BlockSource from(byte[] content) {
 		return new BlockSource() {
 			@Override
-			public ByteBuffer read(long position, int blockSize)
-					throws IOException {
-				ByteBuffer buf = ByteBuffer.allocate(blockSize);
-				if (position < table.length) {
-					int p = (int) position;
-					int n = Math.min(blockSize, table.length - p);
-					buf.put(table, p, n);
+			public ByteBuffer read(long pos, int cnt) {
+				ByteBuffer buf = ByteBuffer.allocate(cnt);
+				if (pos < content.length) {
+					int p = (int) pos;
+					int n = Math.min(cnt, content.length - p);
+					buf.put(content, p, n);
 				}
 				return buf;
 			}
 
 			@Override
-			public long size() throws IOException {
-				return table.length;
+			public long size() {
+				return content.length;
 			}
 
 			@Override
@@ -149,11 +149,13 @@ public abstract class BlockSource implements AutoCloseable {
 	 * The returned {@code BlockSource} is not thread-safe, as it must seek the
 	 * channel to read a block.
 	 *
+	 * @param opts
+	 *            options to control reading from DFS sources.
 	 * @param ch
 	 *            the channel. The {@code BlockSource} will close {@code ch}.
 	 * @return wrapper for {@code ch}.
 	 */
-	public static BlockSource from(ReadableChannel ch) {
+	public static BlockSource from(DfsReaderOptions opts, ReadableChannel ch) {
 		return new BlockSource() {
 			@Override
 			public ByteBuffer read(long pos, int sz) throws IOException {
@@ -168,10 +170,13 @@ public abstract class BlockSource implements AutoCloseable {
 
 			@Override
 			public void adviseSequentialRead(long start, long end) {
-				try {
-					ch.setReadAheadBytes((int) Math.max(end - start, 8 << 20));
-				} catch (IOException e) {
-					// Ignore failed read-ahead advice.
+				int sz = opts.getStreamPackBufferSize();
+				if (sz > 0) {
+					try {
+						ch.setReadAheadBytes((int) Math.min(end - start, sz));
+					} catch (IOException e) {
+						// Ignore failed read-ahead advice.
+					}
 				}
 			}
 
@@ -195,7 +200,7 @@ public abstract class BlockSource implements AutoCloseable {
 	 * Read a block from the file.
 	 * <p>
 	 * To reduce copying, the returned ByteBuffer should have an accessible
-	 * array with {@code arrayOffset() == 0}. Callers will discard the
+	 * array and {@code arrayOffset() == 0}. The caller will discard the
 	 * ByteBuffer and directly use the backing array.
 	 *
 	 * @param position

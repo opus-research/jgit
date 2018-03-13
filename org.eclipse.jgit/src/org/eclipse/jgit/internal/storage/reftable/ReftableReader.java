@@ -74,19 +74,13 @@ import org.eclipse.jgit.util.NB;
 public class ReftableReader extends RefCursor {
 	/** @return an empty reftable. */
 	public static ReftableReader emptyTable() {
-		return new ReftableReader(BlockSource.from(EmptyTableHolder.I));
-	}
-
-	private static class EmptyTableHolder {
-		final static byte[] I = makeEmptyTable();
-		private static byte[] makeEmptyTable() {
-			try {
-				ByteArrayOutputStream out = new ByteArrayOutputStream();
-				new ReftableWriter().begin(out).finish();
-				return out.toByteArray();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+		try {
+			int len = FILE_HEADER_LEN + FILE_FOOTER_LEN;
+			ByteArrayOutputStream buf = new ByteArrayOutputStream(len);
+			new ReftableWriter().begin(buf).finish();
+			return new ReftableReader(BlockSource.from(buf.toByteArray()));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
 	}
 
