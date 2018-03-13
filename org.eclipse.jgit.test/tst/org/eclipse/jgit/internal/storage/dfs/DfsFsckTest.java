@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.pack;
+package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.junit.JGitTestUtil.concat;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
@@ -52,10 +52,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import org.eclipse.jgit.internal.storage.dfs.DfsFsck;
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.internal.storage.pack.FsckPackParser.CorruptObject;
+
+import org.eclipse.jgit.internal.fsck.FsckError;
+import org.eclipse.jgit.internal.fsck.FsckError.CorruptObject;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectChecker.ErrorType;
@@ -87,11 +86,11 @@ public class DfsFsckTest {
 		git.update("master", commit1);
 
 		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
+		FsckError errors = fsck.check(null);
 
-		assertEquals(fsck.getCorruptObjects().size(), 0);
-		assertEquals(fsck.getMissingObjects().size(), 0);
-		assertEquals(fsck.getCorruptIndices().size(), 0);
+		assertEquals(errors.getCorruptObjects().size(), 0);
+		assertEquals(errors.getMissingObjects().size(), 0);
+		assertEquals(errors.getCorruptIndices().size(), 0);
 	}
 
 	@Test
@@ -105,10 +104,10 @@ public class DfsFsckTest {
 		ins.flush();
 
 		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
+		FsckError errors = fsck.check(null);
 
-		assertEquals(fsck.getCorruptObjects().size(), 1);
-		CorruptObject o = fsck.getCorruptObjects().iterator().next();
+		assertEquals(errors.getCorruptObjects().size(), 1);
+		CorruptObject o = errors.getCorruptObjects().iterator().next();
 		assertTrue(o.getId().equals(id));
 		assertEquals(o.getErrorType(), ErrorType.BAD_DATE);
 	}
@@ -124,10 +123,10 @@ public class DfsFsckTest {
 		ins.flush();
 
 		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
+		FsckError errors = fsck.check(null);
 
-		assertEquals(fsck.getCorruptObjects().size(), 1);
-		CorruptObject o = fsck.getCorruptObjects().iterator().next();
+		assertEquals(errors.getCorruptObjects().size(), 1);
+		CorruptObject o = errors.getCorruptObjects().iterator().next();
 		assertTrue(o.getId().equals(id));
 		assertEquals(o.getErrorType(), ErrorType.MISSING_TREE);
 	}
@@ -143,10 +142,10 @@ public class DfsFsckTest {
 		ins.flush();
 
 		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
+		FsckError errors = fsck.check(null);
 
-		assertEquals(fsck.getCorruptObjects().size(), 1);
-		CorruptObject o = fsck.getCorruptObjects().iterator().next();
+		assertEquals(errors.getCorruptObjects().size(), 1);
+		CorruptObject o = errors.getCorruptObjects().iterator().next();
 		assertTrue(o.getId().equals(id));
 		assertEquals(o.getErrorType(), ErrorType.MISSING_OBJECT);
 	}
@@ -154,15 +153,15 @@ public class DfsFsckTest {
 	@Test
 	public void testTreeWithNullSha() throws Exception {
 		byte[] data = concat(encodeASCII("100644 A"), new byte[] { '\0' },
-						new byte[OBJECT_ID_LENGTH]);
+				new byte[OBJECT_ID_LENGTH]);
 		ObjectId id = ins.insert(Constants.OBJ_TREE, data);
 		ins.flush();
 
 		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
+		FsckError errors = fsck.check(null);
 
-		assertEquals(fsck.getCorruptObjects().size(), 1);
-		CorruptObject o = fsck.getCorruptObjects().iterator().next();
+		assertEquals(errors.getCorruptObjects().size(), 1);
+		CorruptObject o = errors.getCorruptObjects().iterator().next();
 		assertTrue(o.getId().equals(id));
 		assertEquals(o.getErrorType(), ErrorType.NULL_SHA1);
 	}
@@ -186,10 +185,10 @@ public class DfsFsckTest {
 		ins.flush();
 
 		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
+		FsckError errors = fsck.check(null);
 
-		assertEquals(fsck.getCorruptObjects().size(), 2);
-		for (CorruptObject o :fsck.getCorruptObjects()) {
+		assertEquals(errors.getCorruptObjects().size(), 2);
+		for (CorruptObject o : errors.getCorruptObjects()) {
 			if (o.getId().equals(id1)) {
 				assertEquals(o.getErrorType(), ErrorType.BAD_PARENT_SHA1);
 			} else if (o.getId().equals(id2)) {
@@ -198,47 +197,5 @@ public class DfsFsckTest {
 				fail();
 			}
 		}
-	}
-
-	@Test
-	public void testValidConnectivity() throws Exception {
-		ObjectId blobId = ins
-				.insert(Constants.OBJ_BLOB, Constants.encode("foo"));
-
-		byte[] blobIdBytes = new byte[OBJECT_ID_LENGTH];
-		blobId.copyRawTo(blobIdBytes, 0);
-		byte[] data = concat(encodeASCII("100644 regular-file\0"), blobIdBytes);
-		ObjectId treeId = ins.insert(Constants.OBJ_TREE, data);
-		ins.flush();
-
-		RevCommit commit = git.commit().message("0").setTopLevelTree(treeId)
-				.create();
-
-		git.update("master", commit);
-
-		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
-		assertEquals(fsck.getMissingObjects().size(), 0);
-	}
-
-	@Test
-	public void testMissingObject() throws Exception {
-		ObjectId blobId = ObjectId
-				.fromString("19102815663d23f8b75a47e7a01965dcdc96468c");
-		byte[] blobIdBytes = new byte[OBJECT_ID_LENGTH];
-		blobId.copyRawTo(blobIdBytes, 0);
-		byte[] data = concat(encodeASCII("100644 regular-file\0"), blobIdBytes);
-		ObjectId treeId = ins.insert(Constants.OBJ_TREE, data);
-		ins.flush();
-
-		RevCommit commit = git.commit().message("0").setTopLevelTree(treeId)
-				.create();
-
-		git.update("master", commit);
-
-		DfsFsck fsck = new DfsFsck(repo);
-		fsck.check(null);
-		assertEquals(fsck.getMissingObjects().size(), 1);
-		assertEquals(fsck.getMissingObjects().iterator().next(), blobId);
 	}
 }

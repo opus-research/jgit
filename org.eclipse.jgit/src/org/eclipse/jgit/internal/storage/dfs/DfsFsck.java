@@ -44,117 +44,82 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+
+import org.eclipse.jgit.errors.CorruptPackIndexException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.storage.pack.CorruptPackIndexException;
-import org.eclipse.jgit.internal.storage.pack.FsckPackParser;
-import org.eclipse.jgit.internal.storage.pack.FsckPackParser.CorruptIndex;
-import org.eclipse.jgit.internal.storage.pack.FsckPackParser.CorruptObject;
+import org.eclipse.jgit.internal.fsck.Fsck;
+import org.eclipse.jgit.internal.fsck.FsckError;
+import org.eclipse.jgit.internal.fsck.FsckError.CorruptIndex;
+import org.eclipse.jgit.internal.fsck.FsckPackParser;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
 /**
- * Verify the validity and connectivity of the objects in a dfs repository.
- * @since 4.9
+ * {@link Fsck} implementation for DFS repository.
  */
-public class DfsFsck {
+public class DfsFsck implements Fsck {
 	private final DfsRepository repo;
 
 	private final DfsObjDatabase objdb;
 
 	private final DfsReader ctx;
 
-	private final ObjectChecker objChecker;
-
-	private final Set<CorruptObject> corruptObjects = new HashSet<>();
-
-	private final Set<ObjectId> missingObjects = new HashSet<>();
-
-	private final Set<CorruptIndex> corruptIndices = new HashSet<>();
+	private ObjectChecker objChecker = new ObjectChecker();
 
 	/**
 	 * Initialize a Dfs Fsck.
 	 *
-	 * @param repository the dfs repository to check.
-	 * @param objectChecker A customized object checker.
+	 * @param repository
+	 *            the dfs repository to check.
 	 */
-	public DfsFsck(DfsRepository repository, ObjectChecker objectChecker) {
+	public DfsFsck(DfsRepository repository) {
 		repo = repository;
-		objChecker = objectChecker;
 		objdb = repo.getObjectDatabase();
 		ctx = objdb.newReader();
 	}
 
-	public DfsFsck(DfsRepository repository) {
-		this(repository, new ObjectChecker());
-	}
-
-	public void check(ProgressMonitor pm) throws IOException {
-		if (pm == null) {
-			pm = NullProgressMonitor.INSTANCE;
-		}
-
+	@Override
+	public FsckError check(ProgressMonitor pm) throws IOException {
+		FsckError errors = new FsckError();
 		try {
 			for (DfsPackFile pack : objdb.getPacks()) {
 				DfsPackDescription packDesc = pack.getPackDescription();
-				try (ReadableChannel channel =
-						repo.getObjectDatabase()
-								.openFile(packDesc,
-										PackExt.PACK)) {
+				try (ReadableChannel channel = repo.getObjectDatabase()
+						.openFile(packDesc, PackExt.PACK)) {
 					List<PackedObjectInfo> objectsInPack;
-					FsckPackParser parser = new FsckPackParser(repo,
-							channel, objChecker, packDesc.getObjectCount());
+					FsckPackParser parser = new FsckPackParser(
+							repo.getObjectDatabase(), channel);
+					parser.setObjectChecker(objChecker);
+					parser.overwriteObjectCount(packDesc.getObjectCount());
 					parser.parse(pm);
-					corruptObjects.addAll(parser.getCorruptObjects());
+					errors.getCorruptObjects()
+							.addAll(parser.getCorruptObjects());
 					objectsInPack = parser.getSortedObjectList(null);
 					parser.verifyIndex(objectsInPack, pack.getPackIndex(ctx));
 				} catch (MissingObjectException e) {
-					missingObjects.add(e.getObjectId());
+					errors.getMissingObjects().add(e.getObjectId());
 				} catch (CorruptPackIndexException e) {
-					corruptIndices.add(new CorruptIndex(pack.getPackName(),
-							e.getErrorType()));
+					errors.getCorruptIndices().add(new CorruptIndex(
+							pack.getPackName(), e.getErrorType()));
 				}
-			}
-
-			try (ObjectWalk ow = new ObjectWalk(ctx)) {
-				for (Ref r : repo.getAllRefs().values()) {
-					ow.markStart(ow.parseAny(r.getObjectId()));
-				}
-				ow.checkConnectivity();
-			} catch (MissingObjectException e) {
-				missingObjects.add(e.getObjectId());
 			}
 		} finally {
 			ctx.close();
 		}
+		return errors;
 	}
 
 	/**
-	 * @return corrupted objects from all pack files.
+	 * Use a customized object checker instead of the default one. Caller can
+	 * specify a skip list to ignore some errors.
+	 *
+	 * @param objChecker
+	 *            A customized object checker.
 	 */
-	public Set<CorruptObject> getCorruptObjects() {
-		return corruptObjects;
-	}
-
-	/**
-	 * @return missing objects that should present in pack files.
-	 */
-	public Set<ObjectId> getMissingObjects() {
-		return missingObjects;
-	}
-
-	/**
-	 * @return corrupted index files associated with the packs.
-	 */
-	public Set<CorruptIndex> getCorruptIndices() {
-		return corruptIndices;
+	public void setObjectChecker(ObjectChecker objChecker) {
+		this.objChecker = objChecker;
 	}
 }

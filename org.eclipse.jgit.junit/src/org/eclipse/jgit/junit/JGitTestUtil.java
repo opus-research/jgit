@@ -260,6 +260,11 @@ public abstract class JGitTestUtil {
 
 	/**
 	 * Concatenate byte arrays.
+	 *
+	 * @param b
+	 *            byte arrays to combine together.
+	 * @return a single byte array that contains all bytes copied from input
+	 *         byte arrays.
 	 * @since 4.9
 	 */
 	public static byte[] concat(byte[]... b) {

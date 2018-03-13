@@ -41,38 +41,51 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.pack;
+package org.eclipse.jgit.errors;
 
 import org.eclipse.jgit.annotations.Nullable;
 
 /**
  * Exception thrown when the pack index file is corrupted.
+ *
  * @since 4.9
  */
 public class CorruptPackIndexException extends Exception {
+	private static final long serialVersionUID = 1L;
+
+	/** The error type of an corrupted index file. */
 	public enum ErrorType {
+		/** Offset doesn't match with pack file. */
 		MISMATCH_OFFSET,
+		/** Crc doesn't match with the object data in pack file. */
 		MISMATCH_CRC,
+		/** Crc doesn't present in index file. */
 		MISSING_CRC,
+		/** Object in pack doesn't present in index file. */
 		MISSING_OBJ,
+		/** Object in index file doesn't present in pack file. */
 		UNKNOWN_OBJ,
 	}
 
-
 	private ErrorType errorType;
 
-	public CorruptPackIndexException(String message) {
-		super(message);
-	}
-
-	public CorruptPackIndexException(String message,
-			ErrorType errorType) {
+	/**
+	 * Report a specific error condition discovered in an index file.
+	 *
+	 * @param message
+	 *            the error message.
+	 * @param errorType
+	 *            the error type of corruption.
+	 */
+	public CorruptPackIndexException(String message, ErrorType errorType) {
 		super(message);
 		this.errorType = errorType;
 	}
 
 	/**
 	 * Specific error condition of why the index file is corrupted.
+	 *
+	 * @return error condition or null.
 	 */
 	@Nullable
 	public ErrorType getErrorType() {

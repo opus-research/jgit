@@ -573,10 +573,9 @@ public abstract class PackParser {
 		return null; // By default there is no locking.
 	}
 
-	protected void processDeltas(ProgressMonitor resolving) throws IOException {
+	private void processDeltas(ProgressMonitor resolving) throws IOException {
 		if (resolving instanceof BatchingProgressMonitor) {
-			((BatchingProgressMonitor) resolving).setDelayStart(
-					1000,
+			((BatchingProgressMonitor) resolving).setDelayStart(1000,
 					TimeUnit.MILLISECONDS);
 		}
 		resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
@@ -1074,8 +1073,21 @@ public abstract class PackParser {
 		}
 	}
 
+	/**
+	 * Verify the integrity of the object.
+	 *
+	 * @param id
+	 *            identity of the object to be tracked.
+	 * @param type
+	 *            the type of the object.
+	 * @param data
+	 *            raw content of the object.
+	 * @throws CorruptObjectException
+	 * @since 4.9
+	 *
+	 */
 	protected void verifySafeObject(final AnyObjectId id, final int type,
-			final byte[] data) throws IOException {
+			final byte[] data) throws CorruptObjectException {
 		if (objCheck != null) {
 			try {
 				objCheck.check(id, type, data);
@@ -1083,11 +1095,11 @@ public abstract class PackParser {
 				if (e.getErrorType() != null) {
 					throw e;
 				}
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().invalidObject,
-						Constants.typeString(type),
-						id.name(),
-						e.getMessage()), e);
+				throw new CorruptObjectException(
+						MessageFormat.format(JGitText.get().invalidObject,
+								Constants.typeString(type), id.name(),
+								e.getMessage()),
+						e);
 			}
 		}
 	}

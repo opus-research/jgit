@@ -41,10 +41,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.pack;
+package org.eclipse.jgit.internal.fsck;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.text.MessageFormat;
@@ -53,59 +52,54 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.CRC32;
+
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.CorruptPackIndexException;
+import org.eclipse.jgit.errors.CorruptPackIndexException.ErrorType;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.fsck.FsckError.CorruptObject;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
-import org.eclipse.jgit.internal.storage.file.PackLock;
-import org.eclipse.jgit.internal.storage.pack.CorruptPackIndexException.ErrorType;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
-/**
- * A read only pack parser for object validity checking.
- * @since 4.9
- */
+/** A read only pack parser for object validity checking. */
 public class FsckPackParser extends PackParser {
-	private final ObjectChecker objCheck;
-
 	private final CRC32 crc;
 
 	private final ReadableChannel channel;
 
 	private final Set<CorruptObject> corruptObjects = new HashSet<>();
 
-	private boolean overwriteObjectCount;
-
-	private long expectedObjectCount;
+	private long expectedObjectCount = -1L;
 
 	private long offset;
 
 	private int blockSize;
 
-	public FsckPackParser(Repository git, ReadableChannel channel,
-			ObjectChecker objCheck, long expectedObjectCount) {
-		super(git.getObjectDatabase(), Channels.newInputStream(channel));
+	/**
+	 *
+	 * @param db
+	 *            the object database which stores repository's data.
+	 * @param channel
+	 *            readable channel of the pack file.
+	 */
+	public FsckPackParser(ObjectDatabase db, ReadableChannel channel) {
+		super(db, Channels.newInputStream(channel));
 		this.channel = channel;
 		setCheckObjectCollisions(false);
-		this.objCheck = objCheck;
-		setObjectChecker(objCheck);
 		this.crc = new CRC32();
-		this.overwriteObjectCount = true;
-		this.expectedObjectCount = expectedObjectCount;
 		this.blockSize = channel.blockSize() > 0 ? channel.blockSize() : 65536;
 	}
 
 	@Override
 	protected void onPackHeader(long objCnt) throws IOException {
-		if (overwriteObjectCount) {
+		if (expectedObjectCount >= 0) {
 			// Some DFS pack files don't contain the correct object count, e.g.
 			// INSERT/RECEIVE packs don't always contain the correct object
 			// count in their headers. Overwrite the expected object count
@@ -165,17 +159,15 @@ public class FsckPackParser extends PackParser {
 	@Override
 	protected void verifySafeObject(final AnyObjectId id, final int type,
 			final byte[] data) {
-		if (objCheck != null) {
-			try {
-				objCheck.check(id, type, data);
-			} catch (CorruptObjectException e) {
-				// catch the exception and continue parse the pack file
-				CorruptObject o = new CorruptObject(id.toObjectId(), type);
-				if (e.getErrorType() != null) {
-					o.setErrorType(e.getErrorType());
-				}
-				corruptObjects.add(o);
+		try {
+			super.verifySafeObject(id, type, data);
+		} catch (CorruptObjectException e) {
+			// catch the exception and continue parse the pack file
+			CorruptObject o = new CorruptObject(id.toObjectId(), type);
+			if (e.getErrorType() != null) {
+				o.setErrorType(e.getErrorType());
 			}
+			corruptObjects.add(o);
 		}
 	}
 
@@ -266,7 +258,6 @@ public class FsckPackParser extends PackParser {
 
 	/**
 	 * @return corrupted objects that reported by {@link ObjectChecker}.
-	 * @since 4.9
 	 */
 	public Set<CorruptObject> getCorruptObjects() {
 		return corruptObjects;
@@ -275,8 +266,10 @@ public class FsckPackParser extends PackParser {
 	/**
 	 * Verify the existing index file with all objects from the pack.
 	 *
-	 * @param entries all the entries that are expected in the index file
-	 * @param idx index file associate with the pack
+	 * @param entries
+	 *            all the entries that are expected in the index file
+	 * @param idx
+	 *            index file associate with the pack
 	 * @throws CorruptPackIndexException
 	 *             when the index file is corrupted.
 	 */
@@ -292,87 +285,43 @@ public class FsckPackParser extends PackParser {
 								entry.getType(), entry.getName()),
 						ErrorType.MISSING_OBJ);
 			} else if (offset != entry.getOffset()) {
-				throw new CorruptPackIndexException(
-						MessageFormat
-								.format(JGitText.get().mismatchOffset,
-										entry.getName()),
+				throw new CorruptPackIndexException(MessageFormat
+						.format(JGitText.get().mismatchOffset, entry.getName()),
 						ErrorType.MISMATCH_OFFSET);
 			}
 
 			try {
-				if (idx.hasCRC32Support() && (int) idx.findCRC32(entry) != entry
-						.getCRC()) {
+				if (idx.hasCRC32Support()
+						&& (int) idx.findCRC32(entry) != entry.getCRC()) {
 					throw new CorruptPackIndexException(
-							MessageFormat
-									.format(JGitText.get().mismatchCRC,
-											entry.getName()),
+							MessageFormat.format(JGitText.get().mismatchCRC,
+									entry.getName()),
 							ErrorType.MISMATCH_CRC);
 				}
 			} catch (MissingObjectException e) {
-				throw new CorruptPackIndexException(
-						MessageFormat.format(JGitText.get().missingCRC,
-								entry.getName()),
+				throw new CorruptPackIndexException(MessageFormat
+						.format(JGitText.get().missingCRC, entry.getName()),
 						ErrorType.MISSING_CRC);
 			}
 		}
 
 		for (MutableEntry entry : idx) {
 			if (!all.contains(entry.name())) {
-				throw new CorruptPackIndexException(
-						MessageFormat
-								.format(JGitText.get().unknownObjectInIndex,
-										entry.name()),
+				throw new CorruptPackIndexException(MessageFormat.format(
+						JGitText.get().unknownObjectInIndex, entry.name()),
 						ErrorType.UNKNOWN_OBJ);
 			}
 		}
 	}
 
-	public static class CorruptObject {
-		final ObjectId id;
-
-		final int type;
-
-		ObjectChecker.ErrorType errorType;
-
-		public CorruptObject(ObjectId id, int type) {
-			this.id = id;
-			this.type = type;
-		}
-
-		void setErrorType(ObjectChecker.ErrorType errorType) {
-			this.errorType = errorType;
-		}
-
-		public ObjectId getId() {
-			return id;
-		}
-
-		public int getType() {
-			return type;
-		}
-
-		public ObjectChecker.ErrorType getErrorType() {
-			return errorType;
-		}
-	}
-
-	public static class CorruptIndex {
-		String packName;
-		CorruptPackIndexException.ErrorType errorType;
-
-		public CorruptIndex(String packName,
-				ErrorType errorType) {
-			this.packName = packName;
-			this.errorType = errorType;
-		}
-
-		public String getPackName() {
-			return packName;
-		}
-
-		public ErrorType getErrorType() {
-			return errorType;
-		}
+	/**
+	 * Set the object count for overwriting the expected object count from pack
+	 * header.
+	 *
+	 * @param expectedObjectCount
+	 *            the actual expected object count.
+	 */
+	public void overwriteObjectCount(long expectedObjectCount) {
+		this.expectedObjectCount = expectedObjectCount;
 	}
 }
-
