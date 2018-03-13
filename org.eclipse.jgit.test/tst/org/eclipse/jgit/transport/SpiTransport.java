@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <zx@redhat.com>
- * Copyright (C) 2011, Abhishek Bhatnagar <abhatnag@redhat.com>
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,85 +40,59 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.transport;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
-import java.util.TreeSet;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
- * Remove untracked files from the working tree
- *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
- *      >Git documentation about Clean</a>
+ * Transport protocol contributed via service provider
  */
-public class CleanCommand extends GitCommand<Set<String>> {
-
-	private Set<String> paths = Collections.emptySet();
-
-	private boolean dryRun;
+public class SpiTransport extends Transport {
 
 	/**
-	 * @param repo
+	 * Transport protocol scheme
 	 */
-	protected CleanCommand(Repository repo) {
-		super(repo);
-	}
+	public static final String SCHEME = "testspi";
 
 	/**
-	 * Executes the {@code clean} command with all the options and parameters
-	 * collected by the setter methods of this class. Each instance of this
-	 * class should only be used for one invocation of the command (means: one
-	 * call to {@link #call()})
-	 *
-	 * @return a set of strings representing each file cleaned.
+	 * Instance
 	 */
-	public Set<String> call() {
-		Set<String> files = new TreeSet<String>();
-		try {
-			StatusCommand command = new StatusCommand(repo);
-			Status status = command.call();
-			for (String file : status.getUntracked()) {
-				if (paths.isEmpty() || paths.contains(file)) {
-					if (!dryRun)
-						FileUtils.delete(new File(repo.getWorkTree(), file));
-					files.add(file);
-				}
-			}
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
+	public static final TransportProtocol PROTO = new TransportProtocol() {
+
+		public String getName() {
+			return "Test SPI Transport Protocol";
 		}
-		return files;
+
+		public Set<String> getSchemes() {
+			return Collections.singleton(SCHEME);
+		}
+
+		public Transport open(URIish uri, Repository local, String remoteName)
+				throws NotSupportedException, TransportException {
+			throw new NotSupportedException("not supported");
+		}
+	};
+
+	private SpiTransport(Repository local, URIish uri) {
+		super(local, uri);
 	}
 
-	/**
-	 * If paths are set, only these paths are affected by the cleaning.
-	 *
-	 * @param paths
-	 *            the paths to set
-	 * @return {@code this}
-	 */
-	public CleanCommand setPaths(Set<String> paths) {
-		this.paths = paths;
-		return this;
+	public FetchConnection openFetch() throws NotSupportedException,
+			TransportException {
+		throw new NotSupportedException("not supported");
 	}
 
-	/**
-	 * If dryRun is set, the paths in question will not actually be deleted.
-	 * 
-	 * @param dryRun
-	 *            whether to do a dry run or not
-	 * @return {@code this}
-	 */
-	public CleanCommand setDryRun(boolean dryRun) {
-		this.dryRun = dryRun;
-		return this;
+	public PushConnection openPush() throws NotSupportedException,
+			TransportException {
+		throw new NotSupportedException("not supported");
+	}
+
+	public void close() {
+		// Intentionally left blank
 	}
 }
