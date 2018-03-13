@@ -3,7 +3,6 @@
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2006-2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2012, Daniel Megert <daniel_megert@ch.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -378,8 +377,7 @@ public abstract class Repository {
 	 *             on serious errors
 	 */
 	public ObjectId resolve(final String revstr)
-			throws AmbiguousObjectException, IncorrectObjectTypeException,
-			RevisionSyntaxException, IOException {
+			throws AmbiguousObjectException, IOException {
 		RevWalk rw = new RevWalk(this);
 		try {
 			Object resolved = resolve(rw, revstr);
@@ -699,7 +697,7 @@ public abstract class Repository {
 			return rev.copy();
 		if (name != null)
 			return name;
-		if (rev == null && done == revstr.length())
+		if (done == revstr.length())
 			return null;
 		name = revstr.substring(done);
 		if (!Repository.isValidRefName("x/" + name))
