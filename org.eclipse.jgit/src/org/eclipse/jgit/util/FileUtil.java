@@ -193,11 +193,10 @@ public class FileUtil {
 	/**
 	 * @param path
 	 * @throws IOException
-	 * @deprecated use {@link FileUtils#delete(File)}
 	 */
-	@Deprecated
 	public static void delete(File path) throws IOException {
-		FileUtils.delete(path);
+		Path nioPath = path.toPath();
+		Files.delete(nioPath);
 	}
 
 	static Attributes getFileAttributesBasic(FS fs, File path) {
