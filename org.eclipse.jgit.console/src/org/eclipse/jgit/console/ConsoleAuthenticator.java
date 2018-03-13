@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +41,55 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
 
+package org.eclipse.jgit.console;
+
+import java.io.Console;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.util.CachedAuthenticator;
 
-/**
- * Exception thrown when a hook returns a process result with a value different
- * from 0. It is up to the caller to decide whether this should block execution
- * or not.
- *
- * @since 4.0
- */
-public class AbortedByHookException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * The hook that caused this exception.
-	 */
-	private final String hookName;
-
-	/**
-	 * The process result.
-	 */
-	private final int returnCode;
-
-	/**
-	 * @param message
-	 *            The error details.
-	 * @param hookName
-	 *            The name of the hook that interrupted the command, must not be
-	 *            null.
-	 * @param returnCode
-	 *            The return code of the hook process that has been run.
-	 */
-	public AbortedByHookException(String message, String hookName,
-			int returnCode) {
-		super(message);
-		this.hookName = hookName;
-		this.returnCode = returnCode;
+/** Basic network prompt for username/password when using the console. */
+public class ConsoleAuthenticator extends CachedAuthenticator {
+	/** Install this authenticator implementation into the JVM. */
+	public static void install() {
+		final ConsoleAuthenticator c = new ConsoleAuthenticator();
+		if (c.cons == null)
+			throw new NoClassDefFoundError(ConsoleText.get().noSystemConsoleAvailable);
+		Authenticator.setDefault(c);
 	}
 
-	/**
-	 * @return the type of the hook that interrupted the git command.
-	 */
-	public String getHookName() {
-		return hookName;
-	}
-
-	/**
-	 * @return the hook process result.
-	 */
-	public int getReturnCode() {
-		return returnCode;
-	}
+	private final Console cons = System.console();
 
 	@Override
-	public String getMessage() {
-		return MessageFormat.format(JGitText.get().commandRejectedByHook,
-				hookName, super.getMessage());
+	protected PasswordAuthentication promptPasswordAuthentication() {
+		final String realm = formatRealm();
+		String username = cons.readLine(MessageFormat.format(ConsoleText.get().usernameFor + " ", realm)); //$NON-NLS-1$
+		if (username == null || username.isEmpty()) {
+			return null;
+		}
+		char[] password = cons.readPassword(ConsoleText.get().password + " "); //$NON-NLS-1$
+		if (password == null) {
+			password = new char[0];
+		}
+		return new PasswordAuthentication(username, password);
+	}
+
+	private String formatRealm() {
+		final StringBuilder realm = new StringBuilder();
+		if (getRequestorType() == RequestorType.PROXY) {
+			realm.append(getRequestorType());
+			realm.append(" "); //$NON-NLS-1$
+			realm.append(getRequestingHost());
+			if (getRequestingPort() > 0) {
+				realm.append(":"); //$NON-NLS-1$
+				realm.append(getRequestingPort());
+			}
+		} else {
+			realm.append(getRequestingURL());
+		}
+		return realm.toString();
 	}
 }

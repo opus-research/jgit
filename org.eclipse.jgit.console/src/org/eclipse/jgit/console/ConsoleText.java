@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Obeo.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,28 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.hooks;
 
-import java.io.IOException;
-import java.io.PrintStream;
+package org.eclipse.jgit.console;
 
-import org.eclipse.jgit.api.errors.AbortedByHookException;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * The <code>pre-commit</code> hook implementation. This hook is run before the
- * commit and can reject the commit.
- *
- * @since 4.0
+ * Translation bundle for JGit console
  */
-public class PreCommitHook extends GitHook<Void> {
-
-	/** The pre-commit hook name. */
-	public static final String NAME = "pre-commit"; //$NON-NLS-1$
+public class ConsoleText extends TranslationBundle {
 
 	/**
-	 * @param repo
-	 *            The repository
-	 * @param outputStream
-	 *            The output stream the hook must use. {@code null} is allowed,
-	 *            in which case the hook will use {@code System.out}.
+	 * @return an instance of this translation bundle
 	 */
-	protected PreCommitHook(Repository repo, PrintStream outputStream) {
-		super(repo, outputStream);
+	public static ConsoleText get() {
+		return NLS.getBundleFor(ConsoleText.class);
 	}
 
-	@Override
-	public Void call() throws IOException, AbortedByHookException {
-		doRun();
-		return null;
-	}
-
-	@Override
-	public String getHookName() {
-		return NAME;
-	}
-
+	// @formatter:off
+	/***/ public String answerNo;
+	/***/ public String answerYes;
+	/***/ public String noSystemConsoleAvailable;
+	/***/ public String password;
+	/***/ public String usernameFor;
 }

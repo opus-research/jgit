@@ -104,7 +104,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 /**
  * Format a Git style patch script.
  */
-public class DiffFormatter implements AutoCloseable {
+public class DiffFormatter {
 	private static final int DEFAULT_BINARY_FILE_THRESHOLD = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 
 	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
@@ -380,23 +380,10 @@ public class DiffFormatter implements AutoCloseable {
 		out.flush();
 	}
 
-	/**
-	 * Release the internal ObjectReader state. Use {@link #close()} instead.
-	 */
-	@Deprecated
+	/** Release the internal ObjectReader state. */
 	public void release() {
-		close();
-	}
-
-	/**
-	 * Release the internal ObjectReader state.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
 		if (reader != null)
-			reader.close();
+			reader.release();
 	}
 
 	/**

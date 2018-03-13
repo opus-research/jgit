@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2015 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,98 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.api.errors;
 
 /**
- * The required information to verify the push.
+ * Exception thrown when a commit is rejected by a hook (either
+ * {@link org.eclipse.jgit.util.Hook#PRE_COMMIT pre-commit} or
+ * {@link org.eclipse.jgit.util.Hook#COMMIT_MSG commit-msg}).
  *
- * @since 4.0
+ * @since 3.7
  */
-public class PushCertificate {
-
-	/** The tuple "name <email>" as presented in the push certificate */
-	String pusher;
-
-	/** The remote URL the signed push goes to */
-	String pushee;
-
-	/** What we think about the returned signed nonce */
-	NonceStatus nonceStatus;
+public class RejectCommitException extends GitAPIException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 *
-	 *
+	 * @param message
 	 */
-	public enum NonceStatus {
-		/**
-		 *
-		 */
-		UNSOLICITED,
-		/**
-		 *
-		 */
-		BAD,
-		/**
-		 *
-		 */
-		MISSING,
-		/**
-		 *
-		 */
-		OK,
-		/**
-		 *
-		 */
-		SLOP
-	}
-
-	/**
-	 *
-	 */
-	String commandList;
-
-	/**
-	 *
-	 */
-	String signature;
-
-	/**
-	 *
-	 * @return the signature, consisting of the lines received between the lines
-	 *         '----BEGIN GPG SIGNATURE-----\n' and the '----END GPG
-	 *         SIGNATURE-----\n'
-	 */
-	public String getSignature() {
-		return signature;
-	}
-
-	/**
-	 * @return the list of commands as one string to be feed into the signature
-	 *         verifier.
-	 */
-	public String getCommandList() {
-		return commandList;
-	}
-
-	/**
-	 * @return the pushedCertPusher
-	 */
-	public String getPusher() {
-		return pusher;
-	}
-
-	/**
-	 * @return the pushedCertPushee
-	 */
-	public String getPushee() {
-		return pushee;
-	}
-
-	/**
-	 * @return the pushCertNonceStatus
-	 */
-	public NonceStatus getNonceStatus() {
-		return nonceStatus;
+	public RejectCommitException(String message) {
+		super(message);
 	}
 }
