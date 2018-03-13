@@ -56,15 +56,12 @@ import org.eclipse.jgit.http.server.glue.MetaServlet;
 import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
 import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.GetAnyFile;
 import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.UploadPack;
 
 /**
  * Handles Git repository access over HTTP.
@@ -99,13 +96,13 @@ import org.eclipse.jgit.transport.UploadPack;
 public class GitServlet extends MetaServlet {
 	private static final long serialVersionUID = 1L;
 
-	private final GetAnyFile getAnyFile;
-
-	private final UploadPackFactory uploadPackFactory;
-
-	private final ReceivePackFactory receivePackFactory;
+	private volatile boolean initialized;
 
 	private RepositoryResolver resolver;
+
+	private GetAnyFile getAnyFile = new GetAnyFile();
+
+	private ReceivePackFactory receivePackFactory = new DefaultReceivePackFactory();
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -114,8 +111,7 @@ public class GitServlet extends MetaServlet {
 	 * the local filesystem directory where all served Git repositories reside.
 	 */
 	public GitServlet() {
-		this(null, new GetAnyFile(), new DefaultUploadPackFactory(),
-				new DefaultReceivePackFactory());
+		// Initialized above by field declarations.
 	}
 
 	/**
@@ -126,31 +122,36 @@ public class GitServlet extends MetaServlet {
 	 *            null the {@code base-path} parameter will be looked for in the
 	 *            parameter table during init, which usually comes from the
 	 *            {@code web.xml} file of the web application.
-	 * @param getAnyFile
+	 */
+	public void setRepositoryResolver(RepositoryResolver resolver) {
+		assertNotInitialized();
+		this.resolver = resolver;
+	}
+
+	/**
+	 * @param f
 	 *            the filter to validate direct access to repository files
 	 *            through a dumb client. If {@code null} then dumb client
 	 *            support is completely disabled.
-	 * @param uploadPackFactory
-	 *            the factory to construct and configure an {@link UploadPack}
-	 *            session when a fetch or clone is requested by a client.
-	 * @param receivePackFactory
+	 */
+	public void setGetAnyFile(GetAnyFile f) {
+		assertNotInitialized();
+		this.getAnyFile = f != null ? f : GetAnyFile.DISABLED;
+	}
+
+	/**
+	 * @param f
 	 *            the factory to construct and configure a {@link ReceivePack}
 	 *            session when a push is requested by a client.
 	 */
-	public GitServlet(final RepositoryResolver resolver, GetAnyFile getAnyFile,
-			UploadPackFactory uploadPackFactory,
-			ReceivePackFactory receivePackFactory) {
-		if (getAnyFile == null)
-			getAnyFile = GetAnyFile.DISABLED;
-		if (uploadPackFactory == null)
-			uploadPackFactory = UploadPackFactory.DISABLED;
-		if (receivePackFactory == null)
-			receivePackFactory = ReceivePackFactory.DISABLED;
+	public void setReceivePackFactory(ReceivePackFactory f) {
+		assertNotInitialized();
+		this.receivePackFactory = f != null ? f : ReceivePackFactory.DISABLED;
+	}
 
-		this.resolver = resolver;
-		this.getAnyFile = getAnyFile;
-		this.uploadPackFactory = uploadPackFactory;
-		this.receivePackFactory = receivePackFactory;
+	private void assertNotInitialized() {
+		if (initialized)
+			throw new IllegalStateException("Already initialized by container");
 	}
 
 	@Override
@@ -161,13 +162,10 @@ public class GitServlet extends MetaServlet {
 			final String basePath = config.getInitParameter("base-path");
 			if (basePath == null || "".equals(basePath))
 				throw new ServletException("Filter parameter base-path not set");
-			resolver = new FileResolver(new File(basePath));
+			setRepositoryResolver(new FileResolver(new File(basePath)));
 		}
 
-		if (uploadPackFactory != ReceivePackFactory.DISABLED) {
-			serve("*/git-upload-pack")//
-					.with(new UploadPackServlet(uploadPackFactory));
-		}
+		initialized = true;
 
 		if (receivePackFactory != ReceivePackFactory.DISABLED) {
 			serve("*/git-receive-pack")//
@@ -175,10 +173,6 @@ public class GitServlet extends MetaServlet {
 		}
 
 		ServletBinder refs = serve("*/" + Constants.INFO_REFS);
-		if (uploadPackFactory != UploadPackFactory.DISABLED) {
-			refs = refs.through(//
-					new UploadPackServlet.InfoRefs(uploadPackFactory));
-		}
 		if (receivePackFactory != ReceivePackFactory.DISABLED) {
 			refs = refs.through(//
 					new ReceivePackServlet.InfoRefs(receivePackFactory));
