@@ -43,18 +43,9 @@
 
 package org.eclipse.jgit.notes;
 
-import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
-import static org.eclipse.jgit.lib.FileMode.REGULAR_FILE;
-
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.TreeFormatter;
 
 /**
  * A note tree holding only notes, with no subtrees.
@@ -73,8 +64,6 @@ import org.eclipse.jgit.lib.TreeFormatter;
  * A LeafBucket must be parsed from a tree object by {@link NoteParser}.
  */
 class LeafBucket extends InMemoryNoteBucket {
-	static final int MAX_SIZE = 256;
-
 	/** All note blobs in this bucket, sorted sequentially. */
 	private Note[] notes;
 
@@ -107,114 +96,9 @@ class LeafBucket extends InMemoryNoteBucket {
 		return 0 <= idx ? notes[idx].getData() : null;
 	}
 
-	@Override
-	Iterator<Note> iterator(AnyObjectId objId, ObjectReader reader) {
-		return new Iterator<Note>() {
-			private int idx;
-
-			public boolean hasNext() {
-				return idx < cnt;
-			}
-
-			public Note next() {
-				if (hasNext())
-					return notes[idx++];
-				else
-					throw new NoSuchElementException();
-			}
-
-			public void remove() {
-				throw new UnsupportedOperationException();
-			}
-		};
-	}
-
-	@Override
-	int estimateSize(AnyObjectId noteOn, ObjectReader or) throws IOException {
-		return cnt;
-	}
-
-	InMemoryNoteBucket set(AnyObjectId noteOn, AnyObjectId noteData,
-			ObjectReader or) throws IOException {
-		int p = search(noteOn);
-		if (0 <= p) {
-			if (noteData != null) {
-				notes[p].setData(noteData.copy());
-				return this;
-
-			} else {
-				System.arraycopy(notes, p + 1, notes, p, cnt - p - 1);
-				cnt--;
-				return 0 < cnt ? this : null;
-			}
-
-		} else if (noteData != null) {
-			if (shouldSplit()) {
-				return split().set(noteOn, noteData, or);
-
-			} else {
-				growIfFull();
-				p = -(p + 1);
-				if (p < cnt)
-					System.arraycopy(notes, p, notes, p + 1, cnt - p);
-				notes[p] = new Note(noteOn, noteData.copy());
-				cnt++;
-				return this;
-			}
-
-		} else {
-			return this;
-		}
-	}
-
-	@Override
-	ObjectId writeTree(ObjectInserter inserter) throws IOException {
-		byte[] nameBuf = new byte[OBJECT_ID_STRING_LENGTH];
-		int nameLen = OBJECT_ID_STRING_LENGTH - prefixLen;
-		TreeFormatter fmt = new TreeFormatter(treeSize(nameLen));
-		NonNoteEntry e = nonNotes;
-
-		for (int i = 0; i < cnt; i++) {
-			Note n = notes[i];
-
-			n.copyTo(nameBuf, 0);
-
-			while (e != null
-					&& e.pathCompare(nameBuf, prefixLen, nameLen, REGULAR_FILE) < 0) {
-				e.format(fmt);
-				e = e.next;
-			}
-
-			fmt.append(nameBuf, prefixLen, nameLen, REGULAR_FILE, n.getData());
-		}
-
-		for (; e != null; e = e.next)
-			e.format(fmt);
-		return fmt.insert(inserter);
-	}
-
-	private int treeSize(final int nameLen) {
-		int sz = cnt * TreeFormatter.entrySize(REGULAR_FILE, nameLen);
-		for (NonNoteEntry e = nonNotes; e != null; e = e.next)
-			sz += e.treeEntrySize();
-		return sz;
-	}
-
 	void parseOneEntry(AnyObjectId noteOn, AnyObjectId noteData) {
 		growIfFull();
 		notes[cnt++] = new Note(noteOn, noteData.copy());
-	}
-
-	@Override
-	InMemoryNoteBucket append(Note note) {
-		if (shouldSplit()) {
-			return split().append(note);
-
-		} else {
-			growIfFull();
-			notes[cnt++] = note;
-			return this;
-		}
 	}
 
 	private void growIfFull() {
@@ -223,17 +107,5 @@ class LeafBucket extends InMemoryNoteBucket {
 			System.arraycopy(notes, 0, n, 0, cnt);
 			notes = n;
 		}
-	}
-
-	private boolean shouldSplit() {
-		return MAX_SIZE <= cnt && prefixLen + 2 < OBJECT_ID_STRING_LENGTH;
-	}
-
-	private InMemoryNoteBucket split() {
-		FanoutBucket n = new FanoutBucket(prefixLen);
-		for (int i = 0; i < cnt; i++)
-			n.append(notes[i]);
-		n.nonNotes = nonNotes;
-		return n;
 	}
 }
