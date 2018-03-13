@@ -43,13 +43,6 @@
 
 package org.eclipse.jgit.storage.dfs;
 
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_CORE_SECTION;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_DFS_SECTION;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_BLOCK_LIMIT;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_BLOCK_SIZE;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_READ_AHEAD_LIMIT;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_READ_AHEAD_THREADS;
-
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadFactory;
@@ -163,30 +156,11 @@ public class DfsBlockCacheConfig {
 	 * @return {@code this}
 	 */
 	public DfsBlockCacheConfig fromConfig(final Config rc) {
-		setBlockLimit(rc.getLong(
-				CONFIG_CORE_SECTION,
-				CONFIG_DFS_SECTION,
-				CONFIG_KEY_BLOCK_LIMIT,
-				getBlockLimit()));
+		setBlockLimit(rc.getLong("core", "dfs", "blockLimit", getBlockLimit()));
+		setBlockSize(rc.getInt("core", "dfs", "blockSize", getBlockSize()));
+		setReadAheadLimit(rc.getInt("core", "dfs", "readAheadLimit", getReadAheadLimit()));
 
-		setBlockSize(rc.getInt(
-				CONFIG_CORE_SECTION,
-				CONFIG_DFS_SECTION,
-				CONFIG_KEY_BLOCK_SIZE,
-				getBlockSize()));
-
-		setReadAheadLimit(rc.getInt(
-				CONFIG_CORE_SECTION,
-				CONFIG_DFS_SECTION,
-				CONFIG_KEY_READ_AHEAD_LIMIT,
-				getReadAheadLimit()));
-
-		int readAheadThreads = rc.getInt(
-				CONFIG_CORE_SECTION,
-				CONFIG_DFS_SECTION,
-				CONFIG_KEY_READ_AHEAD_THREADS,
-				0);
-
+		int readAheadThreads = rc.getInt("core", "dfs", "readAheadThreads", 0);
 		if (0 < getReadAheadLimit() && 0 < readAheadThreads) {
 			setReadAheadService(new ThreadPoolExecutor(
 					1, // Minimum number of threads kept alive.
