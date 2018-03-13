@@ -65,8 +65,8 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.BinaryDelta;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -74,11 +74,12 @@ import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.PackIndexWriter;
-import org.eclipse.jgit.lib.PackLock;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.WindowCursor;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.storage.file.PackIndexWriter;
+import org.eclipse.jgit.storage.file.PackLock;
+import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.util.NB;
 
 /** Indexes Git pack files for local use. */
@@ -127,7 +128,8 @@ public class IndexPack {
 
 		base = new File(objdir, n.substring(0, n.length() - suffix.length()));
 		final IndexPack ip = new IndexPack(db, is, base);
-		ip.setIndexVersion(db.getConfig().getCore().getPackIndexVersion());
+		ip.setIndexVersion(db.getConfig().get(CoreConfig.KEY)
+				.getPackIndexVersion());
 		return ip;
 	}
 
@@ -211,7 +213,7 @@ public class IndexPack {
 	/** If {@link #fixThin} this is the last byte of the original checksum. */
 	private long originalEOF;
 
-	private WindowCursor readCurs;
+	private ObjectReader readCurs;
 
 	/**
 	 * Create a new pack indexer utility.
@@ -230,7 +232,7 @@ public class IndexPack {
 		objectDatabase = db.getObjectDatabase().newCachedDatabase();
 		in = src;
 		inflater = InflaterCache.get();
-		readCurs = new WindowCursor();
+		readCurs = objectDatabase.newReader();
 		buf = new byte[BUFFER_SIZE];
 		objectData = new byte[BUFFER_SIZE];
 		objectDigest = Constants.newMessageDigest();
@@ -428,7 +430,13 @@ public class IndexPack {
 					inflater = null;
 					objectDatabase.close();
 				}
-				readCurs = WindowCursor.release(readCurs);
+
+				try {
+					if (readCurs != null)
+						readCurs.release();
+				} finally {
+					readCurs = null;
+				}
 
 				progress.endTask();
 				if (packOut != null)
@@ -845,12 +853,16 @@ public class IndexPack {
 			}
 		}
 
-		final ObjectLoader ldr = objectDatabase.openObject(readCurs, id);
-		if (ldr != null) {
+		try {
+			final ObjectLoader ldr = readCurs.openObject(id, type);
 			final byte[] existingData = ldr.getCachedBytes();
 			if (ldr.getType() != type || !Arrays.equals(data, existingData)) {
 				throw new IOException(MessageFormat.format(JGitText.get().collisionOn, id.name()));
 			}
+		} catch (MissingObjectException notLocal) {
+			// This is OK, we don't have a copy of the object locally
+			// but the API throws when we try to read it as usually its
+			// an error to read something that doesn't exist.
 		}
 	}
 

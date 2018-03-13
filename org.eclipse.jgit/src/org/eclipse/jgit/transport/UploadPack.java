@@ -56,10 +56,10 @@ import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PackWriter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -69,6 +69,7 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -393,11 +394,15 @@ public class UploadPack {
 			}
 			if (!o.has(ADVERTISED))
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()));
-			want(o);
+			try {
+				want(o);
+			} catch (IOException e) {
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()), e);
+			}
 		}
 	}
 
-	private void want(RevObject o) {
+	private void want(RevObject o) throws MissingObjectException, IOException {
 		if (!o.has(WANT)) {
 			o.add(WANT);
 			wantAll.add(o);
@@ -406,9 +411,7 @@ public class UploadPack {
 				wantCommits.add((RevCommit) o);
 
 			else if (o instanceof RevTag) {
-				do {
-					o = ((RevTag) o).getObject();
-				} while (o instanceof RevTag);
+				o = walk.peel(o);
 				if (o instanceof RevCommit)
 					want(o);
 			}
@@ -428,9 +431,9 @@ public class UploadPack {
 			if (line == PacketLineIn.END) {
 				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
 					pckOut.writeString("NAK\n");
-				pckOut.flush();
 				if (!biDirectionalPipe)
 					return false;
+				pckOut.flush();
 
 			} else if (line.startsWith("have ") && line.length() == 45) {
 				final ObjectId id = ObjectId.fromString(line.substring(5));
