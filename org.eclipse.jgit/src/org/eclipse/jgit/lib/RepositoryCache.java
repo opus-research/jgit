@@ -196,13 +196,10 @@ public class RepositoryCache {
 					db = location.open(mustExist);
 					ref = new SoftReference<Repository>(db);
 					cacheMap.put(location, ref);
-				} else {
-					db.incrementOpen();
 				}
 			}
-		} else {
-			db.incrementOpen();
 		}
+		db.incrementOpen();
 		return db;
 	}
 
