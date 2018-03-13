@@ -35,51 +35,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
-
-import java.util.LinkedList;
-import java.util.List;
+package org.eclipse.jgit.api;
 
 /**
- * Exception thrown when a command can't succeed because of unresolved
- * conflicts.
+ * Exception thrown when the options given to a command don't include a
+ * specification of a message text (e.g. a commit was called without explicitly
+ * specifying a commit message (or other options telling where to take the
+ * message from.
  */
-public class CheckoutConflictException extends GitAPIException {
+public class NoMessageException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
-	private List<String> conflictingPaths;
 
-	CheckoutConflictException(String message, Throwable cause) {
+	NoMessageException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
-	CheckoutConflictException(String message, List<String> conflictingPaths, Throwable cause) {
-		super(message, cause);
-		this.conflictingPaths = conflictingPaths;
-	}
-
-	CheckoutConflictException(String message) {
+	NoMessageException(String message) {
 		super(message);
-	}
-
-	CheckoutConflictException(String message, List<String> conflictingPaths) {
-		super(message);
-		this.conflictingPaths = conflictingPaths;
-	}
-
-	/** @return all the paths where unresolved conflicts have been detected */
-	public List<String> getConflictingPaths() {
-		return conflictingPaths;
-	}
-
-	/**
-	 * Adds a new conflicting path
-	 * @param conflictingPath
-	 * @return {@code this}
-	 */
-	CheckoutConflictException addConflictingPath(String conflictingPath) {
-		if (conflictingPaths == null)
-			conflictingPaths = new LinkedList<String>();
-		conflictingPaths.add(conflictingPath);
-		return this;
 	}
 }
