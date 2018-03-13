@@ -46,16 +46,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.ProcessResult.Status;
-
 
 /**
  * Base FS for POSIX based systems
@@ -129,39 +125,11 @@ public abstract class FS_POSIX extends FS {
 		return proc;
 	}
 
-	/**
-	 * @since 3.6
-	 */
 	@Override
 	public ProcessResult runIfPresent(Repository repository, Hook hook,
-			String[] args,
-			PrintStream outRedirect, PrintStream errRedirect, String stdinArgs)
-			throws JGitInternalException {
-		final File hookFile = tryFindHook(repository, hook);
-		if (hookFile == null)
-			return new ProcessResult(Status.NOT_PRESENT);
-
-		final String hookPath = hookFile.getAbsolutePath();
-		final File runDirectory;
-		if (repository.isBare())
-			runDirectory = repository.getDirectory();
-		else
-			runDirectory = repository.getWorkTree();
-		final String cmd = FileUtils.relativize(runDirectory.getAbsolutePath(),
-				hookPath);
-		ProcessBuilder hookProcess = runInShell(cmd, args);
-		hookProcess.directory(runDirectory);
-		try {
-			return new ProcessResult(runProcess(hookProcess, outRedirect,
-					errRedirect, stdinArgs), Status.OK);
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionCaughtDuringExecutionOfHook,
-					hook.getName()), e);
-		} catch (InterruptedException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionHookExecutionInterrupted,
-					hook.getName()), e);
-		}
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
+		return internalRunIfPresent(repository, hook, args, outRedirect,
+				errRedirect, stdinArgs);
 	}
 }

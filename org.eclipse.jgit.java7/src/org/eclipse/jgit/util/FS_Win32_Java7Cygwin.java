@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -140,13 +141,10 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
-	/**
-	 * @since 3.6
-	 */
 	@Override
-	public File tryFindHook(Repository repository, Hook hook) {
+	public File findHook(Repository repository, Hook hook) {
 		final File gitdir = repository.getDirectory();
-		final Path hookPath = gitdir.toPath().resolve("hooks") //$NON-NLS-1$
+		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
 				.resolve(hook.getName());
 		if (Files.isExecutable(hookPath))
 			return hookPath.toFile();
