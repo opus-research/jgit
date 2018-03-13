@@ -69,7 +69,7 @@ public class MergeResult {
 		FAST_FORWARD {
 			@Override
 			public String toString() {
-				return "Fast-forward"; //$NON-NLS-1$
+				return "Fast-forward";
 			}
 
 			@Override
@@ -83,7 +83,7 @@ public class MergeResult {
 		FAST_FORWARD_SQUASHED {
 			@Override
 			public String toString() {
-				return "Fast-forward-squashed"; //$NON-NLS-1$
+				return "Fast-forward-squashed";
 			}
 
 			@Override
@@ -95,7 +95,7 @@ public class MergeResult {
 		ALREADY_UP_TO_DATE {
 			@Override
 			public String toString() {
-				return "Already-up-to-date"; //$NON-NLS-1$
+				return "Already-up-to-date";
 			}
 
 			@Override
@@ -107,7 +107,7 @@ public class MergeResult {
 		FAILED {
 			@Override
 			public String toString() {
-				return "Failed"; //$NON-NLS-1$
+				return "Failed";
 			}
 
 			@Override
@@ -119,7 +119,7 @@ public class MergeResult {
 		MERGED {
 			@Override
 			public String toString() {
-				return "Merged"; //$NON-NLS-1$
+				return "Merged";
 			}
 
 			@Override
@@ -133,7 +133,7 @@ public class MergeResult {
 		MERGED_SQUASHED {
 			@Override
 			public String toString() {
-				return "Merged-squashed"; //$NON-NLS-1$
+				return "Merged-squashed";
 			}
 
 			@Override
@@ -147,7 +147,7 @@ public class MergeResult {
 		MERGED_SQUASHED_NOT_COMMITTED {
 			@Override
 			public String toString() {
-				return "Merged-squashed-not-committed"; //$NON-NLS-1$
+				return "Merged-squashed-not-committed";
 			}
 
 			@Override
@@ -159,7 +159,7 @@ public class MergeResult {
 		CONFLICTING {
 			@Override
 			public String toString() {
-				return "Conflicting"; //$NON-NLS-1$
+				return "Conflicting";
 			}
 
 			@Override
@@ -173,7 +173,7 @@ public class MergeResult {
 		ABORTED {
 			@Override
 			public String toString() {
-				return "Aborted"; //$NON-NLS-1$
+				return "Aborted";
 			}
 
 			@Override
@@ -185,9 +185,8 @@ public class MergeResult {
 		 * @since 3.0
 		 **/
 		MERGED_NOT_COMMITTED {
-			@Override
 			public String toString() {
-				return "Merged-not-committed"; //$NON-NLS-1$
+				return "Merged-not-committed";
 			}
 
 			@Override
@@ -199,7 +198,7 @@ public class MergeResult {
 		NOT_SUPPORTED {
 			@Override
 			public String toString() {
-				return "Not-yet-supported"; //$NON-NLS-1$
+				return "Not-yet-supported";
 			}
 
 			@Override
@@ -213,9 +212,8 @@ public class MergeResult {
 		 * files (i.e. local modifications prevent checkout of files).
 		 */
 		CHECKOUT_CONFLICT {
-			@Override
 			public String toString() {
-				return "Checkout Conflict"; //$NON-NLS-1$
+				return "Checkout Conflict";
 			}
 
 			@Override
@@ -416,7 +414,7 @@ public class MergeResult {
 	 */
 	public void addConflict(String path, int[][] conflictingRanges) {
 		if (conflicts == null)
-			conflicts = new HashMap<>();
+			conflicts = new HashMap<String, int[][]>();
 		conflicts.put(path, conflictingRanges);
 	}
 
@@ -428,7 +426,7 @@ public class MergeResult {
 		if (!lowLevelResult.containsConflicts())
 			return;
 		if (conflicts == null)
-			conflicts = new HashMap<>();
+			conflicts = new HashMap<String, int[][]>();
 		int nrOfConflicts = 0;
 		// just counting
 		for (MergeChunk mergeChunk : lowLevelResult) {

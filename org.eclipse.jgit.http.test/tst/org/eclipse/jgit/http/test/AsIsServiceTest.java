@@ -64,7 +64,6 @@ public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
 
 	private AsIsFileService service;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -134,7 +133,7 @@ public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
 		private final String host;
 
 		R(final String user, final String host) {
-			super(new Request(null, null) /* can't pass null, sigh */);
+			super(new Request() /* can't pass null, sigh */);
 			this.user = user;
 			this.host = host;
 		}

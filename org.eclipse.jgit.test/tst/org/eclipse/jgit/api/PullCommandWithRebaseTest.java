@@ -61,7 +61,6 @@ import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.StoredConfig;
@@ -146,57 +145,6 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 				.setStrategy(MergeStrategy.RESOLVE).call();
 		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 
-	}
-
-	@Test
-	public void testPullFastForwardDetachedHead() throws Exception {
-		Repository repository = source.getRepository();
-		writeToFile(sourceFile, "2nd commit");
-		source.add().addFilepattern("SomeFile.txt").call();
-		source.commit().setMessage("2nd commit").call();
-
-		try (RevWalk revWalk = new RevWalk(repository)) {
-			// git checkout HEAD^
-			String initialBranch = repository.getBranch();
-			Ref initialRef = repository.findRef(Constants.HEAD);
-			RevCommit initialCommit = revWalk
-					.parseCommit(initialRef.getObjectId());
-			assertEquals("this test need linear history", 1,
-					initialCommit.getParentCount());
-			source.checkout().setName(initialCommit.getParent(0).getName())
-					.call();
-			assertFalse("expected detached HEAD",
-					repository.getFullBranch().startsWith(Constants.R_HEADS));
-
-			// change and commit another file
-			File otherFile = new File(sourceFile.getParentFile(),
-					System.currentTimeMillis() + ".tst");
-			writeToFile(otherFile, "other 2nd commit");
-			source.add().addFilepattern(otherFile.getName()).call();
-			RevCommit newCommit = source.commit().setMessage("other 2nd commit")
-					.call();
-
-			// git pull --rebase initialBranch
-			source.pull().setRebase(true).setRemote(".")
-					.setRemoteBranchName(initialBranch)
-					.call();
-
-			assertEquals(RepositoryState.SAFE,
-					source.getRepository().getRepositoryState());
-			Ref head = source.getRepository().findRef(Constants.HEAD);
-			RevCommit headCommit = revWalk.parseCommit(head.getObjectId());
-
-			// HEAD^ == initialCommit, no merge commit
-			assertEquals(1, headCommit.getParentCount());
-			assertEquals(initialCommit, headCommit.getParent(0));
-
-			// both contributions for both commits are available
-			assertFileContentsEqual(sourceFile, "2nd commit");
-			assertFileContentsEqual(otherFile, "other 2nd commit");
-			// HEAD has same message as rebased commit
-			assertEquals(newCommit.getShortMessage(),
-					headCommit.getShortMessage());
-		}
 	}
 
 	@Test
@@ -325,27 +273,26 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 
 		// Get the HEAD and HEAD~1 commits
 		Repository targetRepo = target.getRepository();
-		try (RevWalk revWalk = new RevWalk(targetRepo)) {
-			ObjectId headId = targetRepo.resolve(Constants.HEAD);
-			RevCommit root = revWalk.parseCommit(headId);
-			revWalk.markStart(root);
-			// HEAD
-			RevCommit head = revWalk.next();
-			// HEAD~1
-			RevCommit beforeHead = revWalk.next();
+		RevWalk revWalk = new RevWalk(targetRepo);
+		ObjectId headId = targetRepo.resolve(Constants.HEAD);
+		RevCommit root = revWalk.parseCommit(headId);
+		revWalk.markStart(root);
+		// HEAD
+		RevCommit head = revWalk.next();
+		// HEAD~1
+		RevCommit beforeHead = revWalk.next();
 
-			// verify the commit message on the HEAD commit
-			assertEquals(TARGET_COMMIT_MESSAGE, head.getFullMessage());
-			// verify the commit just before HEAD
-			assertEquals(SOURCE_COMMIT_MESSAGE, beforeHead.getFullMessage());
+		// verify the commit message on the HEAD commit
+		assertEquals(TARGET_COMMIT_MESSAGE, head.getFullMessage());
+		// verify the commit just before HEAD
+		assertEquals(SOURCE_COMMIT_MESSAGE, beforeHead.getFullMessage());
 
-			// verify file states
-			assertFileContentsEqual(sourceFile, SOURCE_FILE_CONTENTS);
-			assertFileContentsEqual(newFile, NEW_FILE_CONTENTS);
-			// verify repository state
-			assertEquals(RepositoryState.SAFE, target
-				.getRepository().getRepositoryState());
-		}
+		// verify file states
+		assertFileContentsEqual(sourceFile, SOURCE_FILE_CONTENTS);
+		assertFileContentsEqual(newFile, NEW_FILE_CONTENTS);
+		// verify repository state
+		assertEquals(RepositoryState.SAFE, target
+			.getRepository().getRepositoryState());
 	}
 
 	@Override

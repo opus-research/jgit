@@ -121,9 +121,7 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private ResetType mode;
 
-	private Collection<String> filepaths = new LinkedList<>();
-
-	private boolean isReflogDisabled;
+	private Collection<String> filepaths = new LinkedList<String>();
 
 	/**
 	 *
@@ -141,7 +139,6 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * @return the Ref after reset
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Ref call() throws GitAPIException, CheckoutConflictException {
 		checkCallable();
 
@@ -160,8 +157,8 @@ public class ResetCommand extends GitCommand<Ref> {
 			if (ref != null && commitId == null) {
 				// @TODO throw an InvalidRefNameException. We can't do that
 				// now because this would break the API
-				throw new JGitInternalException(MessageFormat
-						.format(JGitText.get().invalidRefName, ref));
+				throw new JGitInternalException("Invalid ref " + ref
+						+ " specified");
 			}
 
 			final ObjectId commitTree;
@@ -174,7 +171,7 @@ public class ResetCommand extends GitCommand<Ref> {
 				// reset [commit] -- paths
 				resetIndexForPaths(commitTree);
 				setCallable(false);
-				return repo.exactRef(Constants.HEAD);
+				return repo.getRef(Constants.HEAD);
 			}
 
 			final Ref result;
@@ -184,12 +181,8 @@ public class ResetCommand extends GitCommand<Ref> {
 				ru.setNewObjectId(commitId);
 
 				String refName = Repository.shortenRefName(getRefOrHEAD());
-				if (isReflogDisabled) {
-					ru.disableRefLog();
-				} else {
-					String message = refName + ": updating " + Constants.HEAD; //$NON-NLS-1$
-					ru.setRefLogMessage(message, false);
-				}
+				String message = refName + ": updating " + Constants.HEAD; //$NON-NLS-1$
+				ru.setRefLogMessage(message, false);
 				if (ru.forceUpdate() == RefUpdate.Result.LOCK_FAILURE)
 					throw new JGitInternalException(MessageFormat.format(
 							JGitText.get().cannotLock, ru.getName()));
@@ -197,8 +190,10 @@ public class ResetCommand extends GitCommand<Ref> {
 				ObjectId origHead = ru.getOldObjectId();
 				if (origHead != null)
 					repo.writeOrigHead(origHead);
+				result = ru.getRef();
+			} else {
+				result = repo.getRef(Constants.HEAD);
 			}
-			result = repo.exactRef(Constants.HEAD);
 
 			if (mode == null)
 				mode = ResetType.MIXED;
@@ -239,12 +234,17 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	private RevCommit parseCommit(final ObjectId commitId) {
-		try (RevWalk rw = new RevWalk(repo)) {
-			return rw.parseCommit(commitId);
+		RevCommit commit;
+		RevWalk rw = new RevWalk(repo);
+		try {
+			commit = rw.parseCommit(commitId);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cannotReadCommit, commitId.toString()), e);
+		} finally {
+			rw.release();
 		}
+		return commit;
 	}
 
 	private ObjectId resolveRefToCommitId() {
@@ -276,7 +276,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		if (!filepaths.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$ //$NON-NLS-2$
+					"[--mixed | --soft | --hard]", "<paths>...")); //$NON-NLS-1$
 		this.mode = mode;
 		return this;
 	}
@@ -290,30 +290,10 @@ public class ResetCommand extends GitCommand<Ref> {
 	public ResetCommand addPath(String path) {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "<paths>...", //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "<paths>...",
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
 		filepaths.add(path);
 		return this;
-	}
-
-	/**
-	 * @param disable
-	 *            if {@code true} disables writing a reflog entry for this reset
-	 *            command
-	 * @return this instance
-	 * @since 4.5
-	 */
-	public ResetCommand disableRefLog(boolean disable) {
-		this.isReflogDisabled = disable;
-		return this;
-	}
-
-	/**
-	 * @return {@code true} if writing reflog is disabled for this reset command
-	 * @since 4.5
-	 */
-	public boolean isReflogDisabled() {
-		return this.isReflogDisabled;
 	}
 
 	private String getRefOrHEAD() {
@@ -325,10 +305,11 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndexForPaths(ObjectId commitTree) {
 		DirCache dc = null;
-		try (final TreeWalk tw = new TreeWalk(repo)) {
+		try {
 			dc = repo.lockDirCache();
 			DirCacheBuilder builder = dc.builder();
 
+			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (commitTree != null)
 				tw.addTree(commitTree);
@@ -361,9 +342,11 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndex(ObjectId commitTree) throws IOException {
 		DirCache dc = repo.lockDirCache();
-		try (TreeWalk walk = new TreeWalk(repo)) {
+		TreeWalk walk = null;
+		try {
 			DirCacheBuilder builder = dc.builder();
 
+			walk = new TreeWalk(repo);
 			if (commitTree != null)
 				walk.addTree(commitTree);
 			else
@@ -397,6 +380,8 @@ public class ResetCommand extends GitCommand<Ref> {
 			builder.commit();
 		} finally {
 			dc.unlock();
+			if (walk != null)
+				walk.release();
 		}
 	}
 
@@ -431,14 +416,6 @@ public class ResetCommand extends GitCommand<Ref> {
 	private void resetRevert() throws IOException {
 		repo.writeRevertHead(null);
 		repo.writeMergeCommitMsg(null);
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return "ResetCommand [repo=" + repo + ", ref=" + ref + ", mode=" + mode
-				+ ", isReflogDisabled=" + isReflogDisabled + ", filepaths="
-				+ filepaths + "]";
 	}
 
 }

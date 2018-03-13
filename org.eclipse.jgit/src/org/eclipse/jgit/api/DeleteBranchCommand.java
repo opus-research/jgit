@@ -79,7 +79,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  *      >Git documentation about Branch</a>
  */
 public class DeleteBranchCommand extends GitCommand<List<String>> {
-	private final Set<String> branchNames = new HashSet<>();
+	private final Set<String> branchNames = new HashSet<String>();
 
 	private boolean force;
 
@@ -97,11 +97,10 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 	 * @throws CannotDeleteCurrentBranchException
 	 * @return the list with the (full) names of the deleted branches
 	 */
-	@Override
 	public List<String> call() throws GitAPIException,
 			NotMergedException, CannotDeleteCurrentBranchException {
 		checkCallable();
-		List<String> result = new ArrayList<>();
+		List<String> result = new ArrayList<String>();
 		if (branchNames.isEmpty())
 			return result;
 		try {
@@ -109,21 +108,18 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 			if (!force) {
 				// check if the branches to be deleted
 				// are all merged into the current branch
-				try (RevWalk walk = new RevWalk(repo)) {
-					RevCommit tip = walk
-							.parseCommit(repo.resolve(Constants.HEAD));
-					for (String branchName : branchNames) {
-						if (branchName == null)
-							continue;
-						Ref currentRef = repo.findRef(branchName);
-						if (currentRef == null)
-							continue;
+				RevWalk walk = new RevWalk(repo);
+				RevCommit tip = walk.parseCommit(repo.resolve(Constants.HEAD));
+				for (String branchName : branchNames) {
+					if (branchName == null)
+						continue;
+					Ref currentRef = repo.getRef(branchName);
+					if (currentRef == null)
+						continue;
 
-						RevCommit base = walk
-								.parseCommit(repo.resolve(branchName));
-						if (!walk.isMergedInto(base, tip)) {
-							throw new NotMergedException();
-						}
+					RevCommit base = walk.parseCommit(repo.resolve(branchName));
+					if (!walk.isMergedInto(base, tip)) {
+						throw new NotMergedException();
 					}
 				}
 			}
@@ -131,7 +127,7 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 			for (String branchName : branchNames) {
 				if (branchName == null)
 					continue;
-				Ref currentRef = repo.findRef(branchName);
+				Ref currentRef = repo.getRef(branchName);
 				if (currentRef == null)
 					continue;
 				String fullName = currentRef.getName();

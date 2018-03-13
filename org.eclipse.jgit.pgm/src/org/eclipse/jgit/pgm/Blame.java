@@ -114,7 +114,7 @@ class Blame extends TextBuiltin {
 	private String rangeString;
 
 	@Option(name = "--reverse", metaVar = "metaVar_blameReverse", usage = "usage_blameReverse")
-	private List<RevCommit> reverseRange = new ArrayList<>(2);
+	private List<RevCommit> reverseRange = new ArrayList<RevCommit>(2);
 
 	@Argument(index = 0, required = false, metaVar = "metaVar_revision")
 	private String revision;
@@ -124,7 +124,7 @@ class Blame extends TextBuiltin {
 
 	private ObjectReader reader;
 
-	private final Map<RevCommit, String> abbreviatedCommits = new HashMap<>();
+	private final Map<RevCommit, String> abbreviatedCommits = new HashMap<RevCommit, String>();
 
 	private SimpleDateFormat dateFmt;
 
@@ -156,14 +156,15 @@ class Blame extends TextBuiltin {
 		else
 			dateFmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss ZZZZ"); //$NON-NLS-1$
 
+		BlameGenerator generator = new BlameGenerator(db, file);
+		RevFlag scanned = generator.newFlag("SCANNED"); //$NON-NLS-1$
 		reader = db.newObjectReader();
-		try (BlameGenerator generator = new BlameGenerator(db, file)) {
-			RevFlag scanned = generator.newFlag("SCANNED"); //$NON-NLS-1$
+		try {
 			generator.setTextComparator(comparator);
 
 			if (!reverseRange.isEmpty()) {
 				RevCommit rangeStart = null;
-				List<RevCommit> rangeEnd = new ArrayList<>(2);
+				List<RevCommit> rangeEnd = new ArrayList<RevCommit>(2);
 				for (RevCommit c : reverseRange) {
 					if (c.has(RevFlag.UNINTERESTING))
 						rangeStart = c;
@@ -246,7 +247,8 @@ class Blame extends TextBuiltin {
 				} while (++line < end && blame.getSourceCommit(line) == c);
 			}
 		} finally {
-			reader.close();
+			generator.release();
+			reader.release();
 		}
 	}
 

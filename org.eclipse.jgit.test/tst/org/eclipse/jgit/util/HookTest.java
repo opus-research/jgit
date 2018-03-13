@@ -54,7 +54,6 @@ import java.io.PrintStream;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.hooks.CommitMsgHook;
-import org.eclipse.jgit.hooks.PostCommitHook;
 import org.eclipse.jgit.hooks.PreCommitHook;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
@@ -74,18 +73,6 @@ public class HookTest extends RepositoryTestCase {
 				"#!/bin/bash\necho \"test $1 $2\"");
 		assertEquals("expected to find pre-commit hook", hookFile,
 				FS.DETECTED.findHook(db, PreCommitHook.NAME));
-	}
-
-	@Test
-	public void testFindPostCommitHook() throws Exception {
-		assumeSupportedPlatform();
-
-		assertNull("no hook should be installed",
-				FS.DETECTED.findHook(db, PostCommitHook.NAME));
-		File hookFile = writeHookFile(PostCommitHook.NAME,
-				"#!/bin/bash\necho \"test $1 $2\"");
-		assertEquals("expected to find post-commit hook", hookFile,
-				FS.DETECTED.findHook(db, PostCommitHook.NAME));
 	}
 
 	@Test
@@ -125,8 +112,7 @@ public class HookTest extends RepositoryTestCase {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		git.commit().setMessage("commit")
 				.setHookOutputStream(new PrintStream(out)).call();
-		assertEquals(".git/COMMIT_EDITMSG\n",
-				out.toString("UTF-8"));
+		assertEquals(".git/COMMIT_EDITMSG\n", out.toString("UTF-8"));
 	}
 
 	@Test
@@ -146,55 +132,6 @@ public class HookTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testPostCommitRunHook() throws Exception {
-		assumeSupportedPlatform();
-
-		writeHookFile(PostCommitHook.NAME,
-				"#!/bin/sh\necho \"test $1 $2\"\nread INPUT\necho $INPUT\necho 1>&2 \"stderr\"");
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		ByteArrayOutputStream err = new ByteArrayOutputStream();
-		ProcessResult res = FS.DETECTED.runHookIfPresent(db,
-				PostCommitHook.NAME,
-				new String[] {
-				"arg1", "arg2" },
-				new PrintStream(out), new PrintStream(err), "stdin");
-
-		assertEquals("unexpected hook output", "test arg1 arg2\nstdin\n",
-				out.toString("UTF-8"));
-		assertEquals("unexpected output on stderr stream", "stderr\n",
-				err.toString("UTF-8"));
-		assertEquals("unexpected exit code", 0, res.getExitCode());
-		assertEquals("unexpected process status", ProcessResult.Status.OK,
-				res.getStatus());
-	}
-
-	@Test
-	public void testAllCommitHooks() throws Exception {
-		assumeSupportedPlatform();
-
-		writeHookFile(PreCommitHook.NAME,
-				"#!/bin/sh\necho \"test pre-commit\"\n\necho 1>&2 \"stderr pre-commit\"\nexit 0");
-		writeHookFile(CommitMsgHook.NAME,
-				"#!/bin/sh\necho \"test commit-msg $1\"\n\necho 1>&2 \"stderr commit-msg\"\nexit 0");
-		writeHookFile(PostCommitHook.NAME,
-				"#!/bin/sh\necho \"test post-commit\"\necho 1>&2 \"stderr post-commit\"\nexit 0");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		try {
-			git.commit().setMessage("commit")
-					.setHookOutputStream(new PrintStream(out)).call();
-		} catch (AbortedByHookException e) {
-			fail("unexpected hook failure");
-		}
-		assertEquals("unexpected hook output",
-				"test pre-commit\ntest commit-msg .git/COMMIT_EDITMSG\ntest post-commit\n",
-				out.toString("UTF-8"));
-	}
-
-	@Test
 	public void testRunHook() throws Exception {
 		assumeSupportedPlatform();
 
@@ -207,7 +144,6 @@ public class HookTest extends RepositoryTestCase {
 				new String[] {
 				"arg1", "arg2" },
 				new PrintStream(out), new PrintStream(err), "stdin");
-
 		assertEquals("unexpected hook output", "test arg1 arg2\nstdin\n",
 				out.toString("UTF-8"));
 		assertEquals("unexpected output on stderr stream", "stderr\n",

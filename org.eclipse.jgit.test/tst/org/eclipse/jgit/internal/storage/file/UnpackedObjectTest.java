@@ -93,7 +93,6 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		return rng;
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -106,11 +105,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
-			wc.close();
+			wc.release();
 		new WindowCacheConfig().install();
 		super.tearDown();
 	}
@@ -145,7 +143,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 	public void testStandardFormat_LargeObject() throws Exception {
 		final int type = Constants.OBJ_BLOB;
 		byte[] data = getRng().nextBytes(streamThreshold + 5);
-		ObjectId id = getId(type, data);
+		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		write(id, compressStandardFormat(type, data));
 
 		ObjectLoader ol;
@@ -308,7 +306,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 			throws Exception {
 		final int type = Constants.OBJ_BLOB;
 		byte[] data = getRng().nextBytes(streamThreshold + 5);
-		ObjectId id = getId(type, data);
+		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		byte[] gz = compressStandardFormat(type, data);
 		gz[gz.length - 1] = 0;
 		gz[gz.length - 2] = 0;
@@ -346,7 +344,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 			throws Exception {
 		final int type = Constants.OBJ_BLOB;
 		byte[] data = getRng().nextBytes(streamThreshold + 5);
-		ObjectId id = getId(type, data);
+		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		byte[] gz = compressStandardFormat(type, data);
 		byte[] tr = new byte[gz.length - 1];
 		System.arraycopy(gz, 0, tr, 0, tr.length);
@@ -381,7 +379,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 			throws Exception {
 		final int type = Constants.OBJ_BLOB;
 		byte[] data = getRng().nextBytes(streamThreshold + 5);
-		ObjectId id = getId(type, data);
+		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		byte[] gz = compressStandardFormat(type, data);
 		byte[] tr = new byte[gz.length + 1];
 		System.arraycopy(gz, 0, tr, 0, gz.length);
@@ -440,7 +438,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 	public void testPackFormat_LargeObject() throws Exception {
 		final int type = Constants.OBJ_BLOB;
 		byte[] data = getRng().nextBytes(streamThreshold + 5);
-		ObjectId id = getId(type, data);
+		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		write(id, compressPackFormat(type, data));
 
 		ObjectLoader ol;
@@ -578,12 +576,6 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 			out.write(data);
 		} finally {
 			out.close();
-		}
-	}
-
-	private ObjectId getId(int type, byte[] data) {
-		try (ObjectInserter.Formatter formatter = new ObjectInserter.Formatter()) {
-			return formatter.idFor(type, data);
 		}
 	}
 }

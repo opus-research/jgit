@@ -48,6 +48,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
@@ -70,6 +71,12 @@ public class AsIsFileService {
 		}
 	};
 
+	private static final SectionParser<ServiceConfig> CONFIG = new SectionParser<ServiceConfig>() {
+		public ServiceConfig parse(final Config cfg) {
+			return new ServiceConfig(cfg);
+		}
+	};
+
 	private static class ServiceConfig {
 		final boolean enabled;
 
@@ -88,7 +95,7 @@ public class AsIsFileService {
 	 *         {@code true}.
 	 */
 	protected static boolean isEnabled(Repository db) {
-		return db.getConfig().get(ServiceConfig::new).enabled;
+		return db.getConfig().get(CONFIG).enabled;
 	}
 
 	/**

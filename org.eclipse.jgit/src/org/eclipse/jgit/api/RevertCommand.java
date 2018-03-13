@@ -85,11 +85,11 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about revert</a>
  */
 public class RevertCommand extends GitCommand<RevCommit> {
-	private List<Ref> commits = new LinkedList<>();
+	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
 
-	private List<Ref> revertedRefs = new LinkedList<>();
+	private List<Ref> revertedRefs = new LinkedList<Ref>();
 
 	private MergeResult failingResult;
 
@@ -120,17 +120,17 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 * @throws UnmergedPathsException
 	 * @throws NoMessageException
 	 */
-	@Override
 	public RevCommit call() throws NoMessageException, UnmergedPathsException,
 			ConcurrentRefUpdateException, WrongRepositoryStateException,
 			GitAPIException {
 		RevCommit newHead = null;
 		checkCallable();
 
-		try (RevWalk revWalk = new RevWalk(repo)) {
+		RevWalk revWalk = new RevWalk(repo);
+		try {
 
 			// get the head commit
-			Ref headRef = repo.exactRef(Constants.HEAD);
+			Ref headRef = repo.getRef(Constants.HEAD);
 			if (headRef == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
@@ -182,11 +182,9 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					try (Git git = new Git(getRepository())) {
-						newHead = git.commit().setMessage(newMessage)
-								.setReflogComment("revert: " + shortMessage) //$NON-NLS-1$
-								.call();
-					}
+					newHead = new Git(getRepository()).commit()
+							.setMessage(newMessage)
+							.setReflogComment("revert: " + shortMessage).call(); //$NON-NLS-1$
 					revertedRefs.add(src);
 					headCommit = newHead;
 				} else {
@@ -222,6 +220,8 @@ public class RevertCommand extends GitCommand<RevCommit> {
 					MessageFormat.format(
 									JGitText.get().exceptionCaughtDuringExecutionOfRevertCommand,
 							e), e);
+		} finally {
+			revWalk.release();
 		}
 		return newHead;
 	}

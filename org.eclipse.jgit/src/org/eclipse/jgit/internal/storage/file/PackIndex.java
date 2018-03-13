@@ -55,13 +55,11 @@ import java.util.Set;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.UnsupportedPackIndexVersionException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
@@ -74,8 +72,7 @@ import org.eclipse.jgit.util.NB;
  * by ObjectId.
  * </p>
  */
-public abstract class PackIndex
-		implements Iterable<PackIndex.MutableEntry>, ObjectIdSet {
+public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Open an existing pack <code>.idx</code> file for reading.
 	 * <p>
@@ -139,7 +136,9 @@ public abstract class PackIndex
 			case 2:
 				return new PackIndexV2(fd);
 			default:
-				throw new UnsupportedPackIndexVersionException(v);
+				throw new IOException(MessageFormat.format(
+						JGitText.get().unsupportedPackIndexVersion,
+						Integer.valueOf(v)));
 			}
 		}
 		return new PackIndexV1(fd, hdr);
@@ -167,11 +166,6 @@ public abstract class PackIndex
 		return findOffset(id) != -1;
 	}
 
-	@Override
-	public boolean contains(AnyObjectId id) {
-		return findOffset(id) != -1;
-	}
-
 	/**
 	 * Provide iterator that gives access to index entries. Note, that iterator
 	 * returns reference to mutable object, the same reference in each call -
@@ -183,7 +177,6 @@ public abstract class PackIndex
 	 *
 	 * @return iterator over pack index entries
 	 */
-	@Override
 	public abstract Iterator<MutableEntry> iterator();
 
 	/**
@@ -366,7 +359,6 @@ public abstract class PackIndex
 
 		protected abstract MutableEntry initEntry();
 
-		@Override
 		public boolean hasNext() {
 			return returnedNumber < getObjectCount();
 		}
@@ -375,10 +367,8 @@ public abstract class PackIndex
 		 * Implementation must update {@link #returnedNumber} before returning
 		 * element.
 		 */
-		@Override
 		public abstract MutableEntry next();
 
-		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}

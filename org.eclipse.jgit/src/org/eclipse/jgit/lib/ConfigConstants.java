@@ -65,12 +65,6 @@ public class ConfigConstants {
 	/** The "dfs" section */
 	public static final String CONFIG_DFS_SECTION = "dfs";
 
-	/**
-	 * The "receive" section
-	 * @since 4.6
-	 */
-	public static final String CONFIG_RECEIVE_SECTION = "receive";
-
 	/** The "user" section */
 	public static final String CONFIG_USER_SECTION = "user";
 
@@ -107,48 +101,11 @@ public class ConfigConstants {
 	 */
 	public static final String CONFIG_PULL_SECTION = "pull";
 
-	/**
-	 * The "merge" section
-	 * @since 4.9
-	 */
-	public static final String CONFIG_MERGE_SECTION = "merge";
-
-	/**
-	 * The "filter" section
-	 * @since 4.6
-	 */
-	public static final String CONFIG_FILTER_SECTION = "filter";
-
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
-
-	/**
-	 * The "auto" key
-	 * @since 4.6
-	 */
-	public static final String CONFIG_KEY_AUTO = "auto";
-
-	/**
-	 * The "autogc" key
-	 * @since 4.6
-	 */
-	public static final String CONFIG_KEY_AUTOGC = "autogc";
-
-	/**
-	 * The "autopacklimit" key
-	 * @since 4.6
-	 */
-	public static final String CONFIG_KEY_AUTOPACKLIMIT = "autopacklimit";
-
-	/**
-	 * The "eol" key
-	 *
-	 * @since 4.3
-	 */
-	public static final String CONFIG_KEY_EOL = "eol";
 
 	/** The "bare" key */
 	public static final String CONFIG_KEY_BARE = "bare";
@@ -180,13 +137,6 @@ public class ConfigConstants {
 
 	/** The "blockSize" key */
 	public static final String CONFIG_KEY_BLOCK_SIZE = "blockSize";
-
-	/**
-	 * The "concurrencyLevel" key
-	 *
-	 * @since 4.6
-	 */
-	public static final String CONFIG_KEY_CONCURRENCY_LEVEL = "concurrencyLevel";
 
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
@@ -278,37 +228,11 @@ public class ConfigConstants {
 	 */
 	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
 
-	/**
-	 * The "dirnogitlinks" key
-	 * @since 4.3
-	 */
-	public static final String CONFIG_KEY_DIRNOGITLINKS = "dirNoGitLinks";
-
 	/** The "precomposeunicode" key */
 	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
 
 	/** The "pruneexpire" key */
 	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
-
-	/**
-	 * The "prunepackexpire" key
-	 * @since 4.3
-	 */
-	public static final String CONFIG_KEY_PRUNEPACKEXPIRE = "prunepackexpire";
-
-	/**
-	 * The "logexpiry" key
-	 *
-	 * @since 4.7
-	 */
-	public static final String CONFIG_KEY_LOGEXPIRY = "logExpiry";
-
-	/**
-	 * The "autodetach" key
-	 *
-	 * @since 4.7
-	 */
-	public static final String CONFIG_KEY_AUTODETACH = "autoDetach";
 
 	/**
 	 * The "aggressiveDepth" key
@@ -371,46 +295,8 @@ public class ConfigConstants {
 	public static final String CONFIG_KEY_RENAMES = "renames";
 
 	/**
-	 * The "inCoreLimit" key in the "merge section". It's a size limit (bytes) used to
-	 * control a file to be stored in {@code Heap} or {@code LocalFile} during the merge.
-	 * @since 4.9
-	 */
-	public static final String CONFIG_KEY_IN_CORE_LIMIT = "inCoreLimit";
-
-	/**
 	 * The "prune" key
 	 * @since 3.3
 	 */
 	public static final String CONFIG_KEY_PRUNE = "prune";
-
-	/**
-	 * The "streamBuffer" key
-	 * @since 4.0
-	 */
-	public static final String CONFIG_KEY_STREAM_BUFFER = "streamBuffer";
-
-	/**
-	 * The "streamRatio" key
-	 * @since 4.0
-	 */
-	public static final String CONFIG_KEY_STREAM_RATIO = "streamRatio";
-
-	/**
-	 * Flag in the filter section whether to use JGit's implementations of
-	 * filters and hooks
-	 * @since 4.6
-	 */
-	public static final String CONFIG_KEY_USEJGITBUILTIN = "useJGitBuiltin";
-
-	/**
-	 * The "fetchRecurseSubmodules" key
-	 * @since 4.7
-	 */
-	public static final String CONFIG_KEY_FETCH_RECURSE_SUBMODULES = "fetchRecurseSubmodules";
-
-	/**
-	 * The "recurseSubmodules" key
-	 * @since 4.7
-	 */
-	public static final String CONFIG_KEY_RECURSE_SUBMODULES = "recurseSubmodules";
 }

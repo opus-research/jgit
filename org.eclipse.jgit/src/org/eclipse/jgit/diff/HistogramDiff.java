@@ -94,7 +94,7 @@ import java.util.List;
  */
 public class HistogramDiff extends LowLevelDiffAlgorithm {
 	/** Algorithm to use when there are too many element occurrences. */
-	DiffAlgorithm fallback = MyersDiff.INSTANCE;
+	private DiffAlgorithm fallback = MyersDiff.INSTANCE;
 
 	/**
 	 * Maximum number of positions to consider for a given element hash.
@@ -103,7 +103,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 	 * size is capped to ensure search is linear time at O(len_A + len_B) rather
 	 * than quadratic at O(len_A * len_B).
 	 */
-	int maxChainLength = 64;
+	private int maxChainLength = 64;
 
 	/**
 	 * Set the algorithm used when there are too many element occurrences.
@@ -130,18 +130,17 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		maxChainLength = maxLen;
 	}
 
-	@Override
 	public <S extends Sequence> void diffNonCommon(EditList edits,
 			HashedSequenceComparator<S> cmp, HashedSequence<S> a,
 			HashedSequence<S> b, Edit region) {
-		new State<>(edits, cmp, a, b).diffRegion(region);
+		new State<S>(edits, cmp, a, b).diffRegion(region);
 	}
 
 	private class State<S extends Sequence> {
 		private final HashedSequenceComparator<S> cmp;
 		private final HashedSequence<S> a;
 		private final HashedSequence<S> b;
-		private final List<Edit> queue = new ArrayList<>();
+		private final List<Edit> queue = new ArrayList<Edit>();
 
 		/** Result edits we have determined that must be made to convert a to b. */
 		final EditList edits;
@@ -161,7 +160,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		}
 
 		private void diffReplace(Edit r) {
-			Edit lcs = new HistogramDiffIndex<>(maxChainLength, cmp, a, b, r)
+			Edit lcs = new HistogramDiffIndex<S>(maxChainLength, cmp, a, b, r)
 					.findLongestCommonSequence();
 			if (lcs != null) {
 				// If we were given an edit, we can prove a result here.
@@ -214,7 +213,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		}
 
 		private SubsequenceComparator<HashedSequence<S>> subcmp() {
-			return new SubsequenceComparator<>(cmp);
+			return new SubsequenceComparator<HashedSequence<S>>(cmp);
 		}
 	}
 }

@@ -189,7 +189,7 @@ public class Status {
 	 * @since 3.2
 	 */
 	public Set<String> getUncommittedChanges() {
-		Set<String> uncommittedChanges = new HashSet<>();
+		Set<String> uncommittedChanges = new HashSet<String>();
 		uncommittedChanges.addAll(diff.getAdded());
 		uncommittedChanges.addAll(diff.getChanged());
 		uncommittedChanges.addAll(diff.getRemoved());

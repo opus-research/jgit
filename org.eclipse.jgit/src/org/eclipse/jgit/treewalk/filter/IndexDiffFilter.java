@@ -86,11 +86,11 @@ public class IndexDiffFilter extends TreeFilter {
 
 	private final boolean honorIgnores;
 
-	private final Set<String> ignoredPaths = new HashSet<>();
+	private final Set<String> ignoredPaths = new HashSet<String>();
 
-	private final LinkedList<String> untrackedParentFolders = new LinkedList<>();
+	private final LinkedList<String> untrackedParentFolders = new LinkedList<String>();
 
-	private final LinkedList<String> untrackedFolders = new LinkedList<>();
+	private final LinkedList<String> untrackedFolders = new LinkedList<String>();
 
 	/**
 	 * Creates a new instance of this filter. Do not use an instance of this
@@ -199,7 +199,7 @@ public class IndexDiffFilter extends TreeFilter {
 
 				// If i is cnt then the path does not appear in any other tree,
 				// and this working tree entry can be safely ignored.
-				return i != cnt;
+				return i == cnt ? false : true;
 			} else {
 				// In working tree and not ignored, and not in DirCache.
 				return true;
@@ -224,8 +224,7 @@ public class IndexDiffFilter extends TreeFilter {
 		// Only one chance left to detect a diff: between index and working
 		// tree. Make use of the WorkingTreeIterator#isModified() method to
 		// avoid computing SHA1 on filesystem content if not really needed.
-		return wi.isModified(di == null ? null : di.getDirCacheEntry(), true,
-				tw.getObjectReader());
+		return wi.isModified(di.getDirCacheEntry(), true, tw.getObjectReader());
 	}
 
 	/**
@@ -292,7 +291,7 @@ public class IndexDiffFilter extends TreeFilter {
 	 *         empty list will be returned.
 	 */
 	public List<String> getUntrackedFolders() {
-		LinkedList<String> ret = new LinkedList<>(untrackedFolders);
+		LinkedList<String> ret = new LinkedList<String>(untrackedFolders);
 		if (!untrackedParentFolders.isEmpty()) {
 			String toBeAdded = untrackedParentFolders.getLast();
 			while (!ret.isEmpty() && ret.getLast().startsWith(toBeAdded))

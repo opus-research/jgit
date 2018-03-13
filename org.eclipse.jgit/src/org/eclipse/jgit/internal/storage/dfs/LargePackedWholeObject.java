@@ -99,7 +99,7 @@ final class LargePackedWholeObject extends ObjectLoader {
 
 	@Override
 	public ObjectStream openStream() throws MissingObjectException, IOException {
-		DfsReader ctx = db.newReader();
+		DfsReader ctx = new DfsReader(db);
 		InputStream in;
 		try {
 			in = new PackInputStream(pack, objectOffset + headerLength, ctx);
@@ -112,10 +112,8 @@ final class LargePackedWholeObject extends ObjectLoader {
 				ObjectId obj = pack.getReverseIdx(ctx).findObject(objectOffset);
 				return ctx.open(obj, type).openStream();
 			} finally {
-				ctx.close();
+				ctx.release();
 			}
-		} finally {
-			ctx.close();
 		}
 
 		// Align buffer to inflater size, at a larger than default block.

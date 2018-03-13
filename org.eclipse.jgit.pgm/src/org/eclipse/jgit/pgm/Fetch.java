@@ -45,15 +45,11 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.List;
 
 import org.eclipse.jgit.api.FetchCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.SubmoduleConfig.FetchRecurseSubmodulesMode;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
@@ -62,7 +58,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_updateRemoteRefsFromAnotherRepository")
-class Fetch extends AbstractFetchCommand implements FetchCommand.Callback {
+class Fetch extends AbstractFetchCommand {
 	@Option(name = "--timeout", metaVar = "metaVar_seconds", usage = "usage_abortConnectionIfNoActivity")
 	int timeout = -1;
 
@@ -100,31 +96,6 @@ class Fetch extends AbstractFetchCommand implements FetchCommand.Callback {
 		tags = Boolean.FALSE;
 	}
 
-	private FetchRecurseSubmodulesMode recurseSubmodules;
-
-	@Option(name = "--recurse-submodules", usage = "usage_recurseSubmodules")
-	void recurseSubmodules(String mode) {
-		if (mode == null || mode.isEmpty()) {
-			recurseSubmodules = FetchRecurseSubmodulesMode.YES;
-		} else {
-			for (FetchRecurseSubmodulesMode m : FetchRecurseSubmodulesMode
-					.values()) {
-				if (m.matchConfigValue(mode)) {
-					recurseSubmodules = m;
-					return;
-				}
-			}
-			throw die(MessageFormat
-					.format(CLIText.get().invalidRecurseSubmodulesMode, mode));
-		}
-	}
-
-	@Option(name = "--no-recurse-submodules", usage = "usage_noRecurseSubmodules")
-	void noRecurseSubmodules(@SuppressWarnings("unused")
-	final boolean ignored) {
-		recurseSubmodules = FetchRecurseSubmodulesMode.NO;
-	}
-
 	@Argument(index = 0, metaVar = "metaVar_uriish")
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
@@ -133,45 +104,31 @@ class Fetch extends AbstractFetchCommand implements FetchCommand.Callback {
 
 	@Override
 	protected void run() throws Exception {
-		try (Git git = new Git(db)) {
-			FetchCommand fetch = git.fetch();
-			if (fsck != null)
-				fetch.setCheckFetchedObjects(fsck.booleanValue());
-			if (prune != null)
-				fetch.setRemoveDeletedRefs(prune.booleanValue());
-			if (toget != null)
-				fetch.setRefSpecs(toget);
-			if (tags != null) {
-				fetch.setTagOpt(tags.booleanValue() ? TagOpt.FETCH_TAGS
-						: TagOpt.NO_TAGS);
-			}
-			if (0 <= timeout)
-				fetch.setTimeout(timeout);
-			fetch.setDryRun(dryRun);
-			fetch.setRemote(remote);
-			if (thin != null)
-				fetch.setThin(thin.booleanValue());
-			if (quiet == null || !quiet.booleanValue())
-				fetch.setProgressMonitor(new TextProgressMonitor(errw));
-			fetch.setRecurseSubmodules(recurseSubmodules).setCallback(this);
-
-			FetchResult result = fetch.call();
-			if (result.getTrackingRefUpdates().isEmpty()
-					&& result.submoduleResults().isEmpty())
-				return;
-
-			showFetchResult(result);
+		Git git = new Git(db);
+		FetchCommand fetch = git.fetch();
+		if (fsck != null)
+			fetch.setCheckFetchedObjects(fsck.booleanValue());
+		if (prune != null)
+			fetch.setRemoveDeletedRefs(prune.booleanValue());
+		if (toget != null)
+			fetch.setRefSpecs(toget);
+		if (tags != null) {
+			fetch.setTagOpt(tags.booleanValue() ? TagOpt.FETCH_TAGS
+					: TagOpt.NO_TAGS);
 		}
-	}
+		if (0 <= timeout)
+			fetch.setTimeout(timeout);
+		fetch.setDryRun(dryRun);
+		fetch.setRemote(remote);
+		if (thin != null)
+			fetch.setThin(thin.booleanValue());
+		if (quiet == null || !quiet.booleanValue())
+			fetch.setProgressMonitor(new TextProgressMonitor(errw));
 
-	@Override
-	public void fetchingSubmodule(String name) {
-		try {
-			outw.println(MessageFormat.format(CLIText.get().fetchingSubmodule,
-					name));
-			outw.flush();
-		} catch (IOException e) {
-			// ignore
-		}
+		FetchResult result = fetch.call();
+		if (result.getTrackingRefUpdates().isEmpty())
+			return;
+
+		showFetchResult(result);
 	}
 }

@@ -51,7 +51,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.blame.Candidate.BlobCandidate;
 import org.eclipse.jgit.blame.Candidate.ReverseCandidate;
 import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
@@ -173,13 +172,14 @@ public class BlameGenerator implements AutoCloseable {
 			throw new IllegalStateException();
 
 		if (revPool != null)
-			revPool.close();
+			revPool.release();
 
 		if (reverse)
 			revPool = new ReverseWalk(getRepository());
 		else
 			revPool = new RevWalk(getRepository());
 
+		revPool.setRetainBody(true);
 		SEEN = revPool.newFlag("SEEN"); //$NON-NLS-1$
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
@@ -239,13 +239,11 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Obtain the RenameDetector, allowing the application to configure its
-	 * settings for rename score and breaking behavior.
+	 * Obtain the RenameDetector if {@code setFollowFileRenames(true)}.
 	 *
-	 * @return the rename detector, or {@code null} if
-	 *         {@code setFollowFileRenames(false)}.
+	 * @return the rename detector, allowing the application to configure its
+	 *         settings for rename score and breaking behavior.
 	 */
-	@Nullable
 	public RenameDetector getRenameDetector() {
 		return renameDetector;
 	}
@@ -453,7 +451,7 @@ public class BlameGenerator implements AutoCloseable {
 				r.computeAll();
 			return r;
 		} finally {
-			close();
+			release();
 		}
 	}
 
@@ -516,7 +514,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	private boolean done() {
-		close();
+		release();
 		return false;
 	}
 
@@ -937,6 +935,14 @@ public class BlameGenerator implements AutoCloseable {
 	 */
 	public RawText getResultContents() throws IOException {
 		return queue != null ? queue.sourceText : null;
+	}
+
+	/**
+	 * Release the current blame session. Use {@link #close()} instead.
+	 */
+	@Deprecated
+	public void release() {
+		close();
 	}
 
 	/**

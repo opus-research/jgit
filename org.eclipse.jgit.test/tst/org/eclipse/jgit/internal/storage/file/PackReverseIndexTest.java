@@ -50,6 +50,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.internal.storage.file.PackIndex;
+import org.eclipse.jgit.internal.storage.file.PackReverseIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
@@ -65,7 +67,6 @@ public class PackReverseIndexTest extends RepositoryTestCase {
 	/**
 	 * Set up tested class instance, test constructor by the way.
 	 */
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

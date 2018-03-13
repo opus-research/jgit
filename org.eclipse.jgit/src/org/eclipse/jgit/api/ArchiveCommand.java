@@ -162,8 +162,8 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		 * @param out
 		 *            archive object from createArchiveOutputStream
 		 * @param path
-		 *            full filename relative to the root of the archive (with
-		 *            trailing '/' for directories)
+		 *            full filename relative to the root of the archive
+		 *            (with trailing '/' for directories)
 		 * @param mode
 		 *            mode (for example FileMode.REGULAR_FILE or
 		 *            FileMode.SYMLINK)
@@ -171,36 +171,9 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		 *            blob object with data for this entry (null for
 		 *            directories)
 		 * @throws IOException
-		 *             thrown by the underlying output stream for I/O errors
-		 * @deprecated use
-		 *             {@link #putEntry(Closeable, ObjectId, String, FileMode, ObjectLoader)}
-		 *             instead
+		 *            thrown by the underlying output stream for I/O errors
 		 */
-		@Deprecated
 		void putEntry(T out, String path, FileMode mode,
-					  ObjectLoader loader) throws IOException;
-
-		/**
-		 * Write an entry to an archive.
-		 *
-		 * @param out
-		 *            archive object from createArchiveOutputStream
-		 * @param tree
-		 *            the tag, commit, or tree object to produce an archive for
-		 * @param path
-		 *            full filename relative to the root of the archive (with
-		 *            trailing '/' for directories)
-		 * @param mode
-		 *            mode (for example FileMode.REGULAR_FILE or
-		 *            FileMode.SYMLINK)
-		 * @param loader
-		 *            blob object with data for this entry (null for
-		 *            directories)
-		 * @throws IOException
-		 *             thrown by the underlying output stream for I/O errors
-		 * @since 4.7
-		 */
-		void putEntry(T out, ObjectId tree, String path, FileMode mode,
 				ObjectLoader loader) throws IOException;
 
 		/**
@@ -259,7 +232,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * the --format= option)
 	 */
 	private static final ConcurrentMap<String, FormatEntry> formats =
-			new ConcurrentHashMap<>();
+			new ConcurrentHashMap<String, FormatEntry>();
 
 	/**
 	 * Replaces the entry for a key only if currently mapped to a given
@@ -377,7 +350,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	private String prefix;
 	private String format;
 	private Map<String, Object> formatOptions = new HashMap<>();
-	private List<String> paths = new ArrayList<>();
+	private List<String> paths = new ArrayList<String>();
 
 	/** Filename suffix, for automatically choosing a format. */
 	private String suffix;
@@ -391,26 +364,19 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	}
 
 	private <T extends Closeable> OutputStream writeArchive(Format<T> fmt) {
-		try {
-			try (TreeWalk walk = new TreeWalk(repo);
-					RevWalk rw = new RevWalk(walk.getObjectReader())) {
-				String pfx = prefix == null ? "" : prefix; //$NON-NLS-1$
-				T outa = fmt.createArchiveOutputStream(out, formatOptions);
-				MutableObjectId idBuf = new MutableObjectId();
-				ObjectReader reader = walk.getObjectReader();
+		final String pfx = prefix == null ? "" : prefix; //$NON-NLS-1$
+		try (final TreeWalk walk = new TreeWalk(repo)) {
+			final T outa = fmt.createArchiveOutputStream(out, formatOptions);
+			try (final RevWalk rw = new RevWalk(walk.getObjectReader())) {
+				final MutableObjectId idBuf = new MutableObjectId();
+				final ObjectReader reader = walk.getObjectReader();
 
 				walk.reset(rw.parseTree(tree));
 				if (!paths.isEmpty())
 					walk.setFilter(PathFilterGroup.createFromStrings(paths));
 
-				// Put base directory into archive
-				if (pfx.endsWith("/")) { //$NON-NLS-1$
-					fmt.putEntry(outa, tree, pfx.replaceAll("[/]+$", "/"), //$NON-NLS-1$ //$NON-NLS-2$
-							FileMode.TREE, null);
-				}
-
 				while (walk.next()) {
-					String name = pfx + walk.getPathString();
+					final String name = pfx + walk.getPathString();
 					FileMode mode = walk.getFileMode(0);
 
 					if (walk.isSubtree())
@@ -422,17 +388,17 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 						mode = FileMode.TREE;
 
 					if (mode == FileMode.TREE) {
-						fmt.putEntry(outa, tree, name + "/", mode, null); //$NON-NLS-1$
+						fmt.putEntry(outa, name + "/", mode, null); //$NON-NLS-1$
 						continue;
 					}
 					walk.getObjectId(idBuf, 0);
-					fmt.putEntry(outa, tree, name, mode, reader.open(idBuf));
+					fmt.putEntry(outa, name, mode, reader.open(idBuf));
 				}
 				outa.close();
-				return out;
 			} finally {
 				out.close();
 			}
+			return out;
 		} catch (IOException e) {
 			// TODO(jrn): Throw finer-grained errors.
 			throw new JGitInternalException(
@@ -447,7 +413,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	public OutputStream call() throws GitAPIException {
 		checkCallable();
 
-		Format<?> fmt;
+		final Format<?> fmt;
 		if (format == null)
 			fmt = formatBySuffix(suffix);
 		else

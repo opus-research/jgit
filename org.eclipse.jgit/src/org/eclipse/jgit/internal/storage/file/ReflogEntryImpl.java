@@ -93,7 +93,6 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getOldId()
 	 */
-	@Override
 	public ObjectId getOldId() {
 		return oldId;
 	}
@@ -101,7 +100,6 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getNewId()
 	 */
-	@Override
 	public ObjectId getNewId() {
 		return newId;
 	}
@@ -109,7 +107,6 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getWho()
 	 */
-	@Override
 	public PersonIdent getWho() {
 		return who;
 	}
@@ -117,7 +114,6 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#getComment()
 	 */
-	@Override
 	public String getComment() {
 		return comment;
 	}
@@ -132,7 +128,6 @@ public class ReflogEntryImpl implements Serializable, ReflogEntry {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogEntry#parseCheckout()
 	 */
-	@Override
 	public CheckoutEntry parseCheckout() {
 		if (getComment().startsWith(CheckoutEntryImpl.CHECKOUT_MOVING_FROM))
 			return new CheckoutEntryImpl(this);

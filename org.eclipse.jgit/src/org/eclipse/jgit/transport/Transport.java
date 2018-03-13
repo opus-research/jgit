@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -71,16 +70,12 @@ import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.hooks.Hooks;
-import org.eclipse.jgit.hooks.PrePushHook;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -99,7 +94,7 @@ import org.eclipse.jgit.storage.pack.PackConfig;
  * Transport instances and the connections they create are not thread-safe.
  * Callers must ensure a transport is accessed by only one thread at a time.
  */
-public abstract class Transport implements AutoCloseable {
+public abstract class Transport {
 	/** Type of operation a Transport is being opened for. */
 	public enum Operation {
 		/** Transport is to fetch objects locally. */
@@ -109,7 +104,7 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	private static final List<WeakReference<TransportProtocol>> protocols =
-		new CopyOnWriteArrayList<>();
+		new CopyOnWriteArrayList<WeakReference<TransportProtocol>>();
 
 	static {
 		// Registration goes backwards in order of priority.
@@ -226,7 +221,7 @@ public abstract class Transport implements AutoCloseable {
 	 *            the protocol definition. Must not be null.
 	 */
 	public static void register(TransportProtocol proto) {
-		protocols.add(0, new WeakReference<>(proto));
+		protocols.add(0, new WeakReference<TransportProtocol>(proto));
 	}
 
 	/**
@@ -256,7 +251,7 @@ public abstract class Transport implements AutoCloseable {
 	 */
 	public static List<TransportProtocol> getTransportProtocols() {
 		int cnt = protocols.size();
-		List<TransportProtocol> res = new ArrayList<>(cnt);
+		List<TransportProtocol> res = new ArrayList<TransportProtocol>(cnt);
 		for (WeakReference<TransportProtocol> ref : protocols) {
 			TransportProtocol proto = ref.get();
 			if (proto != null)
@@ -380,7 +375,7 @@ public abstract class Transport implements AutoCloseable {
 			TransportException {
 		final RemoteConfig cfg = new RemoteConfig(local.getConfig(), remote);
 		if (doesNotExist(cfg)) {
-			final ArrayList<Transport> transports = new ArrayList<>(1);
+			final ArrayList<Transport> transports = new ArrayList<Transport>(1);
 			transports.add(open(local, new URIish(remote), null));
 			return transports;
 		}
@@ -490,7 +485,7 @@ public abstract class Transport implements AutoCloseable {
 			final RemoteConfig cfg, final Operation op)
 			throws NotSupportedException, TransportException {
 		final List<URIish> uris = getURIs(cfg, op);
-		final List<Transport> transports = new ArrayList<>(uris.size());
+		final List<Transport> transports = new ArrayList<Transport>(uris.size());
 		for (final URIish uri : uris) {
 			final Transport tn = open(local, uri, cfg.getName());
 			tn.applyConfig(cfg);
@@ -562,13 +557,8 @@ public abstract class Transport implements AutoCloseable {
 				continue;
 			}
 
-			if (proto.canHandle(uri, local, remoteName)) {
-				Transport tn = proto.open(uri, local, remoteName);
-				tn.prePush = Hooks.prePush(local, tn.hookOutRedirect);
-				tn.prePush.setRemoteLocation(uri.toString());
-				tn.prePush.setRemoteName(remoteName);
-				return tn;
-			}
+			if (proto.canHandle(uri, local, remoteName))
+				return proto.open(uri, local, remoteName);
 		}
 
 		throw new NotSupportedException(MessageFormat.format(JGitText.get().URINotSupported, uri));
@@ -604,16 +594,14 @@ public abstract class Transport implements AutoCloseable {
 	 * Convert push remote refs update specification from {@link RefSpec} form
 	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
 	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
-	 * set when specified in leases. Tracking branch is configured if RefSpec
-	 * destination matches source of any fetch ref spec for this transport
-	 * remote configuration.
+	 * always set as null. Tracking branch is configured if RefSpec destination
+	 * matches source of any fetch ref spec for this transport remote
+	 * configuration.
 	 *
 	 * @param db
 	 *            local database.
 	 * @param specs
 	 *            collection of RefSpec to convert.
-	 * @param leases
-	 *            map from ref to lease (containing expected old object id)
 	 * @param fetchSpecs
 	 *            fetch specifications used for finding localtracking refs. May
 	 *            be null or empty collection.
@@ -621,20 +609,18 @@ public abstract class Transport implements AutoCloseable {
 	 * @throws IOException
 	 *             when problem occurred during conversion or specification set
 	 *             up: most probably, missing objects or refs.
-	 * @since 4.7
 	 */
 	public static Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
 			final Repository db, final Collection<RefSpec> specs,
-			final Map<String, RefLeaseSpec> leases,
 			Collection<RefSpec> fetchSpecs) throws IOException {
 		if (fetchSpecs == null)
 			fetchSpecs = Collections.emptyList();
-		final List<RemoteRefUpdate> result = new LinkedList<>();
+		final List<RemoteRefUpdate> result = new LinkedList<RemoteRefUpdate>();
 		final Collection<RefSpec> procRefs = expandPushWildcardsFor(db, specs);
 
 		for (final RefSpec spec : procRefs) {
 			String srcSpec = spec.getSource();
-			final Ref srcRef = db.findRef(srcSpec);
+			final Ref srcRef = db.getRef(srcSpec);
 			if (srcRef != null)
 				srcSpec = srcRef.getName();
 
@@ -657,48 +643,18 @@ public abstract class Transport implements AutoCloseable {
 
 			final boolean forceUpdate = spec.isForceUpdate();
 			final String localName = findTrackingRefName(destSpec, fetchSpecs);
-			final RefLeaseSpec leaseSpec = leases.get(destSpec);
-			final ObjectId expected = leaseSpec == null ? null :
-				db.resolve(leaseSpec.getExpected());
 			final RemoteRefUpdate rru = new RemoteRefUpdate(db, srcSpec,
-					destSpec, forceUpdate, localName, expected);
+					destSpec, forceUpdate, localName, null);
 			result.add(rru);
 		}
 		return result;
-	}
-
-	/**
-	 * Convert push remote refs update specification from {@link RefSpec} form
-	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
-	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
-	 * always set as null. Tracking branch is configured if RefSpec destination
-	 * matches source of any fetch ref spec for this transport remote
-	 * configuration.
-	 *
-	 * @param db
-	 *            local database.
-	 * @param specs
-	 *            collection of RefSpec to convert.
-	 * @param fetchSpecs
-	 *            fetch specifications used for finding localtracking refs. May
-	 *            be null or empty collection.
-	 * @return collection of set up {@link RemoteRefUpdate}.
-	 * @throws IOException
-	 *             when problem occurred during conversion or specification set
-	 *             up: most probably, missing objects or refs.
-	 */
-	public static Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
-			final Repository db, final Collection<RefSpec> specs,
-			Collection<RefSpec> fetchSpecs) throws IOException {
-		return findRemoteRefUpdatesFor(db, specs, Collections.emptyMap(),
-					       fetchSpecs);
 	}
 
 	private static Collection<RefSpec> expandPushWildcardsFor(
 			final Repository db, final Collection<RefSpec> specs)
 			throws IOException {
 		final Map<String, Ref> localRefs = db.getRefDatabase().getRefs(ALL);
-		final Collection<RefSpec> procRefs = new HashSet<>();
+		final Collection<RefSpec> procRefs = new HashSet<RefSpec>();
 
 		for (final RefSpec spec : specs) {
 			if (spec.isWildcard()) {
@@ -787,9 +743,6 @@ public abstract class Transport implements AutoCloseable {
 	/** Should push produce thin-pack when sending objects to remote repository. */
 	private boolean pushThin = DEFAULT_PUSH_THIN;
 
-	/** Should push be all-or-nothing atomic behavior? */
-	private boolean pushAtomic;
-
 	/** Should push just check for operation result, not really push. */
 	private boolean dryRun;
 
@@ -808,12 +761,6 @@ public abstract class Transport implements AutoCloseable {
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
 
-	/** The option strings associated with the push operation. */
-	private List<String> pushOptions;
-
-	private PrintStream hookOutRedirect;
-
-	private PrePushHook prePush;
 	/**
 	 * Create a new transport instance.
 	 *
@@ -831,7 +778,6 @@ public abstract class Transport implements AutoCloseable {
 		this.uri = uri;
 		this.objectChecker = tc.newObjectChecker();
 		this.credentialsProvider = CredentialsProvider.getDefault();
-		prePush = Hooks.prePush(local, hookOutRedirect);
 	}
 
 	/**
@@ -1011,31 +957,6 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
-	 * Default setting is false.
-	 *
-	 * @return true if push requires all-or-nothing atomic behavior.
-	 * @since 4.2
-	 */
-	public boolean isPushAtomic() {
-		return pushAtomic;
-	}
-
-	/**
-	 * Request atomic push (all references succeed, or none do).
-	 * <p>
-	 * Server must also support atomic push. If the server does not support the
-	 * feature the push will abort without making changes.
-	 *
-	 * @param atomic
-	 *            true when push should be an all-or-nothing operation.
-	 * @see PackTransport
-	 * @since 4.2
-	 */
-	public void setPushAtomic(final boolean atomic) {
-		this.pushAtomic = atomic;
-	}
-
-	/**
 	 * @return true if destination refs should be removed if they no longer
 	 *         exist at the source repository.
 	 */
@@ -1159,25 +1080,6 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
-	 * @return the option strings associated with the push operation
-	 * @since 4.5
-	 */
-	public List<String> getPushOptions() {
-		return pushOptions;
-	}
-
-	/**
-	 * Sets the option strings associated with the push operation.
-	 *
-	 * @param pushOptions
-	 *            null if push options are unsupported
-	 * @since 4.5
-	 */
-	public void setPushOptions(final List<String> pushOptions) {
-		this.pushOptions = pushOptions;
-	}
-
-	/**
 	 * Fetch objects and refs from the remote repository to the local one.
 	 * <p>
 	 * This is a utility function providing standard fetch behavior. Local
@@ -1217,7 +1119,7 @@ public abstract class Transport implements AutoCloseable {
 			// the local tracking branches without incurring additional
 			// object transfer overheads.
 			//
-			final Collection<RefSpec> tmp = new ArrayList<>(toFetch);
+			final Collection<RefSpec> tmp = new ArrayList<RefSpec>(toFetch);
 			for (final RefSpec requested : toFetch) {
 				final String reqSrc = requested.getSource();
 				for (final RefSpec configured : fetch) {
@@ -1234,9 +1136,6 @@ public abstract class Transport implements AutoCloseable {
 
 		final FetchResult result = new FetchResult();
 		new FetchProcess(this, toFetch).execute(monitor, result);
-
-		local.autoGC(monitor);
-
 		return result;
 	}
 
@@ -1297,15 +1196,6 @@ public abstract class Transport implements AutoCloseable {
 			if (toPush.isEmpty())
 				throw new TransportException(JGitText.get().nothingToPush);
 		}
-		if (prePush != null) {
-			try {
-				prePush.setRefs(toPush);
-				prePush.call();
-			} catch (AbortedByHookException | IOException e) {
-				throw new TransportException(e.getMessage(), e);
-			}
-		}
-
 		final PushProcess pushProcess = new PushProcess(this, toPush, out);
 		return pushProcess.execute(monitor);
 	}
@@ -1376,36 +1266,7 @@ public abstract class Transport implements AutoCloseable {
 	 */
 	public Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
 			final Collection<RefSpec> specs) throws IOException {
-		return findRemoteRefUpdatesFor(local, specs, Collections.emptyMap(),
-					       fetch);
-	}
-
-	/**
-	 * Convert push remote refs update specification from {@link RefSpec} form
-	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
-	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
-	 * set according to leases. Tracking branch is configured if RefSpec destination
-	 * matches source of any fetch ref spec for this transport remote
-	 * configuration.
-	 * <p>
-	 * Conversion is performed for context of this transport (database, fetch
-	 * specifications).
-	 *
-	 * @param specs
-	 *            collection of RefSpec to convert.
-	 * @param leases
-	 *            map from ref to lease (containing expected old object id)
-	 * @return collection of set up {@link RemoteRefUpdate}.
-	 * @throws IOException
-	 *             when problem occurred during conversion or specification set
-	 *             up: most probably, missing objects or refs.
-	 * @since 4.7
-	 */
-	public Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
-			final Collection<RefSpec> specs,
-			final Map<String, RefLeaseSpec> leases) throws IOException {
-		return findRemoteRefUpdatesFor(local, specs, leases,
-					       fetch);
+		return findRemoteRefUpdatesFor(local, specs, fetch);
 	}
 
 	/**
@@ -1442,11 +1303,6 @@ public abstract class Transport implements AutoCloseable {
 	 * must close that network socket, disconnecting the two peers. If the
 	 * remote repository is actually local (same system) this method must close
 	 * any open file handles used to read the "remote" repository.
-	 * <p>
-	 * {@code AutoClosable.close()} declares that it throws {@link Exception}.
-	 * Implementers shouldn't throw checked exceptions. This override narrows
-	 * the signature to prevent them from doing so.
 	 */
-	@Override
 	public abstract void close();
 }

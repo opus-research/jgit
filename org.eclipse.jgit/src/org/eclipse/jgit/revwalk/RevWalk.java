@@ -172,7 +172,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	ObjectIdOwnerMap<RevObject> objects;
 
-	int freeFlags = APP_FLAGS;
+	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
 
@@ -192,7 +192,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	private TreeFilter treeFilter;
 
-	private boolean retainBody = true;
+	private boolean retainBody;
 
 	private boolean rewriteParents = true;
 
@@ -226,19 +226,31 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	private RevWalk(ObjectReader or, boolean closeReader) {
 		reader = or;
 		idBuffer = new MutableObjectId();
-		objects = new ObjectIdOwnerMap<>();
-		roots = new ArrayList<>();
+		objects = new ObjectIdOwnerMap<RevObject>();
+		roots = new ArrayList<RevCommit>();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
 		sorting = EnumSet.of(RevSort.NONE);
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
+		retainBody = true;
 		this.closeReader = closeReader;
 	}
 
 	/** @return the reader this walker is using to load objects. */
 	public ObjectReader getObjectReader() {
 		return reader;
+	}
+
+	/**
+	 * Release any resources used by this walker's reader.
+	 * <p>
+	 * A walker that has been released can be used again, but may need to be
+	 * released after the subsequent usage. Use {@link #close()} instead.
+	 */
+	@Deprecated
+	public void release() {
+		close();
 	}
 
 	/**
@@ -595,9 +607,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * Usually the body is always retained, but some application code might not
 	 * care and would prefer to discard the body of a commit as early as
 	 * possible, to reduce memory usage.
-	 * <p>
-	 * True by default on {@link RevWalk} and false by default for
-	 * {@link ObjectWalk}.
 	 *
 	 * @return true if the body should be retained; false it is discarded.
 	 */
@@ -611,9 +620,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * If a body of a commit or tag is not retained, the application must
 	 * call {@link #parseBody(RevObject)} before the body can be safely
 	 * accessed through the type specific access methods.
-	 * <p>
-	 * True by default on {@link RevWalk} and false by default for
-	 * {@link ObjectWalk}.
 	 *
 	 * @param retain true to retain bodies; false to discard them early.
 	 */
@@ -931,8 +937,8 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	public <T extends ObjectId> AsyncRevObjectQueue parseAny(
 			Iterable<T> objectIds, boolean reportMissing) {
-		List<T> need = new ArrayList<>();
-		List<RevObject> have = new ArrayList<>();
+		List<T> need = new ArrayList<T>();
+		List<RevObject> have = new ArrayList<RevObject>();
 		for (T id : objectIds) {
 			RevObject r = objects.get(id);
 			if (r != null && (r.flags & PARSED) != 0)
@@ -944,17 +950,14 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		final Iterator<RevObject> objItr = have.iterator();
 		if (need.isEmpty()) {
 			return new AsyncRevObjectQueue() {
-				@Override
 				public RevObject next() {
 					return objItr.hasNext() ? objItr.next() : null;
 				}
 
-				@Override
 				public boolean cancel(boolean mayInterruptIfRunning) {
 					return true;
 				}
 
-				@Override
 				public void release() {
 					// In-memory only, no action required.
 				}
@@ -963,7 +966,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 		final AsyncObjectLoaderQueue<T> lItr = reader.open(need, reportMissing);
 		return new AsyncRevObjectQueue() {
-			@Override
 			public RevObject next() throws MissingObjectException,
 					IncorrectObjectTypeException, IOException {
 				if (objItr.hasNext())
@@ -987,12 +989,10 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 				return r;
 			}
 
-			@Override
 			public boolean cancel(boolean mayInterruptIfRunning) {
 				return lItr.cancel(mayInterruptIfRunning);
 			}
 
-			@Override
 			public void release() {
 				lItr.release();
 			}
@@ -1301,6 +1301,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
+		reader.close();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -1322,7 +1323,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * @return an iterator over this walker's commits.
 	 * @see RevWalkException
 	 */
-	@Override
 	public Iterator<RevCommit> iterator() {
 		final RevCommit first;
 		try {
@@ -1338,12 +1338,10 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		return new Iterator<RevCommit>() {
 			RevCommit next = first;
 
-			@Override
 			public boolean hasNext() {
 				return next != null;
 			}
 
-			@Override
 			public RevCommit next() {
 				try {
 					final RevCommit r = next;
@@ -1358,7 +1356,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 				}
 			}
 
-			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}
@@ -1415,8 +1412,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	/**
 	 * Assume additional commits are shallow (have no parents).
-	 * <p>
-	 * This method is a No-op if the collection is empty.
 	 *
 	 * @param ids
 	 *            commits that should be treated as shallow commits, in addition

@@ -120,13 +120,13 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 	 *             invalid
 	 * @return the newly created branch
 	 */
-	@Override
 	public Ref call() throws GitAPIException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException {
 		checkCallable();
 		processOptions();
-		try (RevWalk revWalk = new RevWalk(repo)) {
-			Ref refToCheck = repo.findRef(name);
+		RevWalk revWalk = new RevWalk(repo);
+		try {
+			Ref refToCheck = repo.getRef(name);
 			boolean exists = refToCheck != null
 					&& refToCheck.getName().startsWith(Constants.R_HEADS);
 			if (!force && exists)
@@ -136,7 +136,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 			ObjectId startAt = getStartPointObjectId();
 			String startPointFullName = null;
 			if (startPoint != null) {
-				Ref baseRef = repo.findRef(startPoint);
+				Ref baseRef = repo.getRef(startPoint);
 				if (baseRef != null)
 					startPointFullName = baseRef.getName();
 			}
@@ -208,7 +208,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 						.get().createBranchUnexpectedResult, updateResult
 						.name()));
 
-			Ref result = repo.findRef(name);
+			Ref result = repo.getRef(name);
 			if (result == null)
 				throw new JGitInternalException(
 						JGitText.get().createBranchFailedUnknownReason);
@@ -270,6 +270,8 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 			return result;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
+		} finally {
+			revWalk.release();
 		}
 	}
 

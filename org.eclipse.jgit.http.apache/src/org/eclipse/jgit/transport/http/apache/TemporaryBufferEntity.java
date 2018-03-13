@@ -55,8 +55,7 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  *
  * @since 3.3
  */
-public class TemporaryBufferEntity extends AbstractHttpEntity
-		implements AutoCloseable {
+public class TemporaryBufferEntity extends AbstractHttpEntity {
 	private TemporaryBuffer buffer;
 
 	private Integer contentLength;
@@ -78,30 +77,25 @@ public class TemporaryBufferEntity extends AbstractHttpEntity
 		return buffer;
 	}
 
-	@Override
 	public boolean isRepeatable() {
 		return true;
 	}
 
-	@Override
 	public long getContentLength() {
 		if (contentLength != null)
 			return contentLength.intValue();
 		return buffer.length();
 	}
 
-	@Override
 	public InputStream getContent() throws IOException, IllegalStateException {
 		return buffer.openInputStream();
 	}
 
-	@Override
 	public void writeTo(OutputStream outstream) throws IOException {
 		// TODO: dont we need a progressmonitor
 		buffer.writeTo(outstream, null);
 	}
 
-	@Override
 	public boolean isStreaming() {
 		return false;
 	}
@@ -110,18 +104,6 @@ public class TemporaryBufferEntity extends AbstractHttpEntity
 	 * @param contentLength
 	 */
 	public void setContentLength(int contentLength) {
-		this.contentLength = Integer.valueOf(contentLength);
-	}
-
-	/**
-	 * Close destroys the associated buffer used to buffer the entity
-	 *
-	 * @since 4.5
-	 */
-	@Override
-	public void close() {
-		if (buffer != null) {
-			buffer.destroy();
-		}
+		this.contentLength = new Integer(contentLength);
 	}
 }

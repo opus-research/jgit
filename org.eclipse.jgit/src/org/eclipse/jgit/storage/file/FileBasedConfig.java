@@ -55,8 +55,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.FileSnapshot;
 import org.eclipse.jgit.internal.storage.file.LockFile;
@@ -73,6 +73,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
+
+	private final FS fs;
 
 	private boolean utf8Bom;
 
@@ -107,6 +109,7 @@ public class FileBasedConfig extends StoredConfig {
 	public FileBasedConfig(Config base, File cfgLocation, FS fs) {
 		super(base);
 		configFile = cfgLocation;
+		this.fs = fs;
 		this.snapshot = FileSnapshot.DIRTY;
 		this.hash = ObjectId.zeroId();
 	}
@@ -147,7 +150,8 @@ public class FileBasedConfig extends StoredConfig {
 					snapshot = newSnapshot;
 			} else {
 				final String decoded;
-				if (isUtf8(in)) {
+				if (in.length >= 3 && in[0] == (byte) 0xEF
+						&& in[1] == (byte) 0xBB && in[2] == (byte) 0xBF) {
 					decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
 							in, 3, in.length);
 					utf8Bom = true;
@@ -159,9 +163,6 @@ public class FileBasedConfig extends StoredConfig {
 				hash = newHash;
 			}
 		} catch (FileNotFoundException noFile) {
-			if (configFile.exists()) {
-				throw noFile;
-			}
 			clear();
 			snapshot = newSnapshot;
 		} catch (IOException e) {
@@ -185,7 +186,6 @@ public class FileBasedConfig extends StoredConfig {
 	 * @throws IOException
 	 *             the file could not be written.
 	 */
-	@Override
 	public void save() throws IOException {
 		final byte[] out;
 		final String text = toText();
@@ -200,7 +200,7 @@ public class FileBasedConfig extends StoredConfig {
 			out = Constants.encode(text);
 		}
 
-		final LockFile lf = new LockFile(getFile());
+		final LockFile lf = new LockFile(getFile(), fs);
 		if (!lf.lock())
 			throw new LockFailedException(getFile());
 		try {

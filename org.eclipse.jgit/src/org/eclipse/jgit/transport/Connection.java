@@ -59,7 +59,8 @@ import org.eclipse.jgit.lib.Ref;
  *
  * @see Transport
  */
-public interface Connection extends AutoCloseable {
+public interface Connection {
+
 	/**
 	 * Get the complete map of refs advertised as available for fetching or
 	 * pushing.
@@ -107,12 +108,7 @@ public interface Connection extends AutoCloseable {
 	 * <p>
 	 * If additional messages were produced by the remote peer, these should
 	 * still be retained in the connection instance for {@link #getMessages()}.
-	 * <p>
-	 * {@code AutoClosable.close()} declares that it throws {@link Exception}.
-	 * Implementers shouldn't throw checked exceptions. This override narrows
-	 * the signature to prevent them from doing so.
 	 */
-	@Override
 	public void close();
 
 	/**
@@ -131,13 +127,4 @@ public interface Connection extends AutoCloseable {
 	 *         remote produced no additional messages.
 	 */
 	public String getMessages();
-
-	/**
-	 * User agent advertised by the remote server.
-	 *
-	 * @return agent (version of Git) running on the remote server. Null if the
-	 *         server does not advertise this version.
-	 * @since 4.0
-	 */
-	public String getPeerUserAgent();
 }

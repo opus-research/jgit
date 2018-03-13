@@ -60,7 +60,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.errors.NoMergeBaseException.MergeBaseFailureReason;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
@@ -110,7 +109,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		db_t = new TestRepository<>(db);
+		db_t = new TestRepository<FileRepository>(db);
 	}
 
 	@Theory
@@ -309,7 +308,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			if (indexState != IndexState.Bare)
 				assertEquals(
 						"[f, mode:100644, content:1-master\n2\n3-res(master)\n4\n5\n6\n7-res(side)\n8\n9-side\n]",
-						indexState(LocalDiskRepositoryTestCase.CONTENT));
+						indexState(RepositoryTestCase.CONTENT));
 			if (worktreeState != WorktreeState.Bare
 					&& worktreeState != WorktreeState.Missing)
 				assertEquals(
@@ -394,7 +393,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			if (indexState != IndexState.Bare)
 				assertEquals(
 						"[f, mode:100644, content:1-master-r\n2\n3-side-r\n]",
-						indexState(LocalDiskRepositoryTestCase.CONTENT));
+						indexState(RepositoryTestCase.CONTENT));
 			if (worktreeState != WorktreeState.Bare
 					&& worktreeState != WorktreeState.Missing)
 				assertEquals(
@@ -479,7 +478,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			if (indexState != IndexState.Bare)
 				assertEquals(
 						"[f, mode:100644, content:1\nx(side)\n2\n3\ny(side-again)\n]",
-						indexState(LocalDiskRepositoryTestCase.CONTENT));
+						indexState(RepositoryTestCase.CONTENT));
 			if (worktreeState != WorktreeState.Bare
 					&& worktreeState != WorktreeState.Missing)
 				assertEquals("1\nx(side)\n2\n3\ny(side-again)\n", read("f"));
@@ -562,7 +561,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			if (indexState != IndexState.Bare)
 				assertEquals(
 						"[f, mode:100644, content:1-master-r\n2\n3-side-r\n][m.c, mode:100644, content:0][m.m, mode:100644, content:1][s.c, mode:100644, content:0][s.m, mode:100644, content:1]",
-						indexState(LocalDiskRepositoryTestCase.CONTENT));
+						indexState(RepositoryTestCase.CONTENT));
 			if (worktreeState != WorktreeState.Bare
 					&& worktreeState != WorktreeState.Missing) {
 				assertEquals(
@@ -639,7 +638,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 						"[f, mode:100644, stage:1, content:1-master\n2\n3\n4\n5\n6\n7\n8\n9-side\n]"
 								+ "[f, mode:100644, stage:2, content:1-master\n2\n3\n4\n5\n6\n7-conflict\n8\n9-side\n]"
 								+ "[f, mode:100644, stage:3, content:1-master\n2\n3\n4\n5\n6\n7-res(side)\n8\n9-side\n]",
-						indexState(LocalDiskRepositoryTestCase.CONTENT));
+						indexState(RepositoryTestCase.CONTENT));
 				assertEquals(
 						"1-master\n2\n3\n4\n5\n6\n<<<<<<< OURS\n7-conflict\n=======\n7-res(side)\n>>>>>>> THEIRS\n8\n9-side\n",
 						read("f"));
@@ -737,7 +736,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			if (indexState != IndexState.Bare)
 				assertEquals(
 						"[f, mode:100644, content:1-master\n2\n3-res(master)\n4\n5-other\n6\n7-res(side)\n8\n9-side\n]",
-						indexState(LocalDiskRepositoryTestCase.CONTENT));
+						indexState(RepositoryTestCase.CONTENT));
 			if (worktreeState != WorktreeState.Bare
 					&& worktreeState != WorktreeState.Missing)
 				assertEquals(
@@ -778,7 +777,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			db.close();
 			file.delete();
 			db = new FileRepository(db.getDirectory());
-			db_t = new TestRepository<>(db);
+			db_t = new TestRepository<FileRepository>(db);
 			break;
 		}
 	}
@@ -846,7 +845,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 				db.getConfig().setBoolean("core", null, "bare", true);
 				db.getDirectory().renameTo(new File(workTreeFile, "test.git"));
 				db = new FileRepository(new File(workTreeFile, "test.git"));
-				db_t = new TestRepository<>(db);
+				db_t = new TestRepository<FileRepository>(db);
 			}
 		} finally {
 			if (fos != null)
@@ -872,31 +871,32 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 
 	private String contentAsString(Repository r, ObjectId treeId, String path)
 			throws MissingObjectException, IOException {
-		AnyObjectId blobId;
-		try (TreeWalk tw = new TreeWalk(r)) {
-			tw.addTree(treeId);
-			tw.setFilter(PathFilter.create(path));
-			tw.setRecursive(true);
-			if (!tw.next()) {
-				return null;
-			}
-			blobId = tw.getObjectId(0);
-		}
+		TreeWalk tw = new TreeWalk(r);
+		tw.addTree(treeId);
+		tw.setFilter(PathFilter.create(path));
+		tw.setRecursive(true);
+		if (!tw.next())
+			return null;
+		AnyObjectId blobId = tw.getObjectId(0);
 
 		StringBuilder result = new StringBuilder();
+		BufferedReader br = null;
 		ObjectReader or = r.newObjectReader();
-		try (BufferedReader br = new BufferedReader(
-				new InputStreamReader(or.open(blobId).openStream()))) {
+		try {
+			br = new BufferedReader(new InputStreamReader(or.open(blobId)
+					.openStream()));
 			String line;
 			boolean first = true;
 			while ((line = br.readLine()) != null) {
-				if (!first) {
+				if (!first)
 					result.append('\n');
-				}
 				result.append(line);
 				first = false;
 			}
 			return result.toString();
+		} finally {
+			if (br != null)
+				br.close();
 		}
 	}
 }

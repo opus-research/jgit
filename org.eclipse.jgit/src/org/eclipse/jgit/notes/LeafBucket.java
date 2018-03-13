@@ -53,7 +53,6 @@ import java.util.NoSuchElementException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectInserter.Formatter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.TreeFormatter;
 
@@ -122,12 +121,10 @@ class LeafBucket extends InMemoryNoteBucket {
 		return new Iterator<Note>() {
 			private int idx;
 
-			@Override
 			public boolean hasNext() {
 				return idx < cnt;
 			}
 
-			@Override
 			public Note next() {
 				if (hasNext())
 					return notes[idx++];
@@ -135,7 +132,6 @@ class LeafBucket extends InMemoryNoteBucket {
 					throw new NoSuchElementException();
 			}
 
-			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}
@@ -147,7 +143,6 @@ class LeafBucket extends InMemoryNoteBucket {
 		return cnt;
 	}
 
-	@Override
 	InMemoryNoteBucket set(AnyObjectId noteOn, AnyObjectId noteData,
 			ObjectReader or) throws IOException {
 		int p = search(noteOn);
@@ -188,9 +183,7 @@ class LeafBucket extends InMemoryNoteBucket {
 
 	@Override
 	ObjectId getTreeId() {
-		try (Formatter f = new ObjectInserter.Formatter()) {
-			return f.idFor(build());
-		}
+		return new ObjectInserter.Formatter().idFor(build());
 	}
 
 	private TreeFormatter build() {

@@ -49,7 +49,11 @@ import org.eclipse.jgit.lib.CoreConfig;
 
 class WriteConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
-	static final Config.SectionParser<WriteConfig> KEY = WriteConfig::new;
+	static final Config.SectionParser<WriteConfig> KEY = new SectionParser<WriteConfig>() {
+		public WriteConfig parse(final Config cfg) {
+			return new WriteConfig(cfg);
+		}
+	};
 
 	private final int compression;
 

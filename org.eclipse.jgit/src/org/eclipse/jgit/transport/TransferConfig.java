@@ -43,20 +43,12 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.util.StringUtils.equalsIgnoreCase;
-import static org.eclipse.jgit.util.StringUtils.toLowerCase;
-
-import java.io.File;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.internal.storage.file.LazyObjectIdSetFile;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.SystemReader;
@@ -66,94 +58,49 @@ import org.eclipse.jgit.util.SystemReader;
  * parameters.
  */
 public class TransferConfig {
-	private static final String FSCK = "fsck"; //$NON-NLS-1$
-
 	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<TransferConfig> KEY =
-			TransferConfig::new;
+	public static final Config.SectionParser<TransferConfig> KEY = new SectionParser<TransferConfig>() {
+		public TransferConfig parse(final Config cfg) {
+			return new TransferConfig(cfg);
+		}
+	};
 
-	/**
-	 * A git configuration value for how to handle a fsck failure of a particular kind.
-	 * Used in e.g. fsck.missingEmail.
-	 * @since 4.9
-	 */
-	public enum FsckMode {
-		/**
-		 * Treat it as an error (the default).
-		 */
-		ERROR,
-		/**
-		 * Issue a warning (in fact, jgit treats this like IGNORE, but git itself does warn).
-		 */
-		WARN,
-		/**
-		 * Ignore the error.
-		 */
-		IGNORE;
-	}
-
-	private final boolean fetchFsck;
-	private final boolean receiveFsck;
-	private final String fsckSkipList;
-	private final EnumSet<ObjectChecker.ErrorType> ignore;
-	private final boolean allowInvalidPersonIdent;
+	private final boolean checkReceivedObjects;
+	private final boolean allowLeadingZeroFileMode;
 	private final boolean safeForWindows;
 	private final boolean safeForMacOS;
 	private final boolean allowTipSha1InWant;
-	private final boolean allowReachableSha1InWant;
-	final String[] hideRefs;
+	private final String[] hideRefs;
 
 	TransferConfig(final Repository db) {
 		this(db.getConfig());
 	}
 
-	TransferConfig(final Config rc) {
-		boolean fsck = rc.getBoolean("transfer", "fsckobjects", false); //$NON-NLS-1$ //$NON-NLS-2$
-		fetchFsck = rc.getBoolean("fetch", "fsckobjects", fsck); //$NON-NLS-1$ //$NON-NLS-2$
-		receiveFsck = rc.getBoolean("receive", "fsckobjects", fsck); //$NON-NLS-1$ //$NON-NLS-2$
-		fsckSkipList = rc.getString(FSCK, null, "skipList"); //$NON-NLS-1$
-		allowInvalidPersonIdent = rc.getBoolean(FSCK, "allowInvalidPersonIdent", false); //$NON-NLS-1$
-		safeForWindows = rc.getBoolean(FSCK, "safeForWindows", //$NON-NLS-1$
+	private TransferConfig(final Config rc) {
+		checkReceivedObjects = rc.getBoolean(
+				"fetch", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
+				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
+		allowLeadingZeroFileMode = checkReceivedObjects
+				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
+		safeForWindows = checkReceivedObjects
+				&& rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
 						SystemReader.getInstance().isWindows());
-		safeForMacOS = rc.getBoolean(FSCK, "safeForMacOS", //$NON-NLS-1$
+		safeForMacOS = checkReceivedObjects
+				&& rc.getBoolean("fsck", "safeForMacOS", //$NON-NLS-1$ //$NON-NLS-2$
 						SystemReader.getInstance().isMacOS());
-
-		ignore = EnumSet.noneOf(ObjectChecker.ErrorType.class);
-		EnumSet<ObjectChecker.ErrorType> set = EnumSet
-				.noneOf(ObjectChecker.ErrorType.class);
-		for (String key : rc.getNames(FSCK)) {
-			if (equalsIgnoreCase(key, "skipList") //$NON-NLS-1$
-					|| equalsIgnoreCase(key, "allowLeadingZeroFileMode") //$NON-NLS-1$
-					|| equalsIgnoreCase(key, "allowInvalidPersonIdent") //$NON-NLS-1$
-					|| equalsIgnoreCase(key, "safeForWindows") //$NON-NLS-1$
-					|| equalsIgnoreCase(key, "safeForMacOS")) { //$NON-NLS-1$
-				continue;
-			}
-
-			ObjectChecker.ErrorType id = FsckKeyNameHolder.parse(key);
-			if (id != null) {
-				switch (rc.getEnum(FSCK, null, key, FsckMode.ERROR)) {
-				case ERROR:
-					ignore.remove(id);
-					break;
-				case WARN:
-				case IGNORE:
-					ignore.add(id);
-					break;
-				}
-				set.add(id);
-			}
-		}
-		if (!set.contains(ObjectChecker.ErrorType.ZERO_PADDED_FILEMODE)
-				&& rc.getBoolean(FSCK, "allowLeadingZeroFileMode", false)) { //$NON-NLS-1$
-			ignore.add(ObjectChecker.ErrorType.ZERO_PADDED_FILEMODE);
-		}
 
 		allowTipSha1InWant = rc.getBoolean(
 				"uploadpack", "allowtipsha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
-		allowReachableSha1InWant = rc.getBoolean(
-				"uploadpack", "allowreachablesha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
 		hideRefs = rc.getStringList("uploadpack", null, "hiderefs"); //$NON-NLS-1$ //$NON-NLS-2$
+	}
+
+	/**
+	 * @return strictly verify received objects?
+	 * @deprecated use {@link #newObjectChecker()} instead.
+	 */
+	@Deprecated
+	public boolean isFsckObjects() {
+		return checkReceivedObjects;
 	}
 
 	/**
@@ -161,38 +108,13 @@ public class TransferConfig {
 	 *         enabled in the repository configuration.
 	 * @since 3.6
 	 */
-	@Nullable
 	public ObjectChecker newObjectChecker() {
-		return newObjectChecker(fetchFsck);
-	}
-
-	/**
-	 * @return checker to verify objects pushed into this repository, or null if
-	 *         checking is not enabled in the repository configuration.
-	 * @since 4.2
-	 */
-	@Nullable
-	public ObjectChecker newReceiveObjectChecker() {
-		return newObjectChecker(receiveFsck);
-	}
-
-	private ObjectChecker newObjectChecker(boolean check) {
-		if (!check) {
+		if (!checkReceivedObjects)
 			return null;
-		}
 		return new ObjectChecker()
-			.setIgnore(ignore)
-			.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
+			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
 			.setSafeForWindows(safeForWindows)
-			.setSafeForMacOS(safeForMacOS)
-			.setSkipList(skipList());
-	}
-
-	private ObjectIdSet skipList() {
-		if (fsckSkipList != null && !fsckSkipList.isEmpty()) {
-			return new LazyObjectIdSetFile(new File(fsckSkipList));
-		}
-		return null;
+			.setSafeForMacOS(safeForMacOS);
 	}
 
 	/**
@@ -204,14 +126,6 @@ public class TransferConfig {
 	}
 
 	/**
-	 * @return allow clients to request non-tip SHA-1s?
-	 * @since 4.1
-	 */
-	public boolean isAllowReachableSha1InWant() {
-		return allowReachableSha1InWant;
-	}
-
-	/**
 	 * @return {@link RefFilter} respecting configured hidden refs.
 	 * @since 3.1
 	 */
@@ -220,9 +134,8 @@ public class TransferConfig {
 			return RefFilter.DEFAULT;
 
 		return new RefFilter() {
-			@Override
 			public Map<String, Ref> filter(Map<String, Ref> refs) {
-				Map<String, Ref> result = new HashMap<>();
+				Map<String, Ref> result = new HashMap<String, Ref>();
 				for (Map.Entry<String, Ref> e : refs.entrySet()) {
 					boolean add = true;
 					for (String hide : hideRefs) {
@@ -241,35 +154,5 @@ public class TransferConfig {
 				return p.charAt(p.length() - 1) == '/' && s.startsWith(p);
 			}
 		};
-	}
-
-	static class FsckKeyNameHolder {
-		private static final Map<String, ObjectChecker.ErrorType> errors;
-
-		static {
-			errors = new HashMap<>();
-			for (ObjectChecker.ErrorType m : ObjectChecker.ErrorType.values()) {
-				errors.put(keyNameFor(m.name()), m);
-			}
-		}
-
-		@Nullable
-		static ObjectChecker.ErrorType parse(String key) {
-			return errors.get(toLowerCase(key));
-		}
-
-		private static String keyNameFor(String name) {
-			StringBuilder r = new StringBuilder(name.length());
-			for (int i = 0; i < name.length(); i++) {
-				char c = name.charAt(i);
-				if (c != '_') {
-					r.append(c);
-				}
-			}
-			return toLowerCase(r.toString());
-		}
-
-		private FsckKeyNameHolder() {
-		}
 	}
 }

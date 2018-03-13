@@ -70,7 +70,6 @@ public class RenameDetector {
 	private static final int EXACT_RENAME_SCORE = 100;
 
 	private static final Comparator<DiffEntry> DIFF_COMPARATOR = new Comparator<DiffEntry>() {
-		@Override
 		public int compare(DiffEntry a, DiffEntry b) {
 			int cmp = nameOf(a).compareTo(nameOf(b));
 			if (cmp == 0)
@@ -220,9 +219,7 @@ public class RenameDetector {
 	 * must be allocated, and 1,000,000 file compares may need to be performed.
 	 *
 	 * @param limit
-	 *            new file limit. 0 means no limit; a negative number means no
-	 *            inexact rename detection will be performed, only exact rename
-	 *            detection.
+	 *            new file limit.
 	 */
 	public void setRenameLimit(int limit) {
 		renameLimit = limit;
@@ -326,7 +323,7 @@ public class RenameDetector {
 			try {
 				return compute(objectReader, pm);
 			} finally {
-				objectReader.close();
+				objectReader.release();
 			}
 		}
 		return Collections.unmodifiableList(entries);
@@ -395,15 +392,15 @@ public class RenameDetector {
 
 	/** Reset this rename detector for another rename detection pass. */
 	public void reset() {
-		entries = new ArrayList<>();
-		deleted = new ArrayList<>();
-		added = new ArrayList<>();
+		entries = new ArrayList<DiffEntry>();
+		deleted = new ArrayList<DiffEntry>();
+		added = new ArrayList<DiffEntry>();
 		done = false;
 	}
 
 	private void breakModifies(ContentSource.Pair reader, ProgressMonitor pm)
 			throws IOException {
-		ArrayList<DiffEntry> newEntries = new ArrayList<>(entries.size());
+		ArrayList<DiffEntry> newEntries = new ArrayList<DiffEntry>(entries.size());
 
 		pm.beginTask(JGitText.get().renamesBreakingModifies, entries.size());
 
@@ -430,8 +427,8 @@ public class RenameDetector {
 	}
 
 	private void rejoinModifies(ProgressMonitor pm) {
-		HashMap<String, DiffEntry> nameMap = new HashMap<>();
-		ArrayList<DiffEntry> newAdded = new ArrayList<>(added.size());
+		HashMap<String, DiffEntry> nameMap = new HashMap<String, DiffEntry>();
+		ArrayList<DiffEntry> newAdded = new ArrayList<DiffEntry>(added.size());
 
 		pm.beginTask(JGitText.get().renamesRejoiningModifies, added.size()
 				+ deleted.size());
@@ -458,7 +455,7 @@ public class RenameDetector {
 		}
 
 		added = newAdded;
-		deleted = new ArrayList<>(nameMap.values());
+		deleted = new ArrayList<DiffEntry>(nameMap.values());
 	}
 
 	private int calculateModifyScore(ContentSource.Pair reader, DiffEntry d)
@@ -510,8 +507,8 @@ public class RenameDetector {
 		HashMap<AbbreviatedObjectId, Object> deletedMap = populateMap(deleted, pm);
 		HashMap<AbbreviatedObjectId, Object> addedMap = populateMap(added, pm);
 
-		ArrayList<DiffEntry> uniqueAdds = new ArrayList<>(added.size());
-		ArrayList<List<DiffEntry>> nonUniqueAdds = new ArrayList<>();
+		ArrayList<DiffEntry> uniqueAdds = new ArrayList<DiffEntry>(added.size());
+		ArrayList<List<DiffEntry>> nonUniqueAdds = new ArrayList<List<DiffEntry>>();
 
 		for (Object o : addedMap.values()) {
 			if (o instanceof DiffEntry)
@@ -520,7 +517,7 @@ public class RenameDetector {
 				nonUniqueAdds.add((List<DiffEntry>) o);
 		}
 
-		ArrayList<DiffEntry> left = new ArrayList<>(added.size());
+		ArrayList<DiffEntry> left = new ArrayList<DiffEntry>(added.size());
 
 		for (DiffEntry a : uniqueAdds) {
 			Object del = deletedMap.get(a.newId);
@@ -629,7 +626,7 @@ public class RenameDetector {
 		}
 		added = left;
 
-		deleted = new ArrayList<>(deletedMap.size());
+		deleted = new ArrayList<DiffEntry>(deletedMap.size());
 		for (Object o : deletedMap.values()) {
 			if (o instanceof DiffEntry) {
 				DiffEntry e = (DiffEntry) o;
@@ -679,11 +676,11 @@ public class RenameDetector {
 	@SuppressWarnings("unchecked")
 	private HashMap<AbbreviatedObjectId, Object> populateMap(
 			List<DiffEntry> diffEntries, ProgressMonitor pm) {
-		HashMap<AbbreviatedObjectId, Object> map = new HashMap<>();
+		HashMap<AbbreviatedObjectId, Object> map = new HashMap<AbbreviatedObjectId, Object>();
 		for (DiffEntry de : diffEntries) {
 			Object old = map.put(id(de), de);
 			if (old instanceof DiffEntry) {
-				ArrayList<DiffEntry> list = new ArrayList<>(2);
+				ArrayList<DiffEntry> list = new ArrayList<DiffEntry>(2);
 				list.add((DiffEntry) old);
 				list.add(de);
 				map.put(id(de), list);

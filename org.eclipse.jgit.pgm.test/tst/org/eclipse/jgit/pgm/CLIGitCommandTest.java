@@ -51,11 +51,9 @@ public class CLIGitCommandTest {
 
 	@Test
 	public void testSplit() throws Exception {
-		assertArrayEquals(new String[0], split(""));
 		assertArrayEquals(new String[] { "a" }, split("a"));
 		assertArrayEquals(new String[] { "a", "b" }, split("a b"));
 		assertArrayEquals(new String[] { "a", "b c" }, split("a 'b c'"));
 		assertArrayEquals(new String[] { "a", "b c" }, split("a \"b c\""));
-		assertArrayEquals(new String[] { "a", "b\\c" }, split("a \"b\\c\""));
 	}
 }

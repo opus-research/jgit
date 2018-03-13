@@ -78,17 +78,17 @@ public class TestProtocol<C> extends TransportProtocol {
 	private static final String SCHEME = "test"; //$NON-NLS-1$
 
 	private class Handle {
-		final C req;
-		final Repository remote;
+		private final C req;
+		private final Repository remote;
 
-		Handle(C req, Repository remote) {
+		private Handle(C req, Repository remote) {
 			this.req = req;
 			this.remote = remote;
 		}
 	}
 
-	final UploadPackFactory<C> uploadPackFactory;
-	final ReceivePackFactory<C> receivePackFactory;
+	private final UploadPackFactory<C> uploadPackFactory;
+	private final ReceivePackFactory<C> receivePackFactory;
 	private final HashMap<URIish, Handle> handles;
 
 	/**
@@ -103,7 +103,7 @@ public class TestProtocol<C> extends TransportProtocol {
 			ReceivePackFactory<C> receivePackFactory) {
 		this.uploadPackFactory = uploadPackFactory;
 		this.receivePackFactory = receivePackFactory;
-		this.handles = new HashMap<>();
+		this.handles = new HashMap<URIish, Handle>();
 	}
 
 	@Override
@@ -165,7 +165,7 @@ public class TestProtocol<C> extends TransportProtocol {
 	private class TransportInternal extends Transport implements PackTransport {
 		private final Handle handle;
 
-		TransportInternal(Repository local, URIish uri, Handle handle) {
+		private TransportInternal(Repository local, URIish uri, Handle handle) {
 			super(local, uri);
 			this.handle = handle;
 		}
@@ -174,7 +174,7 @@ public class TestProtocol<C> extends TransportProtocol {
 		public FetchConnection openFetch() throws NotSupportedException,
 				TransportException {
 			handle.remote.incrementOpen();
-			return new InternalFetchConnection<>(
+			return new InternalFetchConnection<C>(
 					this, uploadPackFactory, handle.req, handle.remote);
 		}
 
@@ -182,7 +182,7 @@ public class TestProtocol<C> extends TransportProtocol {
 		public PushConnection openPush() throws NotSupportedException,
 				TransportException {
 			handle.remote.incrementOpen();
-			return new InternalPushConnection<>(
+			return new InternalPushConnection<C>(
 					this, receivePackFactory, handle.req, handle.remote);
 		}
 

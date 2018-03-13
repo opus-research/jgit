@@ -47,12 +47,7 @@ import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_CORE_SECTION;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_DFS_SECTION;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_BLOCK_LIMIT;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_BLOCK_SIZE;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_CONCURRENCY_LEVEL;
-import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_STREAM_RATIO;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 
 /** Configuration parameters for {@link DfsBlockCache}. */
@@ -64,16 +59,13 @@ public class DfsBlockCacheConfig {
 	public static final int MB = 1024 * KB;
 
 	private long blockLimit;
+
 	private int blockSize;
-	private double streamRatio;
-	private int concurrencyLevel;
 
 	/** Create a default configuration. */
 	public DfsBlockCacheConfig() {
 		setBlockLimit(32 * MB);
 		setBlockSize(64 * KB);
-		setStreamRatio(0.30);
-		setConcurrencyLevel(32);
 	}
 
 	/**
@@ -106,55 +98,10 @@ public class DfsBlockCacheConfig {
 	/**
 	 * @param newSize
 	 *            size in bytes of a single window read in from the pack file.
-	 *            The value must be a power of 2.
 	 * @return {@code this}
 	 */
 	public DfsBlockCacheConfig setBlockSize(final int newSize) {
-		int size = Math.max(512, newSize);
-		if ((size & (size - 1)) != 0) {
-			throw new IllegalArgumentException(
-					JGitText.get().blockSizeNotPowerOf2);
-		}
-		blockSize = size;
-		return this;
-	}
-
-	/**
-	 * @return the estimated number of threads concurrently accessing the cache.
-	 *         <b>Default is 32.</b>
-	 */
-	public int getConcurrencyLevel() {
-		return concurrencyLevel;
-	}
-
-	/**
-	 * @param newConcurrencyLevel
-	 *            the estimated number of threads concurrently accessing the
-	 *            cache.
-	 * @return {@code this}
-	 */
-	public DfsBlockCacheConfig setConcurrencyLevel(
-			final int newConcurrencyLevel) {
-		concurrencyLevel = newConcurrencyLevel;
-		return this;
-	}
-
-	/**
-	 * @return highest percentage of {@link #getBlockLimit()} a single pack can
-	 *         occupy while being copied by the pack reuse strategy. <b>Default
-	 *         is 0.30, or 30%</b>.
-	 */
-	public double getStreamRatio() {
-		return streamRatio;
-	}
-
-	/**
-	 * @param ratio
-	 *            percentage of cache to occupy with a copied pack.
-	 * @return {@code this}
-	 */
-	public DfsBlockCacheConfig setStreamRatio(double ratio) {
-		streamRatio = Math.max(0, Math.min(ratio, 1.0));
+		blockSize = Math.max(512, newSize);
 		return this;
 	}
 
@@ -180,28 +127,6 @@ public class DfsBlockCacheConfig {
 				CONFIG_DFS_SECTION,
 				CONFIG_KEY_BLOCK_SIZE,
 				getBlockSize()));
-
-		setConcurrencyLevel(rc.getInt(
-				CONFIG_CORE_SECTION,
-				CONFIG_DFS_SECTION,
-				CONFIG_KEY_CONCURRENCY_LEVEL,
-				getConcurrencyLevel()));
-
-		String v = rc.getString(
-				CONFIG_CORE_SECTION,
-				CONFIG_DFS_SECTION,
-				CONFIG_KEY_STREAM_RATIO);
-		if (v != null) {
-			try {
-				setStreamRatio(Double.parseDouble(v));
-			} catch (NumberFormatException e) {
-				throw new IllegalArgumentException(MessageFormat.format(
-						JGitText.get().enumValueNotSupported3,
-						CONFIG_CORE_SECTION,
-						CONFIG_DFS_SECTION,
-						CONFIG_KEY_STREAM_RATIO, v));
-			}
-		}
 		return this;
 	}
 }

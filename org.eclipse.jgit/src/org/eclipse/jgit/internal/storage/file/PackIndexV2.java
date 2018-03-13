@@ -75,16 +75,16 @@ class PackIndexV2 extends PackIndex {
 	private final long[] fanoutTable;
 
 	/** 256 arrays of contiguous object names. */
-	int[][] names;
+	private int[][] names;
 
 	/** 256 arrays of the 32 bit offset data, matching {@link #names}. */
-	byte[][] offset32;
+	private byte[][] offset32;
 
 	/** 256 arrays of the CRC-32 of objects, matching {@link #names}. */
 	private byte[][] crc32;
 
 	/** 64 bit offset table. */
-	byte[] offset64;
+	private byte[] offset64;
 
 	PackIndexV2(final InputStream fd) throws IOException {
 		final byte[] fanoutRaw = new byte[4 * FANOUT];
@@ -304,14 +304,13 @@ class PackIndexV2 extends PackIndex {
 	}
 
 	private class EntriesIteratorV2 extends EntriesIterator {
-		int levelOne;
+		private int levelOne;
 
-		int levelTwo;
+		private int levelTwo;
 
 		@Override
 		protected MutableEntry initEntry() {
 			return new MutableEntry() {
-				@Override
 				protected void ensureId() {
 					idBuffer.fromRaw(names[levelOne], levelTwo
 							- Constants.OBJECT_ID_LENGTH / 4);
@@ -319,7 +318,6 @@ class PackIndexV2 extends PackIndex {
 			};
 		}
 
-		@Override
 		public MutableEntry next() {
 			for (; levelOne < names.length; levelOne++) {
 				if (levelTwo < names[levelOne].length) {
