@@ -172,10 +172,9 @@ public class Subscriber {
 	public void subscribe(final Map<String, List<SubscribeCommand>> commands,
 			ProgressMonitor monitor) throws NotSupportedException,
 			InterruptedException, TransportException, IOException {
-		connection = transport.openSubscribe();
+		connection = transport.openSubscribe(this);
 		transport.setTimeout(timeout);
 		try {
-			connection.doSubscribeAdvertisement(this);
 			connection.doSubscribe(this, commands, monitor);
 		} finally {
 			close();
