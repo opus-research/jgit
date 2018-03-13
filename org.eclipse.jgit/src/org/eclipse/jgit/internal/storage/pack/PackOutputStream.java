@@ -47,7 +47,6 @@ package org.eclipse.jgit.internal.storage.pack;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
-import java.util.zip.CRC32;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -63,8 +62,6 @@ public final class PackOutputStream extends OutputStream {
 	private final OutputStream out;
 
 	private final PackWriter packWriter;
-
-	private CRC32 crc = new CRC32();
 
 	private final MessageDigest md = Constants.newMessageDigest();
 
@@ -102,8 +99,6 @@ public final class PackOutputStream extends OutputStream {
 	public final void write(final int b) throws IOException {
 		count++;
 		out.write(b);
-		if (crc != null)
-			crc.update(b);
 		md.update((byte) b);
 	}
 
@@ -123,8 +118,6 @@ public final class PackOutputStream extends OutputStream {
 			}
 
 			out.write(b, off, n);
-			if (crc != null)
-				crc.update(b, off, n);
 			md.update(b, off, n);
 
 			off += n;
@@ -234,21 +227,6 @@ public final class PackOutputStream extends OutputStream {
 	/** @return total number of bytes written since stream start. */
 	public final long length() {
 		return count;
-	}
-
-	final void disableCRC32() {
-		crc = null;
-	}
-
-	/** @return obtain the current CRC32 register. */
-	final int getCRC32() {
-		return crc != null ? (int) crc.getValue() : 0;
-	}
-
-	/** Reinitialize the CRC32 register for a new region. */
-	final void resetCRC32() {
-		if (crc != null)
-			crc.reset();
 	}
 
 	/** @return obtain the current SHA-1 digest. */
