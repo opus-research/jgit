@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -60,7 +58,6 @@ import java.util.Map;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
-import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -72,10 +69,10 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.LockFile;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -97,7 +94,6 @@ import org.kohsuke.args4j.Option;
  * deleted from the current repository.
  * <p>
  */
-@Command(usage = "usage_RebuildCommitGraph")
 class RebuildCommitGraph extends TextBuiltin {
 	private static final String REALLY = "--destroy-this-repository"; //$NON-NLS-1$
 
@@ -116,7 +112,7 @@ class RebuildCommitGraph extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		if (!really && !db.getRefDatabase().getRefs(ALL).isEmpty()) {
+		if (!really && !db.getAllRefs().isEmpty()) {
 			System.err.println(
 				MessageFormat.format(CLIText.get().fatalThisProgramWillDestroyTheRepository
 					, db.getDirectory().getAbsolutePath(), REALLY));
@@ -243,8 +239,7 @@ class RebuildCommitGraph extends TextBuiltin {
 
 	private void deleteAllRefs() throws Exception {
 		final RevWalk rw = new RevWalk(db);
-		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
-		for (final Ref r : refs.values()) {
+		for (final Ref r : db.getAllRefs().values()) {
 			if (Constants.HEAD.equals(r.getName()))
 				continue;
 			final RefUpdate u = db.updateRef(r.getName());

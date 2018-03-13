@@ -104,8 +104,7 @@ public class RmCommand extends GitCommand<DirCache> {
 
 	/**
 	 * @param filepattern
-	 *            repository-relative path of file to remove (with
-	 *            <code>/</code> as separator)
+	 *            File to remove.
 	 * @return {@code this}
 	 */
 	public RmCommand addFilepattern(String filepattern) {

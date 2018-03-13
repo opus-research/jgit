@@ -76,8 +76,7 @@ public class PathFilterGroupTest {
 				"b/c",
 				"c/d/e",
 				"c/d/f",
-				"d/e/f/g",
-				"d/e/f/g.x"
+				"d/e/f/g"
 				};
 		// @formatter:on
 		filter = PathFilterGroup.createFromStrings(paths);
@@ -91,7 +90,6 @@ public class PathFilterGroupTest {
 		assertTrue(filter.include(fakeWalk("c/d/e")));
 		assertTrue(filter.include(fakeWalk("c/d/f")));
 		assertTrue(filter.include(fakeWalk("d/e/f/g")));
-		assertTrue(filter.include(fakeWalk("d/e/f/g.x")));
 	}
 
 	@Test
@@ -134,24 +132,6 @@ public class PathFilterGroupTest {
 		assertTrue(filter.include(fakeWalk("c/d/e/f")));
 		assertTrue(filter.include(fakeWalk("c/d/f/g")));
 		assertTrue(filter.include(fakeWalk("d/e/f/g/h")));
-		assertTrue(filter.include(fakeWalk("d/e/f/g/y")));
-		assertTrue(filter.include(fakeWalk("d/e/f/g.x/h")));
-		// listed before g/y, so can't StopWalk here, but it's not included
-		// either
-		assertFalse(filter.include(fakeWalk("d/e/f/g.y")));
-	}
-
-	@Test
-	public void testLongPaths() throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		TreeFilter longPathFilter = PathFilterGroup
-				.createFromStrings(
-						"tst/org/eclipse/jgit/treewalk/filter/PathFilterGroupTest.java",
-						"tst/org/eclipse/jgit/treewalk/filter/PathFilterGroupTest2.java");
-		assertFalse(longPathFilter
-				.include(fakeWalk("tst/org/eclipse/jgit/treewalk/FileTreeIteratorTest.java")));
-		assertFalse(longPathFilter.include(fakeWalk("tst/a-other-in-same")));
-		assertFalse(longPathFilter.include(fakeWalk("a-nothing-in-common")));
 	}
 
 	@Test
@@ -178,9 +158,6 @@ public class PathFilterGroupTest {
 		} catch (StopWalkException e) {
 			// good
 		}
-
-		// less obvious #2 due to git sorting order
-		filter.include(fakeWalk("d/e/f/g/h.txt"));
 
 		// non-ascii
 		try {

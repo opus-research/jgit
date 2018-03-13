@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 François Rey <eclipse.org_@_francois_._rey_._name>
+ * Copyright (C) 2011, François Rey <eclipse.org_@_francois_._rey_._name>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,19 +47,12 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeSet;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.StatusCommand;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.IndexDiff.StageState;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.Option;
 
 @Command(usage = "usage_Status", common = true)
 class Status extends TextBuiltin {
@@ -70,144 +63,26 @@ class Status extends TextBuiltin {
 
 	protected final String statusFileListFormatWithPrefix = CLIText.get().statusFileListFormatWithPrefix;
 
-	protected final String statusFileListFormatUnmerged = CLIText.get().statusFileListFormatUnmerged;
-
-	@Option(name = "--porcelain", usage = "usage_machineReadableOutput")
-	protected boolean porcelain;
-
-	@Option(name = "--", metaVar = "metaVar_path", multiValued = true)
-	protected List<String> filterPaths;
-
 	@Override
 	protected void run() throws Exception {
-		StatusCommand statusCommand = new Git(db).status();
-		if (filterPaths != null && filterPaths.size() > 0)
-			for (String path : filterPaths)
-				statusCommand.addPath(path);
-		org.eclipse.jgit.api.Status status = statusCommand.call();
-		printStatus(status);
-	}
-
-	private void printStatus(org.eclipse.jgit.api.Status status)
-			throws IOException {
-		if (porcelain)
-			printPorcelainStatus(status);
-		else
-			printLongStatus(status);
-	}
-
-	private void printPorcelainStatus(org.eclipse.jgit.api.Status status)
-			throws IOException {
-
-		Collection<String> added = status.getAdded();
-		Collection<String> changed = status.getChanged();
-		Collection<String> removed = status.getRemoved();
-		Collection<String> modified = status.getModified();
-		Collection<String> missing = status.getMissing();
-		Map<String, StageState> conflicting = status.getConflictingStageState();
-
-		// build a sorted list of all paths except untracked and ignored
-		TreeSet<String> sorted = new TreeSet<String>();
-		sorted.addAll(added);
-		sorted.addAll(changed);
-		sorted.addAll(removed);
-		sorted.addAll(modified);
-		sorted.addAll(missing);
-		sorted.addAll(conflicting.keySet());
-
-		// list each path
-		for (String path : sorted) {
-			char x = ' ';
-			char y = ' ';
-
-			if (added.contains(path))
-				x = 'A';
-			else if (changed.contains(path))
-				x = 'M';
-			else if (removed.contains(path))
-				x = 'D';
-
-			if (modified.contains(path))
-				y = 'M';
-			else if (missing.contains(path))
-				y = 'D';
-
-			if (conflicting.containsKey(path)) {
-				StageState stageState = conflicting.get(path);
-
-				switch (stageState) {
-				case BOTH_DELETED:
-					x = 'D';
-					y = 'D';
-					break;
-				case ADDED_BY_US:
-					x = 'A';
-					y = 'U';
-					break;
-				case DELETED_BY_THEM:
-					x = 'U';
-					y = 'D';
-					break;
-				case ADDED_BY_THEM:
-					x = 'U';
-					y = 'A';
-					break;
-				case DELETED_BY_US:
-					x = 'D';
-					y = 'U';
-					break;
-				case BOTH_ADDED:
-					x = 'A';
-					y = 'A';
-					break;
-				case BOTH_MODIFIED:
-					x = 'U';
-					y = 'U';
-					break;
-				default:
-					throw new IllegalArgumentException("Unknown StageState: " //$NON-NLS-1$
-							+ stageState);
-				}
-			}
-
-			printPorcelainLine(x, y, path);
-		}
-
-		// untracked are always at the end of the list
-		TreeSet<String> untracked = new TreeSet<String>(status.getUntracked());
-		for (String path : untracked)
-			printPorcelainLine('?', '?', path);
-	}
-
-	private void printPorcelainLine(char x, char y, String path)
-			throws IOException {
-		StringBuilder lineBuilder = new StringBuilder();
-		lineBuilder.append(x).append(y).append(' ').append(path);
-		outw.println(lineBuilder.toString());
-	}
-
-	private void printLongStatus(org.eclipse.jgit.api.Status status)
-			throws IOException {
 		// Print current branch name
 		final Ref head = db.getRef(Constants.HEAD);
+		boolean firstHeader = true;
 		if (head != null && head.isSymbolic()) {
 			String branch = Repository.shortenRefName(head.getLeaf().getName());
-			outw.println(CLIText.formatLine(MessageFormat.format(
-					CLIText.get().onBranch, branch)));
+			outw.println(CLIText.formatLine(
+					MessageFormat.format(CLIText.get().onBranch, branch)));
 		} else
 			outw.println(CLIText.formatLine(CLIText.get().notOnAnyBranch));
-
 		// List changes
-		boolean firstHeader = true;
-
+		org.eclipse.jgit.api.Status status = new Git(db).status().call();
 		Collection<String> added = status.getAdded();
 		Collection<String> changed = status.getChanged();
 		Collection<String> removed = status.getRemoved();
 		Collection<String> modified = status.getModified();
 		Collection<String> missing = status.getMissing();
 		Collection<String> untracked = status.getUntracked();
-		Map<String, StageState> unmergedStates = status
-				.getConflictingStageState();
+		Collection<String> unmerged = status.getConflicting();
 		Collection<String> toBeCommitted = new ArrayList<String>(added);
 		toBeCommitted.addAll(changed);
 		toBeCommitted.addAll(removed);
@@ -231,12 +106,12 @@ class Status extends TextBuiltin {
 					modified, missing, null);
 			firstHeader = false;
 		}
-		int nbUnmerged = unmergedStates.size();
+		int nbUnmerged = unmerged.size();
 		if (nbUnmerged > 0) {
 			if (!firstHeader)
 				printSectionHeader(""); //$NON-NLS-1$
 			printSectionHeader(CLIText.get().unmergedPaths);
-			printUnmerged(unmergedStates);
+			printList(unmerged);
 			firstHeader = false;
 		}
 		int nbUntracked = untracked.size();
@@ -292,41 +167,5 @@ class Status extends TextBuiltin {
 			outw.flush();
 		}
 		return list.size();
-	}
-
-	private void printUnmerged(Map<String, StageState> unmergedStates)
-			throws IOException {
-		List<String> paths = new ArrayList<String>(unmergedStates.keySet());
-		Collections.sort(paths);
-		for (String path : paths) {
-			StageState state = unmergedStates.get(path);
-			String stateDescription = getStageStateDescription(state);
-			outw.println(CLIText.formatLine(String.format(
-					statusFileListFormatUnmerged, stateDescription, path)));
-			outw.flush();
-		}
-	}
-
-	private static String getStageStateDescription(StageState stageState) {
-		CLIText text = CLIText.get();
-		switch (stageState) {
-		case BOTH_DELETED:
-			return text.statusBothDeleted;
-		case ADDED_BY_US:
-			return text.statusAddedByUs;
-		case DELETED_BY_THEM:
-			return text.statusDeletedByThem;
-		case ADDED_BY_THEM:
-			return text.statusAddedByThem;
-		case DELETED_BY_US:
-			return text.statusDeletedByUs;
-		case BOTH_ADDED:
-			return text.statusBothAdded;
-		case BOTH_MODIFIED:
-			return text.statusBothModified;
-		default:
-			throw new IllegalArgumentException("Unknown StageState: " //$NON-NLS-1$
-					+ stageState);
-		}
 	}
 }
