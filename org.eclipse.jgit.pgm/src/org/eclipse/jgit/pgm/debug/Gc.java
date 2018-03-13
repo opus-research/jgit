@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,63 +41,18 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.pgm.debug;
 
-import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.GC;
-import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
+import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.GC;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
-
-class DfsObjectRepresentation extends StoredObjectRepresentation {
-	final ObjectToPack object;
-
-	DfsPackFile pack;
-
-	/**
-	 * Position of {@link #pack} in the reader's pack list. Lower numbers are
-	 * newer/more recent packs and less likely to contain the best format for a
-	 * base object. Higher numbered packs are bigger, more stable, and favored
-	 * by PackWriter when selecting representations... but only if they come
-	 * last in the representation ordering.
-	 */
-	int packIndex;
-
-	long offset;
-
-	int format;
-
-	long length;
-
-	ObjectId baseId;
-
-	DfsObjectRepresentation(ObjectToPack object) {
-		this.object = object;
-	}
-
+class Gc extends TextBuiltin {
 	@Override
-	public int getFormat() {
-		return format;
-	}
-
-	@Override
-	public int getWeight() {
-		return (int) Math.min(length, Integer.MAX_VALUE);
-	}
-
-	@Override
-	public ObjectId getDeltaBase() {
-		return baseId;
-	}
-
-	@Override
-	public boolean wasDeltaAttempted() {
-		if (pack != null) {
-			PackSource source = pack.getPackDescription().getPackSource();
-			return source == GC || source == UNREACHABLE_GARBAGE;
-		}
-		return false;
+	protected void run() throws Exception {
+		GC gc = new GC((FileRepository) db);
+		gc.setProgressMonitor(new TextProgressMonitor());
+		gc.gc();
 	}
 }
