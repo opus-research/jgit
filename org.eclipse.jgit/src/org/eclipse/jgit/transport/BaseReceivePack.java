@@ -48,10 +48,10 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
+import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
@@ -178,9 +178,6 @@ public abstract class BaseReceivePack {
 	/** Should an incoming transfer permit non-fast-forward requests? */
 	private boolean allowNonFastForwards;
 
-	/** Should an incoming transfer permit push options? **/
-	private boolean allowPushOptions;
-
 	/**
 	 * Should the requested ref updates be performed as a single atomic
 	 * transaction?
@@ -219,6 +216,7 @@ public abstract class BaseReceivePack {
 
 	/** Optional message output stream. */
 	protected OutputStream msgOut;
+	private SideBandOutputStream errOut;
 
 	/** Packet line input stream around {@link #rawIn}. */
 	protected PacketLineIn pckIn;
@@ -248,12 +246,6 @@ public abstract class BaseReceivePack {
 	private boolean sideBand;
 
 	private boolean quiet;
-
-	/** A list of option strings associated with a push. */
-	protected List<String> pushOptions;
-
-	/** Whether the client intends to use push options. */
-	protected boolean usePushOptions;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -319,7 +311,6 @@ public abstract class BaseReceivePack {
 		allowBranchDeletes = rc.allowDeletes;
 		allowNonFastForwards = rc.allowNonFastForwards;
 		allowOfsDelta = rc.allowOfsDelta;
-		allowPushOptions = rc.allowPushOptions;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
@@ -339,8 +330,6 @@ public abstract class BaseReceivePack {
 		final boolean allowDeletes;
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
-		final boolean allowPushOptions;
-
 		final SignedPushConfig signedPush;
 
 		ReceiveConfig(final Config config) {
@@ -350,8 +339,6 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-			allowPushOptions = config.getBoolean("receive", "pushoptions", //$NON-NLS-1$ //$NON-NLS-2$
-					false);
 			signedPush = SignedPushConfig.KEY.parse(config);
 		}
 	}
@@ -801,31 +788,12 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * @return true if the server supports the receiving of push options.
-	 * @since 4.5
-	 */
-	public boolean isAllowPushOptions() {
-		return allowPushOptions;
-	}
-
-	/**
-	 * Configure if the server supports the receiving of push options.
-	 *
-	 * @param allow
-	 *            true to permit option strings.
-	 * @since 4.5
-	 */
-	public void setAllowPushOptions(boolean allow) {
-		allowPushOptions = allow;
-	}
-
-	/**
 	 * True if the client wants less verbose output.
 	 *
 	 * @return true if the client has requested the server to be less verbose.
 	 * @throws RequestNotYetReadException
 	 *             if the client's request has not yet been read from the wire,
-	 *             so we do not know if they expect quiet. Note that the
+	 *             so we do not know if they expect side-band. Note that the
 	 *             client may have already written the request, it just has not
 	 *             been read.
 	 * @since 4.0
@@ -834,22 +802,6 @@ public abstract class BaseReceivePack {
 		if (enabledCapabilities == null)
 			throw new RequestNotYetReadException();
 		return quiet;
-	}
-
-	/**
-	 * Gets the list of string options associated with this push.
-	 *
-	 * @return pushOptions
-	 * @throws RequestNotYetReadException
-	 *             if the client's request has not yet been read from the wire,
-	 *             so we do not know if they expect push options. Note that the
-	 *             client may have already written the request, it just has not
-	 *             been read.
-	 */
-	public List<String> getPushOptions() throws RequestNotYetReadException {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
-		return Collections.unmodifiableList(pushOptions);
 	}
 
 	/**
@@ -926,6 +878,19 @@ public abstract class BaseReceivePack {
 			advertiseError.append(what).append('\n');
 		} else {
 			msgOutWrapper.write(Constants.encode("error: " + what + "\n")); //$NON-NLS-1$ //$NON-NLS-2$
+		}
+	}
+
+	private void fatalError(String msg) {
+		if (errOut != null) {
+			try {
+				errOut.write(Constants.encode(msg));
+				errOut.flush();
+			} catch (IOException e) {
+				// Ignore write failures
+			}
+		} else {
+			sendError(msg);
 		}
 	}
 
@@ -1111,10 +1076,6 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		if (allowPushOptions) {
-			adv.advertiseCapability(CAPABILITY_PUSH_OPTIONS);
-			pushOptions = new ArrayList<>();
-		}
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
@@ -1131,7 +1092,7 @@ public abstract class BaseReceivePack {
 	 */
 	protected void recvCommands() throws IOException {
 		PushCertificateParser certParser = getPushCertificateParser();
-		FirstLine firstLine = null;
+		boolean firstPkt = true;
 		try {
 			for (;;) {
 				String line;
@@ -1147,14 +1108,16 @@ public abstract class BaseReceivePack {
 				}
 
 				if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-					clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
+					parseShallow(line.substring(8, 48));
 					continue;
 				}
 
-				if (firstLine == null) {
-					firstLine = new FirstLine(line);
+				if (firstPkt) {
+					firstPkt = false;
+					FirstLine firstLine = new FirstLine(line);
 					enabledCapabilities = firstLine.getCapabilities();
 					line = firstLine.getLine();
+					enableCapabilities();
 
 					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
 						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
@@ -1167,13 +1130,7 @@ public abstract class BaseReceivePack {
 					continue;
 				}
 
-				ReceiveCommand cmd;
-				try {
-					cmd = parseCommand(line);
-				} catch (PackProtocolException e) {
-					sendError(e.getMessage());
-					throw e;
-				}
+				ReceiveCommand cmd = parseCommand(line);
 				if (cmd.getRefName().equals(Constants.HEAD)) {
 					cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
 				} else {
@@ -1186,9 +1143,26 @@ public abstract class BaseReceivePack {
 			}
 			pushCert = certParser.build();
 		} catch (PackProtocolException e) {
-			sendError(e.getMessage());
+			if (sideBand) {
+				try {
+					pckIn.discardUntilEnd();
+				} catch (IOException e2) {
+					// Ignore read failures attempting to discard.
+				}
+			}
+			fatalError(e.getMessage());
 			throw e;
 		}
+	}
+
+	private void parseShallow(String idStr) throws PackProtocolException {
+		ObjectId id;
+		try {
+			id = ObjectId.fromString(idStr);
+		} catch (InvalidObjectIdException e) {
+			throw new PackProtocolException(e.getMessage(), e);
+		}
+		clientShallowCommits.add(id);
 	}
 
 	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
@@ -1218,27 +1192,16 @@ public abstract class BaseReceivePack {
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
 		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
-		usePushOptions = allowPushOptions
-				&& isCapabilityEnabled(CAPABILITY_PUSH_OPTIONS);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
 			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
+			errOut = new SideBandOutputStream(CH_ERROR, MAX_BUF, out);
 
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
 		}
-	}
-
-	/**
-	 * Sets the client's intention regarding push options.
-	 *
-	 * @param usePushOptions
-	 *            whether the client intends to use push options
-	 */
-	public void setUsePushOptions(boolean usePushOptions) {
-		this.usePushOptions = usePushOptions;
 	}
 
 	/**

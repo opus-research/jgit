@@ -49,7 +49,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -88,9 +87,6 @@ class PushProcess {
 	/** an outputstream to write messages to */
 	private final OutputStream out;
 
-	/** A list of option strings associated with this push */
-	private List<String> pushOptions;
-
 	/**
 	 * Create process for specified transport and refs updates specification.
 	 *
@@ -126,7 +122,6 @@ class PushProcess {
 		this.transport = transport;
 		this.toPush = new HashMap<String, RemoteRefUpdate>();
 		this.out = out;
-		this.pushOptions = transport.getPushOptions();
 		for (final RemoteRefUpdate rru : toPush) {
 			if (this.toPush.put(rru.getRemoteName(), rru) != null)
 				throw new TransportException(MessageFormat.format(
@@ -155,6 +150,7 @@ class PushProcess {
 		try {
 			monitor.beginTask(PROGRESS_OPENING_CONNECTION,
 					ProgressMonitor.UNKNOWN);
+
 			final PushResult res = new PushResult();
 			connection = transport.openPush();
 			try {
@@ -297,14 +293,5 @@ class PushProcess {
 				}
 			}
 		}
-	}
-
-	/**
-	 * Gets the list of option strings associated with this push.
-	 *
-	 * @return pushOptions
-	 */
-	public List<String> getPushOptions() {
-		return pushOptions;
 	}
 }
