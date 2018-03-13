@@ -49,9 +49,9 @@ import java.util.List;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.revwalk.RevObject;
 
 /**
  * Extension of {@link ObjectReader} that supports reusing objects in packs.
@@ -71,13 +71,13 @@ public interface ObjectReuseAsIs {
 	 * object state, such as to remember what file and offset contains the
 	 * object's pack encoded data.
 	 *
-	 * @param objectId
-	 *            the id of the object that will be packed.
-	 * @param type
-	 *            the Git type of the object that will be packed.
+	 * @param obj
+	 *            identity of the object that will be packed. The object's
+	 *            parsed status is undefined here. Implementers must not rely on
+	 *            the object being parsed.
 	 * @return a new instance for this object.
 	 */
-	public ObjectToPack newObjectToPack(AnyObjectId objectId, int type);
+	public ObjectToPack newObjectToPack(RevObject obj);
 
 	/**
 	 * Select the best object representation for a packer.
