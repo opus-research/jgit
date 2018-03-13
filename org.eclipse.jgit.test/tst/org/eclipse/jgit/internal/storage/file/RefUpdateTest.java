@@ -104,14 +104,9 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 
 	private void delete(final RefUpdate ref, final Result expected,
 			final boolean exists, final boolean removed) throws IOException {
-		delete(db, ref, expected, exists, removed);
-	}
-
-	private void delete(Repository repo, final RefUpdate ref, final Result expected,
-			final boolean exists, final boolean removed) throws IOException {
-		assertEquals(exists, repo.getAllRefs().containsKey(ref.getName()));
+		assertEquals(exists, db.getAllRefs().containsKey(ref.getName()));
 		assertEquals(expected, ref.delete());
-		assertEquals(!removed, repo.getAllRefs().containsKey(ref.getName()));
+		assertEquals(!removed, db.getAllRefs().containsKey(ref.getName()));
 	}
 
 	@Test
@@ -237,17 +232,6 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		assertEquals(0, db.getReflogReader("HEAD").getReverseEntries().size());
 	}
 
-	@Test
-	public void testDeleteHeadInBareRepo() throws IOException {
-		try (Repository bareRepo = createBareRepository()) {
-			RefUpdate ref = bareRepo.updateRef(Constants.HEAD);
-			ref.setNewObjectId(ObjectId.fromString("0123456789012345678901234567890123456789"));
-			// Create the HEAD ref so we can delete it.
-			assertEquals(Result.NEW, ref.update());
-			ref = bareRepo.updateRef(Constants.HEAD);
-			delete(bareRepo, ref, Result.NO_CHANGE, true, true);
-		}
-	}
 	/**
 	 * Delete a loose ref and make sure the directory in refs is deleted too,
 	 * and the reflog dir too
@@ -597,13 +581,14 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		RefUpdate updateRef = db.updateRef("refs/heads/master");
 		updateRef.setNewObjectId(pid);
 		LockFile lockFile1 = new LockFile(new File(db.getDirectory(),
-				"refs/heads/master"));
+				"refs/heads/master"), db.getFS());
 		try {
 			assertTrue(lockFile1.lock()); // precondition to test
 			Result update = updateRef.update();
 			assertEquals(Result.LOCK_FAILURE, update);
 			assertEquals(opid, db.resolve("refs/heads/master"));
-			LockFile lockFile2 = new LockFile(new File(db.getDirectory(),"refs/heads/master"));
+			LockFile lockFile2 = new LockFile(new File(db.getDirectory(),"refs/heads/master"),
+					db.getFS());
 			assertFalse(lockFile2.lock()); // was locked, still is
 		} finally {
 			lockFile1.unlock();
@@ -746,7 +731,8 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 				"logs/" + fromName).exists());
 
 		// "someone" has branch X locked
-		LockFile lockFile = new LockFile(new File(db.getDirectory(), toLock));
+		LockFile lockFile = new LockFile(new File(db.getDirectory(), toLock),
+				db.getFS());
 		try {
 			assertTrue(lockFile.lock());
 
