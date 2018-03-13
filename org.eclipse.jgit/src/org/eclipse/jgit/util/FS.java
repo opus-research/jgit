@@ -643,28 +643,28 @@ public abstract class FS {
 	public static class Attributes {
 
 		/**
-		 * @return true if this is the attributes of an executable file
+		 * @return true if this are the attributes of a directory
 		 */
 		public boolean isDirectory() {
 			return isDirectory;
 		}
 
 		/**
-		 * @return true if this is the attributes of an executable file
+		 * @return true if this are the attributes of an executable file
 		 */
 		public boolean isExecutable() {
 			return isExecutable;
 		}
 
 		/**
-		 * @return true if this is the attributes of a symbolic link
+		 * @return true if this are the attributes of a symbolic link
 		 */
 		public boolean isSymbolicLink() {
 			return isSymbolicLink;
 		}
 
 		/**
-		 * @return true if this is the attributes of a regular file
+		 * @return true if this are the attributes of a regular file
 		 */
 		public boolean isRegularFile() {
 			return isRegularFile;
@@ -678,7 +678,7 @@ public abstract class FS {
 		}
 
 		/**
-		 * @return the time (milliseconds since 1900-01-01) when this object was
+		 * @return the time (milliseconds since 1970-01-01) when this object was
 		 *         last modified
 		 */
 		public long getLastModifiedTime() {
