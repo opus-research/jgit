@@ -54,8 +54,10 @@ import java.util.NoSuchElementException;
  * This map provides an efficient translation from any ObjectId instance to a
  * cached subclass of ObjectId that has the same value.
  * <p>
- * If object instances are stored in only one map, {@link ObjectIdOwnerMap} is a
- * more efficient implementation.
+ * Raw value equality is tested when comparing two ObjectIds (or subclasses),
+ * not reference equality and not <code>.equals(Object)</code> equality. This
+ * allows subclasses to override <code>equals</code> to supply their own
+ * extended semantics.
  *
  * @param <V>
  *            type of subclass of ObjectId that will be stored in the map.
@@ -90,15 +92,16 @@ public class ObjectIdSubclassMap<V extends ObjectId> implements Iterable<V> {
 	 * @return the instance mapped to toFind, or null if no mapping exists.
 	 */
 	public V get(final AnyObjectId toFind) {
-		final int msk = mask;
-		int i = toFind.w1 & msk;
+		int i = toFind.w1 & mask;
 		final V[] tbl = table;
+		final int end = tbl.length;
 		V obj;
 
 		while ((obj = tbl[i]) != null) {
 			if (AnyObjectId.equals(obj, toFind))
 				return obj;
-			i = (i + 1) & msk;
+			if (++i == end)
+				i = 0;
 		}
 		return null;
 	}
@@ -154,15 +157,16 @@ public class ObjectIdSubclassMap<V extends ObjectId> implements Iterable<V> {
 	 *            type of instance to store.
 	 */
 	public <Q extends V> V addIfAbsent(final Q newValue) {
-		final int msk = mask;
-		int i = newValue.w1 & msk;
+		int i = newValue.w1 & mask;
 		final V[] tbl = table;
+		final int end = tbl.length;
 		V obj;
 
 		while ((obj = tbl[i]) != null) {
 			if (AnyObjectId.equals(obj, newValue))
 				return obj;
-			i = (i + 1) & msk;
+			if (++i == end)
+				i = 0;
 		}
 
 		if (++size == grow) {
@@ -214,11 +218,13 @@ public class ObjectIdSubclassMap<V extends ObjectId> implements Iterable<V> {
 	}
 
 	private void insert(final V newValue) {
-		final int msk = mask;
-		int j = newValue.w1 & msk;
+		int j = newValue.w1 & mask;
 		final V[] tbl = table;
-		while (tbl[j] != null)
-			j = (j + 1) & msk;
+		final int end = tbl.length;
+		while (tbl[j] != null) {
+			if (++j == end)
+				j = 0;
+		}
 		tbl[j] = newValue;
 	}
 
