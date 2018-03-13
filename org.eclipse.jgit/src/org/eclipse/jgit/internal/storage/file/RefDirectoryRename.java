@@ -96,7 +96,8 @@ class RefDirectoryRename extends RefRename {
 		objId = source.getOldObjectId();
 		updateHEAD = needToUpdateHEAD();
 		tmp = refdb.newTemporaryUpdate();
-		try (final RevWalk rw = new RevWalk(refdb.getRepository())) {
+		final RevWalk rw = new RevWalk(refdb.getRepository());
+		try {
 			// First backup the source so its never unreachable.
 			tmp.setNewObjectId(objId);
 			tmp.setForceUpdate(true);
@@ -177,6 +178,7 @@ class RefDirectoryRename extends RefRename {
 			} catch (IOException err) {
 				FileUtils.delete(refdb.fileFor(tmp.getName()));
 			}
+			rw.release();
 		}
 	}
 
