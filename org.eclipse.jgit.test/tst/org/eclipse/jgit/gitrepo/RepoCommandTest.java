@@ -743,9 +743,9 @@ public class RepoCommandTest extends RepositoryTestCase {
 				FileBasedConfig c = new FileBasedConfig(gitmodules,
 						FS.DETECTED);
 				c.load();
-				assertEquals("Recording remote branches should work for short branch descriptions", "master",
+				assertEquals("standard branches work", "master",
 						c.getString("submodule", "with-branch", "branch"));
-				assertEquals("Recording remote branches should work for full ref specs", "refs/heads/master",
+				assertEquals("long branches work", "refs/heads/master",
 						c.getString("submodule", "with-long-branch", "branch"));
 			}
 		}
