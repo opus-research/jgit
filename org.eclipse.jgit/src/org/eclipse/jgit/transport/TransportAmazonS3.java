@@ -126,7 +126,23 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			throws NotSupportedException {
 		super(local, uri);
 
-		s3 = new AmazonS3(loadProperties());
+		Properties props = null;
+		File propsFile = new File(local.getDirectory(), uri.getUser());
+		if (!propsFile.isFile())
+			propsFile = new File(local.getFS().userHome(), uri.getUser());
+		if (propsFile.isFile()) {
+			try {
+				props = AmazonS3.properties(propsFile);
+			} catch (IOException e) {
+				throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile), e);
+			}
+		} else {
+			props = new Properties();
+			props.setProperty("accesskey", uri.getUser());
+			props.setProperty("secretkey", uri.getPass());
+		}
+
+		s3 = new AmazonS3(props);
 		bucket = uri.getHost();
 
 		String p = uri.getPath();
@@ -135,33 +151,6 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 		if (p.endsWith("/"))
 			p = p.substring(0, p.length() - 1);
 		keyPrefix = p;
-	}
-
-	private Properties loadProperties() throws NotSupportedException {
-		if (local.getDirectory() != null) {
-			File propsFile = new File(local.getDirectory(), uri.getUser());
-			if (propsFile.isFile())
-				return loadPropertiesFile(propsFile);
-		}
-
-		File propsFile = new File(local.getFS().userHome(), uri.getUser());
-		if (propsFile.isFile())
-			return loadPropertiesFile(propsFile);
-
-		Properties props = new Properties();
-		props.setProperty("accesskey", uri.getUser());
-		props.setProperty("secretkey", uri.getPass());
-		return props;
-	}
-
-	private static Properties loadPropertiesFile(File propsFile)
-			throws NotSupportedException {
-		try {
-			return AmazonS3.properties(propsFile);
-		} catch (IOException e) {
-			throw new NotSupportedException(MessageFormat.format(
-					JGitText.get().cannotReadFile, propsFile), e);
-		}
 	}
 
 	@Override

@@ -51,7 +51,6 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
@@ -100,7 +99,7 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 
 		InCoreMerger(final Repository local) {
 			super(local);
-			tw = new NameConflictTreeWalk(reader);
+			tw = new NameConflictTreeWalk(db);
 			cache = DirCache.newInCore();
 		}
 
@@ -153,9 +152,7 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 			if (hasConflict)
 				return false;
 			try {
-				ObjectInserter odi = getObjectInserter();
-				resultTree = cache.writeTree(odi);
-				odi.flush();
+				resultTree = cache.writeTree(getObjectWriter());
 				return true;
 			} catch (UnmergedPathException upe) {
 				resultTree = null;
@@ -171,7 +168,7 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 			final AbstractTreeIterator i = getTree(tree);
 			if (i != null) {
 				if (FileMode.TREE.equals(tw.getRawMode(tree))) {
-					builder.addTree(tw.getRawPath(), stage, reader, tw
+					builder.addTree(tw.getRawPath(), stage, db, tw
 							.getObjectId(tree));
 				} else {
 					final DirCacheEntry e;
