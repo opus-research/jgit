@@ -52,13 +52,15 @@ import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Test;
 
 public class StatusCommandTest extends RepositoryTestCase {
 
 	@Test
-	public void testEmptyStatus() throws IOException {
+	public void testEmptyStatus() throws NoWorkTreeException,
+			GitAPIException {
 		Git git = new Git(db);
 
 		Status stat = git.status().call();
@@ -78,12 +80,11 @@ public class StatusCommandTest extends RepositoryTestCase {
 		writeTrashFile("b", "content of b");
 		writeTrashFile("c", "content of c");
 		git.add().addFilepattern("a").addFilepattern("b").call();
-		writeTrashFile("b", "Content of b");
 		Status stat = git.status().call();
 		assertEquals(set("a", "b"), stat.getAdded());
 		assertEquals(0, stat.getChanged().size());
 		assertEquals(0, stat.getMissing().size());
-		assertEquals(set("b"), stat.getModified());
+		assertEquals(0, stat.getModified().size());
 		assertEquals(0, stat.getRemoved().size());
 		assertEquals(set("c"), stat.getUntracked());
 		git.commit().setMessage("initial").call();

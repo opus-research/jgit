@@ -58,12 +58,13 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -75,6 +76,7 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
 
 /**
@@ -304,6 +306,8 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) throws IOException {
 		if (m != null) {
+			if (!isValidPath(m))
+				throw new InvalidPathException(m.getEntryPathString());
 			// There is an entry in the merge commit. Means: we want to update
 			// what's currently in the index and working-tree to that one
 			if (i == null) {
@@ -328,8 +332,14 @@ public class DirCacheCheckout {
 					// conflict
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 							m.getEntryFileMode());
-				else
-					keep(i.getDirCacheEntry());
+				else {
+					// update the timestamp of the index with the one from the
+					// file if not set, as we are sure to be in sync here.
+					DirCacheEntry entry = i.getDirCacheEntry();
+					if (entry.getLastModified() == 0)
+						entry.setLastModified(f.getEntryLastModified());
+					keep(entry);
+				}
 			} else
 				// The index contains a folder
 				keep(i.getDirCacheEntry());
@@ -506,11 +516,14 @@ public class DirCacheCheckout {
 	 * @throws IOException
 	 */
 
-	void processEntry(AbstractTreeIterator h, AbstractTreeIterator m,
+	void processEntry(CanonicalTreeParser h, CanonicalTreeParser m,
 			DirCacheBuildIterator i, WorkingTreeIterator f) throws IOException {
 		DirCacheEntry dce = i != null ? i.getDirCacheEntry() : null;
 
 		String name = walk.getPathString();
+
+		if (m != null && !isValidPath(m))
+			throw new InvalidPathException(m.getEntryPathString());
 
 		if (i == null && m == null && h == null) {
 			// File/Directory conflict case #20
@@ -795,7 +808,7 @@ public class DirCacheCheckout {
 		DirCacheEntry entry;
 		if (e != null) {
 			entry = new DirCacheEntry(e.getPathString(), DirCacheEntry.STAGE_1);
-			entry.copyMetaData(e);
+			entry.copyMetaData(e, true);
 			builder.add(entry);
 		}
 
@@ -988,4 +1001,102 @@ public class DirCacheCheckout {
 		else
 			entry.setLength((int) ol.getSize());
 	}
+
+	private static byte[][] forbidden;
+	static {
+		String[] list = new String[] { "AUX", "COM1", "COM2", "COM3", "COM4",
+				"COM5", "COM6", "COM7", "COM8", "COM9", "CON", "LPT1", "LPT2",
+				"LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "NUL",
+				"PRN" };
+		forbidden = new byte[list.length][];
+		for (int i = 0; i < list.length; ++i)
+			forbidden[i] = Constants.encodeASCII(list[i]);
+	}
+
+	private static boolean isValidPath(CanonicalTreeParser t) {
+		for (CanonicalTreeParser i = t; i != null; i = i.getParent())
+			if (!isValidPathSegment(i))
+				return false;
+		return true;
+	}
+
+	private static boolean isValidPathSegment(CanonicalTreeParser t) {
+		String osName = SystemReader.getInstance().getProperty("os.name");
+		boolean isWindows = "Windows".equals(osName);
+		boolean isOSX = "Darwin".equals(osName) || "Mac OS X".equals(osName);
+		boolean ignCase = isOSX || isWindows;
+
+		int ptr = t.getNameOffset();
+		byte[] raw = t.getEntryPathBuffer();
+		int end = ptr + t.getNameLength();
+
+		// Validate path component at this level of the tree
+		int start = ptr;
+		while (ptr < end) {
+			if (raw[ptr] == '/')
+				return false;
+			if (isWindows) {
+				if (raw[ptr] == '\\')
+					return false;
+				if (raw[ptr] == ':')
+					return false;
+			}
+			ptr++;
+		}
+		// '.' and '.'' are invalid here
+		if (ptr - start == 1) {
+			if (raw[start] == '.')
+				return false;
+		} else if (ptr - start == 2) {
+			if (raw[start] == '.')
+				if (raw[start + 1] == '.')
+					return false;
+		} else if (ptr - start == 4) {
+			// .git (possibly case insensitive) is disallowed
+			if (raw[start] == '.')
+				if (raw[start + 1] == 'g' || (ignCase && raw[start + 1] == 'G'))
+					if (raw[start + 2] == 'i'
+							|| (ignCase && raw[start + 2] == 'I'))
+						if (raw[start + 3] == 't'
+								|| (ignCase && raw[start + 3] == 'T'))
+							return false;
+		}
+		if (isWindows) {
+			// Space or period at end of file name is ignored by Windows.
+			// Treat this as a bad path for now. We may want to handle
+			// this as case insensitivity in the future.
+			if (raw[ptr - 1] == '.' || raw[ptr - 1] == ' ')
+				return false;
+			int i;
+			// Bad names, eliminate suffix first
+			for (i = start; i < ptr; ++i)
+				if (raw[i] == '.')
+					break;
+			int len = i - start;
+			if (len == 3 || len == 4) {
+				for (int j = 0; j < forbidden.length; ++j) {
+					if (forbidden[j].length == len) {
+						if (toUpper(raw[start]) < forbidden[j][0])
+							break;
+						int k;
+						for (k = 0; k < len; ++k) {
+							if (toUpper(raw[start + k]) != forbidden[j][k])
+								break;
+						}
+						if (k == len)
+							return false;
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	private static byte toUpper(byte b) {
+		if (b >= 'a' && b <= 'z')
+			return (byte) (b - ('a' - 'A'));
+		return b;
+	}
+
 }

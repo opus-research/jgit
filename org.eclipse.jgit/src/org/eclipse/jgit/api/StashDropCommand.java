@@ -69,6 +69,7 @@ import org.eclipse.jgit.util.FileUtils;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
+ * @since 2.0
  */
 public class StashDropCommand extends GitCommand<ObjectId> {
 
@@ -166,8 +167,9 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 	 * stash reference after the drop occurs
 	 *
 	 * @return commit id of stash reference or null if no more stashed changes
+	 * @throws GitAPIException
 	 */
-	public ObjectId call() throws GitAPIException, JGitInternalException {
+	public ObjectId call() throws GitAPIException {
 		checkCallable();
 
 		Ref stashRef = getRef();
