@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2012, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,41 +42,33 @@
  */
 package org.eclipse.jgit.lib;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+/**
+ * A convenient base class which provides empty method bodies for all
+ * ProgressMonitor methods.
+ * <p>
+ * Could be used in scenarios when only some of the progress notifications are
+ * important and others can be ignored.
+ */
+public abstract class EmptyProgressMonitor implements ProgressMonitor {
 
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.pgm.CLIGitCommand;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.junit.Before;
-
-public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
-	/** Test repository, initialized for this test case. */
-	protected FileRepository db;
-
-	/** Working directory of {@link #db}. */
-	protected File trash;
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		db = createWorkRepository();
-		trash = db.getWorkTree();
+	public void start(int totalTasks) {
+		// empty
 	}
 
-	protected String[] execute(String... cmds) throws Exception {
-		List<String> result = new ArrayList<String>(cmds.length);
-		for (String cmd : cmds)
-			result.addAll(CLIGitCommand.execute(cmd, db));
-		return result.toArray(new String[0]);
+	public void beginTask(String title, int totalWork) {
+		// empty
 	}
 
-	protected File writeTrashFile(final String name, final String data)
-			throws IOException {
-		return JGitTestUtil.writeTrashFile(db, name, data);
+	public void update(int completed) {
+		// empty
 	}
+
+	public void endTask() {
+		// empty
+	}
+
+	public boolean isCancelled() {
+		return false;
+	}
+
 }
