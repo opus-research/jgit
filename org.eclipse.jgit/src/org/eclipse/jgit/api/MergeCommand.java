@@ -163,7 +163,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			RevCommit newHeadCommit) throws IOException, CheckoutConflictException {
 		GitIndex index = repo.getIndex();
 
-		File workDir = repo.getWorkTree();
+		File workDir = repo.getWorkDir();
 		if (workDir != null) {
 			WorkDirCheckout workDirCheckout = new WorkDirCheckout(repo,
 					workDir, headCommit.asCommit(revWalk).getTree(), index,
