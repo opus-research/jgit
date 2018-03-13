@@ -13,25 +13,16 @@ java_library(
   visibility = ['PUBLIC'],
 )
 
-genrule(
-  name = 'services__jar',
-  cmd = 'zip -qr $OUT .',
-  srcs = glob(['META-INF/services/*']),
-  out = 'services.jar',
-)
-
 prebuilt_jar(
   name = 'services',
   binary_jar = ':services__jar',
 )
 
-java_binary(
-  name = 'jgit_jar',
-  main_class = 'org.eclipse.jgit.pgm.Main',
-  deps = [
-    ':pgm',
-    '//lib:slf4j-simple',
-  ],
+genrule(
+  name = 'services__jar',
+  cmd = 'cd $SRCDIR ; zip -qr $OUT .',
+  srcs = glob(['META-INF/services/*']),
+  out = 'services.jar',
 )
 
 genrule(
@@ -41,4 +32,13 @@ genrule(
   srcs = ['jgit.sh'],
   out = 'jgit',
   visibility = ['PUBLIC'],
+)
+
+java_binary(
+  name = 'jgit_jar',
+  main_class = 'org.eclipse.jgit.pgm.Main',
+  deps = [
+    ':pgm',
+    '//lib:slf4j-simple',
+  ],
 )
