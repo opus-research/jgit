@@ -47,7 +47,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -237,9 +236,8 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 	 * <li>Checkout branch '1'
 	 * </ol>
 	 * <p>
-	 * The checkout should fail like in native git because the checkout wants to
-	 * delete folder a and under these path we have unsaved content in the
-	 * workingtree
+	 * The working tree should contain 'a' with FileMode.REGULAR_FILE after the
+	 * checkout.
 	 *
 	 * @throws Exception
 	 */
@@ -268,15 +266,11 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 					db.getFS());
 			assertEquals(FileMode.REGULAR_FILE, entry.getMode());
 
-			try {
-				git.checkout().setName(branch_1.getName()).call();
-				fail("Don't get the expected conflict");
-			} catch (CheckoutConflictException e) {
-				assertEquals("[a]", e.getConflictingPaths().toString());
-				entry = new FileTreeIterator.FileEntry(
-						new File(db.getWorkTree(), "a"), db.getFS());
-				assertEquals(FileMode.REGULAR_FILE, entry.getMode());
-			}
+			git.checkout().setName(branch_1.getName()).call();
+
+			entry = new FileTreeIterator.FileEntry(new File(db.getWorkTree(), "a"),
+					db.getFS());
+			assertEquals(FileMode.REGULAR_FILE, entry.getMode());
 		}
 	}
 
