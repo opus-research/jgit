@@ -412,7 +412,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) {
+	private InputStream filterClean(InputStream in) throws IOException {
 		return new EolCanonicalizingInputStream(in, true);
 	}
 
@@ -711,7 +711,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isUpdateNeeded())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
+		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
 			return MetadataDiff.DIFFER_BY_METADATA;
 
 		// Determine difference in mode-bits of file and index-entry. In the

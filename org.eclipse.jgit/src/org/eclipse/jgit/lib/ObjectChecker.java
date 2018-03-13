@@ -127,8 +127,7 @@ public class ObjectChecker {
 			break;
 		default:
 			throw new CorruptObjectException(MessageFormat.format(
-					JGitText.get().corruptObjectInvalidType2,
-					Integer.valueOf(objType)));
+					JGitText.get().corruptObjectInvalidType2, objType));
 		}
 	}
 
