@@ -127,9 +127,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 					ObjectReader reader = repo.newObjectReader();
 					try {
 						p.reset(reader, head);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
 					} finally {
 						reader.release();
 					}
