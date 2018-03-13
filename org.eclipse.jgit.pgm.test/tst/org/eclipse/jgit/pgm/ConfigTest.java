@@ -73,7 +73,8 @@ public class ConfigTest extends CLIRepositoryTestCase {
 				.equals("Mac OS X");
 
 		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<String>();
+		List<String> expect = new ArrayList<>();
+		expect.add("gc.autoDetach=false");
 		expect.add("core.filemode=" + !isWindows);
 		expect.add("core.logallrefupdates=true");
 		if (isMac)
