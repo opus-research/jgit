@@ -43,14 +43,14 @@
 
 package org.eclipse.jgit.internal.storage.reftable;
 
-import static org.eclipse.jgit.lib.RefDatabase.MAX_SYMBOLIC_REF_DEPTH;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.SymbolicRef;
 
 /** Abstract table of references. */
 public abstract class Reftable implements AutoCloseable {
@@ -62,16 +62,14 @@ public abstract class Reftable implements AutoCloseable {
 	public static Reftable from(Collection<Ref> refs) {
 		try {
 			ReftableConfig cfg = new ReftableConfig();
-			cfg.setRefBlockSize(refs.size() < 10000 ? (4 << 10) : (64 << 10));
 			cfg.setIndexObjects(false);
-
-			MemoryReftable buf = new MemoryReftable(cfg.getRefBlockSize());
+			ByteArrayOutputStream buf = new ByteArrayOutputStream();
 			new ReftableWriter()
 				.setConfig(cfg)
-				.begin(buf.getOutput())
+				.begin(buf)
 				.sortAndWriteRefs(refs)
 				.finish();
-			return new ReftableReader(buf.getBlockSource());
+			return new ReftableReader(BlockSource.from(buf.toByteArray()));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -214,42 +212,6 @@ public abstract class Reftable implements AutoCloseable {
 		try (RefCursor rc = byObjectId(id)) {
 			return rc.next();
 		}
-	}
-
-	/**
-	 * Resolve a symbolic reference to populate its value.
-	 *
-	 * @param symref
-	 *            reference to resolve.
-	 * @return resolved {@code symref}, or {@code null}.
-	 * @throws IOException
-	 *             references cannot be read.
-	 */
-	@Nullable
-	public Ref resolve(Ref symref) throws IOException {
-		return resolve(symref, 0);
-	}
-
-	private Ref resolve(Ref ref, int depth) throws IOException {
-		if (!ref.isSymbolic()) {
-			return ref;
-		}
-
-		Ref dst = ref.getTarget();
-		if (MAX_SYMBOLIC_REF_DEPTH <= depth) {
-			return null; // claim it doesn't exist
-		}
-
-		dst = exactRef(dst.getName());
-		if (dst == null) {
-			return ref;
-		}
-
-		dst = resolve(dst, depth + 1);
-		if (dst == null) {
-			return null; // claim it doesn't exist
-		}
-		return new SymbolicRef(ref.getName(), dst);
 	}
 
 	@Override

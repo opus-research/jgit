@@ -123,18 +123,6 @@ public class ReftableTest {
 		}
 	}
 
-	@SuppressWarnings("boxing")
-	@Test
-	public void largeVirtualTableFromRefs() throws IOException {
-		List<Ref> refs = new ArrayList<>();
-		for (int i = 1; i <= 5670; i++) {
-			refs.add(ref(String.format("refs/heads/%04d", i), i));
-		}
-		Reftable t = Reftable.from(refs);
-		assertScan(refs, t);
-		assertSeek(refs, t);
-	}
-
 	@Test
 	public void estimateCurrentBytes() throws IOException {
 		Ref exp = ref(MASTER, 1);
@@ -277,38 +265,6 @@ public class ReftableTest {
 			assertNull(act.getObjectId());
 			assertFalse(rc.next());
 		}
-	}
-
-	@Test
-	public void resolveSymbolicRef() throws IOException {
-		Reftable t = read(write(
-				sym(HEAD, "refs/heads/tmp"),
-				sym("refs/heads/tmp", MASTER),
-				ref(MASTER, 1)));
-
-		Ref head = t.exactRef(HEAD);
-		assertNull(head.getObjectId());
-		assertEquals("refs/heads/tmp", head.getTarget().getName());
-
-		head = t.resolve(head);
-		assertNotNull(head);
-		assertEquals(id(1), head.getObjectId());
-	}
-
-	@Test
-	public void failChainOfSymbolicRef() throws IOException {
-		Reftable t = read(write(
-				sym(HEAD, "refs/heads/1"),
-				sym("refs/heads/1", "refs/heads/2"),
-				sym("refs/heads/2", "refs/heads/3"),
-				sym("refs/heads/3", "refs/heads/4"),
-				sym("refs/heads/4", "refs/heads/5"),
-				sym("refs/heads/5", MASTER),
-				ref(MASTER, 1)));
-
-		Ref head = t.exactRef(HEAD);
-		assertNull(head.getObjectId());
-		assertNull(t.resolve(head));
 	}
 
 	@Test
