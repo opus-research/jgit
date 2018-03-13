@@ -192,7 +192,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	private TreeFilter treeFilter;
 
-	private boolean retainBody;
+	private boolean retainBody = true;
 
 	private boolean rewriteParents = true;
 
@@ -233,7 +233,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		sorting = EnumSet.of(RevSort.NONE);
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
-		retainBody = true;
 		this.closeReader = closeReader;
 	}
 
