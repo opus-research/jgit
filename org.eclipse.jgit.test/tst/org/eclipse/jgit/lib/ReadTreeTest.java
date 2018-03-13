@@ -66,7 +66,6 @@ import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public abstract class ReadTreeTest extends RepositoryTestCase {
@@ -583,7 +582,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		return map;
 	}
 
-	@Ignore
+	@Test
 	public void testUntrackedConflicts() throws IOException {
 		setupCase(null, mk("foo"), null);
 		writeTrashFile("foo", "foo");
