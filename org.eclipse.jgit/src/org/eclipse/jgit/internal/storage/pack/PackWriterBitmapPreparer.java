@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
@@ -155,11 +154,6 @@ class PackWriterBitmapPreparer {
 		 * majority of calculations performed.
 		 */
 		pm.beginTask(JGitText.get().selectingCommits, ProgressMonitor.UNKNOWN);
-
-		// Build bitmaps for all of the branch tips and set up reuse of bitmaps
-		// from the previous pack. setupTipCommitBitmaps() also marks the
-		// commits corresponding to reused bitmaps as "uninteresting" in the
-		// RevWalk so that only new commits will be discovered.
 		RevWalk rw = new RevWalk(reader);
 		rw.setRetainBody(false);
 		CommitSelectionHelper selectionHelper = setupTipCommitBitmaps(rw,
@@ -261,15 +255,12 @@ class PackWriterBitmapPreparer {
 				nextFlg = nextIn == distantCommitSpan
 						? PackBitmapIndex.FLAG_REUSE : 0;
 
-				// Perform a revwalk to get the set of all reachable commits
-				// from the current commit, excluding reused commits.
-				// PackWriterBitmapWalker.newRevFilter() adds all of those
-				// reachable commits to fullBitmap, which for
-				// efficiency has writeBitmaps as a backing index (via
-				// commitBitmapIndex--it's overly subtle).
 				BitmapBuilder fullBitmap = commitBitmapIndex.newBitmapBuilder();
-				rw.resetRetain(RevFlag.UNINTERESTING);
+				rw.reset();
 				rw.markStart(c);
+				for (AnyObjectId objectId : selectionHelper.reusedCommits) {
+					rw.markUninteresting(rw.parseCommit(objectId));
+				}
 				rw.setRevFilter(
 						PackWriterBitmapWalker.newRevFilter(null, fullBitmap));
 
@@ -297,9 +288,6 @@ class PackWriterBitmapPreparer {
 				}
 				longestAncestorChain.add(new BitmapCommit(
 						c, !longestAncestorChain.isEmpty(), flags));
-
-				// Adding the newly seen commits to writeBitmaps makes the
-				// next revwalk to fill in currentCommiBitmap more efficient.
 				writeBitmaps.addBitmap(c, fullBitmap, 0);
 			}
 
