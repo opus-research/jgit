@@ -28,8 +28,8 @@ and read the `$GIT_DIR/refs` directory.
 
 - Near constant time lookup for any single reference, even when the
   repository is cold and not in process or kernel cache.
-- Near constant time verification a SHA-1 is referred to by at least
-  one reference (for allow-tip-sha1-in-want).
+- Near constant time verification if a SHA-1 is referred to by at
+  least one reference (for allow-tip-sha1-in-want).
 - Efficient lookup of an entire namespace, such as `refs/tags/`.
 - Support atomic push with `O(size_of_update)` operations.
 - Combine reflog storage with ref storage for small transactions.
@@ -206,7 +206,7 @@ relative to the start of the block and refer to the first byte of any
 the `restart_offset` list must be sorted, ascending.  Readers can
 start linear scans from any of these records.
 
-A variable number of `ref_record` fill the remainder of the block,
+A variable number of `ref_record` fill the middle of the block,
 describing reference names and values.  The format is described below.
 
 As the first ref block shares the first file block with the file
@@ -241,8 +241,8 @@ Recovering a reference name from any `ref_record` is a simple concat:
 
     this_name = prior_name[0..prefix_length] + suffix
 
-The `suffix_length` value provides the number of bytes to copy from
-`suffix` to complete the reference name.
+The `suffix_length` value provides the number of bytes available in
+`suffix` to copy from `suffix` to complete the reference name.
 
 The `value` follows.  Its format is determined by `value_type`, one of
 the following:
@@ -255,7 +255,7 @@ the following:
 Symbolic references use `0x3` with a `text` string starting with `"ref: "`,
 followed by the complete name of the reference target.  No
 compression is applied to the target name.  Other types of contents
-that are also reference like, such as `FETCH_HEAD` and `MERGE_HEAD`,
+that are also reference-like, such as `FETCH_HEAD` and `MERGE_HEAD`,
 may also be stored using type `0x3`.
 
 Types `0x4..0x7` are reserved for future use.
@@ -269,18 +269,21 @@ containing block, and searching within that block.
 
 The index may be organized into a multi-level index, where the 1st
 level index block points to additional ref index blocks (2nd level),
-which may in turn point to either index blocks (3rd level) or ref
-blocks (leaf level).  Disk reads required to access a ref go up with
-higher index levels.  To acheive constant O(1) disk seeks for lookups
-the index must be a single level, which is permitted to exceed the
-file's configured `block_size`.
+which may in turn point to either additional index blocks (e.g. 3rd
+level) or ref blocks (leaf level).  Disk reads required to access a
+ref go up with higher index levels.  Multi-level indexes may be
+required to ensure no single index block exceeds the file format's max
+block size of `16777215` bytes (15.99 MiB).  To acheive constant O(1)
+disk seeks for lookups the index must be a single level, which is
+permitted to exceed the file's configured `block_size`, but not the
+format's max block size of 15.99 MiB.
 
 If present, the ref index block(s) appears after the last ref block.
 The prior ref block should be padded to ensure the ref index starts on
 a block alignment.
 
 If there are at least 4 ref blocks, a ref index block should be
-written to improve lookup times.  Cold reads using the index requires
+written to improve lookup times.  Cold reads using the index require
 2 disk reads (read index, read block), and binary searching < 4 blocks
 also requires <= 2 reads.  Omitting the index block from smaller files
 saves space.
@@ -312,8 +315,8 @@ within the file's `block_size`, but increasing the number of blocks
 that need to be accessed.
 
 When object blocks are present the ref index block is padded with
-`padding` to maintain alignment for the next block. No padding is
-necessary if log blocks or the file trailer follows the ref index.
+`padding` NULs to maintain alignment for the next block.  No padding
+is necessary if log blocks or the file trailer follows the ref index.
 
 #### index record
 
@@ -399,7 +402,7 @@ blocks.  For 1-7 blocks the block count is stored in `cnt_3`.  When
 `cnt_3 = 0` the actual block count follows in a varint, `cnt_large`.
 
 The use of `cnt_3` bets most objects are pointed to by only a single
-reference, some may be pointed to be a couple of references, and very
+reference, some may be pointed to by a couple of references, and very
 few (if any) are pointed to by more than 7 references.
 
 A special case exists when `cnt_3 = 0` and `cnt_large = 0`: there
@@ -428,7 +431,7 @@ at `block_id * block_size` position in the file, starting from the first
 `ref_record`, testing each reference's SHA-1s (for `value_type = 0x1`
 or `0x2`) for full equality.  Faster searching by SHA-1 within a
 single ref block is not supported by the reftable format.  Smaller
-block sizes reduces the number of candidates this step must consider.
+block sizes reduce the number of candidates this step must consider.
 
 ### Obj index
 
@@ -569,7 +572,7 @@ For `log_type = 0x1`, the `log_data` section follows
 was at the time of the update.  For example `GMT-0800` is encoded in
 reftable as `sint16(-480)` and `GMT+0230` is `sint16(150)`.
 
-The committer email does not contain `<` or `>`, its the value
+The committer email does not contain `<` or `>`, it's the value
 normally found between the `<>` in a git commit object header.
 
 The `message_length` may be 0, in which case there was no message
@@ -747,7 +750,7 @@ block sizes (64 KiB) and less frequent restart points (every 64) yield
 better compression due to more references within the block compressing
 against the prior reference.
 
-Larger block sizes reduces the index size, as the reftable will
+Larger block sizes reduce the index size, as the reftable will
 require fewer blocks to store the same number of references.
 
 ### Minimal disk seeks
