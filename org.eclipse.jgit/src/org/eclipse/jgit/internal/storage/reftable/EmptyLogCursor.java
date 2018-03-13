@@ -41,57 +41,35 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.debug;
+package org.eclipse.jgit.internal.storage.reftable;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 
-import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
-import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.kohsuke.args4j.Argument;
+import org.eclipse.jgit.lib.ReflogEntry;
 
-@Command
-class ReadReftable extends TextBuiltin {
-	@Argument(index = 0)
-	private String input;
-
-	@Argument(index = 1, required = false)
-	private String ref;
-
+class EmptyLogCursor extends LogCursor {
 	@Override
-	protected void run() throws Exception {
-		try (FileInputStream in = new FileInputStream(input);
-				BlockSource src = BlockSource.from(in);
-				ReftableReader reader = new ReftableReader(src)) {
-			try (RefCursor rc = ref != null
-					? reader.seek(ref)
-					: reader.allRefs()) {
-				while (rc.next()) {
-					write(rc.getRef());
-				}
-			}
-		}
+	public boolean next() throws IOException {
+		return false;
 	}
 
-	private void write(Ref r) throws IOException {
-		if (r.isSymbolic()) {
-			outw.println(r.getTarget().getName() + '\t' + r.getName());
-			return;
-		}
+	@Override
+	public String getRefName() {
+		return null;
+	}
 
-		ObjectId id1 = r.getObjectId();
-		if (id1 != null) {
-			outw.println(id1.name() + '\t' + r.getName());
-		}
+	@Override
+	public long getReflogTimeUsec() {
+		return 0;
+	}
 
-		ObjectId id2 = r.getPeeledObjectId();
-		if (id2 != null) {
-			outw.println('^' + id2.name());
-		}
+	@Override
+	public ReflogEntry getReflogEntry() {
+		return null;
+	}
+
+	@Override
+	public void close() {
+		// Do nothing.
 	}
 }
