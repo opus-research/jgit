@@ -49,21 +49,17 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_CHAINED;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_DATA;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_IDENT;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_MESSAGE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseUpdateIndex;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
-import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
@@ -84,7 +80,7 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.util.IntList;
+import org.eclipse.jgit.util.LongList;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -107,10 +103,6 @@ class BlockReader {
 	private byte[] nameBuf = new byte[256];
 	private int nameLen;
 	private int valueType;
-
-	private int logNewIdPtr;
-	private int logCommitterPtr;
-	private int logMessagePtr;
 
 	byte type() {
 		return blockType;
@@ -189,18 +181,9 @@ class BlockReader {
 			return new ObjectIdRef.PeeledTag(PACKED, name, id1, id2);
 		}
 
-		case VALUE_TEXT: {
+		case VALUE_SYMREF: {
 			String val = readValueString();
-			if (val.startsWith("ref: ")) { //$NON-NLS-1$
-				return new SymbolicRef(name, newRef(val.substring(5)));
-			} else if (val.length() >= OBJECT_ID_STRING_LENGTH) {
-				String idStr = val.substring(0, OBJECT_ID_STRING_LENGTH);
-				if (ObjectId.isId(idStr)) {
-					ObjectId id = ObjectId.fromString(idStr);
-					return new ObjectIdRef.Unpeeled(PACKED, name, id);
-				}
-			}
-			return newRef(name);
+			return new SymbolicRef(name, newRef(val));
 		}
 
 		default:
@@ -209,7 +192,7 @@ class BlockReader {
 	}
 
 	@Nullable
-	IntList readBlockIdList() {
+	LongList readBlockPositionList() {
 		int n = valueType & VALUE_TYPE_MASK;
 		if (n == 0) {
 			n = readVarint32();
@@ -218,11 +201,11 @@ class BlockReader {
 			}
 		}
 
-		IntList b = new IntList(n);
-		b.add(readVarint32());
+		LongList b = new LongList(n);
+		b.add(readVarint64());
 		for (int j = 1; j < n; j++) {
-			int prior = b.get(j - 1);
-			b.add(prior + readVarint32());
+			long prior = b.get(j - 1);
+			b.add(prior + readVarint64());
 		}
 		return b;
 	}
@@ -237,44 +220,10 @@ class BlockReader {
 			return null;
 		}
 
-		ObjectId oldId;
-		ObjectId newId;
-		PersonIdent who;
-		String msg;
-
-		if ((valueType & VALUE_TYPE_MASK) == LOG_DATA) {
-			logNewIdPtr = ptr;
-			oldId = readValueId();
-			newId = readValueId();
-			long timeSecs = readVarint64();
-			logCommitterPtr = ptr;
-			who = readPersonIdent(timeSecs);
-			logMessagePtr = ptr;
-			msg = readValueString();
-		} else if ((valueType & LOG_CHAINED) == LOG_CHAINED) {
-			newId = ObjectId.fromRaw(buf, logNewIdPtr);
-			logNewIdPtr = ptr;
-			oldId = readValueId();
-			long timeSecs = readVarint64();
-			if ((valueType & LOG_SAME_IDENT) == LOG_SAME_IDENT) {
-				int savePtr = ptr;
-				ptr = logCommitterPtr;
-				who = readPersonIdent(timeSecs);
-				ptr = savePtr;
-			} else {
-				who = readPersonIdent(timeSecs);
-			}
-			if ((valueType & LOG_SAME_MESSAGE) == LOG_SAME_MESSAGE) {
-				int savePtr = ptr;
-				ptr = logMessagePtr;
-				msg = readValueString();
-				ptr = savePtr;
-			} else {
-				msg = readValueString();
-			}
-		} else {
-			throw new IllegalStateException();
-		}
+		ObjectId oldId = readValueId();
+		ObjectId newId = readValueId();
+		PersonIdent who = readPersonIdent();
+		String msg = readValueString();
 
 		return new ReflogEntry() {
 			@Override
@@ -318,11 +267,11 @@ class BlockReader {
 		return s;
 	}
 
-	private PersonIdent readPersonIdent(long timeSecs) {
-		long ms = timeSecs * 1000;
-		int tz = readInt16();
+	private PersonIdent readPersonIdent() {
 		String name = readValueString();
 		String email = readValueString();
+		long ms = readVarint64() * 1000;
+		int tz = readInt16();
 		return new PersonIdent(name, email, ms, tz);
 	}
 
@@ -364,7 +313,7 @@ class BlockReader {
 		ptr += 4;
 
 		blockType = (byte) (typeAndSize >>> 24);
-		int blockLen = decodeBlockSize(typeAndSize);
+		int blockLen = decodeBlockLen(typeAndSize);
 		if (blockType == LOG_BLOCK_TYPE) {
 			// Log blocks must be inflated after the header.
 			long deflatedSize = inflateBuf(src, pos, blockLen, fileBlockSize);
@@ -374,6 +323,10 @@ class BlockReader {
 			if (blockType != INDEX_BLOCK_TYPE) {
 				throw invalidBlock();
 			}
+			// Its OK during sequential scan for an index block to have been
+			// partially read and be truncated in-memory. This happens when
+			// the index block is larger than the file's blockSize. Caller
+			// will break out of its scan loop once it sees the blockType.
 			truncated = true;
 		} else if (bufLen > blockLen) {
 			bufLen = blockLen;
@@ -390,7 +343,7 @@ class BlockReader {
 		}
 	}
 
-	static int decodeBlockSize(int typeAndSize) {
+	static int decodeBlockLen(int typeAndSize) {
 		return typeAndSize & 0xffffff;
 	}
 
@@ -444,6 +397,27 @@ class BlockReader {
 		}
 	}
 
+	/**
+	 * Find a key in the block and positions the current pointer on its record.
+	 * <p>
+	 * As a side-effect this method arranges for the current pointer to be near
+	 * or exactly on {@code key}, allowing other methods to access data from
+	 * that current record:
+	 * <ul>
+	 * <li>{@link #name()}
+	 * <li>{@link #match(byte[], boolean)}
+	 * <li>{@link #readRef()}
+	 * <li>{@link #readLogUpdateIndex()}
+	 * <li>{@link #readLogEntry()}
+	 * <li>{@link #readBlockPositionList()}
+	 * </ul>
+	 *
+	 * @param key
+	 *            key to find.
+	 * @return {@code <0} if the key occurs before the start of this block;
+	 *         {@code 0} if the block is positioned on the key; {@code >0} if
+	 *         the key occurs after the last key of this block.
+	 */
 	int seekKey(byte[] key) {
 		int low = 0;
 		int end = restartCnt;
@@ -467,6 +441,25 @@ class BlockReader {
 		}
 	}
 
+	/**
+	 * Performs the linear search step within a restart interval.
+	 * <p>
+	 * Starts at a restart position whose key sorts before (or equal to)
+	 * {@code key} and walks sequentially through the following prefix
+	 * compressed records to find {@code key}.
+	 *
+	 * @param key
+	 *            key the caller wants to find.
+	 * @param rPtr
+	 *            current record pointer from restart table binary search.
+	 * @param rIdx
+	 *            current restart table index.
+	 * @param rCmp
+	 *            result of compare from restart table binary search.
+	 * @return {@code <0} if the key occurs before the start of this block;
+	 *         {@code 0} if the block is positioned on the key; {@code >0} if
+	 *         the key occurs after the last key of this block.
+	 */
 	private int scanToKey(byte[] key, int rPtr, int rIdx, int rCmp) {
 		if (rCmp < 0) {
 			if (rIdx == 0) {
@@ -506,7 +499,7 @@ class BlockReader {
 			case VALUE_2ID:
 				ptr += 2 * OBJECT_ID_LENGTH;
 				return;
-			case VALUE_TEXT:
+			case VALUE_SYMREF:
 				skipString();
 				return;
 			}
@@ -531,29 +524,12 @@ class BlockReader {
 			if ((valueType & VALUE_TYPE_MASK) == LOG_NONE) {
 				return;
 			} else if ((valueType & VALUE_TYPE_MASK) == LOG_DATA) {
-				logNewIdPtr = ptr;
 				ptr += 2 * OBJECT_ID_LENGTH; // oldId, newId
-				readVarint64(); // time
-				logCommitterPtr = ptr;
-				ptr += 2; // tz
 				skipString(); // name
 				skipString(); // email
-				logMessagePtr = ptr;
+				readVarint64(); // time
+				ptr += 2; // tz
 				skipString(); // msg
-				return;
-			} else if ((valueType & LOG_CHAINED) == LOG_CHAINED) {
-				logNewIdPtr = ptr;
-				ptr += OBJECT_ID_LENGTH;
-				if ((valueType & LOG_SAME_IDENT) == 0) {
-					logCommitterPtr = ptr;
-					ptr += 2; // tz
-					skipString(); // name
-					skipString(); // email
-				}
-				if ((valueType & LOG_SAME_MESSAGE) == 0) {
-					logMessagePtr = ptr;
-					skipString();
-				}
 				return;
 			}
 		}

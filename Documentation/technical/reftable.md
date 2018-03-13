@@ -41,9 +41,9 @@ A reftable file is a portable binary file format customized for
 reference storage. References are sorted, enabling linear scans,
 binary search lookup, and range scans.
 
-Storage in the file is organized into blocks.  Prefix compression
-is used within a single block to reduce disk space.  Block size is
-tunable by the writer.
+Storage in the file is organized into variable sized blocks.  Prefix
+compression is used within a single block to reduce disk space.  Block
+size and alignment is tunable by the writer.
 
 ### Performance
 
@@ -51,10 +51,10 @@ Space used, packed-refs vs. reftable:
 
 repository | packed-refs | reftable | % original | avg ref  | avg obj
 -----------|------------:|---------:|-----------:|---------:|--------:
-android    |      62.2 M |   34.4 M |     55.2%  | 33 bytes | 8 bytes
-rails      |       1.8 M |    1.1 M |     57.7%  | 29 bytes | 6 bytes
-git        |      78.7 K |   44.0 K |     60.0%  | 50 bytes | 6 bytes
-git (heads)|       332 b |    274 b |     83.1%  | 34 bytes | 0 bytes
+android    |      62.2 M |   36.1 M |     58.0%  | 33 bytes | 5 bytes
+rails      |       1.8 M |    1.1 M |     57.7%  | 29 bytes | 4 bytes
+git        |      78.7 K |   48.1 K |     61.0%  | 50 bytes | 4 bytes
+git (heads)|       332 b |    269 b |     81.0%  | 33 bytes | 0 bytes
 
 Scan (read 866k refs), by reference name lookup (single ref from 866k
 refs), and by SHA-1 lookup (refs with that SHA-1, from 866k refs):
@@ -118,21 +118,21 @@ A reftable file has the following high-level structure:
       header
       first_ref_block
     }
-    ref_blocks*
+    ref_block*
     ref_index*
-    obj_blocks*
+    obj_block*
     obj_index*
-    log_blocks*
+    log_block*
     log_index*
     footer
 
-A log-only file omits the `ref_blocks`, `ref_index`, `obj_blocks` and
-`obj_index` sections, containing only the file header and log blocks:
+A log-only file omits the `ref_block`, `ref_index`, `obj_block` and
+`obj_index` sections, containing only the file header and log block:
 
     first_block {
       header
     }
-    log_blocks*
+    log_block*
     log_index*
     footer
 
@@ -141,9 +141,9 @@ header, without padding to block alignment.
 
 ### Block size
 
-The `block_size` is arbitrarily determined by the writer, and does not
-have to be a power of 2.  The block size must be larger than the
-longest reference name or log entry used in the repository, as
+The file's block size is arbitrarily determined by the writer, and
+does not have to be a power of 2.  The block size must be larger than
+the longest reference name or log entry used in the repository, as
 references cannot span blocks.
 
 Powers of two that are friendly to the virtual memory system or
@@ -152,6 +152,22 @@ yield better compression, with a possible increased cost incurred by
 readers during access.
 
 The largest block size is `16777215` bytes (15.99 MiB).
+
+### Block alignment
+
+Writers may choose to align blocks at multiples of the block size by
+including `padding` filled with NUL bytes at the end of a block to
+round out to the chosen alignment.  When alignment is used, writers
+must specify the alignment with the file header's `block_size` field.
+
+Block alignment is not required by the file format.  Unaligned files
+must set `block_size = 0` in the file header, and omit `padding`.
+Unaligned files must include the [ref index](#Ref-index) to support
+fast lookup.  Readers must be able to read both aligned and
+non-aligned files.
+
+Very small files (e.g. 1 only ref block) may omit `padding` and the
+ref index to reduce total file size.
 
 ### Header
 
@@ -163,11 +179,14 @@ A 24-byte header appears at the beginning of the file:
     uint64( min_update_index )
     uint64( max_update_index )
 
+Aligned files must specify `block_size` to configure readers with the
+expected block alignment.  Unaligned files must set `block_size = 0`.
+
 The `min_update_index` and `max_update_index` describe bounds for the
 `update_index` field of all log records in this file.  When reftables
-are used in a stack for transactions (see below), these fields can
-order the files such that the prior file's `max_update_index + 1` is
-the next file's `min_update_index`.
+are used in a stack for [transactions](#Update-transactions), these
+fields can order the files such that the prior file's
+`max_update_index + 1` is the next file's `min_update_index`.
 
 ### First ref block
 
@@ -187,12 +206,13 @@ A ref block is written as:
     ref_record+
     uint24( restart_offset )+
     uint16( restart_count )
+
     padding?
 
 Blocks begin with `block_type = 'r'` and a 3-byte `block_len` which
 encodes the number of bytes in the block up to, but not including the
-optional `padding`.  This is almost always shorter than the file's
-`block_size`.  In the first ref block, `block_len` includes 24 bytes
+optional `padding`.  This is always less than or equal to the file's
+block size.  In the first ref block, `block_len` includes 24 bytes
 for the file header.
 
 The 2-byte `restart_count` stores the number of entries in the
@@ -200,26 +220,20 @@ The 2-byte `restart_count` stores the number of entries in the
 `restart_count` to binary search between restarts before starting a
 linear scan.
 
-A variable number of 3-byte `restart_offset` follows.  Offsets are
-relative to the start of the block and refer to the first byte of any
-`ref_record` whose name has not been prefix compressed.  Entries in
-the `restart_offset` list must be sorted, ascending.  Readers can
-start linear scans from any of these records.
+Exactly `restart_count` 3-byte `restart_offset` values precedes the
+`restart_count`.  Offsets are relative to the start of the block and
+refer to the first byte of any `ref_record` whose name has not been
+prefix compressed.  Entries in the `restart_offset` list must be
+sorted, ascending.  Readers can start linear scans from any of these
+records.
 
 A variable number of `ref_record` fill the middle of the block,
 describing reference names and values.  The format is described below.
 
 As the first ref block shares the first file block with the file
 header, all `restart_offset` in the first block are relative to the
-start of the file (position 0), and include the file header.
-
-The end of the block may be filled with `padding` NUL bytes to fill
-out the block to the common `block_size` as specified in the file
-header.  Padding may be necessary to ensure the following block starts
-at a block alignment, and does not spill into the tail of this block.
-Padding may be omitted if the block is the last block of the file, and
-there is no index block.  This allows reftable to efficiently scale
-down to a small number of refs.
+start of the file (position 0), and include the file header.  This
+forces the first `restart_offset` to be `28`.
 
 #### ref record
 
@@ -250,13 +264,10 @@ the following:
 - `0x0`: deletion; no value data (see transactions, below)
 - `0x1`: one 20-byte object id; value of the ref
 - `0x2`: two 20-byte object ids; value of the ref, peeled target
-- `0x3`: symref and text: `varint( text_len ) text`
+- `0x3`: symbolic reference: `varint( target_len ) target`
 
-Symbolic references use `0x3` with a `text` string starting with `"ref: "`,
-followed by the complete name of the reference target.  No
-compression is applied to the target name.  Other types of contents
-that are also reference-like, such as `FETCH_HEAD` and `MERGE_HEAD`,
-may also be stored using type `0x3`.
+Symbolic references use `0x3`, followed by the complete name of the
+reference target.  No compression is applied to the target name.
 
 Types `0x4..0x7` are reserved for future use.
 
@@ -275,18 +286,19 @@ ref go up with higher index levels.  Multi-level indexes may be
 required to ensure no single index block exceeds the file format's max
 block size of `16777215` bytes (15.99 MiB).  To acheive constant O(1)
 disk seeks for lookups the index must be a single level, which is
-permitted to exceed the file's configured `block_size`, but not the
+permitted to exceed the file's configured block size, but not the
 format's max block size of 15.99 MiB.
 
 If present, the ref index block(s) appears after the last ref block.
-The prior ref block should be padded to ensure the ref index starts on
-a block alignment.
 
 If there are at least 4 ref blocks, a ref index block should be
 written to improve lookup times.  Cold reads using the index require
 2 disk reads (read index, read block), and binary searching < 4 blocks
 also requires <= 2 reads.  Omitting the index block from smaller files
 saves space.
+
+If the file is unaligned and contains more than one ref block, the ref
+index must be written.
 
 Index block format:
 
@@ -295,6 +307,7 @@ Index block format:
     index_record+
     uint24( restart_offset )+
     uint16( restart_count )
+
     padding?
 
 The index blocks begin with `block_type = 'i'` and a 3-byte
@@ -305,18 +318,14 @@ The `restart_offset` and `restart_count` fields are identical in
 format, meaning and usage as in ref blocks.
 
 To reduce the number of reads required for random access in very large
-files the index block may be larger than the other blocks.  However,
+files the index block may be larger than other blocks.  However,
 readers must hold the entire index in memory to benefit from this, so
 it's a time-space tradeoff in both file size and reader memory.
 
-Increasing the file's `block_size` decreases the index size.
+Increasing the file's block size decreases the index size.
 Alternatively a multi-level index may be used, keeping index blocks
-within the file's `block_size`, but increasing the number of blocks
+within the file's block size, but increasing the number of blocks
 that need to be accessed.
-
-When object blocks are present the ref index block is padded with
-`padding` NULs to maintain alignment for the next block.  No padding
-is necessary if log blocks or the file trailer follows the ref index.
 
 #### index record
 
@@ -343,15 +352,17 @@ block.
 
 Readers loading the ref index must first read the footer (below) to
 obtain `ref_index_position`. If not present, the position will be 0.
-The `ref_index_position` address is for the 1st level root of the ref
-index.
+The `ref_index_position` is for the 1st level root of the ref index.
 
 ### Obj block format
+
+Object blocks are optional.  Writers may choose to omit object blocks,
+especially if readers will not use the SHA-1 to ref mapping.
 
 Object blocks use unique, abbreviated 2-20 byte SHA-1 keys, mapping
 to ref blocks containing references pointing to that object directly,
 or as the peeled value of an annotated tag.  Like ref blocks, object
-blocks use the file's standard `block_size`. The abbrevation length is
+blocks use the file's standard block size. The abbrevation length is
 available in the footer as `obj_id_len`.
 
 To save space in small files, object blocks may be omitted if the ref
@@ -366,6 +377,7 @@ An object block is written as:
     obj_record+
     uint24( restart_offset )+
     uint16( restart_count )
+
     padding?
 
 Fields are identical to ref block.  Binary search using the restart
@@ -376,10 +388,6 @@ unique abbreviation within the reftable, obj key lengths are variable
 between 2 and 20 bytes.  Readers must compare only for common prefix
 match within an obj block or obj index.
 
-Object blocks should be block aligned, according to `block_size` from
-the file header.  The `padding` field is filled with NULs to maintain
-alignment for the next block.
-
 #### obj record
 
 An `obj_record` describes a single object abbreviation, and the blocks
@@ -389,7 +397,7 @@ containing references using that unique abbreviation:
     varint( (suffix_length << 3) | cnt_3 )
     suffix
     varint( cnt_large )?
-    varint( block_delta )*
+    varint( position_delta )*
 
 Like in reference blocks, abbreviations are prefix compressed within
 an obj block.  On large reftables with many unique objects, higher
@@ -397,41 +405,39 @@ block sizes (64k), and higher restart interval (128), a
 `prefix_length` of 2 or 3 and `suffix_length` of 3 may be common in
 obj records (unique abbreviation of 5-6 raw bytes, 10-12 hex digits).
 
-Each record contains `block_count` number of block identifiers for ref
-blocks.  For 1-7 blocks the block count is stored in `cnt_3`.  When
-`cnt_3 = 0` the actual block count follows in a varint, `cnt_large`.
+Each record contains `position_count` number of positions for matching
+ref blocks.  For 1-7 positions the count is stored in `cnt_3`.  When
+`cnt_3 = 0` the actual count follows in a varint, `cnt_large`.
 
 The use of `cnt_3` bets most objects are pointed to by only a single
 reference, some may be pointed to by a couple of references, and very
 few (if any) are pointed to by more than 7 references.
 
 A special case exists when `cnt_3 = 0` and `cnt_large = 0`: there
-are no `block_delta`, but at least one reference starts with this
+are no `position_delta`, but at least one reference starts with this
 abbreviation.  A reader that needs exact reference names must scan all
 references to find which specific references have the desired object.
-Writers should use this format when the `block_delta` list would have
-overflowed the file's `block_size` due to a high number of references
+Writers should use this format when the `position_delta` list would have
+overflowed the file's block size due to a high number of references
 pointing to the same object.
 
-The first `block_delta` is the absolute block identifier counting from
-the start of the file.  The position of that block can be obtained by
-`block_delta[0] * block_size`.  Additional `block_delta` entries are
-sorted ascending and relative to the prior entry, e.g.  a reader would
-perform:
+The first `position_delta` is the position from the start of the file.
+Additional `position_delta` entries are sorted ascending and relative
+to the prior entry, e.g.  a reader would perform:
 
-    block_id = block_delta[0]
-    prior = block_id
-    for (j = 1; j < block_count; j++) {
-      block_id = prior + block_delta[j]
-      prior = block_id
+    pos = position_delta[0]
+    prior = pos
+    for (j = 1; j < position_count; j++) {
+      pos = prior + position_delta[j]
+      prior = pos
     }
 
-With a `block_id` in hand, a reader must linearly scan the ref block
-at `block_id * block_size` position in the file, starting from the first
-`ref_record`, testing each reference's SHA-1s (for `value_type = 0x1`
-or `0x2`) for full equality.  Faster searching by SHA-1 within a
-single ref block is not supported by the reftable format.  Smaller
-block sizes reduce the number of candidates this step must consider.
+With a position in hand, a reader must linearly scan the ref block,
+starting from the first `ref_record`, testing each reference's SHA-1s
+(for `value_type = 0x1` or `0x2`) for full equality.  Faster searching
+by SHA-1 within a single ref block is not supported by the reftable
+format.  Smaller block sizes reduce the number of candidates this step
+must consider.
 
 ### Obj index
 
@@ -443,19 +449,17 @@ blocks.
 The obj index should be present if obj blocks are present, as
 obj blocks should only be written in larger files.
 
-The obj index should be block aligned, according to `block_size` from
-the file header.  This requires padding the last obj block to maintain
-alignment.
-
 Readers loading the obj index must first read the footer (below) to
 obtain `obj_index_position`.  If not present, the position will be 0.
 
 ### Log block format
 
-Unlike ref and obj blocks, log block sizes are variable in size, and
-do not match the `block_size` specified in the file header or footer.
-Writers should choose an appropriate buffer size to prepare a log block
-for deflation, such as `2 * block_size`.
+Unlike ref and obj blocks, log blocks are always unaligned.
+
+Log blocks are variable in size, and do not match the `block_size`
+specified in the file header or footer.  Writers should choose an
+appropriate buffer size to prepare a log block for deflation, such as
+`2 * block_size`.
 
 A log block is written as:
 
@@ -473,7 +477,7 @@ The 4-byte block header is followed by the deflated block contents
 using zlib deflate.  The `block_len` in the header is the inflated
 size (including 4-byte block header), and should be used by readers to
 preallocate the inflation output buffer.  A log block's `block_len`
-may exceed the file's `block_size`.
+may exceed the file's block size.
 
 Offsets within the log block (e.g.  `restart_offset`) still include
 the 4-byte header.  Readers may prefer prefixing the inflation output
@@ -483,11 +487,6 @@ Within the deflate container, a variable number of `log_record`
 describe reference changes.  The log record format is described
 below.  See ref block format (above) for a description of
 `restart_offset` and `restart_count`.
-
-Unlike ref blocks, log blocks are written at any alignment, without
-padding.  The first log block immediately follows the end of the prior
-block, which omits its trailing padding.  In very small files the log
-block may appear in the first block.
 
 Because log blocks have no alignment or padding between blocks,
 readers must keep track of the bytes consumed by the inflater to
@@ -501,7 +500,7 @@ Log record keys are structured as:
 
 where `update_index` is the unique transaction identifier.  The
 `update_index` field must be unique within the scope of a `ref_name`.
-See the update index section below for further details.
+See the update transactions section below for further details.
 
 The `reverse_int64` function inverses the value so lexographical
 ordering the network byte order encoding sorts the more recent records
@@ -519,39 +518,21 @@ log record key described above.
     varint( prefix_length )
     varint( (suffix_length << 3) | log_type )
     suffix
-    ( log_data | log_chained )?
-
-
     log_data {
       old_id
       new_id
-      varint( time_seconds )
-      sint16( tz_offset )
       varint( name_length    )  name
       varint( email_length   )  email
-      varint( message_length )  message
-    }
-
-    log_chained {
-      old_id
       varint( time_seconds )
-      not_same_ident {
-        sint16( tz_offset )
-        varint( name_length    )  name
-        varint( email_length   )  email
-      }?
-      not_same_message {
-        varint( message_length )  message
-      }?
-    }
+      sint16( tz_offset )
+      varint( message_length )  message
+    }?
 ```
 
 Log record entries use `log_type` to indicate what follows:
 
 - `0x0`: deletion; no log data.
 - `0x1`: standard git reflog data using `log_data` above.
-- `0x2..0x3`: reserved for future use.
-- `0x4..0x7`: `log_chained`, with conditional members.
 
 The `log_type = 0x0` is mostly useful for `git stash drop`, removing
 an entry from the reflog of `refs/stash` in a transaction file
@@ -562,10 +543,10 @@ For `log_type = 0x1`, the `log_data` section follows
 [git update-ref][update-ref] logging, and includes:
 
 - two 20-byte SHA-1s (old id, new id)
-- varint time in seconds since epoch (Jan 1, 1970)
-- 2-byte timezone offset in minutes (signed)
 - varint string of committer's name
 - varint string of committer's email
+- varint time in seconds since epoch (Jan 1, 1970)
+- 2-byte timezone offset in minutes (signed)
 - varint string of message
 
 `tz_offset` is the absolute number of minutes from GMT the committer
@@ -577,20 +558,6 @@ normally found between the `<>` in a git commit object header.
 
 The `message_length` may be 0, in which case there was no message
 supplied for the update.
-
-For `log_type = 0x4..0x7` the `log_chained` section is used instead to
-compress information that already appeared in a prior log record, up
-to and including the prior restart, but not records before that
-restart.  This allows readers to only handle chained records within
-the span of a single restart's linear search.
-
-The `log_chained` always includes `old_id` for this record, as `new_id` is
-implied by the prior (by file order, more recent) record's `old_id`.
-
-The `not_same_ident` block appears if `log_type & 0x1` is true,
-`not_same_message` block appears if `log_type & 0x2` is true.  When
-one of these blocks is missing, its values are implied by the prior
-(more recent) log record.
 
 [update-ref]: https://git-scm.com/docs/git-update-ref#_logging_updates
 
@@ -734,13 +701,13 @@ SHA-1 valued with common prefixes, such as Gerrit Code Review's
 `refs/changes/` namespace, GitHub's `refs/pulls/` namespace, or many
 lightweight tags in the `refs/tags/` namespace.
 
-Annotated tags storing the peeled object cost only an additional 20
-bytes per reference.
+Annotated tags storing the peeled object cost an additional 20 bytes
+per reference.
 
 ### Low overhead
 
 A reftable with very few references (e.g. git.git with 5 heads)
-is 274 bytes for reftable, vs. 332 bytes for packed-refs.  This
+is 269 bytes for reftable, vs. 332 bytes for packed-refs.  This
 supports reftable scaling down for transaction logs (below).
 
 ### Block size
@@ -762,9 +729,8 @@ containing block.
 ### Scans and lookups dominate
 
 Scanning all references and lookup by name (or namespace such as
-`refs/heads/`) are the most common activities performed by repositories.
-SHA-1s are stored twice when obj blocks are present, avoiding disk
-seeks for the common cases of scan and lookup by name.
+`refs/heads/`) are the most common activities performed on repositories.
+SHA-1s are stored directly with references to optimize this use case.
 
 ### Logs are infrequently read
 
@@ -800,21 +766,21 @@ directory.  This prevents loose references from being stored.
 A collection of reftable files are stored in the `$GIT_DIR/reftable/`
 directory:
 
-    00000001_UF4paF
-    00000002_bUVgy4
+    00000001.log
+    00000001.ref
+    00000002.ref
 
 where reftable files are named by a unique name such as produced by
-the function:
-
-    mktemp "${update_index}_XXXXXX"
+the function `${update_index}.ref`.
 
 The stack ordering file is `$GIT_DIR/refs` and lists the current
 files, one per line, in order, from oldest (base) to newest (most
 recent):
 
     $ cat .git/refs
-    00000001_UF4paF
-    00000002_bUVgy4
+    00000001.log
+    00000001.ref
+    00000002.ref
 
 Readers must read `$GIT_DIR/refs` to determine which files are
 relevant right now, and search through the stack in reverse order
@@ -822,6 +788,16 @@ relevant right now, and search through the stack in reverse order
 
 Reftable files not listed in `refs` may be new (and about to be added
 to the stack by the active writer), or ancient and ready to be pruned.
+
+### Readers
+
+Readers can obtain a consistent snapshot of the reference space by
+following:
+
+1.  Open and read the `refs` file.
+2.  Open each of the reftable files that it mentions.
+3.  If any of the files is missing, goto 1.
+4.  Read from the now-open files as long as necessary.
 
 ### Update transactions
 
@@ -831,9 +807,10 @@ new reftable and atomically appending it to the stack:
 1. Acquire `refs.lock`.
 2. Read `refs` to determine current reftables.
 3. Select `update_index` to be most recent file's `max_update_index + 1`.
-4. Prepare new reftable `${update_index}_XXXXXX`, including log entries.
-5. Copy `refs` to `refs.lock`, appending file from (4).
-6. Rename `refs.lock` to `refs`.
+4. Prepare temp reftable `${update_index}_XXXXXX`, including log entries.
+5. Rename `${update_index}_XXXXXX` to `${update_index}.ref`.
+6. Copy `refs` to `refs.lock`, appending file from (5).
+7. Rename `refs.lock` to `refs`.
 
 During step 4 the new file's `min_update_index` and `max_update_index`
 are both set to the `update_index` selected by step 3.  All log
@@ -853,7 +830,8 @@ to writers.
 
 Deletion of any reference can be explicitly stored by setting the
 `type` to `0x0` and omitting the `value` field of the `ref_record`.
-This entry shadows the reference in earlier files in the stack.
+This serves as a tombstone, overriding any assertions about the
+existence of the reference from earlier files in the stack.
 
 ### Compaction
 
@@ -875,15 +853,16 @@ is going to compact B and C, leaving A and D alone.
     Ownership of these locks prevents other processes from trying
     to compact these files.
 3.  Release `refs.lock`.
-4.  Compact `B` and `C` into a new file `${min_update_index}_XXXXXX`.
+4.  Compact `B` and `C` into a temp file `${min_update_index}_XXXXXX`.
 5.  Reacquire lock `refs.lock`.
 6.  Verify that `B` and `C` are still in the stack, in that order. This
     should always be the case, assuming that other processes are adhering
     to the locking protocol.
-7.  Write the new stack to `refs.lock`, replacing `B` and `C` with the
+7.  Rename `${min_update_index}_XXXXXX` to `${min_update_index}.ref`.
+8.  Write the new stack to `refs.lock`, replacing `B` and `C` with the
     file from (4).
-8.  Rename `refs.lock` to `refs`.
-9.  Delete `B` and `C`, perhaps after a short sleep to avoid forcing
+9.  Rename `refs.lock` to `refs`.
+10. Delete `B` and `C`, perhaps after a short sleep to avoid forcing
     readers to backtrack.
 
 This strategy permits compactions to proceed independently of updates.
@@ -909,7 +888,7 @@ seem necessary to add the complexity of bzip/gzip/zlib.
 
 Michael Haggerty proposed [an alternate][mh-alt] format to reftable on
 the Git mailing list.  This format uses smaller chunks, without the
-restart table, and avoids block aligning with padding.  Reflog entries
+restart table, and avoids block alignment with padding.  Reflog entries
 immediately follow each ref, and are thus interleaved between refs.
 
 Performance testing indicates reftable is faster for lookups (51%
