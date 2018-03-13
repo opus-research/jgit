@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.WindowCache;
 import org.eclipse.jgit.lib.WindowCacheConfig;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -128,7 +127,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 
 		mockSystemReader = new MockSystemReader();
 		mockSystemReader.userGitConfig = new FileBasedConfig(new File(trash,
-				"usergitconfig"), FS.DETECTED);
+				"usergitconfig"));
 		ceilTestDirectories(getCeilings());
 		SystemReader.setInstance(mockSystemReader);
 

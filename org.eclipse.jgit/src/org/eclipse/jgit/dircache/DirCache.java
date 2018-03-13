@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
@@ -131,7 +130,7 @@ public class DirCache {
 	 *         memory).
 	 */
 	public static DirCache newInCore() {
-		return new DirCache(null, null);
+		return new DirCache(null);
 	}
 
 	/**
@@ -143,9 +142,6 @@ public class DirCache {
 	 *
 	 * @param indexLocation
 	 *            location of the index file on disk.
-	 * @param fs
-	 * 	          the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -154,9 +150,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache read(final File indexLocation, FS fs)
+	public static DirCache read(final File indexLocation)
 			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs);
+		final DirCache c = new DirCache(indexLocation);
 		c.read();
 		return c;
 	}
@@ -180,7 +176,7 @@ public class DirCache {
 	 */
 	public static DirCache read(final Repository db)
 			throws CorruptObjectException, IOException {
-		return read(new File(db.getDirectory(), "index"), db.getFS());
+		return read(new File(db.getDirectory(), "index"));
 	}
 
 	/**
@@ -193,9 +189,6 @@ public class DirCache {
 	 *
 	 * @param indexLocation
 	 *            location of the index file on disk.
-	 * @param fs
-	 * 	          the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -205,9 +198,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache lock(final File indexLocation, FS fs)
+	public static DirCache lock(final File indexLocation)
 			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs);
+		final DirCache c = new DirCache(indexLocation);
 		if (!c.lock())
 			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
 
@@ -247,7 +240,7 @@ public class DirCache {
 	 */
 	public static DirCache lock(final Repository db)
 			throws CorruptObjectException, IOException {
-		return lock(new File(db.getDirectory(), "index"), db.getFS());
+		return lock(new File(db.getDirectory(), "index"));
 	}
 
 	/** Location of the current version of the index file. */
@@ -268,9 +261,6 @@ public class DirCache {
 	/** Our active lock (if we hold it); null if we don't have it locked. */
 	private LockFile myLock;
 
-	/** file system abstraction **/
-	private FS fs;
-
 	/**
 	 * Create a new in-core index representation.
 	 * <p>
@@ -279,13 +269,9 @@ public class DirCache {
 	 *
 	 * @param indexLocation
 	 *            location of the index file on disk.
-	 * @param fs
-	 * 	          the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 */
-	public DirCache(final File indexLocation, FS fs) {
+	public DirCache(final File indexLocation) {
 		liveFile = indexLocation;
-		this.fs = fs;
 		clear();
 	}
 
@@ -489,7 +475,7 @@ public class DirCache {
 	public boolean lock() throws IOException {
 		if (liveFile == null)
 			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
-		final LockFile tmp = new LockFile(liveFile, fs);
+		final LockFile tmp = new LockFile(liveFile);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
 			myLock = tmp;

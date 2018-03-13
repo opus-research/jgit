@@ -103,7 +103,7 @@ public class AbstractTreeIteratorHandler extends
 		if (new File(name).isFile()) {
 			final DirCache dirc;
 			try {
-				dirc = DirCache.read(new File(name), FS.DETECTED);
+				dirc = DirCache.read(new File(name));
 			} catch (IOException e) {
 				throw new CmdLineException(MessageFormat.format(CLIText.get().notAnIndexFile, name), e);
 			}
