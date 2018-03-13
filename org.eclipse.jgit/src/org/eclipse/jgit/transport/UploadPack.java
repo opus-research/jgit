@@ -132,8 +132,8 @@ public class UploadPack {
 		TIP,
 
 		/**
-		 * Client may ask for any commit reachable from a any reference, even if
-		 * that reference wasn't advertised.
+		 * Client may ask for any commit reachable from any reference, even if that
+		 * reference wasn't advertised.
 		 */
 		REACHABLE_COMMIT_TIP,
 
@@ -187,9 +187,6 @@ public class UploadPack {
 
 	/** Configuration to pass into the PackWriter. */
 	private PackConfig packConfig;
-
-	/** Configuration for various transfer options. */
-	private TransferConfig transferConfig;
 
 	/** Timeout in seconds to wait for client interaction. */
 	private int timeout;
@@ -278,7 +275,7 @@ public class UploadPack {
 
 	private final RevFlagSet SAVE;
 
-	private RequestPolicy requestPolicy;
+	private RequestPolicy requestPolicy = RequestPolicy.ADVERTISED;
 
 	private MultiAck multiAck = MultiAck.OFF;
 
@@ -310,8 +307,6 @@ public class UploadPack {
 		SAVE.add(PEER_HAS);
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
-
-		transferConfig = new TransferConfig(db);
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -390,6 +385,12 @@ public class UploadPack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
+		if (!biDirectionalPipe) {
+			if (requestPolicy == RequestPolicy.ADVERTISED)
+				requestPolicy = RequestPolicy.REACHABLE_COMMIT;
+			else if (requestPolicy == RequestPolicy.TIP)
+				requestPolicy = RequestPolicy.REACHABLE_COMMIT_TIP;
+		}
 	}
 
 	/** @return policy used by the service to validate client requests. */
@@ -406,10 +407,9 @@ public class UploadPack {
 	 *            to {@link RequestPolicy#REACHABLE_COMMIT} or
 	 *            {@link RequestPolicy#REACHABLE_COMMIT_TIP} when callers have
 	 *            {@link #setBiDirectionalPipe(boolean)} set to false.
-	 *            Overrides any policy specified in a {@link TransferConfig}.
 	 */
 	public void setRequestPolicy(RequestPolicy policy) {
-		requestPolicy = policy;
+		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
 	}
 
 	/** @return the hook used while advertising the refs to the client */
@@ -477,15 +477,6 @@ public class UploadPack {
 	 */
 	public void setPackConfig(PackConfig pc) {
 		this.packConfig = pc;
-	}
-
-	/**
-	 * @param tc
-	 *            configuration controlling transfer options. If null the source
-	 *            repository's settings will be used.
-	 */
-	public void setTransferConfig(TransferConfig tc) {
-		this.transferConfig = tc != null ? tc : new TransferConfig(db);
 	}
 
 	/** @return the configured logger. */
@@ -591,28 +582,7 @@ public class UploadPack {
 		return refs;
 	}
 
-	private RequestPolicy getEffectiveRequestPolicy() {
-		RequestPolicy rp;
-		if (requestPolicy != null)
-			rp = requestPolicy;
-		else if (transferConfig.isAllowTipSha1InWant())
-			rp = RequestPolicy.TIP;
-		else
-			rp = RequestPolicy.ADVERTISED;
-
-
-		if (!biDirectionalPipe) {
-			if (rp == RequestPolicy.ADVERTISED)
-				rp = RequestPolicy.REACHABLE_COMMIT;
-			else if (rp == RequestPolicy.TIP)
-				rp = RequestPolicy.REACHABLE_COMMIT_TIP;
-		}
-		return rp;
-	}
-
 	private void service() throws IOException {
-		requestPolicy = getEffectiveRequestPolicy();
-
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else if (requestPolicy == RequestPolicy.ANY)
@@ -987,8 +957,8 @@ public class UploadPack {
 		try {
 			List<RevCommit> checkReachable = null;
 			Set<ObjectId> reachableFrom = null;
-			RevObject obj;
 			Set<ObjectId> tips = null;
+			RevObject obj;
 			while ((obj = q.next()) != null) {
 				if (!advertised.contains(obj)) {
 					switch (requestPolicy) {
