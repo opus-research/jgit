@@ -909,9 +909,9 @@ public class PackWriter {
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isReuseAsIs()) // already reusing a representation
-				continue;
 			if (otp.isDoNotDelta()) // delta is disabled for this path
+				continue;
+			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -1437,20 +1437,29 @@ public class PackWriter {
 		}
 		commits = null;
 
-		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
-				objectsMap, edgeObjects, reader);
-		RevObject o;
-		while ((o = walker.nextObject()) != null) {
-			if (o.has(RevFlag.UNINTERESTING))
-				continue;
+		if (thin && !baseTrees.isEmpty()) {
+			BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
+					objectsMap, edgeObjects, reader);
+			RevObject o;
+			while ((o = walker.nextObject()) != null) {
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
 
-			int pathHash = walker.getPathHashCode();
-			byte[] pathBuf = walker.getPathBuffer();
-			int pathLen = walker.getPathLength();
-
-			bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-			addObject(o, pathHash);
-			countingMonitor.update(1);
+				int pathHash = walker.getPathHashCode();
+				byte[] pathBuf = walker.getPathBuffer();
+				int pathLen = walker.getPathLength();
+				bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
+				addObject(o, pathHash);
+				countingMonitor.update(1);
+			}
+		} else {
+			RevObject o;
+			while ((o = walker.nextObject()) != null) {
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
+				addObject(o, walker.getPathHashCode());
+				countingMonitor.update(1);
+			}
 		}
 
 		for (CachedPack pack : cachedPacks)
