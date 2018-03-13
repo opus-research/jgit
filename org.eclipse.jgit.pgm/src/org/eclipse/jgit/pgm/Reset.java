@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,35 +41,49 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.pgm;
 
-/**
- * Key for any row that the DHT will be asked to store.
- * <p>
- * Implementations of this interface know how to encode and decode themselves
- * from a byte array format, expecting the DHT to use the byte array as the row
- * key within the database.
- * <p>
- * It is strongly encouraged to use only row keys that are valid UTF-8 strings,
- * as most DHT systems have client tools that can interact with rows using the
- * UTF-8 encoding.
- */
-public interface RowKey {
-	/** @return key formatted as byte array for storage in the DHT. */
-	public byte[] toBytes();
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ResetCommand;
+import org.eclipse.jgit.api.ResetCommand.ResetType;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-	/** @return relatively unique hash code value for in-memory compares. */
-	public int hashCode();
+@Command(common = true, usage = "usage_reset")
+class Reset extends TextBuiltin {
 
-	/**
-	 * Compare this key to another key for equality.
-	 *
-	 * @param other
-	 *            the other key instance, may be null.
-	 * @return true if these keys reference the same row.
-	 */
-	public boolean equals(Object other);
+	@Option(name = "--soft", usage = "usage_resetSoft")
+	private boolean soft = false;
 
-	/** @return pretty printable string for debugging/reporting only. */
-	public String toString();
+	@Option(name = "--mixed", usage = "usage_resetMixed")
+	private boolean mixed = false;
+
+	@Option(name = "--hard", usage = "usage_resetHard")
+	private boolean hard = false;
+
+	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_reset")
+	private String commit;
+
+	@Override
+	protected void run() throws Exception {
+		ResetCommand command = new Git(db).reset();
+		command.setRef(commit);
+		ResetType mode = null;
+		if (soft)
+			mode = selectMode(mode, ResetType.SOFT);
+		if (mixed)
+			mode = selectMode(mode, ResetType.MIXED);
+		if (hard)
+			mode = selectMode(mode, ResetType.HARD);
+		if (mode == null)
+			throw die("no reset mode set");
+		command.setMode(mode);
+		command.call();
+	}
+
+	private static ResetType selectMode(ResetType mode, ResetType want) {
+		if (mode != null)
+			throw die("reset modes are mutually exclusive, select one");
+		return want;
+	}
 }
