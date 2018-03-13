@@ -1846,10 +1846,9 @@ public class PackWriter {
 			Set<? extends ObjectId> have)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null, true);
+		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null);
 		bitmapWalker.reset();
-		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap,
-				false);
+		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
 		if (useCachedPacks && reuseSupport != null
@@ -2049,7 +2048,7 @@ public class PackWriter {
 				walker = bitmapPreparer.newBitmapWalker();
 
 			BitmapBuilder bitmap = walker.findObjects(
-					Collections.singleton(cmit), null, false);
+					Collections.singleton(cmit), null);
 
 			if (last != null && cmit.isReuseWalker() && !bitmap.contains(last))
 				throw new IllegalStateException(MessageFormat.format(
