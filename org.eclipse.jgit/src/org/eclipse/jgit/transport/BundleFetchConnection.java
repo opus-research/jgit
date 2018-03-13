@@ -47,8 +47,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -244,18 +242,12 @@ class BundleFetchConnection extends BaseFetchConnection {
 				throw new MissingBundlePrerequisiteException(transport.uri,
 						missing);
 
-			try {
-				Map<String, Ref> localRefs =
-					transport.local.getRefDatabase().getRefs(ALL);
-				for (final Ref r : localRefs.values()) {
-					try {
-						rw.markStart(rw.parseCommit(r.getObjectId()));
-					} catch (IOException readError) {
-						// If we cannot read the value of the ref skip it.
-					}
+			for (final Ref r : transport.local.getAllRefs().values()) {
+				try {
+					rw.markStart(rw.parseCommit(r.getObjectId()));
+				} catch (IOException readError) {
+					// If we cannot read the value of the ref skip it.
 				}
-			} catch (IOException readError) {
-				// If we cannot read the value of the refs skip them.
 			}
 
 			int remaining = commits.size();
