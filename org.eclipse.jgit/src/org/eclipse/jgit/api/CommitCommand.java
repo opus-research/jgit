@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,10 +50,12 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -134,21 +136,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             when called on a git repo without a HEAD reference
 	 * @throws NoMessageException
 	 *             when called without specifying a commit message
-	 * @throws UnmergedPathException
+	 * @throws UnmergedPathsException
 	 *             when the current index contained unmerged paths (conflicts)
+	 * @throws ConcurrentRefUpdateException
+	 *             when HEAD or branch ref is updated concurrently by someone
+	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
-	 * @throws JGitInternalException
-	 *             a low-level exception of JGit has occurred. The original
-	 *             exception can be retrieved by calling
-	 *             {@link Exception#getCause()}. Expect only
-	 *             {@code IOException's} to be wrapped. Subclasses of
-	 *             {@link IOException} (e.g. {@link UnmergedPathException}) are
-	 *             typically not wrapped here but thrown as original exception
 	 */
-	public RevCommit call() throws NoHeadException, NoMessageException,
-			UnmergedPathException, ConcurrentRefUpdateException,
-			JGitInternalException, WrongRepositoryStateException {
+	public RevCommit call() throws GitAPIException, NoHeadException,
+			NoMessageException, UnmergedPathsException,
+			ConcurrentRefUpdateException,
+			WrongRepositoryStateException {
 		checkCallable();
 
 		RepositoryState state = repo.getRepositoryState();
@@ -269,10 +268,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				index.unlock();
 			}
 		} catch (UnmergedPathException e) {
-			// since UnmergedPathException is a subclass of IOException
-			// which should not be wrapped by a JGitInternalException we
-			// have to catch and re-throw it here
-			throw e;
+			throw new UnmergedPathsException(e);
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
@@ -357,11 +353,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							// insert object
 							if (inserter == null)
 								inserter = repo.newObjectInserter();
-
+							long contentLength = fTree.getEntryContentLength();
 							InputStream inputStream = fTree.openEntryStream();
 							try {
 								dcEntry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, entryLength,
+										Constants.OBJ_BLOB, contentLength,
 										inputStream));
 							} finally {
 								inputStream.close();
@@ -492,9 +488,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							Constants.MERGE_MSG, e), e);
 				}
 			}
+		} else if (state == RepositoryState.SAFE && message == null) {
+			try {
+				message = repo.readSquashCommitMsg();
+				if (message != null)
+					repo.writeSquashCommitMsg(null /* delete */);
+			} catch (IOException e) {
+				throw new JGitInternalException(MessageFormat.format(
+						JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
+						Constants.MERGE_MSG, e), e);
+			}
+
 		}
 		if (message == null)
-			// as long as we don't suppport -C option we have to have
+			// as long as we don't support -C option we have to have
 			// an explicit message
 			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
 	}

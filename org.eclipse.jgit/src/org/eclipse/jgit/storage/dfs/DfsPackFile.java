@@ -272,7 +272,19 @@ public final class DfsPackFile {
 		}
 	}
 
-	boolean hasObject(DfsReader ctx, AnyObjectId id) throws IOException {
+	/**
+	 * Check if an object is stored within this pack.
+	 *
+	 * @param ctx
+	 *            reader context to support reading from the backing store if
+	 *            the index is not already loaded in memory.
+	 * @param id
+	 *            object to be located.
+	 * @return true if the object exists in this pack; false if it does not.
+	 * @throws IOException
+	 *             the pack index is not available, or is corrupt.
+	 */
+	public boolean hasObject(DfsReader ctx, AnyObjectId id) throws IOException {
 		final long offset = idx(ctx).findOffset(id);
 		return 0 < offset && !isCorrupt(offset);
 	}
@@ -395,7 +407,7 @@ public final class DfsPackFile {
 		int headerCnt = 1;
 		while ((c & 0x80) != 0) {
 			c = buf[headerCnt++] & 0xff;
-			inflatedLength += (c & 0x7f) << shift;
+			inflatedLength += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
@@ -676,7 +688,7 @@ public final class DfsPackFile {
 				int p = 1;
 				while ((c & 0x80) != 0) {
 					c = ib[p++] & 0xff;
-					sz += (c & 0x7f) << shift;
+					sz += ((long) (c & 0x7f)) << shift;
 					shift += 7;
 				}
 
@@ -907,7 +919,7 @@ public final class DfsPackFile {
 		int p = 1;
 		while ((c & 0x80) != 0) {
 			c = ib[p++] & 0xff;
-			sz += (c & 0x7f) << shift;
+			sz += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
