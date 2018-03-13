@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009, Johannes E. Schindelin
+ * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,53 +42,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.diff;
 
-import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
-import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import junit.framework.TestCase;
 
-import java.io.IOException;
-
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jgit.http.server.resolver.GetAnyFile;
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.lib.Repository;
-
-class GetAnyFileFilter implements Filter {
-	private final GetAnyFile getAnyFile;
-
-	GetAnyFileFilter(final GetAnyFile getAnyFile) {
-		this.getAnyFile = getAnyFile;
+public class MyersDiffTest extends TestCase {
+	public void testAtEnd() {
+		assertDiff("HELLO", "HELL", " -4,1 +4,0");
 	}
 
-	public void init(FilterConfig config) throws ServletException {
-		// Do nothing.
+	public void testAtStart() {
+		assertDiff("Git", "JGit", " -0,0 +0,1");
 	}
 
-	public void destroy() {
-		// Do nothing.
+	public void testSimple() {
+		assertDiff("HELLO WORLD", "LOW",
+			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
+		// is ambiguous, could be this, too:
+		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
 	}
 
-	public void doFilter(ServletRequest request, ServletResponse response,
-			FilterChain chain) throws IOException, ServletException {
-		try {
-			final Repository db = getRepository(request);
-			getAnyFile.access((HttpServletRequest) request, db);
-			chain.doFilter(request, response);
-		} catch (ServiceNotAuthorizedException e) {
-			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
-		} catch (ServiceNotEnabledException e) {
-			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
+	public void assertDiff(String a, String b, String edits) {
+		MyersDiff diff = new MyersDiff(toCharArray(a), toCharArray(b));
+		assertEquals(edits, toString(diff.getEdits()));
+	}
+
+	private static String toString(EditList list) {
+		StringBuilder builder = new StringBuilder();
+		for (Edit e : list)
+			builder.append(" -" + e.beginA
+					+ "," + (e.endA - e.beginA)
+				+ " +" + e.beginB + "," + (e.endB - e.beginB));
+		return builder.toString();
+	}
+
+	private static CharArray toCharArray(String s) {
+		return new CharArray(s);
+	}
+
+	protected static String toString(Sequence seq, int begin, int end) {
+		CharArray a = (CharArray)seq;
+		return new String(a.array, begin, end - begin);
+	}
+
+	protected static String toString(CharArray a, CharArray b,
+			int x, int k) {
+		return "(" + x + "," + (k + x)
+			+ (x < 0 ? '<' :
+					(x >= a.array.length ?
+					 '>' : a.array[x]))
+			+ (k + x < 0 ? '<' :
+					(k + x >= b.array.length ?
+					 '>' : b.array[k + x]))
+			+ ")";
+	}
+
+	private static class CharArray implements Sequence {
+		char[] array;
+		public CharArray(String s) { array = s.toCharArray(); }
+		public int size() { return array.length; }
+		public boolean equals(int i, Sequence other, int j) {
+			CharArray o = (CharArray)other;
+			return array[i] == o.array[j];
 		}
 	}
 }
