@@ -45,6 +45,7 @@ package org.eclipse.jgit.pgm.archive;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.text.MessageFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -58,7 +59,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -84,7 +85,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * <pre>
  * try {
  *	cmd.setTree(db.resolve(&quot;master&quot;))
- *		.setFormat(ArchiveCommand.Format.ZIP)
+ *		.setFormat("zip")
  *		.setOutputStream(out).call();
  * } finally {
  *	cmd.release();
@@ -105,7 +106,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *	T out = format.createArchiveOutputStream(System.out);
 	 *	try {
 	 *		for (...) {
-	 *			format.putEntry(path, mode, repo.open(objectId), out);
+	 *			format.putEntry(out, path, mode, repo.open(objectId));
 	 *		}
 	 *	} finally {
 	 *		out.close();
@@ -113,23 +114,52 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 */
 	public static interface Format<T extends Closeable> {
 		T createArchiveOutputStream(OutputStream s);
-		void putEntry(String path, FileMode mode,
-				ObjectLoader loader, T out) throws IOException;
+		void putEntry(T out, String path, FileMode mode,
+				ObjectLoader loader) throws IOException;
+	}
+
+	/**
+	 * Signals an attempt to use an archival format that ArchiveCommand
+	 * doesn't know about (for example due to a typo).
+	 */
+	public static class UnsupportedFormatException extends GitAPIException {
+		private static final long serialVersionUID = 1L;
+
+		private final String format;
+
+		/**
+		 * @param format the problematic format name
+		 */
+		public UnsupportedFormatException(String format) {
+			super(MessageFormat.format(CLIText.get().unsupportedArchiveFormat, format));
+			this.format = format;
+		}
+
+		/**
+		 * @return the problematic format name
+		 */
+		public String getFormat() {
+			return format;
+		}
 	}
 
 	/**
 	 * Available archival formats (corresponding to values for
 	 * the --format= option)
 	 */
-	private static ConcurrentMap<String, Format<?>> formats =
+	private static final ConcurrentMap<String, Format<?>> formats =
 			new ConcurrentHashMap<String, Format<?>>();
 
-	public static void registerFormat(String name, Format<?> fmt) {
-		formats.put(name, fmt);
+	static {
+		formats.put("zip", new ZipFormat());
+		formats.put("tar", new TarFormat());
 	}
 
-	public static void unregisterFormat(String name) {
-		formats.remove(name);
+	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
+		Format<?> fmt = formats.get(formatName);
+		if (fmt == null)
+			throw new UnsupportedFormatException(formatName);
+		return fmt;
 	}
 
 	private OutputStream out;
@@ -173,7 +203,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 						continue;
 
 					walk.getObjectId(idBuf, 0);
-					fmt.putEntry(name, mode, reader.open(idBuf), outa);
+					fmt.putEntry(outa, name, mode, reader.open(idBuf));
 				}
 			} finally {
 				outa.close();
@@ -192,9 +222,9 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 */
 	@Override
 	public OutputStream call() throws GitAPIException {
-		final Format<?> fmt = formats.get(format);
+		final Format<?> fmt = lookupFormat(format);
 		return writeArchive(fmt);
-        }
+	}
 
 	/**
 	 * @param tree

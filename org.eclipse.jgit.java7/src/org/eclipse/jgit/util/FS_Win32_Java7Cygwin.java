@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Google Inc.
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,20 +40,86 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm.archive;
 
-import org.osgi.framework.BundleActivator;
-import org.osgi.framework.BundleContext;
+package org.eclipse.jgit.util;
 
-@SuppressWarnings("unused") public class FormatActivator
-					implements BundleActivator {
-	public void start(BundleContext context) throws Exception {
-		ArchiveCommand.registerFormat("tar", new TarFormat());
-		ArchiveCommand.registerFormat("zip", new ZipFormat());
+import java.io.File;
+import java.io.IOException;
+
+/**
+ * FS for Java7 on Windows with Cygwin
+ */
+public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
+
+	FS_Win32_Java7Cygwin(FS src) {
+		super(src);
 	}
 
-	public void stop(BundleContext context) throws Exception {
-		ArchiveCommand.unregisterFormat("zip");
-		ArchiveCommand.unregisterFormat("tar");
+	FS_Win32_Java7Cygwin() {
+	}
+
+	@Override
+	public FS newInstance() {
+		return new FS_Win32_Java7Cygwin(this);
+	}
+
+	@Override
+	public boolean supportsSymlinks() {
+		return true;
+	}
+
+	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 }
