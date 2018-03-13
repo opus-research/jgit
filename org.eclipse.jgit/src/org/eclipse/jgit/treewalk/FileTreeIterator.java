@@ -94,10 +94,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the repository whose working tree will be scanned.
 	 */
 	public FileTreeIterator(Repository repo) {
-		this(repo,
-				repo.getConfig().get(WorkingTreeOptions.KEY).isDirNoGitLinks() ?
-						NoGitlinksStrategy.INSTANCE :
-						DefaultFileModeStrategy.INSTANCE);
+		this(repo, DefaultFileModeStrategy.INSTANCE);
 	}
 
 	/**
@@ -171,6 +168,26 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
+	 * @since 4.3
+	 * @deprecated use {@link #FileTreeIterator(FileTreeIterator, File, FS)}
+	 *             instead.
+	 */
+	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
+			FS fs) {
+		this(p, root, fs, DefaultFileModeStrategy.INSTANCE);
+	}
+
+	/**
+	 * Create a new iterator to traverse a subdirectory.
+	 *
+	 * @param p
+	 *            the parent iterator we were created from.
+	 * @param root
+	 *            the subdirectory. This should be a directory contained within
+	 *            the parent directory.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to perform
+	 *            certain file system operations.
 	 *
 	 * @since 4.3
 	 */
@@ -197,7 +214,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *
 	 * @since 4.3
 	 */
-	protected FileTreeIterator(final FileTreeIterator p, final File root,
+	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
 			FS fs, FileModeStrategy fileModeStrategy) {
 		super(p);
 		directory = root;
@@ -265,35 +282,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 				} else {
 					return FileMode.TREE;
 				}
-			} else if (attributes.isExecutable()) {
-				return FileMode.EXECUTABLE_FILE;
-			} else {
-				return FileMode.REGULAR_FILE;
-			}
-		}
-	}
-
-	/**
-	 * A FileModeStrategy that implements native git's DIR_NO_GITLINKS
-	 * behavior. This is the same as the default FileModeStrategy, except
-	 * all directories will be treated as directories regardless of whether
-	 * or not they contain a .git directory.
-	 *
-	 * @since 4.3
-	 */
-	static public class NoGitlinksStrategy implements FileModeStrategy {
-
-		/**
-		 * a singleton instance of the default FileModeStrategy
-		 */
-		public final static NoGitlinksStrategy INSTANCE = new NoGitlinksStrategy();
-
-		@Override
-		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink()) {
-				return FileMode.SYMLINK;
-			} else if (attributes.isDirectory()) {
-				return FileMode.TREE;
 			} else if (attributes.isExecutable()) {
 				return FileMode.EXECUTABLE_FILE;
 			} else {
