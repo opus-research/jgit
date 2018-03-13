@@ -189,18 +189,18 @@ class LfsStore extends TextBuiltin {
 
 	protected void run() throws Exception {
 		AppServer server = new AppServer(port);
+		URI baseURI = server.getURI();
 		ServletContextHandler app = server.addContext("/"); //$NON-NLS-1$
-		LargeFileRepository repository;
 
+		final LargeFileRepository repository;
 		switch (storeType) {
 		case FS:
 			Path dir = Paths.get(directory);
-			FileLfsRepository plainFSRepo = new FileLfsRepository(
-					getStoreUrl(server), dir);
-			FileLfsServlet content = new FileLfsServlet(plainFSRepo,
-					30000);
+			FileLfsRepository fsRepo = new FileLfsRepository(
+					getStoreUrl(baseURI), dir);
+			FileLfsServlet content = new FileLfsServlet(fsRepo, 30000);
 			app.addServlet(new ServletHolder(content), STORE_PATH);
-			repository = plainFSRepo;
+			repository = fsRepo;
 			break;
 
 		default:
@@ -208,22 +208,31 @@ class LfsStore extends TextBuiltin {
 					"Unknown store type: " + storeType); //$NON-NLS-1$
 		}
 
-		LfsProtocolServlet protocol = new LfsProtocolServlet(repository);
+		LfsProtocolServlet protocol = new LfsProtocolServlet() {
+
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			protected LargeFileRepository getLargeFileRepository() {
+				return repository;
+			}
+
+		};
 		app.addServlet(new ServletHolder(protocol), PROTOCOL_PATH);
 
 		server.start();
 
-		outw.println("LFS protocol URL: " + getProtocolUrl(server)); //$NON-NLS-1$
+		outw.println("LFS protocol URL: " + getProtocolUrl(baseURI)); //$NON-NLS-1$
 		if (storeType == StoreType.FS) {
 			outw.println("LFS objects located in: " + directory); //$NON-NLS-1$
-			outw.println("LFS store URL: " + getStoreUrl(server)); //$NON-NLS-1$
+			outw.println("LFS store URL: " + getStoreUrl(baseURI)); //$NON-NLS-1$
 		}
 	}
 
-	private String getStoreUrl(AppServer server) {
+	private String getStoreUrl(URI baseURI) {
 		if (storeUrl == null) {
 			if (storeType == StoreType.FS) {
-				storeUrl = server.getURI() + "/" + OBJECTS; //$NON-NLS-1$
+				storeUrl = baseURI + "/" + OBJECTS; //$NON-NLS-1$
 			} else {
 				die("Local store not running and no --store-url specified"); //$NON-NLS-1$
 			}
@@ -231,9 +240,9 @@ class LfsStore extends TextBuiltin {
 		return storeUrl;
 	}
 
-	private String getProtocolUrl(AppServer server) {
+	private String getProtocolUrl(URI baseURI) {
 		if (protocolUrl == null) {
-			protocolUrl = server.getURI() + PROTOCOL_PATH;
+			protocolUrl = baseURI + PROTOCOL_PATH;
 		}
 		return protocolUrl;
 	}
