@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,99 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.treewalk;
 
-package org.eclipse.jgit.util;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 
-/**
- * FS for Java7 on Windows with Cygwin
- */
-public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.util.FS;
+import org.junit.Test;
 
-	FS_Win32_Java7Cygwin(FS src) {
-		super(src);
-	}
-
-	FS_Win32_Java7Cygwin() {
-	}
-
-	@Override
-	public FS newInstance() {
-		return new FS_Win32_Java7Cygwin(this);
-	}
-
-	@Override
-	public boolean supportsSymlinks() {
-		return true;
-	}
-
-	@Override
-	public boolean isSymLink(File path) throws IOException {
-		return FileUtil.isSymlink(path);
-	}
-
-	@Override
-	public long lastModified(File path) throws IOException {
-		return FileUtil.lastModified(path);
-	}
-
-	@Override
-	public void setLastModified(File path, long time) throws IOException {
-		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
-	public long length(File f) throws IOException {
-		return FileUtil.getLength(f);
-	}
-
-	@Override
-	public boolean exists(File path) {
-		return FileUtil.exists(path);
-	}
-
-	@Override
-	public boolean isDirectory(File path) {
-		return FileUtil.isDirectory(path);
-	}
-
-	@Override
-	public boolean isFile(File path) {
-		return FileUtil.isFile(path);
-	}
-
-	@Override
-	public boolean isHidden(File path) throws IOException {
-		return FileUtil.isHidden(path);
-	}
-
-	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtil.setHidden(path, hidden);
-	}
-
-	@Override
-	public String readSymLink(File path) throws IOException {
-		return FileUtil.readSymlink(path);
-	}
-
-	@Override
-	public void createSymLink(File path, String target) throws IOException {
-		FileUtil.createSymLink(path, target);
-	}
-
-	/**
-	 * @since 3.3
-	 */
-	@Override
-	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributesBasic(this, path);
+public class TreeWalkJava7Test extends RepositoryTestCase {
+	@Test
+	public void testSymlinkToDirNotRecursingViaSymlink() throws Exception {
+		FS fs = db.getFS();
+		assertTrue(fs.supportsSymlinks());
+		writeTrashFile("target/data", "targetdata");
+		fs.createSymLink(new File(trash, "link"), "target");
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new FileTreeIterator(db));
+		assertTrue(tw.next());
+		assertEquals("link", tw.getPathString());
+		assertTrue(tw.next());
+		assertEquals("target/data", tw.getPathString());
+		assertFalse(tw.next());
 	}
 }
