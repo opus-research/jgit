@@ -255,9 +255,4 @@ public class IgnoreRule {
 		// We are checking the last part of the segment for which isDirectory has to be considered.
 		return !dirOnly || isDirectory;
 	}
-
-	@Override
-	public String toString() {
-		return pattern;
-	}
 }
