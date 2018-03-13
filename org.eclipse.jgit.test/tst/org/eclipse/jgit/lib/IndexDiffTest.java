@@ -59,7 +59,7 @@ import java.util.TreeSet;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
@@ -139,7 +139,7 @@ public class IndexDiffTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testModified() throws IOException, GitAPIException {
+	public void testModified() throws IOException, NoFilepatternException {
 
 		writeTrashFile("file2", "file2");
 		writeTrashFile("dir/file3", "dir/file3");
@@ -291,7 +291,8 @@ public class IndexDiffTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testUnchangedSimple() throws IOException, GitAPIException {
+	public void testUnchangedSimple() throws IOException,
+			NoFilepatternException {
 		writeTrashFile("a.b", "a.b");
 		writeTrashFile("a.c", "a.c");
 		writeTrashFile("a=c", "a=c");
@@ -327,10 +328,11 @@ public class IndexDiffTest extends RepositoryTestCase {
 	 * used by Git.
 	 *
 	 * @throws IOException
-	 * @throws GitAPIException
+	 * @throws NoFilepatternException
 	 */
 	@Test
-	public void testUnchangedComplex() throws IOException, GitAPIException {
+	public void testUnchangedComplex() throws IOException,
+			NoFilepatternException {
 		Git git = new Git(db);
 		writeTrashFile("a.b", "a.b");
 		writeTrashFile("a.c", "a.c");
