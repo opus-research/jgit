@@ -185,7 +185,6 @@ public class MergeResult {
 		 * @since 3.0
 		 **/
 		MERGED_NOT_COMMITTED {
-			@Override
 			public String toString() {
 				return "Merged-not-committed"; //$NON-NLS-1$
 			}
@@ -213,7 +212,6 @@ public class MergeResult {
 		 * files (i.e. local modifications prevent checkout of files).
 		 */
 		CHECKOUT_CONFLICT {
-			@Override
 			public String toString() {
 				return "Checkout Conflict"; //$NON-NLS-1$
 			}
@@ -416,7 +414,7 @@ public class MergeResult {
 	 */
 	public void addConflict(String path, int[][] conflictingRanges) {
 		if (conflicts == null)
-			conflicts = new HashMap<>();
+			conflicts = new HashMap<String, int[][]>();
 		conflicts.put(path, conflictingRanges);
 	}
 
@@ -428,7 +426,7 @@ public class MergeResult {
 		if (!lowLevelResult.containsConflicts())
 			return;
 		if (conflicts == null)
-			conflicts = new HashMap<>();
+			conflicts = new HashMap<String, int[][]>();
 		int nrOfConflicts = 0;
 		// just counting
 		for (MergeChunk mergeChunk : lowLevelResult) {

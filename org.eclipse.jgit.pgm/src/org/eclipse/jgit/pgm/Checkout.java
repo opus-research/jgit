@@ -60,7 +60,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
+import org.kohsuke.args4j.spi.StopOptionHandler;
 
 @Command(common = true, usage = "usage_checkout")
 class Checkout extends TextBuiltin {
@@ -74,11 +74,12 @@ class Checkout extends TextBuiltin {
 	@Option(name = "--orphan", usage = "usage_orphan")
 	private boolean orphan = false;
 
-	@Argument(required = false, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
+	@Argument(required = true, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
 	private String name;
 
-	@Option(name = "--", metaVar = "metaVar_paths", handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<>();
+	@Argument(index = 1)
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
@@ -92,11 +93,8 @@ class Checkout extends TextBuiltin {
 			CheckoutCommand command = git.checkout();
 			if (paths.size() > 0) {
 				command.setStartPoint(name);
-				if (paths.size() == 1 && paths.get(0).equals(".")) { //$NON-NLS-1$
-					command.setAllPaths(true);
-				} else {
-					command.addPaths(paths);
-				}
+				for (String path : paths)
+					command.addPath(path);
 			} else {
 				command.setCreateBranch(createBranch);
 				command.setName(name);

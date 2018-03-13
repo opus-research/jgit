@@ -101,28 +101,23 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 	static final String S3_SCHEME = "amazon-s3"; //$NON-NLS-1$
 
 	static final TransportProtocol PROTO_S3 = new TransportProtocol() {
-		@Override
 		public String getName() {
 			return "Amazon S3"; //$NON-NLS-1$
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton(S3_SCHEME);
 		}
 
-		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.HOST, URIishField.PATH));
 		}
 
-		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.PASS));
 		}
 
-		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportAmazonS3(local, uri);
@@ -270,10 +265,10 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 
 		@Override
 		Collection<String> getPackNames() throws IOException {
-			final HashSet<String> have = new HashSet<>();
+			final HashSet<String> have = new HashSet<String>();
 			have.addAll(s3.list(bucket, resolveKey("pack"))); //$NON-NLS-1$
 
-			final Collection<String> packs = new ArrayList<>();
+			final Collection<String> packs = new ArrayList<String>();
 			for (final String n : have) {
 				if (!n.startsWith("pack-") || !n.endsWith(".pack")) //$NON-NLS-1$ //$NON-NLS-2$
 					continue;
@@ -312,7 +307,7 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 		}
 
 		Map<String, Ref> readAdvertisedRefs() throws TransportException {
-			final TreeMap<String, Ref> avail = new TreeMap<>();
+			final TreeMap<String, Ref> avail = new TreeMap<String, Ref>();
 			readPackedRefs(avail);
 			readLooseRefs(avail);
 			readRef(avail, Constants.HEAD);

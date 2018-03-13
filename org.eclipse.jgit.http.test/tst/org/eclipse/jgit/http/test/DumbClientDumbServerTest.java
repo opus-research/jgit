@@ -109,7 +109,6 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		HttpTransport.setConnectionFactory(cf);
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -141,7 +140,8 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		assertEquals("http", remoteURI.getScheme());
 
 		Map<String, Ref> map;
-		try (Transport t = Transport.open(dst, remoteURI)) {
+		Transport t = Transport.open(dst, remoteURI);
+		try {
 			// I didn't make up these public interface names, I just
 			// approved them for inclusion into the code base. Sorry.
 			// --spearce
@@ -149,9 +149,14 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 			assertTrue("isa TransportHttp", t instanceof TransportHttp);
 			assertTrue("isa HttpTransport", t instanceof HttpTransport);
 
-			try (FetchConnection c = t.openFetch()) {
+			FetchConnection c = t.openFetch();
+			try {
 				map = c.getRefsMap();
+			} finally {
+				c.close();
 			}
+		} finally {
+			t.close();
 		}
 
 		assertNotNull("have map of refs", map);
@@ -196,8 +201,11 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
 
-		try (Transport t = Transport.open(dst, remoteURI)) {
+		Transport t = Transport.open(dst, remoteURI);
+		try {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
+		} finally {
+			t.close();
 		}
 
 		assertTrue(dst.hasObject(A_txt));
@@ -213,13 +221,16 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<>(remoteRepository).packAndPrune();
+		new TestRepository<Repository>(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
 
-		try (Transport t = Transport.open(dst, remoteURI)) {
+		Transport t = Transport.open(dst, remoteURI);
+		try {
 			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
+		} finally {
+			t.close();
 		}
 
 		assertTrue(dst.hasObject(A_txt));
@@ -254,7 +265,8 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 		final RevCommit Q = src.commit().create();
 		final Repository db = src.getRepository();
 
-		try (Transport t = Transport.open(db, remoteURI)) {
+		Transport t = Transport.open(db, remoteURI);
+		try {
 			try {
 				t.push(NullProgressMonitor.INSTANCE, push(src, Q));
 				fail("push incorrectly completed against a dumb server");
@@ -262,6 +274,8 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 				String exp = "remote does not support smart HTTP push";
 				assertEquals(exp, nse.getMessage());
 			}
+		} finally {
+			t.close();
 		}
 	}
 }

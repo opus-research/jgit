@@ -73,7 +73,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -118,9 +117,9 @@ public class DiffFormatter implements AutoCloseable {
 
 	private final OutputStream out;
 
-	private ObjectReader reader;
+	private Repository db;
 
-	private boolean closeReader;
+	private ObjectReader reader;
 
 	private DiffConfig diffCfg;
 
@@ -173,42 +172,28 @@ public class DiffFormatter implements AutoCloseable {
 	 *            source repository holding referenced objects.
 	 */
 	public void setRepository(Repository repository) {
-		setReader(repository.newObjectReader(), repository.getConfig(), true);
-	}
+		if (reader != null)
+			reader.close();
 
-	/**
-	 * Set the repository the formatter can load object contents from.
-	 *
-	 * @param reader
-	 *            source reader holding referenced objects. Caller is responsible
-	 *            for closing the reader.
-	 * @param cfg
-	 *            config specifying diff algorithm and rename detection options.
-	 * @since 4.5
-	 */
-	public void setReader(ObjectReader reader, Config cfg) {
-		setReader(reader, cfg, false);
-	}
-
-	private void setReader(ObjectReader reader, Config cfg, boolean closeReader) {
-		close();
-		this.closeReader = closeReader;
-		this.reader = reader;
-		this.diffCfg = cfg.get(DiffConfig.KEY);
+		db = repository;
+		reader = db.newObjectReader();
+		diffCfg = db.getConfig().get(DiffConfig.KEY);
 
 		ContentSource cs = ContentSource.create(reader);
 		source = new ContentSource.Pair(cs, cs);
 
-		if (diffCfg.isNoPrefix()) {
+		DiffConfig dc = db.getConfig().get(DiffConfig.KEY);
+		if (dc.isNoPrefix()) {
 			setOldPrefix(""); //$NON-NLS-1$
 			setNewPrefix(""); //$NON-NLS-1$
 		}
-		setDetectRenames(diffCfg.isRenameDetectionEnabled());
+		setDetectRenames(dc.isRenameDetectionEnabled());
 
-		diffAlgorithm = DiffAlgorithm.getAlgorithm(cfg.getEnum(
+		diffAlgorithm = DiffAlgorithm.getAlgorithm(db.getConfig().getEnum(
 				ConfigConstants.CONFIG_DIFF_SECTION, null,
 				ConfigConstants.CONFIG_KEY_ALGORITHM,
 				SupportedAlgorithm.HISTOGRAM));
+
 	}
 
 	/**
@@ -345,8 +330,8 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public void setDetectRenames(boolean on) {
 		if (on && renameDetector == null) {
-			assertHaveReader();
-			renameDetector = new RenameDetector(reader, diffCfg);
+			assertHaveRepository();
+			renameDetector = new RenameDetector(db);
 		} else if (!on)
 			renameDetector = null;
 	}
@@ -402,9 +387,8 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		if (reader != null && closeReader) {
+		if (reader != null)
 			reader.close();
-		}
 	}
 
 	/**
@@ -428,7 +412,7 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public List<DiffEntry> scan(AnyObjectId a, AnyObjectId b)
 			throws IOException {
-		assertHaveReader();
+		assertHaveRepository();
 
 		try (RevWalk rw = new RevWalk(reader)) {
 			RevTree aTree = a != null ? rw.parseTree(a) : null;
@@ -457,7 +441,7 @@ public class DiffFormatter implements AutoCloseable {
 	 *             trees cannot be read or file contents cannot be read.
 	 */
 	public List<DiffEntry> scan(RevTree a, RevTree b) throws IOException {
-		assertHaveReader();
+		assertHaveRepository();
 
 		AbstractTreeIterator aIterator = makeIteratorFromTreeOrNull(a);
 		AbstractTreeIterator bIterator = makeIteratorFromTreeOrNull(b);
@@ -492,7 +476,7 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public List<DiffEntry> scan(AbstractTreeIterator a, AbstractTreeIterator b)
 			throws IOException {
-		assertHaveReader();
+		assertHaveRepository();
 
 		TreeWalk walk = new TreeWalk(reader);
 		walk.addTree(a);
@@ -682,15 +666,12 @@ public class DiffFormatter implements AutoCloseable {
 	}
 
 	private static byte[] writeGitLinkText(AbbreviatedObjectId id) {
-		if (ObjectId.zeroId().equals(id.toObjectId())) {
-			return EMPTY;
-		}
 		return encodeASCII("Subproject commit " + id.name() //$NON-NLS-1$
 				+ "\n"); //$NON-NLS-1$
 	}
 
 	private String format(AbbreviatedObjectId id) {
-		if (id.isComplete() && reader != null) {
+		if (id.isComplete() && db != null) {
 			try {
 				id = reader.abbreviate(id.toObjectId(), abbreviationLength);
 			} catch (IOException cannotAbbreviate) {
@@ -956,7 +937,7 @@ public class DiffFormatter implements AutoCloseable {
 			type = PatchType.UNIFIED;
 
 		} else {
-			assertHaveReader();
+			assertHaveRepository();
 
 			byte[] aRaw, bRaw;
 
@@ -1003,10 +984,9 @@ public class DiffFormatter implements AutoCloseable {
 		return diffAlgorithm.diff(comparator, a, b);
 	}
 
-	private void assertHaveReader() {
-		if (reader == null) {
-			throw new IllegalStateException(JGitText.get().readerIsRequired);
-		}
+	private void assertHaveRepository() {
+		if (db == null)
+			throw new IllegalStateException(JGitText.get().repositoryIsRequired);
 	}
 
 	private byte[] open(DiffEntry.Side side, DiffEntry entry)

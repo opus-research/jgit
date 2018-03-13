@@ -51,7 +51,7 @@ import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
+import org.kohsuke.args4j.spi.StopOptionHandler;
 
 @Command(common = true, usage = "usage_reset")
 class Reset extends TextBuiltin {
@@ -65,12 +65,12 @@ class Reset extends TextBuiltin {
 	@Option(name = "--hard", usage = "usage_resetHard")
 	private boolean hard = false;
 
-	@Argument(required = false, index = 0, metaVar = "metaVar_commitish", usage = "usage_resetReference")
+	@Argument(required = true, index = 0, metaVar = "metaVar_name", usage = "usage_reset")
 	private String commit;
 
-	@Argument(required = false, index = 1, metaVar = "metaVar_paths")
-	@Option(name = "--", metaVar = "metaVar_paths", handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<>();
+	@Argument(index = 1)
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
@@ -89,7 +89,7 @@ class Reset extends TextBuiltin {
 				if (hard)
 					mode = selectMode(mode, ResetType.HARD);
 				if (mode == null)
-					throw die("no reset mode set"); //$NON-NLS-1$
+					throw die("no reset mode set");
 				command.setMode(mode);
 			}
 			command.call();
@@ -98,7 +98,7 @@ class Reset extends TextBuiltin {
 
 	private static ResetType selectMode(ResetType mode, ResetType want) {
 		if (mode != null)
-			throw die("reset modes are mutually exclusive, select one"); //$NON-NLS-1$
+			throw die("reset modes are mutually exclusive, select one");
 		return want;
 	}
 }

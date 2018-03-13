@@ -110,7 +110,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		db_t = new TestRepository<>(db);
+		db_t = new TestRepository<FileRepository>(db);
 	}
 
 	@Theory
@@ -778,7 +778,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 			db.close();
 			file.delete();
 			db = new FileRepository(db.getDirectory());
-			db_t = new TestRepository<>(db);
+			db_t = new TestRepository<FileRepository>(db);
 			break;
 		}
 	}
@@ -846,7 +846,7 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 				db.getConfig().setBoolean("core", null, "bare", true);
 				db.getDirectory().renameTo(new File(workTreeFile, "test.git"));
 				db = new FileRepository(new File(workTreeFile, "test.git"));
-				db_t = new TestRepository<>(db);
+				db_t = new TestRepository<FileRepository>(db);
 			}
 		} finally {
 			if (fos != null)
@@ -872,31 +872,32 @@ public class RecursiveMergerTest extends RepositoryTestCase {
 
 	private String contentAsString(Repository r, ObjectId treeId, String path)
 			throws MissingObjectException, IOException {
-		AnyObjectId blobId;
-		try (TreeWalk tw = new TreeWalk(r)) {
-			tw.addTree(treeId);
-			tw.setFilter(PathFilter.create(path));
-			tw.setRecursive(true);
-			if (!tw.next()) {
-				return null;
-			}
-			blobId = tw.getObjectId(0);
-		}
+		TreeWalk tw = new TreeWalk(r);
+		tw.addTree(treeId);
+		tw.setFilter(PathFilter.create(path));
+		tw.setRecursive(true);
+		if (!tw.next())
+			return null;
+		AnyObjectId blobId = tw.getObjectId(0);
 
 		StringBuilder result = new StringBuilder();
+		BufferedReader br = null;
 		ObjectReader or = r.newObjectReader();
-		try (BufferedReader br = new BufferedReader(
-				new InputStreamReader(or.open(blobId).openStream()))) {
+		try {
+			br = new BufferedReader(new InputStreamReader(or.open(blobId)
+					.openStream()));
 			String line;
 			boolean first = true;
 			while ((line = br.readLine()) != null) {
-				if (!first) {
+				if (!first)
 					result.append('\n');
-				}
 				result.append(line);
 				first = false;
 			}
 			return result.toString();
+		} finally {
+			if (br != null)
+				br.close();
 		}
 	}
 }

@@ -133,17 +133,14 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 	 * @return an iterator over the MergeChunks. The iterator does not support
 	 * the remove operation
 	 */
-	@Override
 	public Iterator<MergeChunk> iterator() {
 		return new Iterator<MergeChunk>() {
 			int idx;
 
-			@Override
 			public boolean hasNext() {
 				return (idx < chunks.size());
 			}
 
-			@Override
 			public MergeChunk next() {
 				ConflictState state = states[chunks.get(idx++)];
 				int srcIdx = chunks.get(idx++);
@@ -152,7 +149,6 @@ public class MergeResult<S extends Sequence> implements Iterable<MergeChunk> {
 				return new MergeChunk(srcIdx, begin, end, state);
 			}
 
-			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}

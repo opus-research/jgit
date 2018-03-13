@@ -46,22 +46,24 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
 
-/** A cached slice of a {@link BlockBasedFile}. */
+/** A cached slice of a {@link DfsPackFile}. */
 final class DfsBlock {
-	final DfsStreamKey stream;
+	final DfsPackKey pack;
+
 	final long start;
+
 	final long end;
+
 	private final byte[] block;
 
-	DfsBlock(DfsStreamKey p, long pos, byte[] buf) {
-		stream = p;
+	DfsBlock(DfsPackKey p, long pos, byte[] buf) {
+		pack = p;
 		start = pos;
 		end = pos + buf.length;
 		block = buf;
@@ -71,14 +73,8 @@ final class DfsBlock {
 		return block.length;
 	}
 
-	ByteBuffer zeroCopyByteBuffer(int n) {
-		ByteBuffer b = ByteBuffer.wrap(block);
-		b.position(n);
-		return b;
-	}
-
-	boolean contains(DfsStreamKey want, long pos) {
-		return stream.equals(want) && start <= pos && pos < end;
+	boolean contains(DfsPackKey want, long pos) {
+		return pack == want && start <= pos && pos < end;
 	}
 
 	int copy(long pos, byte[] dstbuf, int dstoff, int cnt) {
@@ -92,16 +88,9 @@ final class DfsBlock {
 		return n;
 	}
 
-	int setInput(long pos, Inflater inf) throws DataFormatException {
+	int setInput(long pos, Inflater inf) {
 		int ptr = (int) (pos - start);
 		int cnt = block.length - ptr;
-		if (cnt <= 0) {
-			throw new DataFormatException(cnt + " bytes to inflate:" //$NON-NLS-1$
-					+ " at pos=" + pos //$NON-NLS-1$
-					+ "; block.start=" + start //$NON-NLS-1$
-					+ "; ptr=" + ptr //$NON-NLS-1$
-					+ "; block.length=" + block.length); //$NON-NLS-1$
-		}
 		inf.setInput(block, ptr, cnt);
 		return cnt;
 	}

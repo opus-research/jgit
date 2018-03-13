@@ -78,7 +78,6 @@ public class PostUploadHookChain implements PostUploadHook {
 			return new PostUploadHookChain(newHooks, i);
 	}
 
-	@Override
 	public void onPostUpload(PackStatistics stats) {
 		for (int i = 0; i < count; i++)
 			hooks[i].onPostUpload(stats);

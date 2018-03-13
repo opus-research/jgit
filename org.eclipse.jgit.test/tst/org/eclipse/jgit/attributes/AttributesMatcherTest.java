@@ -109,16 +109,16 @@ public class AttributesMatcherTest {
 		pattern = "/src/ne?";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/src/new/a/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/src/new/a/a.c");
 		assertNotMatched(pattern, "/src/new.c");
 
 		//Test name-only fnmatcher matches
 		pattern = "ne?";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/src/new/a/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/src/new/a/a.c");
 		assertMatched(pattern, "/neb");
 		assertNotMatched(pattern, "/src/new.c");
 	}
@@ -169,16 +169,16 @@ public class AttributesMatcherTest {
 		pattern = "/src/ne?";
 		assertMatched(pattern, "src/new/");
 		assertMatched(pattern, "src/new");
-		assertNotMatched(pattern, "src/new/a.c");
-		assertNotMatched(pattern, "src/new/a/a.c");
+		assertMatched(pattern, "src/new/a.c");
+		assertMatched(pattern, "src/new/a/a.c");
 		assertNotMatched(pattern, "src/new.c");
 
 		//Test name-only fnmatcher matches
 		pattern = "ne?";
 		assertMatched(pattern, "src/new/");
 		assertMatched(pattern, "src/new");
-		assertNotMatched(pattern, "src/new/a.c");
-		assertNotMatched(pattern, "src/new/a/a.c");
+		assertMatched(pattern, "src/new/a.c");
+		assertMatched(pattern, "src/new/a/a.c");
 		assertMatched(pattern, "neb");
 		assertNotMatched(pattern, "src/new.c");
 	}
@@ -197,50 +197,35 @@ public class AttributesMatcherTest {
 		pattern = "/src/new";
 		assertMatched(pattern, "/src/new/");
 		assertMatched(pattern, "/src/new");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/src/new/a/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/src/new/a/a.c");
 		assertNotMatched(pattern, "/src/new.c");
 
 		//Test child directory is matched, slash after name
 		pattern = "/src/new/";
 		assertMatched(pattern, "/src/new/");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/src/new/a/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/src/new/a/a.c");
 		assertNotMatched(pattern, "/src/new");
 		assertNotMatched(pattern, "/src/new.c");
 
 		//Test directory is matched by name only
 		pattern = "b1";
-		assertNotMatched(pattern, "/src/new/a/b1/a.c");
+		assertMatched(pattern, "/src/new/a/b1/a.c");
 		assertNotMatched(pattern, "/src/new/a/b2/file.c");
 		assertNotMatched(pattern, "/src/new/a/bb1/file.c");
 		assertNotMatched(pattern, "/src/new/a/file.c");
-		assertNotMatched(pattern, "/src/new/a/bb1");
-		assertMatched(pattern, "/src/new/a/b1");
 	}
 
 	@Test
 	public void testTrailingSlash() {
 		String pattern = "/src/";
 		assertMatched(pattern, "/src/");
-		assertNotMatched(pattern, "/src/new");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/src/a.c");
+		assertMatched(pattern, "/src/new");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/src/a.c");
 		assertNotMatched(pattern, "/src");
 		assertNotMatched(pattern, "/srcA/");
-
-		pattern = "src/";
-		assertMatched(pattern, "src/");
-		assertMatched(pattern, "/src/");
-		assertNotMatched(pattern, "src");
-		assertNotMatched(pattern, "/src/new");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/src/a.c");
-		assertNotMatched(pattern, "foo/src/a.c");
-		assertNotMatched(pattern, "foo/src/bar/a.c");
-		assertNotMatched(pattern, "foo/src/bar/src");
-		assertMatched(pattern, "foo/src/");
-		assertMatched(pattern, "foo/src/bar/src/");
 	}
 
 	@Test
@@ -254,58 +239,51 @@ public class AttributesMatcherTest {
 		assertMatched(pattern, "/src/test.stp");
 		assertNotMatched(pattern, "/test.stp1");
 		assertNotMatched(pattern, "/test.astp");
-		assertNotMatched(pattern, "test.stp/foo.bar");
-		assertMatched(pattern, "test.stp");
-		assertMatched(pattern, "test.stp/");
-		assertMatched(pattern, "test.stp/test.stp");
 
 		//Test matches for name-only, applies to file name or folder name
 		pattern = "src";
 		assertMatched(pattern, "/src");
 		assertMatched(pattern, "/src/");
-		assertNotMatched(pattern, "/src/a.c");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/new/src/a.c");
+		assertMatched(pattern, "/src/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/new/src/a.c");
 		assertMatched(pattern, "/file/src");
 
 		//Test matches for name-only, applies only to folder names
 		pattern = "src/";
-		assertNotMatched(pattern, "/src/a.c");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/new/src/a.c");
+		assertMatched(pattern, "/src/");
+		assertMatched(pattern, "/src/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/new/src/a.c");
 		assertNotMatched(pattern, "/src");
 		assertNotMatched(pattern, "/file/src");
-		assertMatched(pattern, "/file/src/");
 
 		//Test matches for name-only, applies to file name or folder name
 		//With a small wildcard
 		pattern = "?rc";
-		assertNotMatched(pattern, "/src/a.c");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/new/src/a.c");
-		assertMatched(pattern, "/new/src/");
+		assertMatched(pattern, "/src/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/new/src/a.c");
 		assertMatched(pattern, "/file/src");
 		assertMatched(pattern, "/src/");
 
 		//Test matches for name-only, applies to file name or folder name
 		//With a small wildcard
 		pattern = "?r[a-c]";
-		assertNotMatched(pattern, "/src/a.c");
-		assertNotMatched(pattern, "/src/new/a.c");
-		assertNotMatched(pattern, "/new/src/a.c");
+		assertMatched(pattern, "/src/a.c");
+		assertMatched(pattern, "/src/new/a.c");
+		assertMatched(pattern, "/new/src/a.c");
 		assertMatched(pattern, "/file/src");
 		assertMatched(pattern, "/src/");
-		assertNotMatched(pattern, "/srb/a.c");
-		assertNotMatched(pattern, "/grb/new/a.c");
-		assertNotMatched(pattern, "/new/crb/a.c");
+		assertMatched(pattern, "/srb/a.c");
+		assertMatched(pattern, "/grb/new/a.c");
+		assertMatched(pattern, "/new/crb/a.c");
 		assertMatched(pattern, "/file/3rb");
 		assertMatched(pattern, "/xrb/");
-		assertNotMatched(pattern, "/3ra/a.c");
-		assertNotMatched(pattern, "/5ra/new/a.c");
-		assertNotMatched(pattern, "/new/1ra/a.c");
-		assertNotMatched(pattern, "/new/1ra/a.c/");
+		assertMatched(pattern, "/3ra/a.c");
+		assertMatched(pattern, "/5ra/new/a.c");
+		assertMatched(pattern, "/new/1ra/a.c");
 		assertMatched(pattern, "/file/dra");
-		assertMatched(pattern, "/file/dra/");
 		assertMatched(pattern, "/era/");
 		assertNotMatched(pattern, "/crg");
 		assertNotMatched(pattern, "/cr3");
@@ -315,28 +293,28 @@ public class AttributesMatcherTest {
 	public void testGetters() {
 		AttributesRule r = new AttributesRule("/pattern/", "");
 		assertFalse(r.isNameOnly());
-		assertTrue(r.isDirOnly());
+		assertTrue(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertTrue(r.getAttributes().isEmpty());
 		assertEquals(r.getPattern(), "/pattern");
 
 		r = new AttributesRule("/patter?/", "");
 		assertFalse(r.isNameOnly());
-		assertTrue(r.isDirOnly());
+		assertTrue(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertTrue(r.getAttributes().isEmpty());
 		assertEquals(r.getPattern(), "/patter?");
 
 		r = new AttributesRule("patt*", "");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertTrue(r.getAttributes().isEmpty());
 		assertEquals(r.getPattern(), "patt*");
 
 		r = new AttributesRule("pattern", "attribute1");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertFalse(r.getAttributes().isEmpty());
 		assertEquals(r.getAttributes().size(), 1);
@@ -344,28 +322,28 @@ public class AttributesMatcherTest {
 
 		r = new AttributesRule("pattern", "attribute1 -attribute2");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertEquals(r.getAttributes().size(), 2);
 		assertEquals(r.getPattern(), "pattern");
 
 		r = new AttributesRule("pattern", "attribute1 \t-attribute2 \t");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertEquals(r.getAttributes().size(), 2);
 		assertEquals(r.getPattern(), "pattern");
 
 		r = new AttributesRule("pattern", "attribute1\t-attribute2\t");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertEquals(r.getAttributes().size(), 2);
 		assertEquals(r.getPattern(), "pattern");
 
 		r = new AttributesRule("pattern", "attribute1\t -attribute2\t ");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertEquals(r.getAttributes().size(), 2);
 		assertEquals(r.getPattern(), "pattern");
@@ -373,7 +351,7 @@ public class AttributesMatcherTest {
 		r = new AttributesRule("pattern",
 				"attribute1 -attribute2  attribute3=value ");
 		assertTrue(r.isNameOnly());
-		assertFalse(r.isDirOnly());
+		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());
 		assertEquals(r.getAttributes().size(), 3);
 		assertEquals(r.getPattern(), "pattern");

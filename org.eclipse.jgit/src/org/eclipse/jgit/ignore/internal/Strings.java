@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, 2017 Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -58,6 +58,8 @@ import org.eclipse.jgit.internal.JGitText;
 /**
  * Various {@link String} related utility methods, written mostly to avoid
  * generation of new String objects (e.g. via splitting Strings etc).
+ *
+ * @since 3.6
  */
 public class Strings {
 
@@ -74,64 +76,21 @@ public class Strings {
 	 * @return new string with all trailing characters removed
 	 */
 	public static String stripTrailing(String pattern, char c) {
-		for (int i = pattern.length() - 1; i >= 0; i--) {
-			char charAt = pattern.charAt(i);
-			if (charAt != c) {
-				if (i == pattern.length() - 1) {
-					return pattern;
-				}
-				return pattern.substring(0, i + 1);
-			}
-		}
-		return ""; //$NON-NLS-1$
-	}
-
-	/**
-	 * @param pattern
-	 *            non null
-	 * @return new string with all trailing whitespace removed
-	 */
-	public static String stripTrailingWhitespace(String pattern) {
-		for (int i = pattern.length() - 1; i >= 0; i--) {
-			char charAt = pattern.charAt(i);
-			if (!Character.isWhitespace(charAt)) {
-				if (i == pattern.length() - 1) {
-					return pattern;
-				}
-				return pattern.substring(0, i + 1);
-			}
-		}
-		return ""; //$NON-NLS-1$
-	}
-
-	/**
-	 * @param pattern
-	 *            non null
-	 * @return true if the last character, which is not whitespace, is a path
-	 *         separator
-	 */
-	public static boolean isDirectoryPattern(String pattern) {
-		for (int i = pattern.length() - 1; i >= 0; i--) {
-			char charAt = pattern.charAt(i);
-			if (!Character.isWhitespace(charAt)) {
-				return charAt == FastIgnoreRule.PATH_SEPARATOR;
-			}
-		}
-		return false;
+		while (pattern.length() > 0
+				&& pattern.charAt(pattern.length() - 1) == c)
+			pattern = pattern.substring(0, pattern.length() - 1);
+		return pattern;
 	}
 
 	static int count(String s, char c, boolean ignoreFirstLast) {
 		int start = 0;
 		int count = 0;
-		int length = s.length();
-		while (start < length) {
+		while (true) {
 			start = s.indexOf(c, start);
-			if (start == -1) {
+			if (start == -1)
 				break;
-			}
-			if (!ignoreFirstLast || (start != 0 && start != length - 1)) {
+			if (!ignoreFirstLast || (start != 0 && start != s.length()))
 				count++;
-			}
 			start++;
 		}
 		return count;
@@ -151,7 +110,7 @@ public class Strings {
 		if (count < 1)
 			throw new IllegalStateException(
 					"Pattern must have at least two segments: " + pattern); //$NON-NLS-1$
-		List<String> segments = new ArrayList<>(count);
+		List<String> segments = new ArrayList<String>(count);
 		int right = 0;
 		while (true) {
 			int left = right;

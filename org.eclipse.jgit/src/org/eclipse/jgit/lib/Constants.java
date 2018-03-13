@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2017, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -391,13 +391,6 @@ public final class Constants {
 	 */
 	public static final String ATTR_FILTER_TYPE_SMUDGE = "smudge";
 
-	/**
-	 * Builtin filter commands start with this prefix
-	 *
-	 * @since 4.6
-	 */
-	public static final String BUILTIN_FILTER_PREFIX = "jgit://builtin/";
-
 	/** Name of the ignore file */
 	public static final String DOT_GIT_IGNORE = ".gitignore";
 
@@ -427,20 +420,6 @@ public final class Constants {
 	 * @since 3.7
 	 */
 	public static final String HOOKS = "hooks";
-
-	/**
-	 * Merge attribute.
-	 *
-	 * @since 4.9
-	 */
-	public static final String ATTR_MERGE = "merge"; //$NON-NLS-1$
-
-	/**
-	 * Binary value for custom merger.
-	 *
-	 * @since 4.9
-	 */
-	public static final String ATTR_BUILTIN_BINARY_MERGER = "binary"; //$NON-NLS-1$
 
 	/**
 	 * Create a new digest function for objects.

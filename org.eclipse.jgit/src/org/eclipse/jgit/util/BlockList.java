@@ -309,12 +309,10 @@ public class BlockList<T> extends AbstractList<T> {
 
 		private T[] block = directory[0];
 
-		@Override
 		public boolean hasNext() {
 			return index < size;
 		}
 
-		@Override
 		public T next() {
 			if (size <= index)
 				throw new NoSuchElementException();
@@ -331,7 +329,6 @@ public class BlockList<T> extends AbstractList<T> {
 			return res;
 		}
 
-		@Override
 		public void remove() {
 			if (index == 0)
 				throw new IllegalStateException();

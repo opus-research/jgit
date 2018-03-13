@@ -103,7 +103,7 @@ public class TestProtocol<C> extends TransportProtocol {
 			ReceivePackFactory<C> receivePackFactory) {
 		this.uploadPackFactory = uploadPackFactory;
 		this.receivePackFactory = receivePackFactory;
-		this.handles = new HashMap<>();
+		this.handles = new HashMap<URIish, Handle>();
 	}
 
 	@Override
@@ -174,7 +174,7 @@ public class TestProtocol<C> extends TransportProtocol {
 		public FetchConnection openFetch() throws NotSupportedException,
 				TransportException {
 			handle.remote.incrementOpen();
-			return new InternalFetchConnection<>(
+			return new InternalFetchConnection<C>(
 					this, uploadPackFactory, handle.req, handle.remote);
 		}
 
@@ -182,7 +182,7 @@ public class TestProtocol<C> extends TransportProtocol {
 		public PushConnection openPush() throws NotSupportedException,
 				TransportException {
 			handle.remote.incrementOpen();
-			return new InternalPushConnection<>(
+			return new InternalPushConnection<C>(
 					this, receivePackFactory, handle.req, handle.remote);
 		}
 

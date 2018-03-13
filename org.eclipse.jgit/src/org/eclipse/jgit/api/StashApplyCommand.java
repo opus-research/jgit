@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2017 GitHub Inc.
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,9 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
@@ -57,14 +54,11 @@ import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheCheckout.CheckoutMetadata;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CheckoutConflictException;
-import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
@@ -161,7 +155,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 * @throws NoHeadException
 	 * @throws StashApplyFailureException
 	 */
-	@Override
 	public ObjectId call() throws GitAPIException,
 			WrongRepositoryStateException, NoHeadException,
 			StashApplyFailureException {
@@ -202,13 +195,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					"stash" }); //$NON-NLS-1$
 			merger.setBase(stashHeadCommit);
 			merger.setWorkingTreeIterator(new FileTreeIterator(repo));
-			boolean mergeSucceeded = merger.merge(headCommit, stashCommit);
-			List<String> modifiedByMerge = merger.getModifiedFiles();
-			if (!modifiedByMerge.isEmpty()) {
-				repo.fireEvent(
-						new WorkingTreeModifiedEvent(modifiedByMerge, null));
-			}
-			if (mergeSucceeded) {
+			if (merger.merge(headCommit, stashCommit)) {
 				DirCache dc = repo.lockDirCache();
 				DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
 						dc, merger.getResultTreeId());
@@ -234,28 +221,23 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					ResolveMerger untrackedMerger = (ResolveMerger) strategy
 							.newMerger(repo, true);
 					untrackedMerger.setCommitNames(new String[] {
-							"null", "HEAD", "untracked files" }); //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
-					// There is no common base for HEAD & untracked files
-					// because the commit for untracked files has no parent. If
-					// we use stashHeadCommit as common base (as in the other
-					// merges) we potentially report conflicts for files
-					// which are not even member of untracked files commit
-					untrackedMerger.setBase(null);
+							"stashed HEAD", "HEAD", "untracked files" }); //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
+					untrackedMerger.setBase(stashHeadCommit);
 					boolean ok = untrackedMerger.merge(headCommit,
 							untrackedCommit);
-					if (ok) {
+					if (ok)
 						try {
 							RevTree untrackedTree = revWalk
-									.parseTree(untrackedCommit);
+									.parseTree(untrackedMerger
+											.getResultTreeId());
 							resetUntracked(untrackedTree);
 						} catch (CheckoutConflictException e) {
 							throw new StashApplyFailureException(
-									JGitText.get().stashApplyConflict, e);
+									JGitText.get().stashApplyConflict);
 						}
-					} else {
+					else
 						throw new StashApplyFailureException(
 								JGitText.get().stashApplyConflict);
-					}
 				}
 			} else {
 				throw new StashApplyFailureException(
@@ -339,7 +321,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 	private void resetUntracked(RevTree tree) throws CheckoutConflictException,
 			IOException {
-		Set<String> actuallyModifiedPaths = new HashSet<>();
 		// TODO maybe NameConflictTreeWalk ?
 		try (TreeWalk walk = new TreeWalk(repo)) {
 			walk.addTree(tree);
@@ -355,7 +336,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					// Not in commit, don't create untracked
 					continue;
 
-				final EolStreamType eolStreamType = walk.getEolStreamType();
 				final DirCacheEntry entry = new DirCacheEntry(walk.getRawPath());
 				entry.setFileMode(cIter.getEntryFileMode());
 				entry.setObjectIdFromRaw(cIter.idBuffer(), cIter.idOffset());
@@ -370,23 +350,14 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					}
 				}
 
-				checkoutPath(entry, reader,
-						new CheckoutMetadata(eolStreamType, null));
-				actuallyModifiedPaths.add(entry.getPathString());
-			}
-		} finally {
-			if (!actuallyModifiedPaths.isEmpty()) {
-				repo.fireEvent(new WorkingTreeModifiedEvent(
-						actuallyModifiedPaths, null));
+				checkoutPath(entry, reader);
 			}
 		}
 	}
 
-	private void checkoutPath(DirCacheEntry entry, ObjectReader reader,
-			CheckoutMetadata checkoutMetadata) {
+	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		try {
-			DirCacheCheckout.checkoutEntry(repo, entry, reader, true,
-					checkoutMetadata);
+			DirCacheCheckout.checkoutEntry(repo, entry, reader, true);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,

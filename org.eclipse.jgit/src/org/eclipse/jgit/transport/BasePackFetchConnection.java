@@ -63,6 +63,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -70,6 +71,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -78,7 +80,6 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.transport.PacketLineIn.AckNackResult;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -249,7 +250,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		super(packTransport);
 
 		if (local != null) {
-			final FetchConfig cfg = local.getConfig().get(FetchConfig::new);
+			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
 			allowOfsDelta = cfg.allowOfsDelta;
 		} else {
 			allowOfsDelta = true;
@@ -259,7 +260,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 		if (local != null) {
 			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<>();
+			reachableCommits = new RevCommitList<RevCommit>();
 			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
 			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
 			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
@@ -278,6 +279,12 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	}
 
 	private static class FetchConfig {
+		static final SectionParser<FetchConfig> KEY = new SectionParser<FetchConfig>() {
+			public FetchConfig parse(final Config cfg) {
+				return new FetchConfig(cfg);
+			}
+		};
+
 		final boolean allowOfsDelta;
 
 		FetchConfig(final Config c) {
@@ -285,7 +292,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		}
 	}
 
-	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
@@ -295,7 +301,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	/**
 	 * @since 3.0
 	 */
-	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
@@ -303,22 +308,18 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		doFetch(monitor, want, have, outputStream);
 	}
 
-	@Override
 	public boolean didFetchIncludeTags() {
 		return false;
 	}
 
-	@Override
 	public boolean didFetchTestConnectivity() {
 		return false;
 	}
 
-	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
 
-	@Override
 	public Collection<PackLock> getPackLocks() {
 		if (packLock != null)
 			return Collections.singleton(packLock);
@@ -463,12 +464,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		final PacketLineOut p = statelessRPC ? pckState : pckOut;
 		boolean first = true;
 		for (final Ref r : want) {
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				continue;
-			}
 			try {
-				if (walk.parseAny(objectId).has(REACHABLE)) {
+				if (walk.parseAny(r.getObjectId()).has(REACHABLE)) {
 					// We already have this object. Asking for it is
 					// not a very good idea.
 					//
@@ -481,7 +478,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 			final StringBuilder line = new StringBuilder(46);
 			line.append("want "); //$NON-NLS-1$
-			line.append(objectId.name());
+			line.append(r.getObjectId().name());
 			if (first) {
 				line.append(enableCapabilities());
 				first = false;

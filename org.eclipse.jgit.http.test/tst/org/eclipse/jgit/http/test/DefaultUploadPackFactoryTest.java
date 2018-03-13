@@ -69,7 +69,6 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 
 	private UploadPackFactory<HttpServletRequest> factory;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -78,7 +77,6 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 		factory = new DefaultUploadPackFactory();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testDisabledSingleton() throws ServiceNotAuthorizedException {
 		factory = (UploadPackFactory<HttpServletRequest>) UploadPackFactory.DISABLED;

@@ -63,7 +63,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -82,12 +81,13 @@ class Show extends TextBuiltin {
 
 	private final DateFormat fmt;
 
-	private DiffFormatter diffFmt;
+	private final DiffFormatter diffFmt = new DiffFormatter( //
+			new BufferedOutputStream(System.out));
 
 	@Argument(index = 0, metaVar = "metaVar_object")
 	private String objectName;
 
-	@Option(name = "--", metaVar = "metaVar_path", handler = PathTreeFilterHandler.class)
+	@Option(name = "--", metaVar = "metaVar_path", multiValued = true, handler = PathTreeFilterHandler.class)
 	protected TreeFilter pathFilter = TreeFilter.ALL;
 
 	// BEGIN -- Options shared with Diff
@@ -163,12 +163,6 @@ class Show extends TextBuiltin {
 
 	Show() {
 		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US); //$NON-NLS-1$
-	}
-
-	@Override
-	protected void init(final Repository repository, final String gitDir) {
-		super.init(repository, gitDir);
-		diffFmt = new DiffFormatter(new BufferedOutputStream(outs));
 	}
 
 	@SuppressWarnings("boxing")

@@ -130,18 +130,17 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		maxChainLength = maxLen;
 	}
 
-	@Override
 	public <S extends Sequence> void diffNonCommon(EditList edits,
 			HashedSequenceComparator<S> cmp, HashedSequence<S> a,
 			HashedSequence<S> b, Edit region) {
-		new State<>(edits, cmp, a, b).diffRegion(region);
+		new State<S>(edits, cmp, a, b).diffRegion(region);
 	}
 
 	private class State<S extends Sequence> {
 		private final HashedSequenceComparator<S> cmp;
 		private final HashedSequence<S> a;
 		private final HashedSequence<S> b;
-		private final List<Edit> queue = new ArrayList<>();
+		private final List<Edit> queue = new ArrayList<Edit>();
 
 		/** Result edits we have determined that must be made to convert a to b. */
 		final EditList edits;
@@ -161,7 +160,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		}
 
 		private void diffReplace(Edit r) {
-			Edit lcs = new HistogramDiffIndex<>(maxChainLength, cmp, a, b, r)
+			Edit lcs = new HistogramDiffIndex<S>(maxChainLength, cmp, a, b, r)
 					.findLongestCommonSequence();
 			if (lcs != null) {
 				// If we were given an edit, we can prove a result here.
@@ -214,7 +213,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		}
 
 		private SubsequenceComparator<HashedSequence<S>> subcmp() {
-			return new SubsequenceComparator<>(cmp);
+			return new SubsequenceComparator<HashedSequence<S>>(cmp);
 		}
 	}
 }

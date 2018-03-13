@@ -50,6 +50,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import com.googlecode.javaewah.EWAHCompressedBitmap;
+
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl.CompressedBitmap;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -60,8 +62,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.util.BlockList;
-
-import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 /**
  * Helper for constructing {@link PackBitmapIndex}es.
@@ -75,9 +75,9 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	private final EWAHCompressedBitmap tags;
 	private final BlockList<PositionEntry> byOffset;
 	final BlockList<StoredBitmap>
-			byAddOrder = new BlockList<>();
+			byAddOrder = new BlockList<StoredBitmap>();
 	final ObjectIdOwnerMap<PositionEntry>
-			positionEntries = new ObjectIdOwnerMap<>();
+			positionEntries = new ObjectIdOwnerMap<PositionEntry>();
 
 	/**
 	 * Creates a PackBitmapIndex used for building the contents of an index
@@ -133,7 +133,6 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 			positionEntries.add(new PositionEntry(entries.get(i), i));
 		}
 		Collections.sort(entries, new Comparator<ObjectToPack>() {
-			@Override
 			public int compare(ObjectToPack a, ObjectToPack b) {
 				return Long.signum(a.getOffset() - b.getOffset());
 			}
@@ -275,17 +274,14 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 		// Add order is from oldest to newest. The reverse add order is the
 		// output order.
 		return new Iterable<StoredEntry>() {
-			@Override
 			public Iterator<StoredEntry> iterator() {
 				return new Iterator<StoredEntry>() {
 					private int index = byAddOrder.size() - 1;
 
-					@Override
 					public boolean hasNext() {
 						return index >= 0;
 					}
 
-					@Override
 					public StoredEntry next() {
 						if (!hasNext())
 							throw new NoSuchElementException();
@@ -319,7 +315,6 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 								bestXorOffset, item.getFlags());
 					}
 
-					@Override
 					public void remove() {
 						throw new UnsupportedOperationException();
 					}

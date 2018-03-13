@@ -49,8 +49,8 @@ import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeCommand;
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.api.MergeResult;
+import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -114,7 +114,7 @@ class Merge extends TextBuiltin {
 		}
 
 		// determine the other revision we want to merge with HEAD
-		final Ref srcRef = db.findRef(ref);
+		final Ref srcRef = db.getRef(ref);
 		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
 		if (src == null)
 			throw die(MessageFormat.format(
@@ -148,12 +148,9 @@ class Merge extends TextBuiltin {
 			break;
 		case FAST_FORWARD:
 			ObjectId oldHeadId = oldHead.getObjectId();
-			if (oldHeadId != null) {
-				String oldId = oldHeadId.abbreviate(7).name();
-				String newId = result.getNewHead().abbreviate(7).name();
-				outw.println(MessageFormat.format(CLIText.get().updating, oldId,
-						newId));
-			}
+			outw.println(MessageFormat.format(CLIText.get().updating, oldHeadId
+					.abbreviate(7).name(), result.getNewHead().abbreviate(7)
+					.name()));
 			outw.println(result.getMergeStatus().toString());
 			break;
 		case CHECKOUT_CONFLICT:
@@ -209,7 +206,7 @@ class Merge extends TextBuiltin {
 	}
 
 	private Ref getOldHead() throws IOException {
-		Ref oldHead = db.exactRef(Constants.HEAD);
+		Ref oldHead = db.getRef(Constants.HEAD);
 		if (oldHead == null) {
 			throw die(CLIText.get().onBranchToBeBorn);
 		}

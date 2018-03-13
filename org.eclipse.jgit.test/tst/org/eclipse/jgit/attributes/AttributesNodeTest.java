@@ -50,9 +50,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.After;
 import org.junit.Test;
 
@@ -60,8 +57,6 @@ import org.junit.Test;
  * Test {@link AttributesNode}
  */
 public class AttributesNodeTest {
-	private static final TreeWalk DUMMY_WALK = new TreeWalk(
-			new InMemoryRepository(new DfsRepositoryDescription("FooBar")));
 
 	private static final Attribute A_SET_ATTR = new Attribute("A", SET);
 
@@ -166,30 +161,10 @@ public class AttributesNodeTest {
 		assertAttribute("file.type3", node, asSet(A_UNSET_ATTR, B_SET_ATTR));
 	}
 
-	@Test
-	public void testDoubleAsteriskAtEnd() throws IOException {
-		String attributeFileContent = "dir/** \tA -B\tC=value";
-
-		is = new ByteArrayInputStream(attributeFileContent.getBytes());
-		AttributesNode node = new AttributesNode();
-		node.parse(is);
-		assertAttribute("dir", node,
-				asSet(new Attribute[]{}));
-		assertAttribute("dir/", node,
-				asSet(new Attribute[]{}));
-		assertAttribute("dir/file.type1", node,
-				asSet(A_SET_ATTR, B_UNSET_ATTR, C_VALUE_ATTR));
-		assertAttribute("dir/sub/", node,
-				asSet(A_SET_ATTR, B_UNSET_ATTR, C_VALUE_ATTR));
-		assertAttribute("dir/sub/file.type1", node,
-				asSet(A_SET_ATTR, B_UNSET_ATTR, C_VALUE_ATTR));
-	}
-
 	private void assertAttribute(String path, AttributesNode node,
-			Attributes attrs) throws IOException {
+			Attributes attrs) {
 		Attributes attributes = new Attributes();
-		new AttributesHandler(DUMMY_WALK).mergeAttributes(node, path, false,
-				attributes);
+		node.getAttributes(path, false, attributes);
 		assertEquals(attrs, attributes);
 	}
 

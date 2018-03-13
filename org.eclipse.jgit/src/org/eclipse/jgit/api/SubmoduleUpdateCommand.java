@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2011, GitHub Inc.
- * Copyright (C) 2016, Laurent Delaigue <laurent.delaigue@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -89,14 +88,12 @@ public class SubmoduleUpdateCommand extends
 
 	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
 
-	private CloneCommand.Callback callback;
-
 	/**
 	 * @param repo
 	 */
 	public SubmoduleUpdateCommand(final Repository repo) {
 		super(repo);
-		paths = new ArrayList<>();
+		paths = new ArrayList<String>();
 	}
 
 	/**
@@ -139,7 +136,6 @@ public class SubmoduleUpdateCommand extends
 	 * @throws WrongRepositoryStateException
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Collection<String> call() throws InvalidConfigurationException,
 			NoHeadException, ConcurrentRefUpdateException,
 			CheckoutConflictException, InvalidMergeHeadsException,
@@ -150,7 +146,7 @@ public class SubmoduleUpdateCommand extends
 		try (SubmoduleWalk generator = SubmoduleWalk.forIndex(repo)) {
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
-			List<String> updated = new ArrayList<>();
+			List<String> updated = new ArrayList<String>();
 			while (generator.next()) {
 				// Skip submodules not registered in .gitmodules file
 				if (generator.getModulesPath() == null)
@@ -163,9 +159,6 @@ public class SubmoduleUpdateCommand extends
 				Repository submoduleRepo = generator.getRepository();
 				// Clone repository is not present
 				if (submoduleRepo == null) {
-					if (callback != null) {
-						callback.cloningSubmodule(generator.getPath());
-					}
 					CloneCommand clone = Git.cloneRepository();
 					configure(clone);
 					clone.setURI(url);
@@ -185,13 +178,11 @@ public class SubmoduleUpdateCommand extends
 					if (ConfigConstants.CONFIG_KEY_MERGE.equals(update)) {
 						MergeCommand merge = new MergeCommand(submoduleRepo);
 						merge.include(commit);
-						merge.setProgressMonitor(monitor);
 						merge.setStrategy(strategy);
 						merge.call();
 					} else if (ConfigConstants.CONFIG_KEY_REBASE.equals(update)) {
 						RebaseCommand rebase = new RebaseCommand(submoduleRepo);
 						rebase.setUpstream(commit);
-						rebase.setProgressMonitor(monitor);
 						rebase.setStrategy(strategy);
 						rebase.call();
 					} else {
@@ -206,10 +197,6 @@ public class SubmoduleUpdateCommand extends
 								Constants.HEAD, true);
 						refUpdate.setNewObjectId(commit);
 						refUpdate.forceUpdate();
-						if (callback != null) {
-							callback.checkingOut(commit,
-									generator.getPath());
-						}
 					}
 				} finally {
 					submoduleRepo.close();
@@ -232,19 +219,6 @@ public class SubmoduleUpdateCommand extends
 	 */
 	public SubmoduleUpdateCommand setStrategy(MergeStrategy strategy) {
 		this.strategy = strategy;
-		return this;
-	}
-
-	/**
-	 * Set status callback for submodule clone operation.
-	 *
-	 * @param callback
-	 *            the callback
-	 * @return {@code this}
-	 * @since 4.8
-	 */
-	public SubmoduleUpdateCommand setCallback(CloneCommand.Callback callback) {
-		this.callback = callback;
 		return this;
 	}
 }

@@ -130,7 +130,6 @@ class ReceivePackServlet extends HttpServlet {
 			this.receivePackFactory = receivePackFactory;
 		}
 
-		@Override
 		public void doFilter(ServletRequest request, ServletResponse response,
 				FilterChain chain) throws IOException, ServletException {
 			HttpServletRequest req = (HttpServletRequest) request;
@@ -154,12 +153,10 @@ class ReceivePackServlet extends HttpServlet {
 			}
 		}
 
-		@Override
 		public void init(FilterConfig filterConfig) throws ServletException {
 			// Nothing.
 		}
 
-		@Override
 		public void destroy() {
 			// Nothing.
 		}
