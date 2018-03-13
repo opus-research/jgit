@@ -799,7 +799,7 @@ public class PackWriter {
 	}
 
 	private void beginPhase(PackingPhase phase, ProgressMonitor monitor,
-			long cnt) {
+			int cnt) {
 		state.phase = phase;
 		String task;
 		switch (phase) {
@@ -822,7 +822,7 @@ public class PackWriter {
 			throw new IllegalArgumentException(
 					MessageFormat.format(JGitText.get().illegalPackingPhase, phase));
 		}
-		monitor.beginTask(task, (int) cnt);
+		monitor.beginTask(task, cnt);
 	}
 
 	private void endPhase(ProgressMonitor monitor) {
@@ -888,7 +888,7 @@ public class PackWriter {
 
 		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
-		beginPhase(PackingPhase.WRITING, writeMonitor, objCnt);
+		beginPhase(PackingPhase.WRITING, writeMonitor, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
@@ -956,7 +956,7 @@ public class PackWriter {
 	}
 
 	private void searchForReuse(ProgressMonitor monitor) throws IOException {
-		long cnt = 0;
+		int cnt = 0;
 		cnt += objectsLists[Constants.OBJ_COMMIT].size();
 		cnt += objectsLists[Constants.OBJ_TREE].size();
 		cnt += objectsLists[Constants.OBJ_BLOB].size();
@@ -967,11 +967,11 @@ public class PackWriter {
 
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
-			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>((int) cnt);
-			tmp.addAll(objectsLists[Constants.OBJ_TAG]);
+			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>(cnt);
 			tmp.addAll(objectsLists[Constants.OBJ_COMMIT]);
 			tmp.addAll(objectsLists[Constants.OBJ_TREE]);
 			tmp.addAll(objectsLists[Constants.OBJ_BLOB]);
+			tmp.addAll(objectsLists[Constants.OBJ_TAG]);
 			searchForReuse(monitor, tmp);
 			if (pruneCurrentObjectList) {
 				// If the list was pruned, we need to re-prune the main lists.
@@ -982,10 +982,10 @@ public class PackWriter {
 			}
 
 		} else {
-			searchForReuse(monitor, objectsLists[Constants.OBJ_TAG]);
 			searchForReuse(monitor, objectsLists[Constants.OBJ_COMMIT]);
 			searchForReuse(monitor, objectsLists[Constants.OBJ_TREE]);
 			searchForReuse(monitor, objectsLists[Constants.OBJ_BLOB]);
+			searchForReuse(monitor, objectsLists[Constants.OBJ_TAG]);
 		}
 
 		endPhase(monitor);
@@ -1041,11 +1041,12 @@ public class PackWriter {
 		try {
 			final long limit = config.getBigFileThreshold();
 			for (;;) {
+				monitor.update(1);
+
 				try {
 					if (!sizeQueue.next())
 						break;
 				} catch (MissingObjectException notFound) {
-					monitor.update(1);
 					if (ignoreMissingUninteresting) {
 						ObjectToPack otp = sizeQueue.getCurrent();
 						if (otp != null && otp.isEdge()) {
@@ -1075,7 +1076,6 @@ public class PackWriter {
 
 				else
 					otp.setWeight((int) sz);
-				monitor.update(1);
 			}
 		} finally {
 			sizeQueue.release();
@@ -1396,10 +1396,10 @@ public class PackWriter {
 		otp.setCRC(out.getCRC32());
 	}
 
-	private void writeBase(PackOutputStream out, ObjectToPack base)
+	private void writeBase(PackOutputStream out, ObjectToPack baseInPack)
 			throws IOException {
-		if (base != null && !base.isWritten() && !base.isEdge())
-			writeObjectImpl(out, base);
+		if (baseInPack != null && !baseInPack.isWritten())
+			writeObjectImpl(out, baseInPack);
 	}
 
 	private void writeWholeObjectDeflate(PackOutputStream out,
