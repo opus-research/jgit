@@ -674,7 +674,7 @@ public class RefTreeDatabaseTest {
 		InMemRefTreeRepo(DfsRepositoryDescription repoDesc) {
 			super(repoDesc);
 			refs = new RefTreeDatabase(this, super.getRefDatabase(),
-					"refs/txn/", "refs/txn/committed");
+					"refs/txn/committed");
 			RefTreeDatabaseTest.this.refdb = refs;
 		}
 
