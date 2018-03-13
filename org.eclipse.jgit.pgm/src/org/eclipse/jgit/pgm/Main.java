@@ -62,8 +62,6 @@ import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.pgm.opt.SubcommandHandler;
-import org.eclipse.jgit.transport.HttpTransport;
-import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
 import org.eclipse.jgit.util.CachedAuthenticator;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -97,7 +95,6 @@ public class Main {
 	 *            arguments.
 	 */
 	public static void main(final String[] argv) {
-		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
 		new Main().run(argv);
 	}
 
