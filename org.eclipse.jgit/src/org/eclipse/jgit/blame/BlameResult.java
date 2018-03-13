@@ -82,14 +82,17 @@ public class BlameResult {
 	 *             the repository cannot be read.
 	 */
 	public static BlameResult create(BlameGenerator gen) throws IOException {
+		RevCommit commit = gen.getResultCommit();
 		String path = gen.getResultPath();
 		RawText contents = gen.getResultContents();
 		if (contents == null) {
 			gen.release();
 			return null;
 		}
-		return new BlameResult(gen, path, contents);
+		return new BlameResult(gen, commit, path, contents);
 	}
+
+	private final RevCommit resultCommit;
 
 	private final String resultPath;
 
@@ -110,8 +113,9 @@ public class BlameResult {
 
 	private int lastLength;
 
-	BlameResult(BlameGenerator bg, String path, RawText text) {
+	BlameResult(BlameGenerator bg, RevCommit rev, String path, RawText text) {
 		generator = bg;
+		resultCommit = rev;
 		resultPath = path;
 		resultContents = text;
 
@@ -121,6 +125,11 @@ public class BlameResult {
 		sourceCommitters = new PersonIdent[cnt];
 		sourceLines = new int[cnt];
 		sourcePaths = new String[cnt];
+	}
+
+	/** @return commit blame started enumerating history from. */
+	public RevCommit getResultCommit() {
+		return resultCommit;
 	}
 
 	/** @return path of the file this result annotates. */
@@ -167,14 +176,10 @@ public class BlameResult {
 
 	/**
 	 * Get the commit that provided the specified line of the result.
-	 * <p>
-	 * The source commit may be null if the line was blamed to an uncommitted
-	 * revision, such as the working tree copy, or during a reverse blame if the
-	 * line survives to the end revision (e.g. the branch tip).
 	 *
 	 * @param idx
 	 *            line to read data of, 0 based.
-	 * @return commit that provided line {@code idx}. May be null.
+	 * @return commit that provided line {@code idx}.
 	 */
 	public RevCommit getSourceCommit(int idx) {
 		return sourceCommits[idx];
@@ -185,7 +190,7 @@ public class BlameResult {
 	 *
 	 * @param idx
 	 *            line to read data of, 0 based.
-	 * @return author that provided line {@code idx}. May be null.
+	 * @return author that provided line {@code idx}.
 	 */
 	public PersonIdent getSourceAuthor(int idx) {
 		return sourceAuthors[idx];
@@ -196,7 +201,7 @@ public class BlameResult {
 	 *
 	 * @param idx
 	 *            line to read data of, 0 based.
-	 * @return committer that provided line {@code idx}. May be null.
+	 * @return committer that provided line {@code idx}.
 	 */
 	public PersonIdent getSourceCommitter(int idx) {
 		return sourceCommitters[idx];
@@ -323,6 +328,8 @@ public class BlameResult {
 		StringBuilder r = new StringBuilder();
 		r.append("BlameResult: ");
 		r.append(getResultPath());
+		if (getResultCommit() != null)
+			r.append("@").append(getResultCommit().abbreviate(8));
 		return r.toString();
 	}
 
@@ -336,12 +343,6 @@ public class BlameResult {
 		int resEnd = gen.getResultEnd();
 
 		for (; resLine < resEnd; resLine++) {
-			// Reverse blame can generate multiple results for the same line.
-			// Favor the first one selected, as this is the oldest and most
-			// likely to be nearest to the inquiry made by the user.
-			if (sourceLines[resLine] != 0)
-				continue;
-
 			sourceCommits[resLine] = srcCommit;
 			sourceAuthors[resLine] = srcAuthor;
 			sourceCommitters[resLine] = srcCommitter;

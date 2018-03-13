@@ -42,21 +42,13 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.blame.BlameGenerator;
 import org.eclipse.jgit.blame.BlameResult;
 import org.eclipse.jgit.diff.DiffAlgorithm;
-import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 
@@ -72,8 +64,6 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	private RawTextComparator textComparator;
 
 	private ObjectId startCommit;
-
-	private Collection<ObjectId> reverseEndCommits;
 
 	private Boolean followFileRenames;
 
@@ -123,8 +113,8 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 * @param commit
 	 * @return this command
 	 */
-	public BlameCommand setStartCommit(AnyObjectId commit) {
-		this.startCommit = commit.toObjectId();
+	public BlameCommand setStartCommit(ObjectId commit) {
+		this.startCommit = commit;
 		return this;
 	}
 
@@ -146,44 +136,6 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	}
 
 	/**
-	 * Configure the command to compute reverse blame (history of deletes).
-	 *
-	 * @param start
-	 *            oldest commit to traverse from. The result file will be loaded
-	 *            from this commit's tree.
-	 * @param end
-	 *            most recent commit to stop traversal at. Usually an active
-	 *            branch tip, tag, or HEAD.
-	 * @return {@code this}
-	 * @throws IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameCommand reverse(AnyObjectId start, AnyObjectId end)
-			throws IOException {
-		return reverse(start, Collections.singleton(end.toObjectId()));
-	}
-
-	/**
-	 * Configure the generator to compute reverse blame (history of deletes).
-	 *
-	 * @param start
-	 *            oldest commit to traverse from. The result file will be loaded
-	 *            from this commit's tree.
-	 * @param end
-	 *            most recent commits to stop traversal at. Usually an active
-	 *            branch tip, tag, or HEAD.
-	 * @return {@code this}
-	 * @throws IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameCommand reverse(AnyObjectId start, Collection<ObjectId> end)
-			throws IOException {
-		startCommit = start.toObjectId();
-		reverseEndCommits = new ArrayList<ObjectId>(end);
-		return this;
-	}
-
-	/**
 	 * Generate a list of lines with information about when the lines were
 	 * introduced into the file path.
 	 *
@@ -191,37 +143,20 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 */
 	public BlameResult call() throws JGitInternalException {
 		checkCallable();
-		BlameGenerator gen = new BlameGenerator(repo, path);
+		BlameGenerator generator = new BlameGenerator(repo, path);
 		try {
 			if (diffAlgorithm != null)
-				gen.setDiffAlgorithm(diffAlgorithm);
+				generator.setDiffAlgorithm(diffAlgorithm);
 			if (textComparator != null)
-				gen.setTextComparator(textComparator);
+				generator.setTextComparator(textComparator);
+			generator.setStartRevision(startCommit);
 			if (followFileRenames != null)
-				gen.setFollowFileRenames(followFileRenames.booleanValue());
-
-			if (reverseEndCommits != null)
-				gen.reverse(startCommit, reverseEndCommits);
-			else if (startCommit != null)
-				gen.push(null, startCommit);
-			else {
-				gen.push(null, repo.resolve(Constants.HEAD));
-				if (!repo.isBare()) {
-					DirCache dc = repo.readDirCache();
-					int entry = dc.findEntry(path);
-					if (0 <= entry)
-						gen.push(null, dc.getEntry(entry).getObjectId());
-
-					File inTree = new File(repo.getWorkTree(), path);
-					if (inTree.isFile())
-						gen.push(null, new RawText(inTree));
-				}
-			}
-			return gen.computeBlameResult();
+				generator.setFollowFileRenames(followFileRenames.booleanValue());
+			return generator.computeBlameResult();
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		} finally {
-			gen.release();
+			generator.release();
 		}
 	}
 }
