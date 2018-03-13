@@ -487,11 +487,7 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			r.append("  "); //$NON-NLS-1$
 			r.append(cmd);
-			r.append("  (").append(cmd.getResult()); //$NON-NLS-1$
-			if (cmd.getMessage() != null) {
-				r.append(": ").append(cmd.getMessage()); //$NON-NLS-1$
-			}
-			r.append(")\n"); //$NON-NLS-1$
+			r.append("  (").append(cmd.getResult()).append(")\n"); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 		return r.append(']').toString();
 	}
