@@ -200,7 +200,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 		// rule 11
 		setupCase(headMap, null, idxMap);
-		new File(trash, "foo").delete();
+		assertTrue(new File(trash, "foo").delete());
 		writeTrashFile("foo", "bar");
 		db.getIndex().getMembers()[0].forceRecheck();
 		go();
@@ -238,7 +238,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 		// rules 21
 		setupCase(idxMap, mergeMap, idxMap);
-		new File(trash, "foo").delete();
+		assertTrue(new File(trash, "foo").delete());
 		writeTrashFile("foo", "bar");
 		db.getIndex().getMembers()[0].forceRecheck();
 		go();
@@ -685,7 +685,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	public void assertWorkDir(HashMap<String, String> i)
 			throws CorruptObjectException, IOException {
 		TreeWalk walk = new TreeWalk(db);
-		walk.reset();
 		walk.setRecursive(true);
 		walk.addTree(new FileTreeIterator(db));
 		String expectedValue;
