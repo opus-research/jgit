@@ -394,19 +394,17 @@ public class PushCertificateStore implements AutoCloseable {
 	 *
 	 * @param batch
 	 *            update to save to.
-	 * @return whether a command was added to the batch.
 	 * @throws IOException
 	 *             if there was an error reading from or writing to the
 	 *             repository.
 	 */
-	public boolean save(BatchRefUpdate batch) throws IOException {
+	public void save(BatchRefUpdate batch) throws IOException {
 		ObjectId newId = write();
 		if (newId == null) {
-			return false;
+			return;
 		}
 		batch.addCommand(new ReceiveCommand(
 				commit != null ? commit : ObjectId.zeroId(), newId, REF_NAME));
-		return true;
 	}
 
 	/**
